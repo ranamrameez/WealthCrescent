@@ -25,7 +25,7 @@ There is no iOS app in this repo today.
 
 Scan the QR code below to open the live web app:
 
-![Live FinanceMaster](adobe-express-qr-code.png)
+<img src="webapp-qr-code.png" alt="Live FinanceMaster" width="200" height="200">
 
 ## Android app
 
@@ -77,11 +77,10 @@ If release signing is configured, prefer this QR code — a release-signed APK g
 Google Play Protect a real, permanent signing identity to trust instead of the generic
 debug key:
 
-![Download the FinanceRecorder Android APK (release)](builds/android/download-qr-release.png)
 
-Or the debug build, always available:
+The debug build, always available:
 
-![Download the FinanceRecorder Android APK (debug)](builds/android/download-qr.png)
+<img src="builds/android/download-qr.png" alt="Download the FinanceRecorder Android APK (debug)" width="200" height="200">
 
 Scan either with your phone to open and download the current APK without navigating
 through GitHub Actions. Or download directly:
