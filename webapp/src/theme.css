@@ -2146,26 +2146,27 @@ input.price-input[type="number"] {
      optional right-side slot (e.g. Net Worth's currency switcher), so it's
      a flex row rather than being `.chip-tabs` directly. */
 .page-topbar {
-	display: flex;
-	align-items: center;
-	gap: 12px;
-	padding: 5px;
-	position: sticky;
-	top: 0;
 	z-index: 30;
 	background: var(--bg);
-	padding: 14px 12px 12px 12px;
-	margin: -20px -14px 20px -14px;
-
 	background: var(--panel);
 	border: 1px solid var(--border);
 	border-radius: var(--radius-lg);
 	box-shadow: var(--shadow-card);
-	padding: 5px;
-
 	border-bottom: 1px solid var(--border);
-	box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+	align-items: stretch;
+	gap: 12px;
+	margin: -20px -14px 20px;
+	padding: 8px 5px;
+	display: flex;
+	position: sticky;
+	top: 0;
+	box-shadow: 0 4px 10px #0000000f;
+	justify-content: space-between;
+	align-content: center;
+	flex-wrap: wrap;
+	flex-direction: row;
 }
+
 /* Final Material palette guard: ensures component backgrounds/text follow
      the selected Material palette instead of the generic root palette. */
 html[data-color^="material-"] body {
