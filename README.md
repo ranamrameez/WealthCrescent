@@ -1,4 +1,4 @@
-# FinanceRecorder
+# WealthCrescent
 
 A personal finance tracker: stock trading (QSE + PSX exchanges), mutual funds, bank
 accounts, cash, personal loans, EMI/loans, rental income, subscriptions, cross-entity
@@ -21,7 +21,7 @@ There is no iOS app in this repo today.
 
 ## Live app
 
-<https://ranamrameez.github.io/FinaceMaster/>
+<https://ranamrameez.github.io/WealthCrescent/>
 
 Scan the QR code below to open the live web app:
 
