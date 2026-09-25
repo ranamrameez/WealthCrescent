@@ -32,7 +32,7 @@ const tx = (over: Partial<BankTransaction>): BankTransaction => ({
 });
 
 describe('accountBalance', () => {
-  it('reconciles imported duplicates without deleting stored rows', () => {
+  it('retains repeated legitimate transactions in the balance', () => {
     const a = account({});
     const rows = [
       tx({ id: 'manual', amount: -50, description: ' Grocery ' }),
@@ -40,8 +40,8 @@ describe('accountBalance', () => {
       tx({ id: 'other-import', amount: 20, source: 'statement-import' }),
       tx({ id: 'duplicate-import', amount: 20, source: 'statement-import' }),
     ];
-    expect(accountEffectiveTransactions(a, rows).map(row => row.id)).toEqual(['manual', 'other-import']);
-    expect(accountBalance(a, rows)).toBe(970);
+    expect(accountEffectiveTransactions(a, rows).map(row => row.id)).toEqual(['manual', 'imported', 'other-import', 'duplicate-import']);
+    expect(accountBalance(a, rows)).toBe(940);
     expect(rows).toHaveLength(4);
   });
   it('can display future pending rows without changing cleared balances', () => {

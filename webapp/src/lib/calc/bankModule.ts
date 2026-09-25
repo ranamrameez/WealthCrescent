@@ -5,23 +5,20 @@ import { dateOnlyMs } from '../datetime';
 
 export interface BankLedgerRow { tx: BankTransaction; balance: number; }
 
-/** Stable key for reconciling historical statement-import duplicates without
- * modifying stored audit records. Manual rows take precedence over imports. */
+/** Stable key retained for explicit import reconciliation workflows. It must
+ * not be used as a balance-level identity: real accounts can legitimately
+ * contain repeated same-day transactions with the same description/amount. */
 export function bankTransactionFingerprint(t: Pick<BankTransaction, 'date' | 'description' | 'amount'>): string {
   return `${t.date}|${t.description.trim().toLowerCase().replace(/\s+/g, ' ')}|${t.amount.toFixed(8)}`;
 }
 
 export function accountEffectiveTransactions(account: BankAccount, transactions: BankTransaction[]): BankTransaction[] {
-  const rows = transactions.filter((t) => t.accountId === account.id && !t.isPending);
-  const groups = new Map<string, BankTransaction[]>();
-  rows.forEach((row) => {
-    const key = bankTransactionFingerprint(row);
-    groups.set(key, [...(groups.get(key) ?? []), row]);
-  });
-  return [...groups.values()].flatMap((group) => {
-    const manual = group.filter((row) => (row.source ?? 'manual') === 'manual');
-    return manual.length ? manual : [group[0]];
-  });
+  // Every stored cleared transaction is financially real unless an explicit
+  // user-confirmed import reconciliation removed/replaced it. A generic
+  // date/description/amount fingerprint cannot distinguish repeated ATM,
+  // rent, salary, or household payments and therefore must never suppress
+  // rows during balance calculation.
+  return transactions.filter((t) => t.accountId === account.id && !t.isPending);
 }
 
 /** Running cleared balance for one account. The transaction table can opt into
