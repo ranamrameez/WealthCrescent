@@ -1876,9 +1876,14 @@ canvas {
 /* ---------- Portfolio summary (dashboard) ---------- */
 .table-scroll {
 	overflow-x: auto;
+	max-height: 480px;
+	overflow-y: auto;
 }
 .table-scroll table thead th {
+	position: sticky;
+	top: 0;
 	background: var(--panel);
+	z-index: 1;
 }
 /* Narrow editable price inputs (Trade Calculator's "Current price",
      every table's inline market-price cell, Watchlist's target/current

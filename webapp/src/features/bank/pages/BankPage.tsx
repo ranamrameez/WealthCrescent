@@ -1313,7 +1313,7 @@ function TransactionsList({ account, ledger, allLedgerCount }: { account: BankAc
 
   return <>
     <div className="section-toolbar"><ImportStatementSection account={account} compact /></div>
-    <div className="table-scroll"><table>
+    <div><table>
       <thead><tr><th>#</th><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>Balance</th><th>Source</th><th></th></tr></thead>
       <tbody>
         {pageRows.map(({ tx, balance }, index) => {
@@ -1517,7 +1517,7 @@ function ImportStatementSection({ account, compact = false }: { account: BankAcc
             <div className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">Existing duplicates</div><strong className={duplicateRows.length ? 'pill-negative' : 'pill-positive'}>{duplicateRows.length}</strong></div>
           </div>
           <h4>Preview</h4>
-          <div className="table-scroll" style={{ maxHeight: 360 }}>
+          <div style={{ maxHeight: 360 }}>
             <table><thead><tr><th>#</th><th>Date</th><th>Description</th><th>Amount</th><th>Status</th></tr></thead>
               <tbody>{mappedRows.slice(0, 100).map((r) => {
                 const duplicate = r.valid && r.date ? existingByFingerprint.has(fingerprint({ date: r.date, description: r.description, amount: r.amount })) : false;
@@ -1817,7 +1817,7 @@ function BankPlanList({ account, horizonDays }: { account: BankAccount; horizonD
 
   return (
     <CollapsibleCard title={<h3 className="m-0">Plans</h3>}>
-      <div className="table-scroll">
+      <div>
         <table>
           <thead>
             <tr><th>Date</th><th>Description</th><th>Amount</th><th>Category</th><th>Repeats / status</th><th></th></tr>
@@ -2026,7 +2026,7 @@ function AnalyticsTab({ bankId }: { bankId?: string } = {}) {
               Set a monthly spend target per category for {account.name}; compared against what you've actually
               spent there this month.
             </p>
-            <div className="table-scroll">
+            <div>
               <table>
                 <thead><tr><th>Category</th><th>Budget</th><th>Actual</th><th>Remaining</th></tr></thead>
                 <tbody>
