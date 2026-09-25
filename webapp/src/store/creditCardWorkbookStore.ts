@@ -1,3 +1,4 @@
+import { removeCardPlans } from '../lib/planLifecycle';
 import { create } from 'zustand';
 import { toInstantMs } from '../lib/datetime';
 import { assignSeqForEntities, backfillSeq, nextSeqForEntity } from '../lib/seq';
@@ -71,12 +72,14 @@ export const useCreditCardWorkbookStore = create<CreditCardStoreState>((set, get
     updateCard: (id, patch) =>
       mutate((wb) => ({ ...wb, cards: wb.cards.map((c) => (c.id === id ? { ...c, ...patch } : c)) })),
 
-    deleteCard: (id) =>
+    deleteCard: (id) => {
       mutate((wb) => ({
         ...wb,
         cards: wb.cards.filter((c) => c.id !== id),
         transactions: wb.transactions.filter((t) => t.cardId !== id),
-      })),
+      }));
+      removeCardPlans(id);
+    },
 
     addTransaction: (tx) =>
       mutate((wb) => {

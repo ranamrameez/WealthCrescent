@@ -63,6 +63,10 @@ function nextSeqOf(entries: { seq?: number }[]): number {
 export function createEntryStore<TSettings, TEntry extends { id: string }>(
   storageKey: string,
   createEmpty: () => BaseEntryWorkbook<TSettings, TEntry>,
+  lifecycle?: {
+    onDelete?: (id: string) => void;
+    onUpdate?: (id: string, patch: Partial<TEntry>) => void;
+  },
 ): UseBoundStore<StoreApi<EntryStoreState<TSettings, TEntry>>> {
   function normalize(wb: BaseEntryWorkbook<TSettings, TEntry>): BaseEntryWorkbook<TSettings, TEntry> {
     const withIds = ensureIds(wb.entries);
@@ -120,13 +124,18 @@ export function createEntryStore<TSettings, TEntry extends { id: string }>(
           return { ...wb, entries: [...wb.entries, ...withSeq] };
         }),
 
-      updateEntry: (id, patch) =>
+      updateEntry: (id, patch) => {
         mutate((wb) => ({
           ...wb,
           entries: wb.entries.map((e) => (e.id === id ? { ...e, ...patch } : e)),
-        })),
+        }));
+        lifecycle?.onUpdate?.(id, patch);
+      },
 
-      deleteEntry: (id) => mutate((wb) => ({ ...wb, entries: wb.entries.filter((e) => e.id !== id) })),
+      deleteEntry: (id) => {
+        mutate((wb) => ({ ...wb, entries: wb.entries.filter((e) => e.id !== id) }));
+        lifecycle?.onDelete?.(id);
+      },
 
       updateSettings: (patch) =>
         mutate((wb) => ({ ...wb, settings: { ...(wb.settings as object), ...patch } as TSettings })),

@@ -424,7 +424,11 @@ function SubscriptionDetail({ sub, onBack }: { sub: Subscription; onBack: () => 
 
   const generatePlans = async () => {
     if (!(await ensureSignedIn('Sign in to generate renewal plans.'))) return;
-    if (!occurrences.length) return toast('No upcoming occurrences to plan.');
+    const completedDates = new Set([...plannedBankEntries, ...plannedCashEntries, ...plannedCreditCardEntries]
+      .filter(plan => plan.sourceSubscriptionId === sub.id && plan.executed).map(plan => plan.date));
+    const remainingOccurrences = occurrences.filter(occurrence => !completedDates.has(occurrence.date));
+    if (linkModule === 'bank' && !accounts.some(account => account.id === linkRefId)) return toast('Pick a bank account first.');
+    if (linkModule === 'creditCard' && !cards.some(card => card.id === linkRefId)) return toast('Pick a credit card first.');
     const relinking = !!sub.paidVia;
     if (relinking) {
       const ok = await confirmDialog(
@@ -432,14 +436,14 @@ function SubscriptionDetail({ sub, onBack }: { sub: Subscription; onBack: () => 
         'Regenerate renewal plans?',
       );
       if (!ok) return;
-      plannedBankEntries.filter((p) => p.sourceSubscriptionId === sub.id && !p.executed).forEach((p) => deletePlannedBankEntry(p.id));
-      plannedCashEntries.filter((p) => p.sourceSubscriptionId === sub.id && !p.executed).forEach((p) => deletePlannedCashEntry(p.id));
-      plannedCreditCardEntries.filter((p) => p.sourceSubscriptionId === sub.id && !p.executed).forEach((p) => deletePlannedCreditCardEntry(p.id));
     }
+    plannedBankEntries.filter((p) => p.sourceSubscriptionId === sub.id && !p.executed).forEach((p) => deletePlannedBankEntry(p.id));
+    plannedCashEntries.filter((p) => p.sourceSubscriptionId === sub.id && !p.executed).forEach((p) => deletePlannedCashEntry(p.id));
+    plannedCreditCardEntries.filter((p) => p.sourceSubscriptionId === sub.id && !p.executed).forEach((p) => deletePlannedCreditCardEntry(p.id));
     if (linkModule === 'bank') {
       const account = accounts.find((a) => a.id === linkRefId);
       if (!account) return toast('Pick a bank account first.');
-      const newPlans: PlannedBankTransaction[] = occurrences.map((o) => ({
+      const newPlans: PlannedBankTransaction[] = remainingOccurrences.map((o) => ({
         id: crypto.randomUUID(), accountId: account.id, date: o.date,
         description: `Subscription: ${sub.name}`, amount: -o.amount, executed: false, sourceSubscriptionId: sub.id,
       }));
@@ -449,7 +453,7 @@ function SubscriptionDetail({ sub, onBack }: { sub: Subscription; onBack: () => 
     } else if (linkModule === 'creditCard') {
       const card = cards.find((c) => c.id === linkRefId);
       if (!card) return toast('Pick a credit card first.');
-      const newPlans: PlannedCreditCardTransaction[] = occurrences.map((o) => ({
+      const newPlans: PlannedCreditCardTransaction[] = remainingOccurrences.map((o) => ({
         id: crypto.randomUUID(), cardId: card.id, date: o.date, kind: 'charge',
         description: `Subscription: ${sub.name}`, amount: o.amount, executed: false, sourceSubscriptionId: sub.id,
       }));
@@ -463,7 +467,7 @@ function SubscriptionDetail({ sub, onBack }: { sub: Subscription; onBack: () => 
       const planCategory = sub.categoryID && sub.categoryID !== UNCATEGORIZED_ID
         ? categoryName(sub.categoryID, categoryRegistry)
         : sub.category;
-      const newPlans: PlannedCashEntry[] = occurrences.map((o) => ({
+      const newPlans: PlannedCashEntry[] = remainingOccurrences.map((o) => ({
         id: crypto.randomUUID(), date: o.date, type: 'OUT', amount: o.amount, currencyCode: sub.currencyCode,
         category: planCategory, note: `Subscription: ${sub.name}`, executed: false, sourceSubscriptionId: sub.id,
       }));
@@ -562,6 +566,7 @@ function SubscriptionDetail({ sub, onBack }: { sub: Subscription; onBack: () => 
         {linkedLabel ? (
           <p className="text-muted mb-sm">
             Paid via <strong>{linkedLabel}</strong> — upcoming renewals are planned in its own Planning section.
+            {' '}<Link to={sub.paidVia?.module === 'bank' ? `/bank/account/${sub.paidVia.ref}?section=plans` : sub.paidVia?.module === 'creditCard' ? `/bank/card/${sub.paidVia.ref}` : '/cash?section=planning'}>Add / edit plans</Link>
           </p>
         ) : (
           <p className="text-muted mb-sm">

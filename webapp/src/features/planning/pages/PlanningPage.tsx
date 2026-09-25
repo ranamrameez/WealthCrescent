@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { CollapsibleCard } from '../../../components/Card';
 import { Modal } from '../../../components/Modal';
+import { OrphanPlanCleanup } from '../../../components/OrphanPlanCleanup';
 import { toast } from '../../../components/Toast';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
 import { FabButton } from '../../../components/ui/Fab';
@@ -95,6 +96,7 @@ export function PlanningPage({
   return (
     <div>
       <h1 className="pagetitle">Planning</h1>
+      <OrphanPlanCleanup />
       <p className="text-muted mb-12">
         Everything expected to happen soon, across every module — a plan can repeat (e.g. a monthly salary or a
         recurring bill), so you only set it up once. Browse every planned Cash/Banking/Rentals activity below, or

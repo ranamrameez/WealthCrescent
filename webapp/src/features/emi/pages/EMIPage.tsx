@@ -570,8 +570,8 @@ function LoanDetail({ loan, onBack, startInEditMode }: { loan: EMILoan; onBack: 
     const account = accounts.find((a) => a.id === linkAccountId);
     if (!account) return toast('Pick a bank account first.');
     if (!(await ensureSignedIn('Sign in to link this loan to a bank account.'))) return;
-    const remaining = sum.rows.slice(sum.elapsed);
-    if (!remaining.length) return toast('This loan has no remaining installments to plan.');
+    const completedMonths = new Set(plannedBankEntries.filter(plan => plan.sourceEmiLoanId === loan.id && plan.executed).map(plan => plan.sourceEmiMonth));
+    const remaining = sum.rows.slice(sum.elapsed).filter(row => !completedMonths.has(row.month));
     const relinking = !!loan.linkedBankAccountId;
     if (relinking) {
       const ok = await confirmDialog(
@@ -579,10 +579,10 @@ function LoanDetail({ loan, onBack, startInEditMode }: { loan: EMILoan; onBack: 
         'Re-link this loan?',
       );
       if (!ok) return;
-      plannedBankEntries
+    }
+    plannedBankEntries
         .filter((p) => p.sourceEmiLoanId === loan.id && !p.executed)
         .forEach((p) => deletePlannedEntry(p.id));
-    }
     const newPlans: PlannedBankTransaction[] = remaining.map((r) => ({
       id: crypto.randomUUID(),
       accountId: account.id,
@@ -779,6 +779,7 @@ function LoanDetail({ loan, onBack, startInEditMode }: { loan: EMILoan; onBack: 
               {linkedAccount ? (
                 <p className="text-muted mb-sm">
                   Linked to <strong>{linkedAccount.name}</strong> — remaining installments are planned in its Planning tab.
+                  {' '}<Link to={`/bank/account/${linkedAccount.id}?section=plans`}>Add / edit plans</Link>
                 </p>
               ) : (
                 <p className="text-muted mb-sm">

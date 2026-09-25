@@ -926,7 +926,6 @@ function CreditUsageBar({ used, limit, currency }: { used: number; limit: number
 
 export function AccountDetailPage() {
   const { search } = useLocation();
-  const dateFormat = useAppearanceStore((state) => state.appearance.dateFormat ?? 'DD-MMM-YYYY');
   const { id } = useParams();
   const navigate = useNavigate();
   const accounts = useBankWorkbookStore((state) => state.workbook.settings.accounts);
@@ -1115,14 +1114,12 @@ export function AccountDetailPage() {
         {account.isLiability && account.creditLimit ? <CreditUsageBar used={Math.max(0, -currentBalance)} limit={account.creditLimit} currency={account.currencyCode} /> : null}
       </>,
     },
-    ...(upcoming.length ? [{
+    {
       key: 'plans',
-      label: 'Upcoming plans',
+      label: 'Plans',
       summary: <SummaryChip label="Visible" value={upcoming.length} />,
-      content: <div className="table-scroll"><table><thead><tr><th>Date</th><th>Description</th><th>Amount</th></tr></thead><tbody>
-        {upcoming.map((plan) => <tr key={plan.id}><td>{formatDate(plan.date, dateFormat)}</td><td>{plan.description}</td><td className={plan.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(plan.amount, account.currencyCode)}</td></tr>)}
-      </tbody></table></div>,
-    } satisfies StandardPageSection] : []),
+      content: <AccountPlans account={account} />,
+    },
     {
       key: 'transactions',
       label: 'Transactions',
@@ -1697,6 +1694,17 @@ function AddBankPlanFab({ accountId }: { accountId: string }) {
       )}
     </>
   );
+}
+
+function AccountPlans({ account }: { account: BankAccount }) {
+  const [adding, setAdding] = useState(false);
+  return <>
+    <button className="btn secondary small" onClick={() => setAdding(true)}><PlusIcon />Add plan</button>
+    <BankPlanList account={account} horizonDays={null} />
+    {adding && <Modal title="Add a plan" onClose={() => setAdding(false)}>
+      <AddBankPlanForm accountId={account.id} onSaved={() => setAdding(false)} />
+    </Modal>}
+  </>;
 }
 
 function AddBankPlanForm({ accountId, onSaved }: { accountId: string; onSaved?: () => void }) {

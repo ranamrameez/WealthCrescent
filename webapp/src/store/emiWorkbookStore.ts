@@ -1,3 +1,4 @@
+import { removeEmiPlans } from '../lib/planLifecycle';
 import { create } from 'zustand';
 import { createEmptyEMIWorkbook } from './defaultEmiWorkbook';
 import type { EMILoan, EMIRepayment, EMIWorkbook } from '../types/emiWorkbook';
@@ -84,15 +85,19 @@ export const useEMIWorkbookStore = create<EMIStoreState>((set, get) => {
 
     addEntry: (loan) => mutate((wb) => ({ ...wb, entries: [...wb.entries, loan] })),
 
-    updateEntry: (id, patch) =>
-      mutate((wb) => ({ ...wb, entries: wb.entries.map((l) => (l.id === id ? { ...l, ...patch } : l)) })),
+    updateEntry: (id, patch) => {
+      mutate((wb) => ({ ...wb, entries: wb.entries.map((l) => (l.id === id ? { ...l, ...patch } : l)) }));
+      if ('linkedBankAccountId' in patch) removeEmiPlans(id, patch.linkedBankAccountId);
+    },
 
-    deleteEntry: (id) =>
+    deleteEntry: (id) => {
       mutate((wb) => ({
         ...wb,
         entries: wb.entries.filter((l) => l.id !== id),
         repayments: wb.repayments.filter((r) => r.loanId !== id),
-      })),
+      }));
+      removeEmiPlans(id);
+    },
 
     addRepayment: (repayment) =>
       mutate((wb) => ({

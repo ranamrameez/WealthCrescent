@@ -1,4 +1,6 @@
 import type { User } from 'firebase/auth';
+import { RentalPlanEditor } from './RentalPlanEditor';
+import type { PlannedRentalEntry } from '../../../types/plannedRentals';
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bar, Doughnut } from 'react-chartjs-2';
@@ -346,6 +348,7 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
   const addRentalEntry = useRentalsWorkbookStore((s) => s.addEntry);
   const ensureSignedIn = useEnsureSignedIn();
   const [lease, setLease] = useState<Property>(property);
+  const [editingPlan, setEditingPlan] = useState<PlannedRentalEntry | 'new' | null>(null);
 
   const plannedEntries = usePlannedRentalsWorkbookStore((s) => s.workbook.entries);
   const addPlannedEntries = usePlannedRentalsWorkbookStore((s) => s.addEntries);
@@ -410,7 +413,8 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
 
   const generatePlans = async () => {
     if (!(await ensureSignedIn('Sign in to generate projected rent plans.'))) return;
-    const generated = generateLeaseRentPlans(lease);
+    const completedDates = new Set(propertyPlans.filter(plan => plan.executed && plan.sourceLeasePropertyId === property.id).map(plan => plan.date));
+    const generated = generateLeaseRentPlans(lease).filter(plan => !completedDates.has(plan.date));
     if (!generated.length) return toast('Add monthly rent, a cycle day, and a lease start date first.');
     const existing = plannedEntries.filter((p) => p.sourceLeasePropertyId === property.id && !p.executed);
     if (existing.length) {
@@ -428,7 +432,7 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
   const markDone = async (planId: string) => {
     const plan = plannedEntries.find((p) => p.id === planId);
     if (!plan) return;
-    const ok = await confirmDialog(`Add this ${fmtMoney(plan.amount, property.currencyCode)} rent income to the ledger?`, 'Mark as done?');
+    const ok = await confirmDialog(`Add this ${fmtMoney(plan.amount, property.currencyCode)} ${plan.type === 'RENT_INCOME' ? 'rent income' : 'expense'} to the ledger?`, 'Mark as done?');
     if (!ok) return;
     if (!(await ensureSignedIn('Sign in to record this transaction.'))) return;
     addRentalEntry({ id: crypto.randomUUID(), propertyId: plan.propertyId, date: plan.date, isDeposit: plan.type === 'RENT_INCOME', amount: plan.amount, category: plan.category });
@@ -575,27 +579,32 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
         </Card>
       )}
 
-      <h4 style={{ margin: '0 0 6px' }}>Projected rent plans</h4>
+      <h4 style={{ margin: '0 0 6px' }}>Property plans</h4>
+      <button className="btn secondary small" onClick={() => setEditingPlan('new')}><PlusIcon />Add plan</button>
+      {editingPlan && <RentalPlanEditor key={editingPlan === 'new' ? 'new' : editingPlan.id} propertyId={property.id} plan={editingPlan === 'new' ? undefined : editingPlan} onClose={() => setEditingPlan(null)} />}
       <div className="table-scroll" style={{ maxHeight: 260, overflowY: 'auto' }}>
         <table>
-          <thead><tr><th>Date</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>Status</th><th></th></tr></thead>
           <tbody>
             {propertyPlans.map((p) => (
               <tr key={p.id}>
                 <td>{p.date}</td>
+                <td>{p.type === 'RENT_INCOME' ? 'Rent income' : 'Expense'}</td>
+                <td>{p.note || p.category || '—'}</td>
                 <td>{fmtMoney(p.amount, property.currencyCode)}</td>
                 <td>{p.executed ? <span className="pill-positive">Done</span> : <span className="text-muted">Planned</span>}</td>
                 <td>
                   {!p.executed && (
                     <>
                       <button className="btn secondary small" onClick={() => markDone(p.id)}>Mark done</button>{' '}
+                      <button className="btn secondary small" onClick={() => setEditingPlan(p)}><EditIcon size={12} />Edit plan</button>{' '}
                       <button className="btn secondary small" onClick={() => deletePlannedEntry(p.id)}><TrashIcon size={12} />Remove</button>
                     </>
                   )}
                 </td>
               </tr>
             ))}
-            {!propertyPlans.length && <tr><td colSpan={4} className="text-muted">No projected plans yet — fill in lease details above and click "Generate projected rent."</td></tr>}
+            {!propertyPlans.length && <tr><td colSpan={6} className="text-muted">No plans yet. Add a plan or generate projected rent from the lease details above.</td></tr>}
           </tbody>
         </table>
       </div>

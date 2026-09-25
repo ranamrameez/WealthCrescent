@@ -1,3 +1,4 @@
+import { removeAccountPlans } from '../lib/planLifecycle';
 import { create } from 'zustand';
 import { toInstantMs } from '../lib/datetime';
 import { assignSerialNumbersForEntities, backfillSerialNumber, nextSerialNumberForEntity } from '../lib/financeSerial';
@@ -118,12 +119,14 @@ export const useBankWorkbookStore = create<BankStoreState>((set, get) => {
         settings: { ...wb.settings, accounts: wb.settings.accounts.map((a) => (a.id === id ? { ...a, ...patch } : a)) },
       })),
 
-    deleteAccount: (id) =>
+    deleteAccount: (id) => {
       mutate((wb) => ({
         ...wb,
         settings: { ...wb.settings, accounts: wb.settings.accounts.filter((a) => a.id !== id) },
         transactions: wb.transactions.filter((t) => t.accountId !== id),
-      })),
+      }));
+      removeAccountPlans(id);
+    },
 
     addBank: (bank) =>
       mutate((wb) => ({ ...wb, settings: { ...wb.settings, banks: [...(wb.settings.banks ?? []), bank] } })),

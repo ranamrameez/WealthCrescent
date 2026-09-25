@@ -75,8 +75,9 @@ export function nextPendingBalance(expectedAmount: number, amountPaid: number): 
  * accepted simplification as EMI/Loans' `installmentDueDate`. */
 function cycleDate(year: number, monthIndex0: number, day: number): string {
   const lastDayOfMonth = new Date(year, monthIndex0 + 1, 0).getDate();
-  const d = new Date(year, monthIndex0, Math.min(day, lastDayOfMonth));
-  return d.toISOString().slice(0, 10);
+  // This is a calendar date, not an instant: converting local midnight to
+  // UTC shifts it into the preceding day in positive-offset timezones.
+  return `${year}-${String(monthIndex0 + 1).padStart(2, '0')}-${String(Math.min(day, lastDayOfMonth)).padStart(2, '0')}`;
 }
 
 /** Generates one projected RENT_INCOME plan per rent cycle from a

@@ -1,3 +1,4 @@
+import { removePropertyPlans } from '../lib/planLifecycle';
 import { create } from 'zustand';
 import { toInstantMs } from '../lib/datetime';
 import { assignSerialNumbersForEntities, backfillSerialNumber, nextSerialNumberForEntity } from '../lib/financeSerial';
@@ -97,12 +98,14 @@ export const useRentalsWorkbookStore = create<RentalsStoreState>((set, get) => {
         settings: { ...wb.settings, properties: wb.settings.properties.map((p) => (p.id === id ? { ...p, ...patch } : p)) },
       })),
 
-    deleteProperty: (id) =>
+    deleteProperty: (id) => {
       mutate((wb) => ({
         ...wb,
         settings: { ...wb.settings, properties: wb.settings.properties.filter((p) => p.id !== id) },
         entries: wb.entries.filter((e) => e.propertyId !== id),
-      })),
+      }));
+      removePropertyPlans(id);
+    },
 
     // Scoped by property — same reasoning as Cash's scoping-by-currency above.
     addEntry: (entry) =>

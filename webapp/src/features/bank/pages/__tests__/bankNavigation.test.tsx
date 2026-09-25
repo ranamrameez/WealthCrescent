@@ -67,3 +67,9 @@ it('honors a chosen end date and restores future rows when filters are reset', (
   expect(screen.queryByText('Future pending payment')).not.toBeNull();
   expect(screen.queryByText('Prior month')).toBeNull();
 });
+
+it('offers plan creation on an account even when it has no upcoming plans', () => {
+  show('/bank/account/a1?section=plans');
+  fireEvent.click(screen.getByRole('button', { name: 'Add plan' }));
+  expect(screen.queryByText('Add a plan')).not.toBeNull();
+});
