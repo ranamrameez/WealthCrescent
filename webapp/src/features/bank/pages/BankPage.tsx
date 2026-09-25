@@ -667,7 +667,7 @@ export function BankDetailPage() {
           </div>
         )}
       </CollapsibleCard>
-      <Tabs key={bank.id} tabs={[
+      <StandardPageSections key={bank.id} defaultKey="accounts" sections={[
         { key: 'accounts', label: 'Accounts', content: (<div className="mt-md">
         <div className="entity-card-grid">
           {linkedAccounts.map((a) => (
