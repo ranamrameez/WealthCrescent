@@ -32,6 +32,22 @@ const tx = (over: Partial<BankTransaction>): BankTransaction => ({
 });
 
 describe('accountBalance', () => {
+  it('can display future pending rows without changing cleared balances', () => {
+    const a = account({});
+    const rows = [
+      tx({ id: 'old', date: '2026-08-31', amount: 200 }),
+      tx({ id: 'future', date: '2026-09-29', amount: -50 }),
+      tx({ id: 'pending', date: '2026-10-10', amount: -100, isPending: true }),
+      tx({ id: 'other', accountId: 'a2', date: '2026-10-11', amount: 999 }),
+    ];
+    const ledger = accountRunningLedger(a, rows, true);
+    expect(ledger.map(row => [row.tx.id, row.balance])).toEqual([
+      ['old', 1200], ['future', 1150], ['pending', 1150],
+    ]);
+    expect(accountRunningLedger(a, rows).map(row => row.tx.id)).toEqual(['old', 'future']);
+    expect(accountBalance(a, rows)).toBe(1150);
+    expect(accountPeriodAnalytics(a, rows, '2026-09-01').transactions.map(row => row.id)).toEqual(['future']);
+  });
   it('adds opening balance and all transactions for that account', () => {
     const a = account({ openingBalance: 1000 });
     const txs = [tx({ amount: -50 }), tx({ id: 't2', amount: 200 })];

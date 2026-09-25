@@ -1,6 +1,6 @@
 import type { User } from 'firebase/auth';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
 import { SummaryChip, type StandardCardAction } from '../../../components/StandardCard';
@@ -571,6 +571,14 @@ export function BankDetailPage() {
   const cardTransactions = useCreditCardWorkbookStore((s) => s.workbook.transactions);
   const linkedCards = useMemo(() => allCards.filter((c) => c.bankId === id), [allCards, id]);
 
+  usePageTopBarRightSlot(bank ? (
+    <TopBarControls>
+      <TopBarSelect label="Switch bank" value={bank.id}
+        onChange={(event) => { setEditing(false); navigate(event.target.value ? `/bank/bank/${event.target.value}` : '/bank'); }}
+        options={[{ value: '', label: 'All banks' }, ...banks.filter(item => item.isActive !== false || item.id === bank.id).map(item => ({ value: item.id, label: item.name }))]} />
+    </TopBarControls>
+  ) : null);
+
   const startEdit = () => {
     if (!bank) return;
     setDraft({ name: bank.name, notes: bank.notes ?? '', color: bank.color ?? '' });
@@ -659,7 +667,8 @@ export function BankDetailPage() {
           </div>
         )}
       </CollapsibleCard>
-      <div className="mt-md">
+      <Tabs key={bank.id} tabs={[
+        { key: 'accounts', label: 'Accounts', content: (<div className="mt-md">
         <div className="entity-card-grid">
           {linkedAccounts.map((a) => (
             <EntityCard
@@ -674,8 +683,8 @@ export function BankDetailPage() {
           ))}
         </div>
         {!linkedAccounts.length && <p className="text-muted">No accounts linked to this bank yet.</p>}
-      </div>
-      {linkedCards.length > 0 && (
+      </div>) },
+        { key: 'creditCards', label: 'Credit cards', content: <>{!linkedCards.length && <p className="text-muted">No credit cards linked to this bank yet.</p>}{linkedCards.length > 0 && (
         <>
           <hr className="mt-md mb-md" />
           <h3 className="mt-0 mb-sm">Credit cards</h3>
@@ -697,7 +706,9 @@ export function BankDetailPage() {
             })}
           </div>
         </>
-      )}
+      )}</> },
+        { key: 'analytics', label: 'Analytics', content: <AnalyticsTab bankId={bank.id} /> },
+      ]} />
       <FabButton label="Add account" onClick={() => setAddOpen(true)}>
         <PlusIcon />
       </FabButton>
@@ -914,6 +925,7 @@ function CreditUsageBar({ used, limit, currency }: { used: number; limit: number
 }
 
 export function AccountDetailPage() {
+  const { search } = useLocation();
   const dateFormat = useAppearanceStore((state) => state.appearance.dateFormat ?? 'DD-MMM-YYYY');
   const { id } = useParams();
   const navigate = useNavigate();
@@ -955,25 +967,26 @@ export function AccountDetailPage() {
   const [meta, setMeta] = useState<Omit<BankAccount, 'id'>>(() => accountToFormValue(account));
   const [editingMeta, setEditingMeta] = useState(false);
 
-  const allLedger = useMemo(() => account ? accountRunningLedger(account, transactions) : [], [account, transactions]);
+  const allLedger = useMemo(() => account ? accountRunningLedger(account, transactions, true) : [], [account, transactions]);
   const categoryOptions = useMemo(
     () => [...new Set(allLedger.map((row) => categoryName(row.tx.categoryID, categories)))].sort(),
     [allLedger, categories],
   );
   const filteredLedger = useMemo(() => allLedger.filter((row) => {
-    if (row.tx.date < filters.fromDate || row.tx.date > filters.toDate) return false;
+    if ((filters.fromDate && row.tx.date < filters.fromDate) || (filters.toDate && row.tx.date > filters.toDate)) return false;
     if (filters.direction === 'in' && row.tx.amount < 0) return false;
     if (filters.direction === 'out' && row.tx.amount >= 0) return false;
     if (filters.category !== 'all' && categoryName(row.tx.categoryID, categories) !== filters.category) return false;
     if (filters.source !== 'all' && (row.tx.source ?? 'manual') !== filters.source) return false;
     return true;
   }), [allLedger, filters, categories]);
-  const analytics = useMemo(() => bankAnalyticsFromLedger(filteredLedger), [filteredLedger]);
+  const clearedLedger = useMemo(() => filteredLedger.filter(({ tx }) => !tx.isPending), [filteredLedger]);
+  const analytics = useMemo(() => bankAnalyticsFromLedger(clearedLedger), [clearedLedger]);
   const upcoming = useMemo(
     () => account
       ? plannedEntries
           .filter((plan) => plan.accountId === account.id && !plan.executed)
-          .filter((plan) => plan.date >= filters.fromDate && plan.date <= filters.toDate)
+          .filter((plan) => (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate))
           .filter((plan) => filters.direction === 'all' || (filters.direction === 'in' ? plan.amount >= 0 : plan.amount < 0))
           .sort((a, b) => a.date.localeCompare(b.date))
       : [],
@@ -983,16 +996,15 @@ export function AccountDetailPage() {
   usePageTopBarRightSlot(account ? (
     <TopBarControls>
       <TopBarSelect
-        label="Switch bank"
-        value={account.bankId ?? ''}
+        label="Switch account"
+        value={account.id}
         onChange={(event) => {
-          const bankId = event.target.value;
-          navigate(bankId ? `/bank/bank/${bankId}` : '/bank');
+          setEditingMeta(false);
+          navigate(`/bank/account/${event.target.value}${search}`);
         }}
-        options={[
-          { value: '', label: 'All banks' },
-          ...banks.filter((bank) => bank.isActive !== false).map((bank) => ({ value: bank.id, label: bank.name })),
-        ]}
+        options={accounts
+          .filter((item) => !item.migratedToCreditCardId && (item.isActive !== false || item.id === account.id))
+          .map((item) => ({ value: item.id, label: `${item.name} (${item.currencyCode})${item.bankId ? ' · ' + (banks.find(bank => bank.id === item.bankId)?.name ?? '') : ''}` }))}
       />
       <TransactionFilterMenu
         value={filters}
@@ -1044,16 +1056,17 @@ export function AccountDetailPage() {
   const pendingAmount = accountPendingBalance(account, transactions);
 
   const exportTransactions = () => {
-    const header = ['#', 'Date', 'Description', 'Category', 'Amount', 'Balance', 'Source'];
+    const header = ['#', 'Date', 'Description', 'Category', 'Amount', 'Balance', 'Source', 'Status'];
     const body = [...filteredLedger].reverse().map(({ tx, balance }) => [
       tx.serialNumber ?? '', tx.date, tx.description, categoryName(tx.categoryID, categories), tx.amount, balance,
       tx.source === 'statement-import' ? `Imported${tx.statementRef ? ` (${tx.statementRef})` : ''}` : 'Manual',
+      tx.isPending ? 'Pending' : 'Cleared',
     ]);
     const blob = new Blob([toCSV([header, ...body])], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `${account.name.replace(/\s+/g, '_')}_transactions_${filters.fromDate}_to_${filters.toDate}.csv`;
+    anchor.download = `${account.name.replace(/\s+/g, '_')}_transactions_${filters.fromDate}_to_${filters.toDate || 'onward'}.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
     toast(`${body.length} transaction${body.length === 1 ? '' : 's'} downloaded.`);
@@ -1067,7 +1080,7 @@ export function AccountDetailPage() {
         { label: 'Delete account', onClick: deleteThisAccount, tone: 'danger' },
       ]
     : [
-        { label: 'Edit', onClick: () => setEditingMeta(true) },
+        { label: 'Edit', onClick: () => { setMeta(accountToFormValue(account)); setEditingMeta(true); } },
         { label: account.isActive === false ? 'Reopen account' : 'Close account', onClick: toggleArchived },
         { label: 'Delete account', onClick: deleteThisAccount, tone: 'danger' },
       ];
@@ -1125,7 +1138,7 @@ export function AccountDetailPage() {
         <SummaryChip label="Withdrawals" value={fmtMoney(analytics.withdrawals, account.currencyCode)} />
         <SummaryChip label="Net" value={fmtMoney(analytics.netFlow, account.currencyCode)} />
       </>,
-      content: <AccountAnalyticsSection ledger={filteredLedger} />,
+      content: <AccountAnalyticsSection ledger={clearedLedger} />,
     },
   ];
 
@@ -1138,7 +1151,7 @@ export function AccountDetailPage() {
         </div>
       </div>
       {account.migratedToCreditCardId && <Notice tone="info" className="mb-md">This account was migrated to a real Credit Card record — its transactions and balance now live there.{' '}<Link to={`/bank/card/${account.migratedToCreditCardId}`}>View the Credit Card →</Link></Notice>}
-      <StandardPageSections sections={sections} defaultKey="details" />
+      <StandardPageSections key={account.id} sections={sections} defaultKey="details" />
       <AccountTransfersFab accountId={account.id} currencyCode={account.currencyCode} />
     </div>
   );
@@ -1915,8 +1928,9 @@ function PlanningAccountSection({
  * "simple budget/spend-plan tool" MODULES_PLAN.md §11 asks for: editable
  * monthly category targets (persisted in `settings.budgets`) compared
  * against this month's actual spend for the selected account. */
-function AnalyticsTab() {
-  const accounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
+function AnalyticsTab({ bankId }: { bankId?: string } = {}) {
+  const allAccounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
+  const accounts = useMemo(() => allAccounts.filter(account => !account.migratedToCreditCardId && (!bankId || account.bankId === bankId)), [allAccounts, bankId]);
   const transactions = useBankWorkbookStore((s) => s.workbook.transactions);
   const budgets = useBankWorkbookStore((s) => s.workbook.settings.budgets);
   const setBudget = useBankWorkbookStore((s) => s.setBudget);
@@ -1955,7 +1969,7 @@ function AnalyticsTab() {
   return (
     <div>
       <Field label="Account" width={200}>
-        <Select value={accountId || accounts[0].id} onChange={(e) => setAccountId(e.target.value)}>
+        <Select value={account?.id ?? ''} onChange={(e) => setAccountId(e.target.value)}>
           {accounts.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.currencyCode})</option>)}
         </Select>
       </Field>

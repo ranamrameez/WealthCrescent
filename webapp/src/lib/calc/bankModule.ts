@@ -5,17 +5,17 @@ import { dateOnlyMs } from '../datetime';
 
 export interface BankLedgerRow { tx: BankTransaction; balance: number; }
 
-/** Running cleared balance for one account. Pending transactions are kept out
- * of the actual ledger; use accountPendingBalance for their separate impact. */
-export function accountRunningLedger(account: BankAccount, transactions: BankTransaction[]): BankLedgerRow[] {
-  const accountTxs = transactions.filter((t) => t.accountId === account.id && !t.isPending);
+/** Running cleared balance for one account. The transaction table can opt into
+ * pending rows, which leave the cleared running balance unchanged. */
+export function accountRunningLedger(account: BankAccount, transactions: BankTransaction[], includePending = false): BankLedgerRow[] {
+  const accountTxs = transactions.filter((t) => t.accountId === account.id && (includePending || !t.isPending));
   const sorted = [...accountTxs].sort((a, b) => {
     const byDate = dateOnlyMs(a.date) - dateOnlyMs(b.date);
     return byDate !== 0 ? byDate : (a.serialNumber ?? 0) - (b.serialNumber ?? 0);
   });
   let balance = account.openingBalance;
   return sorted.map((tx) => {
-    balance += tx.amount;
+    if (!tx.isPending) balance += tx.amount;
     return { tx, balance };
   });
 }
