@@ -243,15 +243,6 @@ html[data-color="material-slate"][data-theme="dark"] {
 	--accent-soft: #2c4256;
 }
 
-/* Soft, Material-like surfaces for every non-wine theme. The
-     .card.stat-card/.card.chart-card border-left/background pair that
-     used to live here was dead code (a later, same-specificity block
-     further down always won instead) — removed rather than left as a
-     misleading second definition; see --shadow-card below. */
-/* html:not([data-color="wine"]) .card {
-	border: 0;
-	box-shadow: var(--shadow-card);
-} */
 html:not([data-color="wine"]) .btn.secondary,
 html:not([data-color="wine"]) .btn.ghost {
 	border: 0;
@@ -2448,18 +2439,17 @@ html[data-color^="material-"][data-theme="dark"] select:focus {
    --card-hue-driven gradient formula the base `.stat-card` rule already
    uses, so hue differentiation survives in every color theme, not just
    Classic. */
-html:not([data-color="wine"]) .card.chart-card {
+.card.chart-card {
 	border: 0;
 	box-shadow: var(--shadow-card);
 	background: linear-gradient(180deg, color-mix(in srgb, var(--accent-soft) 8%, var(--panel)), var(--panel) 60px);
 }
-/* html:not([data-color="wine"]) .card.stat-card {
-	border: 0;
-	box-shadow: var(--shadow-card);
-	background:
-		radial-gradient(circle at 50% 30%, color-mix(in srgb, white 12%, transparent) 0%, transparent 55%),
-		color-mix(in srgb, var(--card-hue, var(--accent)) 22%, var(--panel));
-} */
+
+.stat-card .label {
+    color: var(--card-hue, var(--accent));
+    font-weight: 800;
+}
+
 html[data-color^="material-"][data-theme="light"] .card.chart-card,
 html[data-color^="material-"][data-theme="dark"] .card.chart-card {
 	border: 0;
@@ -2470,9 +2460,9 @@ html[data-color^="material-"][data-theme="light"] .card.stat-card,
 html[data-color^="material-"][data-theme="dark"] .card.stat-card {
 	border: 0;
 	box-shadow: var(--shadow-card);
-	background: var(--bg-design-1);
-	/* background: color-mix(in srgb, var(--card-hue, var(--accent)) 32%, var(--panel)); */
-	/* background:radial-gradient(circle at 50% 30%, color-mix(in srgb, white 12%, transparent) 0%, transparent 55%), color-mix(in srgb, var(--card-hue, var(--accent)) 22%, var(--panel)); */
+	background: radial-gradient(circle at 93% 87%, color-mix(in srgb, white 59%, var(--card-hue)) 45%, transparent 54%),  color-mix(in srgb, var(--card-hue, var(--accent)) 30%, var(--card-hue) 7%);
+
+	/* background: radial-gradient(circle at 47% -49%, color-mix(in srgb, white 69%, var(--card-hue)) 74%, transparent 10%),  color-mix(in srgb, var(--card-hue, var(--accent)) 30%, var(--card-hue) 7%); */
 }
 
 /* Fields get the same whisper of color the cards get — background only,

@@ -130,29 +130,81 @@ html[data-color="sage"] .page-topbar .chip.active {
 /* Strong, solid stat-card tints. Card.tsx supplies --card-hue for semantic
  * identities; the selected theme now controls the strength without fading
  * through a gradient. */
-html[data-color="aurora"] .stat-card,
-html[data-color="cobalt"] .stat-card,
-html[data-color="teal"] .stat-card,
-html[data-color="copper"] .stat-card,
-html[data-color="rose"] .stat-card,
-html[data-color="gold"] .stat-card,
-html[data-color="sage"] .stat-card {
-	/* border: 1px solid color-mix(in srgb, var(--card-hue, var(--accent)) 48%, var(--border)); */
-	/* background: color-mix(in srgb, var(--card-hue, var(--accent)) 32%, var(--panel)); */
+html[data-color="aurora"] .stat-card {
+    gap: 0;
+    /* padding: 0; */
+    align-items: center;
+    background: radial-gradient(circle at 77% 51%, color-mix(in srgb, #FFF 37%, var(--card-hue)) 21%, transparent 33%),  color-mix(in srgb, var(--card-hue, var(--accent)) 75%, var(--card-hue) 7%);
+}
+html[data-color="aurora"] .stat-card > *, .stat-card-inner {
+    padding: 5px;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    border-radius: 4px;
+    color: var(--card-hue, var(--accent)) !important;
+    /* width: 100%; */
+    margin: 0;
+    background: #ffffff78;
+    font-weight: 800;
+    flex-direction: column;
+    align-content: center;
+    justify-content: space-evenly;
+    align-items: flex-start;
+}
+
+html[data-color="gold"] .stat-card{
+	background: color-mix(in srgb, var(--card-hue, var(--accent)) 32%, var(--panel));
+}
+
+html[data-color="cobalt"] .stat-card {
+    background: radial-gradient(circle at 14% 50%, color-mix(in srgb, #fff 36%, var(--card-hue)) 29%, transparent 0%),  color-mix(in srgb, var(--card-hue, var(--accent)) 75%, var(--card-hue) 7%);
+	background: radial-gradient(circle at 31% 35%, color-mix(in srgb, #fff 19%, var(--card-hue)) 40%, transparent 0%),  color-mix(in srgb, var(--card-hue, var(--accent)) 75%, var(--card-hue) 7%);
+}
+
+html[data-color="cobalt"] .stat-card *{
+	/* color: white !important; */
+}
+
+html[data-color="teal"] .stat-card{
+	background: radial-gradient(circle at 31% 35%, color-mix(in srgb, #fff 19%, var(--card-hue)) 40%, transparent 0%),  color-mix(in srgb, var(--card-hue, var(--accent)) 75%, var(--card-hue) 7%);
+	background: radial-gradient(circle at 14% 50%, color-mix(in srgb, #fff 36%, var(--card-hue)) 29%, transparent 91%),  color-mix(in srgb, var(--card-hue, var(--accent)) 94%, var(--card-hue) 97%);
+}
+
+html[data-color="teal"] .stat-card *{
+	/* color: white !important; */
+}
+
+html[data-color="copper"] .stat-card{
+	background: radial-gradient(circle at 31% 35%, color-mix(in srgb, #fff 19%, var(--card-hue)) 40%, transparent 0%),  color-mix(in srgb, var(--card-hue, var(--accent)) 75%, var(--card-hue) 7%);
+}
+
+html[data-color="rose"] .stat-card{
+    background: radial-gradient(circle at 77% 51%, color-mix(in srgb, #FFF 37%, var(--card-hue)) 26%, transparent 54%),  color-mix(in srgb, var(--card-hue, var(--accent)) 75%, var(--card-hue) 7%);
+}
+
+html[data-color="sage"] .stat-card {	
+	background: radial-gradient(circle at 47% -49%, color-mix(in srgb, white 69%, var(--card-hue)) 74%, transparent 10%),
+		color-mix(in srgb, var(--card-hue, var(--accent)) 30%, var(--card-hue) 7%);
 	box-shadow:
 		inset 0 1px 0 color-mix(in srgb, white 18%, transparent),
 		0 2px 10px rgba(20, 30, 40, 0.1);
 }
-html[data-color="aurora"] .stat-card .label,
+
+
 html[data-color="cobalt"] .stat-card .label,
 html[data-color="teal"] .stat-card .label,
 html[data-color="copper"] .stat-card .label,
 html[data-color="rose"] .stat-card .label,
 html[data-color="gold"] .stat-card .label,
 html[data-color="sage"] .stat-card .label {
-	color: var(--card-hue, var(--accent));
-	font-weight: 800;
+    padding: 5px;
+    border-radius: 5px;
+    color: var(--card-hue, var(--accent));
+    background: rgb(255 255 255 / 72%);
+    font-weight: 800;
 }
+
 html[data-color="aurora"] .stat-card .value,
 html[data-color="cobalt"] .stat-card .value,
 html[data-color="teal"] .stat-card .value,
@@ -521,7 +573,10 @@ html[data-color="gold"][data-theme="dark"] {
 
 /* Repaired Material Teal + Material Rose: retain Material geometry but use
  * strong readable accents and solid surfaces instead of washed-out tints. */
-html[data-color="material-teal"] .stat-card,
+html[data-color="material-teal"] .stat-card{
+	background: radial-gradient(circle at 31% 35%, color-mix(in srgb, #fff 19%, var(--card-hue)) 40%, transparent 0%),  color-mix(in srgb, var(--card-hue, var(--accent)) 75%, var(--card-hue) 7%);
+}
+
 html[data-color="material-purple"] .stat-card {
 	background: color-mix(in srgb, var(--card-hue, var(--accent)) 30%, var(--panel));
 	border: 1px solid color-mix(in srgb, var(--card-hue, var(--accent)) 45%, var(--border));

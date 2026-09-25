@@ -82,19 +82,6 @@ html[data-theme="dark"][data-color="material-teal"] .sidebar {
   color:var(--text);
 }
 
-/* Restore visible card surfaces. Keep every card family on the same neutral
- * panel so the teal accent does not wash out their backgrounds. */
-/* html[data-color="material-teal"] .card,
-html[data-color="material-teal"] .stat-card,
-html[data-color="material-teal"] .entity-card,
-html[data-color="material-teal"] .chart-card,
-html[data-color="material-teal"] .page-topbar {
-  background:var(--panel) !important;
-  background-image:none !important;
-  border-color:var(--border);
-  box-shadow:var(--shadow-card);
-} */
-
 html[data-color="material-teal"] .btn.primary {
   background:var(--accent);
   color:var(--panel);

@@ -140,21 +140,23 @@ export function StatCard({
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
     >
-      {labelTitle ? (
-        <Tooltip text={labelTitle}>
-          <div className="label clickable">{label}</div>
-        </Tooltip>
-      ) : (
-        <div className="label">{label}</div>
-      )}
-      {title ? (
-        <Tooltip text={title}>
+      <div className="stat-card-inner">
+        {labelTitle ? (
+          <Tooltip text={labelTitle}>
+            <div className="label clickable">{label}</div>
+          </Tooltip>
+        ) : (
+          <div className="label">{label}</div>
+        )}
+        {title ? (
+          <Tooltip text={title}>
+            <div className="value">{value}</div>
+          </Tooltip>
+        ) : (
           <div className="value">{value}</div>
-        </Tooltip>
-      ) : (
-        <div className="value">{value}</div>
-      )}
-      {sub && <div className="sub">{sub}</div>}
+        )}
+        {sub && <div className="sub">{sub}</div>}
+        </div>
     </div>
   );
 }
