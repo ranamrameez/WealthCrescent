@@ -6,7 +6,7 @@ import type { TransactionPageFilters, TransactionPeriod } from '../hooks/useUrlT
 import { FilterIcon } from './icons';
 export function TransactionFilterMenu({value,categories,activeCount,onChange,onClear}:{value:TransactionPageFilters;categories:string[];activeCount:number;onChange:(patch:Partial<TransactionPageFilters>)=>void;onClear:()=>void;}){
  const [open,setOpen]=useState(false);
- const applyPreset=(period:TransactionPeriod)=>{if(period==='since-month'){onChange({period,fromDate:currentMonthRange().startDate,toDate:''});return;}if(period==='custom'){onChange({period});return;}const r=presetDateRange(period);onChange({period,fromDate:r.startDate,toDate:r.endDate});};
+ const applyPreset=(period:TransactionPeriod)=>{if(period==='since-month'){onChange({period,fromDate:currentMonthRange().startDate,toDate:''});return;}if(period==='custom'){onChange({period});return;}const r=presetDateRange(period);onChange({period,fromDate:r.startDate,toDate:''});};
  return <><button type="button" className="btn secondary small topbar-filter-btn" onClick={()=>setOpen(true)}><FilterIcon size={14}/> Filters{activeCount?` (${activeCount})`:''}</button>
  {open&&<Modal title="Page filters" onClose={()=>setOpen(false)}>
   <div className="filter-preset-row">{(['since-month','1','3','6','12','ytd','custom'] as TransactionPeriod[]).map(p=><button key={p} type="button" className={`chip${value.period===p?' active':''}`} onClick={()=>applyPreset(p)}>{p==='since-month'?'Since month start':p==='1'?'1M':p==='ytd'?'YTD':p==='custom'?'Custom':`${p}M`}</button>)}</div>
