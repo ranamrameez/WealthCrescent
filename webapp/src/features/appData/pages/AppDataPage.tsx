@@ -162,7 +162,7 @@ export function AppDataPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `financerecorder-full-backup-${today()}.json`;
+    a.download = `WealthCrescent-full-backup-${today()}.json`;
     a.click();
     URL.revokeObjectURL(url);
     toast('Full backup downloaded.');
@@ -245,7 +245,7 @@ export function AppDataPage() {
     <div>
       <h1 className="pagetitle">App Data</h1>
       <p className="text-muted mb-12">
-        Backup or restore your ENTIRE FinanceRecorder account in one file — every module at once, instead of each
+        Backup or restore your ENTIRE WealthCrescent account in one file — every module at once, instead of each
         module's own Settings tab (still there, unchanged, for a per-module backup).
       </p>
       <Card className="mb-md">

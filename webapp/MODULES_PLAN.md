@@ -1,7 +1,7 @@
 # New Modules Plan: Funds, Banking, Cash, Rentals, EMI/Loans, Personal Loans
 
 Design/proposal document for the modules beyond Stock Exchanges (QSE + PSX) that make up
-FinanceRecorder's full vision (see `README.md`'s Migration Plan Overview and `CLAUDE.md`'s
+WealthCrescent's full vision (see `README.md`'s Migration Plan Overview and `CLAUDE.md`'s
 "What this project is"). **Per a 2026-08-23 sequencing decision, none of these get built
 until the Stock Exchanges module is considered finished** — this doc exists so that work
 can start from a real design instead of a blank page once that time comes, not as an
@@ -47,7 +47,7 @@ every module below, not just Stock Exchanges:
   enforces this.
 - **Every entry must be editable, not just add/delete (locked 2026-08-23).** The reference
   prototype in `reference/finance-suite-prototype/` only supports add/delete on every single
-  entity — a typo means losing the record and recreating it. FinanceRecorder's own QSE/PSX
+  entity — a typo means losing the record and recreating it. WealthCrescent's own QSE/PSX
   Transactions already do this right (an inline edit-row, same pattern used throughout this
   codebase); Transfers/Adjustments/Dividends/Watchlist had the same add/delete-only gap and
   were fixed for exactly this reason (2026-08-23). Every new module's every record type

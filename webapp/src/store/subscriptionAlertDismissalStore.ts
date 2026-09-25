@@ -7,7 +7,7 @@ import { create } from 'zustand';
  * (`subId:alertId:occurrenceTag`) — dismissing only silences THIS
  * occurrence; a `daysBefore` alert re-triggers with a fresh key once its
  * cycle rolls forward, so dismissal is never "forever." */
-const STORAGE_KEY = 'financerecorder_subscription_alert_dismissals_v1';
+const STORAGE_KEY = 'WealthCrescent_subscription_alert_dismissals_v1';
 
 function load(): Record<string, true> {
   try {

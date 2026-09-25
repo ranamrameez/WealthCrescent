@@ -1,4 +1,4 @@
-package com.financerecorder.app.sms
+package com.WealthCrescent.app.sms
 
 import android.content.Context
 import androidx.datastore.preferences.core.edit

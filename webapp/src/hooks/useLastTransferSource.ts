@@ -1,6 +1,6 @@
 import type { LinkSideConfig } from '../types/interEntityTransfer';
 
-const STORAGE_PREFIX = 'financerecorder_last_transfer_source_';
+const STORAGE_PREFIX = 'WealthCrescent_last_transfer_source_';
 
 /** Keys a remembered "from" source by which entity it was paying INTO, so
  * "PSX always comes from my Zindagi bank account" and "this rental property

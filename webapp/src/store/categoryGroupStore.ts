@@ -3,7 +3,7 @@ import { toast } from '../components/Toast';
 import { createEmptyCategoryGroupsWorkbook } from './defaultCategoryGroupsWorkbook';
 import type { CategoryGroup, CategoryGroupsWorkbook } from '../types/finance';
 
-const STORAGE_KEY = 'financerecorder_category_groups_v1';
+const STORAGE_KEY = 'WealthCrescent_category_groups_v1';
 
 /** Backfills `serialNumber` onto any group missing it, same idiom as
  * `categoryStore.ts`'s own `normalize()`. */

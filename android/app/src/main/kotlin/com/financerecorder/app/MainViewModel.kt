@@ -1,12 +1,12 @@
-package com.financerecorder.app
+package com.WealthCrescent.app
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.financerecorder.app.bridge.WebAppBridge
-import com.financerecorder.app.sms.KnownSmsAccount
-import com.financerecorder.app.sms.ParsedTransaction
-import com.financerecorder.app.sms.PendingTransactionRepository
+import com.WealthCrescent.app.bridge.WebAppBridge
+import com.WealthCrescent.app.sms.KnownSmsAccount
+import com.WealthCrescent.app.sms.ParsedTransaction
+import com.WealthCrescent.app.sms.PendingTransactionRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow

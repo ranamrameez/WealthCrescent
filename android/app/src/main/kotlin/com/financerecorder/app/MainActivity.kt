@@ -1,4 +1,4 @@
-package com.financerecorder.app
+package com.WealthCrescent.app
 
 import android.Manifest
 import android.content.Context
@@ -47,8 +47,8 @@ import androidx.core.content.ContextCompat
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.financerecorder.app.review.ReviewScreen
-import com.financerecorder.app.ui.theme.FinanceRecorderTheme
+import com.WealthCrescent.app.review.ReviewScreen
+import com.WealthCrescent.app.ui.theme.WealthCrescentTheme
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
@@ -62,7 +62,7 @@ class MainActivity : ComponentActivity() {
 
         val openReview = intent?.action == ACTION_OPEN_REVIEW
         setContent {
-            FinanceRecorderTheme {
+            WealthCrescentTheme {
                 AppRoot(viewModel = viewModel, startOnReview = openReview)
             }
         }
@@ -88,7 +88,7 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val ACTION_OPEN_REVIEW = "com.financerecorder.app.action.OPEN_REVIEW"
+        const val ACTION_OPEN_REVIEW = "com.WealthCrescent.app.action.OPEN_REVIEW"
     }
 }
 

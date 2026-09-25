@@ -5,7 +5,7 @@ import { resolveIsDeposit, resolveLegacyCategoryId } from '../lib/financeMigrati
 import { createEmptyCashWorkbook } from './defaultCashWorkbook';
 import type { CashEntry, CashSettings, CashWorkbook } from '../types/cashWorkbook';
 
-const STORAGE_KEY = 'financerecorder_cash_workbook_v1';
+const STORAGE_KEY = 'WealthCrescent_cash_workbook_v1';
 
 /** `CashEntry` extends `Finance` (2026-09-03 restructure) — `isDeposit` is
  * the real, authoritative field here (the old `type: 'IN'|'OUT'` enum) for

@@ -13,7 +13,7 @@ export function LegalPage() {
       <Card className="mb-md">
         <h3 className="mt-0">Calculation accuracy</h3>
         <p>
-          FinanceRecorder computes fees, taxes, break-even prices, and profit/loss using settings you configure
+          WealthCrescent computes fees, taxes, break-even prices, and profit/loss using settings you configure
           (commission rates, tax rates, tick sizes, etc.). These are <strong>estimates</strong>, not guarantees.
           Brokers, exchanges, and regulators change their fee schedules, tax rules, and rounding conventions
           without notice, and this app cannot always keep pace with every change for every broker.

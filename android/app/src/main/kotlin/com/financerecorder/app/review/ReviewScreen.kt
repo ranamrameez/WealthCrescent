@@ -1,4 +1,4 @@
-package com.financerecorder.app.review
+package com.WealthCrescent.app.review
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,10 +47,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.financerecorder.app.ApproveOutcome
-import com.financerecorder.app.R
-import com.financerecorder.app.sms.KnownSmsAccount
-import com.financerecorder.app.sms.ParsedTransaction
+import com.WealthCrescent.app.ApproveOutcome
+import com.WealthCrescent.app.R
+import com.WealthCrescent.app.sms.KnownSmsAccount
+import com.WealthCrescent.app.sms.ParsedTransaction
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

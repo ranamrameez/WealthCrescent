@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-const STORAGE_KEY = 'financerecorder_currency_onboarding_seen_v1';
+const STORAGE_KEY = 'WealthCrescent_currency_onboarding_seen_v1';
 
 interface CurrencyOnboardingState {
   seen: boolean;

@@ -88,8 +88,8 @@ export function LogInIcon({ size = 14 }: IconProps) {
   );
 }
 
-/** The FinanceRecorder app logo mark (README Pending item 87) — until now
- * the sidebar/browser tab only ever had the "FinanceRecorder" text
+/** The WealthCrescent app logo mark (README Pending item 87) — until now
+ * the sidebar/browser tab only ever had the "WealthCrescent" text
  * wordmark (Done item 32) plus `public/favicon.svg`'s leftover generic
  * Vite scaffold art, never a real designed asset. Fixed brand colors (not
  * currentColor, same deliberate exception as `GoogleIcon` below) — a

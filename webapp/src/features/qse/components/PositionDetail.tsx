@@ -227,12 +227,12 @@ export function PositionDetail({ ticker }: { ticker: string }) {
 
       {isOpen && (
         <CollapsibleCard title={<h4 className="m-0">Current position <StatSourceBadge source="official" /></h4>} className="mb-12">
-          <div className="grid-auto" style={gridAutoStyle(100, 8)}>
+          <div className="grid-auto" style={gridAutoStyle(140, 8)}>
             <div className="stat-card card" style={hueStyle(HUES[2])}>
               <div className="label">Trend</div>
               <div className="value"><Sparkline data={sparkData} formatValue={fmtPrice} /></div>
             </div>
-            <div className="stat-card card" style={hueStyle(HUES[0])}><div className="label">Shares</div><div className="value">{fmt(shares, 0)}</div></div>
+            <div className="stat-card card" style={hueStyle(HUES[0])}><div className="label">Shares</div><div className="value shares-box">{fmt(shares, 0)}</div></div>
             <div className="stat-card card" style={hueStyle(HUES[1])}>
               <Tooltip text="Cost: what you paid per share on average. BE (break-even): the price you'd need to sell at to get your money back, including fees.">
                 <div className="label clickable">Cost</div>
@@ -309,7 +309,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
           own doc comment. */}
       {usingLots ? (
         sortedOfficialLots.length > 0 && (
-          <CollapsibleCard title={<h4 className="m-0">Open lots <StatSourceBadge source="official" /></h4>} className="mb-12">
+          <CollapsibleCard title={<h4 className="m-0">Open Lots <StatSourceBadge source="official" /></h4>} className="mb-12">
             <div className="table-scroll">
               <table>
                 <thead><tr><LotTh col="buyDate">Buy date</LotTh><LotTh col="buyPrice">Buy price</LotTh><LotTh col="remainingShares">Remaining</LotTh><LotTh col="costPerShare">Cost/share</LotTh></tr></thead>
@@ -318,7 +318,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
                     <tr key={i}>
                       <td>{lot.buyDate}</td>
                       <td>{fmtPrice(lot.buyPrice)}</td>
-                      <td>{fmt(lot.remainingShares, 0)}</td>
+                      <td><span className="shares-box">{fmt(lot.remainingShares, 0)}</span></td>
                       <td>{fmtPrice(lot.buyPrice + lot.buyFeeTotal / lot.originalShares)}</td>
                     </tr>
                   ))}
@@ -332,7 +332,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
         )
       ) : (
         reportOpenLots.length > 0 && (
-          <CollapsibleCard title={<h4 className="m-0">Open lots <StatSourceBadge source="history" /></h4>} className="mb-12">
+          <CollapsibleCard title={<h4 className="m-0">Open Lots <StatSourceBadge source="history" /></h4>} className="mb-12">
             <div className="table-scroll">
               <table>
                 <thead>
@@ -343,7 +343,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
                     <tr key={i}>
                       <td>{l.buyDate}</td>
                       <td>{fmtPrice(l.buyPrice)}</td>
-                      <td>{fmt(l.remainingShares, 0)}</td>
+                      <td><span className="shares-box">{fmt(l.remainingShares, 0)}</span></td>
                       <td>{fmtMoney(l.remainingShares * l.buyPrice, currency)}</td>
                       <td>{fmtMoney(l.buyFeeTotal, currency)}</td>
                     </tr>
@@ -533,7 +533,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
                     <tr key={i}>
                       <td>{t.buyDate}<br /><span className="text-muted">{fmtPrice(t.buyPrice)} · {fmtMoney(totalBuy, currency)}</span><br /><span className="text-muted">fee {fmtMoney(t.buyFee, currency)}</span></td>
                       <td>{t.sellDate}<br /><span className="text-muted">{fmtPrice(t.sellPrice)} · {fmtMoney(totalSale, currency)}</span><br /><span className="text-muted">fee {fmtMoney(t.sellFee, currency)}</span></td>
-                      <td>{fmt(t.shares, 0)}</td>
+                      <td><span className="shares-box">{fmt(t.shares, 0)}</span></td>
                       <td>{fmtPrice(be)}</td>
                       <td className={t.netPL >= 0 ? 'text-profit' : 'text-loss'}>
                         {fmtMoney(t.netPL, currency)}

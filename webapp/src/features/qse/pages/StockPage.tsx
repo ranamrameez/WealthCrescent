@@ -107,7 +107,7 @@ function TickerTransactions({ ticker }: { ticker: string }) {
 
   return (
     <div>
-      <div className="row" style={{ gap: 8, marginBottom: 16 }}>
+      <div className="row entry-row" style={{ gap: 8, marginBottom: 16 }}>
         <Field label="Action">
           <select value={action} onChange={(e) => setAction(e.target.value as 'BUY' | 'SELL')}>
             <option value="BUY">Buy</option>
@@ -125,10 +125,10 @@ function TickerTransactions({ ticker }: { ticker: string }) {
           />
         </Field>
         <Field label="Shares" required>
-          <input type="number" placeholder="Shares" value={sharesInput} onChange={(e) => setSharesInput(e.target.value)} className="w-90" />
+          <input type="number" placeholder="Shares" value={sharesInput} onChange={(e) => setSharesInput(e.target.value)} className="" />
         </Field>
         <Field label="Price" required>
-          <input type="number" step="0.001" placeholder="Price" value={priceInput} onChange={(e) => setPriceInput(e.target.value)} className="w-90" />
+          <input type="number" step="0.001" placeholder="Price" value={priceInput} onChange={(e) => setPriceInput(e.target.value)} className="" />
         </Field>
         <TimeZoneFields
           time={time}
@@ -208,7 +208,7 @@ function TickerTransactions({ ticker }: { ticker: string }) {
                     )}
                   </td>
                   <td className={tx.action === 'BUY' ? 'pill-buy' : 'pill-sell'}>{tx.action}</td>
-                  <td>{fmt(tx.shares, 0)}</td>
+                  <td><span className="shares-box">{fmt(tx.shares, 0)}</span></td>
                   <td>{fmtPrice(tx.price)}</td>
                   <td>{fmtMoney(tx.shares * tx.price, currency)}</td>
                   <td>
@@ -289,11 +289,14 @@ export function StockPage() {
 
   return (
     <div>
-      <Link to="/portfolio" className="text-muted">← Back to Portfolio</Link>
-      <h1 className="pagetitle" style={{ marginTop: 8, display: 'flex', alignItems: 'center' }}>
-        <TickerLogo ticker={ticker} size="lg" exchange="qse" />
-        {ticker} {name && <span className="text-muted" style={{ fontSize: 16 }}>{shortenCompanyName(name, 40)}</span>}
-      </h1>
+      <div className="d-flex gap-6">
+        <Link to="/portfolio" className="text-muted">← Back to Portfolio</Link>
+        <h1 className="pagetitle d-flex align-items-center">
+          <TickerLogo ticker={ticker} size="lg" exchange="qse" />
+          {ticker} &nbsp; {name && <span className="text-muted" style={{ fontSize: 16 }}>{shortenCompanyName(name, 40)}</span>}
+        </h1>
+      </div>
+
       <Tabs
         tabs={[
           { key: 'summary', label: 'Summary', content: <PositionDetail ticker={ticker} /> },

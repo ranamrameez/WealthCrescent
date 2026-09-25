@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Appearance } from '../types/workbook';
 
-const STORAGE_KEY = 'financerecorder_appearance_v1';
+const STORAGE_KEY = 'WealthCrescent_appearance_v1';
 
 export const DEFAULT_APPEARANCE: Appearance = {
   theme: 'light',

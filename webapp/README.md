@@ -1,7 +1,7 @@
-# FinanceRecorder — Web App
+# WealthCrescent — Web App
 
 FinanceManager live link:
-<https://ranamrameez.github.io/FinaceMaster/>
+<https://ranamrameez.github.io/WealthCrescent/>
 
 > **This is the web app's own detailed status/backlog doc** — moved here from the repo
 > root on 2026-09-08 as part of a repo-wide cleanup (see the root `README.md` for the
@@ -239,9 +239,9 @@ from the lot system."*
     `App.tsx` root with `z-index: 1000`, deliberately higher than the shared `.modal-overlay`
     (100) and the floating Calculator button (500), so it can't be clicked through. Full
     legal text remains at `/legal` (`LegalPage.tsx`, pre-existing) via the sidebar link.
-16. App name + copyright now visible in the UI (2026-08-23) — "FinanceRecorder" header at
-    the top of the sidebar and a "© {year} FinanceRecorder" line at the bottom
-    (`components/Sidebar.tsx`). The browser tab title was already "FinanceRecorder"
+16. App name + copyright now visible in the UI (2026-08-23) — "WealthCrescent" header at
+    the top of the sidebar and a "© {year} WealthCrescent" line at the bottom
+    (`components/Sidebar.tsx`). The browser tab title was already "WealthCrescent"
     (`webapp/index.html`), but nothing showed inside the app itself before this.
 20. New-modules plan written (2026-08-23) — see **`MODULES_PLAN.md`** at the repo root:
     per-module data model sketches, v1 feature scope, and build-order suggestion for
@@ -1128,11 +1128,11 @@ from the lot system."*
     being actively worked). Separately, `AppShell.tsx` gained a desktop-only sidebar
     collapse (distinct from the existing sub-860px mobile drawer, which is closed by
     default and toggled by a hamburger button): above 860px the sidebar is open by default
-    and can be slid off-screen via a new `«` button next to the "FinanceRecorder" title
+    and can be slid off-screen via a new `«` button next to the "WealthCrescent" title
     (`Sidebar.tsx`'s new `.sidebar-title-row`/`.sidebar-collapse-btn`), leaving a small
     floating `»` tab (`.sidebar-expand-tab`, only rendered above 860px) to bring it back —
     state persists across reloads via `localStorage`
-    (`financerecorder_sidebar_collapsed_v1`). Implemented via a CSS transform
+    (`WealthCrescent_sidebar_collapsed_v1`). Implemented via a CSS transform
     (`translateX(-100%)`) rather than `display:none`, so the slide transition animates.
     Verified live via Playwright: full-screen shows the dimmed backdrop and the card
     filling the viewport; collapse hides the body content and shows "Expand"; the sidebar
@@ -4057,7 +4057,7 @@ from the lot system."*
      store actions) / `npm run build` all clean.
 178. **Real 2-year expense-tracker Excel + real RTDB export merged into one whole-app-import
      file for the user (2026-08-26).** The user attached their real personal
-     `QR.Expense.FY20252026_For__FinanceRecorder.xlsx` (Oct.2024-Sep.2026, one sheet/month)
+     `QR.Expense.FY20252026_For__WealthCrescent.xlsx` (Oct.2024-Sep.2026, one sheet/month)
      plus a real production RTDB export and asked for one combined import file using item
      177's format. Full writeup, including 5 real errors found and fixed via independent
      ground-truth cross-checking against the sheet's own summary rows (2 of them self-caught
@@ -4351,7 +4351,7 @@ from the lot system."*
      12.00% main / Annual equiv.: 12.00% · Monthly equiv.: 1.00% (matching hand-calculated
      expectations exactly) — zero console errors. `npx tsc -b` / `npm run test` (397 tests, 4
      new) / `npm run build` all clean.
-191. **A real FinanceRecorder logo mark designed and added, closing Pending item 87
+191. **A real WealthCrescent logo mark designed and added, closing Pending item 87
      (2026-08-27).** The item itself confirmed no logo asset existed at all — `public/
      favicon.svg` turned out to be Vite's own leftover generic scaffold art (a purple/blue
      abstract shape, unrelated to this app), never actually replaced since the project's first
@@ -4361,7 +4361,7 @@ from the lot system."*
      makes for `GoogleIcon` (a real logo should read as a stable identity independent of
      whichever of the app's 12 in-app color themes the viewer has picked, not reskin with it).
      `public/favicon.svg` is the identical mark as a static file for the browser tab. Placed
-     next to the existing "FinanceRecorder" text wordmark in `Sidebar.tsx`'s title row — no CSS
+     next to the existing "WealthCrescent" text wordmark in `Sidebar.tsx`'s title row — no CSS
      changes needed, `.sidebar-title-row` was already a flex row with room for it. Verified live
      via Playwright with real screenshots in both light and dark theme: the mark renders
      cleanly and stays legible in both (a fixed-color badge doesn't need to react to theme the
@@ -4894,7 +4894,7 @@ from the lot system."*
      (same rotate-90-on-open chevron convention `CollapsibleCard` already uses, but NOT wrapped
      in an actual `Card` — a sidebar nav section shouldn't carry card background/shadow styling)
      collapses the numbered list by default, persisted to a new localStorage key
-     (`financerecorder_stock_pages_open_v1`, same try/catch pattern as the existing whole-
+     (`WealthCrescent_stock_pages_open_v1`, same try/catch pattern as the existing whole-
      sidebar collapse in `AppShell.tsx`) so once a user expands it to navigate between pages,
      it stays expanded across reloads rather than forcing a re-expand every visit. Verified live
      via Playwright: collapsed by default (0 nav items rendered, confirmed distinct from
@@ -6702,7 +6702,7 @@ from the lot system."*
   Fixed by switching the workflow from an implicit denylist to an explicit allowlist —
   it now uploads ONLY `webapp/dist`, nothing else, regardless of what's added to the repo
   root later. The app itself moved from a `/webapp/` subpath to the site root
-  (`https://ranamrameez.github.io/FinaceMaster/`, `vite.config.ts`'s `base` updated to match)
+  (`https://ranamrameez.github.io/WealthCrescent/`, `vite.config.ts`'s `base` updated to match)
   now that there's no legacy content left to share the root with. Also removed, confirmed via
   grep to have zero remaining references first: 5 raw screenshot working-files from the PSX
   contract-note extraction sessions (fully transcribed into `psx/trades/psx_sample_statement.html`
@@ -10600,7 +10600,7 @@ everything below is started. Working down it in priority order across following 
 86. ~~App-wide: "Add a plan" (Cash/Banking's Planning-tab add-form) shouldn't be permanently
     visible either — same FAB+popup treatment as items 81/166.~~ **Done (2026-08-26) — see
     Done item 170.**
-87. ~~App-wide: the FinanceRecorder app logo isn't in the navbar/sidebar at all.~~ **Done
+87. ~~App-wide: the WealthCrescent app logo isn't in the navbar/sidebar at all.~~ **Done
     (2026-08-27) — see Done item 191.** A real designed mark now exists (`LogoMark` in
     `icons.tsx` + `public/favicon.svg`), replacing the browser tab's leftover generic Vite
     scaffold art too.
@@ -11368,7 +11368,7 @@ later, additive input source — not something to design the core architecture a
 
 # Migration Plan Overview 
 
-## Migration from plain HTML FinanceMaster app to React JS FinanceRecorder app
+## Migration from plain HTML FinanceMaster app to React JS WealthCrescent app
 
 ## Idea:
 
@@ -11386,7 +11386,7 @@ Suggest me app name which isn't used online yet. In my mind *finance recorder*, 
 
 ## Preferred App Name: 
 
-**FinanceRecorder**
+**WealthCrescent**
 
 ## Plan
 

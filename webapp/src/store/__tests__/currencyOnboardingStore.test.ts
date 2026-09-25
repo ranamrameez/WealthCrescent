@@ -14,12 +14,12 @@ describe('useCurrencyOnboardingStore', () => {
   it('dismiss() flips seen and persists it', () => {
     useCurrencyOnboardingStore.getState().dismiss();
     expect(useCurrencyOnboardingStore.getState().seen).toBe(true);
-    expect(localStorage.getItem('financerecorder_currency_onboarding_seen_v1')).toBe('true');
+    expect(localStorage.getItem('WealthCrescent_currency_onboarding_seen_v1')).toBe('true');
   });
 
   it('persists across a fresh load (simulates a reload)', () => {
     useCurrencyOnboardingStore.getState().dismiss();
-    expect(localStorage.getItem('financerecorder_currency_onboarding_seen_v1')).toBe('true');
+    expect(localStorage.getItem('WealthCrescent_currency_onboarding_seen_v1')).toBe('true');
   });
 
   it('reset() clears seen back to false and removes the persisted flag (account switch)', () => {
@@ -27,6 +27,6 @@ describe('useCurrencyOnboardingStore', () => {
     expect(useCurrencyOnboardingStore.getState().seen).toBe(true);
     useCurrencyOnboardingStore.getState().reset();
     expect(useCurrencyOnboardingStore.getState().seen).toBe(false);
-    expect(localStorage.getItem('financerecorder_currency_onboarding_seen_v1')).toBeNull();
+    expect(localStorage.getItem('WealthCrescent_currency_onboarding_seen_v1')).toBeNull();
   });
 });

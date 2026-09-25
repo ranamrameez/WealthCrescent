@@ -153,27 +153,21 @@ export function RiskCalculator({
 
   return (
     <div>
-      <Card className="mb-md">
-        <div className="row" style={{ gap: 8, marginBottom: 12 }}>
-          <Field label="Stock">
-            <Select value={ticker} onChange={(e) => { setTicker(e.target.value); setTargetTouched(false); }}>
-              {held.map((r) => (
-                <option key={r.ticker} value={r.ticker}>{r.ticker} — {tickerNames[r.ticker] || ''}</option>
-              ))}
-            </Select>
-          </Field>
-          {ticker && (
-            <Field label=" ">
-              <TickerLogo ticker={ticker} exchange={exchange} />
+      <Card className="mb-md entry-row">
+        <div className="row entry-row justify-content-between" style={{ gap: 8, marginBottom: 12 }}>
+          <div className="align-items-center d-flex flex-nowrap justify-content-center">
+            {ticker && (
+                <TickerLogo ticker={ticker} exchange={exchange} size="lg"/>
+            )}
+            <Field label="Stock">
+              <Select value={ticker} onChange={(e) => { setTicker(e.target.value); setTargetTouched(false); }}>
+                {held.map((r) => (
+                  <option key={r.ticker} value={r.ticker}>{r.ticker} — {tickerNames[r.ticker] || ''}</option>
+                ))}
+              </Select>
             </Field>
-          )}
-          {stockPageUrl && ticker && (
-            <Field label=" ">
-              <Link to={stockPageUrl(ticker)} className="btn secondary" style={{ display: 'inline-block' }}>
-                {ticker}'s page →
-              </Link>
-            </Field>
-          )}
+          </div>
+
           <Field label="Risk mode" title="Only changes the suggested capital ceiling further down the page — it never changes the math or guarantees a recovery.">
             <Select value={riskMode} onChange={(e) => setRiskMode(e.target.value as RiskMode)}>
               <option value="conservative">Conservative</option>
@@ -181,8 +175,16 @@ export function RiskCalculator({
               <option value="aggressive">Aggressive</option>
             </Select>
           </Field>
+
+          {stockPageUrl && ticker && (
+            <Field label=" ">
+              <Link to={stockPageUrl(ticker)} className="btn secondary" style={{ display: 'inline-block' }}>
+                {ticker}'s page →
+              </Link>
+            </Field>
+          )}
         </div>
-        <div className="row gap-sm">
+        <div className="row gap-sm entry-row justify-content-between">
           <Field label="Current price" width={100}>
             <TextInput type="number" step="0.001" value={currentPriceInput || ''} onChange={(e) => setCurrentPriceInput(Number(e.target.value))} />
           </Field>
@@ -306,7 +308,7 @@ export function RiskCalculator({
                     return (
                       <tr key={s.add} style={isBest ? { fontWeight: 700 } : undefined}>
                         <td>{fmtMoney(s.add, currency)}</td>
-                        <td>{fmt(s.newShares, 0)} ({fmt(s.newShares - s.extraShares, 0)} + {fmt(s.extraShares, 0)})</td>
+                        <td><span className="shares-box">{fmt(s.newShares, 0)} ({fmt(s.newShares - s.extraShares, 0)} + {fmt(s.extraShares, 0)})</span></td>
                         <td>{fmtPrice(s.newAvg)}</td>
                         <td>{fmtPrice(s.breakEven)}</td>
                         <td>{fmt(s.recoveryNeededPct, 2)}%</td>

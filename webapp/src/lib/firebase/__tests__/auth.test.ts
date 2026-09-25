@@ -44,7 +44,7 @@ describe('Google redirect sign-in silent-failure detection', () => {
 
   it('marks a redirect as pending before navigating away', async () => {
     await signInWithGoogle();
-    expect(sessionStorage.getItem('financerecorder_google_redirect_pending')).toBe('1');
+    expect(sessionStorage.getItem('WealthCrescent_google_redirect_pending')).toBe('1');
   });
 
   it('reports wasPending: false on an ordinary page load that never attempted a redirect', async () => {
@@ -67,7 +67,7 @@ describe('Google redirect sign-in silent-failure detection', () => {
     const { signedIn, wasPending } = await completeGoogleSignInRedirect();
     expect(signedIn).toBe(true);
     expect(wasPending).toBe(true);
-    expect(sessionStorage.getItem('financerecorder_google_redirect_pending')).toBeNull();
+    expect(sessionStorage.getItem('WealthCrescent_google_redirect_pending')).toBeNull();
   });
 
   it('clears the pending flag after reading it, so a second page load in the same tab is not mistaken for another pending redirect', async () => {

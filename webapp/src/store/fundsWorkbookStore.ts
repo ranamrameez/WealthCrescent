@@ -7,4 +7,4 @@ import { createEmptyFundsWorkbook } from './defaultFundsWorkbook';
  * doesn't know about the extra `funds` field — the Funds page mutates it
  * directly via the store's generic `setWorkbook`, which is exactly what
  * that action is for. */
-export const useFundsWorkbookStore = createWorkbookStore('financerecorder_funds_workbook_v1', createEmptyFundsWorkbook);
+export const useFundsWorkbookStore = createWorkbookStore('WealthCrescent_funds_workbook_v1', createEmptyFundsWorkbook);

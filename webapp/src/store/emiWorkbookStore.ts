@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { createEmptyEMIWorkbook } from './defaultEmiWorkbook';
 import type { EMILoan, EMIRepayment, EMIWorkbook } from '../types/emiWorkbook';
 
-const STORAGE_KEY = 'financerecorder_emi_workbook_v1';
+const STORAGE_KEY = 'WealthCrescent_emi_workbook_v1';
 
 /** EMI gained a second array (`repayments`, README Pending items 21/62's
  * repayment-ledger gap) — like Personal Loans before it, two related

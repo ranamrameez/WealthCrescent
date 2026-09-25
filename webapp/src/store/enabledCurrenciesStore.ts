@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { CURRENCIES } from '../lib/currencies';
 
-const STORAGE_KEY = 'financerecorder_enabled_currencies_v1';
+const STORAGE_KEY = 'WealthCrescent_enabled_currencies_v1';
 
 /** User-requested (2026-09-08): "App setting should let the user choose his
  * currencies. and rest of the app use only those... this app supports

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const STORAGE_PREFIX = 'financerecorder_last_currency_';
+const STORAGE_PREFIX = 'WealthCrescent_last_currency_';
 
 /** Remembers the last currency the user picked in a given add-form (keyed
  * per module, e.g. 'cash', 'bank-account', 'personalLoans') so the next

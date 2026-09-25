@@ -1,6 +1,6 @@
-# FinanceRecorder — User Manual
+# WealthCrescent — User Manual
 
-Live app: <https://ranamrameez.github.io/FinaceMaster/>
+Live app: <https://ranamrameez.github.io/WealthCrescent/>
 
 This is the end-user guide — how to actually use the app. For project status/backlog see
 `README.md`; for developer/AI-continuity notes see the repo root's `CLAUDE.md`; for the
@@ -11,7 +11,7 @@ the app itself — if a feature described here changes, this file changes with i
 
 ## 1. What this app does
 
-FinanceRecorder tracks your investments and broader personal finances across multiple
+WealthCrescent tracks your investments and broader personal finances across multiple
 exchanges and account types. It covers two stock exchanges — **QSE** (Qatar Stock Exchange)
 and **PSX** (Pakistan Stock Exchange) — each with its own portfolio, transactions,
 watchlist, analytics, and settings — plus seven more modules: Cash, Personal Loans, Banking,
@@ -50,7 +50,7 @@ chips) and a collapsible **▸ Pages** list of that exchange's own pages, nested
 the "Stock Exchanges" entry — click **Pages** to expand or collapse it (this choice is
 remembered). Which exchange is "active" always matches whichever page you're on.
 
-On a desktop-width screen, click the **«** button next to the "FinanceRecorder" title to
+On a desktop-width screen, click the **«** button next to the "WealthCrescent" title to
 slide the sidebar off-screen and reclaim the space — a small **»** tab stays in the top-left
 corner to bring it back. This choice is remembered, so it stays collapsed (or expanded) the
 next time you load the app. On a narrow/mobile screen the sidebar instead works as a normal

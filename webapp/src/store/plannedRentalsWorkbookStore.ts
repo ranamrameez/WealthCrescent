@@ -6,6 +6,6 @@ import { createEmptyPlannedRentalsWorkbook } from './defaultPlannedRentalsWorkbo
  * (independent store, no migration risk to `rentalsWorkbookStore.ts`'s
  * existing data). */
 export const usePlannedRentalsWorkbookStore = createEntryStore(
-  'financerecorder_planned_rentals_v1',
+  'WealthCrescent_planned_rentals_v1',
   createEmptyPlannedRentalsWorkbook,
 );

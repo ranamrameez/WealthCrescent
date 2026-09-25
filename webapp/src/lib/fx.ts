@@ -28,7 +28,7 @@ export interface FxRates {
   source: 'api' | 'manual';
 }
 
-const FX_CACHE_KEY = 'financerecorder_fx_rates_v1';
+const FX_CACHE_KEY = 'WealthCrescent_fx_rates_v1';
 const FX_API_URL = 'https://open.er-api.com/v6/latest/USD';
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 

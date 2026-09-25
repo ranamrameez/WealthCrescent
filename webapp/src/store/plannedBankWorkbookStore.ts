@@ -5,6 +5,6 @@ import { createEmptyPlannedBankWorkbook } from './defaultPlannedBankWorkbook';
  * doc comment for the full reasoning (independent store, no migration risk
  * to `bankWorkbookStore.ts`'s existing data). */
 export const usePlannedBankWorkbookStore = createEntryStore(
-  'financerecorder_planned_bank_v1',
+  'WealthCrescent_planned_bank_v1',
   createEmptyPlannedBankWorkbook,
 );

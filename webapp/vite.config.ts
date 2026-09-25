@@ -6,13 +6,13 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   // Deployed at the root of the GitHub Pages project site
-  // (github.com/ranamrameez/FinaceMaster -> ranamrameez.github.io/FinaceMaster/).
+  // (github.com/ranamrameez/WealthCrescent -> ranamrameez.github.io/WealthCrescent/).
   // The legacy static apps that used to occupy the repo root (and the
   // /webapp/ subpath this app used to deploy to alongside them) are gone —
   // see .github/workflows/static.yml's own history/comment for why. HashRouter
   // means routing itself doesn't care about the base path; this only
   // affects built asset URLs.
-  base: '/FinaceMaster/',
+  base: '/WealthCrescent/',
   test: {
     environment: 'jsdom',
     globals: true,

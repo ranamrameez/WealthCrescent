@@ -3,7 +3,7 @@
 // script (no module imports allowed there), so it duplicates the tiny bit
 // of selector-config-reading logic it needs instead of importing this file.
 
-// Same Firebase project FinanceRecorder itself uses (webapp/src/lib/firebase/client.ts).
+// Same Firebase project WealthCrescent itself uses (webapp/src/lib/firebase/client.ts).
 // This API key is not a secret — it only identifies the project; real access
 // control lives in the Realtime Database security rules, same as the web app.
 export const FIREBASE_API_KEY = 'AIzaSyCzg_KmLGNUXlIzqEAUJctG29kyJQruM8I';
@@ -100,10 +100,10 @@ export async function setSyncConfig(patch) {
 }
 
 // Prices AND ticker names are written to the SAME shared `stockData/QSE`
-// node the FinanceRecorder web app already reads for ticker names/
+// node the WealthCrescent web app already reads for ticker names/
 // fundamentals (webapp/src/lib/stockData/reader.ts) — not into any one
 // user's own `users/{uid}/workbook`. This is a deliberate choice: a price
-// or name scraped by one signed-in user is useful to every FinanceRecorder
+// or name scraped by one signed-in user is useful to every WealthCrescent
 // user, not just the person running the extension, and it matches this
 // app's own locked architecture decision (see webapp's CLAUDE.md "Design
 // decisions": no live market-data API calls from the app itself — fetch on

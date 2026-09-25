@@ -1,4 +1,4 @@
-# FinanceRecorder — notes for continuing this project
+# WealthCrescent — notes for continuing this project
 
 This file exists so a Claude Code session on *any* machine (the user works from
 multiple PCs) can pick up full context immediately after `git clone` /
@@ -7,7 +7,7 @@ doing anything else in this repo.
 
 ## What this project is
 
-`FinanceRecorder` is a React rewrite of `FinaceMaster` — a personal finance
+`WealthCrescent` is a React rewrite of `WealthCrescent` — a personal finance
 tracker the user is turning into a public-facing multi-exchange, multi-asset
 app. The **full end-state vision** (from the original README, and confirmed
 directly by the user mid-project): stock tracking across **multiple
@@ -192,8 +192,8 @@ app, not developer notes) continuously as features ship.
     Calculator button would render (and be clickable) right through the
     gate, defeating it; verified this in the browser by clicking the
     button's coordinates while the gate was up and confirming nothing
-    opened. Also added a "FinanceRecorder" header at the top of
-    `Sidebar.tsx` and a "© {year} FinanceRecorder" line at the bottom — the
+    opened. Also added a "WealthCrescent" header at the top of
+    `Sidebar.tsx` and a "© {year} WealthCrescent" line at the bottom — the
     app previously had its name in the browser tab title only, nowhere in
     the UI itself.
   - **New-modules sequencing — building now (updated 2026-08-23):** the
@@ -1382,11 +1382,11 @@ app, not developer notes) continuously as features ship.
   by a hamburger button, and unaffected by this change): above 860px
   the sidebar is open by default and can be slid off-screen via a new
   `«` button (`Sidebar.tsx`'s `.sidebar-title-row`/
-  `.sidebar-collapse-btn`, next to the "FinanceRecorder" title), leaving
+  `.sidebar-collapse-btn`, next to the "WealthCrescent" title), leaving
   a small floating `»` tab (`.sidebar-expand-tab`, `@media(min-width:
   861px)`-gated so it never appears on mobile) to bring it back — state
   persists across reloads via `localStorage` key
-  `financerecorder_sidebar_collapsed_v1`. Uses a CSS
+  `WealthCrescent_sidebar_collapsed_v1`. Uses a CSS
   `transform:translateX(-100%)` on `.sidebar.desktop-collapsed` (not
   `display:none`) so the `.18s` slide transition animates, with
   `.main.sidebar-collapsed{margin-left:0}` so content reflows into the
@@ -3489,7 +3489,7 @@ app, not developer notes) continuously as features ship.
   read back and confirmed to contain the correct seeded values under exactly the 14 expected
   keys.
 - **User provided two real files (2026-08-26): a 2-year personal Excel expense tracker
-  (`QR.Expense.FY20252026_For__FinanceRecorder.xlsx`) plus a real production RTDB export
+  (`QR.Expense.FY20252026_For__WealthCrescent.xlsx`) plus a real production RTDB export
   (`qseappdefaultrtdbexport.json`), asked for one combined whole-app-import JSON built from
   both, and asked for this data to double as future test/seed data — DONE, delivered to the
   user as a file (not auto-applied — this session cannot sign in as the user, so the user
@@ -4200,7 +4200,7 @@ app, not developer notes) continuously as features ship.
   hook in `Sidebar.tsx`: a "▸ Pages" toggle (same rotate-90 chevron convention as
   `CollapsibleCard`, but not wrapped in an actual `Card` — a sidebar nav section shouldn't
   carry card styling) collapses the list by default, persisted to `localStorage`
-  (`financerecorder_stock_pages_open_v1`, same try/catch pattern as `AppShell.tsx`'s existing
+  (`WealthCrescent_stock_pages_open_v1`, same try/catch pattern as `AppShell.tsx`'s existing
   whole-sidebar collapse) so once expanded it stays expanded across reloads. Also picked up
   the smaller companion item (a visual separator between the category list and the exchange
   block) in the same pass without asking again, since it's pure CSS with no navigation-
@@ -6260,7 +6260,7 @@ jokers in different color costumes'") and then explicitly closed it out themselv
 rename app is no effort. i just proposed new codebase to let this app work without any issues.
 If redesigning is safe, no need to go for new efforts. we will work with this same repo."*
 **No fork. No new repo. No new codebase folder.** Every redesign step below happens in place,
-in this same `FinaceMaster`/`FinanceRecorder` repo, on real production data, under this file's
+in this same `WealthCrescent`/`WealthCrescent` repo, on real production data, under this file's
 existing cloud-sync-safety and "commit into main directly / verify before every commit"
 standing rules. A cosmetic rename/rebrand (e.g. to "MoneyTracer") remains cheap to do LATER,
 once the redesign has actually landed and stabilized — it is not a prerequisite and nobody has
@@ -7591,7 +7591,7 @@ touched those.
 
 ## Live URLs
 
-- **https://ranamrameez.github.io/FinaceMaster/** — the React app (QSE + PSX,
+- **https://ranamrameez.github.io/WealthCrescent/** — the React app (QSE + PSX,
   `#/` and `#/psx`), now the ONLY thing this repo deploys. The legacy static
   apps this repo used to ALSO serve (`index.html`/QSE, `PSX_Trade_Planner.html`,
   `Risk_Analysis_Calculator.html`, both a duplicate `PSX_Trade_Planner .html`
@@ -7944,15 +7944,15 @@ that section for the full story. The allowlist (`webapp/dist` only, nothing
 else) is deliberate; keep it that way even if something new gets added to
 the repo root later.
 
-`webapp/vite.config.ts` sets `base: '/FinaceMaster/'` to match this
-root-of-the-site deployment (changed from `/FinaceMaster/webapp/` in the
+`webapp/vite.config.ts` sets `base: '/WealthCrescent/'` to match this
+root-of-the-site deployment (changed from `/WealthCrescent/webapp/` in the
 same 2026-09-08 cleanup, once the legacy root files it used to sit
 alongside were gone). If the deploy path ever changes again, update both
 the workflow and this `base` value together.
 
 Push to `main` to deploy (auto-triggers the workflow). Watching a deploy
 without `gh` CLI (not installed on the dev machine): poll
-`https://api.github.com/repos/ranamrameez/FinaceMaster/actions/runs?per_page=1`
+`https://api.github.com/repos/ranamrameez/WealthCrescent/actions/runs?per_page=1`
 for `status`/`conclusion`, or just check the live URL after ~1-2 minutes.
 
 **Git push from the dev machine can hang** waiting on an interactive Git

@@ -47,11 +47,11 @@ val hasReleaseSigning =
         !releaseKeyAlias.isNullOrBlank()
 
 android {
-    namespace = "com.financerecorder.app"
+    namespace = "com.WealthCrescent.app"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.financerecorder.app"
+        applicationId = "com.WealthCrescent.app"
         // NotificationListenerService needs API 19+; WebView + Compose work comfortably from
         // here. 26 (Android 8.0, 2017+) also means every device targeted can use an adaptive
         // launcher icon with no legacy PNG fallback set needed — a reasonable floor for the

@@ -4,7 +4,7 @@ import { assignSeqForEntities, backfillSeq, nextSeqForEntity } from '../lib/seq'
 import { createEmptyPersonalLoansWorkbook } from './defaultPersonalLoansWorkbook';
 import type { PersonalLoan, PersonalLoanRepayment, PersonalLoansWorkbook } from '../types/personalLoansWorkbook';
 
-const STORAGE_KEY = 'financerecorder_personal_loans_workbook_v1';
+const STORAGE_KEY = 'WealthCrescent_personal_loans_workbook_v1';
 
 /** Personal Loans has two related arrays (loans + repayments), so it
  * doesn't fit createEntryStore's single-`entries`-array shape any better

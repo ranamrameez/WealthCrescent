@@ -29,7 +29,7 @@ const PSX_NAV_ITEMS = [
   { num: '08', label: 'Settings', to: '/psx/settings' },
 ];
 
-const PAGES_OPEN_KEY = 'financerecorder_stock_pages_open_v1';
+const PAGES_OPEN_KEY = 'WealthCrescent_stock_pages_open_v1';
 
 /** User-reported (2026-08-27, two independent complaints converging on the
  * same element — "subnav dumped in main nav" and "side nav poorly
@@ -142,7 +142,7 @@ export function Sidebar({
       <div className="sidebar-title-row">
         <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 18, letterSpacing: '.01em' }}>
           <LogoMark />
-          FinanceRecorder
+          WealthCrescent
         </span>
         {onCollapse && (
           <button type="button" className="sidebar-collapse-btn" onClick={onCollapse} aria-label="Hide sidebar" title="Hide sidebar">
@@ -202,7 +202,7 @@ export function Sidebar({
         </div>
 
         <div className="text-muted" style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>© {new Date().getFullYear()} FinanceRecorder</span>
+          <span>© {new Date().getFullYear()} WealthCrescent</span>
           <NavLink to="/legal" style={{ color: 'inherit' }}>Legal</NavLink>
         </div>
       </div>

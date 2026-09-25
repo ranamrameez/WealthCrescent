@@ -1,11 +1,11 @@
-package com.financerecorder.app.bridge
+package com.WealthCrescent.app.bridge
 
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
-import com.financerecorder.app.AppConfig
-import com.financerecorder.app.sms.KnownSmsAccount
-import com.financerecorder.app.sms.ParsedTransaction
-import com.financerecorder.app.sms.PendingTransactionRepository
+import com.WealthCrescent.app.AppConfig
+import com.WealthCrescent.app.sms.KnownSmsAccount
+import com.WealthCrescent.app.sms.ParsedTransaction
+import com.WealthCrescent.app.sms.PendingTransactionRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

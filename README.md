@@ -50,11 +50,11 @@ merge containing Android changes triggers the build; opening or updating a PR do
 
 After a successful build, CI does two things with the debug APK:
 
-1. Uploads `financerecorder-debug-apk` as the normal GitHub Actions artifact.
+1. Uploads `WealthCrescent-debug-apk` as the normal GitHub Actions artifact.
 2. Copies/replaces the latest APK in the repository at:
 
 ```
-builds/android/financerecorder-debug.apk
+builds/android/WealthCrescent-debug.apk
 ```
 
 It also writes:
@@ -68,7 +68,7 @@ with the CI run number, source commit, and branch.
 Once release-signing secrets are configured in the repository (see
 [`android/README.md`'s "Release signing" section](android/README.md#release-signing)),
 the same run also publishes a real release-signed APK at
-`builds/android/financerecorder-release.apk` — the recommended download once that's
+`builds/android/WealthCrescent-release.apk` — the recommended download once that's
 available, since it doesn't carry Android's shared, reputation-less debug signing key.
 
 ### Download on your phone
@@ -80,12 +80,12 @@ debug key:
 
 The debug build, always available:
 
-<img src="builds/android/download-qr.png" alt="Download the FinanceRecorder Android APK (debug)" width="200" height="200">
+<img src="builds/android/download-qr.png" alt="Download the WealthCrescent Android APK (debug)" width="200" height="200">
 
 Scan either with your phone to open and download the current APK without navigating
 through GitHub Actions. Or download directly:
-[release APK](builds/android/financerecorder-release.apk) ·
-[debug APK](builds/android/financerecorder-debug.apk)
+[release APK](builds/android/WealthCrescent-release.apk) ·
+[debug APK](builds/android/WealthCrescent-debug.apk)
 
 *(All four links populate the first time `android-build.yml` runs after being added — the
 release ones only once release-signing secrets are configured. Until then they point at a

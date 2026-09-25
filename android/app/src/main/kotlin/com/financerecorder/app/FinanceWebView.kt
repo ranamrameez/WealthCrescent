@@ -1,4 +1,4 @@
-package com.financerecorder.app
+package com.WealthCrescent.app
 
 import android.annotation.SuppressLint
 import android.net.Uri
@@ -26,7 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.financerecorder.app.bridge.WebAppBridge
+import com.WealthCrescent.app.bridge.WebAppBridge
 
 /**
  * Full-screen WebView loading the real deployed webapp (see AppConfig.WEBAPP_URL) and wiring

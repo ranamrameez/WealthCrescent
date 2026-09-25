@@ -4,7 +4,7 @@ import { createEmptyCategoriesWorkbook } from './defaultCategoriesWorkbook';
 import { DEFAULT_CATEGORY_IDS } from '../lib/categories';
 import type { CategoriesWorkbook, Category } from '../types/finance';
 
-const STORAGE_KEY = 'financerecorder_categories_v1';
+const STORAGE_KEY = 'WealthCrescent_categories_v1';
 
 /** Backfills `serialNumber` (the Category registry's own identity-column
  * equivalent — see `Finance.serialNumber`'s doc comment) onto any category

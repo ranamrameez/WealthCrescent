@@ -89,7 +89,7 @@ export async function resetPassword(email: string) {
  * already depends on to work at all), so if it's STILL missing on return,
  * the redirect genuinely failed to complete, not just "this is an
  * unrelated page load." */
-const GOOGLE_REDIRECT_PENDING_KEY = 'financerecorder_google_redirect_pending';
+const GOOGLE_REDIRECT_PENDING_KEY = 'WealthCrescent_google_redirect_pending';
 
 export async function signInWithGoogle() {
   try { window.sessionStorage.setItem(GOOGLE_REDIRECT_PENDING_KEY, '1'); } catch { /* ignore — worst case, a failed redirect just goes unexplained like before this fix */ }
@@ -117,7 +117,7 @@ export async function completeGoogleSignInRedirect(): Promise<{ signedIn: boolea
   return { signedIn: result !== null, wasPending };
 }
 
-const EMAIL_LINK_STORAGE_KEY = 'financerecorder_email_for_link';
+const EMAIL_LINK_STORAGE_KEY = 'WealthCrescent_email_for_link';
 
 export async function sendEmailLink(email: string) {
   const a = requireAuth();

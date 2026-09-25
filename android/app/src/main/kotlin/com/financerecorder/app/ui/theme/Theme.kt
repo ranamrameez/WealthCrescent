@@ -1,4 +1,4 @@
-package com.financerecorder.app.ui.theme
+package com.WealthCrescent.app.ui.theme
 
 import android.app.Activity
 import android.os.Build
@@ -38,7 +38,7 @@ private val DarkColors = darkColorScheme(
 )
 
 @Composable
-fun FinanceRecorderTheme(
+fun WealthCrescentTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Dynamic color (Android 12+ Material You) is deliberately off by default — this app's
     // brand color is meaningful (matches the webapp's own default theme), and letting it get

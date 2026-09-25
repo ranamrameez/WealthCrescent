@@ -5,7 +5,7 @@ import { resolveIsDeposit, resolveLegacyCategoryId } from '../lib/financeMigrati
 import { createEmptyRentalsWorkbook } from './defaultRentalsWorkbook';
 import type { Property, RentalEntry, RentalsWorkbook } from '../types/rentalsWorkbook';
 
-const STORAGE_KEY = 'financerecorder_rentals_workbook_v1';
+const STORAGE_KEY = 'WealthCrescent_rentals_workbook_v1';
 
 /** `RentalEntry` extends `Finance` (2026-09-03 restructure) — `isDeposit`
  * is the real, authoritative field here (RENT_INCOME → true, EXPENSE →

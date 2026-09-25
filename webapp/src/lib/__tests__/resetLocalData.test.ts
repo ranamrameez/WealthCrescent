@@ -96,7 +96,7 @@ describe('resetAllLocalWorkbooks', () => {
 
     // Persisted to localStorage too, not just in-memory — a page reload
     // right after logout must not bring the old data back.
-    expect(localStorage.getItem('financerecorder_qse_workbook_v1')).not.toBeNull();
-    expect(JSON.parse(localStorage.getItem('financerecorder_qse_workbook_v1')!).transfers).toHaveLength(0);
+    expect(localStorage.getItem('WealthCrescent_qse_workbook_v1')).not.toBeNull();
+    expect(JSON.parse(localStorage.getItem('WealthCrescent_qse_workbook_v1')!).transfers).toHaveLength(0);
   });
 });

@@ -6,6 +6,6 @@ import { createEmptyInterEntityWorkbook } from './defaultInterEntityWorkbook';
  * store, as usual). Reuses `createEntryStore` since this is exactly its
  * "settings + one array of dated, id-addressed entries" shape. */
 export const useInterEntityTransfersStore = createEntryStore(
-  'financerecorder_inter_entity_transfers_v1',
+  'WealthCrescent_inter_entity_transfers_v1',
   createEmptyInterEntityWorkbook,
 );

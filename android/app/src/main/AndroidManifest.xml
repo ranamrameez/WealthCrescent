@@ -17,7 +17,7 @@
     -->
 
     <application
-        android:name=".FinanceRecorderApp"
+        android:name=".WealthCrescentApp"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
@@ -25,7 +25,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
-        android:theme="@style/Theme.FinanceRecorder"
+        android:theme="@style/Theme.WealthCrescent"
         android:usesCleartextTraffic="false">
 
         <activity
@@ -33,7 +33,7 @@
             android:exported="true"
             android:label="@string/app_name"
             android:launchMode="singleTop"
-            android:theme="@style/Theme.FinanceRecorder"
+            android:theme="@style/Theme.WealthCrescent"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

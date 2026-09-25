@@ -4,7 +4,7 @@ import { assignSeqForEntities, backfillSeq, nextSeqForEntity } from '../lib/seq'
 import { createEmptyCreditCardWorkbook } from './defaultCreditCardWorkbook';
 import type { CreditCard, CreditCardTransaction, CreditCardWorkbook } from '../types/creditCard';
 
-const STORAGE_KEY = 'financerecorder_credit_card_workbook_v1';
+const STORAGE_KEY = 'WealthCrescent_credit_card_workbook_v1';
 
 function withDerivedFields(tx: CreditCardTransaction): CreditCardTransaction {
   return { ...tx, timestamp: tx.timestamp ?? new Date().toISOString() };

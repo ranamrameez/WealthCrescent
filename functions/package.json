@@ -1,5 +1,5 @@
 {
-  "name": "financerecorder-functions",
+  "name": "WealthCrescent-functions",
   "description": "Scheduled Firebase Cloud Function that fetches FX exchange rates on a timer and caches them in Realtime Database — the app itself never calls an FX API directly (locked architecture rule, see repo-root CLAUDE.md's Design decisions section).",
   "private": true,
   "engines": {

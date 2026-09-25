@@ -1,12 +1,12 @@
-# TheGroup → FinanceRecorder Price Sync (Chrome extension)
+# TheGroup → WealthCrescent Price Sync (Chrome extension)
 
 Scrapes live QSE prices — and company names — off [The Group](https://webd.thegroup.com.qa/en/markets/qatar)'s
 market-watch page (while it's open in one of your own logged-in tabs) and pushes them into
-the **shared** `stockData/QSE` node in FinanceRecorder's Firebase Realtime Database — the
+the **shared** `stockData/QSE` node in WealthCrescent's Firebase Realtime Database — the
 same node the web app already reads ticker names/fundamentals from — so the data is useful
-to every FinanceRecorder user, not just whoever runs this extension.
+to every WealthCrescent user, not just whoever runs this extension.
 
-FinanceRecorder's bundled ticker list (`webapp/src/lib/stockData/qseSeed.ts`) only ever
+WealthCrescent's bundled ticker list (`webapp/src/lib/stockData/qseSeed.ts`) only ever
 hard-coded a partial set of QSE's real listed companies and was never meant to be kept
 up to date by hand. Since this extension already scrapes every row of the market-watch
 table for a price, it captures that same row's company-name cell too and pushes it to
@@ -47,7 +47,7 @@ is what actually fills in the app's ticker coverage, not a one-off manual edit.
 ## ⚠️ Required one-time setup: a Firebase Realtime Database rule change
 
 This extension writes to `stockData/QSE/...`. That path's current security rules (set up
-for FinanceRecorder itself) most likely don't allow writes from just any authenticated
+for WealthCrescent itself) most likely don't allow writes from just any authenticated
 user — only the project owner can check/change this, since it needs Firebase console
 access this repo's own AI sessions don't have. Open **Firebase Console → Realtime
 Database → Rules** for the `qse-app` project and make sure `stockData` allows a write from
@@ -95,7 +95,7 @@ overriding on overlap) the bundled seed, with no extra wiring needed.
 
 Firebase RTDB rules need *some* authenticated user, but — since prices land in the shared
 `stockData/QSE` node, not any one person's own workbook — it does **not** need to be your
-main FinanceRecorder login. The popup's sign-in form has a **"Create a new account
+main WealthCrescent login. The popup's sign-in form has a **"Create a new account
 instead"** checkbox that registers a brand-new, dedicated email/password account for this
 purpose alone via Firebase's `accounts:signUp` endpoint, so your main password never has to
 sit in this extension's local storage. Either works.

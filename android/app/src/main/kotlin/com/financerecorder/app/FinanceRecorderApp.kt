@@ -1,11 +1,11 @@
-package com.financerecorder.app
+package com.WealthCrescent.app
 
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 
-class FinanceRecorderApp : Application() {
+class WealthCrescentApp : Application() {
     override fun onCreate() {
         super.onCreate()
         createReviewNotificationChannel()

@@ -5,7 +5,7 @@ import { resolveLegacyCategoryId } from '../lib/financeMigration';
 import { createEmptyBankWorkbook } from './defaultBankWorkbook';
 import type { Bank, BankAccount, BankTransaction, BankWorkbook } from '../types/bankWorkbook';
 
-const STORAGE_KEY = 'financerecorder_bank_workbook_v1';
+const STORAGE_KEY = 'WealthCrescent_bank_workbook_v1';
 
 /** `BankTransaction` extends `Finance` (2026-09-03 restructure) — `amount`
  * stays the SIGNED source of truth (see `types/finance.ts`'s file-level

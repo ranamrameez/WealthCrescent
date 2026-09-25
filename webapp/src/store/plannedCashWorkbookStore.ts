@@ -9,6 +9,6 @@ import { createEmptyPlannedCashWorkbook } from './defaultPlannedCashWorkbook';
  * real users' existing Cash data — same reasoning already used for
  * `interEntityTransfersStore.ts`. */
 export const usePlannedCashWorkbookStore = createEntryStore(
-  'financerecorder_planned_cash_v1',
+  'WealthCrescent_planned_cash_v1',
   createEmptyPlannedCashWorkbook,
 );

@@ -1,7 +1,7 @@
-# FinanceRecorder — Android app
+# WealthCrescent — Android app
 
 A native Kotlin + Jetpack Compose Android app that wraps the real deployed webapp
-(`webapp/`, live at https://ranamrameez.github.io/FinaceMaster/) in a WebView, and adds one
+(`webapp/`, live at https://ranamrameez.github.io/WealthCrescent/) in a WebView, and adds one
 native-only capability on top: detecting a bank SMS and turning it into a draft Bank
 transaction the user reviews and approves before it's saved.
 
@@ -166,15 +166,15 @@ warning on a sideloaded install, but it's a real, necessary step toward publishi
 Play Console (which does eliminate it for users who install from there), and toward Play
 App Signing.
 
-**A real signing keystore already exists for this app** (`financerecorder-release.jks`,
-alias `financerecorder-upload`) — it was generated once and delivered directly to the app
+**A real signing keystore already exists for this app** (`WealthCrescent-release.jks`,
+alias `WealthCrescent-upload`) — it was generated once and delivered directly to the app
 owner, not committed to this repo (never commit a signing keystore or its passwords to
 git — `android/.gitignore` blocks `*.jks`/`keystore.properties` for exactly this reason).
 If you're picking this up without that file, generate your own:
 
 ```bash
-keytool -genkeypair -v -keystore financerecorder-release.jks \
-  -alias financerecorder-upload -keyalg RSA -keysize 2048 -validity 10950
+keytool -genkeypair -v -keystore WealthCrescent-release.jks \
+  -alias WealthCrescent-upload -keyalg RSA -keysize 2048 -validity 10950
 ```
 
 (PKCS12 keystores — `keytool`'s modern default, including this one — don't support a
@@ -202,16 +202,16 @@ automatically on the next push that touches `android/**` — no workflow file ed
 | --- | --- |
 | `ANDROID_KEYSTORE_BASE64` | The `.jks` file, base64-encoded as one line (see below) |
 | `ANDROID_KEYSTORE_PASSWORD` | The keystore's store password |
-| `ANDROID_KEY_ALIAS` | `financerecorder-upload` (or whatever alias you used) |
+| `ANDROID_KEY_ALIAS` | `WealthCrescent-upload` (or whatever alias you used) |
 | `ANDROID_KEY_PASSWORD` | Optional — omit it; it falls back to the store password (see the PKCS12 note above) |
 
 To base64-encode the keystore file:
 
 ```bash
 # macOS / Linux:
-base64 -w0 financerecorder-release.jks
+base64 -w0 WealthCrescent-release.jks
 # Windows PowerShell:
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("financerecorder-release.jks"))
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("WealthCrescent-release.jks"))
 ```
 
 Paste the resulting single-line output as `ANDROID_KEYSTORE_BASE64`'s value.
@@ -219,10 +219,10 @@ Paste the resulting single-line output as `ANDROID_KEYSTORE_BASE64`'s value.
 Once all three required secrets are set, every subsequent CI build (see "GitHub Actions
 build and published APK" below) also produces:
 
-- `builds/android/financerecorder-release.apk` — a real release-signed, installable APK,
+- `builds/android/WealthCrescent-release.apk` — a real release-signed, installable APK,
   committed back to the repo the same way the debug APK already is.
 - `builds/android/download-qr-release.png` — a QR code pointing at it.
-- A GitHub Actions artifact named `financerecorder-release-aab` holding the signed `.aab`
+- A GitHub Actions artifact named `WealthCrescent-release-aab` holding the signed `.aab`
   — this is what you manually upload to Play Console the first time (see below); CI
   doesn't publish it anywhere else, since it's only needed for that one manual step.
 - `builds/android/build-info.txt` gains a `Release signing: yes` line plus the signing
@@ -234,16 +234,16 @@ new published, no build step fails or even runs differently.
 
 ### Bootstrapping Play App Signing (one-time, manual)
 
-1. Download the `financerecorder-release-aab` artifact from a CI run (or build it locally
+1. Download the `WealthCrescent-release-aab` artifact from a CI run (or build it locally
    with `./gradlew bundleRelease`).
 2. In Play Console, create the app listing (if it doesn't exist yet) under the account at
    https://play.google.com/store/apps/dev?id=4696950301960308735, package name
-   `com.financerecorder.app`.
+   `com.WealthCrescent.app`.
 3. Upload that `.aab` as the first release (internal testing track is the lowest-friction
    place to start — it doesn't require a public listing to be reviewed first). Play
    Console will offer to enroll the app in **Play App Signing** on this first upload —
    accept it; Google then re-signs the app for distribution with its own key while your
-   upload key (`financerecorder-upload`, in the keystore above) is what you keep using to
+   upload key (`WealthCrescent-upload`, in the keystore above) is what you keep using to
    sign every future upload.
 4. Every later `bundleRelease` (whether built locally or by CI once secrets are added)
    just needs uploading through Play Console the same way — no further one-time setup.
@@ -268,11 +268,11 @@ a build on every PR push when only a merge to `main`/`master` ships anything rea
 
 After a successful build, CI does two things with the debug APK:
 
-1. Uploads `financerecorder-debug-apk` as the normal GitHub Actions artifact.
+1. Uploads `WealthCrescent-debug-apk` as the normal GitHub Actions artifact.
 2. Copies/replaces the latest APK in the repository at:
 
 ```
-builds/android/financerecorder-debug.apk
+builds/android/WealthCrescent-debug.apk
 ```
 
 It also writes:
@@ -346,9 +346,9 @@ It also carries `[skip ci]` in its own commit message, so it doesn't needlessly 
 
 ```
 android/
-  app/src/main/kotlin/com/financerecorder/app/
+  app/src/main/kotlin/com/WealthCrescent/app/
     AppConfig.kt                 Webapp URL, JS interface name — the few things likely to change
-    FinanceRecorderApp.kt        Application class — sets up the review-reminder notification channel
+    WealthCrescentApp.kt        Application class — sets up the review-reminder notification channel
     MainActivity.kt              Bottom-nav Scaffold (WebView tab / Review tab), permission prompts
     FinanceWebView.kt            The WebView itself — settings, URL allowlist, loading/error state
     MainViewModel.kt             Owns WebAppBridge + the pending-drafts/known-accounts state

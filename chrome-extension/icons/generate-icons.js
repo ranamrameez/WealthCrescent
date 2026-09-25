@@ -1,5 +1,5 @@
 // Dev utility, not loaded by the extension itself: regenerates the plain
-// solid-color placeholder PNG icons (navy square, matching FinanceRecorder's
+// solid-color placeholder PNG icons (navy square, matching WealthCrescent's
 // own LogoMark brand color) using only Node's built-in zlib — no image
 // library dependency for three tiny placeholder icons. Run with:
 //   node icons/generate-icons.js

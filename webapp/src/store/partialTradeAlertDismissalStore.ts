@@ -7,7 +7,7 @@ import { create } from 'zustand';
  * `exchange:ticker:date` — dismissing only silences today's occurrence;
  * a fresh trading day (or the opportunity reappearing after having
  * closed) gets a new key, so dismissal is never "forever." */
-const STORAGE_KEY = 'financerecorder_partial_trade_alert_dismissals_v1';
+const STORAGE_KEY = 'WealthCrescent_partial_trade_alert_dismissals_v1';
 
 function load(): Record<string, true> {
   try {

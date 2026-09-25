@@ -4,7 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 
-const COLLAPSE_KEY = 'financerecorder_sidebar_collapsed_v1';
+const COLLAPSE_KEY = 'WealthCrescent_sidebar_collapsed_v1';
 
 /** App shell: sidebar + main content, with a mobile off-canvas drawer below
  * 860px (see the .sidebar/.mobile-menu-btn rules in theme.css) instead of

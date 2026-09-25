@@ -24,6 +24,14 @@
 	--bg-gradient-2:linear-gradient(168deg, color-mix(in srgb, var(--accent) 40%, var(--panel)) 24%, var(--accent) 95%);
 	--bg-gradient-3:linear-gradient(168deg, color-mix(in srgb, var(--accent) 50%, var(--panel)) 34%, var(--accent) 95%);
 	--bg-gradient-4:linear-gradient(168deg, color-mix(in srgb, var(--accent) 60%, var(--panel)) 44%, var(--accent) 95%);
+
+	--bg-design-1: radial-gradient(circle at 47% -49%, color-mix(in srgb, white 69%, var(--card-hue)) 74%, transparent 55%),  color-mix(in srgb, var(--card-hue, var(--accent)) 22%, var(--card-hue));
+	--bg-design-2: radial-gradient(circle at 47% -49%, color-mix(in srgb, white 69%, var(--card-hue)) 74%, transparent 55%),  color-mix(in srgb, var(--card-hue, var(--accent)) 22%, var(--card-hue));
+	--bg-design-3: radial-gradient(circle at 47% -49%, color-mix(in srgb, white 69%, var(--card-hue)) 74%, transparent 55%),  color-mix(in srgb, var(--card-hue, var(--accent)) 22%, var(--card-hue));
+	--bg-design-4: radial-gradient(circle at 47% -49%, color-mix(in srgb, white 69%, var(--card-hue)) 74%, transparent 55%),  color-mix(in srgb, var(--card-hue, var(--accent)) 22%, var(--card-hue));
+	--bg-design-5: radial-gradient(circle at 47% -49%, color-mix(in srgb, white 69%, var(--card-hue)) 74%, transparent 55%),  color-mix(in srgb, var(--card-hue, var(--accent)) 22%, var(--card-hue));
+	--bg-design-6: radial-gradient(circle at 47% -49%, color-mix(in srgb, white 69%, var(--card-hue)) 74%, transparent 55%),  color-mix(in srgb, var(--card-hue, var(--accent)) 22%, var(--card-hue));
+
 	--panel: #1c2129;
 	--panel-2: #232a33;
 	--border: #2d3640;
@@ -256,10 +264,11 @@ html[data-color^="material-"] body {
 	color: var(--text);
 }
 html[data-color^="material-"] .card {
-	/* box-shadow: var(--shadow-card); */
-	background: var(--panel);
-	border-radius: var(--radius-lg);
-	border-color: transparent;
+    box-shadow: var(--shadow-lg);
+    background: var(--panel);
+    border-radius: var(--radius-lg);
+    /* box-shadow: none; */
+    /* border-color: transparent; */
 }
 html[data-color^="material-"] .btn {
 	border: 0 !important;
@@ -1168,8 +1177,8 @@ tbody td:last-child:has(button) {
 	font-size: 12.5px;
 	font-family: var(--mono);
 	font-weight: 700;
-	background: color-mix(in srgb, var(--accent) 16%, var(--panel));
-	color: var(--accent);
+	color: color-mix(in srgb, var(--accent) 16%, var(--panel));
+	background: var(--accent);
 }
 
 label {
@@ -1494,7 +1503,8 @@ textarea:disabled {
      needed. `flex:0 1 auto` uses each child's own width/content as its
      real size (shrinking only if the row is too narrow, per `min-width`
      below), so fields size themselves instead of splitting the row. */
-.row > * {
+/* .row > * */
+.row > label, .row > input, .row > select {
 	flex: 0 1 auto;
 	min-width: 160px;
 }
@@ -2460,10 +2470,9 @@ html[data-color^="material-"][data-theme="light"] .card.stat-card,
 html[data-color^="material-"][data-theme="dark"] .card.stat-card {
 	border: 0;
 	box-shadow: var(--shadow-card);
-	background: color-mix(in srgb, var(--card-hue, var(--accent)) 32%, var(--panel));
-	background:
-		radial-gradient(circle at 50% 30%, color-mix(in srgb, white 12%, transparent) 0%, transparent 55%),
-		color-mix(in srgb, var(--card-hue, var(--accent)) 22%, var(--panel));
+	background: var(--bg-design-1);
+	/* background: color-mix(in srgb, var(--card-hue, var(--accent)) 32%, var(--panel)); */
+	/* background:radial-gradient(circle at 50% 30%, color-mix(in srgb, white 12%, transparent) 0%, transparent 55%), color-mix(in srgb, var(--card-hue, var(--accent)) 22%, var(--panel)); */
 }
 
 /* Fields get the same whisper of color the cards get — background only,

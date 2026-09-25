@@ -1,4 +1,4 @@
-# FinanceRecorder UI Design Guidelines
+# WealthCrescent UI Design Guidelines
 
 This file is the authoritative UI checklist for this React application. It
 turns the Main / Often / Rare redesign principles and later product

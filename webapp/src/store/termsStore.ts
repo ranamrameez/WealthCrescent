@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-const STORAGE_KEY = 'financerecorder_terms_accepted_v1';
+const STORAGE_KEY = 'WealthCrescent_terms_accepted_v1';
 
 interface TermsState {
   accepted: boolean;

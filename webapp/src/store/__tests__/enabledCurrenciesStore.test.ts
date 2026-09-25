@@ -37,15 +37,15 @@ describe('useEnabledCurrenciesStore', () => {
 
   it('setEnabledCodes(null) resets back to "everything" and clears the persisted key', () => {
     useEnabledCurrenciesStore.getState().setEnabledCodes(['USD', 'EUR']);
-    expect(localStorage.getItem('financerecorder_enabled_currencies_v1')).not.toBeNull();
+    expect(localStorage.getItem('WealthCrescent_enabled_currencies_v1')).not.toBeNull();
     useEnabledCurrenciesStore.getState().setEnabledCodes(null);
     expect(useEnabledCurrenciesStore.getState().enabledCodes).toBeNull();
-    expect(localStorage.getItem('financerecorder_enabled_currencies_v1')).toBeNull();
+    expect(localStorage.getItem('WealthCrescent_enabled_currencies_v1')).toBeNull();
   });
 
   it('persists across a fresh load (simulates a reload)', () => {
     useEnabledCurrenciesStore.getState().setEnabledCodes(['PKR', 'USD']);
-    const raw = localStorage.getItem('financerecorder_enabled_currencies_v1');
+    const raw = localStorage.getItem('WealthCrescent_enabled_currencies_v1');
     expect(JSON.parse(raw!)).toEqual(['PKR', 'USD']);
   });
 });

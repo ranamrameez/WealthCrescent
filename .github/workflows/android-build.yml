@@ -35,11 +35,11 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  APK_FILE_NAME: financerecorder-debug.apk
-  ARTIFACT_NAME: financerecorder-debug-apk
-  RELEASE_APK_FILE_NAME: financerecorder-release.apk
-  RELEASE_ARTIFACT_NAME: financerecorder-release-apk
-  RELEASE_AAB_ARTIFACT_NAME: financerecorder-release-aab
+  APK_FILE_NAME: WealthCrescent-debug.apk
+  ARTIFACT_NAME: WealthCrescent-debug-apk
+  RELEASE_APK_FILE_NAME: WealthCrescent-release.apk
+  RELEASE_ARTIFACT_NAME: WealthCrescent-release-apk
+  RELEASE_AAB_ARTIFACT_NAME: WealthCrescent-release-aab
   BUILD_DIR: builds/android
 
 jobs:
@@ -209,12 +209,12 @@ jobs:
           branch = os.environ["GITHUB_REF_NAME"]
           has_signing = os.environ["HAS_SIGNING"] == "true"
 
-          debug_url = f"https://raw.githubusercontent.com/{repo}/{branch}/builds/android/financerecorder-debug.apk"
+          debug_url = f"https://raw.githubusercontent.com/{repo}/{branch}/builds/android/WealthCrescent-debug.apk"
           qrcode.make(debug_url, box_size=10, border=2).save("builds/android/download-qr.png")
           print(f"Debug QR points to: {debug_url}")
 
           if has_signing:
-              release_url = f"https://raw.githubusercontent.com/{repo}/{branch}/builds/android/financerecorder-release.apk"
+              release_url = f"https://raw.githubusercontent.com/{repo}/{branch}/builds/android/WealthCrescent-release.apk"
               qrcode.make(release_url, box_size=10, border=2).save("builds/android/download-qr-release.png")
               print(f"Release QR points to: {release_url}")
           PY
