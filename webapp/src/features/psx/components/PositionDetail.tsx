@@ -221,7 +221,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
   return (
     // Pending items 54/56/57: charts + Price range move to a right-hand
     // stack while the other stat cards stay on the left, on wide viewports
-    // — see theme.css's .position-split comment for the mobile-order
+    // — see main.css's .position-split comment for the mobile-order
     // tradeoff (left-column content shows first when collapsed to one
     // column, not the original top-to-bottom order).
     <>

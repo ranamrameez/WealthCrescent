@@ -49,7 +49,7 @@ ChartJS.defaults.scales.linear.grace = '10%';
  * ignoring the container's own CSS height), which is exactly why a chart
  * in a wide sidebar-adjacent column could render 500px+ tall with no cap.
  * Set globally so no individual chart call site needs its own `options`
- * override — `ChartCard`'s `.chart-canvas-wrap` (theme.css) then supplies
+ * override — `ChartCard`'s `.chart-canvas-wrap` (main.css) then supplies
  * the actual height/max-height every chart now respects. */
 ChartJS.defaults.maintainAspectRatio = false;
 

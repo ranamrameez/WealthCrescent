@@ -1,0 +1,142 @@
+/* cobalt: palette and component styles. */
+html[data-color="cobalt"] {
+	--radius: 10px;
+	--radius-lg: 14px;
+}
+
+html[data-color="cobalt"] .btn {
+	border: 1px solid var(--border);
+	box-shadow: none;
+	transition:
+		background 0.12s ease,
+		border-color 0.12s ease,
+		color 0.12s ease,
+		transform 0.12s ease,
+		box-shadow 0.12s ease;
+}
+html[data-color="cobalt"] .btn:hover {
+	transform: translateY(-1px);
+	box-shadow: 0 3px 9px rgba(20, 30, 40, 0.12);
+}
+html[data-color="cobalt"] .btn.primary {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--on-accent);
+}
+html[data-color="cobalt"] .btn.secondary {
+	background: var(--accent-soft);
+	border-color: transparent;
+	color: var(--accent);
+}
+html[data-color="cobalt"] .btn.ghost {
+	background: transparent;
+	border-color: transparent;
+	color: var(--accent);
+}
+
+html[data-color="cobalt"] .navbtn.active {
+	background: var(--accent-soft);
+	color: var(--accent);
+	box-shadow: inset 3px 0 0 var(--accent);
+}
+html[data-color="cobalt"] .page-topbar .chip {
+	background: transparent;
+	color: var(--muted);
+}
+html[data-color="cobalt"] .page-topbar .chip.active {
+	background: var(--accent);
+	color: var(--panel);
+}
+
+html[data-color="cobalt"] .stat-card {
+	background: radial-gradient(circle at 31% 35%, color-mix(in srgb, #fff 19%, var(--card-hue)) 40%, transparent 0%),  color-mix(in srgb, var(--card-hue, var(--accent)) 75%, var(--card-hue) 7%);
+}
+
+
+html[data-color="cobalt"] .stat-card .label {
+    padding: 5px;
+    border-radius: 5px;
+    color: var(--card-hue, var(--accent));
+    background: rgb(255 255 255 / 72%);
+    font-weight: 800;
+}
+
+html[data-color="cobalt"] .stat-card .value {
+	color: var(--text);
+	font-weight: 800;
+}
+
+html[data-color="cobalt"] input,
+html[data-color="cobalt"] select {
+	background: var(--panel-2);
+	border-color: var(--border);
+}
+html[data-color="cobalt"] input:focus,
+html[data-color="cobalt"] select:focus {
+	border-color: var(--accent);
+	outline: 3px solid color-mix(in srgb, var(--accent-soft) 78%, transparent);
+}
+html[data-color="cobalt"] thead th {
+	color: var(--accent);
+	border-bottom-color: var(--border);
+}
+html[data-color="cobalt"] tbody tr:hover {
+	background: color-mix(in srgb, var(--accent-soft) 55%, var(--panel));
+}
+html[data-color="cobalt"] .notice,
+html[data-color="cobalt"] .empty,
+html[data-color="cobalt"] .table-wrap {
+	background: var(--panel-2);
+	border-color: var(--border);
+}
+html[data-color="cobalt"] .btn.fab-btn {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--on-accent);
+	box-shadow: 0 5px 18px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+html[data-color="cobalt"] .btn.fab-btn-secondary {
+	background: var(--panel);
+	border-color: var(--border);
+	color: var(--accent);
+}
+html[data-theme="light"][data-color="cobalt"] {
+	--bg: #f4f7fb;
+	--panel: #fff;
+	--panel-2: #edf2f8;
+	--border: #d3dce8;
+	--text: #15202b;
+	--muted: #627181;
+	--accent: #1457b8;
+	--accent-soft: #dce9fb;
+	--on-accent: #fff;
+	--gold: #a86a00;
+	--gold-rgb: 168, 106, 0;
+	--info: #176fa8;
+	--info-rgb: 23, 111, 168;
+	--profit: #168454;
+	--loss: #c73548;
+	--warn: #a86a00;
+	--shadow-card: 0 1px 2px rgba(25, 45, 70, 0.05), 0 5px 16px rgba(25, 45, 70, 0.08);
+	--shadow-lg: 0 10px 26px rgba(25, 45, 70, 0.12);
+}
+html[data-color="cobalt"][data-theme="dark"] {
+	--bg: #0d141d;
+	--panel: #151e2a;
+	--panel-2: #202b39;
+	--border: #334355;
+	--text: #edf4fb;
+	--muted: #9aabbd;
+	--accent: #62a5ff;
+	--accent-soft: #193d68;
+	--on-accent: #081b32;
+	--gold: #f3bf66;
+	--gold-rgb: 243, 191, 102;
+	--info: #72c4ef;
+	--info-rgb: 114, 196, 239;
+	--profit: #61d69a;
+	--loss: #f37b87;
+	--warn: #f3bf66;
+	--shadow-card: 0 1px 2px rgba(0, 0, 0, 0.22), 0 6px 18px rgba(0, 0, 0, 0.24);
+	--shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.34);
+}

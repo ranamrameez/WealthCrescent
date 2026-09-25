@@ -1,0 +1,150 @@
+/* aurora: palette and component styles. */
+html[data-color="aurora"] {
+	--radius: 10px;
+	--radius-lg: 14px;
+}
+
+html[data-color="aurora"] .btn {
+	border: 1px solid var(--border);
+	box-shadow: none;
+	transition:
+		background 0.12s ease,
+		border-color 0.12s ease,
+		color 0.12s ease,
+		transform 0.12s ease,
+		box-shadow 0.12s ease;
+}
+html[data-color="aurora"] .btn:hover {
+	transform: translateY(-1px);
+	box-shadow: 0 3px 9px rgba(20, 30, 40, 0.12);
+}
+html[data-color="aurora"] .btn.primary {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--on-accent);
+}
+html[data-color="aurora"] .btn.secondary {
+	background: var(--accent-soft);
+	border-color: transparent;
+	color: var(--accent);
+}
+html[data-color="aurora"] .btn.ghost {
+	background: transparent;
+	border-color: transparent;
+	color: var(--accent);
+}
+
+html[data-color="aurora"] .navbtn.active {
+	background: var(--accent-soft);
+	color: var(--accent);
+	box-shadow: inset 3px 0 0 var(--accent);
+}
+html[data-color="aurora"] .page-topbar .chip {
+	background: transparent;
+	color: var(--muted);
+}
+html[data-color="aurora"] .page-topbar .chip.active {
+	background: var(--accent);
+	color: var(--panel);
+}
+html[data-color="aurora"] .stat-card {
+    gap: 0;
+    align-items: center;
+    background: radial-gradient(circle at 77% 51%, color-mix(in srgb, #FFF 37%, var(--card-hue)) 21%, transparent 33%),  color-mix(in srgb, var(--card-hue, var(--accent)) 75%, var(--card-hue) 7%);
+}
+html[data-color="aurora"] .stat-card > *,
+html[data-color="aurora"] .stat-card-inner {
+    padding: 5px;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    border-radius: 4px;
+    color: var(--card-hue, var(--accent)) !important;
+    margin: 0;
+    background: #ffffff78;
+    font-weight: 800;
+    flex-direction: column;
+    align-content: center;
+    justify-content: space-evenly;
+    align-items: flex-start;
+}
+
+html[data-color="aurora"] .stat-card .value {
+	color: var(--text);
+	font-weight: 800;
+}
+
+html[data-color="aurora"] input,
+html[data-color="aurora"] select {
+	background: var(--panel-2);
+	border-color: var(--border);
+}
+html[data-color="aurora"] input:focus,
+html[data-color="aurora"] select:focus {
+	border-color: var(--accent);
+	outline: 3px solid color-mix(in srgb, var(--accent-soft) 78%, transparent);
+}
+html[data-color="aurora"] thead th {
+	color: var(--accent);
+	border-bottom-color: var(--border);
+}
+html[data-color="aurora"] tbody tr:hover {
+	background: color-mix(in srgb, var(--accent-soft) 55%, var(--panel));
+}
+html[data-color="aurora"] .notice,
+html[data-color="aurora"] .empty,
+html[data-color="aurora"] .table-wrap {
+	background: var(--panel-2);
+	border-color: var(--border);
+}
+html[data-color="aurora"] .btn.fab-btn {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--on-accent);
+	box-shadow: 0 5px 18px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+html[data-color="aurora"] .btn.fab-btn-secondary {
+	background: var(--panel);
+	border-color: var(--border);
+	color: var(--accent);
+}
+html[data-theme="light"][data-color="aurora"] {
+	--bg: #f5f7fb;
+	--panel: #fff;
+	--panel-2: #eef2f7;
+	--border: #d7deea;
+	--text: #17202a;
+	--muted: #667384;
+	--accent: #5b50d6;
+	--accent-soft: #e6e3ff;
+	--on-accent: #fff;
+	--gold: #a96500;
+	--gold-rgb: 169, 101, 0;
+	--info: #147ca0;
+	--info-rgb: 20, 124, 160;
+	--profit: #168454;
+	--loss: #c73548;
+	--warn: #a96500;
+	--shadow-card: 0 1px 2px rgba(25, 35, 50, 0.05), 0 5px 16px rgba(25, 35, 50, 0.08);
+	--shadow-lg: 0 10px 26px rgba(25, 35, 50, 0.12);
+}
+html[data-color="aurora"][data-theme="dark"] {
+	--bg: #10131a;
+	--panel: #191d27;
+	--panel-2: #232936;
+	--border: #343c4d;
+	--text: #eef1f7;
+	--muted: #9da8ba;
+	--accent: #aaa0ff;
+	--accent-soft: #302c55;
+	--on-accent: #17152c;
+	--gold: #f0bd68;
+	--gold-rgb: 240, 189, 104;
+	--info: #63c9e8;
+	--info-rgb: 99, 201, 232;
+	--profit: #5bdd98;
+	--loss: #f17b88;
+	--warn: #f0bd68;
+	--shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2), 0 6px 18px rgba(0, 0, 0, 0.22);
+	--shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.32);
+}

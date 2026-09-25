@@ -10,7 +10,7 @@ import { tickerColor } from '../lib/cssVar';
  * "present in root repo" was the user's own memory of the LEGACY app's
  * mechanism (`index.html`'s `tickerLogo()`/`logoFallback()`), which this
  * component ports as-is, not a real local asset that got missed. The CSS
- * (`.ticker-logo`/`.ticker-logo-fallback` in `theme.css`) was already
+ * (`.ticker-logo`/`.ticker-logo-fallback` in `main.css`) was already
  * copied over from the legacy app at some point, but nothing in the React
  * codebase ever actually used it — this is that missing piece.
  *

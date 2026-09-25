@@ -3,23 +3,8 @@ import { createPortal } from 'react-dom';
 import { useAppearanceStore } from '../store/appearanceStore';
 import type { DateFormat } from '../lib/format';
 
-const COLOR_THEMES = [
-  { group: 'Classic rounded themes', options: [
-    ['ocean', 'Ocean (Finance Blue)'],
-    ['forest', 'Forest (Finance Green)'],
-    ['violet', 'Violet (Market Purple)'],
-  ] },
-  { group: 'Modern finance themes', options: [
-    ['aurora', 'Aurora (Indigo)'],
-    ['cobalt', 'Cobalt (Finance Blue)'],
-    ['teal', 'Teal (Blue-Green)'],
-    ['copper', 'Copper (Market Orange)'],
-    ['gold', 'Gold (Wealth)'],
-  ] },
-  { group: 'Material themes', options: [
-    ['material-teal', 'Material Teal'],
-  ] },
-];
+import { COLOR_THEMES } from '../themes/catalog';
+
 
 /** The actual set of appearance controls — extracted so both the sidebar's
  * compact popover (`AppearancePanel` below) and the global Account hub's

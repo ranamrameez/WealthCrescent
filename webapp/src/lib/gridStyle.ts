@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 
 /** Builds the style object for the shared `.grid-auto` class
- * (`main/site.css`) - pass the exact minmax/gap numbers a call site used
+ * (`main.css`) - pass the exact minmax/gap numbers a call site used
  * to hardcode inline. Kept as a tiny typed helper (rather than each call
  * site writing the `'--grid-min' as any` cast itself) so every usage
  * stays consistent. */

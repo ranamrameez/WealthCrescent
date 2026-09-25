@@ -1,0 +1,142 @@
+/* teal: palette and component styles. */
+html[data-color="teal"] {
+	--radius: 10px;
+	--radius-lg: 14px;
+}
+
+html[data-color="teal"] .btn {
+	border: 1px solid var(--border);
+	box-shadow: none;
+	transition:
+		background 0.12s ease,
+		border-color 0.12s ease,
+		color 0.12s ease,
+		transform 0.12s ease,
+		box-shadow 0.12s ease;
+}
+html[data-color="teal"] .btn:hover {
+	transform: translateY(-1px);
+	box-shadow: 0 3px 9px rgba(20, 30, 40, 0.12);
+}
+html[data-color="teal"] .btn.primary {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--on-accent);
+}
+html[data-color="teal"] .btn.secondary {
+	background: var(--accent-soft);
+	border-color: transparent;
+	color: var(--accent);
+}
+html[data-color="teal"] .btn.ghost {
+	background: transparent;
+	border-color: transparent;
+	color: var(--accent);
+}
+
+html[data-color="teal"] .navbtn.active {
+	background: var(--accent-soft);
+	color: var(--accent);
+	box-shadow: inset 3px 0 0 var(--accent);
+}
+html[data-color="teal"] .page-topbar .chip {
+	background: transparent;
+	color: var(--muted);
+}
+html[data-color="teal"] .page-topbar .chip.active {
+	background: var(--accent);
+	color: var(--panel);
+}
+
+html[data-color="teal"] .stat-card{
+	background: radial-gradient(circle at 14% 50%, color-mix(in srgb, #fff 36%, var(--card-hue)) 29%, transparent 91%),  color-mix(in srgb, var(--card-hue, var(--accent)) 94%, var(--card-hue) 97%);
+}
+
+
+html[data-color="teal"] .stat-card .label {
+    padding: 5px;
+    border-radius: 5px;
+    color: var(--card-hue, var(--accent));
+    background: rgb(255 255 255 / 72%);
+    font-weight: 800;
+}
+
+html[data-color="teal"] .stat-card .value {
+	color: var(--text);
+	font-weight: 800;
+}
+
+html[data-color="teal"] input,
+html[data-color="teal"] select {
+	background: var(--panel-2);
+	border-color: var(--border);
+}
+html[data-color="teal"] input:focus,
+html[data-color="teal"] select:focus {
+	border-color: var(--accent);
+	outline: 3px solid color-mix(in srgb, var(--accent-soft) 78%, transparent);
+}
+html[data-color="teal"] thead th {
+	color: var(--accent);
+	border-bottom-color: var(--border);
+}
+html[data-color="teal"] tbody tr:hover {
+	background: color-mix(in srgb, var(--accent-soft) 55%, var(--panel));
+}
+html[data-color="teal"] .notice,
+html[data-color="teal"] .empty,
+html[data-color="teal"] .table-wrap {
+	background: var(--panel-2);
+	border-color: var(--border);
+}
+html[data-color="teal"] .btn.fab-btn {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--on-accent);
+	box-shadow: 0 5px 18px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+html[data-color="teal"] .btn.fab-btn-secondary {
+	background: var(--panel);
+	border-color: var(--border);
+	color: var(--accent);
+}
+html[data-theme="light"][data-color="teal"] {
+	--bg: #f3f8fa;
+	--panel: #fff;
+	--panel-2: #e7f1f4;
+	--border: #cedde3;
+	--text: #142328;
+	--muted: #5f7279;
+	--accent: #007d91;
+	--accent-soft: #d7eef2;
+	--on-accent: #fff;
+	--gold: #a56500;
+	--gold-rgb: 165, 101, 0;
+	--info: #2477a0;
+	--info-rgb: 36, 119, 160;
+	--profit: #168454;
+	--loss: #c73548;
+	--warn: #a56500;
+	--shadow-card: 0 1px 2px rgba(20, 45, 55, 0.05), 0 5px 16px rgba(20, 45, 55, 0.08);
+	--shadow-lg: 0 10px 26px rgba(20, 45, 55, 0.12);
+}
+html[data-color="teal"][data-theme="dark"] {
+	--bg: #0d171a;
+	--panel: #152226;
+	--panel-2: #203136;
+	--border: #33464b;
+	--text: #edf7f8;
+	--muted: #9db2b6;
+	--accent: #42c6cc;
+	--accent-soft: #15464a;
+	--on-accent: #062427;
+	--gold: #f0bd68;
+	--gold-rgb: 240, 189, 104;
+	--info: #70c0e6;
+	--info-rgb: 112, 192, 230;
+	--profit: #5ddd9c;
+	--loss: #f37d88;
+	--warn: #f0bd68;
+	--shadow-card: 0 1px 2px rgba(0, 0, 0, 0.22), 0 6px 18px rgba(0, 0, 0, 0.24);
+	--shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.34);
+}

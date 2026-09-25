@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Appearance } from '../types/workbook';
+import { DEFAULT_COLOR_THEME, normalizeColorTheme } from '../themes/catalog';
 
 const STORAGE_KEY = 'WealthCrescent_appearance_v1';
 
@@ -7,7 +8,7 @@ export const DEFAULT_APPEARANCE: Appearance = {
   theme: 'light',
   font: 'body',
   fontSize: 'medium',
-  colorTheme: 'wine',
+  colorTheme: DEFAULT_COLOR_THEME,
   density: 'comfortable',
   numberDisplay: 'compact',
   dateFormat: 'DD-MMM-YYYY',
@@ -27,7 +28,7 @@ function load(): Appearance {
       const dateFormat = typeof legacy === 'string' && DATE_FORMATS.has(legacy)
         ? legacy
         : DEFAULT_APPEARANCE.dateFormat;
-      return { ...DEFAULT_APPEARANCE, ...parsed, dateFormat } as Appearance;
+      return { ...DEFAULT_APPEARANCE, ...parsed, dateFormat, colorTheme: normalizeColorTheme(parsed.colorTheme) } as Appearance;
     }
   } catch {
     /* ignore, fall through to defaults */
@@ -53,6 +54,7 @@ export const useAppearanceStore = create<AppearanceState>((set, get) => ({
 
   update: (patch) => {
     const next = { ...get().appearance, ...patch };
+    next.colorTheme = normalizeColorTheme(next.colorTheme);
     set({ appearance: next });
     persist(next);
   },

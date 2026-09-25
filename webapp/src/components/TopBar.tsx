@@ -11,7 +11,7 @@ import { usePageTopBarStore } from '../store/pageTopBarStore';
  * `AppShell.tsx` renders this as `.main`'s very FIRST child, ahead of
  * every page's own content — on load (scrollTop 0) that already puts it
  * at the top of the visible page with nothing above it to scroll past,
- * and `position: sticky` (see `.page-topbar` in `theme.css`, reusing the
+ * and `position: sticky` (see `.page-topbar` in `main.css`, reusing the
  * old `.chip-tabs.subnav` rule's own tuned padding/shadow) keeps it
  * pinned from there on. Living inside `.main` also means it automatically
  * tracks the sidebar's collapsed/expanded width and the mobile drawer
