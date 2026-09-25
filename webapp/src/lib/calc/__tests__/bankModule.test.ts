@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BankAccount, BankTransaction } from '../../../types/bankWorkbook';
 import type { Category } from '../../../types/finance';
-import { accountBalance, accountBalanceAsOfMonth, accountByCategory, accountPendingBalance, accountPeriodAnalytics, accountRunningLedger, assetBalanceByCurrency, bankAnalyticsFromLedger, bankMonthlyFlow, budgetVsActual, creditCardLiabilityByCurrency, totalBalanceByCurrency } from '../bankModule';
+import { accountBalance, accountBalanceAsOfMonth, accountByCategory, accountEffectiveTransactions, accountPendingBalance, accountPeriodAnalytics, accountRunningLedger, assetBalanceByCurrency, bankAnalyticsFromLedger, bankMonthlyFlow, budgetVsActual, creditCardLiabilityByCurrency, totalBalanceByCurrency } from '../bankModule';
 
 const TEST_CATEGORIES: Category[] = [
   { id: 'cat_food', serialNumber: 1, name: 'Food' },
@@ -32,6 +32,18 @@ const tx = (over: Partial<BankTransaction>): BankTransaction => ({
 });
 
 describe('accountBalance', () => {
+  it('reconciles imported duplicates without deleting stored rows', () => {
+    const a = account({});
+    const rows = [
+      tx({ id: 'manual', amount: -50, description: ' Grocery ' }),
+      tx({ id: 'imported', amount: -50, description: 'grocery', source: 'statement-import' }),
+      tx({ id: 'other-import', amount: 20, source: 'statement-import' }),
+      tx({ id: 'duplicate-import', amount: 20, source: 'statement-import' }),
+    ];
+    expect(accountEffectiveTransactions(a, rows).map(row => row.id)).toEqual(['manual', 'other-import']);
+    expect(accountBalance(a, rows)).toBe(970);
+    expect(rows).toHaveLength(4);
+  });
   it('can display future pending rows without changing cleared balances', () => {
     const a = account({});
     const rows = [
