@@ -1,6 +1,7 @@
 import type { User } from 'firebase/auth';
 import { useEffect, useRef } from 'react';
-import { fetchProfile, saveCurrencyPreference } from './profile';
+import { fetchProfile, saveAppearancePreference, saveCurrencyPreference } from './profile';
+import { useAppearanceStore } from '../../store/appearanceStore';
 import { useCurrencyOnboardingStore } from '../../store/currencyOnboardingStore';
 import { useEnabledCurrenciesStore } from '../../store/enabledCurrenciesStore';
 
@@ -66,6 +67,11 @@ export function useSyncCurrencyPreference(user: User | null): void {
       } else if (useCurrencyOnboardingStore.getState().seen) {
         saveCurrencyPreference(user.uid, { currencyOnboardingSeen: true }).catch(() => {});
       }
+      if (cloud.appearance) {
+        useAppearanceStore.getState().update(cloud.appearance);
+      } else {
+        saveAppearancePreference(user.uid, useAppearanceStore.getState().appearance).catch(() => {});
+      }
       readyForUid.current = user.uid;
     })();
     return () => {
@@ -75,6 +81,7 @@ export function useSyncCurrencyPreference(user: User | null): void {
 
   const enabledCodes = useEnabledCurrenciesStore((s) => s.enabledCodes);
   const seen = useCurrencyOnboardingStore((s) => s.seen);
+  const appearance = useAppearanceStore((s) => s.appearance);
 
   useEffect(() => {
     if (!user || readyForUid.current !== user.uid) return;
@@ -85,4 +92,9 @@ export function useSyncCurrencyPreference(user: User | null): void {
     if (!user || readyForUid.current !== user.uid || !seen) return;
     saveCurrencyPreference(user.uid, { currencyOnboardingSeen: true }).catch(() => {});
   }, [user, seen]);
+
+  useEffect(() => {
+    if (!user || readyForUid.current !== user.uid) return;
+    saveAppearancePreference(user.uid, appearance).catch(() => {});
+  }, [user, appearance]);
 }

@@ -1,6 +1,7 @@
 import { updateProfile as updateAuthProfile, type User } from 'firebase/auth';
 import { get, onValue, ref, update } from 'firebase/database';
 import { db } from './client';
+import type { Appearance } from '../../types/workbook';
 
 export interface UserProfile {
   displayName: string;
@@ -17,6 +18,8 @@ export interface UserProfile {
    * already uses locally. */
   enabledCurrencies?: string[] | null;
   currencyOnboardingSeen?: boolean;
+  /** Account-level UI settings, synced across devices. */
+  appearance?: Partial<Appearance>;
 }
 
 const DEFAULT_PROFILE: UserProfile = { displayName: '', avatarEmoji: '' };
@@ -70,4 +73,9 @@ export async function saveProfile(user: User, profile: Pick<UserProfile, 'displa
 export async function saveCurrencyPreference(uid: string, patch: { enabledCurrencies?: string[] | null; currencyOnboardingSeen?: boolean }): Promise<void> {
   if (!db) throw new Error('Cloud sync is unavailable — Firebase failed to load in this browser.');
   await update(ref(db, profilePath(uid)), patch);
+}
+
+export async function saveAppearancePreference(uid: string, appearance: Appearance): Promise<void> {
+  if (!db) throw new Error('Cloud sync is unavailable — Firebase failed to load in this browser.');
+  await update(ref(db, profilePath(uid)), { appearance });
 }

@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
+import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls';
+import { StandardPageSections } from '../../../components/StandardPageSections';
 import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
 import { confirmDialog } from '../../../components/ConfirmDialog';
@@ -22,6 +24,7 @@ import { useEnabledCurrencies } from '../../../hooks/useEnabledCurrencies';
 import { useLastCurrency } from '../../../hooks/useLastCurrency';
 import { usePrimaryCurrency } from '../../../hooks/usePrimaryCurrency';
 import { usePageFabActions } from '../../../hooks/usePageFabActions';
+import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { getLastTransferSource, rememberTransferSource } from '../../../hooks/useLastTransferSource';
 import { hueStyle } from '../../../lib/statCardHues';
 import { categoryName, UNCATEGORIZED_ID } from '../../../lib/categories';
@@ -438,6 +441,14 @@ export function CreditCardDetailPage() {
   // projection and the plan list below.
   const [horizonDays, setHorizonDays] = useState<PlanningHorizonDays>(30);
 
+  usePageTopBarRightSlot(card ? (
+    <TopBarControls>
+      <TopBarSelect label="Switch card" value={card.id}
+        onChange={(event) => navigate(event.target.value ? `/bank/card/${event.target.value}` : '/bank')}
+        options={[{ value: '', label: 'All cards' }, ...cards.filter((item) => item.isActive !== false || item.id === card.id).map((item) => ({ value: item.id, label: item.name }))]} />
+    </TopBarControls>
+  ) : null);
+
   if (!card) {
     return (
       <div>
@@ -658,9 +669,13 @@ export function CreditCardDetailPage() {
         </CollapsibleCard>
       )}
 
-      <PlanningHorizonField value={horizonDays} onChange={setHorizonDays} />
-      <CardBalanceProjection card={card} horizonDays={horizonDays} />
-      <CardPlanList card={card} horizonDays={horizonDays} />
+      <StandardPageSections key={`${card.id}-plans`} defaultKey="plans" sections={[{
+        key: 'plans', label: 'Plans', content: <>
+          <PlanningHorizonField value={horizonDays} onChange={setHorizonDays} />
+          <CardBalanceProjection card={card} horizonDays={horizonDays} />
+          <CardPlanList card={card} horizonDays={horizonDays} />
+        </>,
+      }]} />
 
       <CollapsibleCard title={<h3 className="m-0">Last 6 months</h3>} defaultOpen={false} className="mb-md">
         <div className="table-scroll">

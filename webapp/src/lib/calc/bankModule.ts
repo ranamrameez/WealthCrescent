@@ -5,10 +5,31 @@ import { dateOnlyMs } from '../datetime';
 
 export interface BankLedgerRow { tx: BankTransaction; balance: number; }
 
+/** Stable key for reconciling historical statement-import duplicates without
+ * modifying stored audit records. Manual rows take precedence over imports. */
+export function bankTransactionFingerprint(t: Pick<BankTransaction, 'date' | 'description' | 'amount'>): string {
+  return `${t.date}|${t.description.trim().toLowerCase().replace(/\s+/g, ' ')}|${t.amount.toFixed(8)}`;
+}
+
+export function accountEffectiveTransactions(account: BankAccount, transactions: BankTransaction[]): BankTransaction[] {
+  const rows = transactions.filter((t) => t.accountId === account.id && !t.isPending);
+  const groups = new Map<string, BankTransaction[]>();
+  rows.forEach((row) => {
+    const key = bankTransactionFingerprint(row);
+    groups.set(key, [...(groups.get(key) ?? []), row]);
+  });
+  return [...groups.values()].flatMap((group) => {
+    const manual = group.filter((row) => (row.source ?? 'manual') === 'manual');
+    return manual.length ? manual : [group[0]];
+  });
+}
+
 /** Running cleared balance for one account. The transaction table can opt into
  * pending rows, which leave the cleared running balance unchanged. */
 export function accountRunningLedger(account: BankAccount, transactions: BankTransaction[], includePending = false): BankLedgerRow[] {
-  const accountTxs = transactions.filter((t) => t.accountId === account.id && (includePending || !t.isPending));
+  const effective = accountEffectiveTransactions(account, transactions);
+  const pending = includePending ? transactions.filter((t) => t.accountId === account.id && t.isPending) : [];
+  const accountTxs = [...effective, ...pending];
   const sorted = [...accountTxs].sort((a, b) => {
     const byDate = dateOnlyMs(a.date) - dateOnlyMs(b.date);
     return byDate !== 0 ? byDate : (a.serialNumber ?? 0) - (b.serialNumber ?? 0);
@@ -21,7 +42,7 @@ export function accountRunningLedger(account: BankAccount, transactions: BankTra
 }
 
 export function accountBalance(account: BankAccount, transactions: BankTransaction[]): number {
-  return transactions.filter((t) => t.accountId === account.id && !t.isPending).reduce((sum, t) => sum + t.amount, 0) + account.openingBalance;
+  return accountEffectiveTransactions(account, transactions).reduce((sum, t) => sum + t.amount, 0) + account.openingBalance;
 }
 
 export function accountPendingBalance(account: BankAccount, transactions: BankTransaction[]): number {

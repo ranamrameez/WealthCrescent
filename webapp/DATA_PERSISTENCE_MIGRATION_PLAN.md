@@ -2,7 +2,7 @@
 
 ## Decision
 
-`localStorage` remains appropriate for small UI preferences only. It is no longer the correct primary datastore for growing financial workbooks.
+All user-owned state, including account settings such as appearance (theme, font, font size, density, number/date display), enabled currencies, onboarding state and layout preferences, must be persisted to the account database and synchronized across devices. `localStorage` is retained only as a temporary recovery/cache layer during migration and for non-account browser mechanics such as auth handoff tokens. It is no longer the source of truth for financial data or account settings.
 
 The current React application rewrites entire workbook JSON blobs on mutations, while Firebase also synchronizes whole module documents. That design originated in the single-HTML prototype and now creates avoidable main-thread work, storage-size pressure, weak queryability and coarse cloud updates.
 

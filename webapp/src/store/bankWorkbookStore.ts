@@ -5,6 +5,7 @@ import { assignSerialNumbersForEntities, backfillSerialNumber, nextSerialNumberF
 import { resolveLegacyCategoryId } from '../lib/financeMigration';
 import { createEmptyBankWorkbook } from './defaultBankWorkbook';
 import type { Bank, BankAccount, BankTransaction, BankWorkbook } from '../types/bankWorkbook';
+import { migrateBankWorkbook } from '../lib/persistence/bankMigration';
 
 const STORAGE_KEY = 'WealthCrescent_bank_workbook_v1';
 
@@ -94,6 +95,14 @@ function persist(workbook: BankWorkbook) {
   }
 }
 
+const initialBankWorkbook = loadFromLocalStorage();
+// Phase 2 migration: copy the legacy workbook into individually-addressable
+// repository records. This never removes or rewrites the legacy blob; a
+// failed migration therefore leaves the user's recovery data untouched.
+void migrateBankWorkbook(initialBankWorkbook).catch((error) => {
+  console.warn('Bank repository migration deferred; legacy data remains available.', error);
+});
+
 export const useBankWorkbookStore = create<BankStoreState>((set, get) => {
   const mutate = (updater: (wb: BankWorkbook) => BankWorkbook) => {
     const next = updater(get().workbook);
@@ -102,7 +111,7 @@ export const useBankWorkbookStore = create<BankStoreState>((set, get) => {
   };
 
   return {
-    workbook: loadFromLocalStorage(),
+    workbook: initialBankWorkbook,
 
     setWorkbook: (wb, opts) => {
       const next = normalize(wb);
