@@ -20,7 +20,7 @@ import type { User } from 'firebase/auth';
  * Priority: a custom `avatarEmoji` (an explicit personalization) wins over
  * the Google photo; the Google photo wins over a plain text initial. The
  * "not a rounded circle" half of the report is the CSS class `.avatar-
- * circle` (theme.css) applied to the `<img>` itself — `border-radius` and
+ * circle` (main.css) applied to the `<img>` itself — `border-radius` and
  * `object-fit` both work directly on an `<img>` element (a "replaced
  * element" in CSS terms), so the photo clips to a circle regardless of
  * its own real aspect ratio, matching the emoji/initial span's existing

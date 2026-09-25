@@ -1,12 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import './main/site.css'
-import './theme.css'
-import './brighter-theme.css'
-import './theme-bright-card-overrides.css'
-import './modern-themes.css'
-import './popup-fixes.css'
-import './classic-rounded-themes.css'
+import './main.css'
+import './themes/index.css'
 import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(

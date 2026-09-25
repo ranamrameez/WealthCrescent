@@ -1,0 +1,142 @@
+/* copper: palette and component styles. */
+html[data-color="copper"] {
+	--radius: 10px;
+	--radius-lg: 14px;
+}
+
+html[data-color="copper"] .btn {
+	border: 1px solid var(--border);
+	box-shadow: none;
+	transition:
+		background 0.12s ease,
+		border-color 0.12s ease,
+		color 0.12s ease,
+		transform 0.12s ease,
+		box-shadow 0.12s ease;
+}
+html[data-color="copper"] .btn:hover {
+	transform: translateY(-1px);
+	box-shadow: 0 3px 9px rgba(20, 30, 40, 0.12);
+}
+html[data-color="copper"] .btn.primary {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--on-accent);
+}
+html[data-color="copper"] .btn.secondary {
+	background: var(--accent-soft);
+	border-color: transparent;
+	color: var(--accent);
+}
+html[data-color="copper"] .btn.ghost {
+	background: transparent;
+	border-color: transparent;
+	color: var(--accent);
+}
+
+html[data-color="copper"] .navbtn.active {
+	background: var(--accent-soft);
+	color: var(--accent);
+	box-shadow: inset 3px 0 0 var(--accent);
+}
+html[data-color="copper"] .page-topbar .chip {
+	background: transparent;
+	color: var(--muted);
+}
+html[data-color="copper"] .page-topbar .chip.active {
+	background: var(--accent);
+	color: var(--panel);
+}
+
+html[data-color="copper"] .stat-card{
+	background: radial-gradient(circle at 31% 35%, color-mix(in srgb, #fff 19%, var(--card-hue)) 40%, transparent 0%),  color-mix(in srgb, var(--card-hue, var(--accent)) 75%, var(--card-hue) 7%);
+}
+
+
+html[data-color="copper"] .stat-card .label {
+    padding: 5px;
+    border-radius: 5px;
+    color: var(--card-hue, var(--accent));
+    background: rgb(255 255 255 / 72%);
+    font-weight: 800;
+}
+
+html[data-color="copper"] .stat-card .value {
+	color: var(--text);
+	font-weight: 800;
+}
+
+html[data-color="copper"] input,
+html[data-color="copper"] select {
+	background: var(--panel-2);
+	border-color: var(--border);
+}
+html[data-color="copper"] input:focus,
+html[data-color="copper"] select:focus {
+	border-color: var(--accent);
+	outline: 3px solid color-mix(in srgb, var(--accent-soft) 78%, transparent);
+}
+html[data-color="copper"] thead th {
+	color: var(--accent);
+	border-bottom-color: var(--border);
+}
+html[data-color="copper"] tbody tr:hover {
+	background: color-mix(in srgb, var(--accent-soft) 55%, var(--panel));
+}
+html[data-color="copper"] .notice,
+html[data-color="copper"] .empty,
+html[data-color="copper"] .table-wrap {
+	background: var(--panel-2);
+	border-color: var(--border);
+}
+html[data-color="copper"] .btn.fab-btn {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--on-accent);
+	box-shadow: 0 5px 18px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+html[data-color="copper"] .btn.fab-btn-secondary {
+	background: var(--panel);
+	border-color: var(--border);
+	color: var(--accent);
+}
+html[data-theme="light"][data-color="copper"] {
+	--bg: #faf6f2;
+	--panel: #fff;
+	--panel-2: #f4ebe4;
+	--border: #e1d3c8;
+	--text: #2a211c;
+	--muted: #786b63;
+	--accent: #b85c1b;
+	--accent-soft: #f8e1d1;
+	--on-accent: #fff;
+	--gold: #9b6200;
+	--gold-rgb: 155, 98, 0;
+	--info: #39769a;
+	--info-rgb: 57, 118, 154;
+	--profit: #168454;
+	--loss: #c73548;
+	--warn: #9b6200;
+	--shadow-card: 0 1px 2px rgba(70, 40, 20, 0.05), 0 5px 16px rgba(70, 40, 20, 0.08);
+	--shadow-lg: 0 10px 26px rgba(70, 40, 20, 0.12);
+}
+html[data-color="copper"][data-theme="dark"] {
+	--bg: #17110d;
+	--panel: #211915;
+	--panel-2: #30231d;
+	--border: #4b382e;
+	--text: #f8eee8;
+	--muted: #bca99d;
+	--accent: #ff9b5b;
+	--accent-soft: #5a301d;
+	--on-accent: #2a1206;
+	--gold: #f5c56e;
+	--gold-rgb: 245, 197, 110;
+	--info: #79b9d9;
+	--info-rgb: 121, 185, 217;
+	--profit: #63dc9e;
+	--loss: #f6818b;
+	--warn: #f5c56e;
+	--shadow-card: 0 1px 2px rgba(0, 0, 0, 0.22), 0 6px 18px rgba(0, 0, 0, 0.25);
+	--shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.34);
+}

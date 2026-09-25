@@ -37,7 +37,7 @@ const DOT: Record<Tier, string> = { error: 'var(--loss)', syncing: '#f5a623', st
  *
  * Reuses the exact `position:fixed`-with-no-explicit-offsets popover
  * pattern already used by `AppearancePanel`/`CategoryNav` (see
- * `theme.css`'s own comment on `.appearance-panel` for why: it escapes
+ * `main.css`'s own comment on `.appearance-panel` for why: it escapes
  * the sidebar's `overflow:auto` clipping while staying visually anchored
  * where it'd sit in normal flow) — new `.sync-status-*` CSS, kept
  * separate from `.appearance-*`/`.category-*` since these are a third

@@ -47,7 +47,7 @@ import { formatDate, parseDateInput } from '../../lib/format';
  * Ticker/Shares/Price columns). Rather than keep debugging the exact JSX/
  * flex interaction that let it break, moved to the simpler, more robust
  * fix the user asked for directly: a single `.field-required::after` CSS
- * rule (`theme.css`) with the marker as one pseudo-element `content`
+ * rule (`main.css`) with the marker as one pseudo-element `content`
  * string — there's no separate DOM text node + sibling `<span>` for a line
  * break to ever land between, since the label text and its marker are one
  * indivisible box as far as text layout is concerned. */

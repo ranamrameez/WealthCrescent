@@ -339,7 +339,7 @@ function TransactionsTable({ card }: { card: CreditCard }) {
                    not a Buy/Sell trade action, so this stays on the
                    green/red `.pill-positive`/`.pill-negative` convention;
                    see `.pill-buy`/`.pill-sell`'s own doc comment in
-                   theme.css for why those two are reserved for an actual
+                   main.css for why those two are reserved for an actual
                    trade action now. */}
                 <td className={t.kind === 'payment' ? 'pill pill-positive' : 'pill pill-negative'} style={{ display: 'inline-block' }}>{KIND_LABELS[t.kind]}</td>
                 <td className="cell-clip" title={t.description}>{t.description}</td>

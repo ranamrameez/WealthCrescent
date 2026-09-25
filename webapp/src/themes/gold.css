@@ -1,0 +1,142 @@
+/* gold: palette and component styles. */
+html[data-color="gold"] {
+	--radius: 10px;
+	--radius-lg: 14px;
+}
+
+html[data-color="gold"] .btn {
+	border: 1px solid var(--border);
+	box-shadow: none;
+	transition:
+		background 0.12s ease,
+		border-color 0.12s ease,
+		color 0.12s ease,
+		transform 0.12s ease,
+		box-shadow 0.12s ease;
+}
+html[data-color="gold"] .btn:hover {
+	transform: translateY(-1px);
+	box-shadow: 0 3px 9px rgba(20, 30, 40, 0.12);
+}
+html[data-color="gold"] .btn.primary {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--on-accent);
+}
+html[data-color="gold"] .btn.secondary {
+	background: var(--accent-soft);
+	border-color: transparent;
+	color: var(--accent);
+}
+html[data-color="gold"] .btn.ghost {
+	background: transparent;
+	border-color: transparent;
+	color: var(--accent);
+}
+
+html[data-color="gold"] .navbtn.active {
+	background: var(--accent-soft);
+	color: var(--accent);
+	box-shadow: inset 3px 0 0 var(--accent);
+}
+html[data-color="gold"] .page-topbar .chip {
+	background: transparent;
+	color: var(--muted);
+}
+html[data-color="gold"] .page-topbar .chip.active {
+	background: var(--accent);
+	color: var(--panel);
+}
+
+html[data-color="gold"] .stat-card{
+	background: color-mix(in srgb, var(--card-hue, var(--accent)) 32%, var(--panel));
+}
+
+
+html[data-color="gold"] .stat-card .label {
+    padding: 5px;
+    border-radius: 5px;
+    color: var(--card-hue, var(--accent));
+    background: rgb(255 255 255 / 72%);
+    font-weight: 800;
+}
+
+html[data-color="gold"] .stat-card .value {
+	color: var(--text);
+	font-weight: 800;
+}
+
+html[data-color="gold"] input,
+html[data-color="gold"] select {
+	background: var(--panel-2);
+	border-color: var(--border);
+}
+html[data-color="gold"] input:focus,
+html[data-color="gold"] select:focus {
+	border-color: var(--accent);
+	outline: 3px solid color-mix(in srgb, var(--accent-soft) 78%, transparent);
+}
+html[data-color="gold"] thead th {
+	color: var(--accent);
+	border-bottom-color: var(--border);
+}
+html[data-color="gold"] tbody tr:hover {
+	background: color-mix(in srgb, var(--accent-soft) 55%, var(--panel));
+}
+html[data-color="gold"] .notice,
+html[data-color="gold"] .empty,
+html[data-color="gold"] .table-wrap {
+	background: var(--panel-2);
+	border-color: var(--border);
+}
+html[data-color="gold"] .btn.fab-btn {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--on-accent);
+	box-shadow: 0 5px 18px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+html[data-color="gold"] .btn.fab-btn-secondary {
+	background: var(--panel);
+	border-color: var(--border);
+	color: var(--accent);
+}
+html[data-theme="light"][data-color="gold"] {
+	--bg: #faf8f2;
+	--panel: #fff;
+	--panel-2: #f3efe2;
+	--border: #dfd6bf;
+	--text: #29251b;
+	--muted: #756d5d;
+	--accent: #9a6a00;
+	--accent-soft: #f4e7bb;
+	--on-accent: #fff;
+	--gold: #8f6100;
+	--gold-rgb: 143, 97, 0;
+	--info: #39769a;
+	--info-rgb: 57, 118, 154;
+	--profit: #168454;
+	--loss: #c73548;
+	--warn: #8f6100;
+	--shadow-card: 0 1px 2px rgba(70, 55, 15, 0.05), 0 5px 16px rgba(70, 55, 15, 0.08);
+	--shadow-lg: 0 10px 26px rgba(70, 55, 15, 0.12);
+}
+html[data-color="gold"][data-theme="dark"] {
+	--bg: #16130b;
+	--panel: #211d13;
+	--panel-2: #302a1b;
+	--border: #4b422d;
+	--text: #faf4df;
+	--muted: #bcb29a;
+	--accent: #f1c453;
+	--accent-soft: #594a1f;
+	--on-accent: #2a2107;
+	--gold: #ffd66d;
+	--gold-rgb: 255, 214, 109;
+	--info: #79b9d9;
+	--info-rgb: 121, 185, 217;
+	--profit: #63dc9e;
+	--loss: #f6818b;
+	--warn: #ffd66d;
+	--shadow-card: 0 1px 2px rgba(0, 0, 0, 0.22), 0 6px 18px rgba(0, 0, 0, 0.25);
+	--shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.34);
+}

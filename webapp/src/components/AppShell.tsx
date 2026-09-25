@@ -7,7 +7,7 @@ import { TopBar } from './TopBar';
 const COLLAPSE_KEY = 'WealthCrescent_sidebar_collapsed_v1';
 
 /** App shell: sidebar + main content, with a mobile off-canvas drawer below
- * 860px (see the .sidebar/.mobile-menu-btn rules in theme.css) instead of
+ * 860px (see the .sidebar/.mobile-menu-btn rules in main.css) instead of
  * the fixed 250px column overflowing a phone-width viewport, plus a
  * separate desktop collapse ("save space and focus" — user request):
  * above 860px the sidebar is open by default and can be slid off-screen
