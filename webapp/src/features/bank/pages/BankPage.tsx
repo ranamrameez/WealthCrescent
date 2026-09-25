@@ -1501,10 +1501,10 @@ function ImportStatementSection({ account, compact = false }: { account: BankAcc
             <label className="text-muted" style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 20 }}><input type="checkbox" checked={flipSign} onChange={(e) => setFlipSign(e.target.checked)} />Flip sign</label>
           </div>
           <div className="grid-auto mt-md" style={gridAutoStyle(150, 8)}>
-            <div className="stat-card card"><div className="label">CSV rows</div><strong>{rows.length}</strong></div>
-            <div className="stat-card card"><div className="label">Valid rows</div><strong>{validRows.length}</strong></div>
-            <div className="stat-card card"><div className="label">New transactions</div><strong>{uniqueRows.filter((r) => !existingByFingerprint.has(fingerprint({ date: r.date, description: r.description, amount: r.amount }))).length}</strong></div>
-            <div className="stat-card card"><div className="label">Existing duplicates</div><strong className={duplicateRows.length ? 'pill-negative' : 'pill-positive'}>{duplicateRows.length}</strong></div>
+            <div className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">CSV rows</div><strong>{rows.length}</strong></div>
+            <div className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">Valid rows</div><strong>{validRows.length}</strong></div>
+            <div className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">New transactions</div><strong>{uniqueRows.filter((r) => !existingByFingerprint.has(fingerprint({ date: r.date, description: r.description, amount: r.amount }))).length}</strong></div>
+            <div className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">Existing duplicates</div><strong className={duplicateRows.length ? 'pill-negative' : 'pill-positive'}>{duplicateRows.length}</strong></div>
           </div>
           <h4>Preview</h4>
           <div className="table-scroll" style={{ maxHeight: 360 }}>
@@ -1644,7 +1644,7 @@ function BalanceProjectionSummary({ horizonDays }: { horizonDays: PlanningHorizo
       ) : (
         <div className="grid-auto" style={gridAutoStyle(180, 8)}>
           {codes.map((code) => (
-            <div key={code} className="stat-card card">
+            <div key={code} className="stat-card card" style={hueStyle('var(--accent)')}>
               <div className="label">{code}</div>
               {settings.showRealBalance && (
                 <div className={projection[code].real >= 0 ? 'pill-positive' : 'pill-negative'}>Real: {fmtMoney(projection[code].real, code)}</div>

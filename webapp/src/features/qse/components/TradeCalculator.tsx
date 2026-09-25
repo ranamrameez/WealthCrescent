@@ -257,12 +257,12 @@ export function TradeCalculator({ initialTicker }: { initialTicker?: string } = 
           )}
           {position && (
             <div className="grid-auto" style={{ ...gridAutoStyle(120, 8), flex: 1 }}>
-              <div className="stat-card card"><div className="label">Avg cost</div><div className="value">{fmtPrice(avg)}</div></div>
+              <div className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">Avg cost</div><div className="value">{fmtPrice(avg)}</div></div>
               <div className="stat-card card" style={currentPrice > 0 ? hueStyle(currentPrice >= be ? 'var(--profit)' : 'var(--loss)') : undefined}>
                 <div className="label">Break-even</div>
                 <div className="value">{fmtPrice(be)}</div>
               </div>
-              <div className="stat-card card"><div className="label">Worth now</div><div className="value">{fmtMoney(worth, currency)}</div></div>
+              <div className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">Worth now</div><div className="value">{fmtMoney(worth, currency)}</div></div>
               <div className="stat-card card" style={currentPrice > 0 ? hueStyle(currentPL >= 0 ? 'var(--profit)' : 'var(--loss)') : undefined}><div className="label">Current P/L</div><div className="value">{fmtMoney(currentPL, currency)}</div></div>
             </div>
           )}

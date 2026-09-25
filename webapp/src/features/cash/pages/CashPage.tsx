@@ -801,7 +801,7 @@ function BalanceProjectionSummary({ horizonDays }: { horizonDays: PlanningHorizo
       ) : (
         <div className="grid-auto" style={gridAutoStyle(180, 8)}>
           {codes.map((code) => (
-            <div key={code} className="stat-card card">
+            <div key={code} className="stat-card card" style={hueStyle('var(--accent)')}>
               <div className="label">{code}</div>
               {settings.showRealBalance && (
                 <div className={projection[code].real >= 0 ? 'pill-positive' : 'pill-negative'}>Real: {fmtMoney(projection[code].real, code)}</div>

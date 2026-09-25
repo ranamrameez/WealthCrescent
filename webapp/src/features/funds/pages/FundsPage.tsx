@@ -1170,7 +1170,7 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
               </div>
             )}
             <div className="grid-auto" style={{ ...gridAutoStyle(120, 8), marginTop: 12 }}>
-              <div className="stat-card card">
+              <div className="stat-card card" style={hueStyle('var(--info)')}>
                 <div className="label">Units held</div>
                 <div className="value">{fmt(units, 2)}</div>
                 {!!pendingUnitDelta && (
@@ -1179,21 +1179,21 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
                   </div>
                 )}
               </div>
-              <div className="stat-card card">
+              <div className="stat-card card" style={hueStyle('var(--accent)')}>
                 <Tooltip text="NAV = Net Asset Value, the price of one unit of this fund. This is the average price you paid per unit across all your purchases.">
                   <div className="label clickable">Avg NAV cost</div>
                 </Tooltip>
                 <div className="value">{fmtPrice(avgNav)}</div>
               </div>
-              <div className="stat-card card"><div className="label">Invested</div><MoneyValue n={invested} currency={fund.currencyCode} /></div>
-              <div className="stat-card card"><div className="label">Current value</div><MoneyValue n={currentValue} currency={fund.currencyCode} /></div>
+              <div className="stat-card card" style={hueStyle('var(--info)')}><div className="label">Invested</div><MoneyValue n={invested} currency={fund.currencyCode} /></div>
+              <div className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">Current value</div><MoneyValue n={currentValue} currency={fund.currencyCode} /></div>
               <div className="stat-card card" style={hueStyle(profit >= 0 ? 'var(--profit)' : 'var(--loss)')}>
                 <Tooltip text="Realized profit from every past withdrawal/sell, plus unrealized profit on units still held — your true total gain, not just what's sitting in the fund right now.">
                   <div className="label clickable">Net profit</div>
                 </Tooltip>
                 <MoneyValue n={profit} currency={fund.currencyCode} after={` (${profitPct.toFixed(1)}%)`} />
               </div>
-              <div className="stat-card card">
+              <div className="stat-card card" style={hueStyle(rate === null ? 'var(--accent)' : rate < 0 ? 'var(--loss)' : 'var(--profit)')}>
                 <Tooltip text="XIRR: your annualized rate of return, accounting for the exact dates and amounts of every purchase — a fairer comparison than a flat percentage when you've invested at different times.">
                   <div className="label clickable">XIRR</div>
                 </Tooltip>

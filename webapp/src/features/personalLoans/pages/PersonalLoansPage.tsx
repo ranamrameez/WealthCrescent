@@ -807,7 +807,7 @@ function LoanDetail({ loan, onBack, startInEditMode }: { loan: PersonalLoan; onB
           </div>
         )}
         <div className="grid-auto" style={{ ...gridAutoStyle(120, 8), marginTop: 12 }}>
-          <div className="stat-card card">
+          <div className="stat-card card" style={hueStyle('var(--accent)')}>
             <Tooltip text="The original amount of the loan, before any repayments.">
               <div className="label clickable">Principal</div>
             </Tooltip>

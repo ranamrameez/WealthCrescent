@@ -261,7 +261,7 @@ export function TradeCalculator({ initialTicker }: { initialTicker?: string } = 
           )}
           {position && (
             <div className="grid-auto" style={{ ...gridAutoStyle(120, 8), flex: 1 }}>
-              <div className="stat-card card"><div className="label">Avg cost</div><div className="value">{fmtPrice(avg)}</div></div>
+              <div className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">Avg cost</div><div className="value">{fmtPrice(avg)}</div></div>
               <div className="stat-card card" style={currentPrice > 0 ? hueStyle(currentPrice >= be ? 'var(--profit)' : 'var(--loss)') : undefined}>
                 <Tooltip text="PSX nets commission when you buy and sell the same ticker on the same day — the smaller-quantity leg (ties go to the buy) pays no commission or SST, only government levies. 'Same-day' assumes this sell nets against a same-day buy; 'other day' assumes the full commission applies.">
                   <div className="label clickable">Break-even</div>
@@ -269,9 +269,9 @@ export function TradeCalculator({ initialTicker }: { initialTicker?: string } = 
                 <div className="value">{fmtPrice(be)}</div>
                 <div className="sub">other day · same-day {fmtPrice(beSameDay)}</div>
               </div>
-              <div className="stat-card card"><div className="label">Worth now</div><div className="value">{fmtMoney(worth, currency)}</div></div>
+              <div className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">Worth now</div><div className="value">{fmtMoney(worth, currency)}</div></div>
               <div className="stat-card card" style={currentPrice > 0 ? hueStyle(currentPL >= 0 ? 'var(--profit)' : 'var(--loss)') : undefined}><div className="label">Current P/L</div><div className="value">{fmtMoney(currentPL, currency)}</div></div>
-              {currentPL > 0 && <div className="stat-card card"><div className="label">Est. CGT if sold now</div><div className="value">{fmtMoney(currentCGT, currency)}</div></div>}
+              {currentPL > 0 && <div className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">Est. CGT if sold now</div><div className="value">{fmtMoney(currentCGT, currency)}</div></div>}
             </div>
           )}
         </div>

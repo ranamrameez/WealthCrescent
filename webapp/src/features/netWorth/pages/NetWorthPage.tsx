@@ -891,7 +891,7 @@ export function NetWorthPage({
           </div>
           <div className="row" style={{ gap: 12 }}>
             {Object.entries(rentalsNet).map(([code, amount]) => (
-              <div key={code} className="stat-card card"><div className="label">{code}</div><MoneyValue n={amount} currency={code} /></div>
+              <div key={code} className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">{code}</div><MoneyValue n={amount} currency={code} /></div>
             ))}
           </div>
         </Card>

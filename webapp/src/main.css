@@ -654,6 +654,7 @@ hr {
      panel color anywhere) plus one small, subtle radial highlight
      centered near the top — a "minor" spotlight, not a second fade. */
 .stat-card {
+    --card-hue: var(--accent);
 	padding: 11px 13px;
 	display: flex;
 	/* border: 0; */

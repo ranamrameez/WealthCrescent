@@ -96,14 +96,8 @@ export function CollapsibleCard({
   );
 }
 
-/** `hue` sets the `--card-hue` custom property `.stat-card`'s own CSS
- * already reads for its left-border accent and background tint — that CSS
- * existed but nothing ever set the variable, so every stat card silently
- * fell back to the same plain `--accent` color regardless of what it
- * showed (a real user-reported "hard to visually tell cards apart"
- * complaint). Pass any CSS color (a hex from a shared palette, or
- * `var(--profit)`/`var(--loss)` for a P/L-sign-driven stat) to give a
- * card its own identity; omit it to keep the old single-color look. */
+/** Sets --card-hue for card backgrounds and labels. Semantic colors such as
+ * var(--profit) override the default, which follows the active theme accent. */
 export function StatCard({
   label,
   value,
@@ -135,7 +129,7 @@ export function StatCard({
   return (
     <div
       className={`card stat-card${onClick ? ' clickable' : ''}`}
-      style={hue ? ({ '--card-hue': hue } as CSSProperties) : undefined}
+      style={{ '--card-hue': hue || 'var(--accent)' } as CSSProperties}
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
@@ -192,7 +186,7 @@ export function EntityCard({
   return (
     <div
       className="card stat-card entity-card"
-      style={hue ? ({ '--card-hue': hue } as CSSProperties) : undefined}
+      style={{ '--card-hue': hue || 'var(--accent)' } as CSSProperties}
       onClick={onClick}
       role={onClick ? 'button' : undefined}
     >

@@ -134,10 +134,10 @@ function BuySellAvgDownCalculator() {
 
       {!avgDown && shareCount > 0 && price > 0 && (
         <div className="grid-auto" style={gridAutoStyle(160, 8)}>
-          <div className="card stat-card"><div className="label">Cost</div><div className="value">{fmtMoney(simpleCost + simpleFee, currency)}</div></div>
-          <div className="card stat-card"><div className="label">Break-even</div><div className="value">{fmtPrice(simpleBreakEven)}</div></div>
+          <div className="card stat-card" style={hueStyle('var(--accent)')}><div className="label">Cost</div><div className="value">{fmtMoney(simpleCost + simpleFee, currency)}</div></div>
+          <div className="card stat-card" style={hueStyle('var(--gold)')}><div className="label">Break-even</div><div className="value">{fmtPrice(simpleBreakEven)}</div></div>
           {simpleTargetPL !== null && (
-            <div className="card stat-card">
+            <div className="card stat-card" style={hueStyle('var(--accent)')}>
               <div className="label">P/L @ target</div>
               <div className={`value ${simpleTargetPL >= 0 ? 'pill-positive' : 'pill-negative'}`}>{fmtMoney(simpleTargetPL, currency)}</div>
             </div>
@@ -147,11 +147,11 @@ function BuySellAvgDownCalculator() {
 
       {avgDown && scenario && (
         <div className="grid-auto" style={gridAutoStyle(160, 8)}>
-          <div className="card stat-card"><div className="label">New shares</div><div className="value">{fmt(scenario.newShares, 0)} ({fmt(scenario.newShares - scenario.extraShares, 0)} + {fmt(scenario.extraShares, 0)})</div></div>
-          <div className="card stat-card"><div className="label">New avg cost</div><div className="value">{fmtPrice(scenario.newAvg)}</div></div>
-          <div className="card stat-card"><div className="label">New break-even</div><div className="value">{fmtPrice(scenario.breakEven)}</div></div>
-          <div className="card stat-card"><div className="label">Recovery needed</div><div className="value">{scenario.recoveryNeededPct.toFixed(2)}%</div></div>
-          <div className="card stat-card">
+          <div className="card stat-card" style={hueStyle('var(--info)')}><div className="label">New shares</div><div className="value">{fmt(scenario.newShares, 0)} ({fmt(scenario.newShares - scenario.extraShares, 0)} + {fmt(scenario.extraShares, 0)})</div></div>
+          <div className="card stat-card" style={hueStyle('var(--accent)')}><div className="label">New avg cost</div><div className="value">{fmtPrice(scenario.newAvg)}</div></div>
+          <div className="card stat-card" style={hueStyle('var(--gold)')}><div className="label">New break-even</div><div className="value">{fmtPrice(scenario.breakEven)}</div></div>
+          <div className="card stat-card" style={hueStyle('var(--accent)')}><div className="label">Recovery needed</div><div className="value">{scenario.recoveryNeededPct.toFixed(2)}%</div></div>
+          <div className="card stat-card" style={hueStyle('var(--accent)')}>
             <div className="label">Net @ target</div>
             <div className={`value ${scenario.netAtTarget >= 0 ? 'pill-positive' : 'pill-negative'}`}>{fmtMoney(scenario.netAtTarget, currency)}</div>
           </div>
@@ -319,15 +319,15 @@ function WhatIfExitCalculator({
 
             {price > 0 && simulatedShares > 0 ? (
               <div className="grid-auto" style={{ ...gridAutoStyle(150, 8), marginTop: 8 }}>
-                <div className="stat-card card">
+                <div className="stat-card card" style={hueStyle('var(--accent)')}>
                   <div className="label">Sale proceeds</div>
                   <div className="value">{fmtMoney(result.proceeds, currency)}</div>
                 </div>
-                <div className="stat-card card">
+                <div className="stat-card card" style={hueStyle('var(--accent)')}>
                   <div className="label">P/L on selected shares</div>
                   <div className={`value ${result.pl >= 0 ? 'pill-positive' : 'pill-negative'}`}>{fmtMoney(result.pl, currency)}</div>
                 </div>
-                <div className="stat-card card">
+                <div className="stat-card card" style={hueStyle('var(--accent)')}>
                   <div className="label">Shares after simulation</div>
                   <div className="value">{fmt(sharesAfter, 0)}</div>
                 </div>
@@ -462,12 +462,12 @@ function BrokerStyleView({ ticker }: { ticker: string }) {
 
   return (
     <div className="grid-auto" style={gridAutoStyle(150, 8)}>
-      <div className="card stat-card"><div className="label">Shares held</div><div className="value">{fmt(shares, 0)}</div></div>
-      <div className="card stat-card"><div className="label">Avg cost</div><div className="value">{fmtPrice(avgCost)}</div></div>
-      <div className="card stat-card"><div className="label">Break-even</div><div className="value">{fmtPrice(be)}</div></div>
-      <div className="card stat-card"><div className="label">Current price</div><div className="value">{mp > 0 ? fmtPrice(mp) : '—'}</div></div>
+      <div className="card stat-card" style={hueStyle('var(--info)')}><div className="label">Shares held</div><div className="value">{fmt(shares, 0)}</div></div>
+      <div className="card stat-card" style={hueStyle('var(--accent)')}><div className="label">Avg cost</div><div className="value">{fmtPrice(avgCost)}</div></div>
+      <div className="card stat-card" style={hueStyle('var(--gold)')}><div className="label">Break-even</div><div className="value">{fmtPrice(be)}</div></div>
+      <div className="card stat-card" style={hueStyle('var(--accent)')}><div className="label">Current price</div><div className="value">{mp > 0 ? fmtPrice(mp) : '—'}</div></div>
       {Number.isFinite(profit) && (
-        <div className="card stat-card">
+        <div className="card stat-card" style={hueStyle('var(--accent)')}>
           <div className="label">Unrealized P/L</div>
           <div className={`value ${profit >= 0 ? 'pill-positive' : 'pill-negative'}`}>{fmtMoney(profit, currency)}</div>
         </div>

@@ -774,7 +774,7 @@ function CardBalanceProjection({ card, horizonDays }: { card: CreditCard; horizo
         </label>
       </div>
       <div className="grid-auto" style={gridAutoStyle(180, 8)}>
-        <div className="stat-card card">
+        <div className="stat-card card" style={hueStyle('var(--accent)')}>
           <div className="label">{card.currencyCode}</div>
           {settings.showRealBalance && (
             <div className={p.real <= 0 ? 'pill-positive' : 'pill-negative'}>Real: {fmtMoney(p.real, card.currencyCode)}</div>
