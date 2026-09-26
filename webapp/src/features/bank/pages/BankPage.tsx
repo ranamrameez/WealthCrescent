@@ -1,5 +1,6 @@
 import type { User } from 'firebase/auth';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
@@ -990,8 +991,15 @@ export function AccountDetailPage() {
   }, [account, allLedger, filters.fromDate]);
   const periodCurrentBalance = clearedLedger.length ? clearedLedger[clearedLedger.length - 1].balance : periodStartBalance;
   const pendingNet = filteredLedger.filter(({ tx }) => tx.isPending).reduce((sum, row) => sum + row.tx.amount, 0);
+  const pendingInflow = filteredLedger.filter(({ tx }) => tx.isPending && tx.amount >= 0).reduce((sum, row) => sum + row.tx.amount, 0);
+  const pendingOutflow = filteredLedger.filter(({ tx }) => tx.isPending && tx.amount < 0).reduce((sum, row) => sum + row.tx.amount, 0);
   const plannedNet = plannedEntries.filter((plan) => plan.accountId === account?.id && !plan.executed && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
-  const periodPills = (items: Array<[string, string, string]>) => <div className="summary-pill-row">{items.map(([label, value, tone]) => <span key={label} className={`pill ${tone}`}>{label}: {value}</span>)}</div>;
+  const plannedInflow = plannedEntries.filter((plan) => plan.accountId === account?.id && !plan.executed && plan.amount >= 0 && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
+  const plannedOutflow = plannedEntries.filter((plan) => plan.accountId === account?.id && !plan.executed && plan.amount < 0 && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
+  const balanceChange = periodCurrentBalance - periodStartBalance;
+  const balanceChangePercent = periodStartBalance === 0 ? null : (balanceChange / Math.abs(periodStartBalance)) * 100;
+  const summaryMetric = (label: string, value: string, tone = 'pill-info', large = false) => <div className={`summary-metric${large ? ' summary-metric-large' : ''}`}><span className="summary-metric-label">{label}</span><strong className={`pill ${tone}`}>{value}</strong></div>;
+  const summaryCard = (title: string, metrics: ReactNode, className = '') => <div className={`account-summary-card ${className}`}><h4>{title}</h4><div className="account-summary-card-metrics">{metrics}</div></div>;
   const upcoming = useMemo(
     () => account
       ? plannedEntries
@@ -1100,15 +1108,35 @@ export function AccountDetailPage() {
       key: 'summary',
       label: 'Account summary',
       summary: <span className="pill pill-info">{filters.fromDate ? formatDate(filters.fromDate, dateFormat) : 'All time'}{filters.toDate ? ` to ${formatDate(filters.toDate, dateFormat)}` : filters.fromDate ? ' onward' : ''}</span>,
-      content: <div className="account-summary-grid">{periodPills([
-        ['Start balance', fmtMoney(periodStartBalance, account.currencyCode), 'pill-info'],
-        ['Current balance', fmtMoney(periodCurrentBalance, account.currencyCode), periodCurrentBalance >= periodStartBalance ? 'pill-positive' : 'pill-negative'],
-        ['Inflow', fmtMoney(analytics.deposits, account.currencyCode), 'pill-positive'],
-        ['Outflow', fmtMoney(analytics.withdrawals, account.currencyCode), 'pill-negative'],
-        ['Expected net', fmtMoney(plannedNet, account.currencyCode), plannedNet >= 0 ? 'pill-positive' : 'pill-negative'],
-        ['Pending net', fmtMoney(pendingNet, account.currencyCode), pendingNet >= 0 ? 'pill-positive' : 'pill-negative'],
-        ['Expected incl. pending', fmtMoney(plannedNet + pendingNet, account.currencyCode), plannedNet + pendingNet >= 0 ? 'pill-positive' : 'pill-negative'],
-      ])}</div>,
+      content: <div className="account-summary-grid">
+        {summaryCard('Balance', <>
+          {summaryMetric('Current balance', fmtMoney(periodCurrentBalance, account.currencyCode), periodCurrentBalance >= 0 ? 'pill-positive' : 'pill-negative', true)}
+          {summaryMetric('Start balance', fmtMoney(periodStartBalance, account.currencyCode))}
+          {summaryMetric('Change', fmtMoney(balanceChange, account.currencyCode), balanceChange >= 0 ? 'pill-positive' : 'pill-negative')}
+          {summaryMetric('% change', balanceChangePercent === null ? '—' : `${balanceChangePercent.toFixed(1)}%`, balanceChange >= 0 ? 'pill-positive' : 'pill-negative')}
+        </>, 'account-summary-card-balance')}
+        {summaryCard('Expected', <>
+          {summaryMetric('Net expected', fmtMoney(pendingNet + plannedNet, account.currencyCode), pendingNet + plannedNet >= 0 ? 'pill-positive' : 'pill-negative', true)}
+          {summaryMetric('Expected inflow', fmtMoney(pendingInflow + plannedInflow, account.currencyCode), 'pill-positive')}
+          {summaryMetric('Expected outflow', fmtMoney(pendingOutflow + plannedOutflow, account.currencyCode), 'pill-negative')}
+          {summaryMetric('Change', fmtMoney(pendingNet + plannedNet, account.currencyCode), pendingNet + plannedNet >= 0 ? 'pill-positive' : 'pill-negative')}
+        </>)}
+        {summaryCard('Pending', <>
+          {summaryMetric('Net pending', fmtMoney(pendingNet, account.currencyCode), pendingNet >= 0 ? 'pill-positive' : 'pill-negative', true)}
+          {summaryMetric('Inflow', fmtMoney(pendingInflow, account.currencyCode), 'pill-positive')}
+          {summaryMetric('Outflow', fmtMoney(pendingOutflow, account.currencyCode), 'pill-negative')}
+        </>)}
+        {summaryCard('Planned', <>
+          {summaryMetric('Net planned', fmtMoney(plannedNet, account.currencyCode), plannedNet >= 0 ? 'pill-positive' : 'pill-negative', true)}
+          {summaryMetric('Inflow', fmtMoney(plannedInflow, account.currencyCode), 'pill-positive')}
+          {summaryMetric('Outflow', fmtMoney(plannedOutflow, account.currencyCode), 'pill-negative')}
+        </>)}
+        {summaryCard('Inflow & outflow', <>
+          {summaryMetric('Inflow', fmtMoney(analytics.deposits, account.currencyCode), 'pill-positive')}
+          {summaryMetric('Outflow', fmtMoney(analytics.withdrawals, account.currencyCode), 'pill-negative')}
+          {summaryMetric('Net flow', fmtMoney(analytics.deposits + analytics.withdrawals, account.currencyCode), analytics.deposits + analytics.withdrawals >= 0 ? 'pill-positive' : 'pill-negative')}
+        </>)}
+      </div>,
     },
     {
       key: 'details',
