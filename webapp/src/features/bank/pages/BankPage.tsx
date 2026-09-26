@@ -940,6 +940,7 @@ export function AccountDetailPage() {
   const categories = useCategoryStore((state) => state.workbook.categories);
   const { num } = useAmountFormat();
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
+  const dateFormat = useAppearanceStore((state) => state.appearance.dateFormat ?? 'DD-MMM-YYYY');
 
   const accountToFormValue = (value: BankAccount | undefined): Omit<BankAccount, 'id'> => ({
     name: value?.name ?? '',
@@ -1098,7 +1099,7 @@ export function AccountDetailPage() {
     {
       key: 'summary',
       label: 'Account summary',
-      summary: <span className="pill pill-info">{filters.fromDate || 'All time'}{filters.toDate ? ` – ${filters.toDate}` : filters.fromDate ? ' onward' : ''}</span>,
+      summary: <span className="pill pill-info">{filters.fromDate ? formatDate(filters.fromDate, dateFormat) : 'All time'}{filters.toDate ? ` to ${formatDate(filters.toDate, dateFormat)}` : filters.fromDate ? ' onward' : ''}</span>,
       content: <div className="account-summary-grid">{periodPills([
         ['Start balance', fmtMoney(periodStartBalance, account.currencyCode), 'pill-info'],
         ['Current balance', fmtMoney(periodCurrentBalance, account.currencyCode), periodCurrentBalance >= periodStartBalance ? 'pill-positive' : 'pill-negative'],
