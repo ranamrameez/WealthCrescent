@@ -982,6 +982,15 @@ export function AccountDetailPage() {
   }), [allLedger, filters, categories]);
   const clearedLedger = useMemo(() => filteredLedger.filter(({ tx }) => !tx.isPending), [filteredLedger]);
   const analytics = useMemo(() => bankAnalyticsFromLedger(clearedLedger), [clearedLedger]);
+  const periodStartBalance = useMemo(() => {
+    if (!account) return 0;
+    const before = allLedger.filter(({ tx }) => !tx.isPending && filters.fromDate && tx.date < filters.fromDate);
+    return before.length ? before[before.length - 1].balance : account.openingBalance;
+  }, [account, allLedger, filters.fromDate]);
+  const periodCurrentBalance = clearedLedger.length ? clearedLedger[clearedLedger.length - 1].balance : periodStartBalance;
+  const pendingNet = filteredLedger.filter(({ tx }) => tx.isPending).reduce((sum, row) => sum + row.tx.amount, 0);
+  const plannedNet = plannedEntries.filter((plan) => plan.accountId === account?.id && !plan.executed && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
+  const periodPills = (items: Array<[string, string, string]>) => <div className="summary-pill-row">{items.map(([label, value, tone]) => <span key={label} className={`pill ${tone}`}>{label}: {value}</span>)}</div>;
   const upcoming = useMemo(
     () => account
       ? plannedEntries
@@ -1122,6 +1131,22 @@ export function AccountDetailPage() {
       content: <AccountPlans account={account} />,
     },
     {
+      key: 'summary',
+      label: 'Account summary',
+      summary: <span className="pill pill-info">Period</span>,
+      content: <div className="account-summary-grid">
+        {periodPills([
+          ['Start balance', fmtMoney(periodStartBalance, account.currencyCode), 'pill-info'],
+          ['Current balance', fmtMoney(periodCurrentBalance, account.currencyCode), periodCurrentBalance >= periodStartBalance ? 'pill-positive' : 'pill-negative'],
+          ['Inflow', fmtMoney(analytics.deposits, account.currencyCode), 'pill-positive'],
+          ['Outflow', fmtMoney(analytics.withdrawals, account.currencyCode), 'pill-negative'],
+          ['Expected net', fmtMoney(plannedNet, account.currencyCode), plannedNet >= 0 ? 'pill-positive' : 'pill-negative'],
+          ['Pending net', fmtMoney(pendingNet, account.currencyCode), pendingNet >= 0 ? 'pill-positive' : 'pill-negative'],
+          ['Expected incl. pending', fmtMoney(plannedNet + pendingNet, account.currencyCode), plannedNet + pendingNet >= 0 ? 'pill-positive' : 'pill-negative'],
+        ])}
+      </div>,
+    },
+    {
       key: 'transactions',
       label: 'Transactions',
       summary: <SummaryChip label="Filtered" value={filteredLedger.length} />,
@@ -1139,7 +1164,7 @@ export function AccountDetailPage() {
         <SummaryChip label="Withdrawals" value={fmtMoney(analytics.withdrawals, account.currencyCode)} />
         <SummaryChip label="Net" value={fmtMoney(analytics.netFlow, account.currencyCode)} />
       </>,
-      content: <AccountAnalyticsSection ledger={clearedLedger} />,
+      content: <AccountAnalyticsSection ledger={clearedLedger} startingBalance={periodStartBalance} />,
     },
   ];
 
@@ -1382,7 +1407,7 @@ function TransactionsList({ account, ledger, allLedgerCount }: { account: BankAc
  * (Income/Expense/Net flow/Balance at month end, then one row per spend
  * category) — a chart's own hover tooltip is the only other way to read
  * an exact number today, and doesn't work at all on a touch device. */
-function AccountAnalyticsSection({ ledger }: { ledger: ReturnType<typeof accountRunningLedger> }) {
+function AccountAnalyticsSection({ ledger, startingBalance }: { ledger: ReturnType<typeof accountRunningLedger>; startingBalance: number }) {
   const dateFormat = useAppearanceStore((state) => state.appearance.dateFormat ?? 'DD-MMM-YYYY');
   const categories = useCategoryStore((state) => state.workbook.categories);
   useAppearanceStore((state) => state.appearance);
@@ -1404,7 +1429,7 @@ function AccountAnalyticsSection({ ledger }: { ledger: ReturnType<typeof account
   const loss = cssVar('--loss') || '#e5484d';
 
   return <div className="analytics-grid">
-    <div className="analytics-chart"><h4>Balance over time</h4><div className="chart-canvas-wrap"><Line plugins={[chartDepthPlugin]} data={{labels:ledger.map((row)=>formatDate(row.tx.date,dateFormat)),datasets:[{label:'Balance',data:ledger.map((row)=>row.balance),borderColor:chartAlpha('#5aa9c9',.82),backgroundColor:chartAlpha('#5aa9c9',.24),fill:true,tension:.24,pointRadius:2}]}} options={{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},datalabels:{display:false}}}} /></div></div>
+    <div className="analytics-chart"><h4>Balance over time</h4><div className="chart-canvas-wrap"><Line plugins={[chartDepthPlugin]} data={{labels:['Period start', ...ledger.map((row)=>formatDate(row.tx.date,dateFormat))],datasets:[{label:'Balance',data:[startingBalance, ...ledger.map((row)=>row.balance)],borderColor:chartAlpha('#5aa9c9',.82),backgroundColor:chartAlpha('#5aa9c9',.24),fill:true,tension:.24,pointRadius:2}]}} options={{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},datalabels:{display:false}}}} /></div></div>
     <div className="analytics-chart"><h4>Transactions by category</h4><div className="chart-canvas-wrap"><Doughnut plugins={[chartDepthPlugin]} data={{labels:categoryTotals.map(([name])=>name),datasets:[{data:categoryTotals.map(([,amount])=>amount),backgroundColor:categoryTotals.map(([name])=>chartAlpha(tickerColor(name),.58)),borderColor:categoryTotals.map(([name])=>chartAlpha(tickerColor(name),.85)),borderWidth:2,hoverOffset:8}]}} options={{responsive:true,maintainAspectRatio:false,cutout:'48%',rotation:-25,plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:10,padding:8}},datalabels:{display:false}},layout:{padding:8}}} /></div></div>
     <div className="analytics-chart"><h4>Deposits vs. withdrawals</h4><div className="chart-canvas-wrap"><Bar plugins={[chartDepthPlugin]} data={{labels:analytics.monthlyFlow.map((flow)=>flow.month),datasets:[{label:'Deposits',data:analytics.monthlyFlow.map((flow)=>flow.income),backgroundColor:chartAlpha(profit,.58),borderColor:chartAlpha(profit,.88),borderWidth:2,borderRadius:6},{label:'Withdrawals',data:analytics.monthlyFlow.map((flow)=>flow.expense),backgroundColor:chartAlpha(loss,.58),borderColor:chartAlpha(loss,.88),borderWidth:2,borderRadius:6}]}} options={{plugins:{datalabels:{display:false}}}} /></div></div>
   </div>;

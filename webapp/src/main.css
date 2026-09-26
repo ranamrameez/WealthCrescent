@@ -1907,6 +1907,8 @@ canvas {
 .standard-card-fullscreen .standard-card-body { overflow: auto; flex: 1; }
 .standard-card-fullscreen-trigger { padding: 0 !important; }
 .standard-button-content { display: inline-flex; align-items: center; gap: 7px; }
+.summary-pill-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.account-summary-grid { display: flex; flex-direction: column; gap: 10px; }
 .table-scroll table thead th {
 	position: sticky;
 	top: 0;
