@@ -1096,6 +1096,20 @@ export function AccountDetailPage() {
 
   const sections: StandardPageSection[] = [
     {
+      key: 'summary',
+      label: 'Account summary',
+      summary: <span className="pill pill-info">Period</span>,
+      content: <div className="account-summary-grid">{periodPills([
+        ['Start balance', fmtMoney(periodStartBalance, account.currencyCode), 'pill-info'],
+        ['Current balance', fmtMoney(periodCurrentBalance, account.currencyCode), periodCurrentBalance >= periodStartBalance ? 'pill-positive' : 'pill-negative'],
+        ['Inflow', fmtMoney(analytics.deposits, account.currencyCode), 'pill-positive'],
+        ['Outflow', fmtMoney(analytics.withdrawals, account.currencyCode), 'pill-negative'],
+        ['Expected net', fmtMoney(plannedNet, account.currencyCode), plannedNet >= 0 ? 'pill-positive' : 'pill-negative'],
+        ['Pending net', fmtMoney(pendingNet, account.currencyCode), pendingNet >= 0 ? 'pill-positive' : 'pill-negative'],
+        ['Expected incl. pending', fmtMoney(plannedNet + pendingNet, account.currencyCode), plannedNet + pendingNet >= 0 ? 'pill-positive' : 'pill-negative'],
+      ])}</div>,
+    },
+    {
       key: 'details',
       label: 'Account details',
       summary: <>
@@ -1131,22 +1145,6 @@ export function AccountDetailPage() {
       content: <AccountPlans account={account} />,
     },
     {
-      key: 'summary',
-      label: 'Account summary',
-      summary: <span className="pill pill-info">Period</span>,
-      content: <div className="account-summary-grid">
-        {periodPills([
-          ['Start balance', fmtMoney(periodStartBalance, account.currencyCode), 'pill-info'],
-          ['Current balance', fmtMoney(periodCurrentBalance, account.currencyCode), periodCurrentBalance >= periodStartBalance ? 'pill-positive' : 'pill-negative'],
-          ['Inflow', fmtMoney(analytics.deposits, account.currencyCode), 'pill-positive'],
-          ['Outflow', fmtMoney(analytics.withdrawals, account.currencyCode), 'pill-negative'],
-          ['Expected net', fmtMoney(plannedNet, account.currencyCode), plannedNet >= 0 ? 'pill-positive' : 'pill-negative'],
-          ['Pending net', fmtMoney(pendingNet, account.currencyCode), pendingNet >= 0 ? 'pill-positive' : 'pill-negative'],
-          ['Expected incl. pending', fmtMoney(plannedNet + pendingNet, account.currencyCode), plannedNet + pendingNet >= 0 ? 'pill-positive' : 'pill-negative'],
-        ])}
-      </div>,
-    },
-    {
       key: 'transactions',
       label: 'Transactions',
       summary: <SummaryChip label="Filtered" value={filteredLedger.length} />,
@@ -1164,7 +1162,7 @@ export function AccountDetailPage() {
         <SummaryChip label="Withdrawals" value={fmtMoney(analytics.withdrawals, account.currencyCode)} />
         <SummaryChip label="Net" value={fmtMoney(analytics.netFlow, account.currencyCode)} />
       </>,
-      content: <AccountAnalyticsSection ledger={clearedLedger} startingBalance={periodStartBalance} />,
+      content: <AccountAnalyticsSection ledger={clearedLedger} startingBalance={periodStartBalance} pendingNet={pendingNet} plannedNet={plannedNet} />,
     },
   ];
 
@@ -1177,7 +1175,7 @@ export function AccountDetailPage() {
         </div>
       </div>
       {account.migratedToCreditCardId && <Notice tone="info" className="mb-md">This account was migrated to a real Credit Card record — its transactions and balance now live there.{' '}<Link to={`/bank/card/${account.migratedToCreditCardId}`}>View the Credit Card →</Link></Notice>}
-      <StandardPageSections key={account.id} sections={sections} defaultKey="details" />
+      <StandardPageSections key={account.id} sections={sections} defaultKey="summary" />
       <AccountTransfersFab accountId={account.id} currencyCode={account.currencyCode} />
     </div>
   );
@@ -1407,7 +1405,7 @@ function TransactionsList({ account, ledger, allLedgerCount }: { account: BankAc
  * (Income/Expense/Net flow/Balance at month end, then one row per spend
  * category) — a chart's own hover tooltip is the only other way to read
  * an exact number today, and doesn't work at all on a touch device. */
-function AccountAnalyticsSection({ ledger, startingBalance }: { ledger: ReturnType<typeof accountRunningLedger>; startingBalance: number }) {
+function AccountAnalyticsSection({ ledger, startingBalance, pendingNet, plannedNet }: { ledger: ReturnType<typeof accountRunningLedger>; startingBalance: number; pendingNet: number; plannedNet: number }) {
   const dateFormat = useAppearanceStore((state) => state.appearance.dateFormat ?? 'DD-MMM-YYYY');
   const categories = useCategoryStore((state) => state.workbook.categories);
   useAppearanceStore((state) => state.appearance);
@@ -1427,11 +1425,15 @@ function AccountAnalyticsSection({ ledger, startingBalance }: { ledger: ReturnTy
 
   const profit = cssVar('--profit') || '#3ecf8e';
   const loss = cssVar('--loss') || '#e5484d';
+  const gridColor = chartAlpha(cssVar('--border') || '#94a3b8', .28);
+  const axisOptions = { grid: { color: gridColor }, ticks: { color: cssVar('--muted') || '#94a3b8' } };
 
   return <div className="analytics-grid">
     <div className="analytics-chart"><h4>Balance over time</h4><div className="chart-canvas-wrap"><Line plugins={[chartDepthPlugin]} data={{labels:['Period start', ...ledger.map((row)=>formatDate(row.tx.date,dateFormat))],datasets:[{label:'Balance',data:[startingBalance, ...ledger.map((row)=>row.balance)],borderColor:chartAlpha('#5aa9c9',.82),backgroundColor:chartAlpha('#5aa9c9',.24),fill:true,tension:.24,pointRadius:2}]}} options={{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},datalabels:{display:false}}}} /></div></div>
     <div className="analytics-chart"><h4>Transactions by category</h4><div className="chart-canvas-wrap"><Doughnut plugins={[chartDepthPlugin]} data={{labels:categoryTotals.map(([name])=>name),datasets:[{data:categoryTotals.map(([,amount])=>amount),backgroundColor:categoryTotals.map(([name])=>chartAlpha(tickerColor(name),.58)),borderColor:categoryTotals.map(([name])=>chartAlpha(tickerColor(name),.85)),borderWidth:2,hoverOffset:8}]}} options={{responsive:true,maintainAspectRatio:false,cutout:'48%',rotation:-25,plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:10,padding:8}},datalabels:{display:false}},layout:{padding:8}}} /></div></div>
-    <div className="analytics-chart"><h4>Deposits vs. withdrawals</h4><div className="chart-canvas-wrap"><Bar plugins={[chartDepthPlugin]} data={{labels:analytics.monthlyFlow.map((flow)=>flow.month),datasets:[{label:'Deposits',data:analytics.monthlyFlow.map((flow)=>flow.income),backgroundColor:chartAlpha(profit,.58),borderColor:chartAlpha(profit,.88),borderWidth:2,borderRadius:6},{label:'Withdrawals',data:analytics.monthlyFlow.map((flow)=>flow.expense),backgroundColor:chartAlpha(loss,.58),borderColor:chartAlpha(loss,.88),borderWidth:2,borderRadius:6}]}} options={{plugins:{datalabels:{display:false}}}} /></div></div>
+    <div className="analytics-chart"><h4>Deposits vs. withdrawals</h4><div className="chart-canvas-wrap"><Bar plugins={[chartDepthPlugin]} data={{labels:analytics.monthlyFlow.map((flow)=>flow.month),datasets:[{label:'Deposits',data:analytics.monthlyFlow.map((flow)=>flow.income),backgroundColor:chartAlpha(profit,.58),borderColor:chartAlpha(profit,.88),borderWidth:2,borderRadius:6},{label:'Withdrawals',data:analytics.monthlyFlow.map((flow)=>flow.expense),backgroundColor:chartAlpha(loss,.58),borderColor:chartAlpha(loss,.88),borderWidth:2,borderRadius:6}]}} options={{scales:{x:axisOptions,y:axisOptions},plugins:{datalabels:{display:false}}}} /></div></div>
+    <div className="analytics-chart"><h4>Period start and end</h4><div className="chart-canvas-wrap"><Bar plugins={[chartDepthPlugin]} data={{labels:['Start balance','Current balance'],datasets:[{label:'Balance',data:[startingBalance, ledger.at(-1)?.balance ?? startingBalance],backgroundColor:[chartAlpha('#5aa9c9',.5),chartAlpha(profit,.55)],borderColor:[chartAlpha('#5aa9c9',.85),chartAlpha(profit,.85)],borderWidth:2,borderRadius:6}]}} options={{scales:{x:axisOptions,y:axisOptions},plugins:{legend:{display:false},datalabels:{display:false}}}} /></div></div>
+    <div className="analytics-chart"><h4>Pending and planned impact</h4><div className="chart-canvas-wrap"><Bar plugins={[chartDepthPlugin]} data={{labels:['Pending','Planned','Combined'],datasets:[{label:'Expected net impact',data:[pendingNet,plannedNet,pendingNet+plannedNet],backgroundColor:[chartAlpha('#eab308',.5),chartAlpha('#8b5cf6',.5),chartAlpha('#5aa9c9',.5)],borderColor:[chartAlpha('#eab308',.85),chartAlpha('#8b5cf6',.85),chartAlpha('#5aa9c9',.85)],borderWidth:2,borderRadius:6}]}} options={{scales:{x:axisOptions,y:axisOptions},plugins:{legend:{display:false},datalabels:{display:false}}}} /></div></div>
   </div>;
 }
 
