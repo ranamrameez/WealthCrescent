@@ -13,7 +13,7 @@ import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
 import { ChartCard } from '../../qse/components/ChartCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
-import { ArrowDownIcon, ArrowHeadDownIcon, ArrowHeadUpIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, CheckIcon, EditIcon, ListIcon, PlanningIcon, PlusIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
+import { ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, CheckIcon, EditIcon, ListIcon, PlanningIcon, PlusIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { StandardButton } from '../../../components/standard';
 import { Modal } from '../../../components/Modal';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
@@ -1002,9 +1002,9 @@ export function AccountDetailPage() {
   const summaryMetric = (label: string, value: string, tone = 'pill-info', large = false, suffix?: ReactNode) => {
     const isFlow = /inflow|outflow/i.test(label);
     const indicator = tone === 'pill-positive'
-      ? (isFlow ? <ArrowUpIcon size={12} /> : <ArrowHeadUpIcon size={12} />)
+      ? (isFlow ? <ArrowUpIcon size={12} /> : <span aria-hidden>▲</span>)
       : tone === 'pill-negative'
-        ? (isFlow ? <ArrowDownIcon size={12} /> : <ArrowHeadDownIcon size={12} />)
+        ? (isFlow ? <ArrowDownIcon size={12} /> : <span aria-hidden>▼</span>)
         : null;
     return <div className={`summary-metric${large ? ' summary-metric-large' : ''}`}><Tooltip text={`${label} for the selected period.`}><span className="summary-metric-label clickable">{label}</span></Tooltip><strong className={`pill ${tone}`}>{indicator}{value}{suffix}</strong></div>;
   };
