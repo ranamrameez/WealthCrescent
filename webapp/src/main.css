@@ -200,6 +200,7 @@
 .topbar-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
 .topbar-select-wrap{margin:0;}
 .topbar-select{min-width:150px;height:30px;padding:4px 28px 4px 8px;font-size:12px;}
+.account-switch-select{min-width:112px;max-width:220px;}
 .topbar-filter-btn{min-width:auto;}
 .filter-preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
 .filter-fields-grid{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;}

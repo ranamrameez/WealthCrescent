@@ -1,7 +1,7 @@
 import type { User } from 'firebase/auth';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
 import { SummaryChip, type StandardCardAction } from '../../../components/StandardCard';
@@ -927,7 +927,6 @@ function CreditUsageBar({ used, limit, currency }: { used: number; limit: number
 }
 
 export function AccountDetailPage() {
-  const { search } = useLocation();
   const { id } = useParams();
   const navigate = useNavigate();
   const accounts = useBankWorkbookStore((state) => state.workbook.settings.accounts);
@@ -1025,15 +1024,23 @@ export function AccountDetailPage() {
   usePageTopBarRightSlot(account ? (
     <TopBarControls>
       <TopBarSelect
-        label="Switch account"
+        label="Account"
+        className="account-switch-select"
         value={account.id}
         onChange={(event) => {
           setEditingMeta(false);
-          navigate(`/bank/account/${event.target.value}${search}`);
+          navigate(`/bank/account/${event.target.value}`);
         }}
         options={accounts
           .filter((item) => !item.migratedToCreditCardId && (item.isActive !== false || item.id === account.id))
           .map((item) => ({ value: item.id, label: `${item.name} (${item.currencyCode})${item.bankId ? ' · ' + (banks.find(bank => bank.id === item.bankId)?.name ?? '') : ''}` }))}
+      />
+      <TopBarSelect
+        label="Bank"
+        className="account-switch-select"
+        value={account.bankId ?? ''}
+        onChange={(event) => navigate(event.target.value ? `/bank/bank/${event.target.value}` : '/bank')}
+        options={[{ value: '', label: 'All banks' }, ...banks.filter((bank) => bank.isActive !== false).map((bank) => ({ value: bank.id, label: bank.name }))]}
       />
       <TransactionFilterMenu
         value={filters}
