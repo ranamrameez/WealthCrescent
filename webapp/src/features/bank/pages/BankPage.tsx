@@ -1472,6 +1472,8 @@ function AccountAnalyticsSection({ ledger, pendingRows, plans, startingBalance, 
     return Object.entries(totals).sort((a, b) => b[1] - a[1]);
   }, [ledger, categories]);
 
+  const periodStartLabel = fromDate ? formatDate(fromDate, dateFormat) : 'Period start';
+  const periodEndLabel = toDate ? formatDate(toDate, dateFormat) : 'Period end';
   const balanceDates = [...new Set([...ledger.map((row) => row.tx.date), ...pendingRows.map((row) => row.tx.date), ...plans.map((plan) => plan.date)])].sort();
   const balanceLabels = [periodStartLabel, ...balanceDates.map((date) => formatDate(date, dateFormat)), periodEndLabel];
   const actualByDate = new Map(ledger.map((row) => [row.tx.date, row.balance]));
@@ -1494,8 +1496,6 @@ function AccountAnalyticsSection({ ledger, pendingRows, plans, startingBalance, 
   const balanceValues = [startingBalance, ...ledger.map((row) => row.balance)];
   const balanceMin = Math.min(...balanceValues);
   const balanceAxis = { ...axisOptions, beginAtZero: false, min: balanceMin >= 0 ? 0 : undefined };
-  const periodStartLabel = fromDate ? formatDate(fromDate, dateFormat) : 'Period start';
-  const periodEndLabel = toDate ? formatDate(toDate, dateFormat) : 'Period end';
 
   return <div className="analytics-grid">
     <div className="analytics-chart chart-height-lg"><Tooltip text="Cleared balance by transaction date, with a separate start-to-end reference line."><h4 className="clickable">Balance over time</h4></Tooltip><div className="chart-canvas-wrap"><Line plugins={[chartDepthPlugin]} data={{labels:[periodStartLabel, ...ledger.map((row)=>formatDate(row.tx.date,dateFormat)), periodEndLabel],datasets:[{type:'bar' as never,label:'Balance columns',data:[startingBalance, ...ledger.map((row)=>row.balance), ledger.at(-1)?.balance ?? startingBalance],backgroundColor:chartAlpha('#38bdf8',.18),borderColor:chartAlpha('#38bdf8',.5),borderWidth:1,borderRadius:4},{label:'Balance by transaction',data:[startingBalance, ...ledger.map((row)=>row.balance), ledger.at(-1)?.balance ?? startingBalance],borderColor:chartAlpha('#38bdf8',.9),backgroundColor:chartAlpha('#38bdf8',.2),fill:true,tension:.24,pointRadius:0,pointHoverRadius:4},{label:'Start → end balance',data:[startingBalance, ...ledger.map(()=>null), ledger.at(-1)?.balance ?? startingBalance],borderColor:chartAlpha('#a78bfa',.95),backgroundColor:'transparent',borderDash:[6,4],borderWidth:2,pointRadius:3,pointHoverRadius:5,spanGaps:true}]}} options={{responsive:true,maintainAspectRatio:false,scales:{x:axisOptions,y:balanceAxis},interaction:{mode:'index',intersect:false},plugins:{legend:{display:true},tooltip:{enabled:true},datalabels:{display:false}}}} /></div></div>
