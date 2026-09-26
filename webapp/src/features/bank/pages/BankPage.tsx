@@ -12,7 +12,7 @@ import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
 import { ChartCard } from '../../qse/components/ChartCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
-import { CheckIcon, EditIcon, ListIcon, PlusIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
+import { CheckIcon, EditIcon, ListIcon, PlanningIcon, PlusIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { Modal } from '../../../components/Modal';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
 import { Tabs } from '../../../components/Tabs';
@@ -1698,8 +1698,8 @@ function AddBankPlanFab({ accountId }: { accountId: string }) {
 
 function AccountPlans({ account }: { account: BankAccount }) {
   const [adding, setAdding] = useState(false);
+  usePageFabActions(`bank-account-plans-${account.id}`, useMemo(() => [{ label: 'Add a plan', icon: <PlanningIcon />, onClick: () => setAdding(true) }], []));
   return <>
-    <button className="btn secondary small" onClick={() => setAdding(true)}><PlusIcon />Add plan</button>
     <BankPlanList account={account} horizonDays={null} />
     {adding && <Modal title="Add a plan" onClose={() => setAdding(false)}>
       <AddBankPlanForm accountId={account.id} onSaved={() => setAdding(false)} />
@@ -1853,7 +1853,7 @@ function BankPlanList({ account, horizonDays }: { account: BankAccount; horizonD
               ) : (
                 <tr key={p.id}>
                   <td>{formatDate(p.date, dateFormat)}</td>
-                  <td>{p.description}</td>
+                  <td><Link to={`/planning?plan=${encodeURIComponent(p.id)}`} className="plan-link">{p.description}</Link></td>
                   <td className={p.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(p.amount, account.currencyCode)}</td>
                   <td>{p.category || '—'}</td>
                   <td className="text-muted">{p.recurrence ? recurrenceLabel(p.recurrence) : p.executed ? 'Done' : 'Planned'}</td>

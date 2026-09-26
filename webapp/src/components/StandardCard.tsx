@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { MenuIcon } from './icons';
+import { ArchiveIcon, EditIcon, ExportIcon, FlaskIcon, MenuIcon, PlanningIcon, PlusIcon, SaveIcon, TrashIcon } from './icons';
 
 export interface StandardCardAction {
   label: string;
+  icon?: ReactNode;
   onClick: () => void;
   disabled?: boolean;
   tone?: 'default' | 'danger';
@@ -23,9 +24,21 @@ function CardActionMenu({ actions }: { actions: StandardCardAction[] }) {
     return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc); };
   }, [open]);
   if (!actions.length) return null;
+  const actionIcon = (label: string) => {
+    const name = label.toLowerCase();
+    if (name.includes('delete')) return <TrashIcon size={14} />;
+    if (name.includes('edit')) return <EditIcon size={14} />;
+    if (name.includes('plan')) return <PlanningIcon size={14} />;
+    if (name.includes('import')) return <PlusIcon size={14} />;
+    if (name.includes('export')) return <ExportIcon size={14} />;
+    if (name.includes('filter')) return <FlaskIcon size={14} />;
+    if (name.includes('save')) return <SaveIcon size={14} />;
+    if (name.includes('close') || name.includes('archive')) return <ArchiveIcon size={14} />;
+    return null;
+  };
   return <div className="standard-card-menu" ref={rootRef}>
     <button type="button" className="standard-card-menu-trigger" aria-label="Card options" aria-expanded={open} onClick={(e)=>{e.stopPropagation();setOpen(v=>!v);}}><MenuIcon size={16}/></button>
-    {open && <div className="standard-card-menu-popover" role="menu">{actions.map(a=><button key={a.label} type="button" className={`standard-card-menu-item${a.tone==='danger'?' danger':''}`} disabled={a.disabled} onClick={()=>{setOpen(false);a.onClick();}}>{a.label}</button>)}</div>}
+    {open && <div className="standard-card-menu-popover" role="menu">{actions.map(a=><button key={a.label} type="button" className={`standard-card-menu-item${a.tone==='danger'?' danger':''}`} disabled={a.disabled} onClick={()=>{setOpen(false);a.onClick();}}>{a.icon ?? actionIcon(a.label)}<span>{a.label}</span></button>)}</div>}
   </div>;
 }
 

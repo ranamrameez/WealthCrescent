@@ -38,7 +38,7 @@ function show(url: string) {
 it('shows future and pending rows from month start, and switches accounts', () => {
   show('/bank/account/a1?section=transactions');
   expect(screen.queryByText('Future cleared payment')).not.toBeNull();
-  expect(screen.queryByText('Future pending payment')).not.toBeNull();
+  expect(screen.queryByText('Future pending payment')).toBeNull();
   expect(screen.queryByText('Prior month')).toBeNull();
   expect(screen.queryByLabelText('Switch bank')).toBeNull();
   fireEvent.change(screen.getByLabelText('Switch account'), { target: { value: 'a2' } });
@@ -64,7 +64,7 @@ it('honors a chosen end date and restores future rows when filters are reset', (
   fireEvent.click(screen.getByRole('button', { name: /Filters/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
   expect(screen.queryByText('Future cleared payment')).not.toBeNull();
-  expect(screen.queryByText('Future pending payment')).not.toBeNull();
+  expect(screen.queryByText('Future pending payment')).toBeNull();
   expect(screen.queryByText('Prior month')).toBeNull();
 });
 

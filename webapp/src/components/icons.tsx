@@ -128,6 +128,10 @@ export function FilterIcon({ size = 14 }: IconProps) {
   );
 }
 
+export function FlaskIcon({ size = 14 }: IconProps) {
+  return <svg width={size} height={size} {...base} aria-hidden><path d="M9 3h6M10 3v6l-5.5 9.2A1.2 1.2 0 0 0 5.5 20h13a1.2 1.2 0 0 0 1-1.8L14 9V3" /><path d="M7.3 15h9.4" /></svg>;
+}
+
 /** "More actions" — `FabPanel`'s own toggle icon when it offers more than
  * one action (user-reported 2026-09-03: "FAB menu: + button is misleading.
  * use menu or more relevant icon"). A plain "+" on that toggle implied "add
