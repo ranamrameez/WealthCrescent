@@ -968,6 +968,7 @@ export function AccountDetailPage() {
   });
   const [meta, setMeta] = useState<Omit<BankAccount, 'id'>>(() => accountToFormValue(account));
   const [editingMeta, setEditingMeta] = useState(false);
+  const [addingPlan, setAddingPlan] = useState(false);
 
   const allLedger = useMemo(() => account ? accountRunningLedger(account, transactions, true) : [], [account, transactions]);
   const categoryOptions = useMemo(
@@ -1171,6 +1172,7 @@ export function AccountDetailPage() {
       key: 'plans',
       label: 'Plans',
       summary: <SummaryChip label="Visible" value={upcoming.length} />,
+      actions: [{ label: 'Add a plan', onClick: () => setAddingPlan(true) }],
       content: <AccountPlans account={account} />,
     },
     {
@@ -1205,6 +1207,9 @@ export function AccountDetailPage() {
       </div>
       {account.migratedToCreditCardId && <Notice tone="info" className="mb-md">This account was migrated to a real Credit Card record — its transactions and balance now live there.{' '}<Link to={`/bank/card/${account.migratedToCreditCardId}`}>View the Credit Card →</Link></Notice>}
       <StandardPageSections key={account.id} sections={sections} defaultKey="summary" />
+      {addingPlan && <Modal title="Add a plan" onClose={() => setAddingPlan(false)}>
+        <AddBankPlanForm accountId={account.id} onSaved={() => setAddingPlan(false)} />
+      </Modal>}
       <AccountTransfersFab accountId={account.id} currencyCode={account.currencyCode} />
     </div>
   );
@@ -1766,14 +1771,7 @@ function AddBankPlanFab({ accountId }: { accountId: string }) {
 
 function AccountPlans({ account }: { account: BankAccount }) {
   const { filters } = useUrlTransactionFilters();
-  const [adding, setAdding] = useState(false);
-  usePageFabActions(`bank-account-plans-${account.id}`, useMemo(() => [{ label: 'Add a plan', icon: <PlanningIcon />, onClick: () => setAdding(true) }], []));
-  return <>
-    <BankPlanList account={account} horizonDays={null} fromDate={filters.fromDate} toDate={filters.toDate} />
-    {adding && <Modal title="Add a plan" onClose={() => setAdding(false)}>
-      <AddBankPlanForm accountId={account.id} onSaved={() => setAdding(false)} />
-    </Modal>}
-  </>;
+  return <BankPlanList account={account} horizonDays={null} fromDate={filters.fromDate} toDate={filters.toDate} />;
 }
 
 function AddBankPlanForm({ accountId, onSaved }: { accountId: string; onSaved?: () => void }) {
