@@ -1697,10 +1697,11 @@ function AddBankPlanFab({ accountId }: { accountId: string }) {
 }
 
 function AccountPlans({ account }: { account: BankAccount }) {
+  const { filters } = useUrlTransactionFilters();
   const [adding, setAdding] = useState(false);
   usePageFabActions(`bank-account-plans-${account.id}`, useMemo(() => [{ label: 'Add a plan', icon: <PlanningIcon />, onClick: () => setAdding(true) }], []));
   return <>
-    <BankPlanList account={account} horizonDays={null} />
+    <BankPlanList account={account} horizonDays={null} fromDate={filters.fromDate} toDate={filters.toDate} />
     {adding && <Modal title="Add a plan" onClose={() => setAdding(false)}>
       <AddBankPlanForm accountId={account.id} onSaved={() => setAdding(false)} />
     </Modal>}
@@ -1766,7 +1767,7 @@ function AddBankPlanForm({ accountId, onSaved }: { accountId: string; onSaved?: 
   );
 }
 
-function BankPlanList({ account, horizonDays }: { account: BankAccount; horizonDays: PlanningHorizonDays }) {
+function BankPlanList({ account, horizonDays, fromDate, toDate }: { account: BankAccount; horizonDays: PlanningHorizonDays; fromDate?: string; toDate?: string }) {
   const dateFormat = useAppearanceStore((s) => s.appearance.dateFormat ?? 'DD-MMM-YYYY');
   const allPlans = usePlannedBankWorkbookStore((s) => s.workbook.entries);
   const updatePlan = usePlannedBankWorkbookStore((s) => s.updateEntry);
@@ -1778,8 +1779,8 @@ function BankPlanList({ account, horizonDays }: { account: BankAccount; horizonD
   const asOf = useMemo(() => new Date(), []);
 
   const plans = useMemo(
-    () => allPlans.filter((p) => p.accountId === account.id && planWithinHorizon(p, asOf, horizonDays)),
-    [allPlans, account.id, horizonDays, asOf],
+    () => allPlans.filter((p) => p.accountId === account.id && planWithinHorizon(p, asOf, horizonDays) && (!fromDate || p.date >= fromDate) && (!toDate || p.date <= toDate)),
+    [allPlans, account.id, horizonDays, asOf, fromDate, toDate],
   );
   const sorted = useMemo(() => [...plans].sort((a, b) => a.date.localeCompare(b.date)), [plans]);
 
@@ -1816,7 +1817,7 @@ function BankPlanList({ account, horizonDays }: { account: BankAccount; horizonD
   };
 
   return (
-    <CollapsibleCard title={<h3 className="m-0">Plans</h3>}>
+    <div>
       <div>
         <table>
           <thead>
@@ -1878,7 +1879,7 @@ function BankPlanList({ account, horizonDays }: { account: BankAccount; horizonD
           </tbody>
         </table>
       </div>
-    </CollapsibleCard>
+    </div>
   );
 }
 

@@ -1888,6 +1888,8 @@ canvas {
 	max-height: 480px;
 	overflow-y: auto;
 }
+.table-responsive { width: 100%; overflow-x: auto; }
+.table-responsive table { min-width: max-content; }
 .table-scroll table thead th {
 	position: sticky;
 	top: 0;
