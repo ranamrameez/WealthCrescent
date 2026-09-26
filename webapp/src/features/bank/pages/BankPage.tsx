@@ -1143,7 +1143,7 @@ export function AccountDetailPage() {
           {summaryMetric('Outflow', fmtMoney(plannedOutflow, account.currencyCode), 'pill-negative')}
         </>, 'Future plans that have not been executed.')}
         {summaryCard('Actual inflow and outflow', <>
-          {summaryMetric('Net flow', fmtMoney(analytics.deposits + analytics.withdrawals, account.currencyCode), analytics.deposits + analytics.withdrawals >= 0 ? 'pill-positive' : 'pill-negative', true)}
+          {summaryMetric('Net flow', fmtMoney(analytics.netFlow, account.currencyCode), analytics.netFlow >= 0 ? 'pill-positive' : 'pill-negative', true)}
           {summaryMetric('Inflow', fmtMoney(analytics.deposits, account.currencyCode), 'pill-positive')}
           {summaryMetric('Outflow', fmtMoney(analytics.withdrawals, account.currencyCode), 'pill-negative')}
         </>, 'Cleared deposits and withdrawals in the selected period.')}
