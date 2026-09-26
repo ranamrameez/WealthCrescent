@@ -221,6 +221,7 @@
 .analytics-grid > .analytics-chart:nth-child(1), .analytics-grid > .analytics-chart:nth-child(2){grid-column:1 / -1;}
 .analytics-chart{min-width:0;padding:10px 0;}
 .analytics-chart h4{margin:0 0 8px;text-align:center;text-transform:capitalize;}
+.analytics-chart > .tooltip-trigger{display:block!important;text-align:center;}
 .analytics-chart.chart-height-sm .chart-canvas-wrap{height:min(24vh,240px);}
 .analytics-chart.chart-height-mid .chart-canvas-wrap{height:min(35vh,340px);}
 .analytics-chart.chart-height-lg .chart-canvas-wrap{height:55vh;}
