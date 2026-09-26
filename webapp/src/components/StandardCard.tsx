@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ArchiveIcon, CheckIcon, EditIcon, ExportIcon, FlaskIcon, MenuIcon, PlanningIcon, PlusIcon, SaveIcon, TrashIcon, XIcon } from './icons';
+import { ArchiveIcon, CheckIcon, CollapseIcon, EditIcon, ExpandIcon, ExportIcon, FlaskIcon, MenuIcon, PlanningIcon, PlusIcon, SaveIcon, TrashIcon, XIcon } from './icons';
 import { StandardIconButton } from './standard';
 
 export interface StandardCardAction {
@@ -49,13 +49,23 @@ export function StandardCard({ title, summary, actions=[], headerEnd, defaultOpe
   title:string; summary?:ReactNode; actions?:StandardCardAction[]; headerEnd?:ReactNode; defaultOpen?:boolean; open?:boolean; onToggle?:(open:boolean)=>void; children:ReactNode; className?:string;
 }) {
   const [internalOpen,setInternalOpen]=useState(defaultOpen);
+  const [fullScreen, setFullScreen] = useState(false);
   const open=controlledOpen??internalOpen;
   const toggle=()=>{const next=!open; if(onToggle)onToggle(next); else setInternalOpen(next);};
-  return <section className={`card standard-card ${className}`.trim()}>
+  return <section className={`card standard-card${fullScreen ? ' standard-card-fullscreen' : ''} ${className}`.trim()}>
     <header className="standard-card-header">
       <button type="button" className="standard-card-toggle" aria-expanded={open} onClick={toggle}><span className={`standard-card-arrow${open?' open':''}`} aria-hidden>▸</span><span className="standard-card-title">{title}</span></button>
       <div className="standard-card-summary">{summary}</div>
-      <div className="standard-card-actions" onClick={e=>e.stopPropagation()}>{headerEnd}<CardActionMenu actions={actions}/></div>
+      <div className="standard-card-actions" onClick={e=>e.stopPropagation()}>
+        {headerEnd}
+        <StandardIconButton
+          label={fullScreen ? 'Exit full screen' : 'Full screen'}
+          icon={fullScreen ? <CollapseIcon size={15} /> : <ExpandIcon size={15} />}
+          className="standard-card-fullscreen-trigger"
+          onClick={() => setFullScreen((value) => !value)}
+        />
+        <CardActionMenu actions={actions}/>
+      </div>
     </header>
     {open && <div className="standard-card-body">{children}</div>}
   </section>;

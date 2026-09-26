@@ -1894,6 +1894,17 @@ canvas {
 }
 .table-responsive { width: 100%; overflow-x: auto; }
 .table-responsive table { min-width: max-content; }
+.standard-card-fullscreen {
+	position: fixed;
+	inset: 12px;
+	z-index: 700;
+	margin: 0;
+	max-height: calc(100vh - 24px);
+	display: flex;
+	flex-direction: column;
+}
+.standard-card-fullscreen .standard-card-body { overflow: auto; flex: 1; }
+.standard-card-fullscreen-trigger { padding: 5px 7px !important; }
 .table-scroll table thead th {
 	position: sticky;
 	top: 0;
