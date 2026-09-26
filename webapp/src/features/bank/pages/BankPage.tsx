@@ -1313,7 +1313,7 @@ function TransactionsList({ account, ledger, allLedgerCount }: { account: BankAc
 
   return <>
     <div className="section-toolbar"><ImportStatementSection account={account} compact /></div>
-    <div><table>
+    <div className="table-responsive"><table>
       <thead><tr><th>#</th><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>Balance</th><th>Source</th><th></th></tr></thead>
       <tbody>
         {pageRows.map(({ tx, balance }, index) => {
@@ -1518,7 +1518,7 @@ function ImportStatementSection({ account, compact = false }: { account: BankAcc
           </div>
           <h4>Preview</h4>
           <div style={{ maxHeight: 360 }}>
-            <table><thead><tr><th>#</th><th>Date</th><th>Description</th><th>Amount</th><th>Status</th></tr></thead>
+            <table className="table-responsive"><thead><tr><th>#</th><th>Date</th><th>Description</th><th>Amount</th><th>Status</th></tr></thead>
               <tbody>{mappedRows.slice(0, 100).map((r) => {
                 const duplicate = r.valid && r.date ? existingByFingerprint.has(fingerprint({ date: r.date, description: r.description, amount: r.amount })) : false;
                 return <tr key={r.index}><td>{r.index + 1}</td><td>{r.date ? formatDate(r.date, dateFormat) : r.rawDate || '—'}</td><td>{r.description}</td><td className={r.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{Number.isFinite(r.amount) ? fmtMoney(r.amount, account.currencyCode) : 'Invalid'}</td><td className={r.valid ? (duplicate ? 'text-loss' : 'text-profit') : 'text-loss'}>{r.valid ? (duplicate ? 'Duplicate' : 'New') : 'Invalid'}</td></tr>;
@@ -1818,7 +1818,7 @@ function BankPlanList({ account, horizonDays, fromDate, toDate }: { account: Ban
 
   return (
     <div>
-      <div>
+      <div className="table-responsive">
         <table>
           <thead>
             <tr><th>Date</th><th>Description</th><th>Amount</th><th>Category</th><th>Repeats / status</th><th></th></tr>
