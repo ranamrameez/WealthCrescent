@@ -9,5 +9,5 @@ export function StandardButton({ tone = 'primary', size = 'normal', icon, childr
   icon?: ReactNode;
 }) {
   const classes = ['btn', tone === 'primary' ? '' : tone, size === 'small' ? 'small' : '', className].filter(Boolean).join(' ');
-  return <button {...props} className={classes}>{icon}{children}</button>;
+  return <button {...props} className={classes}><span className="standard-button-content">{icon}{children}</span></button>;
 }

@@ -256,6 +256,8 @@ export function ArrowDownIcon({ size = 14 }: IconProps) {
     </svg>
   );
 }
+export function ArrowLeftIcon({ size = 14 }: IconProps) { return <svg width={size} height={size} {...base} aria-hidden><path d="M19 12H5M11 6l-6 6 6 6" /></svg>; }
+export function ArrowRightIcon({ size = 14 }: IconProps) { return <svg width={size} height={size} {...base} aria-hidden><path d="M5 12h14M13 6l6 6-6 6" /></svg>; }
 
 /** Full-screen toggle for `Modal` (UI_DESIGN_GUIDELINES.md: every popup
  * must offer a full-screen escape hatch, since the default width is

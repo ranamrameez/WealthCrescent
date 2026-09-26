@@ -12,7 +12,8 @@ import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
 import { ChartCard } from '../../qse/components/ChartCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
-import { CheckIcon, EditIcon, ListIcon, PlanningIcon, PlusIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
+import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, EditIcon, ListIcon, PlanningIcon, PlusIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
+import { StandardButton } from '../../../components/standard';
 import { Modal } from '../../../components/Modal';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
 import { Tabs } from '../../../components/Tabs';
@@ -1124,7 +1125,10 @@ export function AccountDetailPage() {
       key: 'transactions',
       label: 'Transactions',
       summary: <SummaryChip label="Filtered" value={filteredLedger.length} />,
-      actions: [{ label: 'Export filtered CSV', onClick: exportTransactions, disabled: !filteredLedger.length }],
+      actions: [
+        { label: 'Import transactions', onClick: () => window.dispatchEvent(new Event('bank:open-import')) },
+        { label: 'Export filtered CSV', onClick: exportTransactions, disabled: !filteredLedger.length },
+      ],
       content: <TransactionsList account={account} ledger={filteredLedger} allLedgerCount={allLedger.length} />,
     },
     {
@@ -1340,10 +1344,12 @@ function TransactionsList({ account, ledger, allLedgerCount }: { account: BankAc
     <div className="pagination-bar">
       <div className="text-muted">{sorted.length ? `Showing ${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, sorted.length)} of ${sorted.length}` : 'No rows'}</div>
       <div className="pagination-actions">
+          <span className="text-muted">Page {safePage} of {pageCount}</span>
         <Field label="Rows" width={78}><Select value={String(pageSize)} onChange={(event)=>setPageSize(Number(event.target.value))}><option value="25">25</option><option value="50">50</option><option value="100">100</option></Select></Field>
-        <button type="button" className="btn secondary small" disabled={safePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button>
-        <span className="text-muted">Page {safePage} of {pageCount}</span>
-        <button type="button" className="btn secondary small" disabled={safePage >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Next</button>
+        <div className="d-flex justify-content-center" >
+          <StandardButton tone="secondary" size="small" icon={<ArrowLeftIcon />} disabled={safePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</StandardButton>
+          <StandardButton tone="secondary" size="small" icon={<ArrowRightIcon />} disabled={safePage >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Next</StandardButton>
+        </div>
       </div>
     </div>
     {editingTx && <EditTransactionModal tx={editingTx} onClose={() => setEditingTx(null)} />}
@@ -1429,6 +1435,12 @@ function ImportStatementSection({ account, compact = false }: { account: BankAcc
   const [amountCol, setAmountCol] = useState('');
   const [flipSign, setFlipSign] = useState(false);
 
+  useEffect(() => {
+    const openImport = () => fileInput.current?.click();
+    window.addEventListener('bank:open-import', openImport);
+    return () => window.removeEventListener('bank:open-import', openImport);
+  }, []);
+
   const reset = () => { setOpen(false); setFileName(''); setHeaders([]); setRows([]); setDateCol(''); setDescCol(''); setAmountCol(''); setFlipSign(false); };
 
   const onFile = (file: File) => {
@@ -1494,7 +1506,7 @@ function ImportStatementSection({ account, compact = false }: { account: BankAcc
 
   return (
     <div>
-      {compact && <button className="btn secondary small" onClick={() => fileInput.current?.click()}><PlusIcon size={13} />Import</button>}
+      {compact && null}
       {!compact && <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
         <span className="text-muted">Import a CSV export from your bank into {account.name}.</span>
         <Tooltip text="Choose a CSV, map its columns, review the import, then confirm. Existing matching transactions are detected by date + description + amount so importing the same statement again does not create duplicates." />

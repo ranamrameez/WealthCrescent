@@ -192,7 +192,7 @@
 .standard-card-menu{position:relative;}
 .standard-card-menu-trigger{width:30px;height:30px;min-width:30px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:7px;background:var(--panel-2);color:var(--text);cursor:pointer;}
 .standard-card-menu-popover{position:absolute;right:0;top:calc(100% + 6px);z-index:30;min-width:180px;padding:6px;border:1px solid var(--border);border-radius:9px;background:var(--panel);box-shadow:0 12px 28px rgba(0,0,0,.24);}
-.standard-card-menu-item{width:100%;display:flex;align-items:center;padding:8px 10px;border:0;border-radius:6px;background:transparent;color:var(--text);cursor:pointer;text-align:left;font:inherit;}
+.standard-card-menu-item{width:100%;display:flex;align-items:center;gap:8px;padding:8px 10px;border:0;border-radius:6px;background:transparent;color:var(--text);cursor:pointer;text-align:left;font:inherit;}
 .standard-card-menu-item:hover{background:var(--panel-2);}
 .standard-card-menu-item.danger{color:var(--loss);}
 .page-topbar-sections{margin:0;/*flex:1*/;min-width:0;}
@@ -1906,6 +1906,7 @@ canvas {
 .standard-card-backdrop { position: fixed; inset: 0; z-index: 699; background: rgba(0, 0, 0, .45); }
 .standard-card-fullscreen .standard-card-body { overflow: auto; flex: 1; }
 .standard-card-fullscreen-trigger { padding: 0 !important; }
+.standard-button-content { display: inline-flex; align-items: center; gap: 7px; }
 .table-scroll table thead th {
 	position: sticky;
 	top: 0;
