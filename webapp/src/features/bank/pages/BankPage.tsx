@@ -1210,7 +1210,7 @@ export function AccountDetailPage() {
         <SummaryChip label="Withdrawals" value={fmtMoney(analytics.withdrawals, account.currencyCode)} />
         <SummaryChip label="Net" value={fmtMoney(analytics.netFlow, account.currencyCode)} />
       </>,
-      content: <AccountAnalyticsSection ledger={clearedLedger} startingBalance={periodStartBalance} pendingNet={pendingNet} plannedNet={plannedNet} currencyCode={account.currencyCode} />,
+      content: <AccountAnalyticsSection ledger={clearedLedger} startingBalance={periodStartBalance} pendingNet={pendingNet} plannedNet={plannedNet} currencyCode={account.currencyCode} fromDate={filters.fromDate} toDate={filters.toDate} />,
     },
   ];
 
@@ -1227,7 +1227,7 @@ export function AccountDetailPage() {
       {addingPlan && <Modal title="Add a plan" onClose={() => setAddingPlan(false)}>
         <AddBankPlanForm accountId={account.id} onSaved={() => setAddingPlan(false)} />
       </Modal>}
-      <AccountTransfersFab accountId={account.id} currencyCode={account.currencyCode} />
+      <AccountTransfersFab accountId={account.id} currencyCode={account.currencyCode} fromDate={filters.fromDate} toDate={filters.toDate} />
     </div>
   );
 }
@@ -1456,7 +1456,7 @@ function TransactionsList({ account, ledger, allLedgerCount }: { account: BankAc
  * (Income/Expense/Net flow/Balance at month end, then one row per spend
  * category) — a chart's own hover tooltip is the only other way to read
  * an exact number today, and doesn't work at all on a touch device. */
-function AccountAnalyticsSection({ ledger, startingBalance, pendingNet, plannedNet, currencyCode }: { ledger: ReturnType<typeof accountRunningLedger>; startingBalance: number; pendingNet: number; plannedNet: number; currencyCode: string }) {
+function AccountAnalyticsSection({ ledger, startingBalance, pendingNet, plannedNet, currencyCode, fromDate, toDate }: { ledger: ReturnType<typeof accountRunningLedger>; startingBalance: number; pendingNet: number; plannedNet: number; currencyCode: string; fromDate?: string; toDate?: string }) {
   const dateFormat = useAppearanceStore((state) => state.appearance.dateFormat ?? 'DD-MMM-YYYY');
   const categories = useCategoryStore((state) => state.workbook.categories);
   useAppearanceStore((state) => state.appearance);
