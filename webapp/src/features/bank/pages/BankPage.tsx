@@ -998,7 +998,7 @@ export function AccountDetailPage() {
   const plannedOutflow = plannedEntries.filter((plan) => plan.accountId === account?.id && !plan.executed && plan.amount < 0 && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
   const balanceChange = periodCurrentBalance - periodStartBalance;
   const balanceChangePercent = periodStartBalance === 0 ? null : (balanceChange / Math.abs(periodStartBalance)) * 100;
-  const summaryMetric = (label: string, value: string, tone = 'pill-info', large = false, suffix?: ReactNode) => <div className={`summary-metric${large ? ' summary-metric-large' : ''}`}><span className="summary-metric-label">{label}</span><strong className={`pill ${tone}`}>{value}{suffix}</strong></div>;
+  const summaryMetric = (label: string, value: string, tone = 'pill-info', large = false, suffix?: ReactNode) => <div className={`summary-metric${large ? ' summary-metric-large' : ''}`}><Tooltip text={`${label} for the selected period.`}><span className="summary-metric-label clickable">{label}</span></Tooltip><strong className={`pill ${tone}`}>{value}{suffix}</strong></div>;
   const summaryCard = (title: string, metrics: ReactNode, tooltip: string, className = '') => <div className={`stat-card card account-summary-card ${className}`}><Tooltip text={tooltip}><h4 className="clickable">{title}</h4></Tooltip><div className="account-summary-card-metrics">{metrics}</div></div>;
   const upcoming = useMemo(
     () => account
@@ -1115,8 +1115,8 @@ export function AccountDetailPage() {
           {summaryMetric('Change', fmtMoney(balanceChange, account.currencyCode), balanceChange >= 0 ? 'pill-positive' : 'pill-negative', false, <small className="summary-percent" title="Change as a percentage of the period start balance">{balanceChangePercent === null ? '—' : ` (${balanceChangePercent.toFixed(1)}%)`}</small>)}
         </>, 'Actual cleared account balance over the selected period.', 'account-summary-card-balance')}
         {summaryCard('Expected balance impact', <>
-          {summaryMetric('Net expected', fmtMoney(pendingNet + plannedNet, account.currencyCode), pendingNet + plannedNet >= 0 ? 'pill-positive' : 'pill-negative', true)}
-          {summaryMetric('Expected balance', fmtMoney(periodCurrentBalance + pendingNet + plannedNet, account.currencyCode), periodCurrentBalance + pendingNet + plannedNet >= 0 ? 'pill-positive' : 'pill-negative')}
+          {summaryMetric('Expected balance', fmtMoney(periodCurrentBalance + pendingNet + plannedNet, account.currencyCode), periodCurrentBalance + pendingNet + plannedNet >= 0 ? 'pill-positive' : 'pill-negative', true)}
+          {summaryMetric('Net expected', fmtMoney(pendingNet + plannedNet, account.currencyCode), pendingNet + plannedNet >= 0 ? 'pill-positive' : 'pill-negative')}
           {summaryMetric('Expected inflow', fmtMoney(pendingInflow + plannedInflow, account.currencyCode), 'pill-positive')}
           {summaryMetric('Expected outflow', fmtMoney(pendingOutflow + plannedOutflow, account.currencyCode), 'pill-negative')}
           {summaryMetric('Change', fmtMoney(pendingNet + plannedNet, account.currencyCode), pendingNet + plannedNet >= 0 ? 'pill-positive' : 'pill-negative')}
@@ -1132,9 +1132,9 @@ export function AccountDetailPage() {
           {summaryMetric('Outflow', fmtMoney(plannedOutflow, account.currencyCode), 'pill-negative')}
         </>, 'Future plans that have not been executed.')}
         {summaryCard('Actual inflow and outflow', <>
+          {summaryMetric('Net flow', fmtMoney(analytics.deposits + analytics.withdrawals, account.currencyCode), analytics.deposits + analytics.withdrawals >= 0 ? 'pill-positive' : 'pill-negative', true)}
           {summaryMetric('Inflow', fmtMoney(analytics.deposits, account.currencyCode), 'pill-positive')}
           {summaryMetric('Outflow', fmtMoney(analytics.withdrawals, account.currencyCode), 'pill-negative')}
-          {summaryMetric('Net flow', fmtMoney(analytics.deposits + analytics.withdrawals, account.currencyCode), analytics.deposits + analytics.withdrawals >= 0 ? 'pill-positive' : 'pill-negative')}
         </>, 'Cleared deposits and withdrawals in the selected period.')}
       </div>,
     },
