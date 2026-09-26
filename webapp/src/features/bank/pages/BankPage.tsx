@@ -1098,7 +1098,7 @@ export function AccountDetailPage() {
     {
       key: 'summary',
       label: 'Account summary',
-      summary: <span className="pill pill-info">Period</span>,
+      summary: <span className="pill pill-info">{filters.fromDate || 'All time'}{filters.toDate ? ` – ${filters.toDate}` : filters.fromDate ? ' onward' : ''}</span>,
       content: <div className="account-summary-grid">{periodPills([
         ['Start balance', fmtMoney(periodStartBalance, account.currencyCode), 'pill-info'],
         ['Current balance', fmtMoney(periodCurrentBalance, account.currencyCode), periodCurrentBalance >= periodStartBalance ? 'pill-positive' : 'pill-negative'],
