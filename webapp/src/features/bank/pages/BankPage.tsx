@@ -1004,7 +1004,7 @@ export function AccountDetailPage() {
     const numericValue = Number(value.replace(/[^0-9.-]/g, ''));
     const hasValue = Number.isFinite(numericValue) && numericValue !== 0;
     const indicator = hasValue && tone === 'pill-positive'
-      ? (isFlow ? <span aria-hidden>↙</span> : <span aria-hidden>▲</span>)
+      ? (isFlow ? <span aria-hidden>↘</span> : <span aria-hidden>▲</span>)
       : hasValue && tone === 'pill-negative'
         ? (isFlow ? <span aria-hidden>↗</span> : <span aria-hidden>▼</span>)
         : null;
