@@ -1905,7 +1905,7 @@ canvas {
 }
 .standard-card-backdrop { position: fixed; inset: 0; z-index: 699; background: rgba(0, 0, 0, .45); }
 .standard-card-fullscreen .standard-card-body { overflow: auto; flex: 1; }
-.standard-card-fullscreen-trigger { padding: 5px 9px !important; min-width: 30px; }
+.standard-card-fullscreen-trigger { padding: 0 !important; }
 .table-scroll table thead th {
 	position: sticky;
 	top: 0;

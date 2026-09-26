@@ -69,7 +69,7 @@ export function StandardCard({ title, summary, actions=[], headerEnd, defaultOpe
         <StandardIconButton
           label={fullScreen ? 'Exit full screen' : 'Full screen'}
           icon={fullScreen ? <CollapseIcon size={15} /> : <ExpandIcon size={15} />}
-          className="standard-card-fullscreen-trigger"
+          className="standard-card-menu-trigger standard-card-fullscreen-trigger"
           onClick={() => fullScreen ? setFullScreen(false) : enterFullScreen()}
         />
         <CardActionMenu actions={actions}/>
