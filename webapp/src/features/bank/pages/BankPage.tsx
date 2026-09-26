@@ -1115,7 +1115,8 @@ export function AccountDetailPage() {
           {summaryMetric('Change', fmtMoney(balanceChange, account.currencyCode), balanceChange >= 0 ? 'pill-positive' : 'pill-negative', false, <small className="summary-percent" title="Change as a percentage of the period start balance">{balanceChangePercent === null ? '—' : ` (${balanceChangePercent.toFixed(1)}%)`}</small>)}
         </>, 'Actual cleared account balance over the selected period.', 'account-summary-card-balance')}
         {summaryCard('Expected balance impact', <>
-          {summaryMetric('Expected balance', fmtMoney(periodCurrentBalance + pendingNet + plannedNet, account.currencyCode), periodCurrentBalance + pendingNet + plannedNet >= 0 ? 'pill-positive' : 'pill-negative', true)}
+          {summaryMetric('Net expected', fmtMoney(pendingNet + plannedNet, account.currencyCode), pendingNet + plannedNet >= 0 ? 'pill-positive' : 'pill-negative', true)}
+          {summaryMetric('Expected balance', fmtMoney(periodCurrentBalance + pendingNet + plannedNet, account.currencyCode), periodCurrentBalance + pendingNet + plannedNet >= 0 ? 'pill-positive' : 'pill-negative')}
           {summaryMetric('Expected inflow', fmtMoney(pendingInflow + plannedInflow, account.currencyCode), 'pill-positive')}
           {summaryMetric('Expected outflow', fmtMoney(pendingOutflow + plannedOutflow, account.currencyCode), 'pill-negative')}
           {summaryMetric('Change', fmtMoney(pendingNet + plannedNet, account.currencyCode), pendingNet + plannedNet >= 0 ? 'pill-positive' : 'pill-negative')}
