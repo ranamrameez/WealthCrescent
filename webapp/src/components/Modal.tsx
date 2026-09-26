@@ -7,6 +7,7 @@ export function Modal({
   children,
   zIndex,
   width,
+  widthClass,
 }: {
   title: string;
   onClose: () => void;
@@ -15,12 +16,13 @@ export function Modal({
   zIndex?: number;
   /** Overrides `.modal-box`'s default width cap. */
   width?: string;
+  widthClass?: '40' | '50' | '60';
 }) {
   const [fullScreen, setFullScreen] = useState(false);
   return (
     <div className="modal-overlay show" style={zIndex ? { zIndex } : undefined} onClick={onClose}>
       <div
-        className={`modal-box${fullScreen ? ' fullscreen' : ''}`}
+        className={`modal-box${fullScreen ? ' fullscreen' : ''}${!fullScreen && widthClass ? ` modal-width-${widthClass}` : ''}`}
         style={!fullScreen && width ? { maxWidth: width } : undefined}
         onClick={(e) => e.stopPropagation()}
       >

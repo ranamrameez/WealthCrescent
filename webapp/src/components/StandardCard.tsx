@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ArchiveIcon, EditIcon, ExportIcon, FlaskIcon, MenuIcon, PlanningIcon, PlusIcon, SaveIcon, TrashIcon } from './icons';
+import { ArchiveIcon, CheckIcon, EditIcon, ExportIcon, FlaskIcon, MenuIcon, PlanningIcon, PlusIcon, SaveIcon, TrashIcon, XIcon } from './icons';
 
 export interface StandardCardAction {
   label: string;
@@ -33,6 +33,8 @@ function CardActionMenu({ actions }: { actions: StandardCardAction[] }) {
     if (name.includes('export')) return <ExportIcon size={14} />;
     if (name.includes('filter')) return <FlaskIcon size={14} />;
     if (name.includes('save')) return <SaveIcon size={14} />;
+    if (name.includes('done') || name.includes('complete')) return <CheckIcon size={14} />;
+    if (name.includes('cancel')) return <XIcon size={14} />;
     if (name.includes('close') || name.includes('archive')) return <ArchiveIcon size={14} />;
     return null;
   };

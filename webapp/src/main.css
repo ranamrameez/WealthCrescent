@@ -1840,6 +1840,9 @@ canvas {
 	max-height: 92vh;
 	overflow-y: auto;
 }
+.modal-width-40 { max-width: 40%; }
+.modal-width-50 { max-width: 50%; }
+.modal-width-60 { max-width: 60%; }
 .modal-box.fullscreen {
 	max-width: 96vw;
 	max-height: 96vh;
