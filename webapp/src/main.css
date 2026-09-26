@@ -1908,7 +1908,7 @@ canvas {
 .standard-card-fullscreen-trigger { padding: 0 !important; }
 .standard-button-content { display: inline-flex; align-items: center; gap: 7px; }
 .summary-pill-row { display: flex; flex-wrap: wrap; gap: 8px; }
-.account-summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.account-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .account-summary-card { min-width: 0; padding: 14px; }
 .account-summary-card h4 { margin: 0 0 12px; font-size: 0.82rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
 .account-summary-card-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -1917,7 +1917,7 @@ canvas {
 .summary-metric strong { width: fit-content; max-width: 100%; font-size: .9rem; }
 .summary-metric-large { grid-column: 1 / -1; }
 .summary-metric-large strong { font-size: 1.2rem; }
-.summary-percent { grid-column: 2; align-self: end; justify-self: end; font-size: .78rem; color: var(--text-muted); }
+.summary-percent { font-size: .72em; color: var(--text-muted); font-weight: 500; }
 @media (max-width: 700px) {
   .account-summary-grid { grid-template-columns: 1fr; }
 }
