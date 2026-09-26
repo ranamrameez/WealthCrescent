@@ -123,7 +123,7 @@ export function CalendarIcon({ size = 14 }: IconProps) {
 export function FilterIcon({ size = 14 }: IconProps) {
   return (
     <svg width={size} height={size} {...base} aria-hidden>
-      <path d="M4 5h16M7 12h10M10 19h4" />
+      <path d="M3 4h18l-7 8v6l-4 2v-8Z" />
     </svg>
   );
 }

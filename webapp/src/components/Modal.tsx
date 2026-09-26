@@ -38,9 +38,10 @@ export function Modal({
               aria-label={fullScreen ? 'Exit full screen' : 'Full screen'}
               title={fullScreen ? 'Exit full screen' : 'Full screen'}
               onClick={() => setFullScreen((v) => !v)}
-              className="modal-icon-btn"
+              className="modal-icon-btn modal-screen-toggle"
             >
               {fullScreen ? <CollapseIcon /> : <ExpandIcon />}
+              <span>{fullScreen ? 'Exit full screen' : 'Full screen'}</span>
             </button>
             <button aria-label="Close" title="Close" onClick={onClose} className="modal-icon-btn modal-icon-btn-close">
               ✕
