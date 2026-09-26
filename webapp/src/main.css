@@ -1903,8 +1903,9 @@ canvas {
 	display: flex;
 	flex-direction: column;
 }
+.standard-card-backdrop { position: fixed; inset: 0; z-index: 699; background: rgba(0, 0, 0, .45); }
 .standard-card-fullscreen .standard-card-body { overflow: auto; flex: 1; }
-.standard-card-fullscreen-trigger { padding: 5px 7px !important; }
+.standard-card-fullscreen-trigger { padding: 5px 9px !important; min-width: 30px; }
 .table-scroll table thead th {
 	position: sticky;
 	top: 0;

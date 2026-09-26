@@ -50,9 +50,17 @@ export function StandardCard({ title, summary, actions=[], headerEnd, defaultOpe
 }) {
   const [internalOpen,setInternalOpen]=useState(defaultOpen);
   const [fullScreen, setFullScreen] = useState(false);
+  useEffect(() => {
+    if (!fullScreen) return;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') setFullScreen(false); };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [fullScreen]);
   const open=controlledOpen??internalOpen;
   const toggle=()=>{const next=!open; if(onToggle)onToggle(next); else setInternalOpen(next);};
-  return <section className={`card standard-card${fullScreen ? ' standard-card-fullscreen' : ''} ${className}`.trim()}>
+  const enterFullScreen = () => { setFullScreen(true); if (!open) { if (onToggle) onToggle(true); else setInternalOpen(true); } };
+  return <>{fullScreen && <div className="standard-card-backdrop" onClick={() => setFullScreen(false)} />}
+  <section className={`card standard-card${fullScreen ? ' standard-card-fullscreen' : ''} ${className}`.trim()}>
     <header className="standard-card-header">
       <button type="button" className="standard-card-toggle" aria-expanded={open} onClick={toggle}><span className={`standard-card-arrow${open?' open':''}`} aria-hidden>▸</span><span className="standard-card-title">{title}</span></button>
       <div className="standard-card-summary">{summary}</div>
@@ -62,11 +70,11 @@ export function StandardCard({ title, summary, actions=[], headerEnd, defaultOpe
           label={fullScreen ? 'Exit full screen' : 'Full screen'}
           icon={fullScreen ? <CollapseIcon size={15} /> : <ExpandIcon size={15} />}
           className="standard-card-fullscreen-trigger"
-          onClick={() => setFullScreen((value) => !value)}
+          onClick={() => fullScreen ? setFullScreen(false) : enterFullScreen()}
         />
         <CardActionMenu actions={actions}/>
       </div>
     </header>
     {open && <div className="standard-card-body">{children}</div>}
-  </section>;
+  </section></>;
 }

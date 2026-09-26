@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { CollapseIcon, ExpandIcon } from './icons';
 
 export function Modal({
@@ -19,6 +19,11 @@ export function Modal({
   widthClass?: '40' | '50' | '60';
 }) {
   const [fullScreen, setFullScreen] = useState(false);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') { if (fullScreen) setFullScreen(false); else onClose(); } };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [fullScreen, onClose]);
   return (
     <div className="modal-overlay show" style={zIndex ? { zIndex } : undefined} onClick={onClose}>
       <div
