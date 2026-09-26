@@ -13,7 +13,7 @@ import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
 import { ChartCard } from '../../qse/components/ChartCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
-import { ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, CheckIcon, EditIcon, ListIcon, PlanningIcon, PlusIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
+import { ArrowDownIcon, ArrowHeadDownIcon, ArrowHeadUpIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, CheckIcon, EditIcon, ListIcon, PlanningIcon, PlusIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { StandardButton } from '../../../components/standard';
 import { Modal } from '../../../components/Modal';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
@@ -999,7 +999,15 @@ export function AccountDetailPage() {
   const plannedOutflow = plannedEntries.filter((plan) => plan.accountId === account?.id && !plan.executed && plan.amount < 0 && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
   const balanceChange = periodCurrentBalance - periodStartBalance;
   const balanceChangePercent = periodStartBalance === 0 ? null : (balanceChange / Math.abs(periodStartBalance)) * 100;
-  const summaryMetric = (label: string, value: string, tone = 'pill-info', large = false, suffix?: ReactNode) => <div className={`summary-metric${large ? ' summary-metric-large' : ''}`}><Tooltip text={`${label} for the selected period.`}><span className="summary-metric-label clickable">{label}</span></Tooltip><strong className={`pill ${tone}`}>{tone === 'pill-positive' && <ArrowUpIcon size={12} />}{tone === 'pill-negative' && <ArrowDownIcon size={12} />}{value}{suffix}</strong></div>;
+  const summaryMetric = (label: string, value: string, tone = 'pill-info', large = false, suffix?: ReactNode) => {
+    const isFlow = /inflow|outflow/i.test(label);
+    const indicator = tone === 'pill-positive'
+      ? (isFlow ? <ArrowUpIcon size={12} /> : <ArrowHeadUpIcon size={12} />)
+      : tone === 'pill-negative'
+        ? (isFlow ? <ArrowDownIcon size={12} /> : <ArrowHeadDownIcon size={12} />)
+        : null;
+    return <div className={`summary-metric${large ? ' summary-metric-large' : ''}`}><Tooltip text={`${label} for the selected period.`}><span className="summary-metric-label clickable">{label}</span></Tooltip><strong className={`pill ${tone}`}>{indicator}{value}{suffix}</strong></div>;
+  };
   const summaryCard = (title: string, metrics: ReactNode, tooltip: string, className = '') => <div className={`stat-card card account-summary-card ${className}`}><Tooltip text={tooltip}><h4 className="clickable">{title}</h4></Tooltip><div className="account-summary-card-metrics">{metrics}</div></div>;
   const upcoming = useMemo(
     () => account
