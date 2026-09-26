@@ -202,7 +202,8 @@
 .topbar-select{min-width:150px;height:30px;padding:4px 28px 4px 8px;font-size:12px;}
 .topbar-filter-btn{min-width:auto;}
 .filter-preset-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
-.filter-fields-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
+.filter-fields-grid{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;}
+.filter-fields-grid > *{flex:1 1 150px;min-width:140px;max-width:100%;}
 .modal-footer-actions{display:flex;justify-content:space-between;gap:8px;margin-top:16px;}
 .date-input-wrap{display:flex;align-items:center;gap:4px;position:relative;}
 .date-input-wrap>input[type="text"]{flex:1;min-width:0;}
@@ -2083,7 +2084,7 @@ input.price-input[type="number"] {
 	border-radius: var(--radius-lg);
 	box-shadow: var(--shadow-card);
 	border-bottom: 1px solid var(--border);
-	align-items: stretch;
+	align-items: center;
 	gap: 12px;
 	margin: -20px -14px 20px;
 	padding: 8px 5px;
