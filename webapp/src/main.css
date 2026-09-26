@@ -221,6 +221,10 @@
 .analytics-grid > .analytics-chart:nth-child(1), .analytics-grid > .analytics-chart:nth-child(2){grid-column:1 / -1;}
 .analytics-chart{min-width:0;padding:10px 0;}
 .analytics-chart h4{margin:0 0 8px;text-transform:capitalize;}
+.analytics-chart.chart-height-sm .chart-canvas-wrap{height:min(24vh,240px);}
+.analytics-chart.chart-height-mid .chart-canvas-wrap{height:min(35vh,340px);}
+.analytics-chart.chart-height-lg .chart-canvas-wrap{height:55vh;}
+.analytics-chart.chart-height-xl .chart-canvas-wrap{height:70vh;}
 @media(max-width:900px){.standard-card-header{grid-template-columns:minmax(0,1fr) auto;}.standard-card-summary{grid-column:1/-1;grid-row:2;justify-content:flex-start;}.analytics-grid{grid-template-columns:1fr;}}
 @media(max-width:640px){.standard-card-header{padding:10px;}.standard-card-body{padding:10px;}.topbar-controls{width:100%;justify-content:stretch;}.topbar-select-wrap,.topbar-select,.topbar-filter-btn{width:100%;}}
 
