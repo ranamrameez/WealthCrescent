@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArchiveIcon, CheckIcon, EditIcon, ExportIcon, FlaskIcon, MenuIcon, PlanningIcon, PlusIcon, SaveIcon, TrashIcon, XIcon } from './icons';
+import { StandardIconButton } from './standard';
 
 export interface StandardCardAction {
   label: string;
@@ -39,7 +40,7 @@ function CardActionMenu({ actions }: { actions: StandardCardAction[] }) {
     return null;
   };
   return <div className="standard-card-menu" ref={rootRef}>
-    <button type="button" className="standard-card-menu-trigger" aria-label="Card options" aria-expanded={open} onClick={(e)=>{e.stopPropagation();setOpen(v=>!v);}}><MenuIcon size={16}/></button>
+    <StandardIconButton type="button" className="standard-card-menu-trigger" label="Card options" icon={<MenuIcon size={16}/>} aria-expanded={open} onClick={(e)=>{e.stopPropagation();setOpen(v=>!v);}} />
     {open && <div className="standard-card-menu-popover" role="menu">{actions.map(a=><button key={a.label} type="button" className={`standard-card-menu-item${a.tone==='danger'?' danger':''}`} disabled={a.disabled} onClick={()=>{setOpen(false);a.onClick();}}>{a.icon ?? actionIcon(a.label)}<span>{a.label}</span></button>)}</div>}
   </div>;
 }
