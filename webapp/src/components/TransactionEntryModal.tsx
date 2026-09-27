@@ -12,6 +12,7 @@ import { getLastTransferSource, rememberTransferSource } from '../hooks/useLastT
 import { CategorySelect } from './CategorySelect';
 import { UNCATEGORIZED_ID } from '../lib/categories';
 import { defaultTimeForDate, defaultTimezoneForCurrency, nowTime } from '../lib/datetime';
+import { loanDirectionForTransfer, transferDirectionForLoan } from '../lib/calc/personalLoansModule';
 import { convertAmount, loadCachedFxRates } from '../lib/fx';
 import { useEnsureSignedIn } from '../lib/firebase/useEnsureSignedIn';
 import { defaultLinkedOtherSide, isSupportedLinkPair, linkSideRequiresRef } from '../lib/interEntityLink';
@@ -256,9 +257,7 @@ function TxRowFields({
             finance,
             subscriptionMode: false,
             subscriptionId: '',
-            direction: selectedLoan
-              ? (selectedLoan.direction === 'i_owe' ? 'in' : 'out')
-              : row.direction,
+            direction: selectedLoan ? transferDirectionForLoan(selectedLoan.direction) : row.direction,
             timezone: defaultTimezoneForCurrency(useSideCurrencyStatic(finance)),
             toAmount: undefined,
             toAmountTouched: false,
@@ -279,7 +278,7 @@ function TxRowFields({
                   onChange({ ...row, direction: d });
                   return;
                 }
-                const wantedDirection = d === 'in' ? 'i_owe' : 'owed_to_me';
+                const wantedDirection = loanDirectionForTransfer(d);
                 const current = personalLoans.find((loan) => loan.id === row.finance.ref);
                 if (current?.direction === wantedDirection) {
                   onChange({ ...row, direction: d });
