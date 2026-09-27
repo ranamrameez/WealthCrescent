@@ -261,18 +261,25 @@ function TxRowFields({
         allowSubscriptions
         subscriptionMode={row.subscriptionMode}
         subscriptionId={row.subscriptionId}
-        onSubscriptionChange={(subscriptionId) =>
+        onSubscriptionChange={(subscriptionId, finance) => {
+          if (!finance) return;
           onChange({
             ...row,
-            subscriptionMode: !!subscriptionId,
+            finance,
+            subscriptionMode: true,
             subscriptionId,
-            linked: subscriptionId ? false : row.linked,
-          })
-        }
+            linked: false,
+            timezone: defaultTimezoneForCurrency(useSideCurrencyStatic(finance)),
+            toAmount: undefined,
+            toAmountTouched: false,
+          });
+        }}
         onChange={(finance) =>
           onChange({
             ...row,
             finance,
+            subscriptionMode: false,
+            subscriptionId: '',
             timezone: defaultTimezoneForCurrency(useSideCurrencyStatic(finance)),
             toAmount: undefined,
             toAmountTouched: false,
@@ -507,8 +514,10 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
     for (const r of valid) {
       if (r.linked) {
         const abs = Math.abs(r.amount);
-        const emiLoan = r.other.module === 'emi' ? emiLoans.find((l) => l.id === r.other.ref) : undefined;
-        const resolvedOther = emiLoan ? { ...r.other, emiMonth: nextUnpaidEmiMonth(emiLoan) } : r.other;
+        const financeEmiLoan = r.finance.module === 'emi' ? emiLoans.find((loan) => loan.id === r.finance.ref) : undefined;
+        const otherEmiLoan = r.other.module === 'emi' ? emiLoans.find((loan) => loan.id === r.other.ref) : undefined;
+        const resolvedFinance = financeEmiLoan ? { ...r.finance, emiMonth: nextUnpaidEmiMonth(financeEmiLoan) } : r.finance;
+        const resolvedOther = otherEmiLoan ? { ...r.other, emiMonth: nextUnpaidEmiMonth(otherEmiLoan) } : r.other;
         // `r.amount` is always the FINANCE side's own amount; `r.toAmount`
         // (when set — a cross-currency link) is always the OTHER side's —
         // `from`/`to` below swap which is which based on direction, so
@@ -521,8 +530,8 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
           date: r.date,
           fromAmount: r.direction === 'out' ? financeAmount : otherAmount,
           toAmount: r.direction === 'out' ? otherAmount : financeAmount,
-          from: r.direction === 'out' ? r.finance : resolvedOther,
-          to: r.direction === 'out' ? resolvedOther : r.finance,
+          from: r.direction === 'out' ? resolvedFinance : resolvedOther,
+          to: r.direction === 'out' ? resolvedOther : resolvedFinance,
           note: r.note.trim() || r.description.trim() || undefined,
           rateSource: r.rateSource.trim() || undefined,
         });
