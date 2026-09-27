@@ -32,6 +32,7 @@ import { categoryName } from '../../../lib/categories';
 import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
 import {
   loanBalanceHistory,
+  loanCategoryForDirection,
   loanOutstanding,
   loanPendingImpact,
   netPendingByCurrency,
@@ -566,7 +567,7 @@ function ImportRepaymentsSection({ loan, onClose }: { loan: PersonalLoan; onClos
 
   const doImport = async () => {
     if (!dateCol || !amountCol) return toast('Map both the date and amount columns.');
-    if (!(await ensureSignedIn('Sign in to import repayments.'))) return;
+    if (!(await ensureSignedIn('Sign in to import payments.'))) return;
     const imported: PersonalLoanRepayment[] = rows
       .map(mapRow)
       .filter((r) => r.date && !Number.isNaN(r.amount) && r.amount !== 0)
@@ -575,6 +576,7 @@ function ImportRepaymentsSection({ loan, onClose }: { loan: PersonalLoan; onClos
         loanId: loan.id,
         date: r.date,
         amount: r.amount,
+        categoryID: loanCategoryForDirection(loan.direction),
         source: 'statement-import' as const,
         statementRef: fileName,
       }));
@@ -639,7 +641,7 @@ function ImportRepaymentsSection({ loan, onClose }: { loan: PersonalLoan; onClos
             </table>
           </div>
           <button className="btn secondary mt-12" onClick={doImport}>
-            <PlusIcon />Import {rows.length} repayment{rows.length === 1 ? '' : 's'}
+            <PlusIcon />Import {rows.length} payment{rows.length === 1 ? '' : 's'}
           </button>
         </div>
       )}
