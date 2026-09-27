@@ -127,7 +127,6 @@ const HAS_PENDING: LinkModule[] = ['cash', 'bank', 'rentals', 'personalLoans'];
  * an additional, independent way to log one REAL payment right now, the
  * same "both a Planning-based path and a direct Transfers-linking path"
  * pattern EMI/Rentals already have for their own entities. */
-const HAS_SUBSCRIPTION: LinkModule[] = ['bank', 'cash', 'creditCard'];
 
 interface TxRow {
   key: number;
@@ -181,8 +180,6 @@ interface TxRow {
  * documented so a future session doesn't have to re-derive why. Only a
  * prefill: `getLastTransferSource()` (checked first, wherever this is
  * used) and the user's own pick both still win over it. */
-const LIKELY_OTHER_MODULE: LinkModule = 'bank';
-
 function emptyRow(
   key: number,
   finance: LinkSideConfig,
@@ -495,11 +492,20 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
     setNextKey((k) => k + 1);
   };
 
+  const sideNeedsRef = (side: LinkSideConfig) =>
+    side.module === 'bank'
+    || side.module === 'rentals'
+    || side.module === 'personalLoans'
+    || side.module === 'emi'
+    || side.module === 'creditCard';
+
   const submit = async () => {
     const valid = rows.filter((r) => r.amount !== 0);
     if (!valid.length) return toast('Enter an amount on at least one row.');
     for (const r of valid) {
       if (r.linked) {
+        if (sideNeedsRef(r.finance) && !r.finance.ref) return toast('Pick the account/entity for the first finance side.');
+        if (sideNeedsRef(r.other) && !r.other.ref) return toast('Pick the account/entity for the linked finance side.');
         const sameEntity = r.finance.module === r.other.module && !!r.finance.ref && r.finance.ref === r.other.ref;
         if (sameEntity) return toast('One row links a finance to itself — pick a different account.');
         if (!isSupportedLinkPair(r.finance.module, r.other.module) || !isSupportedLinkPair(r.other.module, r.finance.module)) {
