@@ -14,7 +14,7 @@ import { Modal } from '../../../components/Modal';
 import { Notice } from '../../../components/Notice';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { hueStyle } from '../../../lib/statCardHues';
-import { ArchiveIcon, CheckIcon, EditIcon, FilterIcon, PersonalLoanIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon } from '../../../components/icons';
+import { ArchiveIcon, CheckIcon, EditIcon, FilterIcon, PersonalLoanIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { toast } from '../../../components/Toast';
 import { Tooltip } from '../../../components/Tooltip';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
@@ -325,10 +325,12 @@ function RepaymentsSection({
   loan,
   filters,
   onEditPayment,
+  showActions,
 }: {
   loan: PersonalLoan;
   filters: PersonalLoanPaymentFilters;
   onEditPayment: (payment: PersonalLoanRepayment) => void;
+  showActions: boolean;
 }) {
   // Select the raw array (a stable reference from the store) and filter it
   // in a memo — filtering *inside* the zustand selector would return a new
@@ -399,7 +401,7 @@ function RepaymentsSection({
                   <tr key={r.id} onClick={() => setDetailRow(r)} className="clickable">
                     <td>
                       {r.date}{' '}
-                      <span onClick={(e) => e.stopPropagation()}>
+                      {showActions && <span onClick={(e) => e.stopPropagation()}>
                         <ReorderButtons
                           rows={sorted}
                           index={i}
@@ -408,7 +410,7 @@ function RepaymentsSection({
                           orderOf={(row) => row.seq}
                           onMove={reorder}
                         />
-                      </span>
+                      </span>}
                     </td>
                     <td>{r.description || '—'}</td>
                     <td>
@@ -434,7 +436,7 @@ function RepaymentsSection({
                       {r.source === 'statement-import' ? `Import${r.statementRef ? ` (${r.statementRef})` : ''}` : 'Manual'}
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
-                      {r.isPending && (
+                      {showActions && r.isPending && (
                         <IconButton
                           label="Mark cleared"
                           icon={<CheckIcon size={13} />}
@@ -445,14 +447,14 @@ function RepaymentsSection({
                             toast('Marked cleared.');
                           }}
                         />
-                      )}{' '}
+                      )}{showActions && <> {' '}
                       <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => onEditPayment(r)} />{' '}
                       <IconButton
                         label="Delete"
                         icon={<TrashIcon size={13} />}
                         align="right"
                         onClick={() => confirmAndDeleteLinkable('personalLoans', r.id, () => deleteRepayment(r.id))}
-                      />
+                      /></>}
                     </td>
                   </tr>
                 );
@@ -695,14 +697,13 @@ function PersonalLoanPlanForm({ loan, onSaved }: { loan: PersonalLoan; onSaved?:
   );
 }
 
-function PersonalLoanPlansSection({ loan }: { loan: PersonalLoan }) {
+function PersonalLoanPlansSection({ loan, showActions }: { loan: PersonalLoan; showActions: boolean }) {
   const plans = usePersonalLoansWorkbookStore((s) => s.workbook.plans ?? []);
   const addRepayment = usePersonalLoansWorkbookStore((s) => s.addRepayment);
   const updatePlan = usePersonalLoansWorkbookStore((s) => s.updatePlan);
   const deletePlan = usePersonalLoansWorkbookStore((s) => s.deletePlan);
   const ensureSignedIn = useEnsureSignedIn();
   const categories = useCategoryStore((s) => s.workbook.categories);
-  const [addOpen, setAddOpen] = useState(false);
   const rows = useMemo(
     () => plans.filter((plan) => plan.loanId === loan.id).sort((a, b) => a.date.localeCompare(b.date)),
     [plans, loan.id],
@@ -738,8 +739,10 @@ function PersonalLoanPlansSection({ loan }: { loan: PersonalLoan }) {
                 <td>{fmtMoney(plan.amount, loan.currencyCode)}</td>
                 <td>{plan.executed ? 'Executed' : 'Planned'}</td>
                 <td>
-                  {!plan.executed && <IconButton label="Execute" icon={<CheckIcon size={13} />} align="right" onClick={() => { void execute(plan); }} />}{' '}
-                  <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => deletePlan(plan.id)} />
+                  {showActions && <>
+                    {!plan.executed && <IconButton label="Execute" icon={<CheckIcon size={13} />} align="right" onClick={() => { void execute(plan); }} />}{' '}
+                    <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => deletePlan(plan.id)} />
+                  </>}
                 </td>
               </tr>
             ))}
@@ -747,8 +750,6 @@ function PersonalLoanPlansSection({ loan }: { loan: PersonalLoan }) {
           </tbody>
         </table>
       </div>
-      <button className="btn secondary small mt-sm" onClick={() => setAddOpen(true)}><PlusIcon size={12} />Add plan</button>
-      {addOpen && <Modal title="Add a plan" onClose={() => setAddOpen(false)}><PersonalLoanPlanForm loan={loan} onSaved={() => setAddOpen(false)} /></Modal>}
     </div>
   );
 }
@@ -849,6 +850,8 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
   const [editPayment, setEditPayment] = useState<PersonalLoanRepayment | null>(null);
   const [addPaymentOpen, setAddPaymentOpen] = useState(false);
   const [addPlanOpen, setAddPlanOpen] = useState(false);
+  const [showPlanActions, setShowPlanActions] = useState(false);
+  const [showPaymentActions, setShowPaymentActions] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [paymentFilters, setPaymentFilters] = useState<PersonalLoanPaymentFilters>({
     fromDate: '',
@@ -987,7 +990,12 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
       key: 'plans',
       label: 'Plans',
       hue: loan.color,
-      content: <PersonalLoanPlansSection loan={loan} />,
+      actions: [
+        { label: 'Add a plan', onClick: () => setAddPlanOpen(true) },
+        { label: showPlanActions ? 'Done modifying' : 'Modify', icon: <EditIcon size={14} />, onClick: () => setShowPlanActions((value) => !value) },
+      ],
+      headerEnd: showPlanActions ? <IconButton label="Hide modification options" icon={<XIcon size={13} />} align="right" onClick={() => setShowPlanActions(false)} /> : undefined,
+      content: <PersonalLoanPlansSection loan={loan} showActions={showPlanActions} />,
     },
     {
       key: 'payments',
@@ -996,10 +1004,12 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
       defaultOpen: true,
       summary: <SummaryChip label="Filtered" value={filteredPayments.length} />,
       actions: [
-        { label: 'Export filtered payments', disabled: !filteredPayments.length, onClick: exportPayments },
         { label: 'Import payments', onClick: () => setImportOpen(true) },
+        { label: 'Export filtered payments', disabled: !filteredPayments.length, onClick: exportPayments },
+        { label: showPaymentActions ? 'Done modifying' : 'Modify', icon: <EditIcon size={14} />, onClick: () => setShowPaymentActions((value) => !value) },
       ],
-      content: <RepaymentsSection loan={loan} filters={paymentFilters} onEditPayment={setEditPayment} />,
+      headerEnd: showPaymentActions ? <IconButton label="Hide modification options" icon={<XIcon size={13} />} align="right" onClick={() => setShowPaymentActions(false)} /> : undefined,
+      content: <RepaymentsSection loan={loan} filters={paymentFilters} onEditPayment={setEditPayment} showActions={showPaymentActions} />,
     },
     {
       key: 'analytics',
