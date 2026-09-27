@@ -28,7 +28,7 @@ import { usePrimaryCurrency } from '../../../hooks/usePrimaryCurrency';
 import { ReorderButtons } from '../../../components/ui/ReorderButtons';
 import { dateOnlyMs } from '../../../lib/datetime';
 import { parseCSV, toCSV } from '../../../lib/csv';
-import { fmtMoney } from '../../../lib/format';
+import { formatDate, fmtMoney } from '../../../lib/format';
 import { categoryName } from '../../../lib/categories';
 import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
 import {
@@ -126,7 +126,6 @@ function PersonalLoanPaymentFilterMenu({
 function NetPositionSummary() {
   const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const repayments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
-  const plans = usePersonalLoansWorkbookStore((s) => s.workbook.plans ?? []);
   const net = netPositionByCurrency(loans, repayments);
   const pending = netPendingByCurrency(loans, repayments);
   const codes = Object.keys(net);
