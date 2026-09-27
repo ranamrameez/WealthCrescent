@@ -961,17 +961,24 @@ function CardBalanceProjection({ card, horizonDays }: { card: CreditCard; horizo
   );
 }
 
-function AddCardPlanForm({ cardId, onSaved }: { cardId: string; onSaved?: () => void }) {
+function AddCardPlanForm({ cardId, onSaved, plan }: { cardId: string; onSaved?: () => void; plan?: PlannedCreditCardTransaction }) {
   const addPlan = usePlannedCreditCardWorkbookStore((s) => s.addEntry);
+  const updatePlan = usePlannedCreditCardWorkbookStore((s) => s.updateEntry);
   const ensureSignedIn = useEnsureSignedIn();
-  const [p, setP] = useState<PlannedCreditCardTransaction>(() => emptyCardPlan(cardId));
+  const [p, setP] = useState<PlannedCreditCardTransaction>(() => plan ? { ...plan } : emptyCardPlan(cardId));
 
   const submit = async () => {
     if (!p.amount || !p.description.trim()) return toast('Enter a description and a non-zero amount.');
-    if (!(await ensureSignedIn('Sign in to save plans.'))) return;
-    addPlan({ ...p, id: crypto.randomUUID(), cardId, description: p.description.trim() });
-    toast('Plan added.');
-    setP(emptyCardPlan(cardId));
+    if (!(await ensureSignedIn(plan ? 'Sign in to update this plan.' : 'Sign in to save plans.'))) return;
+    const clean = { ...p, cardId, description: p.description.trim() };
+    if (plan) {
+      updatePlan(plan.id, clean);
+      toast('Plan updated.');
+    } else {
+      addPlan({ ...clean, id: crypto.randomUUID() });
+      toast('Plan added.');
+      setP(emptyCardPlan(cardId));
+    }
     onSaved?.();
   };
 
@@ -999,7 +1006,7 @@ function AddCardPlanForm({ cardId, onSaved }: { cardId: string; onSaved?: () => 
         <RecurrenceFields startDate={p.date} value={p.recurrence} onChange={(recurrence) => setP({ ...p, recurrence })} />
       </div>
       <button className="btn mt-12" onClick={submit}>
-        <PlusIcon />Add plan
+        {plan ? <SaveIcon /> : <PlusIcon />}{plan ? 'Save plan' : 'Add plan'}
       </button>
     </div>
   );
@@ -1011,8 +1018,7 @@ function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: Pl
   const deletePlan = usePlannedCreditCardWorkbookStore((s) => s.deleteEntry);
   const addTransaction = useCreditCardWorkbookStore((s) => s.addTransaction);
   const ensureSignedIn = useEnsureSignedIn();
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editRow, setEditRow] = useState<PlannedCreditCardTransaction | null>(null);
+  const [editingPlan, setEditingPlan] = useState<PlannedCreditCardTransaction | null>(null);
   const asOf = useMemo(() => new Date(), []);
 
   const plans = useMemo(
@@ -1020,15 +1026,6 @@ function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: Pl
     [allPlans, card.id, horizonDays, asOf],
   );
   const sorted = useMemo(() => [...plans].sort((a, b) => a.date.localeCompare(b.date)), [plans]);
-
-  const startEdit = (p: PlannedCreditCardTransaction) => { setEditId(p.id); setEditRow({ ...p }); };
-  const saveEdit = () => {
-    if (!editId || !editRow) return;
-    updatePlan(editId, editRow);
-    toast('Plan updated.');
-    setEditId(null);
-    setEditRow(null);
-  };
 
   const markDone = async (p: PlannedCreditCardTransaction) => {
     const occurrenceDate = p.recurrence ? nextRecurrenceOccurrence(p.recurrence)?.toISOString().slice(0, 10) : p.date;
@@ -1051,70 +1048,40 @@ function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: Pl
     <div>
       <div className="table-responsive">
         <table>
-          <thead>
-            <tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>Repeats / status</th><th></th></tr>
-          </thead>
+          <thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>Repeats / status</th><th></th></tr></thead>
           <tbody>
-            {sorted.map((p) =>
-              editId === p.id && editRow ? (
-                <tr key={p.id}>
-                  <td>
-                    <input
-                      type="date"
-                      value={editRow.date}
-                      onChange={(e) => setEditRow({ ...editRow, date: e.target.value, recurrence: editRow.recurrence ? { ...editRow.recurrence, startDate: e.target.value } : undefined })}
-                      className="w-130"
-                    />
-                  </td>
-                  <td>
-                    <select value={editRow.kind} onChange={(e) => setEditRow({ ...editRow, kind: e.target.value as CreditCardTransactionKind })}>
-                      {(Object.keys(KIND_LABELS) as CreditCardTransactionKind[]).map((k) => <option key={k} value={k}>{KIND_LABELS[k]}</option>)}
-                    </select>
-                  </td>
-                  <td><input value={editRow.description} onChange={(e) => setEditRow({ ...editRow, description: e.target.value })} className="w-140" /></td>
-                  <td><input type="number" step="0.01" value={editRow.amount} onChange={(e) => setEditRow({ ...editRow, amount: Number(e.target.value) })} className="w-100" /></td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                      <RecurrenceFields
-                        startDate={editRow.date}
-                        value={editRow.recurrence}
-                        onChange={(recurrence) => setEditRow({ ...editRow, recurrence })}
-                      />
-                    </div>
-                  </td>
-                  <td>
-                    <IconButton label="Save" icon={<SaveIcon size={13} />} align="right" onClick={saveEdit} />{' '}
-                    <IconButton label="Cancel" icon={<XIcon size={13} />} align="right" onClick={() => setEditId(null)} />
-                  </td>
-                </tr>
-              ) : (
-                <tr key={p.id}>
-                  <td>{p.date}</td>
-                  <td className={p.kind === 'payment' ? 'pill pill-positive' : 'pill pill-negative'} style={{ display: 'inline-block' }}>{KIND_LABELS[p.kind]}</td>
-                  <td className="cell-clip" title={p.description}>{p.description}</td>
-                  <td>{fmtMoney(p.amount, card.currencyCode)}</td>
-                  <td className="text-muted">{p.recurrence ? recurrenceLabel(p.recurrence) : p.executed ? 'Done' : 'Planned'}</td>
-                  <td>
-                    {(p.recurrence || !p.executed) && (
-                      <button className="btn secondary small" onClick={() => markDone(p)}>Mark as done</button>
-                    )}{' '}
-                    <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => startEdit(p)} />{' '}
-                    <IconButton
-                      label="Delete"
-                      icon={<TrashIcon size={13} />}
-                      align="right"
-                      onClick={async () => {
-                        if (await confirmDialog('This cannot be undone.', 'Delete this plan?')) deletePlan(p.id);
-                      }}
-                    />
-                  </td>
-                </tr>
-              ),
-            )}
+            {sorted.map((p) => (
+              <tr key={p.id}>
+                <td>{p.date}</td>
+                <td className={p.kind === 'payment' ? 'pill pill-positive' : 'pill pill-negative'} style={{ display: 'inline-block' }}>{KIND_LABELS[p.kind]}</td>
+                <td className="cell-clip" title={p.description}>{p.description}</td>
+                <td>{fmtMoney(p.amount, card.currencyCode)}</td>
+                <td className="text-muted">{p.recurrence ? recurrenceLabel(p.recurrence) : p.executed ? 'Done' : 'Planned'}</td>
+                <td>
+                  {(p.recurrence || !p.executed) && (
+                    <button className="btn secondary small" onClick={() => markDone(p)}>Mark as done</button>
+                  )}{' '}
+                  <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => setEditingPlan(p)} />{' '}
+                  <IconButton
+                    label="Delete"
+                    icon={<TrashIcon size={13} />}
+                    align="right"
+                    onClick={async () => {
+                      if (await confirmDialog('This cannot be undone.', 'Delete this plan?')) deletePlan(p.id);
+                    }}
+                  />
+                </td>
+              </tr>
+            ))}
             {!sorted.length && <tr><td colSpan={6} className="text-muted">No planned charges or payments for this card yet.</td></tr>}
           </tbody>
         </table>
       </div>
+      {editingPlan && (
+        <Modal title="Edit plan" onClose={() => setEditingPlan(null)}>
+          <AddCardPlanForm cardId={card.id} plan={editingPlan} onSaved={() => setEditingPlan(null)} />
+        </Modal>
+      )}
     </div>
   );
 }
