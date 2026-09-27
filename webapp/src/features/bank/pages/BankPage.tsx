@@ -1590,7 +1590,7 @@ function BankingScopeTransactions({ accounts, filters }: { accounts: BankAccount
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const accountById = useMemo(() => new Map(accounts.map((account) => [account.id, account])), [accounts]);
-  const { scopedRows, rows } = useMemo(
+  const { rows } = useMemo(
     () => bankingTransactionRows(accounts, transactions, filters, categories),
     [accounts, transactions, filters, categories],
   );
