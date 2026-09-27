@@ -218,7 +218,7 @@ function EditEntryModal({ entry, onClose }: { entry: CashEntry; onClose: () => v
     updateEntry(entry.id, draft);
     let msg = 'Entry updated.';
     if (choice === 'both') {
-      const result = propagateLinkedEdit('cash', entry.id, { date: draft.date, amount: draft.amount, note: draft.note });
+      const result = propagateLinkedEdit('cash', entry.id, { date: draft.date, amount: draft.amount, note: draft.note, direction: draft.isDeposit ? 'in' : 'out' });
       if (result.error) msg = result.error;
       else if (result.message) msg = result.message;
     }
