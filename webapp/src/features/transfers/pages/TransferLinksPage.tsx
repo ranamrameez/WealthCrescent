@@ -265,7 +265,35 @@ export function SideFields({
     }
   };
   const hasRefPicker = cfg.module === 'bank' || cfg.module === 'rentals' || cfg.module === 'personalLoans' || cfg.module === 'emi' || cfg.module === 'creditCard';
-  const entities = entitiesForModule(cfg.module);
+  const activeEntities = entitiesForModule(cfg.module);
+  const selectedHistoricalEntity = (() => {
+    if (!disabled || !cfg.ref || activeEntities.some((entity) => entity.id === cfg.ref)) return undefined;
+    switch (cfg.module) {
+      case 'bank': {
+        const account = bankAccounts.find((item) => item.id === cfg.ref);
+        return account ? { id: account.id, label: `${account.name} (${account.currencyCode})`, currencyCode: account.currencyCode } : undefined;
+      }
+      case 'rentals': {
+        const property = properties.find((item) => item.id === cfg.ref);
+        return property ? { id: property.id, label: `${property.name} (${property.currencyCode})`, currencyCode: property.currencyCode } : undefined;
+      }
+      case 'personalLoans': {
+        const loan = loans.find((item) => item.id === cfg.ref);
+        return loan ? { id: loan.id, label: `${loan.person} (${loan.currencyCode})`, currencyCode: loan.currencyCode } : undefined;
+      }
+      case 'emi': {
+        const loan = emiLoans.find((item) => item.id === cfg.ref);
+        return loan ? { id: loan.id, label: `${loan.name} (${loan.currencyCode})`, currencyCode: loan.currencyCode } : undefined;
+      }
+      case 'creditCard': {
+        const card = creditCards.find((item) => item.id === cfg.ref);
+        return card ? { id: card.id, label: `${card.name} (${card.currencyCode})`, currencyCode: card.currencyCode } : undefined;
+      }
+      default:
+        return undefined;
+    }
+  })();
+  const entities = selectedHistoricalEntity ? [...activeEntities, selectedHistoricalEntity] : activeEntities;
   const filteredEntities = cfg.currencyCode ? entities.filter((e) => e.currencyCode === cfg.currencyCode) : entities;
   const refLabel = REF_PICKER_LABELS[cfg.module];
 
@@ -285,7 +313,7 @@ export function SideFields({
   };
 
   useEffect(() => {
-    if (subscriptionMode || !hasRefPicker) return;
+    if (disabled || subscriptionMode || !hasRefPicker) return;
     const candidates = filteredEntities.length ? filteredEntities : entities;
     if (!candidates.length || candidates.some((entity) => entity.id === cfg.ref)) return;
     const first = candidates[0];
