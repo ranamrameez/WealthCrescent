@@ -164,69 +164,34 @@ function NetPositionSummary() {
  * person, and a repayment timeline; the "payoff planner" from that same
  * sketch lives inside `LoanDetail` below instead, since it needs one
  * specific loan's outstanding balance to project from. */
-function AnalyticsTab() {
+function AnalyticsTab({ filter }: { filter: 'all' | 'owed_to_me' | 'i_owe' }) {
   const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const repayments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
-  useAppearanceStore((s) => s.appearance);
-  applyChartTheme();
-
-  const currencies = useMemo(() => [...new Set(loans.map((l) => l.currencyCode))].sort(), [loans]);
-  const [currency, setCurrency] = useState(currencies[0] ?? 'USD');
-  const effectiveCurrency = currencies.includes(currency) ? currency : (currencies[0] ?? currency);
-
-  const outstandingRows = useMemo(
-    () => outstandingByLoan(loans, repayments, effectiveCurrency),
-    [loans, repayments, effectiveCurrency],
+  const plans = usePersonalLoansWorkbookStore((s) => s.workbook.plans ?? []);
+  const candidates = useMemo(
+    () => loans.filter((loan) => loan.isActive !== false && (filter === 'all' || loan.direction === filter)),
+    [loans, filter],
   );
-  const monthlyRepayments = useMemo(
-    () => repaymentsByMonth(loans, repayments, effectiveCurrency),
-    [loans, repayments, effectiveCurrency],
-  );
+  const [loanId, setLoanId] = useState('');
+  const selected = candidates.find((loan) => loan.id === loanId) ?? candidates[0];
 
-  if (!currencies.length) {
-    return <p className="text-muted">Add a loan first to see charts here.</p>;
-  }
+  if (!selected) return <p className="text-muted">Add a matching loan first to see analytics.</p>;
 
   return (
     <div>
-      {currencies.length > 1 && (
-        <Field label="Currency" width={120}>
-          <Select value={effectiveCurrency} onChange={(e) => setCurrency(e.target.value)}>
-            {currencies.map((c) => <option key={c} value={c}>{c}</option>)}
+      {candidates.length > 1 && (
+        <Field label="Loan" width={220}>
+          <Select value={selected.id} onChange={(e) => setLoanId(e.target.value)}>
+            {candidates.map((loan) => <option key={loan.id} value={loan.id}>{loan.person} ({loan.currencyCode})</option>)}
           </Select>
         </Field>
       )}
-      <div className="grid-auto" style={{ ...gridAutoStyle(320, 16), marginTop: 12 }}>
-        <ChartCard title="Outstanding by loan" empty={!outstandingRows.length}>
-          <Bar
-            data={{
-              labels: outstandingRows.map((r) => r.person),
-              datasets: [
-                {
-                  data: outstandingRows.map((r) => r.outstanding),
-                  backgroundColor: outstandingRows.map((r) => (r.direction === 'owed_to_me' ? cssVar('--profit') || '#3ecf8e' : cssVar('--loss') || '#e5484d')),
-                },
-              ],
-            }}
-            options={{
-              indexAxis: 'y',
-              plugins: {
-                legend: { display: false },
-                datalabels: dlBarV((v) => fmtMoney(v, effectiveCurrency)),
-                tooltip: { callbacks: { afterLabel: (ctx) => (outstandingRows[ctx.dataIndex].direction === 'owed_to_me' ? 'Owed to you' : 'You owe') } },
-              },
-            }}
-          />
-        </ChartCard>
-        <ChartCard title="Payments by month" empty={!monthlyRepayments.length}>
-          <Bar
-            data={{
-              labels: monthlyRepayments.map((f) => f.month),
-              datasets: [{ label: 'Payments', data: monthlyRepayments.map((f) => f.amount), backgroundColor: '#5aa9c9' }],
-            }}
-            options={{ plugins: { legend: { display: false }, datalabels: dlBarV((v) => fmtMoney(v, effectiveCurrency)) } }}
-          />
-        </ChartCard>
+      <div className="mt-sm">
+        <PersonalLoanAnalyticsSection
+          loan={selected}
+          payments={repayments.filter((payment) => payment.loanId === selected.id)}
+          plans={plans.filter((plan) => plan.loanId === selected.id)}
+        />
       </div>
     </div>
   );
@@ -904,6 +869,7 @@ function PersonalLoanAnalyticsSection({
 
 function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; startInEditMode?: boolean }) {
   const repayments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
+  const plans = usePersonalLoansWorkbookStore((s) => s.workbook.plans ?? []);
   const deleteLoan = usePersonalLoansWorkbookStore((s) => s.deleteLoan);
   const updateLoan = usePersonalLoansWorkbookStore((s) => s.updateLoan);
   const ensureSignedIn = useEnsureSignedIn();
