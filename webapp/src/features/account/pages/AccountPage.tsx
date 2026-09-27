@@ -162,7 +162,7 @@ function CurrenciesSection() {
 }
 
 function TransactionDefaultsSection() {
-  const description = useAppearanceStore((s) => s.appearance.transferDefaultDescription ?? 'Transfer By Default');
+  const description = useAppearanceStore((s) => s.appearance.transferDefaultDescription ?? 'Transfer');
   const updateAppearance = useAppearanceStore((s) => s.update);
 
   return (
@@ -174,7 +174,7 @@ function TransactionDefaultsSection() {
         <TextInput
           value={description}
           onChange={(e) => updateAppearance({ transferDefaultDescription: e.target.value })}
-          placeholder="Transfer By Default"
+          placeholder="Transfer"
         />
       </Field>
     </CollapsibleCard>
