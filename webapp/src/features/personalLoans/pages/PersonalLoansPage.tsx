@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { Card, EntityCard, MoneyValue } from '../../../components/Card';
 import { StandardPageSections, type StandardPageSection } from '../../../components/StandardPageSections';
+import { ModuleDetailTemplate } from '../../../components/ModuleDetailTemplate';
 import { SummaryChip, type StandardCardAction } from '../../../components/StandardCard';
 import { AttributeList } from '../../../components/ui/AttributeList';
 import { CategorySelect } from '../../../components/CategorySelect';
@@ -913,7 +914,6 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
       />
     </TopBarControls>
   ), [paymentFilters, categories]);
-  usePageTopBarRightSlot(paymentFilterBar);
 
   const exportPayments = () => {
     const remaining = repaymentRunningOutstanding(loan, repayments);
@@ -1051,8 +1051,15 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
   ];
 
   return (
-    <div className="standard-page">
-      <button className="btn secondary small mb-12" onClick={onBack}>← All personal loans</button>
+    <ModuleDetailTemplate
+      backLabel="All personal loans"
+      onBack={onBack}
+      title={loan.person}
+      hue={loan.color}
+      topBarRight={paymentFilterBar}
+      sections={sections}
+      defaultKey="summary"
+    >
       <StandardPageSections sections={sections} defaultKey="summary" />
       {batchEditor === 'payments' && <LoanPaymentsBatchEditor key={loan.id} loan={loan} rows={[...filteredPayments].sort((a, b) => b.date.localeCompare(a.date) || (b.seq ?? 0) - (a.seq ?? 0))} onClose={() => setBatchEditor(null)} />}
       {batchEditor === 'plans' && <LoanPlansBatchEditor key={loan.id} loan={loan} rows={plans.filter(plan => plan.loanId === loan.id).sort((a, b) => a.date.localeCompare(b.date))} onClose={() => setBatchEditor(null)} />}
@@ -1080,7 +1087,7 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
         />
       )}
       {importOpen && <ImportRepaymentsSection loan={loan} onClose={() => setImportOpen(false)} />}
-    </div>
+    </ModuleDetailTemplate>
   );
 }
 
@@ -1367,3 +1374,10 @@ export function PersonalLoansPage({
     </div>
   );
 }
+
+
+
+
+
+
+
