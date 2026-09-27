@@ -172,6 +172,37 @@ export function buildLinkedRecords(
   return { from, to, link };
 }
 
+export function linkSideRequiresRef(side: LinkSideConfig): boolean {
+  return side.module === 'bank'
+    || side.module === 'rentals'
+    || side.module === 'personalLoans'
+    || side.module === 'emi'
+    || side.module === 'creditCard';
+}
+
+export function defaultLinkedOtherSide(
+  finance: LinkSideConfig,
+  bankAccounts: Array<{ id: string; currencyCode: string; isActive?: boolean }>,
+  cashDefaultCurrency: string,
+): LinkSideConfig {
+  const financeCurrency = finance.currencyCode ?? (
+    finance.module === 'bank'
+      ? bankAccounts.find((account) => account.id === finance.ref)?.currencyCode
+      : undefined
+  );
+  const differentFromFinance = (account: { id: string }) =>
+    account.id !== (finance.module === 'bank' ? finance.ref : undefined);
+  const bank = bankAccounts.find((account) =>
+    account.isActive !== false
+    && differentFromFinance(account)
+    && (!financeCurrency || account.currencyCode === financeCurrency),
+  ) ?? bankAccounts.find((account) => account.isActive !== false && differentFromFinance(account));
+
+  return bank
+    ? { module: 'bank', ref: bank.id, currencyCode: bank.currencyCode }
+    : { module: 'cash', currencyCode: financeCurrency ?? cashDefaultCurrency };
+}
+
 /** Whether a from/to module pairing is actually supported in v1 — see the
  * module doc-comment on `LinkModule` for the locked scope. Bank->Bank is
  * included (moving money between two of the user's own accounts) since
