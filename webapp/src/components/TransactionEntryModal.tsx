@@ -79,7 +79,6 @@ const DIRECTION_LABELS: Partial<Record<LinkModule, { in: string; out: string }>>
   creditCard: { in: 'Payment', out: 'Charge' },
 };
 const HAS_CATEGORY: LinkModule[] = ['bank', 'cash', 'rentals', 'creditCard'];
-const HAS_NOTE: LinkModule[] = ['cash', 'rentals'];
 /** Bank has no `Finance.title` — its own pre-existing `description` field
  * already fills that role (see `types/finance.ts`'s file-level comment) —
  * so this is the one module that needs its own "what is this" text input
@@ -319,11 +318,6 @@ function TxRowFields({
         {HAS_CATEGORY.includes(row.finance.module) && !row.linked && (
           <Field label="Category">
             <CategorySelect value={row.categoryID} onChange={(categoryID) => onChange({ ...row, categoryID })} />
-          </Field>
-        )}
-        {HAS_NOTE.includes(row.finance.module) && (
-          <Field label="Note (optional)">
-            <TextInput value={row.note} onChange={(e) => onChange({ ...row, note: e.target.value })} />
           </Field>
         )}
       </div>
