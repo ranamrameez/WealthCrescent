@@ -1035,6 +1035,13 @@ export function AccountDetailPage() {
   usePageTopBarRightSlot(account ? (
     <TopBarControls>
       <TopBarSelect
+        label="Bank"
+        className="account-switch-select"
+        value={account.bankId ?? ''}
+        onChange={(event) => navigate(event.target.value ? `/bank/bank/${event.target.value}` : '/bank')}
+        options={[{ value: '', label: 'All banks' }, ...banks.filter((bank) => bank.isActive !== false).map((bank) => ({ value: bank.id, label: bank.name }))]}
+      />
+      <TopBarSelect
         label="Account"
         className="account-switch-select"
         value={account.id}
@@ -1045,13 +1052,6 @@ export function AccountDetailPage() {
         options={accounts
           .filter((item) => !item.migratedToCreditCardId && (item.isActive !== false || item.id === account.id))
           .map((item) => ({ value: item.id, label: `${item.name} (${item.currencyCode})${item.bankId ? ' · ' + (banks.find(bank => bank.id === item.bankId)?.name ?? '') : ''}` }))}
-      />
-      <TopBarSelect
-        label="Bank"
-        className="account-switch-select"
-        value={account.bankId ?? ''}
-        onChange={(event) => navigate(event.target.value ? `/bank/bank/${event.target.value}` : '/bank')}
-        options={[{ value: '', label: 'All banks' }, ...banks.filter((bank) => bank.isActive !== false).map((bank) => ({ value: bank.id, label: bank.name }))]}
       />
       <TransactionFilterMenu
         value={filters}
