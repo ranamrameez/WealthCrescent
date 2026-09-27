@@ -1018,7 +1018,6 @@ function CreditCardsList({ showArchived = false }: { showArchived?: boolean }) {
                 stat={<MoneyValue n={balance} currency={c.currencyCode} />}
                 hue={balance > 0 ? 'var(--loss)' : 'var(--profit)'}
                 onClick={() => navigate(`/bank/card/${c.id}`)}
-                actions={<IconButton label="Open" icon={<EditIcon size={13} />} align="right" onClick={() => navigate(`/bank/card/${c.id}`)} />}
               />
             );
           })}
