@@ -969,6 +969,7 @@ export function AccountDetailPage() {
   const [meta, setMeta] = useState<Omit<BankAccount, 'id'>>(() => accountToFormValue(account));
   const [editingMeta, setEditingMeta] = useState(false);
   const [showTransactionActions, setShowTransactionActions] = useState(false);
+  const [showPlanActions, setShowPlanActions] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
@@ -1209,8 +1210,12 @@ export function AccountDetailPage() {
       key: 'plans',
       label: 'Plans',
       summary: <SummaryChip label="Visible" value={upcoming.length} />,
-      actions: [{ label: 'Add a plan', onClick: () => setAddingPlan(true) }],
-      content: <AccountPlans account={account} />,
+      actions: [
+        { label: 'Add a plan', onClick: () => setAddingPlan(true) },
+        { label: showPlanActions ? 'Hide modifications' : 'Show modifications', icon: <EditIcon size={14} />, onClick: () => setShowPlanActions((value) => !value) },
+      ],
+      headerEnd: showPlanActions ? <IconButton label="Hide modification options" icon={<XIcon size={13} />} align="right" onClick={() => setShowPlanActions(false)} /> : undefined,
+      content: <AccountPlans account={account} showActions={showPlanActions} />,
     },
     {
       key: 'transactions',
@@ -1542,7 +1547,7 @@ function AccountAnalyticsSection({ ledger, pendingRows, plans, startingBalance, 
     <div className="analytics-chart chart-height-lg"><Tooltip text="Cleared balance by transaction date, with a separate start-to-end reference line."><h4 className="clickable">Balance over time</h4></Tooltip><div className="chart-canvas-wrap"><Line plugins={[chartDepthPlugin]} data={{labels:[periodStartLabel, ...ledger.map((row)=>formatDate(row.tx.date,dateFormat)), periodEndLabel],datasets:[{type:'bar' as never,label:'Balance columns',data:[startingBalance, ...ledger.map((row)=>row.balance), ledger.at(-1)?.balance ?? startingBalance],backgroundColor:chartAlpha('#38bdf8',.18),borderColor:chartAlpha('#38bdf8',.5),borderWidth:1,borderRadius:4},{label:'Balance by transaction',data:[startingBalance, ...ledger.map((row)=>row.balance), ledger.at(-1)?.balance ?? startingBalance],borderColor:chartAlpha('#38bdf8',.9),backgroundColor:chartAlpha('#38bdf8',.2),fill:true,tension:.24,pointRadius:0,pointHoverRadius:4},{label:'Start → end balance',data:[startingBalance, ...ledger.map(()=>null), ledger.at(-1)?.balance ?? startingBalance],borderColor:chartAlpha('#a78bfa',.95),backgroundColor:'transparent',borderDash:[6,4],borderWidth:2,pointRadius:3,pointHoverRadius:5,spanGaps:true}]}} options={{responsive:true,maintainAspectRatio:false,scales:{x:axisOptions,y:balanceAxis},interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,labels:{filter:(item)=>item.datasetIndex !== 0}},tooltip:{enabled:true,filter:(item)=>item.datasetIndex !== 0},datalabels:{display:false}}}} /></div></div>
     <div className="analytics-chart chart-height-lg"><Tooltip text="Monthly deposits and withdrawals, with actual ending balance and the expected addition from pending and planned transactions stacked above it."><h4 className="clickable">Net Flows Over Time</h4></Tooltip><div className="chart-canvas-wrap"><Bar plugins={[chartDepthPlugin]} data={{labels:monthlyLabels,datasets:[{label:'Deposits',data:monthlyLabels.map((month)=>monthlyFlowByMonth.get(month)?.income ?? 0),backgroundColor:chartAlpha(profit,.72),borderColor:chartAlpha(profit,.95),borderWidth:2,borderRadius:6},{label:'Withdrawals',data:monthlyLabels.map((month)=>monthlyFlowByMonth.get(month)?.expense ?? 0),backgroundColor:chartAlpha(loss,.72),borderColor:chartAlpha(loss,.95),borderWidth:2,borderRadius:6},{label:'Actual balance',data:monthlyActualBalances,backgroundColor:chartAlpha('#38bdf8',.42),borderColor:chartAlpha('#38bdf8',.85),borderWidth:1,borderRadius:4,stack:'balance'},{label:'Expected balance',data:monthlyExpectedAdjustments,backgroundColor:chartAlpha('#a78bfa',.5),borderColor:chartAlpha('#a78bfa',.9),borderWidth:1,borderRadius:4,stack:'balance'},{type:'line' as never,label:'Actual balance',data:monthlyActualBalances,borderColor:chartAlpha('#38bdf8',.95),backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.2}]}} options={{interaction:{mode:'index',intersect:false},scales:{x:{...axisOptions,stacked:true},y:axisOptions},plugins:{legend:{labels:{filter:(item)=>item.datasetIndex !== 2}},tooltip:{filter:(item)=>item.datasetIndex !== 2,callbacks:{label:(item)=>item.datasetIndex===3 ? `Expected balance: ${fmtMoney(monthlyActualBalances[item.dataIndex]+monthlyExpectedAdjustments[item.dataIndex],currencyCode)}` : `${item.dataset.label}: ${fmtMoney(Number(item.raw),currencyCode)}`}},datalabels:dlBarV((v)=>fmtMoney(v,currencyCode))}}} /></div></div>
     <div className="analytics-chart"><Tooltip text="Total transaction amount grouped by category."><h4 className="clickable">Transactions by category</h4></Tooltip><div className="chart-canvas-wrap"><Doughnut plugins={[chartDepthPlugin]} data={{labels:categoryTotals.map(([name])=>name),datasets:[{label:'Spend',data:categoryTotals.map(([,amount])=>amount),backgroundColor:categoryTotals.map(([name])=>chartAlpha(tickerColor(name),.72)),borderColor:categoryTotals.map(([name])=>chartAlpha(tickerColor(name),.95)),borderWidth:2,hoverOffset:8}]}} options={{responsive:true,maintainAspectRatio:false,cutout:'48%',rotation:-25,plugins:{legend:{display:true,position:'right',labels:{boxWidth:10,padding:8}},datalabels:dlDoughnut((v)=>fmtMoney(v, currencyCode))},layout:{padding:8}}} /></div></div>
-    <div className="analytics-chart"><Tooltip text="Actual balance plus pending and planned transactions; expected balance is the combined result."><h4 className="clickable">Pending, planned and expected balance</h4></Tooltip><div className="chart-canvas-wrap"><Bar plugins={[chartDepthPlugin]} data={{labels:balanceLabels,datasets:[{type:'bar' as never,label:'Actual balance',data:[startingBalance, ...actualBalanceByDate, actualBalanceByDate.at(-1) ?? startingBalance],backgroundColor:chartAlpha('#38bdf8',.42),borderColor:chartAlpha('#38bdf8',.85),borderWidth:2,borderRadius:6,stack:'balance'},{type:'line' as never,label:'Actual balance',data:[startingBalance, ...actualBalanceByDate, actualBalanceByDate.at(-1) ?? startingBalance],borderColor:chartAlpha('#38bdf8',.95),backgroundColor:'transparent',borderWidth:2,pointRadius:0,pointHoverRadius:4,tension:.2},{type:'line' as never,label:'Pending balance',data:[0, ...pendingFlowByDate, pendingFlowByDate.at(-1) ?? 0],borderColor:chartAlpha('#f59e0b',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[5,4],pointRadius:0,pointHoverRadius:4,tension:.2},{type:'line' as never,label:'Planned balance',data:[0, ...plannedFlowByDate, plannedFlowByDate.at(-1) ?? 0],borderColor:chartAlpha('#22c55e',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[8,3],pointRadius:0,pointHoverRadius:4,tension:.2},{type:'line' as never,label:'Expected balance',data:[startingBalance, ...expectedFlowByDate, (actualBalanceByDate.at(-1) ?? startingBalance) + (pendingFlowByDate.at(-1) ?? 0) + (plannedFlowByDate.at(-1) ?? 0)],borderColor:chartAlpha('#a78bfa',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[2,3],pointRadius:0,pointHoverRadius:4,tension:.2}]}} options={{interaction:{mode:'index',intersect:false},scales:{x:{...axisOptions,stacked:true},y:{...axisOptions,beginAtZero:false}},plugins:{legend:{display:true,labels:{filter:(item)=>item.datasetIndex !== 0}},tooltip:{enabled:true,filter:(item)=>item.datasetIndex !== 0,callbacks:{title:(items)=>items[0]?.label ?? '',label:(item)=>`${item.dataset.label ?? 'Value'}: ${item.formattedValue}`}},datalabels:{display:false}}}} /></div></div>
+    <div className="analytics-chart"><Tooltip text="Actual balance compared with the running expected balance after pending and planned transactions are applied once on their dates."><h4 className="clickable">Actual vs Expected Balance (Pending &amp; Planned)</h4></Tooltip><div className="chart-canvas-wrap"><Bar plugins={[chartDepthPlugin]} data={{labels:balanceLabels,datasets:[{type:'bar' as never,label:'Actual balance',data:[startingBalance, ...actualBalanceByDate, actualBalanceByDate.at(-1) ?? startingBalance],backgroundColor:chartAlpha('#38bdf8',.42),borderColor:chartAlpha('#38bdf8',.85),borderWidth:2,borderRadius:6,stack:'balance'},{type:'line' as never,label:'Actual balance',data:[startingBalance, ...actualBalanceByDate, actualBalanceByDate.at(-1) ?? startingBalance],borderColor:chartAlpha('#38bdf8',.95),backgroundColor:'transparent',borderWidth:2,pointRadius:0,pointHoverRadius:4,tension:.2},{type:'line' as never,label:'Pending balance',data:[0, ...pendingFlowByDate, pendingFlowByDate.at(-1) ?? 0],borderColor:chartAlpha('#f59e0b',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[5,4],pointRadius:0,pointHoverRadius:4,tension:.2},{type:'line' as never,label:'Planned balance',data:[0, ...plannedFlowByDate, plannedFlowByDate.at(-1) ?? 0],borderColor:chartAlpha('#22c55e',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[8,3],pointRadius:0,pointHoverRadius:4,tension:.2},{type:'line' as never,label:'Expected balance',data:[startingBalance, ...expectedFlowByDate, expectedFlowByDate.at(-1) ?? startingBalance],borderColor:chartAlpha('#a78bfa',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[2,3],pointRadius:0,pointHoverRadius:4,tension:.2}]}} options={{interaction:{mode:'index',intersect:false},scales:{x:{...axisOptions,stacked:true},y:{...axisOptions,beginAtZero:false}},plugins:{legend:{display:true,labels:{filter:(item)=>item.datasetIndex !== 0}},tooltip:{enabled:true,filter:(item)=>item.datasetIndex !== 0,callbacks:{title:(items)=>items[0]?.label ?? '',label:(item)=>`${item.dataset.label ?? 'Value'}: ${item.formattedValue}`}},datalabels:{display:false}}}} /></div></div>
   </div>;
 }
 
@@ -1844,9 +1849,9 @@ function AddBankPlanFab({ accountId }: { accountId: string }) {
   );
 }
 
-function AccountPlans({ account }: { account: BankAccount }) {
+function AccountPlans({ account, showActions }: { account: BankAccount; showActions: boolean }) {
   const { filters } = useUrlTransactionFilters();
-  return <BankPlanList account={account} horizonDays={null} fromDate={filters.fromDate} toDate={filters.toDate} />;
+  return <BankPlanList account={account} horizonDays={null} fromDate={filters.fromDate} toDate={filters.toDate} showActions={showActions} />;
 }
 
 function AddBankPlanForm({ accountId, onSaved }: { accountId: string; onSaved?: () => void }) {
@@ -1908,7 +1913,7 @@ function AddBankPlanForm({ accountId, onSaved }: { accountId: string; onSaved?: 
   );
 }
 
-function BankPlanList({ account, horizonDays, fromDate, toDate }: { account: BankAccount; horizonDays: PlanningHorizonDays; fromDate?: string; toDate?: string }) {
+function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = true }: { account: BankAccount; horizonDays: PlanningHorizonDays; fromDate?: string; toDate?: string; showActions?: boolean }) {
   const dateFormat = useAppearanceStore((s) => s.appearance.dateFormat ?? 'DD-MMM-YYYY');
   const allPlans = usePlannedBankWorkbookStore((s) => s.workbook.entries);
   const updatePlan = usePlannedBankWorkbookStore((s) => s.updateEntry);
@@ -2001,9 +2006,9 @@ function BankPlanList({ account, horizonDays, fromDate, toDate }: { account: Ban
                   <td className="text-muted">{p.recurrence ? recurrenceLabel(p.recurrence) : p.executed ? 'Done' : 'Planned'}</td>
                   <td>
                     {(p.recurrence || !p.executed) && (
-                      <button className="btn secondary small" onClick={() => markDone(p)}>Mark as done</button>
+                      <button className="btn secondary small" onClick={() => markDone(p)}><CheckIcon size={12} />Mark as done</button>
                     )}{' '}
-                    <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => startEdit(p)} />{' '}
+                    {showActions && <><IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => startEdit(p)} />{' '}
                     <IconButton
                       label="Delete"
                       icon={<TrashIcon size={13} />}
@@ -2011,7 +2016,7 @@ function BankPlanList({ account, horizonDays, fromDate, toDate }: { account: Ban
                       onClick={async () => {
                         if (await confirmDialog('This cannot be undone.', 'Delete this plan?')) deletePlan(p.id);
                       }}
-                    />
+                    /></>}
                   </td>
                 </tr>
               ),
