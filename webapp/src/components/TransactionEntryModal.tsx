@@ -6,8 +6,7 @@ import { Field, Select, TextInput } from './ui/Field';
 import { AmountInput } from './ui/AmountInput';
 import { DirectionChips } from './ui/DirectionChips';
 import { TimeZoneFields } from './ui/TimeZoneFields';
-import { PendingToggle } from './ui/PendingToggle';
-import { ToggleChip } from './ui/ToggleChip';
+import { YesNoChips } from './ui/YesNoChips';
 import { SideFields, useSideCurrency, nextUnpaidEmiMonth } from '../features/transfers/pages/TransferLinksPage';
 import { getLastTransferSource, rememberTransferSource } from '../hooks/useLastTransferSource';
 import { CategorySelect } from './CategorySelect';
@@ -26,6 +25,7 @@ import { usePersonalLoansWorkbookStore } from '../store/personalLoansWorkbookSto
 import { usePSXWorkbookStore } from '../store/psxWorkbookStore';
 import { useRentalsWorkbookStore } from '../store/rentalsWorkbookStore';
 import { useSubscriptionsWorkbookStore } from '../store/subscriptionsWorkbookStore';
+import { useAppearanceStore } from '../store/appearanceStore';
 import { useWorkbookStore } from '../store/workbookStore';
 import type { LinkModule, LinkSideConfig } from '../types/interEntityTransfer';
 
@@ -170,6 +170,7 @@ interface TxRow {
    * transaction pays a specific subscription; not part of `LinkSideConfig`/
    * the `linked` two-sided mechanism at all. */
   subscriptionId: string;
+  subscriptionMode: boolean;
 }
 
 /** User-reported (2026-09-08): "try to choose the same/logical module by
@@ -182,12 +183,17 @@ interface TxRow {
  * used) and the user's own pick both still win over it. */
 const LIKELY_OTHER_MODULE: LinkModule = 'bank';
 
-function emptyRow(key: number, finance: LinkSideConfig, currencyCode?: string): TxRow {
+function emptyRow(
+  key: number,
+  finance: LinkSideConfig,
+  other: LinkSideConfig,
+  defaultDescription: string,
+): TxRow {
   return {
     key,
     finance,
     linked: false,
-    other: { module: LIKELY_OTHER_MODULE, currencyCode },
+    other,
     amount: 0,
     direction: 'in',
     date: today(),
@@ -195,10 +201,11 @@ function emptyRow(key: number, finance: LinkSideConfig, currencyCode?: string): 
     timeTouched: false,
     timezone: defaultTimezoneForCurrency(currencyCode),
     categoryID: UNCATEGORIZED_ID,
-    description: '',
+    description: defaultDescription,
     note: '',
     pending: false,
     subscriptionId: '',
+    subscriptionMode: false,
     toAmountTouched: false,
     rateSource: '',
   };
@@ -438,6 +445,8 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
   const addFundsTransfer = useFundsWorkbookStore((s) => s.addTransfer);
   const addCreditCardTransaction = useCreditCardWorkbookStore((s) => s.addTransaction);
   const updateSubscription = useSubscriptionsWorkbookStore((s) => s.updateEntry);
+  const bankAccounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
+  const transferDefaultDescription = useAppearanceStore((s) => s.appearance.transferDefaultDescription ?? 'Transfer By Default');
 
   // User-reported (2026-09-14): "Cash Statements/tables are under wrong
   // currencies" — root cause: a caller opening this modal with NO
@@ -457,13 +466,29 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
     ? (defaultFinance.module === 'cash' && !defaultFinance.currencyCode ? { ...defaultFinance, currencyCode: cashDefaultCurrency } : defaultFinance)
     : { module: 'cash', currencyCode: cashDefaultCurrency };
 
-  const [rows, setRows] = useState<TxRow[]>(() => [emptyRow(0, resolvedDefaultFinance, resolvedDefaultFinance.currencyCode)]);
+  const defaultOtherFor = (finance: LinkSideConfig): LinkSideConfig => {
+    const financeCurrency = finance.currencyCode ?? (
+      finance.module === 'bank' ? bankAccounts.find((account) => account.id === finance.ref)?.currencyCode : undefined
+    );
+    const bank = bankAccounts.find((account) =>
+      account.isActive !== false
+      && account.id !== (finance.module === 'bank' ? finance.ref : undefined)
+      && (!financeCurrency || account.currencyCode === financeCurrency),
+    ) ?? bankAccounts.find((account) => account.isActive !== false && account.id !== (finance.module === 'bank' ? finance.ref : undefined));
+    return bank
+      ? { module: 'bank', ref: bank.id, currencyCode: bank.currencyCode }
+      : { module: 'cash', currencyCode: financeCurrency ?? cashDefaultCurrency };
+  };
+
+  const [rows, setRows] = useState<TxRow[]>(() => [
+    emptyRow(0, resolvedDefaultFinance, defaultOtherFor(resolvedDefaultFinance), transferDefaultDescription),
+  ]);
   const [nextKey, setNextKey] = useState(1);
 
   const updateRow = (key: number, patch: TxRow) => setRows((rs) => rs.map((r) => (r.key === key ? patch : r)));
   const removeRow = (key: number) => setRows((rs) => rs.filter((r) => r.key !== key));
   const addRow = () => {
-    setRows((rs) => [...rs, emptyRow(nextKey, resolvedDefaultFinance, resolvedDefaultFinance.currencyCode)]);
+    setRows((rs) => [...rs, emptyRow(nextKey, resolvedDefaultFinance, defaultOtherFor(resolvedDefaultFinance), transferDefaultDescription)]);
     setNextKey((k) => k + 1);
   };
 
