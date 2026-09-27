@@ -251,7 +251,7 @@ function resolveSideCurrency(cfg: LinkSideConfig): string | null {
 export function propagateLinkedEdit(
   module: LinkModule,
   id: string,
-  changes: { date?: string; amount?: number; note?: string; direction?: 'in' | 'out' },
+  changes: { date?: string; amount?: number; note?: string; categoryID?: string; direction?: 'in' | 'out' },
 ): { error?: string; message?: string } {
   const link = findLinkForRecord(module, id);
   if (!link) return {};
@@ -298,7 +298,7 @@ export function propagateLinkedEdit(
     toAmount,
     from: fromCfg,
     to: toCfg,
-    categoryID: link.categoryID,
+    categoryID: changes.categoryID !== undefined ? changes.categoryID : link.categoryID,
     note: changes.note !== undefined ? changes.note : link.note,
     rateSource: link.rateSource,
   };
