@@ -12,11 +12,11 @@ import { getLastTransferSource, rememberTransferSource } from '../hooks/useLastT
 import { CategorySelect } from './CategorySelect';
 import { UNCATEGORIZED_ID } from '../lib/categories';
 import { defaultTimeForDate, defaultTimezoneForCurrency, nowTime } from '../lib/datetime';
-import { loanDirectionForTransfer, transferDirectionForLoan } from '../lib/calc/personalLoansModule';
+import { loanCategoryForDirection, loanDirectionForTransfer, transferDirectionForLoan } from '../lib/calc/personalLoansModule';
 import { convertAmount, loadCachedFxRates } from '../lib/fx';
 import { useEnsureSignedIn } from '../lib/firebase/useEnsureSignedIn';
 import { defaultLinkedOtherSide, isSupportedLinkPair, linkSideRequiresRef } from '../lib/interEntityLink';
-import { createLinkedTransfer } from '../lib/linkCascade';
+import { createLinkedTransfer, propagateLinkedEdit, resolveLinkedEdit } from '../lib/linkCascade';
 import { useBankWorkbookStore } from '../store/bankWorkbookStore';
 import { useCashWorkbookStore } from '../store/cashWorkbookStore';
 import { useCreditCardWorkbookStore } from '../store/creditCardWorkbookStore';
@@ -29,6 +29,7 @@ import { useSubscriptionsWorkbookStore } from '../store/subscriptionsWorkbookSto
 import { useAppearanceStore } from '../store/appearanceStore';
 import { useWorkbookStore } from '../store/workbookStore';
 import type { LinkModule, LinkSideConfig } from '../types/interEntityTransfer';
+import type { PersonalLoanRepayment } from '../types/personalLoansWorkbook';
 
 const today = () => new Date().toISOString().slice(0, 10);
 const uid = () => crypto.randomUUID();
@@ -80,7 +81,7 @@ const DIRECTION_LABELS: Partial<Record<LinkModule, { in: string; out: string }>>
   creditCard: { in: 'Payment', out: 'Charge' },
   personalLoans: { in: 'Borrow', out: 'Lent' },
 };
-const HAS_CATEGORY: LinkModule[] = ['bank', 'cash', 'rentals', 'creditCard'];
+const HAS_CATEGORY: LinkModule[] = ['bank', 'cash', 'rentals', 'creditCard', 'personalLoans'];
 /** Bank has no `Finance.title` — its own pre-existing `description` field
  * already fills that role (see `types/finance.ts`'s file-level comment) —
  * so this is the one module that needs its own "what is this" text input
@@ -145,6 +146,7 @@ interface TxRow {
   timeTouched: boolean;
   timezone?: string;
   categoryID: string;
+  categoryTouched: boolean;
   description: string;
   pending: boolean;
   /** Set when the Finance selector is in Subscriptions mode. */
@@ -174,6 +176,7 @@ function emptyRow(
     timeTouched: false,
     timezone: defaultTimezoneForCurrency(currencyCode),
     categoryID: UNCATEGORIZED_ID,
+    categoryTouched: false,
     description: defaultDescription,
     pending: false,
     subscriptionId: '',
@@ -192,11 +195,13 @@ function TxRowFields({
   onChange,
   onRemove,
   canRemove,
+  financeLocked = false,
 }: {
   row: TxRow;
   onChange: (row: TxRow) => void;
   onRemove: () => void;
   canRemove: boolean;
+  financeLocked?: boolean;
 }) {
   const personalLoans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const otherCurrency = useSideCurrency(row.other);
@@ -231,6 +236,7 @@ function TxRowFields({
       <SideFields
         label="Finance"
         cfg={row.finance}
+        disabled={financeLocked}
         allowSubscriptions
         subscriptionMode={row.subscriptionMode}
         subscriptionId={row.subscriptionId}
@@ -252,12 +258,17 @@ function TxRowFields({
           const selectedLoan = finance.module === 'personalLoans'
             ? personalLoans.find((loan) => loan.id === finance.ref)
             : undefined;
+          const nextDirection = selectedLoan ? transferDirectionForLoan(selectedLoan.direction) : row.direction;
           onChange({
             ...row,
             finance,
             subscriptionMode: false,
             subscriptionId: '',
-            direction: selectedLoan ? transferDirectionForLoan(selectedLoan.direction) : row.direction,
+            direction: nextDirection,
+            categoryID:
+              selectedLoan && !row.categoryTouched
+                ? loanCategoryForDirection(selectedLoan.direction)
+                : row.categoryID,
             timezone: defaultTimezoneForCurrency(useSideCurrencyStatic(finance)),
             toAmount: undefined,
             toAmountTouched: false,
@@ -281,7 +292,11 @@ function TxRowFields({
                 const wantedDirection = loanDirectionForTransfer(d);
                 const current = personalLoans.find((loan) => loan.id === row.finance.ref);
                 if (current?.direction === wantedDirection) {
-                  onChange({ ...row, direction: d });
+                  onChange({
+                    ...row,
+                    direction: d,
+                    categoryID: row.categoryTouched ? row.categoryID : loanCategoryForDirection(current.direction),
+                  });
                   return;
                 }
                 const replacement = personalLoans.find((loan) =>
@@ -317,12 +332,12 @@ function TxRowFields({
           <TextInput
             value={row.description}
             onChange={(e) => onChange({ ...row, description: e.target.value })}
-            placeholder="Transfer By Default"
+            placeholder="Transfer"
           />
         </Field>
-        {HAS_CATEGORY.includes(row.finance.module) && !row.linked && (
+        {HAS_CATEGORY.includes(row.finance.module) && (
           <Field label="Category">
-            <CategorySelect value={row.categoryID} onChange={(categoryID) => onChange({ ...row, categoryID })} />
+            <CategorySelect value={row.categoryID} onChange={(categoryID) => onChange({ ...row, categoryID, categoryTouched: true })} />
           </Field>
         )}
       </div>
@@ -443,13 +458,23 @@ function useSideCurrencyStatic(cfg: LinkSideConfig): string | undefined {
  * already do for a link, generalized here to also cover the plain
  * single-account case by calling that module's own native "add" action
  * directly. */
-export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFinance?: LinkSideConfig; onClose: () => void }) {
+export function TransactionEntryModal({
+  defaultFinance,
+  editPersonalLoanPayment,
+  onClose,
+}: {
+  defaultFinance?: LinkSideConfig;
+  editPersonalLoanPayment?: PersonalLoanRepayment;
+  onClose: () => void;
+}) {
   const ensureSignedIn = useEnsureSignedIn();
   const addBankTransactions = useBankWorkbookStore((s) => s.addTransactions);
   const addCashEntry = useCashWorkbookStore((s) => s.addEntry);
   const cashDefaultCurrency = useCashWorkbookStore((s) => s.workbook.settings.defaultCurrency);
   const addRentalEntry = useRentalsWorkbookStore((s) => s.addEntry);
   const addPersonalLoanRepayment = usePersonalLoansWorkbookStore((s) => s.addRepayment);
+  const updatePersonalLoanRepayment = usePersonalLoansWorkbookStore((s) => s.updateRepayment);
+  const personalLoans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const addEMIRepayment = useEMIWorkbookStore((s) => s.addRepayment);
   const emiLoans = useEMIWorkbookStore((s) => s.workbook.entries);
   const addQSETransfer = useWorkbookStore((s) => s.addTransfer);
@@ -458,7 +483,7 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
   const addCreditCardTransaction = useCreditCardWorkbookStore((s) => s.addTransaction);
   const updateSubscription = useSubscriptionsWorkbookStore((s) => s.updateEntry);
   const bankAccounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
-  const transferDefaultDescription = useAppearanceStore((s) => s.appearance.transferDefaultDescription ?? 'Transfer By Default');
+  const transferDefaultDescription = useAppearanceStore((s) => s.appearance.transferDefaultDescription ?? 'Transfer');
 
   // User-reported (2026-09-14): "Cash Statements/tables are under wrong
   // currencies" — root cause: a caller opening this modal with NO
@@ -474,18 +499,54 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
   // no visible sign anything was wrong. Fixed at the source: a `cash`
   // finance side always starts with a REAL currency (the workbook's own
   // default), matching what the dropdown already visibly showed.
-  const resolvedDefaultFinance: LinkSideConfig = defaultFinance
-    ? (defaultFinance.module === 'cash' && !defaultFinance.currencyCode ? { ...defaultFinance, currencyCode: cashDefaultCurrency } : defaultFinance)
+  const editingLoan = editPersonalLoanPayment
+    ? personalLoans.find((loan) => loan.id === editPersonalLoanPayment.loanId)
+    : undefined;
+  const editFinance: LinkSideConfig | undefined = editPersonalLoanPayment
+    ? { module: 'personalLoans', ref: editPersonalLoanPayment.loanId, currencyCode: editingLoan?.currencyCode }
+    : undefined;
+  const baseFinance = editFinance ?? defaultFinance;
+  const resolvedDefaultFinance: LinkSideConfig = baseFinance
+    ? (baseFinance.module === 'cash' && !baseFinance.currencyCode ? { ...baseFinance, currencyCode: cashDefaultCurrency } : baseFinance)
     : { module: 'cash', currencyCode: cashDefaultCurrency };
 
   const resolvedDefaultCurrency = resolvedDefaultFinance.currencyCode
     ?? (resolvedDefaultFinance.module === 'bank'
       ? bankAccounts.find((account) => account.id === resolvedDefaultFinance.ref)?.currencyCode
       : undefined);
+  const initialPersonalLoan = resolvedDefaultFinance.module === 'personalLoans'
+    ? personalLoans.find((loan) => loan.id === resolvedDefaultFinance.ref)
+    : undefined;
 
-  const [rows, setRows] = useState<TxRow[]>(() => [
-    emptyRow(0, resolvedDefaultFinance, defaultLinkedOtherSide(resolvedDefaultFinance, bankAccounts, cashDefaultCurrency), transferDefaultDescription, resolvedDefaultCurrency),
-  ]);
+  const [rows, setRows] = useState<TxRow[]>(() => {
+    const base = emptyRow(
+      0,
+      resolvedDefaultFinance,
+      defaultLinkedOtherSide(resolvedDefaultFinance, bankAccounts, cashDefaultCurrency),
+      transferDefaultDescription,
+      resolvedDefaultCurrency,
+    );
+    if (!editPersonalLoanPayment) {
+      if (initialPersonalLoan && !base.categoryTouched) {
+        base.direction = transferDirectionForLoan(initialPersonalLoan.direction);
+        base.categoryID = loanCategoryForDirection(initialPersonalLoan.direction);
+      }
+      return [base];
+    }
+    return [{
+      ...base,
+      amount: editPersonalLoanPayment.amount,
+      direction: editingLoan ? transferDirectionForLoan(editingLoan.direction) : base.direction,
+      date: editPersonalLoanPayment.date,
+      time: editPersonalLoanPayment.time,
+      timeTouched: !!editPersonalLoanPayment.time,
+      timezone: editPersonalLoanPayment.timezone,
+      categoryID: editPersonalLoanPayment.categoryID ?? (editingLoan ? loanCategoryForDirection(editingLoan.direction) : UNCATEGORIZED_ID),
+      categoryTouched: !!editPersonalLoanPayment.categoryID,
+      description: editPersonalLoanPayment.description ?? transferDefaultDescription,
+      pending: !!editPersonalLoanPayment.isPending,
+    }];
+  });
   const [nextKey, setNextKey] = useState(1);
 
   const updateRow = (key: number, patch: TxRow) => setRows((rs) => rs.map((r) => (r.key === key ? patch : r)));
@@ -509,7 +570,42 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
         }
       }
     }
-    if (!(await ensureSignedIn('Sign in to save transactions.'))) return;
+    if (!(await ensureSignedIn(editPersonalLoanPayment ? 'Sign in to update this payment.' : 'Sign in to save transactions.'))) return;
+
+    if (editPersonalLoanPayment) {
+      const r = valid[0];
+      if (r.finance.module !== 'personalLoans' || !r.finance.ref) return toast('Pick a personal loan first.');
+      if (r.finance.ref !== editPersonalLoanPayment.loanId) {
+        return toast('Move-to-another-loan is not supported while editing a payment. Add a new payment on the other loan instead.');
+      }
+      const choice = await resolveLinkedEdit('personalLoans', editPersonalLoanPayment.id);
+      if (choice === 'cancel') return;
+      updatePersonalLoanRepayment(editPersonalLoanPayment.id, {
+        loanId: r.finance.ref,
+        date: r.date,
+        time: r.time,
+        timezone: r.timezone,
+        amount: Math.abs(r.amount),
+        description: r.description.trim() || undefined,
+        categoryID: r.categoryID,
+        isPending: r.pending || undefined,
+      });
+      let message = 'Payment updated.';
+      if (choice === 'both') {
+        const propagated = propagateLinkedEdit('personalLoans', editPersonalLoanPayment.id, {
+          date: r.date,
+          amount: Math.abs(r.amount),
+          note: r.description.trim() || undefined,
+          categoryID: r.categoryID,
+          direction: r.direction,
+        });
+        if (propagated.error) message = propagated.error;
+        else if (propagated.message) message = propagated.message;
+      }
+      toast(message);
+      onClose();
+      return;
+    }
 
     let plainCount = 0;
     let linkedCount = 0;
@@ -534,6 +630,7 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
           toAmount: r.direction === 'out' ? otherAmount : financeAmount,
           from: r.direction === 'out' ? resolvedFinance : resolvedOther,
           to: r.direction === 'out' ? resolvedOther : resolvedFinance,
+          categoryID: r.categoryID,
           note: r.description.trim() || undefined,
           rateSource: r.rateSource.trim() || undefined,
         });
@@ -588,7 +685,8 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
           if (!r.finance.ref) { toast('Pick a loan first.'); continue; }
           addPersonalLoanRepayment({
             id: uid(), loanId: r.finance.ref, date: r.date, time: r.time, timezone: r.timezone,
-            amount: Math.abs(r.amount), description: r.description.trim() || undefined, isPending: r.pending || undefined,
+            amount: Math.abs(r.amount), description: r.description.trim() || undefined,
+            categoryID: r.categoryID, isPending: r.pending || undefined,
           });
           break;
         case 'emi': {
@@ -642,20 +740,29 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
     onClose();
   };
 
+  const modalTitle = editPersonalLoanPayment
+    ? 'Edit payment'
+    : defaultFinance?.module === 'personalLoans' && defaultFinance.ref
+      ? 'Add payment'
+      : 'Transfers';
+
   return (
-    <Modal title="Transfers" onClose={onClose}>
+    <Modal title={modalTitle} onClose={onClose}>
       {rows.map((r) => (
         <TxRowFields
           key={r.key}
           row={r}
           onChange={(row) => updateRow(r.key, row)}
           onRemove={() => removeRow(r.key)}
-          canRemove={rows.length > 1}
+          canRemove={!editPersonalLoanPayment && rows.length > 1}
+          financeLocked={!!editPersonalLoanPayment}
         />
       ))}
-      <div className="row" style={{ gap: 8, marginTop: 16 }}>
-        <button className="btn secondary" onClick={addRow}><PlusIcon size={12} />Add row</button>
-      </div>
+      {!editPersonalLoanPayment && (
+        <div className="row" style={{ gap: 8, marginTop: 16 }}>
+          <button className="btn secondary" onClick={addRow}><PlusIcon size={12} />Add row</button>
+        </div>
+      )}
       <div className="d-flex justify-center mt-md">
         <button className="btn" style={{ minWidth: 220 }} onClick={submit}><SaveIcon />Save</button>
       </div>

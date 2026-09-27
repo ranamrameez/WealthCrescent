@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { toast } from '../components/Toast';
 import { createEmptyCategoriesWorkbook } from './defaultCategoriesWorkbook';
-import { DEFAULT_CATEGORY_IDS } from '../lib/categories';
+import { DEFAULT_CATEGORIES, DEFAULT_CATEGORY_IDS } from '../lib/categories';
 import type { CategoriesWorkbook, Category } from '../types/finance';
 
 const STORAGE_KEY = 'WealthCrescent_categories_v1';
@@ -18,8 +18,13 @@ const STORAGE_KEY = 'WealthCrescent_categories_v1';
  * existed — `createEmptyCategoriesWorkbook()` seeds with them); anything
  * else is a real user addition, tagged `'custom'`. */
 function normalize(wb: CategoriesWorkbook): CategoriesWorkbook {
-  let max = wb.categories.reduce((m, c) => Math.max(m, c.serialNumber ?? 0), 0);
-  const categories = wb.categories.map((c) => {
+  const existingIds = new Set(wb.categories.map((category) => category.id));
+  const withMissingDefaults = [
+    ...wb.categories,
+    ...DEFAULT_CATEGORIES.filter((category) => !existingIds.has(category.id)).map((category) => ({ ...category })),
+  ];
+  let max = withMissingDefaults.reduce((m, c) => Math.max(m, c.serialNumber ?? 0), 0);
+  const categories = withMissingDefaults.map((c) => {
     const withSerial = c.serialNumber !== undefined ? c : { ...c, serialNumber: ++max };
     if (withSerial.scope) return withSerial;
     return { ...withSerial, scope: DEFAULT_CATEGORY_IDS.has(withSerial.id) ? 'app' as const : 'custom' as const };

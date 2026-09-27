@@ -26,7 +26,7 @@ const PROMINENT_TIER_SIZE = 2; // Primary + Secondary, per the 2026-09-16 curren
  * === null`) or a single/dual-currency one has nothing worth collapsing,
  * matching the user's own "single currency user doesn't need complexity"
  * instruction. */
-export function CurrencyChips({ value, onChange }: { value: string; onChange: (code: string) => void }) {
+export function CurrencyChips({ value, onChange, disabled = false }: { value: string; onChange: (code: string) => void; disabled?: boolean }) {
   const options = useEnabledCurrencies(value);
   const enabledCodes = useEnabledCurrenciesStore((s) => s.enabledCodes);
   const [expanded, setExpanded] = useState(false);
@@ -44,13 +44,14 @@ export function CurrencyChips({ value, onChange }: { value: string; onChange: (c
           key={c.code}
           type="button"
           className={`chip${value === c.code ? ' active' : ''}`}
+          disabled={disabled}
           onClick={() => onChange(c.code)}
         >
           {c.code}
         </button>
       ))}
       {!showAll && hiddenCount > 0 && (
-        <button type="button" className="chip" onClick={() => setExpanded(true)}>
+        <button type="button" className="chip" disabled={disabled} onClick={() => setExpanded(true)}>
           +{hiddenCount} more
         </button>
       )}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PersonalLoan, PersonalLoanRepayment } from '../../../types/personalLoansWorkbook';
-import { loanBalanceHistory, loanDirectionForTransfer, loanOutstanding, loanPendingImpact, netPendingByCurrency, netPositionByCurrency, outstandingByLoan, projectPayoff, repaymentRunningOutstanding, repaymentsByMonth, transferDirectionForLoan } from '../personalLoansModule';
+import { loanBalanceHistory, loanCategoryForDirection, loanDirectionForTransfer, loanOutstanding, loanPendingImpact, netPendingByCurrency, netPositionByCurrency, outstandingByLoan, projectPayoff, repaymentRunningOutstanding, repaymentsByMonth, transferDirectionForLoan } from '../personalLoansModule';
 
 const loan = (over: Partial<PersonalLoan>): PersonalLoan => ({
   id: 'l1',
@@ -249,5 +249,10 @@ describe('personal loan transfer direction', () => {
   it('maps Lent to an owed_to_me loan and a Personal Loans sending side', () => {
     expect(loanDirectionForTransfer('out')).toBe('owed_to_me');
     expect(transferDirectionForLoan('owed_to_me')).toBe('out');
+  });
+
+  it('suggests stable app categories for Borrowed and Lent loans', () => {
+    expect(loanCategoryForDirection('i_owe')).toBe('cat_loan_borrowed');
+    expect(loanCategoryForDirection('owed_to_me')).toBe('cat_loan_lent');
   });
 });

@@ -223,6 +223,7 @@ export function SideFields({
   subscriptionMode = false,
   subscriptionId = '',
   onSubscriptionChange,
+  disabled = false,
 }: {
   label: string;
   cfg: LinkSideConfig;
@@ -232,6 +233,7 @@ export function SideFields({
   subscriptionMode?: boolean;
   subscriptionId?: string;
   onSubscriptionChange?: (subscriptionId: string, finance?: LinkSideConfig) => void;
+  disabled?: boolean;
 }) {
   const bankAccounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
   const properties = useRentalsWorkbookStore((s) => s.workbook.settings.properties);
@@ -263,7 +265,35 @@ export function SideFields({
     }
   };
   const hasRefPicker = cfg.module === 'bank' || cfg.module === 'rentals' || cfg.module === 'personalLoans' || cfg.module === 'emi' || cfg.module === 'creditCard';
-  const entities = entitiesForModule(cfg.module);
+  const activeEntities = entitiesForModule(cfg.module);
+  const selectedHistoricalEntity = (() => {
+    if (!disabled || !cfg.ref || activeEntities.some((entity) => entity.id === cfg.ref)) return undefined;
+    switch (cfg.module) {
+      case 'bank': {
+        const account = bankAccounts.find((item) => item.id === cfg.ref);
+        return account ? { id: account.id, label: `${account.name} (${account.currencyCode})`, currencyCode: account.currencyCode } : undefined;
+      }
+      case 'rentals': {
+        const property = properties.find((item) => item.id === cfg.ref);
+        return property ? { id: property.id, label: `${property.name} (${property.currencyCode})`, currencyCode: property.currencyCode } : undefined;
+      }
+      case 'personalLoans': {
+        const loan = loans.find((item) => item.id === cfg.ref);
+        return loan ? { id: loan.id, label: `${loan.person} (${loan.currencyCode})`, currencyCode: loan.currencyCode } : undefined;
+      }
+      case 'emi': {
+        const loan = emiLoans.find((item) => item.id === cfg.ref);
+        return loan ? { id: loan.id, label: `${loan.name} (${loan.currencyCode})`, currencyCode: loan.currencyCode } : undefined;
+      }
+      case 'creditCard': {
+        const card = creditCards.find((item) => item.id === cfg.ref);
+        return card ? { id: card.id, label: `${card.name} (${card.currencyCode})`, currencyCode: card.currencyCode } : undefined;
+      }
+      default:
+        return undefined;
+    }
+  })();
+  const entities = selectedHistoricalEntity ? [...activeEntities, selectedHistoricalEntity] : activeEntities;
   const filteredEntities = cfg.currencyCode ? entities.filter((e) => e.currencyCode === cfg.currencyCode) : entities;
   const refLabel = REF_PICKER_LABELS[cfg.module];
 
@@ -283,18 +313,19 @@ export function SideFields({
   };
 
   useEffect(() => {
-    if (subscriptionMode || !hasRefPicker) return;
+    if (disabled || subscriptionMode || !hasRefPicker) return;
     const candidates = filteredEntities.length ? filteredEntities : entities;
     if (!candidates.length || candidates.some((entity) => entity.id === cfg.ref)) return;
     const first = candidates[0];
     onChange({ ...cfg, ref: first.id, currencyCode: first.currencyCode });
-  }, [subscriptionMode, hasRefPicker, cfg, entities, filteredEntities, onChange]);
+  }, [disabled, subscriptionMode, hasRefPicker, cfg, entities, filteredEntities, onChange]);
 
   return (
-    <div className="row gap-sm">
-      <Field label={label}>
+    <div className="row gap-sm" style={{ alignItems: 'flex-end', flexWrap: 'nowrap', overflowX: 'auto' }}>
+      <Field label={label} width={150}>
         <Select
           value={subscriptionMode ? '__subscription__' : cfg.module}
+          disabled={disabled}
           onChange={(e) => {
             if (e.target.value === '__subscription__') {
               const first = activeSubscriptions[0];
@@ -327,9 +358,10 @@ export function SideFields({
         </Select>
       </Field>
       {subscriptionMode && (
-        <Field label="Subscription">
+        <Field label="Subscription" width={190}>
           <Select
             value={subscriptionId}
+            disabled={disabled}
             onChange={(e) => {
               const side = sideForSubscription(e.target.value);
               if (!side) return;
@@ -342,8 +374,9 @@ export function SideFields({
       )}
       {!subscriptionMode && hasRefPicker && (
         <>
-          <Field label="Currency">
+          <Field label="Currency" width={210}>
             <CurrencyChips
+              disabled={disabled}
               // User-reported (2026-09-07): restoring a remembered account
               // (which sets `cfg.ref` directly, without going through this
               // component's own module-change handler) left `cfg.currencyCode`
@@ -384,17 +417,19 @@ export function SideFields({
              separate `min-width:160px` floor is a hard floor that wins
              over a smaller explicit `width` regardless; only overriding
              BOTH together actually shrinks the rendered element. */}
-          <Field label={refLabel}>
+          <Field label={refLabel} width={190}>
             <div className="row" style={{ gap: 4, alignItems: 'center' }}>
-              <Select value={cfg.ref ?? ''} onChange={(e) => onChange({ ...cfg, ref: e.target.value })} width={110} style={{ minWidth: 110 }}>
+              <Select value={cfg.ref ?? ''} disabled={disabled} onChange={(e) => onChange({ ...cfg, ref: e.target.value })} width={110} style={{ minWidth: 110 }}>
                 {!filteredEntities.length && <option value="">None in this currency</option>}
                 {filteredEntities.map((en) => <option key={en.id} value={en.id}>{en.label}</option>)}
               </Select>
-              <IconButton
-                label={`Add a missing ${(refLabel ?? 'finance').toLowerCase()}`}
-                icon={<PlusIcon size={13} />}
-                onClick={() => setAddOpen(true)}
-              />
+              {!disabled && (
+                <IconButton
+                  label={`Add a missing ${(refLabel ?? 'finance').toLowerCase()}`}
+                  icon={<PlusIcon size={13} />}
+                  onClick={() => setAddOpen(true)}
+                />
+              )}
             </div>
           </Field>
         </>
@@ -409,8 +444,9 @@ export function SideFields({
          actually being populated instead of falling back to a hardcoded
          'USD' (see that function's own comment). */}
       {!subscriptionMode && (cfg.module === 'cash' || cfg.module === 'funds') && (
-        <Field label="Currency">
+        <Field label="Currency" width={210}>
           <CurrencyChips
+            disabled={disabled}
             value={cfg.currencyCode ?? (cfg.module === 'cash' ? cashCurrency : fundsCurrency)}
             onChange={(code) => onChange({ ...cfg, currencyCode: code })}
           />

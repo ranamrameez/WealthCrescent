@@ -1,4 +1,5 @@
 import type { PersonalLoan, PersonalLoanRepayment } from '../../types/personalLoansWorkbook';
+import { PERSONAL_LOAN_BORROWED_CATEGORY_ID, PERSONAL_LOAN_LENT_CATEGORY_ID } from '../categories';
 import { dateOnlyMs } from '../datetime';
 
 export function transferDirectionForLoan(direction: PersonalLoan['direction']): 'in' | 'out' {
@@ -10,6 +11,10 @@ export function transferDirectionForLoan(direction: PersonalLoan['direction']): 
 
 export function loanDirectionForTransfer(direction: 'in' | 'out'): PersonalLoan['direction'] {
   return direction === 'in' ? 'i_owe' : 'owed_to_me';
+}
+
+export function loanCategoryForDirection(direction: PersonalLoan['direction']): string {
+  return direction === 'i_owe' ? PERSONAL_LOAN_BORROWED_CATEGORY_ID : PERSONAL_LOAN_LENT_CATEGORY_ID;
 }
 
 export function loanOutstanding(loan: PersonalLoan, repayments: PersonalLoanRepayment[]): number {
