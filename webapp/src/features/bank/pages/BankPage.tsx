@@ -757,169 +757,75 @@ export function BankDetailPage() {
  * groups BOTH by currency — a currency group can now exist from a card
  * alone (no plain account in that currency yet), from an account alone, or
  * both; the divider only renders when a group actually has cards. */
-function AccountsList() {
+function AccountsList({ showArchived = false }: { showArchived?: boolean }) {
   const accounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
   const transactions = useBankWorkbookStore((s) => s.workbook.transactions);
-  const updateAccount = useBankWorkbookStore((s) => s.updateAccount);
-  const cards = useCreditCardWorkbookStore((s) => s.workbook.cards);
-  const cardTransactions = useCreditCardWorkbookStore((s) => s.workbook.transactions);
   const navigate = useNavigate();
-  const ensureSignedIn = useEnsureSignedIn();
-  const [showArchived, setShowArchived] = useState(false);
   const { num } = useAmountFormat();
 
-  // Pending item 115(c): "add numeric sequence Id with each entity... for
-  // correct data ordering" — the account's own stable position in the
-  // underlying array (creation order), NOT the currency-grouped/favorite-
-  // sorted display order below. Same convention Funds' own Sr# column
-  // already established (Done item 226).
-  const srNumOf = useMemo(() => new Map(accounts.map((a, i) => [a.id, i + 1])), [accounts]);
-  const cardSrNumOf = useMemo(() => new Map(cards.map((c, i) => [c.id, i + 1])), [cards]);
-
-  const archivedCount = useMemo(
-    () => accounts.filter((a) => a.isActive === false).length + cards.filter((c) => c.isActive === false).length,
-    [accounts, cards],
-  );
   const visibleAccounts = useMemo(
-    () => (showArchived ? accounts : accounts.filter((a) => a.isActive !== false)),
+    () => (showArchived ? accounts : accounts.filter((account) => account.isActive !== false))
+      .filter((account) => !account.migratedToCreditCardId),
     [accounts, showArchived],
   );
-  const visibleCards = useMemo(
-    () => (showArchived ? cards : cards.filter((c) => c.isActive !== false)),
-    [cards, showArchived],
-  );
-
-  const toggleFavorite = async (a: BankAccount) => {
-    if (!(await ensureSignedIn(a.isFavorite ? 'Sign in to unfavorite this account.' : 'Sign in to favorite this account.'))) return;
-    updateAccount(a.id, { isFavorite: !a.isFavorite });
-  };
-
+  const srNumOf = useMemo(() => new Map(accounts.map((account, index) => [account.id, index + 1])), [accounts]);
   const currencyGroups = useMemo(() => {
-    const byCurrency = new Map<string, { accounts: BankAccount[]; cards: CreditCard[] }>();
-    const groupFor = (code: string) => {
-      let g = byCurrency.get(code);
-      if (!g) { g = { accounts: [], cards: [] }; byCurrency.set(code, g); }
-      return g;
-    };
-    for (const a of visibleAccounts) groupFor(a.currencyCode).accounts.push(a);
-    for (const c of visibleCards) groupFor(c.currencyCode).cards.push(c);
-    // Favorites float to the top of each currency group; a stable sort
-    // otherwise leaves creation order (matching Sr#) as the tiebreak.
-    for (const g of byCurrency.values()) {
-      g.accounts.sort((a, b) => Number(!!b.isFavorite) - Number(!!a.isFavorite));
-      g.cards.sort((a, b) => Number(!!b.isFavorite) - Number(!!a.isFavorite));
+    const byCurrency = new Map<string, BankAccount[]>();
+    for (const account of visibleAccounts) {
+      const group = byCurrency.get(account.currencyCode) ?? [];
+      group.push(account);
+      byCurrency.set(account.currencyCode, group);
+    }
+    for (const group of byCurrency.values()) {
+      group.sort((a, b) => Number(!!b.isFavorite) - Number(!!a.isFavorite));
     }
     return [...byCurrency.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [visibleAccounts, visibleCards]);
+  }, [visibleAccounts]);
 
-  if (!accounts.length && !cards.length) {
-    return <p className="text-muted">No accounts yet — use the + button below to add one.</p>;
+  if (!accounts.some((account) => !account.migratedToCreditCardId)) {
+    return <p className="text-muted">No accounts yet — use Actions → Add an account.</p>;
+  }
+  if (!visibleAccounts.length) {
+    return <p className="text-muted">Every account is closed — use this card's Actions menu to show closed accounts.</p>;
   }
 
   return (
     <div>
-      {archivedCount > 0 && (
-        <button
-          className="btn secondary small mb-12"
-          onClick={() => setShowArchived((v) => !v)}
-        >
-          {showArchived ? 'Hide' : 'Show'} closed ({archivedCount})
-        </button>
-      )}
-      {!visibleAccounts.length && !visibleCards.length && (
-        <p className="text-muted">Every account is closed — click "Show closed" above to see them.</p>
-      )}
       {currencyGroups.map(([currency, group]) => {
-        // User-requested (2026-09-06): "give sums in a tag for each
-        // currency in header/label" — a quick total for whichever accounts
-        // are actually visible in THIS group right now (respects the
-        // "Show archived" toggle above), distinct from `TotalBalances`'
-        // own top-of-page stat cards (which always include archived
-        // accounts in their true grand total) — this is "what am I looking
-        // at in this group," not "the real overall total." Credit card debt
-        // is deliberately excluded from this tag (it's an amount OWED, the
-        // opposite sense from a plain balance) — its own "Owed" figure sits
-        // on each card's own EntityCard instead.
-        const groupSum = group.accounts.reduce((s, a) => s + accountBalance(a, transactions), 0);
+        const groupSum = group.reduce((sum, account) => sum + accountBalance(account, transactions), 0);
         return (
-        <div key={currency} style={{ marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <span className="text-muted" style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: 11, letterSpacing: '.04em' }}>
-              {currency}
-            </span>
-            {group.accounts.length > 0 && <span className="pill-info fs-11">{num(groupSum)} {currency}</span>}
-          </div>
-          {group.accounts.length > 0 && (
-            <div className="entity-card-grid">
-              {group.accounts.map((a) => (
-                <EntityCard
-                  key={a.id}
-                  title={<><span className="text-muted entity-card-sr">#{srNumOf.get(a.id)}</span>{accountDisplayName(a)}</>}
-                  subtitle={[a.accountType, a.branch].filter(Boolean).join(' · ') || undefined}
-                  badge={
-                    a.isLiability || a.isActive === false ? (
-                      <span style={{ display: 'flex', gap: 4 }}>
-                        {a.isLiability && <span className="pill-negative fs-10">Credit card</span>}
-                        {a.isActive === false && <span className="pill-warn fs-10">Closed</span>}
-                      </span>
-                    ) : undefined
-                  }
-                  statLabel={a.isLiability ? 'Owed' : 'Balance'}
-                  stat={
-                    <MoneyValue
-                      n={a.isLiability ? Math.max(0, -accountBalance(a, transactions)) : accountBalance(a, transactions)}
-                      currency={a.currencyCode}
-                    />
-                  }
-                  hue={
-                    a.isLiability
-                      ? (accountBalance(a, transactions) < 0 ? 'var(--loss)' : 'var(--profit)')
-                      : (accountBalance(a, transactions) >= 0 ? 'var(--profit)' : 'var(--loss)')
-                  }
-                  onClick={() => navigate(`/bank/account/${a.id}`)}
-                  actions={
-                    <>
-                      <IconButton
-                        label={a.isFavorite ? 'Unfavorite' : 'Favorite'}
-                        icon={<StarIcon size={13} filled={a.isFavorite} />}
-                        align="right"
-                        onClick={() => toggleFavorite(a)}
-                      />
-                      <IconButton
-                        label="Transactions"
-                        icon={<ListIcon size={13} />}
-                        align="right"
-                        onClick={() => navigate(`/bank/account/${a.id}`)}
-                      />
-                    </>
-                  }
-                />
-              ))}
+          <div key={currency} style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <span className="text-muted" style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: 11, letterSpacing: '.04em' }}>
+                {currency}
+              </span>
+              <span className="pill-info fs-11">{num(groupSum)} {currency}</span>
             </div>
-          )}
-          {group.cards.length > 0 && (
-            <>
-              {group.accounts.length > 0 && <hr className="mt-sm mb-sm" />}
-              <div className="entity-card-grid">
-                {group.cards.map((c) => {
-                  const balance = Math.max(0, outstandingBalanceByCard(c, cardTransactions));
-                  return (
-                    <EntityCard
-                      key={c.id}
-                      title={<><span className="text-muted entity-card-sr">#{cardSrNumOf.get(c.id)}</span>{c.name}</>}
-                      subtitle={<>{c.cardNetwork ? `Credit card · ${c.cardNetwork}` : 'Credit card'}{c.creditLimit ? ` · Limit ${fmtMoney(c.creditLimit, c.currencyCode)}` : ''}</>}
-                      badge={c.isActive === false ? <span className="pill-warn fs-10">Closed</span> : undefined}
-                      statLabel="Owed"
-                      stat={<MoneyValue n={balance} currency={c.currencyCode} />}
-                      hue={balance > 0 ? 'var(--loss)' : 'var(--profit)'}
-                      onClick={() => navigate(`/bank/card/${c.id}`)}
-                    />
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
+            <div className="entity-card-grid">
+              {group.map((account) => {
+                const balance = accountBalance(account, transactions);
+                return (
+                  <EntityCard
+                    key={account.id}
+                    title={<><span className="text-muted entity-card-sr">#{srNumOf.get(account.id)}</span>{accountDisplayName(account)}</>}
+                    subtitle={[account.accountType, account.branch].filter(Boolean).join(' · ') || undefined}
+                    badge={
+                      account.isLiability || account.isActive === false ? (
+                        <span style={{ display: 'flex', gap: 4 }}>
+                          {account.isLiability && <span className="pill-negative fs-10">Liability</span>}
+                          {account.isActive === false && <span className="pill-warn fs-10">Closed</span>}
+                        </span>
+                      ) : undefined
+                    }
+                    statLabel={account.isLiability ? 'Owed' : 'Balance'}
+                    stat={<MoneyValue n={account.isLiability ? Math.max(0, -balance) : balance} currency={account.currencyCode} />}
+                    hue={account.color ?? (account.isLiability ? (balance < 0 ? 'var(--loss)' : 'var(--profit)') : (balance >= 0 ? 'var(--profit)' : 'var(--loss)'))}
+                    onClick={() => navigate(`/bank/account/${account.id}`)}
+                  />
+                );
+              })}
+            </div>
+          </div>
         );
       })}
     </div>
