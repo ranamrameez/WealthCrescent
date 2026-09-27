@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
 import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls';
 import { StandardPageSections } from '../../../components/StandardPageSections';
+import { StandardCard, SummaryChip } from '../../../components/StandardCard';
 import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
 import { confirmDialog } from '../../../components/ConfirmDialog';
@@ -105,6 +106,12 @@ export function AddCreditCardForm({ onSaved, initialCurrency }: { onSaved?: (id:
         </Field>
         <Field label="Credit limit (optional)" width={140}>
           <TextInput type="number" step="0.01" value={c.creditLimit ?? ''} onChange={(e) => setC({ ...c, creditLimit: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        </Field>
+        <Field label="Card color (optional)" width={150}>
+          <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+            <input type="color" value={c.color || '#5aa9c9'} onChange={(e) => setC({ ...c, color: e.target.value })} style={{ width: 44, height: 32, padding: 2, minWidth: 0 }} />
+            {c.color && <button type="button" className="btn secondary small" onClick={() => setC({ ...c, color: undefined })}>Reset</button>}
+          </div>
         </Field>
         <Field label="Already owed (optional)" width={140} title="Debt that already exists on this card before you start tracking it here — e.g. from a real statement you already have. Leave blank for a brand-new card with nothing owed yet.">
           <TextInput type="number" step="0.01" value={c.openingBalance ?? ''} onChange={(e) => setC({ ...c, openingBalance: e.target.value === '' ? undefined : Number(e.target.value) })} />
@@ -526,7 +533,21 @@ export function CreditCardDetailPage() {
 
       {card.creditLimit ? <CreditUsageBar used={Math.max(0, balance)} limit={card.creditLimit} currency={card.currencyCode} /> : null}
 
-      <CollapsibleCard title={<h3 className="m-0">Card details</h3>} className="mb-md">
+      <StandardCard
+        title="Summary"
+        hue={card.color}
+        summary={<SummaryChip label="Outstanding" value={fmtMoney(balance, card.currencyCode)} />}
+      >
+        <div className="grid-auto" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10 }}>
+          <div className="stat-card card" style={hueStyle(card.color ?? (balance > 0 ? 'var(--loss)' : 'var(--profit)'))}>
+            <div className="label">Outstanding</div>
+            <MoneyValue n={balance} currency={card.currencyCode} />
+          </div>
+          {card.creditLimit ? <div className="stat-card card" style={hueStyle(card.color ?? 'var(--accent)')}><div className="label">Credit limit</div><MoneyValue n={card.creditLimit} currency={card.currencyCode} /></div> : null}
+        </div>
+      </StandardCard>
+
+      <StandardCard title="Card details" hue={card.color} className="mb-md">
         {editing ? (
           <div>
             <div className="row gap-sm">
@@ -538,6 +559,12 @@ export function CreditCardDetailPage() {
               </Field>
               <Field label="Credit limit"><TextInput type="number" step="0.01" value={draft.creditLimit ?? ''} onChange={(e) => setDraft({ ...draft, creditLimit: e.target.value === '' ? undefined : Number(e.target.value) })} /></Field>
               <Field label="Network"><TextInput value={draft.cardNetwork ?? ''} onChange={(e) => setDraft({ ...draft, cardNetwork: e.target.value })} placeholder="e.g. Visa" /></Field>
+              <Field label="Card color (optional)" width={150}>
+                <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+                  <input type="color" value={draft.color || '#5aa9c9'} onChange={(e) => setDraft({ ...draft, color: e.target.value })} style={{ width: 44, height: 32, padding: 2, minWidth: 0 }} />
+                  {draft.color && <button type="button" className="btn secondary small" onClick={() => setDraft({ ...draft, color: undefined })}>Reset</button>}
+                </div>
+              </Field>
               <Field label="Already owed" title="Debt that existed on this card before its own transaction log started here — see this card's own opening balance.">
                 <TextInput type="number" step="0.01" value={draft.openingBalance ?? ''} onChange={(e) => setDraft({ ...draft, openingBalance: e.target.value === '' ? undefined : Number(e.target.value) })} />
               </Field>
@@ -600,7 +627,7 @@ export function CreditCardDetailPage() {
             ]}
           />
         )}
-      </CollapsibleCard>
+      </StandardCard>
 
       {statement && (
         <CollapsibleCard title={<h3 className="m-0">Current statement</h3>} className="mb-md">
@@ -1016,7 +1043,7 @@ function CreditCardsList({ showArchived = false }: { showArchived?: boolean }) {
                 badge={c.isActive === false ? <span className="pill-warn fs-10">Closed</span> : undefined}
                 statLabel="Owed"
                 stat={<MoneyValue n={balance} currency={c.currencyCode} />}
-                hue={balance > 0 ? 'var(--loss)' : 'var(--profit)'}
+                hue={card.color ?? (balance > 0 ? 'var(--loss)' : 'var(--profit)')}
                 onClick={() => navigate(`/bank/card/${c.id}`)}
               />
             );
