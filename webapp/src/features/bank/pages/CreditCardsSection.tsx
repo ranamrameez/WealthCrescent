@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
 import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls';
@@ -6,6 +7,7 @@ import { StandardPageSections } from '../../../components/StandardPageSections';
 import { StandardCard, SummaryChip } from '../../../components/StandardCard';
 import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
+import { AnalyticsChartEnhancer } from '../../../components/AnalyticsChartCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { ArchiveIcon, EditIcon, ListIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { Modal } from '../../../components/Modal';
@@ -30,6 +32,10 @@ import { getLastTransferSource, rememberTransferSource } from '../../../hooks/us
 import { hueStyle } from '../../../lib/statCardHues';
 import { categoryName, UNCATEGORIZED_ID } from '../../../lib/categories';
 import { gridAutoStyle } from '../../../lib/gridStyle';
+import { dlBarV, dlDoughnut } from '../../../lib/chartLabels';
+import { applyChartTheme } from '../../../lib/chartSetup';
+import { cssVar, tickerColor } from '../../../lib/cssVar';
+import { chartAlpha, chartDepthPlugin } from '../../../lib/chartVisuals';
 import { nextRecurrenceOccurrence } from '../../../lib/calc/recurrence';
 import { recurrenceLabel } from '../../../lib/recurrenceLabel';
 import { planWithinHorizon, plannedCreditCardProjection, type PlanningHorizonDays } from '../../../lib/calc/plannedBalance';
@@ -43,7 +49,7 @@ import {
   outstandingBalanceByCard,
   proposeMinPayment,
 } from '../../../lib/calc/creditCardModule';
-import { fmtMoney } from '../../../lib/format';
+import { formatDate, fmtMoney } from '../../../lib/format';
 import { createLinkedTransfer } from '../../../lib/linkCascade';
 import { defaultTimezoneForCurrency, nowTime } from '../../../lib/datetime';
 import { firebaseReady } from '../../../lib/firebase/client';
@@ -52,6 +58,7 @@ import { useBankWorkbookStore } from '../../../store/bankWorkbookStore';
 import { useCashWorkbookStore } from '../../../store/cashWorkbookStore';
 import { addCreditCardTransactions, useCreditCardWorkbookStore } from '../../../store/creditCardWorkbookStore';
 import { usePlannedCreditCardWorkbookStore } from '../../../store/plannedCreditCardWorkbookStore';
+import { useAppearanceStore } from '../../../store/appearanceStore';
 import type { LinkSideConfig } from '../../../types/interEntityTransfer';
 import type { CreditCard, CreditCardTransaction, CreditCardTransactionKind } from '../../../types/creditCard';
 import type { PlannedCreditCardTransaction } from '../../../types/plannedCreditCard';
@@ -410,6 +417,90 @@ function TransactionsTable({ card }: { card: CreditCard }) {
  * mirroring Rentals' rent collection), the computed markup for this cycle
  * with a "Log markup" action, and the full transaction ledger with a
  * kind-based add-transaction form. */
+
+function CreditCardAnalyticsSection({ card }: { card: CreditCard }) {
+  const transactions = useCreditCardWorkbookStore((s) => s.workbook.transactions);
+  const plans = usePlannedCreditCardWorkbookStore((s) => s.workbook.entries);
+  const categories = useCategoryStore((s) => s.workbook.categories);
+  const dateFormat = useAppearanceStore((s) => s.appearance.dateFormat ?? 'DD-MMM-YYYY');
+  useAppearanceStore((s) => s.appearance);
+  applyChartTheme();
+
+  const effect = (tx: CreditCardTransaction) => tx.kind === 'payment' ? -tx.amount : tx.amount;
+  const rows = useMemo(
+    () => transactions
+      .filter((tx) => tx.cardId === card.id)
+      .sort((a, b) => a.date.localeCompare(b.date) || (a.seq ?? 0) - (b.seq ?? 0)),
+    [transactions, card.id],
+  );
+  const activePlans = useMemo(
+    () => plans
+      .filter((plan) => plan.cardId === card.id && !plan.executed)
+      .sort((a, b) => a.date.localeCompare(b.date)),
+    [plans, card.id],
+  );
+
+  let balance = card.openingBalance ?? 0;
+  const ledger = rows.map((tx) => {
+    balance = Math.max(0, balance + effect(tx));
+    return { tx, balance };
+  });
+  const categoryTotals = Object.entries(rows.reduce<Record<string, number>>((out, tx) => {
+    const name = categoryName(tx.categoryID, categories);
+    out[name] = (out[name] ?? 0) + tx.amount;
+    return out;
+  }, {})).sort((a, b) => b[1] - a[1]);
+
+  const dates = [...new Set([...rows.map((tx) => tx.date), ...activePlans.map((plan) => plan.date)])].sort();
+  const comparisonLabels = ['Opening', ...dates.map((date) => formatDate(date, dateFormat)), 'Closing'];
+  const actualByDate = dates.map((date) => ledger.filter((row) => row.tx.date <= date).at(-1)?.balance ?? (card.openingBalance ?? 0));
+  const planEffectFor = (plan: PlannedCreditCardTransaction) => plan.kind === 'payment' ? -plan.amount : plan.amount;
+  const plannedByDate = dates.map((date) => activePlans.filter((plan) => plan.date === date).reduce((sum, plan) => sum + planEffectFor(plan), 0));
+  let expected = card.openingBalance ?? 0;
+  const expectedByDate = dates.map((date) => {
+    expected += rows.filter((tx) => tx.date === date).reduce((sum, tx) => sum + effect(tx), 0);
+    expected += activePlans.filter((plan) => plan.date === date).reduce((sum, plan) => sum + planEffectFor(plan), 0);
+    return Math.max(0, expected);
+  });
+  const opening = card.openingBalance ?? 0;
+  const actualChartData = [opening, ...actualByDate, actualByDate.at(-1) ?? opening];
+  const pendingChartData = [0, ...dates.map(() => 0), 0];
+  const plannedChartData = [0, ...plannedByDate, 0];
+  const expectedChartData = [opening, ...expectedByDate, expectedByDate.at(-1) ?? opening];
+
+  const months = [...new Set([...rows.map((tx) => tx.date.slice(0, 7)), ...activePlans.map((plan) => plan.date.slice(0, 7))])].sort();
+  const deposits = months.map((month) => rows.filter((tx) => tx.date.startsWith(month) && tx.kind === 'payment').reduce((sum, tx) => sum + tx.amount, 0));
+  const withdrawals = months.map((month) => rows.filter((tx) => tx.date.startsWith(month) && tx.kind !== 'payment').reduce((sum, tx) => sum + tx.amount, 0));
+  const monthlyActualBalance = months.map((month) => ledger.filter((row) => row.tx.date.slice(0, 7) <= month).at(-1)?.balance ?? opening);
+  let plannedRunning = 0;
+  const monthlyExpectedAdjustment = months.map((month) => {
+    plannedRunning += activePlans.filter((plan) => plan.date.startsWith(month)).reduce((sum, plan) => sum + planEffectFor(plan), 0);
+    return plannedRunning;
+  });
+
+  const periodEndActual = ledger.at(-1)?.balance ?? opening;
+  const periodEndPending = 0;
+  const periodEndPlanned = activePlans.reduce((sum, plan) => sum + planEffectFor(plan), 0);
+  const periodEndExpected = Math.max(0, periodEndActual + periodEndPlanned);
+
+  if (!rows.length && !activePlans.length) return <p className="text-muted m-0">No transactions or plans yet.</p>;
+
+  const profit = cssVar('--profit') || '#3ecf8e';
+  const loss = cssVar('--loss') || '#e5484d';
+  const gridColor = chartAlpha(cssVar('--border') || '#94a3b8', .28);
+  const axisOptions = { grid: { color: gridColor }, ticks: { color: cssVar('--muted') || '#94a3b8', autoSkip: true, maxTicksLimit: 6, maxRotation: 0 } };
+  const balanceAxis = { ...axisOptions, beginAtZero: true };
+
+  return <div className="analytics-grid">
+    <AnalyticsChartEnhancer />
+    <div className="analytics-chart chart-height-lg"><Tooltip text="Outstanding card balance over time."><h4 className="clickable">Balance over time</h4></Tooltip><div className="chart-canvas-wrap"><Line plugins={[chartDepthPlugin]} data={({labels:['Opening',...ledger.map((row)=>formatDate(row.tx.date,dateFormat)),'Closing'],datasets:[{type:'bar' as never,label:'Balance columns',data:[opening,...ledger.map((row)=>row.balance),periodEndActual],backgroundColor:chartAlpha('#38bdf8',.18),borderColor:chartAlpha('#38bdf8',.5),borderWidth:1,borderRadius:4},{label:'Balance by transaction',data:[opening,...ledger.map((row)=>row.balance),periodEndActual],borderColor:chartAlpha('#38bdf8',.9),backgroundColor:chartAlpha('#38bdf8',.2),fill:true,tension:.24,pointRadius:0,pointHoverRadius:4},{label:'Start → end balance',data:[opening,...ledger.map(()=>null),periodEndActual],borderColor:chartAlpha('#a78bfa',.95),backgroundColor:'transparent',borderDash:[6,4],borderWidth:2,pointRadius:3,pointHoverRadius:5,spanGaps:true}]} as any)} options={{responsive:true,maintainAspectRatio:false,scales:{x:axisOptions,y:balanceAxis},interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,labels:{filter:(item)=>item.datasetIndex!==0}},tooltip:{enabled:true,filter:(item)=>item.datasetIndex!==0},datalabels:{display:false}}}} /></div></div>
+    <div className="analytics-chart chart-height-lg"><Tooltip text="Card payments and charges by month, with actual and planned expected outstanding."><h4 className="clickable">Net Flows Over Time</h4></Tooltip><div className="chart-canvas-wrap"><Bar plugins={[chartDepthPlugin]} data={({labels:months,datasets:[{label:'Deposits',data:deposits,backgroundColor:chartAlpha(profit,.72),borderColor:chartAlpha(profit,.95),borderWidth:2,borderRadius:6},{label:'Withdrawals',data:withdrawals,backgroundColor:chartAlpha(loss,.72),borderColor:chartAlpha(loss,.95),borderWidth:2,borderRadius:6},{label:'Actual balance',data:monthlyActualBalance,backgroundColor:chartAlpha('#38bdf8',.42),borderColor:chartAlpha('#38bdf8',.85),borderWidth:1,borderRadius:4,stack:'balance'},{label:'Expected balance',data:monthlyExpectedAdjustment,backgroundColor:chartAlpha('#a78bfa',.5),borderColor:chartAlpha('#a78bfa',.9),borderWidth:1,borderRadius:4,stack:'balance'},{type:'line' as never,label:'Actual balance',data:monthlyActualBalance,borderColor:chartAlpha('#38bdf8',.95),backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.2}]} as any)} options={{interaction:{mode:'index',intersect:false},scales:{x:{...axisOptions,stacked:true},y:axisOptions},plugins:{legend:{labels:{filter:(item)=>item.datasetIndex!==2}},tooltip:{filter:(item)=>item.datasetIndex!==2},datalabels:dlBarV((v)=>fmtMoney(v,card.currencyCode))}}} /></div></div>
+    <div className="analytics-chart"><Tooltip text="Total card transaction amount grouped by category."><h4 className="clickable">Transactions by category</h4></Tooltip><div className="chart-canvas-wrap"><Doughnut plugins={[chartDepthPlugin]} data={({labels:categoryTotals.map(([name])=>name),datasets:[{label:'Transactions',data:categoryTotals.map(([,amount])=>amount),backgroundColor:categoryTotals.map(([name])=>chartAlpha(tickerColor(name),.72)),borderColor:categoryTotals.map(([name])=>chartAlpha(tickerColor(name),.95)),borderWidth:2,hoverOffset:8}]} as any)} options={{responsive:true,maintainAspectRatio:false,cutout:'48%',rotation:-25,plugins:{legend:{display:true,position:'right',labels:{boxWidth:10,padding:8}},datalabels:dlDoughnut((v)=>fmtMoney(v,card.currencyCode))},layout:{padding:8}}} /></div></div>
+    <div className="analytics-chart"><Tooltip text="Actual and planned expected outstanding balance. Credit Cards do not currently have pending ledger transactions, so Pending remains zero."><h4 className="clickable">Actual vs Expected Balance (Pending &amp; Planned)</h4></Tooltip><div className="chart-canvas-wrap"><Bar plugins={[chartDepthPlugin]} data={({labels:comparisonLabels,datasets:[{type:'bar' as never,label:'Actual balance',data:actualChartData,backgroundColor:chartAlpha('#38bdf8',.42),borderColor:chartAlpha('#38bdf8',.85),borderWidth:2,borderRadius:6,stack:'balance'},{type:'line' as never,label:'Actual balance',data:actualChartData,borderColor:chartAlpha('#38bdf8',.95),backgroundColor:'transparent',borderWidth:2,pointRadius:0,tension:.2},{type:'line' as never,label:'Pending balance',data:pendingChartData,borderColor:chartAlpha('#f59e0b',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[5,4],pointRadius:0},{type:'line' as never,label:'Planned balance',data:plannedChartData,borderColor:chartAlpha('#22c55e',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[8,3],pointRadius:0},{type:'line' as never,label:'Expected balance',data:expectedChartData,borderColor:chartAlpha('#a78bfa',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[2,3],pointRadius:0}]} as any)} options={{interaction:{mode:'index',intersect:false},scales:{x:{...axisOptions,stacked:true},y:balanceAxis},plugins:{legend:{display:true,labels:{filter:(item)=>item.datasetIndex!==0}},tooltip:{filter:(item)=>item.datasetIndex!==0},datalabels:{display:false}}}} /></div></div>
+    <div className="analytics-chart"><Tooltip text="Actual, pending, planned, and combined expected outstanding at period end."><h4 className="clickable">Period-end balance summary</h4></Tooltip><div className="chart-canvas-wrap"><Doughnut plugins={[chartDepthPlugin]} data={({labels:['Actual','Pending','Planned','Expected'],datasets:[{label:'Period end',data:[Math.abs(periodEndActual),Math.abs(periodEndPending),Math.abs(periodEndPlanned),Math.abs(periodEndExpected)],backgroundColor:['#38bdf8','#f59e0b','#22c55e','#a78bfa'].map((color)=>chartAlpha(color,.72)),borderColor:['#38bdf8','#f59e0b','#22c55e','#a78bfa'],borderWidth:2,hoverOffset:8}]} as any)} options={{responsive:true,maintainAspectRatio:false,cutout:'48%',plugins:{legend:{display:true,position:'right'},tooltip:{callbacks:{label:(item)=>`${item.label}: ${fmtMoney([periodEndActual,periodEndPending,periodEndPlanned,periodEndExpected][item.dataIndex],card.currencyCode)}`}},datalabels:dlDoughnut((v)=>fmtMoney(v,card.currencyCode))}}} /></div></div>
+  </div>;
+}
+
 export function CreditCardDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -703,6 +794,10 @@ export function CreditCardDetailPage() {
           <CardPlanList card={card} horizonDays={horizonDays} />
         </>,
       }]} />
+
+      <StandardCard title="Analytics" hue={card.color} className="mb-md">
+        <CreditCardAnalyticsSection card={card} />
+      </StandardCard>
 
       <CollapsibleCard title={<h3 className="m-0">Last 6 months</h3>} defaultOpen={false} className="mb-md">
         <div className="table-responsive">
