@@ -28,6 +28,24 @@ describe('buildLinkedRecords', () => {
     expect(link).toMatchObject({ id: 'link-1', fromRecordId: 'from-1', toRecordId: 'to-1', fromAmount: 250, toAmount: 250 });
   });
 
+  it('applies a selected category to both category-capable linked sides', () => {
+    const input: InterEntityTransferInput = {
+      date: '2026-01-05',
+      fromAmount: 100,
+      toAmount: 100,
+      from: { module: 'bank', ref: 'acct-1' },
+      to: { module: 'personalLoans', ref: 'loan-1' },
+      categoryID: 'cat_loan_borrowed',
+      note: 'Transfer',
+    };
+    const { from, to, link } = buildLinkedRecords(input, ids);
+    expect(from.module).toBe('bank');
+    if (from.module === 'bank') expect(from.record.categoryID).toBe('cat_loan_borrowed');
+    expect(to.module).toBe('personalLoans');
+    if (to.module === 'personalLoans') expect(to.record.categoryID).toBe('cat_loan_borrowed');
+    expect(link.categoryID).toBe('cat_loan_borrowed');
+  });
+
   it('signs the Bank record negative when Bank is the `from` side', () => {
     const input: InterEntityTransferInput = {
       date: '2026-01-05',
