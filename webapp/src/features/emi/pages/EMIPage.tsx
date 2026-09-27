@@ -1,8 +1,10 @@
+import { StandardPageSections } from '../../../components/StandardPageSections';
 import type { User } from 'firebase/auth';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Bar, Line } from 'react-chartjs-2';
 import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
+import { ModuleDetailTemplate } from '../../../components/ModuleDetailTemplate';
 import { Modal } from '../../../components/Modal';
 import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
@@ -599,35 +601,7 @@ function LoanDetail({ loan, onBack, startInEditMode }: { loan: EMILoan; onBack: 
   };
 
   return (
-    <div>
-      <button className="btn secondary small mb-12" onClick={onBack}>← All loans</button>
-      {/* README item 66 (2026-08-26 feedback): Save/Cancel (and Edit/Delete)
-         should sit at the card's top-right corner like every other single-
-         stranded-action card in the app (Done item 121) — this previously
-         swapped the WHOLE Card body (title included) between a display view
-         and an edit view, so the buttons ended up below the field grid
-         instead. Restructured onto CollapsibleCard's title/headerExtra
-         slots so the action buttons live in a fixed header position in
-         both modes, only the body content underneath changes. */}
-      <CollapsibleCard
-        className="mb-md"
-        title={
-          editing ? (
-            <h3 className="m-0">Editing {loan.name}</h3>
-          ) : (
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                {loan.name}
-                {loan.isActive === false && <span className="pill-warn fs-11">Closed</span>}
-              </div>
-              <div className="text-muted" style={{ fontWeight: 400 }}>
-                {loan.lender} · {loan.currencyCode} · {loan.repaymentMode === 'fixedTotal' ? 'Fixed total (no interest)' : `${loan.annualRatePct}% p.a.`} · {loan.tenureMonths} months
-              </div>
-            </div>
-          )
-        }
-        headerExtra={
-          editing ? (
+    <ModuleDetailTemplate title={loan.name} backLabel="All loans" onBack={onBack} sections={[{ key: 'summary', label: 'Summary', content: <LoanStatZones loan={loan} sum={sum} loanRepayments={loanRepayments} /> }, { key: 'details', label: 'Details', defaultOpen: true, headerEnd: editing ? (
             <div className="row gap-sm">
               <IconButton
                 label="Save"
@@ -666,9 +640,7 @@ function LoanDetail({ loan, onBack, startInEditMode }: { loan: EMILoan; onBack: 
                 }}
               />
             </div>
-          )
-        }
-      >
+          ), content: <>
         {editing && (
           <div className="row gap-sm">
             <Field label="Loan name">
@@ -806,18 +778,9 @@ function LoanDetail({ loan, onBack, startInEditMode }: { loan: EMILoan; onBack: 
             </div>
           </div>
         )}
-        <LoanStatZones loan={loan} sum={sum} loanRepayments={loanRepayments} />
-      </CollapsibleCard>
 
-      {/* README item 68 of a 2026-08-26 feedback batch: page order should be
-         Stats → Schedule → Charts → What-if — the Amortization chart,
-         What-if planner, and Link-to-bank card (which don't have a named
-         target position in that request) all moved together as a group to
-         right after the Schedule, keeping their own relative order. */}
-      <CollapsibleCard
-        title={<h3 className="m-0">Schedule {showFullSchedule ? '(full, start to end)' : '(next 12 installments from today)'}</h3>}
-        headerExtra={<button className="btn secondary" onClick={exportSchedule}>Export full schedule CSV</button>}
-      >
+      </> },
+{ key: 'plans', label: 'Plans', defaultOpen: true, headerEnd: <button className="btn secondary" onClick={exportSchedule}>Export full schedule CSV</button>, content: <>
       <p className="text-muted mt-0">
         Click the pencil on any upcoming installment to set a different amount (and, optionally, a different due
         date) for just that month. Every later month recalculates from what's actually paid.
@@ -956,16 +919,9 @@ function LoanDetail({ loan, onBack, startInEditMode }: { loan: EMILoan; onBack: 
           </tbody>
         </table>
       </div>
-      </CollapsibleCard>
-
-      <CollapsibleCard
-        title={
-          <Tooltip text="A month-by-month breakdown of each installment, showing how much of it pays down the principal vs. how much is interest/markup.">
-            <h3 style={{ margin: 0, cursor: 'pointer' }}>Amortization schedule</h3>
-          </Tooltip>
-        }
-        className="mb-md"
-      >
+      </> },
+{ key: 'payments', label: 'Payments', defaultOpen: true,  content: <><RepaymentLog loan={loan} repayments={loanRepayments} /></> },
+{ key: 'analytics', label: 'Analytics', defaultOpen: true,  content: <>
         <div style={{ height: 220 }}>
           <Bar
             data={{
@@ -982,19 +938,8 @@ function LoanDetail({ loan, onBack, startInEditMode }: { loan: EMILoan; onBack: 
             }}
           />
         </div>
-      </CollapsibleCard>
 
-      {/* README Pending item 72: EMI "read as no charts" beyond the
-         Amortization stacked bar above — this adds the specific alternate
-         view the item itself named as most likely wanted (a balance-over-
-         time line, matching Personal Loans' own equivalent chart, Done
-         item 172). Reuses `schedule.rows`/`resolvedDueDate` the Schedule
-         table already computes — no new calc function, since the whole
-         projected balance curve is already known from day 1 for an
-         amortizing loan (unlike Personal Loans, where balance-over-time
-         depends on actual sparse repayment events that haven't all
-         happened yet). */}
-      <CollapsibleCard title={<h3 className="m-0">Balance over time</h3>} className="mb-md">
+
         <div style={{ height: 220 }}>
           <Line
             data={{
@@ -1011,9 +956,8 @@ function LoanDetail({ loan, onBack, startInEditMode }: { loan: EMILoan; onBack: 
             options={{ maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: dlLine((v) => fmtMoney(v, loan.currencyCode)) } }}
           />
         </div>
-      </CollapsibleCard>
 
-      <CollapsibleCard title={<h3 className="m-0">What if: extra payment</h3>} className="mb-md">
+
         <p className="text-muted mt-0">
           See how much sooner this loan clears — and how much {loan.repaymentMode === 'fixedTotal' ? 'markup' : 'interest'} you'd
           save — by paying a fixed extra amount on top of the normal installment every month. A live estimate, nothing is saved.
@@ -1031,10 +975,7 @@ function LoanDetail({ loan, onBack, startInEditMode }: { loan: EMILoan; onBack: 
             </div>
           </div>
         )}
-      </CollapsibleCard>
-
-      <RepaymentLog loan={loan} repayments={loanRepayments} />
-    </div>
+      </> }]}></ModuleDetailTemplate>
   );
 }
 
@@ -1323,9 +1264,11 @@ export function EMIPage({
              "check my loans" visit. Moved behind a floating add button
              (same round-FAB pattern as the Calculator button) with the
              form itself in a popup, and the stats+list now render first. */}
-          <OverallSummary />
-          <LoanList onSelect={openLoan} onEdit={editLoan} />
-          <AccountSection cloudEmpty={cloudEmpty} uploadLocalToCloud={uploadLocalToCloud} />
+          <StandardPageSections sections={[
+            { key: 'summary', label: 'Summary', content: <OverallSummary /> },
+            { key: 'loans', label: 'Loans', content: <LoanList onSelect={openLoan} onEdit={editLoan} /> },
+            { key: 'settings', label: 'Settings', content: <AccountSection cloudEmpty={cloudEmpty} uploadLocalToCloud={uploadLocalToCloud} /> },
+          ]} />
           <AddLoanFab
             onLoanCreated={(id) => {
               const loan = useEMIWorkbookStore.getState().workbook.entries.find((l) => l.id === id);

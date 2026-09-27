@@ -1060,7 +1060,6 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
       sections={sections}
       defaultKey="summary"
     >
-      <StandardPageSections sections={sections} defaultKey="summary" />
       {batchEditor === 'payments' && <LoanPaymentsBatchEditor key={loan.id} loan={loan} rows={[...filteredPayments].sort((a, b) => b.date.localeCompare(a.date) || (b.seq ?? 0) - (a.seq ?? 0))} onClose={() => setBatchEditor(null)} />}
       {batchEditor === 'plans' && <LoanPlansBatchEditor key={loan.id} loan={loan} rows={plans.filter(plan => plan.loanId === loan.id).sort((a, b) => a.date.localeCompare(b.date))} onClose={() => setBatchEditor(null)} />}
       <FabPanel actions={[

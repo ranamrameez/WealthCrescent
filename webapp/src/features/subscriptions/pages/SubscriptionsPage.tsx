@@ -1,3 +1,4 @@
+import { ModuleDetailTemplate } from '../../../components/ModuleDetailTemplate';
 import type { User } from 'firebase/auth';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -10,7 +11,7 @@ import { Tooltip } from '../../../components/Tooltip';
 import { HUES, hueStyle } from '../../../lib/statCardHues';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { EditIcon, PlusIcon, SaveIcon, StarIcon, TrashIcon, XIcon } from '../../../components/icons';
-import { Tabs } from '../../../components/Tabs';
+import { StandardPageSections } from '../../../components/StandardPageSections';
 import { toast } from '../../../components/Toast';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
 import { IconButton } from '../../../components/ui/IconButton';
@@ -30,7 +31,7 @@ import { dlBarV, dlDoughnut } from '../../../lib/chartLabels';
 import { applyChartTheme } from '../../../lib/chartSetup';
 import { categoryName, UNCATEGORIZED_ID } from '../../../lib/categories';
 import { cssVar, tickerColor } from '../../../lib/cssVar';
-import { fmtMoney } from '../../../lib/format';
+import { fmtMoney, formatDate } from '../../../lib/format';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { firebaseReady } from '../../../lib/firebase/client';
 import { useAppearanceStore } from '../../../store/appearanceStore';
@@ -368,6 +369,7 @@ function AlertsSection({ sub }: { sub: Subscription }) {
 }
 
 function SubscriptionDetail({ sub, onBack }: { sub: Subscription; onBack: () => void }) {
+  const dateFormat = useAppearanceStore((s) => s.appearance.dateFormat);
   const updateEntry = useSubscriptionsWorkbookStore((s) => s.updateEntry);
   const deleteEntry = useSubscriptionsWorkbookStore((s) => s.deleteEntry);
   const categoryRegistry = useCategoryStore((s) => s.workbook.categories);
@@ -478,9 +480,7 @@ function SubscriptionDetail({ sub, onBack }: { sub: Subscription; onBack: () => 
   };
 
   return (
-    <div>
-      <button className="btn secondary small mb-12" onClick={onBack}>← All subscriptions</button>
-      <Card className="mb-md">
+    <ModuleDetailTemplate title={sub.name} backLabel="All subscriptions" onBack={onBack} sections={[{ key: 'summary', label: 'Summary', defaultOpen: true,  content: <>
         {editing ? (
           <div>
             <div className="row gap-sm">
@@ -525,8 +525,8 @@ function SubscriptionDetail({ sub, onBack }: { sub: Subscription; onBack: () => 
             <div>
               <div style={{ fontWeight: 700, fontSize: 16 }}>{sub.name}</div>
               <div className="text-muted">
-                {fmtMoney(sub.amount, sub.currencyCode)}{CYCLE_LABEL[sub.billingCycle]} · {subCategoryLabel(sub, categoryRegistry)} · since {sub.startDate}
-                {!sub.active && sub.cancelledDate && ` · cancelled ${sub.cancelledDate}`}
+                {fmtMoney(sub.amount, sub.currencyCode)}{CYCLE_LABEL[sub.billingCycle]} · {subCategoryLabel(sub, categoryRegistry)} · since {formatDate(sub.startDate, dateFormat)}
+                {!sub.active && sub.cancelledDate && ` · cancelled ${formatDate(sub.cancelledDate, dateFormat)}`}
               </div>
             </div>
             <div className="row gap-sm">
@@ -559,9 +559,8 @@ function SubscriptionDetail({ sub, onBack }: { sub: Subscription; onBack: () => 
           <div className="stat-card card" style={hueStyle(HUES[0])}><div className="label">Next renewal</div><div className="value fs-14">{sub.active ? nextBillingDate(sub) : '—'}</div></div>
           <div className="stat-card card" style={hueStyle(sub.active ? 'var(--profit)' : 'var(--loss)')}><div className="label">Status</div><div className="value fs-14">{sub.active ? 'Active' : 'Cancelled'}</div></div>
         </div>
-      </Card>
-
-      <Card className="mb-md">
+      </> },
+{ key: 'details', label: 'Paying account', defaultOpen: true,  content: <>
         <h4 style={{ margin: '0 0 8px' }}>Link to a paying account</h4>
         {linkedLabel ? (
           <p className="text-muted mb-sm">
@@ -612,24 +611,21 @@ function SubscriptionDetail({ sub, onBack }: { sub: Subscription; onBack: () => 
             {linkedLabel ? 'Re-link / regenerate plans' : 'Generate renewal plans'}
           </button>
         </div>
-      </Card>
-
-      <AlertsSection sub={sub} />
-
-      <CollapsibleCard title={<h3 className="m-0">Upcoming occurrences (next 12 months)</h3>}>
+      </> },
+{ key: 'plans', label: 'Plans', defaultOpen: true,  content: <>
         <div className="table-scroll">
           <table>
             <thead><tr><th>Date</th><th>Amount</th></tr></thead>
             <tbody>
               {occurrences.map((o, i) => (
-                <tr key={i}><td>{o.date}</td><td>{fmtMoney(o.amount, sub.currencyCode)}</td></tr>
+                <tr key={i}><td>{formatDate(o.date, dateFormat)}</td><td>{fmtMoney(o.amount, sub.currencyCode)}</td></tr>
               ))}
               {!occurrences.length && <tr><td colSpan={2} className="text-muted">No upcoming occurrences (subscription is cancelled).</td></tr>}
             </tbody>
           </table>
         </div>
-      </CollapsibleCard>
-    </div>
+      </> },
+{ key: 'alerts', label: 'Alerts', defaultOpen: true,  content: <><AlertsSection sub={sub} /></> }]}></ModuleDetailTemplate>
   );
 }
 
@@ -823,14 +819,14 @@ export function SubscriptionsPage({
       {liveSelected ? (
         <SubscriptionDetail sub={liveSelected} onBack={() => setSelected(null)} />
       ) : (
-        <Tabs
-          tabs={[
+        <StandardPageSections sections={[
+            { key: 'summary', label: 'Summary', content: <OverallSummary /> },
             {
               key: 'subscriptions',
               label: 'Subscriptions',
               content: (
                 <div>
-                  <OverallSummary />
+
                   <SubscriptionList onSelect={setSelected} />
                   <AddSubscriptionFab />
                 </div>

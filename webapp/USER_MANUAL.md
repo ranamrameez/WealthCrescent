@@ -885,3 +885,6 @@ Every number in this app is an **estimate** computed from settings you configure
 not a substitute for your actual broker/exchange statement, and it is not financial advice.
 See **Disclaimer & Privacy** (linked at the bottom of the sidebar) for the full legal text.
 If a number here ever disagrees with your official statement, trust the statement.
+# Shared finance page sections
+
+EMI, Funds, brokers, and Subscriptions now use the same section navigation and fullscreen cards as Banking. Cash and Rentals have separate Summary sections. Use the section chips to jump to details, plans, activity, or analytics where available. Existing transaction and planning controls remain within their relevant sections.

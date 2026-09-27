@@ -8,7 +8,7 @@ import { confirmDialog } from '../../../components/ConfirmDialog';
 import { CheckIcon, EditIcon, PlusIcon, SaveIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { Modal } from '../../../components/Modal';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
-import { Tabs } from '../../../components/Tabs';
+import { StandardPageSections } from '../../../components/StandardPageSections';
 import { toast } from '../../../components/Toast';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
 import { PendingToggle } from '../../../components/ui/PendingToggle';
@@ -510,7 +510,7 @@ function CashStatementGrid() {
 function CashStatementTab() {
   return (
     <div>
-      <BalancesSummary />
+
       <CashStatementGrid />
     </div>
   );
@@ -1298,9 +1298,9 @@ export function CashPage({
          previously embedded inside a combined "Ledger" tab, ahead of the
          statement itself; it's now its own tab, moved to the end. Import/
          Settings (not named in the request) stay after, unchanged. */}
-      <Tabs
-        tabs={[
-          { key: 'statement', label: 'Cash statement', content: <CashStatementTab /> },
+      <StandardPageSections sections={[
+          { key: 'summary', label: 'Summary', content: <BalancesSummary /> },
+          { key: 'statement', label: 'Transactions', content: <CashStatementTab /> },
           {
             key: 'plans',
             label: 'Plans',

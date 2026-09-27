@@ -28,3 +28,15 @@ Banking (Banks & Accounts) is the reference interaction model for every finance 
 ```
 
 Do not create module-specific section shells when the content can be expressed as a standard section. Domain-specific fields and calculations belong inside the section content; the surrounding behavior belongs in the template.
+
+## Migration coverage
+
+- Personal Loans: template owns the sections exactly once; batch editor dialogs are children, never a second section stack.
+- EMI: Summary, Details, Plans, Payments, and Analytics detail sections; Summary, Loans, and Settings landing sections.
+- Funds: fund Summary & Details, transaction entry, valuation, Transactions, and Balance history; broker Summary & Details and Funds.
+- Subscriptions: Summary, paying account, Plans, and Alerts detail sections; separate landing Summary.
+- Cash and Rentals: separate landing Summary and activity/entity sections, using StandardPageSections directly.
+
+Stock Exchange modules are excluded from this migration. Domain-specific import/export and filters are retained; this layout migration does not add batch-edit support to ledgers that do not already have it.
+
+The template owns navigation and section rendering. Its children are reserved for dialogs and floating actions. Never render another StandardPageSections with the same sections inside it: doing so duplicates page content after dialogs close.

@@ -1,3 +1,4 @@
+import { ModuleDetailTemplate } from '../../../components/ModuleDetailTemplate';
 import type { User } from 'firebase/auth';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -9,7 +10,7 @@ import { TickerLogo } from '../../../components/TickerLogo';
 import { HUES, hueStyle } from '../../../lib/statCardHues';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { ArchiveIcon, CheckIcon, EditIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
-import { Tabs } from '../../../components/Tabs';
+import { StandardPageSections } from '../../../components/StandardPageSections';
 import { toast } from '../../../components/Toast';
 import { Tooltip } from '../../../components/Tooltip';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
@@ -227,20 +228,12 @@ function BrokerDetail({ broker, onBack, onSelectFund }: { broker: Broker; onBack
   };
 
   return (
-    <div>
-      <button className="btn secondary small mb-12" onClick={onBack}>← All funds</button>
-      <CollapsibleCard
-        title={editing ? 'Edit broker' : broker.name}
-        defaultOpen
-        headerExtra={
-          !editing && (
+    <ModuleDetailTemplate title={broker.name} backLabel="All funds" onBack={onBack} sections={[{ key: 'summary', label: 'Summary & Details', defaultOpen: true, headerEnd: !editing && (
             <>
               <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={startEdit} />
               <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={remove} />
             </>
-          )
-        }
-      >
+          ), content: <>
         {editing ? (
           <div>
             <Field label="Broker name" width={220} required>
@@ -271,8 +264,8 @@ function BrokerDetail({ broker, onBack, onSelectFund }: { broker: Broker; onBack
             </div>
           </div>
         )}
-      </CollapsibleCard>
-      <div className="mt-md">
+      </> },
+{ key: 'funds', label: 'Funds', defaultOpen: true,  content: <><div className="mt-md">
         <div className="entity-card-grid">
           {linkedFunds.map((f) => {
             const nav = getMarketPrice(f.id, workbook.marketPrices, workbook.transactions);
@@ -291,9 +284,7 @@ function BrokerDetail({ broker, onBack, onSelectFund }: { broker: Broker; onBack
           })}
         </div>
         {!linkedFunds.length && <p className="text-muted">No funds linked to this broker yet.</p>}
-      </div>
-      <FabButtonAddFund brokerId={broker.id} open={addOpen} setOpen={setAddOpen} />
-    </div>
+      </div></> }]}><FabButtonAddFund brokerId={broker.id} open={addOpen} setOpen={setAddOpen} /></ModuleDetailTemplate>
   );
 }
 
@@ -1121,10 +1112,7 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
   };
 
   return (
-    <div>
-      <button className="btn secondary small mb-12" onClick={onBack}>← All funds</button>
-
-      <Card className="mb-md">
+    <ModuleDetailTemplate title={fund.name} backLabel="All funds" onBack={onBack} sections={[{ key: 'summary', label: 'Summary & Details', defaultOpen: true,  content: <>
             {editingFund ? (
               <div>
                 <div className="row gap-sm">
@@ -1230,10 +1218,9 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
                 />
               </ChartCard>
             </div>
-      </Card>
-
-      <h3>Add transaction</h3>
-      <div className="row" style={{ gap: 8, marginBottom: 16 }}>
+      </> },
+{ key: 'entry', label: 'Add transaction', defaultOpen: true,  content: <><h3>Add transaction</h3>
+<div className="row" style={{ gap: 8, marginBottom: 16 }}>
         <Field label="Action">
           <Select value={txAction} onChange={(e) => setTxAction(e.target.value as 'BUY' | 'SELL')}>
             <option value="BUY">Invest</option>
@@ -1300,15 +1287,8 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
           </label>
         </Field>
         <button className="btn" onClick={submitTx}><PlusIcon />Add</button>
-      </div>
-
-      {/* User-requested (2026-09-03): "I asked to stack update Balance +
-          OR update NAV and stacked below Add transaction form" — corrects
-          the earlier round's right-rail placement (also removed: a
-          "Transfers" card here, redundant with the Transactions table
-          right below). Two stacked options, "OR" between them, not two
-          side-by-side rows. */}
-      <Card className="mb-md">
+      </div></> },
+{ key: 'valuation', label: 'Balance & NAV', defaultOpen: true,  content: <>
         <h3 className="mt-0">Update balance or NAV</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div className="row gap-sm">
@@ -1326,12 +1306,8 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
             <button className="btn secondary small" onClick={commitBalance} disabled={units <= 0}><SaveIcon size={12} />Save balance</button>
           </div>
         </div>
-      </Card>
-
-      <CollapsibleCard
-        title={<h3 className="m-0">Transactions</h3>}
-        headerExtra={
-          txs.length > 0 ? (
+      </> },
+{ key: 'transactions', label: 'Transactions', defaultOpen: true, headerEnd: txs.length > 0 ? (
             <div className="row gap-sm">
               <Field label="From (optional)">
                 <TextInput type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
@@ -1341,9 +1317,7 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
               </Field>
               <button className="btn secondary" onClick={exportStatement}>Export CSV</button>
             </div>
-          ) : undefined
-        }
-      >
+          ) : undefined, content: <>
       <div className="row gap-sm mb-sm">
         <Field label="Type" width={140}>
           <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}>
@@ -1430,16 +1404,8 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
           </tbody>
         </table>
       </div>
-      </CollapsibleCard>
-
-      {/* User-requested (2026-09-03): "ability to see balance updates,"
-          then "missing crucial data. Add all data like Index, Date, prv
-          balnce + NAV, new balance + NAV, change + %age, Actions etc." */}
-      <CollapsibleCard
-        title={<h3 className="m-0">Balance Update History</h3>}
-        className="mt-md"
-        headerExtra={balanceRows.length > 0 ? <button className="btn secondary" onClick={exportBalanceHistory}>Export CSV</button> : undefined}
-      >
+      </> },
+{ key: 'history', label: 'Balance history', defaultOpen: true, headerEnd: balanceRows.length > 0 ? <button className="btn secondary" onClick={exportBalanceHistory}>Export CSV</button> : undefined, content: <>
         {!balanceRows.length && <p className="text-muted">No balance/NAV updates recorded yet — use "Update balance or NAV" above.</p>}
         {balanceRows.length > 0 && (
           <>
@@ -1495,8 +1461,7 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
             </div>
           </>
         )}
-      </CollapsibleCard>
-      {detailTx && (
+      </> }]}>{detailTx && (
         <RecordDetailModal
           title={detailTx.action === 'BUY' ? 'Invested' : 'Withdrew'}
           onClose={() => setDetailTx(null)}
@@ -1511,8 +1476,7 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
             { label: 'Status', value: detailTx.isPending ? 'Pending (not yet settled)' : 'Cleared' },
           ]}
         />
-      )}
-    </div>
+      )}</ModuleDetailTemplate>
   );
 }
 
@@ -1900,14 +1864,14 @@ export function FundsPage({
           onSelectFund={(f) => { setSelectedBroker(null); setSelected(f); }}
         />
       ) : (
-        <Tabs
-          tabs={[
+        <StandardPageSections sections={[
+            { key: 'summary', label: 'Summary', content: <OverallSummary /> },
             {
               key: 'funds',
               label: 'Funds',
               content: (
                 <div>
-                  <OverallSummary />
+
                   <BrokersList onSelect={setSelectedBroker} />
                   <FundList onSelect={setSelected} />
                   <AddFundFab />

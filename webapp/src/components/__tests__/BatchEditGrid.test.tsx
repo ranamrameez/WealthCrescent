@@ -67,14 +67,14 @@ describe('BatchEditGrid', () => {
   it('does not render editors for locked rows', () => {
     setup({ rowReadOnly: (row: Row) => row.id === 'a' ? 'Linked transfer' : undefined });
     expect(screen.queryByLabelText('Row 1, Amount')).toBeNull();
-    expect(screen.getByText('Linked transfer')).toBeTruthy();
+    expect(screen.getByText('This Side Only').getAttribute('title')).toBe('Linked transfer');
     expect(screen.getByLabelText('Row 2, Amount')).toBeTruthy();
   });
   it('evaluates formulas on Save and highlights edited columns', async () => {
     const { save } = setup();
     fireEvent.change(screen.getByLabelText('Row 1, Amount'), { target: { value: '=5*986.5' } });
     expect(screen.getByText('= 4932.5')).toBeTruthy();
-    expect(screen.getByRole('columnheader', { name: 'Amount Edited' }).className).toContain('column-dirty');
+    expect(screen.getByRole('columnheader', { name: /Amount\s*Edited/ }).className).toContain('column-dirty');
     fireEvent.click(screen.getByText('Save all changes'));
     await waitFor(() => expect(save).toHaveBeenCalledOnce());
     expect(save.mock.calls[0][0][0].after.amount).toBe(4932.5);

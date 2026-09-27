@@ -10,7 +10,7 @@ import { hueStyle } from '../../../lib/statCardHues';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { ArchiveIcon, CheckIcon, EditIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon } from '../../../components/icons';
 import { Modal } from '../../../components/Modal';
-import { Tabs } from '../../../components/Tabs';
+import { StandardPageSections } from '../../../components/StandardPageSections';
 import { toast } from '../../../components/Toast';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
 import { PendingToggle } from '../../../components/ui/PendingToggle';
@@ -615,7 +615,7 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
 function PropertiesTab() {
   return (
     <div>
-      <NetIncomeSummary />
+
       <PropertiesList />
       <AddPropertyFab />
     </div>
@@ -1348,14 +1348,14 @@ export function RentalsPage({
         Rental property income and expenses — recurring rent received and costs (maintenance, property tax,
         management fees) against one or more properties, not discrete buy/sell trades.
       </p>
-      <Tabs
-        tabs={[
+      <StandardPageSections sections={[
+          { key: 'summary', label: 'Summary', content: <NetIncomeSummary /> },
           { key: 'properties', label: 'Properties', content: <PropertiesTab /> },
           {
             key: 'entries',
             label: 'Income & expenses',
             content: <EntriesTab properties={properties} property={property} propertyId={propertyId} setPropertyId={setPropertyId} />,
-            headerExtra: hasRows ? (
+            headerEnd: hasRows ? (
               <div className="row gap-sm">
                 <Field label="From (optional)">
                   <TextInput type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
