@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PersonalLoan, PersonalLoanRepayment } from '../../../types/personalLoansWorkbook';
-import { loanBalanceHistory, loanOutstanding, loanPendingImpact, netPendingByCurrency, netPositionByCurrency, outstandingByLoan, projectPayoff, repaymentRunningOutstanding, repaymentsByMonth } from '../personalLoansModule';
+import { loanBalanceHistory, loanDirectionForTransfer, loanOutstanding, loanPendingImpact, netPendingByCurrency, netPositionByCurrency, outstandingByLoan, projectPayoff, repaymentRunningOutstanding, repaymentsByMonth, transferDirectionForLoan } from '../personalLoansModule';
 
 const loan = (over: Partial<PersonalLoan>): PersonalLoan => ({
   id: 'l1',
@@ -237,5 +237,17 @@ describe('loanBalanceHistory', () => {
       { date: '2026-01-01', balance: 100 },
       { date: '2026-01-05', balance: 0 },
     ]);
+  });
+});
+
+describe('personal loan transfer direction', () => {
+  it('maps Borrow to an i_owe loan and a Personal Loans receiving side', () => {
+    expect(loanDirectionForTransfer('in')).toBe('i_owe');
+    expect(transferDirectionForLoan('i_owe')).toBe('in');
+  });
+
+  it('maps Lent to an owed_to_me loan and a Personal Loans sending side', () => {
+    expect(loanDirectionForTransfer('out')).toBe('owed_to_me');
+    expect(transferDirectionForLoan('owed_to_me')).toBe('out');
   });
 });
