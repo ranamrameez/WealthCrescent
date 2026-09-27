@@ -159,6 +159,8 @@ export interface Transfer {
   type: 'DEPOSIT' | 'WITHDRAWAL';
   gross: number;
   fee: number;
+  /** Optional description entered through the centralized Transfers popup. */
+  description?: string;
   /** Same reasoning as `Transaction.timestamp` above. */
   timestamp?: string;
 }
@@ -333,6 +335,10 @@ export interface Appearance {
    * always rendering it expanded. Optional, `undefined`/false keeps
    * today's default (collapsed-until-clicked). */
   fabAlwaysOpen?: boolean;
+  /** Default description prefilled in the centralized Transfers popup.
+   * Users can change it in global settings; existing transaction data is
+   * never rewritten when this preference changes. */
+  transferDefaultDescription?: string;
   /** Global date display preference. Stored separately from transaction data so changing it never changes the underlying ISO dates. */
   dateFormat?: 'DD-MMM-YYYY' | 'YYYY-MMM-DD' | 'DD-MM-YYYY' | 'MM-DD-YYYY' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'dddd, MMM DD, YYYY' | 'ddd, DD MMM, YYYY';
 }

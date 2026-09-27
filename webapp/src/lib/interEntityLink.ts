@@ -48,7 +48,7 @@ function buildSideRecord(
           // filling default currency").
           currencyCode: cfg.currencyCode || 'USD',
           categoryID: TRANSFER_CATEGORY_ID,
-          note,
+          title: note,
           source: 'manual',
         },
       };
@@ -75,7 +75,7 @@ function buildSideRecord(
     case 'funds':
       return {
         module: cfg.module,
-        record: { id, date, type: direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: amount, fee: 0 },
+        record: { id, date, type: direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: amount, fee: 0, description: note },
       };
     case 'rentals':
       // Unlike Bank/Cash/QSE/PSX/Funds, Rentals has no real balance of its
@@ -109,7 +109,7 @@ function buildSideRecord(
           // "normally" here).
           isDeposit: direction !== 'in',
           amount,
-          note,
+          title: note,
         },
       };
     case 'personalLoans':
@@ -121,7 +121,7 @@ function buildSideRecord(
       if (!cfg.ref) throw new Error('Personal Loans side of a linked transfer needs a loan.');
       return {
         module: 'personalLoans',
-        record: { id, loanId: cfg.ref, date, amount },
+        record: { id, loanId: cfg.ref, date, amount, description: note },
       };
     case 'emi':
       // Same "direction doesn't flip the sign" exception as personalLoans
@@ -134,7 +134,7 @@ function buildSideRecord(
       if (!cfg.emiMonth) throw new Error("Couldn't determine which installment this payment applies to.");
       return {
         module: 'emi',
-        record: { id, loanId: cfg.ref, month: cfg.emiMonth, amount, date },
+        record: { id, loanId: cfg.ref, month: cfg.emiMonth, amount, date, description: note },
       };
     case 'creditCard':
       // Same "direction doesn't flip the sign" exception as personalLoans/
@@ -170,6 +170,37 @@ export function buildLinkedRecords(
     toRecordId: ids.toRecordId,
   };
   return { from, to, link };
+}
+
+export function linkSideRequiresRef(side: LinkSideConfig): boolean {
+  return side.module === 'bank'
+    || side.module === 'rentals'
+    || side.module === 'personalLoans'
+    || side.module === 'emi'
+    || side.module === 'creditCard';
+}
+
+export function defaultLinkedOtherSide(
+  finance: LinkSideConfig,
+  bankAccounts: Array<{ id: string; currencyCode: string; isActive?: boolean }>,
+  cashDefaultCurrency: string,
+): LinkSideConfig {
+  const financeCurrency = finance.currencyCode ?? (
+    finance.module === 'bank'
+      ? bankAccounts.find((account) => account.id === finance.ref)?.currencyCode
+      : undefined
+  );
+  const differentFromFinance = (account: { id: string }) =>
+    account.id !== (finance.module === 'bank' ? finance.ref : undefined);
+  const bank = bankAccounts.find((account) =>
+    account.isActive !== false
+    && differentFromFinance(account)
+    && (!financeCurrency || account.currencyCode === financeCurrency),
+  ) ?? bankAccounts.find((account) => account.isActive !== false && differentFromFinance(account));
+
+  return bank
+    ? { module: 'bank', ref: bank.id, currencyCode: bank.currencyCode }
+    : { module: 'cash', currencyCode: financeCurrency ?? cashDefaultCurrency };
 }
 
 /** Whether a from/to module pairing is actually supported in v1 — see the

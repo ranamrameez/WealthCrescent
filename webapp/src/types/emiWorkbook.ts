@@ -91,6 +91,8 @@ export interface EMIRepayment {
   month: number;
   amount: number;
   date: string;
+  /** Optional description entered through the centralized Transfers popup. */
+  description?: string;
   /** 'statement-import' mirrors every other module's ledger source field —
    * unset (implicitly manual) for now since EMI has no CSV import yet. */
   source?: 'manual' | 'statement-import';

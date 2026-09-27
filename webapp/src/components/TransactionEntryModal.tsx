@@ -2,12 +2,11 @@ import { useEffect, useState } from 'react';
 import { Modal } from './Modal';
 import { toast } from './Toast';
 import { PlusIcon, SaveIcon, TrashIcon } from './icons';
-import { Field, Select, TextInput } from './ui/Field';
+import { Field, TextInput } from './ui/Field';
 import { AmountInput } from './ui/AmountInput';
 import { DirectionChips } from './ui/DirectionChips';
 import { TimeZoneFields } from './ui/TimeZoneFields';
-import { PendingToggle } from './ui/PendingToggle';
-import { ToggleChip } from './ui/ToggleChip';
+import { YesNoChips } from './ui/YesNoChips';
 import { SideFields, useSideCurrency, nextUnpaidEmiMonth } from '../features/transfers/pages/TransferLinksPage';
 import { getLastTransferSource, rememberTransferSource } from '../hooks/useLastTransferSource';
 import { CategorySelect } from './CategorySelect';
@@ -15,7 +14,7 @@ import { UNCATEGORIZED_ID } from '../lib/categories';
 import { defaultTimeForDate, defaultTimezoneForCurrency, nowTime } from '../lib/datetime';
 import { convertAmount, loadCachedFxRates } from '../lib/fx';
 import { useEnsureSignedIn } from '../lib/firebase/useEnsureSignedIn';
-import { isSupportedLinkPair } from '../lib/interEntityLink';
+import { defaultLinkedOtherSide, isSupportedLinkPair, linkSideRequiresRef } from '../lib/interEntityLink';
 import { createLinkedTransfer } from '../lib/linkCascade';
 import { useBankWorkbookStore } from '../store/bankWorkbookStore';
 import { useCashWorkbookStore } from '../store/cashWorkbookStore';
@@ -26,6 +25,7 @@ import { usePersonalLoansWorkbookStore } from '../store/personalLoansWorkbookSto
 import { usePSXWorkbookStore } from '../store/psxWorkbookStore';
 import { useRentalsWorkbookStore } from '../store/rentalsWorkbookStore';
 import { useSubscriptionsWorkbookStore } from '../store/subscriptionsWorkbookStore';
+import { useAppearanceStore } from '../store/appearanceStore';
 import { useWorkbookStore } from '../store/workbookStore';
 import type { LinkModule, LinkSideConfig } from '../types/interEntityTransfer';
 
@@ -79,7 +79,6 @@ const DIRECTION_LABELS: Partial<Record<LinkModule, { in: string; out: string }>>
   creditCard: { in: 'Payment', out: 'Charge' },
 };
 const HAS_CATEGORY: LinkModule[] = ['bank', 'cash', 'rentals', 'creditCard'];
-const HAS_NOTE: LinkModule[] = ['cash', 'rentals'];
 /** Bank has no `Finance.title` — its own pre-existing `description` field
  * already fills that role (see `types/finance.ts`'s file-level comment) —
  * so this is the one module that needs its own "what is this" text input
@@ -92,7 +91,6 @@ const HAS_NOTE: LinkModule[] = ['cash', 'rentals'];
  * "Blunder on CC page transfer" report above) — `CreditCardTransaction`
  * has its own `description` field (see `types/creditCard.ts`), and this
  * popup silently defaulted it to "Payment" with no way to type a real one. */
-const HAS_DESCRIPTION: LinkModule[] = ['bank', 'creditCard'];
 /** User-requested (2026-09-08): a "Pending" state — a real transaction the
  * user already knows is happening but hasn't cleared yet (a sent transfer
  * not yet reflected, a stock order not yet filled). Shipped first for
@@ -104,30 +102,12 @@ const HAS_DESCRIPTION: LinkModule[] = ['bank', 'creditCard'];
  * for a link needs its own design (does one side clear independently of
  * the other?) not attempted here. */
 const HAS_PENDING: LinkModule[] = ['cash', 'bank', 'rentals', 'personalLoans'];
-/** User-requested (2026-09-20): "list the subscriptions in the transfer
- * features. and update their date according to the transaction." Only
- * offered for a PLAIN (non-linked) row on the three modules that can
- * realistically pay a subscription — Bank, Cash, Credit Card — since a
- * linked row already means "move money between two of my own accounts,"
- * a different question from "what was this specific charge for."
- * Deliberately NOT wired into the general `LinkModule`/`InterEntityTransfer`
- * system (Subscriptions has no per-payment ledger of its own — a
- * `Subscription` is a single record with a `startDate`/`billingCycle`, not
- * an array of transactions — so it can't participate in that system's
- * add/update/delete-by-id, rollback, and `findLinkForRecord` machinery the
- * way Bank/Cash/Rentals/Personal Loans/EMI/Funds/Credit Card all do). This
- * is a lighter one-directional annotation instead: picking a subscription
- * just updates that subscription's own `startDate` to the transaction's
- * date once the transaction saves — `nextBillingDate()`'s recurrence engine
- * already walks forward from `startDate` regardless of how stale it is, so
- * this is purely about keeping the cycle's day-of-month anchor aligned with
- * when you actually paid, not something the app was silently getting wrong
- * before. Subscriptions' own separate "Link to a paying account" feature
- * (its Planning-tab-based "Generate renewal plans") is unaffected — this is
- * an additional, independent way to log one REAL payment right now, the
- * same "both a Planning-based path and a direct Transfers-linking path"
- * pattern EMI/Rentals already have for their own entities. */
-const HAS_SUBSCRIPTION: LinkModule[] = ['bank', 'cash', 'creditCard'];
+
+/** Subscriptions are exposed as a Finance choice in the centralized popup.
+ * Selecting one resolves its configured `paidVia` Bank/Cash/Credit Card
+ * into the real ledger side and updates the subscription's billing anchor
+ * after that real transaction saves. Subscriptions still are not
+ * InterEntityTransfer sides because they have no payment ledger of their own. */
 
 interface TxRow {
   key: number;
@@ -164,30 +144,27 @@ interface TxRow {
   timezone?: string;
   categoryID: string;
   description: string;
-  note: string;
   pending: boolean;
-  /** See `HAS_SUBSCRIPTION`'s own doc comment — set when this real
-   * transaction pays a specific subscription; not part of `LinkSideConfig`/
-   * the `linked` two-sided mechanism at all. */
+  /** Set when the Finance selector is in Subscriptions mode. */
   subscriptionId: string;
+  subscriptionMode: boolean;
 }
 
-/** User-reported (2026-09-08): "try to choose the same/logical module by
- * default for max UX. like Bank to Bank, Cash to Bank." `bank` is the most
- * likely real "other side" for every module — including Bank itself
- * (Bank-to-Bank, the user's own first example) — so this is a plain
- * constant default rather than a per-module lookup table; still named and
- * documented so a future session doesn't have to re-derive why. Only a
- * prefill: `getLastTransferSource()` (checked first, wherever this is
- * used) and the user's own pick both still win over it. */
-const LIKELY_OTHER_MODULE: LinkModule = 'bank';
-
-function emptyRow(key: number, finance: LinkSideConfig, currencyCode?: string): TxRow {
+/** Creates one popup row from already-resolved primary and secondary finance
+ * sides. The secondary side is supplied by `defaultLinkedOtherSide()`, so
+ * its visible account and persisted `ref` cannot drift apart. */
+function emptyRow(
+  key: number,
+  finance: LinkSideConfig,
+  other: LinkSideConfig,
+  defaultDescription: string,
+  currencyCode?: string,
+): TxRow {
   return {
     key,
     finance,
     linked: false,
-    other: { module: LIKELY_OTHER_MODULE, currencyCode },
+    other,
     amount: 0,
     direction: 'in',
     date: today(),
@@ -195,10 +172,10 @@ function emptyRow(key: number, finance: LinkSideConfig, currencyCode?: string): 
     timeTouched: false,
     timezone: defaultTimezoneForCurrency(currencyCode),
     categoryID: UNCATEGORIZED_ID,
-    description: '',
-    note: '',
+    description: defaultDescription,
     pending: false,
     subscriptionId: '',
+    subscriptionMode: false,
     toAmountTouched: false,
     rateSource: '',
   };
@@ -221,9 +198,6 @@ function TxRowFields({
 }) {
   const otherCurrency = useSideCurrency(row.other);
   const financeCurrency = useSideCurrency(row.finance);
-  const subscriptions = useSubscriptionsWorkbookStore((s) => s.workbook.entries);
-  const activeSubscriptions = subscriptions.filter((s) => s.active).sort((a, b) => a.name.localeCompare(b.name));
-  const showSubscriptionPicker = !row.linked && HAS_SUBSCRIPTION.includes(row.finance.module) && activeSubscriptions.length > 0;
   const currencyMismatch = row.linked && !!otherCurrency && !!financeCurrency && otherCurrency !== financeCurrency;
   const direction = DIRECTION_LABELS[row.finance.module];
   // See `DIRECTION_LABELS`'s own doc comment on `creditCard` — a linked
@@ -254,16 +228,62 @@ function TxRowFields({
       <SideFields
         label="Finance"
         cfg={row.finance}
+        allowSubscriptions
+        subscriptionMode={row.subscriptionMode}
+        subscriptionId={row.subscriptionId}
+        onSubscriptionChange={(subscriptionId, finance) => {
+          if (!finance) return;
+          onChange({
+            ...row,
+            finance,
+            subscriptionMode: true,
+            subscriptionId,
+            linked: false,
+            direction: 'out',
+            timezone: defaultTimezoneForCurrency(useSideCurrencyStatic(finance)),
+            toAmount: undefined,
+            toAmountTouched: false,
+          });
+        }}
         onChange={(finance) =>
           onChange({
             ...row,
             finance,
+            subscriptionMode: false,
+            subscriptionId: '',
             timezone: defaultTimezoneForCurrency(useSideCurrencyStatic(finance)),
             toAmount: undefined,
             toAmountTouched: false,
           })
         }
       />
+
+      <div className="row gap-sm mt-sm" style={{ alignItems: 'flex-end' }}>
+        <Field label="Amount" required title={!showDirection ? 'A repayment is always entered as a positive amount, regardless of which way the debt runs.' : 'You can type a math expression here too, e.g. 10.5+5 — it evaluates once you leave the field.'}>
+          <AmountInput value={row.amount} onChange={(amount) => onChange({ ...row, amount })} />
+        </Field>
+        {showDirection && (
+          <Field label="Direction">
+            <DirectionChips value={row.direction} onChange={(d) => onChange({ ...row, direction: d })} labels={direction!} />
+          </Field>
+        )}
+      </div>
+
+      <div className="row gap-sm mt-sm">
+        <Field label="Description" required={row.finance.module === 'bank'}>
+          <TextInput
+            value={row.description}
+            onChange={(e) => onChange({ ...row, description: e.target.value })}
+            placeholder="Transfer By Default"
+          />
+        </Field>
+        {HAS_CATEGORY.includes(row.finance.module) && !row.linked && (
+          <Field label="Category">
+            <CategorySelect value={row.categoryID} onChange={(categoryID) => onChange({ ...row, categoryID })} />
+          </Field>
+        )}
+      </div>
+
       <div className="row gap-sm mt-sm">
         <Field label="Date">
           <TextInput
@@ -275,47 +295,6 @@ function TxRowFields({
             }}
           />
         </Field>
-        {showDirection && (
-          <Field label="Direction">
-            <DirectionChips value={row.direction} onChange={(d) => onChange({ ...row, direction: d })} labels={direction!} />
-          </Field>
-        )}
-        <Field label="Amount" required title={!showDirection ? 'A repayment is always entered as a positive amount, regardless of which way the debt runs.' : 'You can type a math expression here too, e.g. 10.5+5 — it evaluates once you leave the field.'}>
-          <AmountInput value={row.amount} onChange={(amount) => onChange({ ...row, amount })} />
-        </Field>
-        {HAS_DESCRIPTION.includes(row.finance.module) && (
-          // Bank's own `submit()` case actually enforces this (toasts if
-          // left blank) — a credit card row doesn't (it defaults to
-          // "Charge"/"Payment" instead, same as before this field existed
-          // for it), so only Bank shows it as `required` — the asterisk
-          // should never claim a stronger constraint than `submit()` really
-          // checks.
-          <Field label="Description" required={row.finance.module === 'bank'}>
-            <TextInput
-              value={row.description}
-              onChange={(e) => onChange({ ...row, description: e.target.value })}
-              placeholder={row.finance.module === 'creditCard' ? 'e.g. Grocery run (optional — defaults to Charge/Payment)' : 'e.g. Rent, Grocery run'}
-            />
-          </Field>
-        )}
-        {HAS_CATEGORY.includes(row.finance.module) && !row.linked && (
-          <Field label="Category">
-            <CategorySelect value={row.categoryID} onChange={(categoryID) => onChange({ ...row, categoryID })} />
-          </Field>
-        )}
-        {showSubscriptionPicker && (
-          <Field label="Subscription (optional)" title="Marks this as paying a specific subscription — moves that subscription's own billing anchor to this transaction's date once saved.">
-            <Select value={row.subscriptionId} onChange={(e) => onChange({ ...row, subscriptionId: e.target.value })}>
-              <option value="">— None —</option>
-              {activeSubscriptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </Select>
-          </Field>
-        )}
-        {HAS_NOTE.includes(row.finance.module) && (
-          <Field label="Note (optional)">
-            <TextInput value={row.note} onChange={(e) => onChange({ ...row, note: e.target.value })} />
-          </Field>
-        )}
         <TimeZoneFields
           time={row.time}
           timezone={row.timezone}
@@ -323,29 +302,26 @@ function TxRowFields({
           onTimezoneChange={(timezone) => onChange({ ...row, timezone })}
         />
       </div>
-      <div className="mt-sm">
-        <ToggleChip
-          checked={row.linked}
-          onChange={(linked) => {
-            // Same "remember the last used source" convenience every other
-            // linking entry point already has — prefills, never forces.
-            const remembered = linked ? getLastTransferSource(row.finance) : undefined;
-            onChange({ ...row, linked, other: remembered ?? row.other, toAmount: undefined, toAmountTouched: false });
-          }}
-          label="Link to another finance (a transfer between two accounts)"
-          title={HAS_CATEGORY.includes(row.finance.module) ? 'A linked transfer is always categorized as Transfer on this side — the Category picker above is hidden while this is checked, not silently ignored.' : undefined}
-        />
-      </div>
-      {!row.linked && HAS_PENDING.includes(row.finance.module) && (
-        <div className="mt-sm">
-          <PendingToggle
-            checked={row.pending}
-            onChange={(v) => onChange({ ...row, pending: v })}
-            label="Pending (not yet cleared)"
-            title="Money already sent/placed but not yet reflected or filled — excluded from the current balance until you mark it cleared."
+
+      <div className="row gap-sm mt-sm" style={{ alignItems: 'flex-end' }}>
+        <Field label="Link to another finance">
+          <YesNoChips
+            value={row.linked}
+            disableYes={row.subscriptionMode}
+            title={row.subscriptionMode ? 'Subscription payments use the subscription\'s configured Paid via finance and are not two-sided transfer links.' : undefined}
+            onChange={(linked) => {
+              const remembered = linked ? getLastTransferSource(row.finance) : undefined;
+              const rememberedIsUsable = remembered && (!linkSideRequiresRef(remembered) || !!remembered.ref);
+              onChange({ ...row, linked, other: rememberedIsUsable ? remembered : row.other, toAmount: undefined, toAmountTouched: false });
+            }}
           />
-        </div>
-      )}
+        </Field>
+        {HAS_PENDING.includes(row.finance.module) && !row.linked && (
+          <Field label="Pending transaction">
+            <YesNoChips value={row.pending} onChange={(pending) => onChange({ ...row, pending })} />
+          </Field>
+        )}
+      </div>
       {row.linked && (
         <div className="mt-sm">
           <SideFields
@@ -438,6 +414,8 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
   const addFundsTransfer = useFundsWorkbookStore((s) => s.addTransfer);
   const addCreditCardTransaction = useCreditCardWorkbookStore((s) => s.addTransaction);
   const updateSubscription = useSubscriptionsWorkbookStore((s) => s.updateEntry);
+  const bankAccounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
+  const transferDefaultDescription = useAppearanceStore((s) => s.appearance.transferDefaultDescription ?? 'Transfer By Default');
 
   // User-reported (2026-09-14): "Cash Statements/tables are under wrong
   // currencies" — root cause: a caller opening this modal with NO
@@ -457,13 +435,20 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
     ? (defaultFinance.module === 'cash' && !defaultFinance.currencyCode ? { ...defaultFinance, currencyCode: cashDefaultCurrency } : defaultFinance)
     : { module: 'cash', currencyCode: cashDefaultCurrency };
 
-  const [rows, setRows] = useState<TxRow[]>(() => [emptyRow(0, resolvedDefaultFinance, resolvedDefaultFinance.currencyCode)]);
+  const resolvedDefaultCurrency = resolvedDefaultFinance.currencyCode
+    ?? (resolvedDefaultFinance.module === 'bank'
+      ? bankAccounts.find((account) => account.id === resolvedDefaultFinance.ref)?.currencyCode
+      : undefined);
+
+  const [rows, setRows] = useState<TxRow[]>(() => [
+    emptyRow(0, resolvedDefaultFinance, defaultLinkedOtherSide(resolvedDefaultFinance, bankAccounts, cashDefaultCurrency), transferDefaultDescription, resolvedDefaultCurrency),
+  ]);
   const [nextKey, setNextKey] = useState(1);
 
   const updateRow = (key: number, patch: TxRow) => setRows((rs) => rs.map((r) => (r.key === key ? patch : r)));
   const removeRow = (key: number) => setRows((rs) => rs.filter((r) => r.key !== key));
   const addRow = () => {
-    setRows((rs) => [...rs, emptyRow(nextKey, resolvedDefaultFinance, resolvedDefaultFinance.currencyCode)]);
+    setRows((rs) => [...rs, emptyRow(nextKey, resolvedDefaultFinance, defaultLinkedOtherSide(resolvedDefaultFinance, bankAccounts, cashDefaultCurrency), transferDefaultDescription, resolvedDefaultCurrency)]);
     setNextKey((k) => k + 1);
   };
 
@@ -472,6 +457,8 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
     if (!valid.length) return toast('Enter an amount on at least one row.');
     for (const r of valid) {
       if (r.linked) {
+        if (linkSideRequiresRef(r.finance) && !r.finance.ref) return toast('Pick the account/entity for the first finance side.');
+        if (linkSideRequiresRef(r.other) && !r.other.ref) return toast('Pick the account/entity for the linked finance side.');
         const sameEntity = r.finance.module === r.other.module && !!r.finance.ref && r.finance.ref === r.other.ref;
         if (sameEntity) return toast('One row links a finance to itself — pick a different account.');
         if (!isSupportedLinkPair(r.finance.module, r.other.module) || !isSupportedLinkPair(r.other.module, r.finance.module)) {
@@ -486,8 +473,10 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
     for (const r of valid) {
       if (r.linked) {
         const abs = Math.abs(r.amount);
-        const emiLoan = r.other.module === 'emi' ? emiLoans.find((l) => l.id === r.other.ref) : undefined;
-        const resolvedOther = emiLoan ? { ...r.other, emiMonth: nextUnpaidEmiMonth(emiLoan) } : r.other;
+        const financeEmiLoan = r.finance.module === 'emi' ? emiLoans.find((loan) => loan.id === r.finance.ref) : undefined;
+        const otherEmiLoan = r.other.module === 'emi' ? emiLoans.find((loan) => loan.id === r.other.ref) : undefined;
+        const resolvedFinance = financeEmiLoan ? { ...r.finance, emiMonth: nextUnpaidEmiMonth(financeEmiLoan) } : r.finance;
+        const resolvedOther = otherEmiLoan ? { ...r.other, emiMonth: nextUnpaidEmiMonth(otherEmiLoan) } : r.other;
         // `r.amount` is always the FINANCE side's own amount; `r.toAmount`
         // (when set — a cross-currency link) is always the OTHER side's —
         // `from`/`to` below swap which is which based on direction, so
@@ -500,9 +489,9 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
           date: r.date,
           fromAmount: r.direction === 'out' ? financeAmount : otherAmount,
           toAmount: r.direction === 'out' ? otherAmount : financeAmount,
-          from: r.direction === 'out' ? r.finance : resolvedOther,
-          to: r.direction === 'out' ? resolvedOther : r.finance,
-          note: r.note.trim() || r.description.trim() || undefined,
+          from: r.direction === 'out' ? resolvedFinance : resolvedOther,
+          to: r.direction === 'out' ? resolvedOther : resolvedFinance,
+          note: r.description.trim() || undefined,
           rateSource: r.rateSource.trim() || undefined,
         });
         if ('error' in result) {
@@ -539,7 +528,7 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
             // `buildSideRecord` fallback — `resolvedDefaultFinance` above
             // already guarantees a real currency by the time a row exists.
             currencyCode: r.finance.currencyCode || cashDefaultCurrency,
-            categoryID: r.categoryID, note: r.note.trim() || undefined, source: 'manual',
+            categoryID: r.categoryID, title: r.description.trim() || undefined, source: 'manual',
             isPending: r.pending || undefined,
           });
           break;
@@ -548,7 +537,7 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
           addRentalEntry({
             id: uid(), propertyId: r.finance.ref, date: r.date, time: r.time, timezone: r.timezone,
             isDeposit: r.direction === 'in', amount: Math.abs(r.amount),
-            categoryID: r.categoryID, note: r.note.trim() || undefined,
+            categoryID: r.categoryID, title: r.description.trim() || undefined,
             isPending: r.pending || undefined,
           });
           break;
@@ -556,24 +545,24 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
           if (!r.finance.ref) { toast('Pick a loan first.'); continue; }
           addPersonalLoanRepayment({
             id: uid(), loanId: r.finance.ref, date: r.date, time: r.time, timezone: r.timezone,
-            amount: Math.abs(r.amount), isPending: r.pending || undefined,
+            amount: Math.abs(r.amount), description: r.description.trim() || undefined, isPending: r.pending || undefined,
           });
           break;
         case 'emi': {
           if (!r.finance.ref) { toast('Pick a loan first.'); continue; }
           const loan = emiLoans.find((l) => l.id === r.finance.ref);
           if (!loan) { toast('Pick a loan first.'); continue; }
-          addEMIRepayment({ id: uid(), loanId: r.finance.ref, month: nextUnpaidEmiMonth(loan), amount: Math.abs(r.amount), date: r.date, source: 'manual' });
+          addEMIRepayment({ id: uid(), loanId: r.finance.ref, month: nextUnpaidEmiMonth(loan), amount: Math.abs(r.amount), date: r.date, description: r.description.trim() || undefined, source: 'manual' });
           break;
         }
         case 'qse':
-          addQSETransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: 0 });
+          addQSETransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: 0, description: r.description.trim() || undefined });
           break;
         case 'psx':
-          addPSXTransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: 0 });
+          addPSXTransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: 0, description: r.description.trim() || undefined });
           break;
         case 'funds':
-          addFundsTransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: 0 });
+          addFundsTransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: 0, description: r.description.trim() || undefined });
           break;
         case 'creditCard': {
           // User-reported (2026-09-14): "no choice of expense or payment,
@@ -597,11 +586,11 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
         }
       }
       plainCount++;
-      // See `HAS_SUBSCRIPTION`'s own doc comment — this transaction just
+      // A transaction entered through the Subscriptions finance choice just
       // saved successfully (we only get here past every case's own
       // validation `continue`), so it's safe to move the subscription's
       // billing anchor to match.
-      if (r.subscriptionId && HAS_SUBSCRIPTION.includes(r.finance.module)) {
+      if (r.subscriptionMode && r.subscriptionId) {
         updateSubscription(r.subscriptionId, { startDate: r.date });
       }
     }

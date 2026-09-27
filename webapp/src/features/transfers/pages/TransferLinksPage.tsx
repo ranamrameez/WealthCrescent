@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal } from '../../../components/Modal';
 import { PlusIcon } from '../../../components/icons';
 import { Field, Select } from '../../../components/ui/Field';
@@ -18,6 +18,7 @@ import { useFundsWorkbookStore } from '../../../store/fundsWorkbookStore';
 import { usePersonalLoansWorkbookStore } from '../../../store/personalLoansWorkbookStore';
 import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
 import { useRentalsWorkbookStore } from '../../../store/rentalsWorkbookStore';
+import { useSubscriptionsWorkbookStore } from '../../../store/subscriptionsWorkbookStore';
 import { useWorkbookStore } from '../../../store/workbookStore';
 import type { EMILoan } from '../../../types/emiWorkbook';
 import { LINK_MODULES, LINK_MODULE_LABELS, type LinkModule, type LinkSideConfig } from '../../../types/interEntityTransfer';
@@ -213,12 +214,32 @@ const REF_PICKER_LABELS: Partial<Record<LinkModule, string>> = {
  * actually matches it, so a same-currency transfer is the default unless
  * the user deliberately picks otherwise. Only ever passed for the "Other
  * finance" side — Account 1 has nothing to lean toward, it's the anchor. */
-export function SideFields({ label, cfg, onChange, preferredCurrency }: { label: string; cfg: LinkSideConfig; onChange: (cfg: LinkSideConfig) => void; preferredCurrency?: string }) {
+export function SideFields({
+  label,
+  cfg,
+  onChange,
+  preferredCurrency,
+  allowSubscriptions = false,
+  subscriptionMode = false,
+  subscriptionId = '',
+  onSubscriptionChange,
+}: {
+  label: string;
+  cfg: LinkSideConfig;
+  onChange: (cfg: LinkSideConfig) => void;
+  preferredCurrency?: string;
+  allowSubscriptions?: boolean;
+  subscriptionMode?: boolean;
+  subscriptionId?: string;
+  onSubscriptionChange?: (subscriptionId: string, finance?: LinkSideConfig) => void;
+}) {
   const bankAccounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
   const properties = useRentalsWorkbookStore((s) => s.workbook.settings.properties);
   const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const emiLoans = useEMIWorkbookStore((s) => s.workbook.entries);
   const creditCards = useCreditCardWorkbookStore((s) => s.workbook.cards);
+  const subscriptions = useSubscriptionsWorkbookStore((s) => s.workbook.entries);
+  const activeSubscriptions = subscriptions.filter((subscription) => subscription.active && subscription.paidVia);
   const cashCurrency = useCashWorkbookStore((s) => s.workbook.settings.defaultCurrency);
   const fundsCurrency = useFundsWorkbookStore((s) => s.workbook.settings.defaultCurrency);
   const currency = useSideCurrency(cfg);
@@ -246,12 +267,43 @@ export function SideFields({ label, cfg, onChange, preferredCurrency }: { label:
   const filteredEntities = cfg.currencyCode ? entities.filter((e) => e.currencyCode === cfg.currencyCode) : entities;
   const refLabel = REF_PICKER_LABELS[cfg.module];
 
+  const sideForSubscription = (id: string): LinkSideConfig | null => {
+    const subscription = activeSubscriptions.find((item) => item.id === id);
+    if (!subscription?.paidVia) return null;
+    if (subscription.paidVia.module === 'cash') {
+      return { module: 'cash', currencyCode: subscription.currencyCode || cashCurrency };
+    }
+    if (!subscription.paidVia.ref) return null;
+    if (subscription.paidVia.module === 'bank') {
+      const account = bankAccounts.find((item) => item.id === subscription.paidVia?.ref);
+      return account ? { module: 'bank', ref: account.id, currencyCode: account.currencyCode } : null;
+    }
+    const card = creditCards.find((item) => item.id === subscription.paidVia?.ref);
+    return card ? { module: 'creditCard', ref: card.id, currencyCode: card.currencyCode } : null;
+  };
+
+  useEffect(() => {
+    if (subscriptionMode || !hasRefPicker) return;
+    const candidates = filteredEntities.length ? filteredEntities : entities;
+    if (!candidates.length || candidates.some((entity) => entity.id === cfg.ref)) return;
+    const first = candidates[0];
+    onChange({ ...cfg, ref: first.id, currencyCode: first.currencyCode });
+  }, [subscriptionMode, hasRefPicker, cfg, entities, filteredEntities, onChange]);
+
   return (
     <div className="row gap-sm">
       <Field label={label}>
         <Select
-          value={cfg.module}
+          value={subscriptionMode ? '__subscription__' : cfg.module}
           onChange={(e) => {
+            if (e.target.value === '__subscription__') {
+              const first = activeSubscriptions[0];
+              if (!first) return;
+              const side = sideForSubscription(first.id);
+              if (!side) return;
+              onSubscriptionChange?.(first.id, side);
+              return;
+            }
             const module = e.target.value as LinkModule;
             const list = entitiesForModule(module);
             // Prefer an entity matching `preferredCurrency` (Account 1's own
@@ -271,9 +323,24 @@ export function SideFields({ label, cfg, onChange, preferredCurrency }: { label:
           }}
         >
           {LINK_MODULES.map((m) => <option key={m} value={m}>{LINK_MODULE_LABELS[m]}</option>)}
+          {allowSubscriptions && <option value="__subscription__" disabled={!activeSubscriptions.length}>Subscriptions</option>}
         </Select>
       </Field>
-      {hasRefPicker && (
+      {subscriptionMode && (
+        <Field label="Subscription">
+          <Select
+            value={subscriptionId}
+            onChange={(e) => {
+              const side = sideForSubscription(e.target.value);
+              if (!side) return;
+              onSubscriptionChange?.(e.target.value, side);
+            }}
+          >
+            {activeSubscriptions.map((subscription) => <option key={subscription.id} value={subscription.id}>{subscription.name}</option>)}
+          </Select>
+        </Field>
+      )}
+      {!subscriptionMode && hasRefPicker && (
         <>
           <Field label="Currency">
             <CurrencyChips
@@ -341,7 +408,7 @@ export function SideFields({ label, cfg, onChange, preferredCurrency }: { label:
          — this is also what fixes `buildSideRecord`'s own currencyCode
          actually being populated instead of falling back to a hardcoded
          'USD' (see that function's own comment). */}
-      {(cfg.module === 'cash' || cfg.module === 'funds') && (
+      {!subscriptionMode && (cfg.module === 'cash' || cfg.module === 'funds') && (
         <Field label="Currency">
           <CurrencyChips
             value={cfg.currencyCode ?? (cfg.module === 'cash' ? cashCurrency : fundsCurrency)}
@@ -349,28 +416,28 @@ export function SideFields({ label, cfg, onChange, preferredCurrency }: { label:
           />
         </Field>
       )}
-      {currency && !hasRefPicker && cfg.module !== 'cash' && cfg.module !== 'funds' && <span className="text-muted">{currency}</span>}
-      {addOpen && cfg.module === 'bank' && (
+      {!subscriptionMode && currency && !hasRefPicker && cfg.module !== 'cash' && cfg.module !== 'funds' && <span className="text-muted">{currency}</span>}
+      {!subscriptionMode && addOpen && cfg.module === 'bank' && (
         <Modal title="Add a missing account" onClose={() => setAddOpen(false)}>
           <AddAccountForm initialCurrency={cfg.currencyCode} onSaved={(id) => { onChange({ ...cfg, ref: id }); setAddOpen(false); }} />
         </Modal>
       )}
-      {addOpen && cfg.module === 'rentals' && (
+      {!subscriptionMode && addOpen && cfg.module === 'rentals' && (
         <Modal title="Add a missing property" onClose={() => setAddOpen(false)}>
           <AddPropertyForm initialCurrency={cfg.currencyCode} onSaved={(id) => { onChange({ ...cfg, ref: id }); setAddOpen(false); }} />
         </Modal>
       )}
-      {addOpen && cfg.module === 'personalLoans' && (
+      {!subscriptionMode && addOpen && cfg.module === 'personalLoans' && (
         <Modal title="Add a missing loan" onClose={() => setAddOpen(false)}>
           <AddPersonalLoanForm initialCurrency={cfg.currencyCode} onSaved={(id) => { onChange({ ...cfg, ref: id }); setAddOpen(false); }} />
         </Modal>
       )}
-      {addOpen && cfg.module === 'emi' && (
+      {!subscriptionMode && addOpen && cfg.module === 'emi' && (
         <Modal title="Add a missing loan" onClose={() => setAddOpen(false)}>
           <AddEMILoanForm initialCurrency={cfg.currencyCode} onSaved={(id) => { onChange({ ...cfg, ref: id }); setAddOpen(false); }} />
         </Modal>
       )}
-      {addOpen && cfg.module === 'creditCard' && (
+      {!subscriptionMode && addOpen && cfg.module === 'creditCard' && (
         <Modal title="Add a missing credit card" onClose={() => setAddOpen(false)}>
           <AddCreditCardForm initialCurrency={cfg.currencyCode} onSaved={(id) => { onChange({ ...cfg, ref: id }); setAddOpen(false); }} />
         </Modal>

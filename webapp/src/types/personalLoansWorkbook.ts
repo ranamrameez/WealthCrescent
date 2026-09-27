@@ -47,6 +47,8 @@ export interface PersonalLoanRepayment {
   /** IANA timezone the `date`+`time` are in; defaults to UTC when absent. */
   timezone?: string;
   amount: number;
+  /** Optional description entered through the centralized Transfers popup. */
+  description?: string;
   /** 'statement-import' added 2026-08-23 (README item 25 / MODULES_PLAN.md
    * §13's CSV-import scope) — same "transaction doesn't care about its
    * source" shape as Bank/Cash/Rentals. Unset (implicitly manual) for

@@ -12,6 +12,7 @@ export const DEFAULT_APPEARANCE: Appearance = {
   density: 'comfortable',
   numberDisplay: 'compact',
   dateFormat: 'DD-MMM-YYYY',
+  transferDefaultDescription: 'Transfer By Default',
 };
 
 const DATE_FORMATS = new Set([

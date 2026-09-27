@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildLinkedRecords, isSupportedLinkPair } from '../interEntityLink';
+import { buildLinkedRecords, defaultLinkedOtherSide, isSupportedLinkPair, linkSideRequiresRef } from '../interEntityLink';
 import type { InterEntityTransferInput } from '../../types/interEntityTransfer';
 
 const ids = { linkId: 'link-1', fromRecordId: 'from-1', toRecordId: 'to-1' };
@@ -322,5 +322,44 @@ describe('isSupportedLinkPair', () => {
     expect(isSupportedLinkPair('cash', 'cash')).toBe(false);
     expect(isSupportedLinkPair('qse', 'funds')).toBe(false);
     expect(isSupportedLinkPair('rentals', 'funds')).toBe(false);
+  });
+});
+
+describe('linked transfer side defaults', () => {
+  const accounts = [
+    { id: 'usd-1', currencyCode: 'USD', isActive: true },
+    { id: 'usd-2', currencyCode: 'USD', isActive: true },
+    { id: 'pkr-1', currencyCode: 'PKR', isActive: true },
+  ];
+
+  it('chooses a real different bank account in the same currency', () => {
+    expect(defaultLinkedOtherSide({ module: 'bank', ref: 'usd-1' }, accounts, 'QAR')).toEqual({
+      module: 'bank',
+      ref: 'usd-2',
+      currencyCode: 'USD',
+    });
+  });
+
+  it('falls back to Cash when no different bank account exists', () => {
+    expect(defaultLinkedOtherSide(
+      { module: 'bank', ref: 'usd-1' },
+      [{ id: 'usd-1', currencyCode: 'USD', isActive: true }],
+      'QAR',
+    )).toEqual({ module: 'cash', currencyCode: 'USD' });
+  });
+
+  it('prefers a bank account matching a non-bank finance currency', () => {
+    expect(defaultLinkedOtherSide({ module: 'cash', currencyCode: 'PKR' }, accounts, 'QAR')).toEqual({
+      module: 'bank',
+      ref: 'pkr-1',
+      currencyCode: 'PKR',
+    });
+  });
+
+  it('knows which linked sides require a concrete entity id', () => {
+    expect(linkSideRequiresRef({ module: 'bank' })).toBe(true);
+    expect(linkSideRequiresRef({ module: 'creditCard' })).toBe(true);
+    expect(linkSideRequiresRef({ module: 'cash', currencyCode: 'USD' })).toBe(false);
+    expect(linkSideRequiresRef({ module: 'funds', currencyCode: 'USD' })).toBe(false);
   });
 });

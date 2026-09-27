@@ -39,3 +39,15 @@ it('normalizes invalid theme updates before saving', async () => {
   useAppearanceStore.getState().update({ colorTheme: 'wine' });
   expect(JSON.parse(localStorage.getItem(key)!)).toMatchObject({ colorTheme: 'ocean' });
 });
+
+it('defaults and persists the centralized transfer description', async () => {
+  const { useAppearanceStore } = await import('../appearanceStore');
+  expect(useAppearanceStore.getState().appearance.transferDefaultDescription).toBe('Transfer By Default');
+
+  useAppearanceStore.getState().update({ transferDefaultDescription: 'Internal transfer' });
+  expect(JSON.parse(localStorage.getItem(key)!)).toMatchObject({ transferDefaultDescription: 'Internal transfer' });
+
+  vi.resetModules();
+  const reloaded = await import('../appearanceStore');
+  expect(reloaded.useAppearanceStore.getState().appearance.transferDefaultDescription).toBe('Internal transfer');
+});
