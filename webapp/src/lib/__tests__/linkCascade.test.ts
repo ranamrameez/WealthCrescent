@@ -238,6 +238,31 @@ describe('propagateLinkedEdit', () => {
     expect(useInterEntityTransfersStore.getState().workbook.entries[0]).toMatchObject({ fromAmount: 250, toAmount: 250, date: '2026-02-01' });
   });
 
+  it('flips the linked peer to the opposite direction when a both-sides edit changes direction', () => {
+    const created = createLinkedTransfer(cashToBankInput);
+    if (!('link' in created)) throw new Error('expected success');
+
+    const cashRecordId = created.link.fromRecordId;
+    const bankRecordId = created.link.toRecordId;
+
+    // The native Cash edit is saved first, exactly like CashPage does.
+    useCashWorkbookStore.getState().updateEntry(cashRecordId, { isDeposit: true });
+
+    const result = propagateLinkedEdit('cash', cashRecordId, { direction: 'in', amount: 100 });
+    expect(result.error).toBeUndefined();
+
+    // Cash is now money-in, so Banking must become money-out — never the
+    // same direction on both sides.
+    expect(useCashWorkbookStore.getState().workbook.entries[0].isDeposit).toBe(true);
+    expect(useBankWorkbookStore.getState().workbook.transactions[0].amount).toBe(-100);
+
+    const updatedLink = useInterEntityTransfersStore.getState().workbook.entries[0];
+    expect(updatedLink.from).toMatchObject({ module: 'bank', ref: bankAccountId });
+    expect(updatedLink.to).toMatchObject({ module: 'cash', currencyCode: 'USD' });
+    expect(updatedLink.fromRecordId).toBe(bankRecordId);
+    expect(updatedLink.toRecordId).toBe(cashRecordId);
+  });
+
   it('leaves the other side\'s own amount untouched when the currencies differ, and says so', () => {
     useBankWorkbookStore.getState().setWorkbook({
       ...useBankWorkbookStore.getState().workbook,
