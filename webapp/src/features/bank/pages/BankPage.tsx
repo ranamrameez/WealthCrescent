@@ -150,24 +150,13 @@ function IbanLookupFields({ value, onChange, onBankNameFound }: { value: IbanLoo
   );
 }
 
-/** The ONE place an account's bank identity lives — replaces what used to
- * be two disconnected controls (a `Bank`-entity `<Select>`, only shown once
- * at least one Bank existed, and a free-text "Bank name" field IBAN lookup
- * also wrote to). A single type-to-search field: typing an EXISTING bank's
- * name (case-insensitively) links to that real `Bank` entity; typing a new
- * name creates one on blur — "still able to add new Bank in this easy
- * way," per the user's own wording — rather than a fixed enum. Suggestions
- * are the user's own existing banks plus `bankDirectory.ts`'s prefilled
- * Pakistani/Qatari banks FILTERED BY THE ACCOUNT'S OWN CURRENCY ("list
- * banks by currency"). Deliberately not a live bank-lookup API call (the
- * user's own suggested implementation) — this app's locked design
- * decision is no live third-party API calls from a page load/user action;
- * the bundled directory plus the user's own already-created Bank entities
- * serves the same "don't make the user type it from scratch" goal without
- * one. `bankName` (the old free-text field) is kept ONLY as a read fallback
- * for accounts that predate this — for anything typed here going forward,
- * `bankId` is authoritative and `bankName` is cleared. */
-function BankIdentityField({ value, onChange }: { value: Pick<BankAccount, 'bankId' | 'bankName' | 'currencyCode'>; onChange: (patch: Partial<BankAccount>) => void; idSuffix: string }) {
+/** The ONE place an account's Bank-entity link is chosen. New Bank
+ * creation deliberately does not happen here: Banks are added/edited
+ * through the shared Banking popup so full name, notes, and custom color
+ * are captured consistently. `bankName` remains only as a read fallback
+ * for older accounts that predate Bank entities; `bankId` is authoritative
+ * once an existing Bank is selected. */
+function BankIdentityField({ value, onChange }: { value: Pick<BankAccount, 'bankId' | 'bankName' | 'currencyCode'>; onChange: (patch: Partial<BankAccount>) => void }) {
   const banks = useBankWorkbookStore((s) => s.workbook.settings.banks ?? []);
   const visibleBanks = useMemo(() => banks.filter((bank) => bank.isActive !== false), [banks]);
 
@@ -317,7 +306,7 @@ function AccountFormFields({
          Select shown only once a Bank existed, and it's typing-to-create
          so "no bank yet" costs nothing extra. */}
       <div className="row gap-sm mb-sm">
-        <BankIdentityField value={value} onChange={onChange} idSuffix={idSuffix} />
+        <BankIdentityField value={value} onChange={onChange} />
       </div>
       <div className="row gap-sm">
         <Field label="Nickname" width={120} required title="A short account label used in cards and selectors (maximum 11 characters).">
