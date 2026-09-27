@@ -2,7 +2,7 @@ import type { User } from 'firebase/auth';
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bar, Line } from 'react-chartjs-2';
-import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
+import { Card, EntityCard, MoneyValue } from '../../../components/Card';
 import { StandardPageSections, type StandardPageSection } from '../../../components/StandardPageSections';
 import { SummaryChip, type StandardCardAction } from '../../../components/StandardCard';
 import { AttributeList } from '../../../components/ui/AttributeList';
