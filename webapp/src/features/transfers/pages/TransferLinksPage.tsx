@@ -274,11 +274,12 @@ export function SideFields({
       return { module: 'cash', currencyCode: subscription.currencyCode || cashCurrency };
     }
     if (!subscription.paidVia.ref) return null;
-    return {
-      module: subscription.paidVia.module,
-      ref: subscription.paidVia.ref,
-      currencyCode: subscription.currencyCode,
-    };
+    if (subscription.paidVia.module === 'bank') {
+      const account = bankAccounts.find((item) => item.id === subscription.paidVia?.ref);
+      return account ? { module: 'bank', ref: account.id, currencyCode: account.currencyCode } : null;
+    }
+    const card = creditCards.find((item) => item.id === subscription.paidVia?.ref);
+    return card ? { module: 'creditCard', ref: card.id, currencyCode: card.currencyCode } : null;
   };
 
   useEffect(() => {
@@ -320,7 +321,7 @@ export function SideFields({
           }}
         >
           {LINK_MODULES.map((m) => <option key={m} value={m}>{LINK_MODULE_LABELS[m]}</option>)}
-          {allowSubscriptions && <option value="__subscription__">Subscriptions</option>}
+          {allowSubscriptions && <option value="__subscription__" disabled={!activeSubscriptions.length}>Subscriptions</option>}
         </Select>
       </Field>
       {subscriptionMode && (
