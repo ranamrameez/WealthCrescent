@@ -2147,8 +2147,7 @@ function AnalyticsTab({ bankId, filters }: { bankId?: string; filters: BankingFi
     () => (account ? budgetVsActual(transactions, [account.id], budgets ?? {}, thisMonth, categoryList) : []),
     [account, transactions, budgets, thisMonth, categoryList],
   );
-  const [newBudgetCategory, setNewBudgetCategory] = useState('');
-  const [newBudgetAmount, setNewBudgetAmount] = useState(0);
+  const [budgetEditor, setBudgetEditor] = useState<{ category: string; amount: number; originalCategory?: string } | null>(null);
 
   if (!account) return <p className="text-muted">Add a bank account first to see analytics.</p>;
 
@@ -2169,36 +2168,41 @@ function AnalyticsTab({ bankId, filters }: { bankId?: string; filters: BankingFi
         </p>
         <div>
           <table>
-            <thead><tr><th>Category</th><th>Budget</th><th>Actual</th><th>Remaining</th></tr></thead>
+            <thead><tr><th>Category</th><th>Budget</th><th>Actual</th><th>Remaining</th><th></th></tr></thead>
             <tbody>
               {budgetRows.map((row) => (
                 <tr key={row.category}>
                   <td>{row.category}</td>
-                  <td><input type="number" step="0.01" className="price-input w-96" defaultValue={row.budget || ''} placeholder="—" onKeyDown={async (event) => {
-                    if (event.key !== 'Enter') return;
-                    const value = parseFloat((event.target as HTMLInputElement).value) || 0;
-                    if (await ensureSignedIn('Sign in to save a budget target.')) setBudget(row.category, value);
-                    (event.target as HTMLInputElement).blur();
-                  }} /></td>
+                  <td>{row.budget > 0 ? fmtMoney(row.budget, account.currencyCode) : '—'}</td>
                   <td className={row.budget > 0 && row.actual > row.budget ? 'pill-negative' : ''}>{fmtMoney(row.actual, account.currencyCode)}</td>
                   <td className={row.budget > 0 ? (row.budget - row.actual >= 0 ? 'pill-positive' : 'pill-negative') : ''}>{row.budget > 0 ? fmtMoney(row.budget - row.actual, account.currencyCode) : '—'}</td>
+                  <td><IconButton label="Edit budget" icon={<EditIcon size={13} />} align="right" onClick={() => setBudgetEditor({ category: row.category, amount: row.budget, originalCategory: row.category })} /></td>
                 </tr>
               ))}
-              {!budgetRows.length && <tr><td colSpan={4} className="text-muted">No spend or budget targets for this account yet.</td></tr>}
+              {!budgetRows.length && <tr><td colSpan={5} className="text-muted">No spend or budget targets for this account yet.</td></tr>}
             </tbody>
           </table>
         </div>
-        <div className="row gap-sm mt-sm">
-          <TextInput placeholder="New category" value={newBudgetCategory} onChange={(e) => setNewBudgetCategory(e.target.value)} className="w-140" />
-          <input type="number" step="0.01" placeholder="Monthly target" value={newBudgetAmount || ''} onChange={(e) => setNewBudgetAmount(Number(e.target.value))} className="w-120" />
-          <button className="btn secondary small" onClick={async () => {
-            if (!newBudgetCategory.trim() || !newBudgetAmount) return toast('Enter a category name and a target amount.');
-            if (!(await ensureSignedIn('Sign in to save a budget target.'))) return;
-            setBudget(newBudgetCategory.trim(), newBudgetAmount);
-            setNewBudgetCategory('');
-            setNewBudgetAmount(0);
-          }}><PlusIcon size={12} />Add budget category</button>
-        </div>
+        <button className="btn secondary small mt-sm" onClick={() => setBudgetEditor({ category: '', amount: 0 })}><PlusIcon size={12} />Add budget category</button>
+        {budgetEditor && (
+          <Modal title={budgetEditor.originalCategory ? 'Edit budget target' : 'Add budget target'} onClose={() => setBudgetEditor(null)}>
+            <div className="row gap-sm">
+              <Field label="Category" required><TextInput value={budgetEditor.category} onChange={(event) => setBudgetEditor({ ...budgetEditor, category: event.target.value })} /></Field>
+              <Field label="Monthly target" required><TextInput type="number" step="0.01" min={0} value={budgetEditor.amount || ''} onChange={(event) => setBudgetEditor({ ...budgetEditor, amount: Number(event.target.value) })} /></Field>
+            </div>
+            <div className="d-flex justify-center mt-md">
+              <button className="btn" onClick={async () => {
+                const category = budgetEditor.category.trim();
+                if (!category || budgetEditor.amount <= 0) return toast('Enter a category and target.');
+                if (!(await ensureSignedIn('Sign in to save a budget target.'))) return;
+                if (budgetEditor.originalCategory && budgetEditor.originalCategory !== category) setBudget(budgetEditor.originalCategory, 0);
+                setBudget(category, budgetEditor.amount);
+                setBudgetEditor(null);
+                toast('Budget target saved.');
+              }}><SaveIcon size={13} />Save budget</button>
+            </div>
+          </Modal>
+        )}
       </CollapsibleCard>
     </div>
   );
