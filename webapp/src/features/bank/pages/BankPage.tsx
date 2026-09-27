@@ -14,7 +14,7 @@ import { Tooltip } from '../../../components/Tooltip';
 import { ChartCard } from '../../qse/components/ChartCard';
 import { AnalyticsChartEnhancer } from '../../../components/AnalyticsChartCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
-import { ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, BankIcon, CheckIcon, EditIcon, ListIcon, PlusIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
+import { ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, BankIcon, CheckIcon, EditIcon, ListIcon, PlusIcon, SaveIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { StandardButton } from '../../../components/standard';
 import { Modal } from '../../../components/Modal';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
@@ -24,7 +24,7 @@ import { PendingToggle } from '../../../components/ui/PendingToggle';
 import { DirectionChips } from '../../../components/ui/DirectionChips';
 import { IconButton } from '../../../components/ui/IconButton';
 import { AttributeList } from '../../../components/ui/AttributeList';
-import { FabButton, FabPanel } from '../../../components/ui/Fab';
+import { FabPanel } from '../../../components/ui/Fab';
 import { TransactionEntryModal } from '../../../components/TransactionEntryModal';
 import { CategorySelect } from '../../../components/CategorySelect';
 import { FinanceEditModal } from '../../../components/FinanceEditModal';
@@ -69,7 +69,6 @@ import { useInterEntityTransfersStore } from '../../../store/interEntityTransfer
 import { linkTargetPath, useLinkSideLabel } from '../../transfers/pages/TransferLinksPage';
 import { CreditCardsTab } from './CreditCardsSection';
 import type { Bank, BankAccount, BankTransaction } from '../../../types/bankWorkbook';
-import type { CreditCard } from '../../../types/creditCard';
 import type { PlannedBankTransaction } from '../../../types/plannedBank';
 import { gridAutoStyle } from '../../../lib/gridStyle';
 
