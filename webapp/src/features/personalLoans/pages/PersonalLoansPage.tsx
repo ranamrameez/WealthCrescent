@@ -528,7 +528,7 @@ function RepaymentsSection({
  * modules, a repayment's amount has no direction to derive from a sign —
  * it's always a positive amount against the loan — so there's no
  * "Flip sign" checkbox here, just Date + Amount (absolute value). */
-function ImportRepaymentsSection({ loan }: { loan: PersonalLoan }) {
+function ImportRepaymentsSection({ loan, onClose }: { loan: PersonalLoan; onClose: () => void }) {
   const addRepayments = usePersonalLoansWorkbookStore((s) => s.addRepayments);
   const ensureSignedIn = useEnsureSignedIn();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -584,11 +584,11 @@ function ImportRepaymentsSection({ loan }: { loan: PersonalLoan }) {
     setHeaders([]);
     setRows([]);
     setFileName('');
+    onClose();
   };
 
   return (
-    <Card className="mt-12">
-      <h4 className="mt-0">Import payments (CSV)</h4>
+    <Modal title="Import payments (CSV)" onClose={onClose} widthClass="50">
       <p className="text-muted mb-12">
         Import a CSV export of payments against this loan. This is a simple "map these columns" tool —
         pick which column is which below; every payment is recorded as a positive amount regardless of
@@ -643,7 +643,7 @@ function ImportRepaymentsSection({ loan }: { loan: PersonalLoan }) {
           </button>
         </div>
       )}
-    </Card>
+    </Modal>
   );
 }
 
@@ -722,6 +722,24 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
   const [editLoanOpen, setEditLoanOpen] = useState(false);
   const [editPayment, setEditPayment] = useState<PersonalLoanRepayment | null>(null);
   const [addPaymentOpen, setAddPaymentOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [paymentFilters, setPaymentFilters] = useState<PersonalLoanPaymentFilters>({
+    fromDate: '',
+    toDate: '',
+    source: 'all',
+    categoryID: 'all',
+  });
+  const categories = useCategoryStore((s) => s.workbook.categories);
+  const filteredPayments = useMemo(
+    () => repayments.filter((payment) => {
+      if (paymentFilters.fromDate && payment.date < paymentFilters.fromDate) return false;
+      if (paymentFilters.toDate && payment.date > paymentFilters.toDate) return false;
+      if (paymentFilters.source !== 'all' && (payment.source ?? 'manual') !== paymentFilters.source) return false;
+      if (paymentFilters.categoryID !== 'all' && payment.categoryID !== paymentFilters.categoryID) return false;
+      return true;
+    }),
+    [repayments, paymentFilters],
+  );
 
   const toggleArchived = async () => {
     if (!(await ensureSignedIn(loan.isActive === false ? 'Sign in to reopen this loan.' : 'Sign in to close this loan.'))) return;
@@ -734,6 +752,40 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
     if (!(await ensureSignedIn('Sign in to delete this loan.'))) return;
     deleteLoan(loan.id);
     onBack();
+  };
+
+  usePageTopBarRightSlot(
+    <TopBarControls>
+      <PersonalLoanPaymentFilterMenu
+        value={paymentFilters}
+        categories={categories}
+        onChange={(patch) => setPaymentFilters((current) => ({ ...current, ...patch }))}
+        onClear={() => setPaymentFilters({ fromDate: '', toDate: '', source: 'all', categoryID: 'all' })}
+      />
+    </TopBarControls>,
+  );
+
+  const exportPayments = () => {
+    const remaining = repaymentRunningOutstanding(loan, repayments);
+    const header = ['Date', 'Description', 'Amount', 'Category', 'Remaining', 'Source'];
+    const body = [...filteredPayments]
+      .sort((a, b) => a.date.localeCompare(b.date) || (a.seq ?? 0) - (b.seq ?? 0))
+      .map((payment) => [
+        payment.date,
+        payment.description ?? '',
+        payment.amount,
+        categoryName(payment.categoryID, categories),
+        remaining.get(payment.id) ?? 0,
+        payment.source === 'statement-import' ? `Import${payment.statementRef ? ` (${payment.statementRef})` : ''}` : 'Manual',
+      ]);
+    const blob = new Blob([toCSV([header, ...body])], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${loan.person.replace(/\s+/g, '_')}_payments.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    toast('Payments exported.');
   };
 
   const summaryActions: StandardCardAction[] = [
@@ -788,7 +840,12 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
       key: 'payments',
       label: 'Payments',
       defaultOpen: true,
-      content: <RepaymentsSection loan={loan} onEditPayment={setEditPayment} />,
+      summary: <SummaryChip label="Filtered" value={filteredPayments.length} />,
+      actions: [
+        { label: 'Export filtered payments', disabled: !filteredPayments.length, onClick: exportPayments },
+        { label: 'Import payments', onClick: () => setImportOpen(true) },
+      ],
+      content: <RepaymentsSection loan={loan} filters={paymentFilters} onEditPayment={setEditPayment} />,
     },
     {
       key: 'analytics',
@@ -825,6 +882,7 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
           onClose={() => setEditPayment(null)}
         />
       )}
+      {importOpen && <ImportRepaymentsSection loan={loan} onClose={() => setImportOpen(false)} />}
     </div>
   );
 }
