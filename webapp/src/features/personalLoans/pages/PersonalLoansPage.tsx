@@ -328,6 +328,12 @@ function LoanForm({
         <Field label="Amount" width={130} required title="The original amount exchanged between you and this person.">
           <TextInput type="number" step="0.01" min={0} value={draft.principal || ''} onChange={(e) => setDraft({ ...draft, principal: Number(e.target.value) })} />
         </Field>
+        <Field label="Card color (optional)" width={150}>
+          <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+            <input type="color" value={draft.color || '#5aa9c9'} onChange={(e) => setDraft({ ...draft, color: e.target.value })} style={{ width: 44, height: 32, padding: 2, minWidth: 0 }} />
+            {draft.color && <button type="button" className="btn secondary small" onClick={() => setDraft({ ...draft, color: undefined })}>Reset</button>}
+          </div>
+        </Field>
       </div>
       <div className="row gap-sm mt-sm">
         <Field label="Date">
@@ -809,6 +815,7 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
     {
       key: 'summary',
       label: 'Summary',
+      hue: loan.color,
       defaultOpen: true,
       actions: summaryActions,
       content: (
@@ -841,6 +848,7 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
     {
       key: 'payments',
       label: 'Payments',
+      hue: loan.color,
       defaultOpen: true,
       summary: <SummaryChip label="Filtered" value={filteredPayments.length} />,
       actions: [
@@ -852,6 +860,7 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
     {
       key: 'analytics',
       label: 'Analytics',
+      hue: loan.color,
       content: (
         <div>
           <LoanBalanceChart loan={loan} repayments={repayments} />
@@ -939,7 +948,7 @@ function LoanList({
             badge={loan.isActive === false ? <span className="pill-warn fs-10">Closed</span> : undefined}
             statLabel="Outstanding"
             stat={<MoneyValue n={outstanding} currency={loan.currencyCode} />}
-            hue={loan.direction === 'owed_to_me' ? 'var(--profit)' : 'var(--loss)'}
+            hue={loan.color ?? (loan.direction === 'owed_to_me' ? 'var(--profit)' : 'var(--loss)')}
             onClick={() => onSelect(loan)}
           />
         );
