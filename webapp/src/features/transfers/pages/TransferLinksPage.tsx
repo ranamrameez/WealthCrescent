@@ -291,8 +291,8 @@ export function SideFields({
   }, [subscriptionMode, hasRefPicker, cfg, entities, filteredEntities, onChange]);
 
   return (
-    <div className="row gap-sm">
-      <Field label={label}>
+    <div className="row gap-sm" style={{ alignItems: 'flex-end', flexWrap: 'nowrap', overflowX: 'auto' }}>
+      <Field label={label} width={150}>
         <Select
           value={subscriptionMode ? '__subscription__' : cfg.module}
           onChange={(e) => {
@@ -327,7 +327,7 @@ export function SideFields({
         </Select>
       </Field>
       {subscriptionMode && (
-        <Field label="Subscription">
+        <Field label="Subscription" width={190}>
           <Select
             value={subscriptionId}
             onChange={(e) => {
@@ -342,7 +342,7 @@ export function SideFields({
       )}
       {!subscriptionMode && hasRefPicker && (
         <>
-          <Field label="Currency">
+          <Field label="Currency" width={210}>
             <CurrencyChips
               // User-reported (2026-09-07): restoring a remembered account
               // (which sets `cfg.ref` directly, without going through this
@@ -384,7 +384,7 @@ export function SideFields({
              separate `min-width:160px` floor is a hard floor that wins
              over a smaller explicit `width` regardless; only overriding
              BOTH together actually shrinks the rendered element. */}
-          <Field label={refLabel}>
+          <Field label={refLabel} width={190}>
             <div className="row" style={{ gap: 4, alignItems: 'center' }}>
               <Select value={cfg.ref ?? ''} onChange={(e) => onChange({ ...cfg, ref: e.target.value })} width={110} style={{ minWidth: 110 }}>
                 {!filteredEntities.length && <option value="">None in this currency</option>}
@@ -409,7 +409,7 @@ export function SideFields({
          actually being populated instead of falling back to a hardcoded
          'USD' (see that function's own comment). */}
       {!subscriptionMode && (cfg.module === 'cash' || cfg.module === 'funds') && (
-        <Field label="Currency">
+        <Field label="Currency" width={210}>
           <CurrencyChips
             value={cfg.currencyCode ?? (cfg.module === 'cash' ? cashCurrency : fundsCurrency)}
             onChange={(code) => onChange({ ...cfg, currencyCode: code })}
