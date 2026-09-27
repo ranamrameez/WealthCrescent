@@ -362,6 +362,12 @@ function AccountFormFields({
         <Field label="Opening balance (optional)" width={140}>
           <TextInput type="number" step="0.01" value={value.openingBalance || ''} onChange={(e) => onChange({ openingBalance: Number(e.target.value) })} />
         </Field>
+        <Field label="Card color (optional)" width={150} title="Choose a custom color for this account's cards.">
+          <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+            <input type="color" value={value.color || '#5aa9c9'} onChange={(e) => onChange({ color: e.target.value })} style={{ width: 44, height: 32, padding: 2, minWidth: 0 }} />
+            {value.color && <button type="button" className="btn secondary small" onClick={() => onChange({ color: undefined })}>Reset</button>}
+          </div>
+        </Field>
       </div>
       {/* README item 82: branch/account-type, free-form (not a fixed enum) —
          ACCOUNT_TYPES is just a datalist of common suggestions, any value is
@@ -966,6 +972,7 @@ export function AccountDetailPage() {
     cardNetwork: value?.cardNetwork,
     cardBin: value?.cardBin,
     bankId: value?.bankId,
+    color: value?.color,
   });
   const [meta, setMeta] = useState<Omit<BankAccount, 'id'>>(() => accountToFormValue(account));
   const [editingMeta, setEditingMeta] = useState(false);
