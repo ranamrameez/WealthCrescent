@@ -968,6 +968,14 @@ export function AccountDetailPage() {
   const [meta, setMeta] = useState<Omit<BankAccount, 'id'>>(() => accountToFormValue(account));
   const [editingMeta, setEditingMeta] = useState(false);
   const [showTransactionActions, setShowTransactionActions] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+    setShowScrollTop(false);
+    const onScroll = () => setShowScrollTop(window.scrollY > 360);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [id, search]);
   const [addingPlan, setAddingPlan] = useState(false);
 
   const allLedger = useMemo(() => account ? accountRunningLedger(account, transactions, true) : [], [account, transactions]);
@@ -1242,6 +1250,7 @@ export function AccountDetailPage() {
         <AddBankPlanForm accountId={account.id} onSaved={() => setAddingPlan(false)} />
       </Modal>}
       <AccountTransfersFab accountId={account.id} currencyCode={account.currencyCode} fromDate={filters.fromDate} toDate={filters.toDate} />
+      {showScrollTop && <button type="button" className="scroll-top-button" aria-label="Scroll to top" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}><ArrowUpIcon size={16} /></button>}
     </div>
   );
 }
