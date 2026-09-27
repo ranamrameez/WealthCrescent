@@ -12,7 +12,7 @@ import { Modal } from '../../../components/Modal';
 import { Notice } from '../../../components/Notice';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { hueStyle } from '../../../lib/statCardHues';
-import { ArchiveIcon, CheckIcon, EditIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon } from '../../../components/icons';
+import { ArchiveIcon, CheckIcon, EditIcon, FilterIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon } from '../../../components/icons';
 import { toast } from '../../../components/Toast';
 import { Tooltip } from '../../../components/Tooltip';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
@@ -59,6 +59,69 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 function emptyLoan(defaultCurrency: string): PersonalLoan {
   return { id: '', person: '', direction: 'owed_to_me', currencyCode: defaultCurrency, principal: 0, date: today(), note: '' };
+}
+
+type PersonalLoanPaymentFilters = {
+  fromDate: string;
+  toDate: string;
+  source: 'all' | 'manual' | 'statement-import';
+  categoryID: string;
+};
+
+function PersonalLoanPaymentFilterMenu({
+  value,
+  categories,
+  onChange,
+  onClear,
+}: {
+  value: PersonalLoanPaymentFilters;
+  categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories'];
+  onChange: (patch: Partial<PersonalLoanPaymentFilters>) => void;
+  onClear: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const activeCount =
+    (value.fromDate ? 1 : 0)
+    + (value.toDate ? 1 : 0)
+    + (value.source !== 'all' ? 1 : 0)
+    + (value.categoryID !== 'all' ? 1 : 0);
+
+  return (
+    <>
+      <button type="button" className="btn secondary small topbar-filter-btn" onClick={() => setOpen(true)}>
+        <FilterIcon size={14} /> Filters{activeCount ? ` (${activeCount})` : ''}
+      </button>
+      {open && (
+        <Modal title="Payment filters" onClose={() => setOpen(false)} widthClass="50">
+          <div className="filter-fields-grid">
+            <Field label="From">
+              <TextInput type="date" value={value.fromDate} max={value.toDate || undefined} onChange={(e) => onChange({ fromDate: e.target.value })} />
+            </Field>
+            <Field label="To">
+              <TextInput type="date" value={value.toDate} min={value.fromDate || undefined} onChange={(e) => onChange({ toDate: e.target.value })} />
+            </Field>
+            <Field label="Category">
+              <Select value={value.categoryID} onChange={(e) => onChange({ categoryID: e.target.value })}>
+                <option value="all">All categories</option>
+                {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+              </Select>
+            </Field>
+            <Field label="Source">
+              <Select value={value.source} onChange={(e) => onChange({ source: e.target.value as PersonalLoanPaymentFilters['source'] })}>
+                <option value="all">All</option>
+                <option value="manual">Manual</option>
+                <option value="statement-import">Imported</option>
+              </Select>
+            </Field>
+          </div>
+          <div className="modal-footer-actions">
+            <button type="button" className="btn secondary small" onClick={onClear}>Reset</button>
+            <button type="button" className="btn small" onClick={() => setOpen(false)}>Done</button>
+          </div>
+        </Modal>
+      )}
+    </>
+  );
 }
 
 function NetPositionSummary() {
