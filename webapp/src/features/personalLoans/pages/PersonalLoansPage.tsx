@@ -130,6 +130,7 @@ function PersonalLoanPaymentFilterMenu({
 function NetPositionSummary() {
   const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const repayments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
+  const plans = usePersonalLoansWorkbookStore((s) => s.workbook.plans ?? []);
   const net = netPositionByCurrency(loans, repayments);
   const pending = netPendingByCurrency(loans, repayments);
   const codes = Object.keys(net);
@@ -911,6 +912,7 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
   const [editLoanOpen, setEditLoanOpen] = useState(false);
   const [editPayment, setEditPayment] = useState<PersonalLoanRepayment | null>(null);
   const [addPaymentOpen, setAddPaymentOpen] = useState(false);
+  const [addPlanOpen, setAddPlanOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [paymentFilters, setPaymentFilters] = useState<PersonalLoanPaymentFilters>({
     fromDate: '',
@@ -921,6 +923,7 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
   const categories = useCategoryStore((s) => s.workbook.categories);
   const filteredPayments = useMemo(
     () => repayments.filter((payment) => {
+      if (payment.loanId !== loan.id) return false;
       if (paymentFilters.fromDate && payment.date < paymentFilters.fromDate) return false;
       if (paymentFilters.toDate && payment.date > paymentFilters.toDate) return false;
       if (paymentFilters.source !== 'all' && (payment.source ?? 'manual') !== paymentFilters.source) return false;
@@ -1010,11 +1013,11 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
             { label: 'Note', value: loan.note },
           ]} />
           <div className="grid-auto mt-md" style={gridAutoStyle(160, 8)}>
-            <div className="stat-card card" style={hueStyle('var(--accent)')}>
+            <div className="stat-card card" style={hueStyle(loan.color ?? 'var(--accent)')}>
               <div className="label">Amount</div>
               <MoneyValue n={loan.principal} currency={loan.currencyCode} />
             </div>
-            <div className="stat-card card" style={hueStyle(loan.direction === 'owed_to_me' ? 'var(--profit)' : 'var(--loss)')}>
+            <div className="stat-card card" style={hueStyle(loan.color ?? (loan.direction === 'owed_to_me' ? 'var(--profit)' : 'var(--loss)'))}>
               <div className="label">Outstanding</div>
               <MoneyValue n={outstanding} currency={loan.currencyCode} />
               {pendingImpact !== 0 && (
@@ -1026,6 +1029,29 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
           </div>
         </div>
       ),
+    },
+    {
+      key: 'details',
+      label: 'Loan details',
+      hue: loan.color,
+      content: (
+        <AttributeList items={[
+          { label: 'Person', value: loan.person },
+          { label: 'Loan type', value: loan.direction === 'owed_to_me' ? 'I lent money' : 'I borrowed money' },
+          { label: 'Currency', value: loan.currencyCode },
+          { label: 'Amount', value: fmtMoney(loan.principal, loan.currencyCode) },
+          { label: 'Date', value: loan.date },
+          { label: 'Note', value: loan.note },
+          { label: 'Status', value: loan.isActive === false ? 'Closed' : 'Active' },
+          { label: 'Favorite', value: loan.isFavorite ? 'Yes' : 'No' },
+        ]} />
+      ),
+    },
+    {
+      key: 'plans',
+      label: 'Plans',
+      hue: loan.color,
+      content: <PersonalLoanPlansSection loan={loan} />,
     },
     {
       key: 'payments',
@@ -1045,7 +1071,13 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
       hue: loan.color,
       content: (
         <div>
-          <LoanBalanceChart loan={loan} repayments={repayments} />
+          <PersonalLoanAnalyticsSection
+            loan={loan}
+            payments={repayments.filter((payment) => payment.loanId === loan.id)}
+            plans={plans.filter((plan) => plan.loanId === loan.id)}
+            fromDate={paymentFilters.fromDate}
+            toDate={paymentFilters.toDate}
+          />
           <PayoffPlanner loan={loan} outstanding={outstanding} />
         </div>
       ),
@@ -1056,7 +1088,10 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
     <div className="standard-page">
       <button className="btn secondary small mb-12" onClick={onBack}>← All personal loans</button>
       <StandardPageSections sections={sections} defaultKey="summary" />
-      <FabPanel actions={[{ label: 'Add payment', icon: <TransferIcon />, onClick: () => setAddPaymentOpen(true) }]} />
+      <FabPanel actions={[
+        { label: 'Add payment', icon: <TransferIcon />, onClick: () => setAddPaymentOpen(true) },
+        { label: 'Add a plan', icon: <PlusIcon />, onClick: () => setAddPlanOpen(true) },
+      ]} />
       {editLoanOpen && (
         <Modal title="Edit loan" onClose={() => setEditLoanOpen(false)}>
           <LoanForm loan={loan} onSaved={() => setEditLoanOpen(false)} />
@@ -1068,6 +1103,7 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
           onClose={() => setAddPaymentOpen(false)}
         />
       )}
+      {addPlanOpen && <Modal title="Add a plan" onClose={() => setAddPlanOpen(false)}><PersonalLoanPlanForm loan={loan} onSaved={() => setAddPlanOpen(false)} /></Modal>}
       {editPayment && (
         <TransactionEntryModal
           defaultFinance={{ module: 'personalLoans', ref: loan.id, currencyCode: loan.currencyCode }}
