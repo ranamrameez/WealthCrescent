@@ -12,6 +12,7 @@ import { getLastTransferSource, rememberTransferSource } from '../hooks/useLastT
 import { CategorySelect } from './CategorySelect';
 import { UNCATEGORIZED_ID } from '../lib/categories';
 import { defaultTimeForDate, defaultTimezoneForCurrency, nowTime } from '../lib/datetime';
+import { loanDirectionForTransfer, transferDirectionForLoan } from '../lib/calc/personalLoansModule';
 import { convertAmount, loadCachedFxRates } from '../lib/fx';
 import { useEnsureSignedIn } from '../lib/firebase/useEnsureSignedIn';
 import { defaultLinkedOtherSide, isSupportedLinkPair, linkSideRequiresRef } from '../lib/interEntityLink';
@@ -77,6 +78,7 @@ const DIRECTION_LABELS: Partial<Record<LinkModule, { in: string; out: string }>>
   psx: { in: 'Deposit', out: 'Withdrawal' },
   funds: { in: 'Deposit', out: 'Withdrawal' },
   creditCard: { in: 'Payment', out: 'Charge' },
+  personalLoans: { in: 'Borrow', out: 'Lent' },
 };
 const HAS_CATEGORY: LinkModule[] = ['bank', 'cash', 'rentals', 'creditCard'];
 /** Bank has no `Finance.title` — its own pre-existing `description` field
@@ -196,6 +198,7 @@ function TxRowFields({
   onRemove: () => void;
   canRemove: boolean;
 }) {
+  const personalLoans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const otherCurrency = useSideCurrency(row.other);
   const financeCurrency = useSideCurrency(row.finance);
   const currencyMismatch = row.linked && !!otherCurrency && !!financeCurrency && otherCurrency !== financeCurrency;
@@ -245,17 +248,21 @@ function TxRowFields({
             toAmountTouched: false,
           });
         }}
-        onChange={(finance) =>
+        onChange={(finance) => {
+          const selectedLoan = finance.module === 'personalLoans'
+            ? personalLoans.find((loan) => loan.id === finance.ref)
+            : undefined;
           onChange({
             ...row,
             finance,
             subscriptionMode: false,
             subscriptionId: '',
+            direction: selectedLoan ? transferDirectionForLoan(selectedLoan.direction) : row.direction,
             timezone: defaultTimezoneForCurrency(useSideCurrencyStatic(finance)),
             toAmount: undefined,
             toAmountTouched: false,
-          })
-        }
+          });
+        }}
       />
 
       <div className="row gap-sm mt-sm" style={{ alignItems: 'flex-end' }}>
@@ -263,8 +270,44 @@ function TxRowFields({
           <AmountInput value={row.amount} onChange={(amount) => onChange({ ...row, amount })} />
         </Field>
         {showDirection && (
-          <Field label="Direction">
-            <DirectionChips value={row.direction} onChange={(d) => onChange({ ...row, direction: d })} labels={direction!} />
+          <Field label={row.finance.module === 'personalLoans' ? 'Loan type' : 'Direction'}>
+            <DirectionChips
+              value={row.direction}
+              onChange={(d) => {
+                if (row.finance.module !== 'personalLoans') {
+                  onChange({ ...row, direction: d });
+                  return;
+                }
+                const wantedDirection = loanDirectionForTransfer(d);
+                const current = personalLoans.find((loan) => loan.id === row.finance.ref);
+                if (current?.direction === wantedDirection) {
+                  onChange({ ...row, direction: d });
+                  return;
+                }
+                const replacement = personalLoans.find((loan) =>
+                  loan.isActive !== false
+                  && loan.direction === wantedDirection
+                  && (!financeCurrency || loan.currencyCode === financeCurrency),
+                ) ?? personalLoans.find((loan) => loan.isActive !== false && loan.direction === wantedDirection);
+                if (!replacement) {
+                  toast(`No active ${d === 'in' ? 'Borrow' : 'Lent'} personal loan exists yet. Add that loan first.`);
+                  return;
+                }
+                onChange({
+                  ...row,
+                  direction: d,
+                  finance: {
+                    module: 'personalLoans',
+                    ref: replacement.id,
+                    currencyCode: replacement.currencyCode,
+                  },
+                  timezone: defaultTimezoneForCurrency(replacement.currencyCode),
+                  toAmount: undefined,
+                  toAmountTouched: false,
+                });
+              }}
+              labels={direction!}
+            />
           </Field>
         )}
       </div>
