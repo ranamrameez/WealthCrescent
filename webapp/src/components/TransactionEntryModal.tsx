@@ -736,8 +736,14 @@ export function TransactionEntryModal({
     onClose();
   };
 
+  const modalTitle = editPersonalLoanPayment
+    ? 'Edit payment'
+    : defaultFinance?.module === 'personalLoans' && defaultFinance.ref
+      ? 'Add payment'
+      : 'Transfers';
+
   return (
-    <Modal title={editPersonalLoanPayment ? "Edit payment" : "Transfers"} onClose={onClose}>
+    <Modal title={modalTitle} onClose={onClose}>
       {rows.map((r) => (
         <TxRowFields
           key={r.key}
