@@ -13,7 +13,7 @@ import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
 import { ChartCard } from '../../qse/components/ChartCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
-import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, EditIcon, ListIcon, PlanningIcon, PlusIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
+import { ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, CheckIcon, EditIcon, ListIcon, PlanningIcon, PlusIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { StandardButton } from '../../../components/standard';
 import { Modal } from '../../../components/Modal';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
