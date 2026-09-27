@@ -27,6 +27,7 @@ function buildSideRecord(
   amount: number,
   direction: 'in' | 'out',
   note: string | undefined,
+  categoryID?: string,
 ): LinkSideRecord {
   switch (cfg.module) {
     case 'cash':
@@ -47,7 +48,7 @@ function buildSideRecord(
           // fixed (README Done item: "Link To always shows USD instead of
           // filling default currency").
           currencyCode: cfg.currencyCode || 'USD',
-          categoryID: TRANSFER_CATEGORY_ID,
+          categoryID: categoryID ?? TRANSFER_CATEGORY_ID,
           title: note,
           source: 'manual',
         },
@@ -66,7 +67,7 @@ function buildSideRecord(
           amount: direction === 'in' ? amount : -amount,
           isDeposit: direction === 'in',
           description: note || 'Linked transfer',
-          categoryID: TRANSFER_CATEGORY_ID,
+          categoryID: categoryID ?? TRANSFER_CATEGORY_ID,
           source: 'manual',
         },
       };
@@ -109,6 +110,7 @@ function buildSideRecord(
           // "normally" here).
           isDeposit: direction !== 'in',
           amount,
+          categoryID,
           title: note,
         },
       };
@@ -121,7 +123,7 @@ function buildSideRecord(
       if (!cfg.ref) throw new Error('Personal Loans side of a linked transfer needs a loan.');
       return {
         module: 'personalLoans',
-        record: { id, loanId: cfg.ref, date, amount, description: note },
+        record: { id, loanId: cfg.ref, date, amount, description: note, categoryID },
       };
     case 'emi':
       // Same "direction doesn't flip the sign" exception as personalLoans
@@ -145,7 +147,7 @@ function buildSideRecord(
       if (!cfg.ref) throw new Error('Credit Cards side of a linked transfer needs a card.');
       return {
         module: 'creditCard',
-        record: { id, cardId: cfg.ref, date, kind: 'payment', amount, description: note || 'Linked payment', source: 'manual' },
+        record: { id, cardId: cfg.ref, date, kind: 'payment', amount, description: note || 'Linked payment', categoryID, source: 'manual' },
       };
   }
 }
@@ -161,8 +163,8 @@ export function buildLinkedRecords(
   input: InterEntityTransferInput,
   ids: { linkId: string; fromRecordId: string; toRecordId: string },
 ): { from: LinkSideRecord; to: LinkSideRecord; link: InterEntityTransfer } {
-  const from = buildSideRecord(input.from, ids.fromRecordId, input.date, input.fromAmount, 'out', input.note);
-  const to = buildSideRecord(input.to, ids.toRecordId, input.date, input.toAmount, 'in', input.note);
+  const from = buildSideRecord(input.from, ids.fromRecordId, input.date, input.fromAmount, 'out', input.note, input.categoryID);
+  const to = buildSideRecord(input.to, ids.toRecordId, input.date, input.toAmount, 'in', input.note, input.categoryID);
   const link: InterEntityTransfer = {
     ...input,
     id: ids.linkId,
