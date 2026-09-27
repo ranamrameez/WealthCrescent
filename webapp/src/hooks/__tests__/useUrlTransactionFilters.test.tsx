@@ -34,3 +34,16 @@ it('preserves explicit end dates and resets to the open-ended default', () => {
   act(() => result.current.resetFilters());
   expect(result.current.filters).toMatchObject({ period: 'since-month', fromDate: '2026-09-01', toDate: '', direction: 'all' });
 });
+
+it('keeps filter and callback references stable across unrelated rerenders', () => {
+  const { result, rerender } = setup('/bank/account/a1?period=custom&from=2026-08-01&to=&section=transactions');
+  const firstFilters = result.current.filters;
+  const firstSetFilters = result.current.setFilters;
+  const firstResetFilters = result.current.resetFilters;
+
+  rerender();
+
+  expect(result.current.filters).toBe(firstFilters);
+  expect(result.current.setFilters).toBe(firstSetFilters);
+  expect(result.current.resetFilters).toBe(firstResetFilters);
+});
