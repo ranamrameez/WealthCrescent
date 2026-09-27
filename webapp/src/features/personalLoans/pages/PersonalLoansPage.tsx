@@ -1,18 +1,20 @@
 import type { User } from 'firebase/auth';
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Bar, Line } from 'react-chartjs-2';
+import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { Card, EntityCard, MoneyValue } from '../../../components/Card';
 import { StandardPageSections, type StandardPageSection } from '../../../components/StandardPageSections';
 import { SummaryChip, type StandardCardAction } from '../../../components/StandardCard';
 import { AttributeList } from '../../../components/ui/AttributeList';
+import { CategorySelect } from '../../../components/CategorySelect';
+import { AnalyticsChartEnhancer } from '../../../components/AnalyticsChartCard';
 import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { Modal } from '../../../components/Modal';
 import { Notice } from '../../../components/Notice';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { hueStyle } from '../../../lib/statCardHues';
-import { ArchiveIcon, CheckIcon, EditIcon, FilterIcon, PersonalLoanIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon } from '../../../components/icons';
+import { ArchiveIcon, CheckIcon, EditIcon, FilterIcon, PersonalLoanIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { toast } from '../../../components/Toast';
 import { Tooltip } from '../../../components/Tooltip';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
@@ -26,24 +28,22 @@ import { usePrimaryCurrency } from '../../../hooks/usePrimaryCurrency';
 import { ReorderButtons } from '../../../components/ui/ReorderButtons';
 import { dateOnlyMs } from '../../../lib/datetime';
 import { parseCSV, toCSV } from '../../../lib/csv';
-import { fmtMoney } from '../../../lib/format';
+import { formatDate, fmtMoney } from '../../../lib/format';
 import { categoryName } from '../../../lib/categories';
 import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
 import {
-  loanBalanceHistory,
   loanCategoryForDirection,
   loanOutstanding,
   loanPendingImpact,
   netPendingByCurrency,
   netPositionByCurrency,
-  outstandingByLoan,
   projectPayoff,
   repaymentRunningOutstanding,
-  repaymentsByMonth,
 } from '../../../lib/calc/personalLoansModule';
-import { dlBarV, dlLine } from '../../../lib/chartLabels';
+import { dlBarV, dlDoughnut } from '../../../lib/chartLabels';
 import { applyChartTheme } from '../../../lib/chartSetup';
-import { cssVar } from '../../../lib/cssVar';
+import { cssVar, tickerColor } from '../../../lib/cssVar';
+import { chartAlpha, chartDepthPlugin } from '../../../lib/chartVisuals';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { firebaseReady } from '../../../lib/firebase/client';
 import { useAppearanceStore } from '../../../store/appearanceStore';
@@ -51,8 +51,7 @@ import { usePersonalLoansWorkbookStore } from '../../../store/personalLoansWorkb
 import { useCategoryStore } from '../../../store/categoryStore';
 import { useInterEntityTransfersStore } from '../../../store/interEntityTransfersStore';
 import { linkTargetPath, useLinkSideLabel } from '../../transfers/pages/TransferLinksPage';
-import type { PersonalLoan, PersonalLoanRepayment } from '../../../types/personalLoansWorkbook';
-import { ChartCard } from '../../qse/components/ChartCard';
+import type { PersonalLoan, PersonalLoanPlan, PersonalLoanRepayment } from '../../../types/personalLoansWorkbook';
 import { gridAutoStyle } from '../../../lib/gridStyle';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -160,69 +159,34 @@ function NetPositionSummary() {
  * person, and a repayment timeline; the "payoff planner" from that same
  * sketch lives inside `LoanDetail` below instead, since it needs one
  * specific loan's outstanding balance to project from. */
-function AnalyticsTab() {
+function AnalyticsTab({ filter }: { filter: 'all' | 'owed_to_me' | 'i_owe' }) {
   const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const repayments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
-  useAppearanceStore((s) => s.appearance);
-  applyChartTheme();
-
-  const currencies = useMemo(() => [...new Set(loans.map((l) => l.currencyCode))].sort(), [loans]);
-  const [currency, setCurrency] = useState(currencies[0] ?? 'USD');
-  const effectiveCurrency = currencies.includes(currency) ? currency : (currencies[0] ?? currency);
-
-  const outstandingRows = useMemo(
-    () => outstandingByLoan(loans, repayments, effectiveCurrency),
-    [loans, repayments, effectiveCurrency],
+  const plans = usePersonalLoansWorkbookStore((s) => s.workbook.plans ?? []);
+  const candidates = useMemo(
+    () => loans.filter((loan) => loan.isActive !== false && (filter === 'all' || loan.direction === filter)),
+    [loans, filter],
   );
-  const monthlyRepayments = useMemo(
-    () => repaymentsByMonth(loans, repayments, effectiveCurrency),
-    [loans, repayments, effectiveCurrency],
-  );
+  const [loanId, setLoanId] = useState('');
+  const selected = candidates.find((loan) => loan.id === loanId) ?? candidates[0];
 
-  if (!currencies.length) {
-    return <p className="text-muted">Add a loan first to see charts here.</p>;
-  }
+  if (!selected) return <p className="text-muted">Add a matching loan first to see analytics.</p>;
 
   return (
     <div>
-      {currencies.length > 1 && (
-        <Field label="Currency" width={120}>
-          <Select value={effectiveCurrency} onChange={(e) => setCurrency(e.target.value)}>
-            {currencies.map((c) => <option key={c} value={c}>{c}</option>)}
+      {candidates.length > 1 && (
+        <Field label="Loan" width={220}>
+          <Select value={selected.id} onChange={(e) => setLoanId(e.target.value)}>
+            {candidates.map((loan) => <option key={loan.id} value={loan.id}>{loan.person} ({loan.currencyCode})</option>)}
           </Select>
         </Field>
       )}
-      <div className="grid-auto" style={{ ...gridAutoStyle(320, 16), marginTop: 12 }}>
-        <ChartCard title="Outstanding by loan" empty={!outstandingRows.length}>
-          <Bar
-            data={{
-              labels: outstandingRows.map((r) => r.person),
-              datasets: [
-                {
-                  data: outstandingRows.map((r) => r.outstanding),
-                  backgroundColor: outstandingRows.map((r) => (r.direction === 'owed_to_me' ? cssVar('--profit') || '#3ecf8e' : cssVar('--loss') || '#e5484d')),
-                },
-              ],
-            }}
-            options={{
-              indexAxis: 'y',
-              plugins: {
-                legend: { display: false },
-                datalabels: dlBarV((v) => fmtMoney(v, effectiveCurrency)),
-                tooltip: { callbacks: { afterLabel: (ctx) => (outstandingRows[ctx.dataIndex].direction === 'owed_to_me' ? 'Owed to you' : 'You owe') } },
-              },
-            }}
-          />
-        </ChartCard>
-        <ChartCard title="Payments by month" empty={!monthlyRepayments.length}>
-          <Bar
-            data={{
-              labels: monthlyRepayments.map((f) => f.month),
-              datasets: [{ label: 'Payments', data: monthlyRepayments.map((f) => f.amount), backgroundColor: '#5aa9c9' }],
-            }}
-            options={{ plugins: { legend: { display: false }, datalabels: dlBarV((v) => fmtMoney(v, effectiveCurrency)) } }}
-          />
-        </ChartCard>
+      <div className="mt-sm">
+        <PersonalLoanAnalyticsSection
+          loan={selected}
+          payments={repayments.filter((payment) => payment.loanId === selected.id)}
+          plans={plans.filter((plan) => plan.loanId === selected.id)}
+        />
       </div>
     </div>
   );
@@ -328,6 +292,12 @@ function LoanForm({
         <Field label="Amount" width={130} required title="The original amount exchanged between you and this person.">
           <TextInput type="number" step="0.01" min={0} value={draft.principal || ''} onChange={(e) => setDraft({ ...draft, principal: Number(e.target.value) })} />
         </Field>
+        <Field label="Card color (optional)" width={150}>
+          <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+            <input type="color" value={draft.color || '#5aa9c9'} onChange={(e) => setDraft({ ...draft, color: e.target.value })} style={{ width: 44, height: 32, padding: 2, minWidth: 0 }} />
+            {draft.color && <button type="button" className="btn secondary small" onClick={() => setDraft({ ...draft, color: undefined })}>Reset</button>}
+          </div>
+        </Field>
       </div>
       <div className="row gap-sm mt-sm">
         <Field label="Date">
@@ -354,10 +324,12 @@ function RepaymentsSection({
   loan,
   filters,
   onEditPayment,
+  showActions,
 }: {
   loan: PersonalLoan;
   filters: PersonalLoanPaymentFilters;
   onEditPayment: (payment: PersonalLoanRepayment) => void;
+  showActions: boolean;
 }) {
   // Select the raw array (a stable reference from the store) and filter it
   // in a memo — filtering *inside* the zustand selector would return a new
@@ -428,7 +400,7 @@ function RepaymentsSection({
                   <tr key={r.id} onClick={() => setDetailRow(r)} className="clickable">
                     <td>
                       {r.date}{' '}
-                      <span onClick={(e) => e.stopPropagation()}>
+                      {showActions && <span onClick={(e) => e.stopPropagation()}>
                         <ReorderButtons
                           rows={sorted}
                           index={i}
@@ -437,7 +409,7 @@ function RepaymentsSection({
                           orderOf={(row) => row.seq}
                           onMove={reorder}
                         />
-                      </span>
+                      </span>}
                     </td>
                     <td>{r.description || '—'}</td>
                     <td>
@@ -463,7 +435,7 @@ function RepaymentsSection({
                       {r.source === 'statement-import' ? `Import${r.statementRef ? ` (${r.statementRef})` : ''}` : 'Manual'}
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
-                      {r.isPending && (
+                      {showActions && r.isPending && (
                         <IconButton
                           label="Mark cleared"
                           icon={<CheckIcon size={13} />}
@@ -474,14 +446,14 @@ function RepaymentsSection({
                             toast('Marked cleared.');
                           }}
                         />
-                      )}{' '}
+                      )}{showActions && <> {' '}
                       <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => onEditPayment(r)} />{' '}
                       <IconButton
                         label="Delete"
                         icon={<TrashIcon size={13} />}
                         align="right"
                         onClick={() => confirmAndDeleteLinkable('personalLoans', r.id, () => deleteRepayment(r.id))}
-                      />
+                      /></>}
                     </td>
                   </tr>
                 );
@@ -657,32 +629,6 @@ function ImportRepaymentsSection({ loan, onClose }: { loan: PersonalLoan; onClos
  * are all scoped across every loan, not this one. A single balance-over-
  * time line is enough to show progress at a glance without duplicating
  * the full repayments table right below it. */
-function LoanBalanceChart({ loan, repayments }: { loan: PersonalLoan; repayments: PersonalLoanRepayment[] }) {
-  useAppearanceStore((s) => s.appearance);
-  applyChartTheme();
-  const history = useMemo(() => loanBalanceHistory(loan, repayments), [loan, repayments]);
-  if (history.length < 2) return null; // nothing to chart until at least one repayment exists
-
-  return (
-    <ChartCard title="Balance over time">
-      <Line
-        data={{
-          labels: history.map((p) => p.date),
-          datasets: [{
-            label: 'Outstanding',
-            data: history.map((p) => p.balance),
-            borderColor: '#5aa9c9',
-            backgroundColor: '#5aa9c933',
-            fill: true,
-            tension: 0.2,
-          }],
-        }}
-        options={{ plugins: { legend: { display: false }, datalabels: dlLine((v) => fmtMoney(v, loan.currencyCode)) } }}
-      />
-    </ChartCard>
-  );
-}
-
 function PayoffPlanner({ loan, outstanding }: { loan: PersonalLoan; outstanding: number }) {
   const [monthly, setMonthly] = useState(0);
   const projection = monthly > 0 ? projectPayoff(outstanding, monthly, today()) : null;
@@ -713,8 +659,191 @@ function PayoffPlanner({ loan, outstanding }: { loan: PersonalLoan; outstanding:
   );
 }
 
+
+function PersonalLoanPlanForm({ loan, onSaved }: { loan: PersonalLoan; onSaved?: () => void }) {
+  const addPlan = usePersonalLoansWorkbookStore((s) => s.addPlan);
+  const ensureSignedIn = useEnsureSignedIn();
+  const [draft, setDraft] = useState<Omit<PersonalLoanPlan, 'id' | 'loanId'>>({
+    date: today(),
+    amount: 0,
+    description: 'Planned payment',
+    categoryID: loanCategoryForDirection(loan.direction),
+    executed: false,
+  });
+
+  const submit = async () => {
+    if (!(draft.amount > 0)) return toast('Enter a planned payment amount.');
+    if (!(await ensureSignedIn('Sign in to save this plan.'))) return;
+    addPlan({ id: crypto.randomUUID(), loanId: loan.id, ...draft });
+    toast('Plan added.');
+    onSaved?.();
+  };
+
+  return (
+    <div>
+      <div className="row gap-sm">
+        <Field label="Amount" required><TextInput type="number" step="0.01" min={0} value={draft.amount || ''} onChange={(e) => setDraft({ ...draft, amount: Number(e.target.value) })} /></Field>
+        <Field label="Description"><TextInput value={draft.description ?? ''} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Field>
+        <Field label="Category"><CategorySelect value={draft.categoryID ?? loanCategoryForDirection(loan.direction)} onChange={(categoryID) => setDraft({ ...draft, categoryID })} /></Field>
+      </div>
+      <div className="row gap-sm mt-sm">
+        <Field label="Date"><TextInput type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} /></Field>
+      </div>
+      <div className="d-flex justify-center mt-md">
+        <button className="btn" onClick={submit}><SaveIcon />Add plan</button>
+      </div>
+    </div>
+  );
+}
+
+function PersonalLoanPlansSection({ loan, showActions }: { loan: PersonalLoan; showActions: boolean }) {
+  const plans = usePersonalLoansWorkbookStore((s) => s.workbook.plans ?? []);
+  const addRepayment = usePersonalLoansWorkbookStore((s) => s.addRepayment);
+  const updatePlan = usePersonalLoansWorkbookStore((s) => s.updatePlan);
+  const deletePlan = usePersonalLoansWorkbookStore((s) => s.deletePlan);
+  const ensureSignedIn = useEnsureSignedIn();
+  const categories = useCategoryStore((s) => s.workbook.categories);
+  const rows = useMemo(
+    () => plans.filter((plan) => plan.loanId === loan.id).sort((a, b) => a.date.localeCompare(b.date)),
+    [plans, loan.id],
+  );
+
+  const execute = async (plan: PersonalLoanPlan) => {
+    if (plan.executed) return;
+    if (!(await ensureSignedIn('Sign in to execute this plan.'))) return;
+    addRepayment({
+      id: crypto.randomUUID(),
+      loanId: loan.id,
+      date: plan.date,
+      amount: plan.amount,
+      description: plan.description ?? 'Planned payment',
+      categoryID: plan.categoryID ?? loanCategoryForDirection(loan.direction),
+      source: 'manual',
+    });
+    updatePlan(plan.id, { executed: true });
+    toast('Plan executed and payment logged.');
+  };
+
+  return (
+    <div>
+      <div className="table-responsive">
+        <table>
+          <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {rows.map((plan) => (
+              <tr key={plan.id}>
+                <td>{plan.date}</td>
+                <td>{plan.description || '—'}</td>
+                <td>{categoryName(plan.categoryID, categories)}</td>
+                <td>{fmtMoney(plan.amount, loan.currencyCode)}</td>
+                <td>{plan.executed ? 'Executed' : 'Planned'}</td>
+                <td>
+                  {showActions && <>
+                    {!plan.executed && <IconButton label="Execute" icon={<CheckIcon size={13} />} align="right" onClick={() => { void execute(plan); }} />}{' '}
+                    <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => deletePlan(plan.id)} />
+                  </>}
+                </td>
+              </tr>
+            ))}
+            {!rows.length && <tr><td colSpan={6} className="text-muted">No plans for this loan yet.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function PersonalLoanAnalyticsSection({
+  loan,
+  payments,
+  plans,
+  fromDate,
+  toDate,
+}: {
+  loan: PersonalLoan;
+  payments: PersonalLoanRepayment[];
+  plans: PersonalLoanPlan[];
+  fromDate?: string;
+  toDate?: string;
+}) {
+  const categories = useCategoryStore((s) => s.workbook.categories);
+  const dateFormat = useAppearanceStore((s) => s.appearance.dateFormat ?? 'DD-MMM-YYYY');
+  useAppearanceStore((s) => s.appearance);
+  applyChartTheme();
+
+  const inPeriod = (date: string) => (!fromDate || date >= fromDate) && (!toDate || date <= toDate);
+  const priorCleared = payments
+    .filter((payment) => !payment.isPending && !!fromDate && payment.date < fromDate)
+    .reduce((sum, payment) => sum + payment.amount, 0);
+  const startingBalance = Math.max(0, loan.principal - priorCleared);
+  const cleared = [...payments].filter((payment) => !payment.isPending && inPeriod(payment.date)).sort((a, b) => a.date.localeCompare(b.date) || (a.seq ?? 0) - (b.seq ?? 0));
+  const pending = payments.filter((payment) => payment.isPending && inPeriod(payment.date));
+  const activePlans = plans.filter((plan) => !plan.executed && inPeriod(plan.date));
+
+  let balance = startingBalance;
+  const ledger = cleared.map((payment) => {
+    balance = Math.max(0, balance - payment.amount);
+    return { payment, balance };
+  });
+  const categoryTotals = Object.entries(cleared.reduce<Record<string, number>>((out, payment) => {
+    const name = categoryName(payment.categoryID, categories);
+    out[name] = (out[name] ?? 0) + payment.amount;
+    return out;
+  }, {})).sort((a, b) => b[1] - a[1]);
+
+  const dates = [...new Set([...cleared.map((p) => p.date), ...pending.map((p) => p.date), ...activePlans.map((p) => p.date)])].sort();
+  const labels = ['Opening', ...dates.map((date) => formatDate(date, dateFormat)), 'Closing'];
+  const actualByDate = dates.map((date) => ledger.filter((row) => row.payment.date <= date).at(-1)?.balance ?? startingBalance);
+  const pendingByDate = dates.map((date) => pending.filter((p) => p.date === date).reduce((sum, p) => sum + p.amount, 0));
+  const plannedByDate = dates.map((date) => activePlans.filter((p) => p.date === date).reduce((sum, p) => sum + p.amount, 0));
+  let expected = startingBalance;
+  const expectedByDate = dates.map((date) => {
+    const actualPaid = cleared.filter((p) => p.date === date).reduce((sum, p) => sum + p.amount, 0);
+    const pendingPaid = pending.filter((p) => p.date === date).reduce((sum, p) => sum + p.amount, 0);
+    const plannedPaid = activePlans.filter((p) => p.date === date).reduce((sum, p) => sum + p.amount, 0);
+    expected = Math.max(0, expected - actualPaid - pendingPaid - plannedPaid);
+    return expected;
+  });
+  const actualChartData = [startingBalance, ...actualByDate, actualByDate.at(-1) ?? startingBalance];
+  const pendingChartData = [0, ...pendingByDate.map((amount) => -amount), 0];
+  const plannedChartData = [0, ...plannedByDate.map((amount) => -amount), 0];
+  const expectedChartData = [startingBalance, ...expectedByDate, expectedByDate.at(-1) ?? startingBalance];
+
+  const months = [...new Set([...cleared.map((p) => p.date.slice(0, 7)), ...pending.map((p) => p.date.slice(0, 7)), ...activePlans.map((p) => p.date.slice(0, 7))])].sort();
+  const deposits = months.map((month) => loan.direction === 'owed_to_me' ? cleared.filter((p) => p.date.startsWith(month)).reduce((sum, p) => sum + p.amount, 0) : 0);
+  const withdrawals = months.map((month) => loan.direction === 'i_owe' ? cleared.filter((p) => p.date.startsWith(month)).reduce((sum, p) => sum + p.amount, 0) : 0);
+  const monthlyActualBalance = months.map((month) => ledger.filter((row) => row.payment.date.slice(0, 7) <= month).at(-1)?.balance ?? startingBalance);
+  const monthlyExpectedAdjustment = months.map((month) => -(
+    pending.filter((p) => p.date.startsWith(month)).reduce((sum, p) => sum + p.amount, 0)
+    + activePlans.filter((p) => p.date.startsWith(month)).reduce((sum, p) => sum + p.amount, 0)
+  ));
+
+  const periodEndActual = ledger.at(-1)?.balance ?? loan.principal;
+  const periodEndPending = pending.reduce((sum, payment) => sum + payment.amount, 0);
+  const periodEndPlanned = activePlans.reduce((sum, plan) => sum + plan.amount, 0);
+  const periodEndExpected = Math.max(0, periodEndActual - periodEndPending - periodEndPlanned);
+
+  if (!cleared.length && !pending.length && !activePlans.length) return <p className="text-muted m-0">No payments or plans match the page filters.</p>;
+
+  const profit = cssVar('--profit') || '#3ecf8e';
+  const loss = cssVar('--loss') || '#e5484d';
+  const gridColor = chartAlpha(cssVar('--border') || '#94a3b8', .28);
+  const axisOptions = { grid: { color: gridColor }, ticks: { color: cssVar('--muted') || '#94a3b8', autoSkip: true, maxTicksLimit: 6, maxRotation: 0 } };
+  const balanceAxis = { ...axisOptions, beginAtZero: true };
+
+  return <div className="analytics-grid">
+    <AnalyticsChartEnhancer />
+    <div className="analytics-chart chart-height-lg"><Tooltip text="Outstanding loan amount after each cleared payment, using the same chart layout as Bank Account."><h4 className="clickable">Balance over time</h4></Tooltip><div className="chart-canvas-wrap"><Line plugins={[chartDepthPlugin]} data={({labels:['Opening', ...ledger.map((row)=>formatDate(row.payment.date,dateFormat)), 'Closing'],datasets:[{type:'bar' as never,label:'Balance columns',data:[startingBalance,...ledger.map((row)=>row.balance),periodEndActual],backgroundColor:chartAlpha('#38bdf8',.18),borderColor:chartAlpha('#38bdf8',.5),borderWidth:1,borderRadius:4},{label:'Balance by transaction',data:[loan.principal,...ledger.map((row)=>row.balance),periodEndActual],borderColor:chartAlpha('#38bdf8',.9),backgroundColor:chartAlpha('#38bdf8',.2),fill:true,tension:.24,pointRadius:0,pointHoverRadius:4},{label:'Start → end balance',data:[startingBalance,...ledger.map(()=>null),periodEndActual],borderColor:chartAlpha('#a78bfa',.95),backgroundColor:'transparent',borderDash:[6,4],borderWidth:2,pointRadius:3,pointHoverRadius:5,spanGaps:true}]} as any)} options={{responsive:true,maintainAspectRatio:false,scales:{x:axisOptions,y:balanceAxis},interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,labels:{filter:(item)=>item.datasetIndex!==0}},tooltip:{enabled:true,filter:(item)=>item.datasetIndex!==0},datalabels:{display:false}}}} /></div></div>
+    <div className="analytics-chart chart-height-lg"><Tooltip text="Payments by month, with actual outstanding and pending/planned expected change."><h4 className="clickable">Net Flows Over Time</h4></Tooltip><div className="chart-canvas-wrap"><Bar plugins={[chartDepthPlugin]} data={({labels:months,datasets:[{label:'Deposits',data:deposits,backgroundColor:chartAlpha(profit,.72),borderColor:chartAlpha(profit,.95),borderWidth:2,borderRadius:6},{label:'Withdrawals',data:withdrawals,backgroundColor:chartAlpha(loss,.72),borderColor:chartAlpha(loss,.95),borderWidth:2,borderRadius:6},{label:'Actual balance',data:monthlyActualBalance,backgroundColor:chartAlpha('#38bdf8',.42),borderColor:chartAlpha('#38bdf8',.85),borderWidth:1,borderRadius:4,stack:'balance'},{label:'Expected balance',data:monthlyExpectedAdjustment,backgroundColor:chartAlpha('#a78bfa',.5),borderColor:chartAlpha('#a78bfa',.9),borderWidth:1,borderRadius:4,stack:'balance'},{type:'line' as never,label:'Actual balance',data:monthlyActualBalance,borderColor:chartAlpha('#38bdf8',.95),backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.2}]} as any)} options={{interaction:{mode:'index',intersect:false},scales:{x:{...axisOptions,stacked:true},y:axisOptions},plugins:{legend:{labels:{filter:(item)=>item.datasetIndex!==2}},tooltip:{filter:(item)=>item.datasetIndex!==2},datalabels:dlBarV((v)=>fmtMoney(v,loan.currencyCode))}}} /></div></div>
+    <div className="analytics-chart"><Tooltip text="Total payment amount grouped by category."><h4 className="clickable">Transactions by category</h4></Tooltip><div className="chart-canvas-wrap"><Doughnut plugins={[chartDepthPlugin]} data={({labels:categoryTotals.map(([name])=>name),datasets:[{label:'Payments',data:categoryTotals.map(([,amount])=>amount),backgroundColor:categoryTotals.map(([name])=>chartAlpha(tickerColor(name),.72)),borderColor:categoryTotals.map(([name])=>chartAlpha(tickerColor(name),.95)),borderWidth:2,hoverOffset:8}]} as any)} options={{responsive:true,maintainAspectRatio:false,cutout:'48%',rotation:-25,plugins:{legend:{display:true,position:'right',labels:{boxWidth:10,padding:8}},datalabels:dlDoughnut((v)=>fmtMoney(v,loan.currencyCode))},layout:{padding:8}}} /></div></div>
+    <div className="analytics-chart"><Tooltip text="Opening outstanding, actual payments, pending payments, plans, and expected outstanding."><h4 className="clickable">Actual vs Expected Balance (Pending &amp; Planned)</h4></Tooltip><div className="chart-canvas-wrap"><Bar plugins={[chartDepthPlugin]} data={({labels,datasets:[{type:'bar' as never,label:'Actual balance',data:actualChartData,backgroundColor:chartAlpha('#38bdf8',.42),borderColor:chartAlpha('#38bdf8',.85),borderWidth:2,borderRadius:6,stack:'balance'},{type:'line' as never,label:'Actual balance',data:actualChartData,borderColor:chartAlpha('#38bdf8',.95),backgroundColor:'transparent',borderWidth:2,pointRadius:0,tension:.2},{type:'line' as never,label:'Pending balance',data:pendingChartData,borderColor:chartAlpha('#f59e0b',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[5,4],pointRadius:0},{type:'line' as never,label:'Planned balance',data:plannedChartData,borderColor:chartAlpha('#22c55e',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[8,3],pointRadius:0},{type:'line' as never,label:'Expected balance',data:expectedChartData,borderColor:chartAlpha('#a78bfa',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[2,3],pointRadius:0}]} as any)} options={{interaction:{mode:'index',intersect:false},scales:{x:{...axisOptions,stacked:true},y:balanceAxis},plugins:{legend:{display:true,labels:{filter:(item)=>item.datasetIndex!==0}},tooltip:{filter:(item)=>item.datasetIndex!==0},datalabels:{display:false}}}} /></div></div>
+    <div className="analytics-chart"><Tooltip text="Actual, pending, planned, and combined expected outstanding at period end."><h4 className="clickable">Period-end balance summary</h4></Tooltip><div className="chart-canvas-wrap"><Doughnut plugins={[chartDepthPlugin]} data={({labels:['Actual','Pending','Planned','Expected'],datasets:[{label:'Period end',data:[Math.abs(periodEndActual),Math.abs(periodEndPending),Math.abs(periodEndPlanned),Math.abs(periodEndExpected)],backgroundColor:['#38bdf8','#f59e0b','#22c55e','#a78bfa'].map((color)=>chartAlpha(color,.72)),borderColor:['#38bdf8','#f59e0b','#22c55e','#a78bfa'],borderWidth:2,hoverOffset:8}]} as any)} options={{responsive:true,maintainAspectRatio:false,cutout:'48%',plugins:{legend:{display:true,position:'right'},tooltip:{callbacks:{label:(item)=>`${item.label}: ${fmtMoney([periodEndActual,periodEndPending,periodEndPlanned,periodEndExpected][item.dataIndex],loan.currencyCode)}`}},datalabels:dlDoughnut((v)=>fmtMoney(v,loan.currencyCode))}}} /></div></div>
+  </div>;
+}
+
 function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; startInEditMode?: boolean }) {
   const repayments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
+  const plans = usePersonalLoansWorkbookStore((s) => s.workbook.plans ?? []);
   const deleteLoan = usePersonalLoansWorkbookStore((s) => s.deleteLoan);
   const updateLoan = usePersonalLoansWorkbookStore((s) => s.updateLoan);
   const ensureSignedIn = useEnsureSignedIn();
@@ -723,6 +852,9 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
   const [editLoanOpen, setEditLoanOpen] = useState(false);
   const [editPayment, setEditPayment] = useState<PersonalLoanRepayment | null>(null);
   const [addPaymentOpen, setAddPaymentOpen] = useState(false);
+  const [addPlanOpen, setAddPlanOpen] = useState(false);
+  const [showPlanActions, setShowPlanActions] = useState(false);
+  const [showPaymentActions, setShowPaymentActions] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [paymentFilters, setPaymentFilters] = useState<PersonalLoanPaymentFilters>({
     fromDate: '',
@@ -733,6 +865,7 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
   const categories = useCategoryStore((s) => s.workbook.categories);
   const filteredPayments = useMemo(
     () => repayments.filter((payment) => {
+      if (payment.loanId !== loan.id) return false;
       if (paymentFilters.fromDate && payment.date < paymentFilters.fromDate) return false;
       if (paymentFilters.toDate && payment.date > paymentFilters.toDate) return false;
       if (paymentFilters.source !== 'all' && (payment.source ?? 'manual') !== paymentFilters.source) return false;
@@ -741,6 +874,19 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
     }),
     [repayments, paymentFilters],
   );
+  const filteredPlans = useMemo(
+    () => plans.filter((plan) =>
+      plan.loanId === loan.id
+      && !plan.executed
+      && (!paymentFilters.fromDate || plan.date >= paymentFilters.fromDate)
+      && (!paymentFilters.toDate || plan.date <= paymentFilters.toDate),
+    ),
+    [plans, loan.id, paymentFilters.fromDate, paymentFilters.toDate],
+  );
+  const actualPaid = filteredPayments.filter((payment) => !payment.isPending).reduce((sum, payment) => sum + payment.amount, 0);
+  const pendingPaid = filteredPayments.filter((payment) => payment.isPending).reduce((sum, payment) => sum + payment.amount, 0);
+  const plannedPaid = filteredPlans.reduce((sum, plan) => sum + plan.amount, 0);
+
 
   const toggleArchived = async () => {
     if (!(await ensureSignedIn(loan.isActive === false ? 'Sign in to reopen this loan.' : 'Sign in to close this loan.'))) return;
@@ -809,52 +955,91 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
     {
       key: 'summary',
       label: 'Summary',
+      hue: loan.color,
       defaultOpen: true,
       actions: summaryActions,
+      summary: <SummaryChip label="Outstanding" value={fmtMoney(outstanding, loan.currencyCode)} />,
       content: (
-        <div>
-          <AttributeList items={[
-            { label: 'Person', value: loan.person },
-            { label: 'Loan type', value: loan.direction === 'owed_to_me' ? 'I lent money' : 'I borrowed money' },
-            { label: 'Currency', value: loan.currencyCode },
-            { label: 'Date', value: loan.date },
-            { label: 'Note', value: loan.note },
-          ]} />
-          <div className="grid-auto mt-md" style={gridAutoStyle(160, 8)}>
-            <div className="stat-card card" style={hueStyle('var(--accent)')}>
-              <div className="label">Amount</div>
-              <MoneyValue n={loan.principal} currency={loan.currencyCode} />
-            </div>
-            <div className="stat-card card" style={hueStyle(loan.direction === 'owed_to_me' ? 'var(--profit)' : 'var(--loss)')}>
-              <div className="label">Outstanding</div>
-              <MoneyValue n={outstanding} currency={loan.currencyCode} />
-              {pendingImpact !== 0 && (
-                <div className="sub">
-                  -{fmtMoney(pendingImpact, loan.currencyCode)} pending → {fmtMoney(Math.max(0, outstanding - pendingImpact), loan.currencyCode)} incl. pending
-                </div>
-              )}
-            </div>
+        <div className="grid-auto" style={gridAutoStyle(170, 8)}>
+          <div className="stat-card card" style={hueStyle(loan.color ?? 'var(--accent)')}>
+            <div className="label">Amount</div>
+            <MoneyValue n={loan.principal} currency={loan.currencyCode} />
+          </div>
+          <div className="stat-card card" style={hueStyle(loan.color ?? (loan.direction === 'owed_to_me' ? 'var(--profit)' : 'var(--loss)'))}>
+            <div className="label">Outstanding</div>
+            <MoneyValue n={outstanding} currency={loan.currencyCode} />
+          </div>
+          <div className="stat-card card" style={hueStyle(loan.color ?? 'var(--accent)')}>
+            <div className="label">Actual payments</div>
+            <MoneyValue n={actualPaid} currency={loan.currencyCode} />
+          </div>
+          <div className="stat-card card" style={hueStyle(loan.color ?? 'var(--accent)')}>
+            <div className="label">Pending payments</div>
+            <MoneyValue n={pendingPaid} currency={loan.currencyCode} />
+            {pendingImpact !== 0 && <div className="sub">Expected outstanding: {fmtMoney(Math.max(0, outstanding - pendingImpact), loan.currencyCode)}</div>}
+          </div>
+          <div className="stat-card card" style={hueStyle(loan.color ?? 'var(--accent)')}>
+            <div className="label">Planned payments</div>
+            <MoneyValue n={plannedPaid} currency={loan.currencyCode} />
           </div>
         </div>
       ),
     },
     {
+      key: 'details',
+      label: 'Loan details',
+      hue: loan.color,
+      content: (
+        <AttributeList items={[
+          { label: 'Person', value: loan.person },
+          { label: 'Loan type', value: loan.direction === 'owed_to_me' ? 'I lent money' : 'I borrowed money' },
+          { label: 'Currency', value: loan.currencyCode },
+          { label: 'Amount', value: fmtMoney(loan.principal, loan.currencyCode) },
+          { label: 'Date', value: loan.date },
+          { label: 'Note', value: loan.note },
+          { label: 'Status', value: loan.isActive === false ? 'Closed' : 'Active' },
+          { label: 'Favorite', value: loan.isFavorite ? 'Yes' : 'No' },
+        ]} />
+      ),
+    },
+    {
+      key: 'plans',
+      label: 'Plans',
+      hue: loan.color,
+      actions: [
+        { label: 'Add a plan', onClick: () => setAddPlanOpen(true) },
+        { label: showPlanActions ? 'Done modifying' : 'Modify', icon: <EditIcon size={14} />, onClick: () => setShowPlanActions((value) => !value) },
+      ],
+      headerEnd: showPlanActions ? <IconButton label="Hide modification options" icon={<XIcon size={13} />} align="right" onClick={() => setShowPlanActions(false)} /> : undefined,
+      content: <PersonalLoanPlansSection loan={loan} showActions={showPlanActions} />,
+    },
+    {
       key: 'payments',
       label: 'Payments',
+      hue: loan.color,
       defaultOpen: true,
       summary: <SummaryChip label="Filtered" value={filteredPayments.length} />,
       actions: [
-        { label: 'Export filtered payments', disabled: !filteredPayments.length, onClick: exportPayments },
         { label: 'Import payments', onClick: () => setImportOpen(true) },
+        { label: 'Export filtered payments', disabled: !filteredPayments.length, onClick: exportPayments },
+        { label: showPaymentActions ? 'Done modifying' : 'Modify', icon: <EditIcon size={14} />, onClick: () => setShowPaymentActions((value) => !value) },
       ],
-      content: <RepaymentsSection loan={loan} filters={paymentFilters} onEditPayment={setEditPayment} />,
+      headerEnd: showPaymentActions ? <IconButton label="Hide modification options" icon={<XIcon size={13} />} align="right" onClick={() => setShowPaymentActions(false)} /> : undefined,
+      content: <RepaymentsSection loan={loan} filters={paymentFilters} onEditPayment={setEditPayment} showActions={showPaymentActions} />,
     },
     {
       key: 'analytics',
       label: 'Analytics',
+      hue: loan.color,
       content: (
         <div>
-          <LoanBalanceChart loan={loan} repayments={repayments} />
+          <PersonalLoanAnalyticsSection
+            loan={loan}
+            payments={repayments.filter((payment) => payment.loanId === loan.id)}
+            plans={plans.filter((plan) => plan.loanId === loan.id)}
+            fromDate={paymentFilters.fromDate}
+            toDate={paymentFilters.toDate}
+          />
           <PayoffPlanner loan={loan} outstanding={outstanding} />
         </div>
       ),
@@ -865,7 +1050,10 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
     <div className="standard-page">
       <button className="btn secondary small mb-12" onClick={onBack}>← All personal loans</button>
       <StandardPageSections sections={sections} defaultKey="summary" />
-      <FabPanel actions={[{ label: 'Add payment', icon: <TransferIcon />, onClick: () => setAddPaymentOpen(true) }]} />
+      <FabPanel actions={[
+        { label: 'Add payment', icon: <TransferIcon />, onClick: () => setAddPaymentOpen(true) },
+        { label: 'Add a plan', icon: <PlusIcon />, onClick: () => setAddPlanOpen(true) },
+      ]} />
       {editLoanOpen && (
         <Modal title="Edit loan" onClose={() => setEditLoanOpen(false)}>
           <LoanForm loan={loan} onSaved={() => setEditLoanOpen(false)} />
@@ -877,6 +1065,7 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
           onClose={() => setAddPaymentOpen(false)}
         />
       )}
+      {addPlanOpen && <Modal title="Add a plan" onClose={() => setAddPlanOpen(false)}><PersonalLoanPlanForm loan={loan} onSaved={() => setAddPlanOpen(false)} /></Modal>}
       {editPayment && (
         <TransactionEntryModal
           defaultFinance={{ module: 'personalLoans', ref: loan.id, currencyCode: loan.currencyCode }}
@@ -939,11 +1128,94 @@ function LoanList({
             badge={loan.isActive === false ? <span className="pill-warn fs-10">Closed</span> : undefined}
             statLabel="Outstanding"
             stat={<MoneyValue n={outstanding} currency={loan.currencyCode} />}
-            hue={loan.direction === 'owed_to_me' ? 'var(--profit)' : 'var(--loss)'}
+            hue={loan.color ?? (loan.direction === 'owed_to_me' ? 'var(--profit)' : 'var(--loss)')}
             onClick={() => onSelect(loan)}
           />
         );
       })}
+    </div>
+  );
+}
+
+
+function PersonalLoansModulePlans({
+  filter,
+  onSelectLoan,
+}: {
+  filter: 'all' | 'owed_to_me' | 'i_owe';
+  onSelectLoan: (loan: PersonalLoan) => void;
+}) {
+  const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
+  const plans = usePersonalLoansWorkbookStore((s) => s.workbook.plans ?? []);
+  const visibleLoans = new Map(
+    loans.filter((loan) => filter === 'all' || loan.direction === filter).map((loan) => [loan.id, loan]),
+  );
+  const rows = plans
+    .filter((plan) => visibleLoans.has(plan.loanId))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  return (
+    <div className="table-responsive">
+      <table>
+        <thead><tr><th>Date</th><th>Loan</th><th>Description</th><th>Amount</th><th>Status</th></tr></thead>
+        <tbody>
+          {rows.map((plan) => {
+            const loan = visibleLoans.get(plan.loanId)!;
+            return (
+              <tr key={plan.id} className="clickable" onClick={() => onSelectLoan(loan)}>
+                <td>{plan.date}</td>
+                <td>{loan.person}</td>
+                <td>{plan.description || '—'}</td>
+                <td>{fmtMoney(plan.amount, loan.currencyCode)}</td>
+                <td>{plan.executed ? 'Executed' : 'Planned'}</td>
+              </tr>
+            );
+          })}
+          {!rows.length && <tr><td colSpan={5} className="text-muted">No plans match this loan filter.</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function PersonalLoansModulePayments({
+  filter,
+  onSelectLoan,
+}: {
+  filter: 'all' | 'owed_to_me' | 'i_owe';
+  onSelectLoan: (loan: PersonalLoan) => void;
+}) {
+  const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
+  const payments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
+  const categories = useCategoryStore((s) => s.workbook.categories);
+  const visibleLoans = new Map(
+    loans.filter((loan) => filter === 'all' || loan.direction === filter).map((loan) => [loan.id, loan]),
+  );
+  const rows = payments
+    .filter((payment) => visibleLoans.has(payment.loanId))
+    .sort((a, b) => b.date.localeCompare(a.date) || (b.seq ?? 0) - (a.seq ?? 0));
+
+  return (
+    <div className="table-responsive">
+      <table>
+        <thead><tr><th>Date</th><th>Loan</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th></tr></thead>
+        <tbody>
+          {rows.map((payment) => {
+            const loan = visibleLoans.get(payment.loanId)!;
+            return (
+              <tr key={payment.id} className="clickable" onClick={() => onSelectLoan(loan)}>
+                <td>{payment.date}</td>
+                <td>{loan.person}</td>
+                <td>{payment.description || '—'}</td>
+                <td>{categoryName(payment.categoryID, categories)}</td>
+                <td>{fmtMoney(payment.amount, loan.currencyCode)}</td>
+                <td>{payment.isPending ? 'Pending' : 'Cleared'}</td>
+              </tr>
+            );
+          })}
+          {!rows.length && <tr><td colSpan={6} className="text-muted">No payments match this loan filter.</td></tr>}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -1057,9 +1329,19 @@ export function PersonalLoansPage({
       content: <LoanList onSelect={setSelected} filter={filter} showArchived={showArchived} />,
     },
     {
+      key: 'plans',
+      label: 'Plans',
+      content: <PersonalLoansModulePlans filter={filter} onSelectLoan={setSelected} />,
+    },
+    {
+      key: 'payments',
+      label: 'Payments',
+      content: <PersonalLoansModulePayments filter={filter} onSelectLoan={setSelected} />,
+    },
+    {
       key: 'analytics',
       label: 'Analytics',
-      content: <AnalyticsTab />,
+      content: <AnalyticsTab filter={filter} />,
     },
     {
       key: 'settings',

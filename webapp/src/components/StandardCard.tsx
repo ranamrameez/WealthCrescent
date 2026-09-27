@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { ArchiveIcon, CheckIcon, CollapseIcon, EditIcon, ExpandIcon, ExportIcon, FlaskIcon, MenuIcon, PlanningIcon, PlusIcon, SaveIcon, TrashIcon, XIcon } from './icons';
 import { StandardIconButton } from './standard';
 
@@ -45,8 +45,8 @@ function CardActionMenu({ actions, onAction }: { actions: StandardCardAction[]; 
   </div>;
 }
 
-export function StandardCard({ title, summary, actions=[], headerEnd, defaultOpen=true, open:controlledOpen, onToggle, children, className='' }: {
-  title:string; summary?:ReactNode; actions?:StandardCardAction[]; headerEnd?:ReactNode; defaultOpen?:boolean; open?:boolean; onToggle?:(open:boolean)=>void; children:ReactNode; className?:string;
+export function StandardCard({ title, summary, actions=[], headerEnd, defaultOpen=true, open:controlledOpen, onToggle, children, className='', hue }: {
+  title:string; summary?:ReactNode; actions?:StandardCardAction[]; headerEnd?:ReactNode; defaultOpen?:boolean; open?:boolean; onToggle?:(open:boolean)=>void; children:ReactNode; className?:string; hue?:string;
 }) {
   const [internalOpen,setInternalOpen]=useState(defaultOpen);
   const [fullScreen, setFullScreen] = useState(false);
@@ -60,7 +60,10 @@ export function StandardCard({ title, summary, actions=[], headerEnd, defaultOpe
   const toggle=()=>{const next=!open; if(onToggle)onToggle(next); else setInternalOpen(next);};
   const enterFullScreen = () => { setFullScreen(true); if (!open) { if (onToggle) onToggle(true); else setInternalOpen(true); } };
   return <>{fullScreen && <div className="standard-card-backdrop" onClick={() => setFullScreen(false)} />}
-  <section className={`card standard-card${fullScreen ? ' standard-card-fullscreen' : ''} ${className}`.trim()}>
+  <section
+    className={`card standard-card${hue ? ' standard-card-hued' : ''}${fullScreen ? ' standard-card-fullscreen' : ''} ${className}`.trim()}
+    style={hue ? ({ '--card-hue': hue } as CSSProperties) : undefined}
+  >
     <header className="standard-card-header">
       <button type="button" className="standard-card-toggle" aria-expanded={open} onClick={toggle}><span className={`standard-card-arrow${open?' open':''}`} aria-hidden>▸</span><span className="standard-card-title">{title}</span></button>
       <div className="standard-card-summary">{summary}</div>

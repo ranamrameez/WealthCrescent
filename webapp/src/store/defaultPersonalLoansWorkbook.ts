@@ -9,5 +9,6 @@ export function createEmptyPersonalLoansWorkbook(): PersonalLoansWorkbook {
     settings: { ...DEFAULT_PERSONAL_LOANS_SETTINGS },
     loans: [],
     repayments: [],
+    plans: [],
   };
 }

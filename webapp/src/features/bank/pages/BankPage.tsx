@@ -11,10 +11,9 @@ import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu
 import { UsageBar } from '../../../components/ui/UsageBar';
 import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
-import { ChartCard } from '../../qse/components/ChartCard';
 import { AnalyticsChartEnhancer } from '../../../components/AnalyticsChartCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
-import { ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, BankIcon, CheckIcon, EditIcon, ListIcon, PlusIcon, SaveIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
+import { ArchiveIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, BankIcon, CheckIcon, EditIcon, ListIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { StandardButton } from '../../../components/standard';
 import { Modal } from '../../../components/Modal';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
@@ -45,10 +44,10 @@ import { recurrenceLabel } from '../../../lib/recurrenceLabel';
 import { hueStyle } from '../../../lib/statCardHues';
 import { categoryName, UNCATEGORIZED_ID } from '../../../lib/categories';
 import { useCategoryStore } from '../../../store/categoryStore';
-import { accountBalance, accountByCategory, accountPendingBalance, accountPeriodAnalytics, accountRunningLedger, bankAnalyticsFromLedger, bankTotalsByCurrency, budgetVsActual } from '../../../lib/calc/bankModule';
+import { accountBalance, accountPendingBalance, accountRunningLedger, bankAnalyticsFromLedger, bankTotalsByCurrency, budgetVsActual } from '../../../lib/calc/bankModule';
 import { outstandingBalanceByCard } from '../../../lib/calc/creditCardModule';
 import { planWithinHorizon, plannedBankProjection, type PlanningHorizonDays } from '../../../lib/calc/plannedBalance';
-import { dlBarV, dlDoughnut, dlLine } from '../../../lib/chartLabels';
+import { dlBarV, dlDoughnut } from '../../../lib/chartLabels';
 import { applyChartTheme } from '../../../lib/chartSetup';
 import { cssVar, tickerColor } from '../../../lib/cssVar';
 import { chartAlpha, chartDepthPlugin } from '../../../lib/chartVisuals';
@@ -378,23 +377,69 @@ function AccountFormFields({
  * the caller (still optional, still fires with no meaningful argument for
  * the existing `AddAccountFab` caller, which only used it to close its own
  * modal) so that same picker can auto-select the new account immediately. */
-export function AddAccountForm({ onSaved, initialCurrency, initialBankId }: { onSaved?: (id: string) => void; initialCurrency?: string; initialBankId?: string }) {
+export function AddAccountForm({ onSaved, initialCurrency, initialBankId, account }: { onSaved?: (id: string) => void; initialCurrency?: string; initialBankId?: string; account?: BankAccount }) {
   const addAccount = useBankWorkbookStore((s) => s.addAccount);
+  const updateAccount = useBankWorkbookStore((s) => s.updateAccount);
   const primaryCurrency = usePrimaryCurrency();
   const [lastCurrency, setLastCurrency] = useLastCurrency('bank-account', primaryCurrency ?? 'USD');
   const ensureSignedIn = useEnsureSignedIn();
-  const [a, setA] = useState(() => emptyAccount(initialCurrency ?? lastCurrency, initialBankId));
+  const [a, setA] = useState<Omit<BankAccount, 'id'>>(() => account ? {
+    name: account.name,
+    nickname: account.nickname,
+    currencyCode: account.currencyCode,
+    openingBalance: account.openingBalance,
+    accountNumber: account.accountNumber,
+    smsSenderId: account.smsSenderId,
+    smsSenderNumber: account.smsSenderNumber,
+    branch: account.branch,
+    accountType: account.accountType,
+    iban: account.iban,
+    bankName: account.bankName,
+    bic: account.bic,
+    isLiability: account.isLiability,
+    creditLimit: account.creditLimit,
+    annualFee: account.annualFee,
+    statementDate: account.statementDate,
+    paymentDueDate: account.paymentDueDate,
+    lateFeeAfterDue: account.lateFeeAfterDue,
+    minPaymentAmount: account.minPaymentAmount,
+    cardNetwork: account.cardNetwork,
+    cardBin: account.cardBin,
+    bankId: account.bankId,
+    color: account.color,
+    isActive: account.isActive,
+    isFavorite: account.isFavorite,
+  } : emptyAccount(initialCurrency ?? lastCurrency, initialBankId));
 
   const submit = async () => {
     if (!a.name.trim()) return toast('Enter an account name.');
     if (!a.nickname?.trim()) return toast('Enter an account nickname.');
     if (a.nickname.trim().length > 11) return toast('Nickname must be fewer than 12 characters.');
-    if (!(await ensureSignedIn('Sign in to save bank accounts.'))) return;
-    const id = uid();
-    addAccount({ ...a, id, name: a.name.trim(), nickname: a.nickname.trim() });
-    toast(`Account "${a.name.trim()}" added.`);
-    setA(emptyAccount(a.currencyCode, initialBankId));
-    onSaved?.(id);
+    if (!(await ensureSignedIn(account ? 'Sign in to update this account.' : 'Sign in to save bank accounts.'))) return;
+    const clean = {
+      ...a,
+      name: a.name.trim(),
+      nickname: a.nickname.trim(),
+      accountNumber: a.accountNumber?.trim() || undefined,
+      smsSenderId: a.smsSenderId?.trim() || undefined,
+      smsSenderNumber: a.smsSenderNumber?.trim() || undefined,
+      branch: a.branch?.trim() || undefined,
+      accountType: a.accountType?.trim() || undefined,
+      iban: a.iban?.trim() || undefined,
+      bankName: a.bankName?.trim() || undefined,
+      bic: a.bic?.trim() || undefined,
+    };
+    if (account) {
+      updateAccount(account.id, clean);
+      toast('Account updated.');
+      onSaved?.(account.id);
+    } else {
+      const id = uid();
+      addAccount({ ...clean, id });
+      toast(`Account "${clean.name}" added.`);
+      setA(emptyAccount(a.currencyCode, initialBankId));
+      onSaved?.(id);
+    }
   };
 
   return (
@@ -405,10 +450,10 @@ export function AddAccountForm({ onSaved, initialCurrency, initialBankId }: { on
           setA((prev) => ({ ...prev, ...patch }));
           if (patch.currencyCode) setLastCurrency(patch.currencyCode);
         }}
-        idSuffix="add"
+        idSuffix={account ? 'edit' : 'add'}
       />
       <button className="btn mt-12" onClick={submit}>
-        <PlusIcon />Add account
+        {account ? <SaveIcon /> : <PlusIcon />}{account ? 'Save account' : 'Add account'}
       </button>
       <p className="text-muted mt-sm"><span className="text-loss">*</span> Required. Everything else on this form is optional.</p>
     </div>
@@ -503,6 +548,7 @@ export function BankDetailPage() {
   const bank = banks.find((b) => b.id === id);
   const accounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
   const transactions = useBankWorkbookStore((s) => s.workbook.transactions);
+  const updateBank = useBankWorkbookStore((s) => s.updateBank);
   const deleteBank = useBankWorkbookStore((s) => s.deleteBank);
   const ensureSignedIn = useEnsureSignedIn();
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
@@ -577,6 +623,7 @@ export function BankDetailPage() {
   }
 
   const summaryActions: StandardCardAction[] = [
+    { label: bank.isFavorite ? 'Unfavorite bank' : 'Favorite bank', icon: <StarIcon size={14} filled={bank.isFavorite} />, onClick: () => updateBank(bank.id, { isFavorite: !bank.isFavorite }) },
     { label: 'Edit bank', icon: <EditIcon size={14} />, onClick: () => setBankModalOpen(true) },
     { label: 'Delete bank', icon: <TrashIcon size={14} />, tone: 'danger', onClick: remove },
   ];
@@ -588,6 +635,7 @@ export function BankDetailPage() {
       defaultOpen: true,
       summary: <SummaryChip label="Accounts" value={linkedAccounts.length} />,
       actions: summaryActions,
+      hue: bank.color,
       content: (
         <div>
           <AttributeList items={[
@@ -613,10 +661,21 @@ export function BankDetailPage() {
       ),
     },
     {
+      key: 'details',
+      label: 'Bank details',
+      hue: bank.color,
+      content: <AttributeList items={[
+        { label: 'Full bank name', value: bank.name },
+        { label: 'Notes', value: bank.notes },
+        { label: 'Favorite', value: bank.isFavorite ? 'Yes' : 'No' },
+      ]} />,
+    },
+    {
       key: 'accounts',
       label: 'Accounts',
       defaultOpen: true,
       summary: <SummaryChip value={linkedAccounts.length + linkedCards.length} />,
+      hue: bank.color,
       content: (
         <div>
           <div className="entity-card-grid">
@@ -652,7 +711,7 @@ export function BankDetailPage() {
                     badge={card.isActive === false ? <span className="pill-warn fs-10">Closed</span> : undefined}
                     statLabel="Owed"
                     stat={<MoneyValue n={balance} currency={card.currencyCode} />}
-                    hue={balance > 0 ? 'var(--loss)' : 'var(--profit)'}
+                    hue={card.color ?? (balance > 0 ? 'var(--loss)' : 'var(--profit)')}
                     onClick={() => navigate(`/bank/card/${card.id}`)}
                   />
                 );
@@ -662,15 +721,16 @@ export function BankDetailPage() {
         </div>
       ),
     },
-    { key: 'plans', label: 'Plans', content: <BankingScopePlans accounts={linkedAccounts} filters={filters} /> },
+    { key: 'plans', label: 'Plans', hue: bank.color, content: <BankingScopePlans accounts={linkedAccounts} filters={filters} /> },
     {
       key: 'transactions',
       label: 'Transactions',
       summary: <SummaryChip label="Accounts" value={linkedAccounts.length} />,
       actions: bankingTransactionActions(linkedAccounts, transactions, filters, categories),
+      hue: bank.color,
       content: <BankingScopeTransactions accounts={linkedAccounts} filters={filters} />,
     },
-    { key: 'analytics', label: 'Analytics', content: <AnalyticsTab bankId={bank.id} filters={filters} /> },
+    { key: 'analytics', label: 'Analytics', hue: bank.color, content: <AnalyticsTab bankId={bank.id} filters={filters} /> },
   ];
 
   const transferDefault = linkedAccounts[0]
@@ -827,33 +887,7 @@ export function AccountDetailPage() {
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
   const dateFormat = useAppearanceStore((state) => state.appearance.dateFormat ?? 'DD-MMM-YYYY');
 
-  const accountToFormValue = (value: BankAccount | undefined): Omit<BankAccount, 'id'> => ({
-    name: value?.name ?? '',
-    nickname: value?.nickname ?? '',
-    currencyCode: value?.currencyCode ?? 'USD',
-    openingBalance: value?.openingBalance ?? 0,
-    accountNumber: value?.accountNumber,
-    smsSenderId: value?.smsSenderId,
-    smsSenderNumber: value?.smsSenderNumber,
-    branch: value?.branch,
-    accountType: value?.accountType,
-    iban: value?.iban,
-    bankName: value?.bankName,
-    bic: value?.bic,
-    isLiability: value?.isLiability,
-    creditLimit: value?.creditLimit,
-    annualFee: value?.annualFee,
-    statementDate: value?.statementDate,
-    paymentDueDate: value?.paymentDueDate,
-    lateFeeAfterDue: value?.lateFeeAfterDue,
-    minPaymentAmount: value?.minPaymentAmount,
-    cardNetwork: value?.cardNetwork,
-    cardBin: value?.cardBin,
-    bankId: value?.bankId,
-    color: value?.color,
-  });
-  const [meta, setMeta] = useState<Omit<BankAccount, 'id'>>(() => accountToFormValue(account));
-  const [editingMeta, setEditingMeta] = useState(false);
+  const [editAccountOpen, setEditAccountOpen] = useState(false);
   const [showTransactionActions, setShowTransactionActions] = useState(false);
   const [showPlanActions, setShowPlanActions] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -932,7 +966,7 @@ export function AccountDetailPage() {
         className="account-switch-select"
         value={account.id}
         onChange={(event) => {
-          setEditingMeta(false);
+          setEditAccountOpen(false);
           navigate(`/bank/account/${event.target.value}`);
         }}
         options={accounts
@@ -953,28 +987,6 @@ export function AccountDetailPage() {
     return <div className="standard-page"><Link to="/bank" className="text-muted">← Back to Banking</Link><p className="text-muted mt-12">Account not found.</p></div>;
   }
 
-  const saveMeta = async () => {
-    if (!meta.name.trim()) return toast('Enter an account name.');
-    if (!meta.nickname?.trim()) return toast('Enter an account nickname.');
-    if (meta.nickname.trim().length > 11) return toast('Nickname must be fewer than 12 characters.');
-    if (!(await ensureSignedIn('Sign in to save account details.'))) return;
-    updateAccount(account.id, {
-      ...meta,
-      name: meta.name.trim(),
-      nickname: meta.nickname.trim(),
-      accountNumber: meta.accountNumber?.trim() || undefined,
-      smsSenderId: meta.smsSenderId?.trim() || undefined,
-      smsSenderNumber: meta.smsSenderNumber?.trim() || undefined,
-      branch: meta.branch?.trim() || undefined,
-      accountType: meta.accountType?.trim() || undefined,
-      iban: meta.iban?.trim() || undefined,
-      bankName: meta.bankName?.trim() || undefined,
-      bic: meta.bic?.trim() || undefined,
-    });
-    setEditingMeta(false);
-    toast('Account details saved.');
-  };
-  const cancelMetaEdit = () => { setMeta(accountToFormValue(account)); setEditingMeta(false); };
   const deleteThisAccount = async () => {
     if (!(await confirmDialog('This deletes the account and all its transactions — this cannot be undone.', `Delete "${account.name}"?`))) return;
     deleteAccount(account.id);
@@ -1018,23 +1030,22 @@ export function AccountDetailPage() {
     ? (() => { const days = Math.round((new Date(filters.toDate).getTime() - new Date(filters.fromDate).getTime()) / 86400000) + 1; return days <= 31 ? 'This month' : days <= 93 ? '3 months' : `${formatDate(filters.fromDate, dateFormat)} to ${formatDate(filters.toDate, dateFormat)}`; })()
     : filters.fromDate ? `${formatDate(filters.fromDate, dateFormat)} onward` : 'All time';
 
-  const detailActions: StandardCardAction[] = editingMeta
-    ? [
-        { label: 'Save', onClick: saveMeta },
-        { label: 'Cancel', onClick: cancelMetaEdit },
-        { label: account.isActive === false ? 'Reopen account' : 'Close account', onClick: toggleArchived },
-        { label: 'Delete account', onClick: deleteThisAccount, tone: 'danger' },
-      ]
-    : [
-        { label: 'Edit', onClick: () => { setMeta(accountToFormValue(account)); setEditingMeta(true); } },
-        { label: account.isActive === false ? 'Reopen account' : 'Close account', onClick: toggleArchived },
-        { label: 'Delete account', onClick: deleteThisAccount, tone: 'danger' },
-      ];
+  const detailActions: StandardCardAction[] = [
+    { label: account.isFavorite ? 'Unfavorite account' : 'Favorite account', icon: <StarIcon size={14} filled={account.isFavorite} />, onClick: () => updateAccount(account.id, { isFavorite: !account.isFavorite }) },
+    { label: 'Edit account', icon: <EditIcon size={14} />, onClick: () => setEditAccountOpen(true) },
+    {
+      label: account.isActive === false ? 'Reopen account' : 'Close account',
+      icon: account.isActive === false ? <RestoreIcon size={14} /> : <ArchiveIcon size={14} />,
+      onClick: () => { void toggleArchived(); },
+    },
+    { label: 'Delete account', icon: <TrashIcon size={14} />, tone: 'danger', onClick: () => { void deleteThisAccount(); } },
+  ];
 
   const sections: StandardPageSection[] = [
     {
       key: 'summary',
       label: 'Account summary',
+      hue: account.color,
       summary: <span className="text-muted">{periodSummary}</span>,
       content: <div className="account-summary-grid">
         {summaryCard('Actual balance', <>
@@ -1069,36 +1080,34 @@ export function AccountDetailPage() {
     {
       key: 'details',
       label: 'Account details',
+      hue: account.color,
       summary: <>
         <SummaryChip label={account.isLiability ? 'Owed' : 'Balance'} value={`${num(displayBalance)} ${account.currencyCode}`} />
         {pendingAmount !== 0 && <SummaryChip label="Pending" value={`${pendingAmount > 0 ? '+' : ''}${num(pendingAmount)} ${account.currencyCode}`} />}
       </>,
       actions: detailActions,
       content: <>
-        {!editingMeta ? (
-          <AttributeList items={[
-            { label: 'Nickname', value: account.nickname },
-            { label: 'Name', value: account.name },
-            { label: 'Currency', value: account.currencyCode },
-            { label: 'Opening balance', value: fmtMoney(account.openingBalance, account.currencyCode) },
-            { label: 'Branch', value: account.branch },
-            { label: 'Account type', value: account.accountType },
-            { label: 'IBAN', value: account.iban },
-            { label: 'Bank name', value: account.bankName },
-            { label: 'BIC', value: account.bic },
-            { label: 'Account number', value: account.accountNumber },
-            { label: 'SMS sender ID', value: account.smsSenderId },
-            { label: 'SMS sender number', value: account.smsSenderNumber },
-          ]} />
-        ) : (
-          <AccountFormFields value={meta} onChange={(patch) => setMeta((current) => ({ ...current, ...patch }))} idSuffix="detail" />
-        )}
+        <AttributeList items={[
+          { label: 'Nickname', value: account.nickname },
+          { label: 'Name', value: account.name },
+          { label: 'Currency', value: account.currencyCode },
+          { label: 'Opening balance', value: fmtMoney(account.openingBalance, account.currencyCode) },
+          { label: 'Branch', value: account.branch },
+          { label: 'Account type', value: account.accountType },
+          { label: 'IBAN', value: account.iban },
+          { label: 'Bank name', value: account.bankName },
+          { label: 'BIC', value: account.bic },
+          { label: 'Account number', value: account.accountNumber },
+          { label: 'SMS sender ID', value: account.smsSenderId },
+          { label: 'SMS sender number', value: account.smsSenderNumber },
+        ]} />
         {account.isLiability && account.creditLimit ? <CreditUsageBar used={Math.max(0, -currentBalance)} limit={account.creditLimit} currency={account.currencyCode} /> : null}
       </>,
     },
     {
       key: 'plans',
       label: 'Plans',
+      hue: account.color,
       summary: <SummaryChip label="Visible" value={upcoming.length} />,
       actions: [
         { label: 'Add a plan', onClick: () => setAddingPlan(true) },
@@ -1110,6 +1119,7 @@ export function AccountDetailPage() {
     {
       key: 'transactions',
       label: 'Transactions',
+      hue: account.color,
       summary: <SummaryChip label="Filtered" value={filteredLedger.length} />,
       actions: [
         { label: 'Import transactions', onClick: () => window.dispatchEvent(new Event('bank:open-import')) },
@@ -1123,6 +1133,7 @@ export function AccountDetailPage() {
     {
       key: 'analytics',
       label: 'Analytics',
+      hue: account.color,
       summary: <>
         <SummaryChip label="Deposits" value={fmtMoney(analytics.deposits, account.currencyCode)} />
         <SummaryChip label="Withdrawals" value={fmtMoney(analytics.withdrawals, account.currencyCode)} />
@@ -1142,6 +1153,11 @@ export function AccountDetailPage() {
       </div>
       {account.migratedToCreditCardId && <Notice tone="info" className="mb-md">This account was migrated to a real Credit Card record — its transactions and balance now live there.{' '}<Link to={`/bank/card/${account.migratedToCreditCardId}`}>View the Credit Card →</Link></Notice>}
       <StandardPageSections key={account.id} sections={sections} defaultKey="summary" />
+      {editAccountOpen && (
+        <Modal title="Edit account" onClose={() => setEditAccountOpen(false)}>
+          <AddAccountForm account={account} onSaved={() => setEditAccountOpen(false)} />
+        </Modal>
+      )}
       {addingPlan && <Modal title="Add a plan" onClose={() => setAddingPlan(false)}>
         <AddBankPlanForm accountId={account.id} onSaved={() => setAddingPlan(false)} />
       </Modal>}
@@ -1874,10 +1890,11 @@ function AccountPlans({ account, showActions }: { account: BankAccount; showActi
   return <BankPlanList account={account} horizonDays={null} fromDate={filters.fromDate} toDate={filters.toDate} showActions={showActions} />;
 }
 
-export function AddBankPlanForm({ accountId, onSaved }: { accountId: string; onSaved?: () => void }) {
+export function AddBankPlanForm({ accountId, onSaved, plan }: { accountId: string; onSaved?: () => void; plan?: PlannedBankTransaction }) {
   const addPlan = usePlannedBankWorkbookStore((s) => s.addEntry);
+  const updatePlan = usePlannedBankWorkbookStore((s) => s.updateEntry);
   const ensureSignedIn = useEnsureSignedIn();
-  const [p, setP] = useState<PlannedBankTransaction>(() => emptyBankPlan(accountId));
+  const [p, setP] = useState<PlannedBankTransaction>(() => plan ? { ...plan } : emptyBankPlan(accountId));
   // Keep the user's direction choice independent from amount sign while the
   // magnitude is zero. Deriving direction from `p.amount >= 0` made a fresh
   // Withdrawal click write -0, which still compares >= 0 in JavaScript and
@@ -1887,11 +1904,17 @@ export function AddBankPlanForm({ accountId, onSaved }: { accountId: string; onS
 
   const submit = async () => {
     if (!p.amount || !p.description.trim()) return toast('Enter a description and a non-zero amount.');
-    if (!(await ensureSignedIn('Sign in to save plans.'))) return;
-    addPlan({ ...p, id: crypto.randomUUID(), accountId, category: p.category?.trim() || undefined });
-    toast('Plan added.');
-    setP(emptyBankPlan(accountId));
-    setDirection('in');
+    if (!(await ensureSignedIn(plan ? 'Sign in to update this plan.' : 'Sign in to save plans.'))) return;
+    const clean = { ...p, accountId, category: p.category?.trim() || undefined };
+    if (plan) {
+      updatePlan(plan.id, clean);
+      toast('Plan updated.');
+    } else {
+      addPlan({ ...clean, id: crypto.randomUUID() });
+      toast('Plan added.');
+      setP(emptyBankPlan(accountId));
+      setDirection('in');
+    }
     onSaved?.();
   };
 
@@ -1932,7 +1955,7 @@ export function AddBankPlanForm({ accountId, onSaved }: { accountId: string; onS
         <RecurrenceFields startDate={p.date} value={p.recurrence} onChange={(recurrence) => setP({ ...p, recurrence })} />
       </div>
       <button className="btn mt-12" onClick={submit}>
-        <PlusIcon />Add plan
+        {plan ? <SaveIcon /> : <PlusIcon />}{plan ? 'Save plan' : 'Add plan'}
       </button>
     </div>
   );
@@ -1945,8 +1968,7 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
   const deletePlan = usePlannedBankWorkbookStore((s) => s.deleteEntry);
   const addTransaction = useBankWorkbookStore((s) => s.addTransaction);
   const ensureSignedIn = useEnsureSignedIn();
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editRow, setEditRow] = useState<PlannedBankTransaction | null>(null);
+  const [editingPlan, setEditingPlan] = useState<PlannedBankTransaction | null>(null);
   const asOf = useMemo(() => new Date(), []);
 
   const plans = useMemo(
@@ -1954,15 +1976,6 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
     [allPlans, account.id, horizonDays, asOf, fromDate, toDate],
   );
   const sorted = useMemo(() => [...plans].sort((a, b) => a.date.localeCompare(b.date)), [plans]);
-
-  const startEdit = (p: PlannedBankTransaction) => { setEditId(p.id); setEditRow({ ...p }); };
-  const saveEdit = () => {
-    if (!editId || !editRow) return;
-    updatePlan(editId, editRow);
-    toast('Plan updated.');
-    setEditId(null);
-    setEditRow(null);
-  };
 
   const markDone = async (p: PlannedBankTransaction) => {
     const occurrenceDate = p.recurrence ? nextRecurrenceOccurrence(p.recurrence)?.toISOString().slice(0, 10) : p.date;
@@ -1995,61 +2008,38 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
             <tr><th>Date</th><th>Description</th><th>Amount</th><th>Category</th><th>Repeats / status</th><th></th></tr>
           </thead>
           <tbody>
-            {sorted.map((p) =>
-              editId === p.id && editRow ? (
-                <tr key={p.id}>
-                  <td>
-                    <DateInput
-                      value={editRow.date}
-                      onChange={(e) => setEditRow({ ...editRow, date: e.target.value, recurrence: editRow.recurrence ? { ...editRow.recurrence, startDate: e.target.value } : undefined })}
-                      width={130}
-                    />
-                  </td>
-                  <td><input value={editRow.description} onChange={(e) => setEditRow({ ...editRow, description: e.target.value })} /></td>
-                  <td><input type="number" step="0.01" value={editRow.amount} onChange={(e) => setEditRow({ ...editRow, amount: Number(e.target.value) })} className="w-100" /></td>
-                  <td><input value={editRow.category ?? ''} onChange={(e) => setEditRow({ ...editRow, category: e.target.value })} className="w-100" /></td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                      <RecurrenceFields
-                        startDate={editRow.date}
-                        value={editRow.recurrence}
-                        onChange={(recurrence) => setEditRow({ ...editRow, recurrence })}
-                      />
-                    </div>
-                  </td>
-                  <td>
-                    <IconButton label="Save" icon={<SaveIcon size={13} />} align="right" onClick={saveEdit} />{' '}
-                    <IconButton label="Cancel" icon={<XIcon size={13} />} align="right" onClick={() => setEditId(null)} />
-                  </td>
-                </tr>
-              ) : (
-                <tr key={p.id}>
-                  <td>{formatDate(p.date, dateFormat)}</td>
-                  <td><Link to={`/planning?plan=${encodeURIComponent(p.id)}`} className="plan-link">{p.description}</Link></td>
-                  <td className={p.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(p.amount, account.currencyCode)}</td>
-                  <td>{p.category || '—'}</td>
-                  <td className="text-muted">{p.recurrence ? recurrenceLabel(p.recurrence) : p.executed ? 'Done' : 'Planned'}</td>
-                  <td>
-                    {(p.recurrence || !p.executed) && (
-                      <button className="btn secondary small" onClick={() => markDone(p)}><CheckIcon size={12} />Mark as done</button>
-                    )}{' '}
-                    {showActions && <><IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => startEdit(p)} />{' '}
-                    <IconButton
-                      label="Delete"
-                      icon={<TrashIcon size={13} />}
-                      align="right"
-                      onClick={async () => {
-                        if (await confirmDialog('This cannot be undone.', 'Delete this plan?')) deletePlan(p.id);
-                      }}
-                    /></>}
-                  </td>
-                </tr>
-              ),
-            )}
+            {sorted.map((p) => (
+              <tr key={p.id}>
+                <td>{formatDate(p.date, dateFormat)}</td>
+                <td><Link to={`/planning?plan=${encodeURIComponent(p.id)}`} className="plan-link">{p.description}</Link></td>
+                <td className={p.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(p.amount, account.currencyCode)}</td>
+                <td>{p.category || '—'}</td>
+                <td className="text-muted">{p.recurrence ? recurrenceLabel(p.recurrence) : p.executed ? 'Done' : 'Planned'}</td>
+                <td>
+                  {(p.recurrence || !p.executed) && (
+                    <button className="btn secondary small" onClick={() => markDone(p)}><CheckIcon size={12} />Mark as done</button>
+                  )}{' '}
+                  {showActions && <><IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => setEditingPlan(p)} />{' '}
+                  <IconButton
+                    label="Delete"
+                    icon={<TrashIcon size={13} />}
+                    align="right"
+                    onClick={async () => {
+                      if (await confirmDialog('This cannot be undone.', 'Delete this plan?')) deletePlan(p.id);
+                    }}
+                  /></>}
+                </td>
+              </tr>
+            ))}
             {!sorted.length && <tr><td colSpan={6} className="text-muted">No plans for this account yet.</td></tr>}
           </tbody>
         </table>
       </div>
+      {editingPlan && (
+        <Modal title="Edit plan" onClose={() => setEditingPlan(null)}>
+          <AddBankPlanForm accountId={account.id} plan={editingPlan} onSaved={() => setEditingPlan(null)} />
+        </Modal>
+      )}
     </div>
   );
 }
@@ -2110,153 +2100,110 @@ function PlanningAccountSection({
  * against this month's actual spend for the selected account. */
 function AnalyticsTab({ bankId, filters }: { bankId?: string; filters: BankingFilters }) {
   const allAccounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
-  const accounts = useMemo(() => allAccounts.filter(account => !account.migratedToCreditCardId && (!bankId || account.bankId === bankId)), [allAccounts, bankId]);
+  const accounts = useMemo(
+    () => allAccounts.filter((account) => !account.migratedToCreditCardId && (!bankId || account.bankId === bankId)),
+    [allAccounts, bankId],
+  );
   const transactions = useBankWorkbookStore((s) => s.workbook.transactions);
+  const plannedEntries = usePlannedBankWorkbookStore((s) => s.workbook.entries);
   const budgets = useBankWorkbookStore((s) => s.workbook.settings.budgets);
   const setBudget = useBankWorkbookStore((s) => s.setBudget);
   const ensureSignedIn = useEnsureSignedIn();
-  const dateFormat = useAppearanceStore((s) => s.appearance.dateFormat ?? 'DD-MMM-YYYY');
-  applyChartTheme();
-
-  const account = (filters.accountId !== 'all' ? accounts.find((item) => item.id === filters.accountId) : undefined) ?? accounts[0];
   const categoryList = useCategoryStore((s) => s.workbook.categories);
-  const periodTransactions = useMemo(
-    () => transactions.filter((tx) => (!filters.fromDate || tx.date >= filters.fromDate) && (!filters.toDate || tx.date <= filters.toDate)),
-    [transactions, filters.fromDate, filters.toDate],
-  );
+  const account = (filters.accountId !== 'all' ? accounts.find((item) => item.id === filters.accountId) : undefined) ?? accounts[0];
 
-  const byCategory = useMemo(
-    () => (account ? accountByCategory(account, periodTransactions, categoryList) : {}),
-    [account, periodTransactions, categoryList],
+  const allLedger = useMemo(
+    () => account ? accountRunningLedger(account, transactions, true) : [],
+    [account, transactions],
   );
-  const categories = Object.keys(byCategory).filter((c) => byCategory[c] < 0);
-  const analytics = useMemo(
-    () => (account ? accountPeriodAnalytics(account, transactions, filters.fromDate, filters.toDate) : null),
-    [account, transactions, filters.fromDate, filters.toDate],
+  const filteredLedger = useMemo(() => allLedger.filter((row) => {
+    if ((filters.fromDate && row.tx.date < filters.fromDate) || (filters.toDate && row.tx.date > filters.toDate)) return false;
+    if (filters.direction === 'in' && row.tx.amount < 0) return false;
+    if (filters.direction === 'out' && row.tx.amount >= 0) return false;
+    if (filters.category !== 'all' && categoryName(row.tx.categoryID, categoryList) !== filters.category) return false;
+    if (filters.source !== 'all' && (row.tx.source ?? 'manual') !== filters.source) return false;
+    return true;
+  }), [allLedger, filters, categoryList]);
+  const clearedLedger = useMemo(() => filteredLedger.filter(({ tx }) => !tx.isPending), [filteredLedger]);
+  const pendingRows = useMemo(() => filteredLedger.filter(({ tx }) => tx.isPending), [filteredLedger]);
+  const periodStartBalance = useMemo(() => {
+    if (!account) return 0;
+    const before = allLedger.filter(({ tx }) => !tx.isPending && filters.fromDate && tx.date < filters.fromDate);
+    return before.length ? before[before.length - 1].balance : account.openingBalance;
+  }, [account, allLedger, filters.fromDate]);
+  const upcoming = useMemo(
+    () => account
+      ? plannedEntries
+          .filter((plan) => plan.accountId === account.id && !plan.executed)
+          .filter((plan) => (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate))
+          .filter((plan) => filters.direction === 'all' || (filters.direction === 'in' ? plan.amount >= 0 : plan.amount < 0))
+          .sort((a, b) => a.date.localeCompare(b.date))
+      : [],
+    [plannedEntries, account, filters.fromDate, filters.toDate, filters.direction],
   );
-  const monthlyFlow = analytics?.monthlyFlow ?? [];
-  const balanceOverTime = analytics?.periodLedger ?? [];
 
   const thisMonth = today().slice(0, 7);
   const budgetRows = useMemo(
     () => (account ? budgetVsActual(transactions, [account.id], budgets ?? {}, thisMonth, categoryList) : []),
     [account, transactions, budgets, thisMonth, categoryList],
   );
-  const [newBudgetCategory, setNewBudgetCategory] = useState('');
-  const [newBudgetAmount, setNewBudgetAmount] = useState(0);
+  const [budgetEditor, setBudgetEditor] = useState<{ category: string; amount: number; originalCategory?: string } | null>(null);
 
-  if (!accounts.length) {
-    return <p className="text-muted">Add a bank account first (Accounts tab) to see charts here.</p>;
-  }
+  if (!account) return <p className="text-muted">Add a bank account first to see analytics.</p>;
 
   return (
     <div>
-      {account && (
-        <>
-          <div className="grid-auto" style={{ ...gridAutoStyle(320, 16), marginTop: 12 }}>
-            <ChartCard flat title="Balance over time" empty={!balanceOverTime.length}>
-              <Line
-                data={{
-                  labels: balanceOverTime.map((r) => formatDate(r.tx.date, dateFormat)),
-                  datasets: [{ label: 'Balance', data: balanceOverTime.map((r) => r.balance), borderColor: '#5aa9c9', backgroundColor: '#5aa9c933', fill: true, tension: 0.2 }],
-                }}
-                options={{ scales: { x: { ticks: { autoSkip: true, maxTicksLimit: 6, maxRotation: 0 } }, y: { ticks: { maxTicksLimit: 6 } } }, plugins: { legend: { display: false }, datalabels: dlLine((v) => fmtMoney(v, account.currencyCode)) } }}
-              />
-            </ChartCard>
-            <ChartCard flat title="Category breakdown (spend)" empty={!categories.length}>
-              <Doughnut
-                data={{
-                  labels: categories,
-                  datasets: [{ data: categories.map((c) => Math.abs(byCategory[c])), backgroundColor: categories.map((c) => tickerColor(c)) }],
-                }}
-                options={{ cutout: '55%', plugins: { legend: { display: true, position: 'right', labels: { boxWidth: 10, padding: 8 } }, datalabels: dlDoughnut((v) => fmtMoney(v, account.currencyCode)) } }}
-              />
-            </ChartCard>
-            <ChartCard
-              flat
-              title="Deposits vs. withdrawals by month"
-              titleTooltip="Every deposit vs. withdrawal across the selected account(s), including any inter-account transfer — this is a raw cash-flow view, not a categorized income/expense breakdown."
-              empty={!monthlyFlow.length}
-            >
-              <Bar
-                data={{
-                  labels: monthlyFlow.map((f) => f.month),
-                  datasets: [
-                    { label: 'Deposits', data: monthlyFlow.map((f) => f.income), backgroundColor: cssVar('--profit') || '#3ecf8e' },
-                    { label: 'Withdrawals', data: monthlyFlow.map((f) => f.expense), backgroundColor: cssVar('--loss') || '#e5484d' },
-                  ],
-                }}
-                options={{ scales: { x: { ticks: { autoSkip: true, maxTicksLimit: 6, maxRotation: 0 } }, y: { ticks: { maxTicksLimit: 6 } } }, plugins: { datalabels: dlBarV((v) => fmtMoney(v, account.currencyCode)) } }}
-              />
-            </ChartCard>
-          </div>
-
-          <CollapsibleCard title={<h3 className="m-0">Budget — {thisMonth}</h3>} className="mt-md">
-            <p className="text-muted mt-0">
-              Set a monthly spend target per category for {accountDisplayName(account)}; compared against what you've actually
-              spent there this month.
-            </p>
-            <div>
-              <table>
-                <thead><tr><th>Category</th><th>Budget</th><th>Actual</th><th>Remaining</th></tr></thead>
-                <tbody>
-                  {budgetRows.map((r) => (
-                    <tr key={r.category}>
-                      <td>{r.category}</td>
-                      <td>
-                        <input
-                          type="number"
-                          step="0.01"
-                          className="price-input w-96"
-                          defaultValue={r.budget || ''}
-                          placeholder="—"
-                          
-                          onKeyDown={async (e) => {
-                            if (e.key === 'Enter') {
-                              const val = parseFloat((e.target as HTMLInputElement).value) || 0;
-                              if (await ensureSignedIn('Sign in to save a budget target.')) setBudget(r.category, val);
-                              (e.target as HTMLInputElement).blur();
-                            }
-                          }}
-                        />
-                      </td>
-                      <td className={r.budget > 0 && r.actual > r.budget ? 'pill-negative' : ''}>{fmtMoney(r.actual, account.currencyCode)}</td>
-                      <td className={r.budget > 0 ? (r.budget - r.actual >= 0 ? 'pill-positive' : 'pill-negative') : ''}>
-                        {r.budget > 0 ? fmtMoney(r.budget - r.actual, account.currencyCode) : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                  {!budgetRows.length && <tr><td colSpan={4} className="text-muted">No spend or budget targets for this account yet.</td></tr>}
-                </tbody>
-              </table>
+      <AccountAnalyticsSection
+        ledger={clearedLedger}
+        pendingRows={pendingRows}
+        plans={upcoming}
+        startingBalance={periodStartBalance}
+        currencyCode={account.currencyCode}
+        fromDate={filters.fromDate}
+        toDate={filters.toDate}
+      />
+      <CollapsibleCard title={<h3 className="m-0">Budget — {thisMonth}</h3>} className="mt-md">
+        <p className="text-muted mt-0">
+          Monthly spend targets for {accountDisplayName(account)}. Account selection and period come from the same centralized Filters control used by the charts.
+        </p>
+        <div>
+          <table>
+            <thead><tr><th>Category</th><th>Budget</th><th>Actual</th><th>Remaining</th><th></th></tr></thead>
+            <tbody>
+              {budgetRows.map((row) => (
+                <tr key={row.category}>
+                  <td>{row.category}</td>
+                  <td>{row.budget > 0 ? fmtMoney(row.budget, account.currencyCode) : '—'}</td>
+                  <td className={row.budget > 0 && row.actual > row.budget ? 'pill-negative' : ''}>{fmtMoney(row.actual, account.currencyCode)}</td>
+                  <td className={row.budget > 0 ? (row.budget - row.actual >= 0 ? 'pill-positive' : 'pill-negative') : ''}>{row.budget > 0 ? fmtMoney(row.budget - row.actual, account.currencyCode) : '—'}</td>
+                  <td><IconButton label="Edit budget" icon={<EditIcon size={13} />} align="right" onClick={() => setBudgetEditor({ category: row.category, amount: row.budget, originalCategory: row.category })} /></td>
+                </tr>
+              ))}
+              {!budgetRows.length && <tr><td colSpan={5} className="text-muted">No spend or budget targets for this account yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        <button className="btn secondary small mt-sm" onClick={() => setBudgetEditor({ category: '', amount: 0 })}><PlusIcon size={12} />Add budget category</button>
+        {budgetEditor && (
+          <Modal title={budgetEditor.originalCategory ? 'Edit budget target' : 'Add budget target'} onClose={() => setBudgetEditor(null)}>
+            <div className="row gap-sm">
+              <Field label="Category" required><TextInput value={budgetEditor.category} onChange={(event) => setBudgetEditor({ ...budgetEditor, category: event.target.value })} /></Field>
+              <Field label="Monthly target" required><TextInput type="number" step="0.01" min={0} value={budgetEditor.amount || ''} onChange={(event) => setBudgetEditor({ ...budgetEditor, amount: Number(event.target.value) })} /></Field>
             </div>
-            <div className="row gap-sm mt-sm">
-              <TextInput placeholder="New category" value={newBudgetCategory} onChange={(e) => setNewBudgetCategory(e.target.value)} className="w-140" />
-              <input
-                type="number"
-                step="0.01"
-                placeholder="Monthly target"
-                value={newBudgetAmount || ''}
-                onChange={(e) => setNewBudgetAmount(Number(e.target.value))}
-                className="w-120"
-              />
-              <button
-                className="btn secondary small"
-                onClick={async () => {
-                  if (!newBudgetCategory.trim() || !newBudgetAmount) return toast('Enter a category name and a target amount.');
-                  if (!(await ensureSignedIn('Sign in to save a budget target.'))) return;
-                  setBudget(newBudgetCategory.trim(), newBudgetAmount);
-                  toast(`Budget set for ${newBudgetCategory.trim()}.`);
-                  setNewBudgetCategory('');
-                  setNewBudgetAmount(0);
-                }}
-              >
-                <PlusIcon size={12} />Add budget category
-              </button>
+            <div className="d-flex justify-center mt-md">
+              <button className="btn" onClick={async () => {
+                const category = budgetEditor.category.trim();
+                if (!category || budgetEditor.amount <= 0) return toast('Enter a category and target.');
+                if (!(await ensureSignedIn('Sign in to save a budget target.'))) return;
+                if (budgetEditor.originalCategory && budgetEditor.originalCategory !== category) setBudget(budgetEditor.originalCategory, 0);
+                setBudget(category, budgetEditor.amount);
+                setBudgetEditor(null);
+                toast('Budget target saved.');
+              }}><SaveIcon size={13} />Save budget</button>
             </div>
-          </CollapsibleCard>
-        </>
-      )}
+          </Modal>
+        )}
+      </CollapsibleCard>
     </div>
   );
 }
@@ -2451,7 +2398,7 @@ export function BankPage({
     },
     {
       key: 'planning',
-      label: 'Planning',
+      label: 'Plans',
       content: <PlanningTab plannedCloudEmpty={plannedCloudEmpty} uploadPlannedLocalToCloud={uploadPlannedLocalToCloud} />,
     },
     {
