@@ -14,7 +14,7 @@ import { Tooltip } from '../../../components/Tooltip';
 import { ChartCard } from '../../qse/components/ChartCard';
 import { AnalyticsChartEnhancer } from '../../../components/AnalyticsChartCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
-import { ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, CheckIcon, EditIcon, ListIcon, PlusIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
+import { ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, BankIcon, CheckIcon, EditIcon, ListIcon, PlusIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { StandardButton } from '../../../components/standard';
 import { Modal } from '../../../components/Modal';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
@@ -68,7 +68,7 @@ import { usePlannedBankWorkbookStore } from '../../../store/plannedBankWorkbookS
 import { useInterEntityTransfersStore } from '../../../store/interEntityTransfersStore';
 import { linkTargetPath, useLinkSideLabel } from '../../transfers/pages/TransferLinksPage';
 import { CreditCardsTab } from './CreditCardsSection';
-import type { BankAccount, BankTransaction } from '../../../types/bankWorkbook';
+import type { Bank, BankAccount, BankTransaction } from '../../../types/bankWorkbook';
 import type { CreditCard } from '../../../types/creditCard';
 import type { PlannedBankTransaction } from '../../../types/plannedBank';
 import { gridAutoStyle } from '../../../lib/gridStyle';
@@ -235,28 +235,61 @@ function BankIdentityField({ value, onChange, idSuffix }: { value: Pick<BankAcco
  * Fixed by registering via the keyed `usePageFabActions` (same mechanism
  * QSE's/PSX's Transfers FAB already used for the single-writer case) —
  * `BankPage` itself renders the one merged `FabPanel` for the whole page. */
+function BankForm({ bank, onSaved }: { bank?: Bank; onSaved?: () => void }) {
+  const addBank = useBankWorkbookStore((s) => s.addBank);
+  const updateBank = useBankWorkbookStore((s) => s.updateBank);
+  const ensureSignedIn = useEnsureSignedIn();
+  const [draft, setDraft] = useState(() => ({
+    name: bank?.name ?? '',
+    notes: bank?.notes ?? '',
+    color: bank?.color ?? '',
+  }));
+
+  const submit = async () => {
+    const name = draft.name.trim();
+    if (!name) return toast('Enter a bank name.');
+    if (!(await ensureSignedIn(bank ? 'Sign in to update this bank.' : 'Sign in to save a bank.'))) return;
+    const patch = { name, notes: draft.notes.trim() || undefined, color: draft.color || undefined };
+    if (bank) {
+      updateBank(bank.id, patch);
+      toast('Bank updated.');
+    } else {
+      addBank({ id: uid(), ...patch });
+      toast('Bank added.');
+    }
+    onSaved?.();
+  };
+
+  return (
+    <div>
+      <div className="row gap-sm">
+        <Field label="Full bank name" width={220} required>
+          <TextInput value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="e.g. United Bank Limited" />
+        </Field>
+        <Field label="Card color (optional)" width={150} title="Choose a custom color for this bank's cards.">
+          <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+            <input type="color" value={draft.color || '#5aa9c9'} onChange={(e) => setDraft({ ...draft, color: e.target.value })} style={{ width: 44, height: 32, padding: 2, minWidth: 0 }} />
+            {draft.color && <button type="button" className="btn secondary small" onClick={() => setDraft({ ...draft, color: '' })}>Reset</button>}
+          </div>
+        </Field>
+      </div>
+      <Field label="Notes (optional)" width={320}>
+        <TextInput value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
+      </Field>
+      <div className="d-flex justify-center mt-md">
+        <button className="btn" onClick={submit}><SaveIcon />{bank ? 'Save bank' : 'Add bank'}</button>
+      </div>
+    </div>
+  );
+}
+
 function AccountsFab() {
   const [open, setOpen] = useState<'account' | 'transfer' | 'bank' | null>(null);
-  const addBank = useBankWorkbookStore((s) => s.addBank);
-  const ensureSignedIn = useEnsureSignedIn();
-  const [bankName, setBankName] = useState('');
-  const submitBank = async () => {
-    if (!bankName.trim()) return toast('Enter a bank name.');
-    if (!(await ensureSignedIn('Sign in to save a bank.'))) return;
-    addBank({ id: uid(), name: bankName.trim() });
-    toast('Bank added.');
-    setBankName('');
-    setOpen(null);
-  };
   const actions = useMemo(
     () => [
-      { label: 'Add an account', icon: <PlusIcon />, onClick: () => setOpen('account') },
+      { label: 'Add an account', icon: <ListIcon />, onClick: () => setOpen('account') },
       { label: 'Transfers', icon: <TransferIcon />, onClick: () => setOpen('transfer') },
-      // Pending item 115(a): grouped here rather than a second floating
-      // button, so it can't stack/overlap with this panel (same class
-      // of bug already fixed once for the app-wide Transfers FAB —
-      // see Done item 239).
-      { label: 'Add a bank', icon: <PlusIcon />, onClick: () => setOpen('bank') },
+      { label: 'Add a bank', icon: <BankIcon />, onClick: () => setOpen('bank') },
     ],
     [],
   );
@@ -271,12 +304,7 @@ function AccountsFab() {
       {open === 'transfer' && <TransactionEntryModal onClose={() => setOpen(null)} />}
       {open === 'bank' && (
         <Modal title="Add a bank" onClose={() => setOpen(null)}>
-          <Field label="Bank name" width={220} required>
-            <TextInput value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. UBL" />
-          </Field>
-          <div className="d-flex justify-center mt-md">
-            <button className="btn" onClick={submitBank}><SaveIcon />Save</button>
-          </div>
+          <BankForm onSaved={() => setOpen(null)} />
         </Modal>
       )}
     </>
