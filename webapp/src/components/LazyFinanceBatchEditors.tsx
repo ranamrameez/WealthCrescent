@@ -5,6 +5,16 @@ const BankTransactions = lazy(() => import('./FinanceBatchEditors').then(module 
 const BankPlans = lazy(() => import('./FinanceBatchEditors').then(module => ({ default: module.BankPlansBatchEditor })));
 const LoanPayments = lazy(() => import('./FinanceBatchEditors').then(module => ({ default: module.LoanPaymentsBatchEditor })));
 const LoanPlans = lazy(() => import('./FinanceBatchEditors').then(module => ({ default: module.LoanPlansBatchEditor })));
+const CashTransactions = lazy(() => import('./FinanceBatchEditors').then(module => ({ default: module.CashTransactionsBatchEditor })));
+const RentalTransactions = lazy(() => import('./FinanceBatchEditors').then(module => ({ default: module.RentalTransactionsBatchEditor })));
+
+export function RentalTransactionsBatchEditor(props: ComponentProps<typeof Editors.RentalTransactionsBatchEditor>) {
+  return <Loading><RentalTransactions {...props} /></Loading>;
+}
+
+export function CashTransactionsBatchEditor(props: ComponentProps<typeof Editors.CashTransactionsBatchEditor>) {
+  return <Loading><CashTransactions {...props} /></Loading>;
+}
 
 function Loading({ children }: { children: ReactNode }) {
   return <Suspense fallback={<p role="status">Loading batch editor…</p>}>{children}</Suspense>;

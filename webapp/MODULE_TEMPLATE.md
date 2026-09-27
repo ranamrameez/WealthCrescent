@@ -37,6 +37,8 @@ Do not create module-specific section shells when the content can be expressed a
 - Subscriptions: Summary, paying account, Plans, and Alerts detail sections; separate landing Summary.
 - Cash and Rentals: separate landing Summary and activity/entity sections, using StandardPageSections directly.
 
-Stock Exchange modules are excluded from this migration. Domain-specific import/export and filters are retained; this layout migration does not add batch-edit support to ledgers that do not already have it.
+Stock Exchange modules are excluded from this migration. Cash and Rentals now support lazy-loaded transaction batch editing with formula amounts, edited-column indicators, category choices, and date periods. Cash edits are scoped to a currency; Rentals edits are scoped to a property. Saves validate all rows before one store update and reject stale drafts, invalid amounts, or linked records requiring the single-record editor. Rentals' date controls now filter both the visible ledger and its export period.
+
+Remaining parity work: batch editors for Funds, EMI, Credit Cards, and applicable planning records; broader settings and filter alignment across their detail views.
 
 The template owns navigation and section rendering. Its children are reserved for dialogs and floating actions. Never render another StandardPageSections with the same sections inside it: doing so duplicates page content after dialogs close.

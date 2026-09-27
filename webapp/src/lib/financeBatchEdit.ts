@@ -1,5 +1,9 @@
 import { prepareBatch, validBatchDate, type BatchChange, type RowErrors } from '../components/batchEditModel';
 import { useBankWorkbookStore } from '../store/bankWorkbookStore';
+import { useCashWorkbookStore } from '../store/cashWorkbookStore';
+import type { CashEntry } from '../types/cashWorkbook';
+import { useRentalsWorkbookStore } from '../store/rentalsWorkbookStore';
+import type { Property, RentalEntry } from '../types/rentalsWorkbook';
 import { usePersonalLoansWorkbookStore } from '../store/personalLoansWorkbookStore';
 import { usePlannedBankWorkbookStore } from '../store/plannedBankWorkbookStore';
 import { useInterEntityTransfersStore } from '../store/interEntityTransfersStore';
@@ -8,7 +12,7 @@ import type { BankAccount, BankTransaction } from '../types/bankWorkbook';
 import type { PersonalLoan, PersonalLoanPlan, PersonalLoanRepayment } from '../types/personalLoansWorkbook';
 import type { PlannedBankTransaction } from '../types/plannedBank';
 
-export function linkedBatchReason(module: 'bank' | 'personalLoans', id: string): string | undefined {
+export function linkedBatchReason(module: 'bank' | 'personalLoans' | 'cash' | 'rentals', id: string): string | undefined {
   return useInterEntityTransfersStore.getState().workbook.entries.some(link =>
     (link.from.module === module && link.fromRecordId === id) || (link.to.module === module && link.toRecordId === id))
     ? 'Linked transfer: use single Edit to handle both sides.' : undefined;
@@ -33,6 +37,26 @@ export function validateFinanceBatch(row: { date: string; amount: number; time?:
 }
 const transactionFields = ['date', 'time', 'timezone', 'description', 'amount', 'categoryID', 'isPending'] as const;
 const planFields = ['date', 'description', 'amount', 'categoryID'] as const;
+
+export function saveCashBatch(currencyCode: string, changes: BatchChange<CashEntry>[]) {
+  const state = useCashWorkbookStore.getState();
+  const entries = prepareBatch(state.workbook.entries, changes,
+    ['date', 'time', 'timezone', 'note', 'amount', 'isDeposit', 'categoryID', 'isPending'],
+    row => validateFinanceBatch(row, false),
+    row => row.currencyCode !== currencyCode ? 'Currency cannot be changed.' : linkedBatchReason('cash', row.id));
+  state.setWorkbook({ ...state.workbook, entries });
+}
+
+export function saveRentalBatch(property: Property, changes: BatchChange<RentalEntry>[]) {
+  const state = useRentalsWorkbookStore.getState();
+  const current = state.workbook.settings.properties.find(row => row.id === property.id);
+  if (!current || current.currencyCode !== property.currencyCode) throw new Error('Property changed or was removed. Discard and reopen the editor.');
+  const entries = prepareBatch(state.workbook.entries, changes,
+    ['date', 'time', 'timezone', 'note', 'amount', 'isDeposit', 'categoryID', 'isPending'],
+    row => validateFinanceBatch(row, false),
+    row => row.propertyId !== property.id ? 'Property cannot be changed.' : linkedBatchReason('rentals', row.id));
+  state.setWorkbook({ ...state.workbook, entries });
+}
 
 function assertAccount(expected: BankAccount) {
   const current = useBankWorkbookStore.getState().workbook.settings.accounts.find(row => row.id === expected.id);

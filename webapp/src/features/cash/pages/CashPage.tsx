@@ -40,7 +40,8 @@ import { cssVar, tickerColor } from '../../../lib/cssVar';
 import { useAppearanceStore } from '../../../store/appearanceStore';
 import { ChartCard } from '../../qse/components/ChartCard';
 import { parseCSV } from '../../../lib/csv';
-import { fmtMoney } from '../../../lib/format';
+import { fmtMoney, formatDate } from '../../../lib/format';
+import { CashTransactionsBatchEditor } from '../../../components/LazyFinanceBatchEditors';
 import { confirmAndDeleteLinkable, propagateLinkedEdit, resolveLinkedEdit } from '../../../lib/linkCascade';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { firebaseReady } from '../../../lib/firebase/client';
@@ -277,6 +278,10 @@ function EditEntryModal({ entry, onClose }: { entry: CashEntry; onClose: () => v
  * down. Also gained Type/Category filters, per "All tables should have
  * filter options to view filtered table data." */
 function CashStatementTable({ code, rows: allRows }: { code: string; rows: CashLedgerRow[] }) {
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const dateFormat = useAppearanceStore(s => s.appearance.dateFormat);
   const deleteEntry = useCashWorkbookStore((s) => s.deleteEntry);
   const updateEntry = useCashWorkbookStore((s) => s.updateEntry);
   const categories = useCategoryStore((s) => s.workbook.categories);
@@ -310,13 +315,15 @@ function CashStatementTable({ code, rows: allRows }: { code: string; rows: CashL
 
   const rows = useMemo(
     () => allRows.filter((r) => {
+      if (fromDate && r.entry.date < fromDate) return false;
+      if (toDate && r.entry.date > toDate) return false;
       if (typeFilter === 'in' && !r.entry.isDeposit) return false;
       if (typeFilter === 'out' && r.entry.isDeposit) return false;
       if (categoryFilter !== 'all' && categoryName(r.entry.categoryID, categories) !== categoryFilter) return false;
       if (sourceFilter !== 'all' && (r.entry.source ?? 'manual') !== sourceFilter) return false;
       return true;
     }),
-    [allRows, typeFilter, categoryFilter, sourceFilter, categories],
+    [allRows, typeFilter, categoryFilter, sourceFilter, categories, fromDate, toDate],
   );
 
   // User-reported (2026-09-06): "we may stop sorting options for
@@ -337,6 +344,12 @@ function CashStatementTable({ code, rows: allRows }: { code: string; rows: CashL
   return (
     <Card>
       <h4 className="mt-0">{code}</h4>
+      {batchOpen && <CashTransactionsBatchEditor currencyCode={code} rows={rows.map(row => row.entry)} onClose={() => setBatchOpen(false)} />}
+      <div className="row gap-sm mb-sm">
+        <Field label="From"><TextInput type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} /></Field>
+        <Field label="To"><TextInput type="date" value={toDate} onChange={e => setToDate(e.target.value)} /></Field>
+        <button className="btn secondary" disabled={!rows.length} onClick={() => setBatchOpen(true)}>Batch edit</button>
+      </div>
       <div className="row gap-sm mb-sm">
         <Field label="Type" width={120}>
           <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}>
@@ -384,7 +397,7 @@ function CashStatementTable({ code, rows: allRows }: { code: string; rows: CashL
               return (
                 <tr key={entry.id} onClick={() => setDetailEntry(entry)} className="clickable">
                   <td>
-                    {entry.date}{' '}
+                    {formatDate(entry.date, dateFormat)}{' '}
                     <span onClick={(e) => e.stopPropagation()}>
                       <ReorderButtons
                         rows={sorted}

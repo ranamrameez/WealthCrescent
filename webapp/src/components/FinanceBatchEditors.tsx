@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { saveCashBatch, saveRentalBatch } from '../lib/financeBatchEdit';
+import type { Property, RentalEntry } from '../types/rentalsWorkbook';
+import type { CashEntry } from '../types/cashWorkbook';
 import { BatchEditGrid, type BatchColumn, type BatchChange } from './BatchEditGrid';
 import { useCategoryStore } from '../store/categoryStore';
 import { useInterEntityTransfersStore } from '../store/interEntityTransfersStore';
@@ -33,6 +36,38 @@ const timeColumns = [
 ] as const;
 const pendingColumn = { key: 'isPending', label: 'Pending', type: 'boolean', width: 90 } as const;
 const sourceColumn = { key: 'source', label: 'Source', editable: false, width: 150 } as const;
+
+export function CashTransactionsBatchEditor({ currencyCode, rows, onClose }: { currencyCode: string; rows: CashEntry[]; onClose: () => void }) {
+  const options = useCategoryOptions();
+  const dateFormat = useAppearanceStore(state => state.appearance.dateFormat);
+  useInterEntityTransfersStore(state => state.workbook.entries);
+  const save = useBatchSave<CashEntry>(changes => saveCashBatch(currencyCode, changes));
+  const columns: BatchColumn<CashEntry>[] = [
+    { key: 'serialNumber', label: '#', editable: false, width: 70 },
+    { ...dateColumn, formatter: value => formatDate(String(value), dateFormat) }, ...timeColumns,
+    { key: 'note', label: 'Note', width: 270 },
+    { ...amountColumn, label: `Amount (${currencyCode})` },
+    { key: 'isDeposit', label: 'Cash in', type: 'boolean', width: 90 },
+    { key: 'categoryID', label: 'Category', type: 'category', options, width: 190 }, pendingColumn, sourceColumn,
+  ];
+  return <BatchEditGrid title={`Batch edit Cash — ${currencyCode}`} description="Amounts must be positive. Cash in checked = deposit; unchecked = withdrawal. Currency and source are locked." rows={rows} columns={columns} getRowId={row => row.id} getRowDate={row => row.date} validateRow={row => validateFinanceBatch(row, false)} rowReadOnly={row => linkedBatchReason('cash', row.id)} onSave={save} onClose={onClose} />;
+}
+
+export function RentalTransactionsBatchEditor({ property, rows, onClose }: { property: Property; rows: RentalEntry[]; onClose: () => void }) {
+  const [entity] = useState(() => ({ ...property }));
+  const options = useCategoryOptions();
+  const dateFormat = useAppearanceStore(state => state.appearance.dateFormat);
+  useInterEntityTransfersStore(state => state.workbook.entries);
+  const save = useBatchSave<RentalEntry>(changes => saveRentalBatch(entity, changes));
+  const columns: BatchColumn<RentalEntry>[] = [
+    { key: 'serialNumber', label: '#', editable: false, width: 70 },
+    { ...dateColumn, formatter: value => formatDate(String(value), dateFormat) }, ...timeColumns,
+    { key: 'note', label: 'Note', width: 270 }, { ...amountColumn, label: `Amount (${entity.currencyCode})` },
+    { key: 'isDeposit', label: 'Rent income', type: 'boolean', width: 100 },
+    { key: 'categoryID', label: 'Category', type: 'category', options, width: 190 }, pendingColumn, sourceColumn,
+  ];
+  return <BatchEditGrid title={`Batch edit Rentals — ${entity.name}`} description="Amounts must be positive. Rent income checked = income; unchecked = expense. Property and source are locked." rows={rows} columns={columns} getRowId={row => row.id} getRowDate={row => row.date} validateRow={row => validateFinanceBatch(row, false)} rowReadOnly={row => linkedBatchReason('rentals', row.id)} onSave={save} onClose={onClose} />;
+}
 
 export function BankTransactionsBatchEditor({ account, rows, onClose }: { account: BankAccount; rows: BankTransaction[]; onClose: () => void }) {
   const [entity] = useState(() => ({ ...account }));

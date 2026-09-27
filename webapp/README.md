@@ -11414,6 +11414,8 @@ Include each and evrything from our FinanceMaster app.
 Develop FinanceGuru app which will be React JS based. All shared components should be extracted developed separately. Then we can have Specialized components for each Stock Exchange. User can switch between Exchanges to view and modify his portfolio. For both PSX and QSE we have real trade data to verify our formulas and calculations.
 # Module layout update
 
+Done: Cash and Rentals transaction batch editors reuse formula entry, dirty-column indicators, date-period filtering, category options, and atomic conflict-checked saves. Ledger dates respect the selected display format. Rentals' date-period controls now also filter its visible entries.
+
 Done: EMI, Funds/brokers, and Subscriptions detail sections now use the shared Banking-based template. Cash and Rentals expose separate Summary sections. Personal Loans no longer renders its section stack twice when batch editors close. See MODULE_TEMPLATE.md for migration coverage.
 
 Pending: extend batch editing to the remaining ledgers and audit their date/filter behavior independently of the section-layout migration. Stock Exchanges are excluded.

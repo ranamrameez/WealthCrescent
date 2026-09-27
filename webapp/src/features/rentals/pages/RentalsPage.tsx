@@ -30,7 +30,8 @@ import { useCategoryStore } from '../../../store/categoryStore';
 import { netIncomeByCurrency, netIncomeByProperty, netIncomePendingByCurrency, propertyByCategory, propertyMonthlyRollup, propertyNetIncome } from '../../../lib/calc/rentalsModule';
 import { generateLeaseRentPlans, nextPendingBalance, proposeRentCollection } from '../../../lib/calc/rentalPlanning';
 import { parseCSV, toCSV } from '../../../lib/csv';
-import { fmtMoney } from '../../../lib/format';
+import { fmtMoney, formatDate } from '../../../lib/format';
+import { RentalTransactionsBatchEditor } from '../../../components/LazyFinanceBatchEditors';
 import { confirmAndDeleteLinkable, createLinkedTransfer, propagateLinkedEdit, resolveLinkedEdit } from '../../../lib/linkCascade';
 import { getLastTransferSource, rememberTransferSource } from '../../../hooks/useLastTransferSource';
 import { useBankWorkbookStore } from '../../../store/bankWorkbookStore';
@@ -850,7 +851,9 @@ function EditEntryModal({ entry, onClose }: { entry: RentalEntry; onClose: () =>
 /** User-requested (2026-09-03): "add filters to other tables as well" —
  * extends the Type/Category filter treatment Cash's statement tables got
  * (README Done item 224) here too. */
-function EntriesList({ property }: { property: Property }) {
+function EntriesList({ property, fromDate, toDate }: { property: Property; fromDate: string; toDate: string }) {
+  const [batchOpen, setBatchOpen] = useState(false);
+  const dateFormat = useAppearanceStore(s => s.appearance.dateFormat);
   const allEntries = useRentalsWorkbookStore((s) => s.workbook.entries);
   const deleteEntry = useRentalsWorkbookStore((s) => s.deleteEntry);
   const updateEntry = useRentalsWorkbookStore((s) => s.updateEntry);
@@ -870,12 +873,14 @@ function EntriesList({ property }: { property: Property }) {
   );
   const entries = useMemo(
     () => allPropertyEntries.filter((e) => {
+      if (fromDate && e.date < fromDate) return false;
+      if (toDate && e.date > toDate) return false;
       if (typeFilter === 'in' && !e.isDeposit) return false;
       if (typeFilter === 'out' && e.isDeposit) return false;
       if (categoryFilter !== 'all' && categoryName(e.categoryID, categories) !== categoryFilter) return false;
       return true;
     }),
-    [allPropertyEntries, typeFilter, categoryFilter, categories],
+    [allPropertyEntries, typeFilter, categoryFilter, categories, fromDate, toDate],
   );
   const linkByRecordId = useMemo(() => {
     const map = new Map<string, (typeof links)[number]>();
@@ -899,6 +904,8 @@ function EntriesList({ property }: { property: Property }) {
 
   return (
     <div>
+      {batchOpen && <RentalTransactionsBatchEditor property={property} rows={sorted} onClose={() => setBatchOpen(false)} />}
+      <button className="btn secondary mb-sm" disabled={!entries.length} onClick={() => setBatchOpen(true)}>Batch edit</button>
       <div className="row gap-sm mb-sm">
         <Field label="Type" width={130}>
           <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}>
@@ -928,7 +935,7 @@ function EntriesList({ property }: { property: Property }) {
             const otherSide = link ? (link.from.module === 'rentals' && link.fromRecordId === e.id ? link.to : link.from) : undefined;
             return (
               <tr key={e.id} onClick={() => setDetailEntry(e)} className="clickable">
-                <td>{e.date}</td>
+                <td>{formatDate(e.date, dateFormat)}</td>
                 <td className={e.isDeposit ? 'pill-positive' : 'pill-negative'}>{e.isDeposit ? 'Rent income' : 'Expense'}</td>
                 <td className={e.isDeposit ? 'pill-positive' : 'pill-negative'}>{fmtMoney(e.isDeposit ? e.amount : -e.amount, property.currencyCode)}</td>
                 <td>{e.isDeposit ? '—' : <span className="pill-info">{categoryName(e.categoryID, categories)}</span>}</td>
@@ -1221,11 +1228,15 @@ function EntriesTab({
   property,
   propertyId,
   setPropertyId,
+  fromDate,
+  toDate,
 }: {
   properties: Property[];
   property: Property | null;
   propertyId: string;
   setPropertyId: (id: string) => void;
+  fromDate: string;
+  toDate: string;
 }) {
   if (!properties.length) {
     return <p className="text-muted">Add a property first (Properties tab) before logging income/expenses.</p>;
@@ -1241,7 +1252,7 @@ function EntriesTab({
       {property && (
         <div className="mt-12">
           <CategoryAndRollup property={property} />
-          <EntriesList property={property} />
+          <EntriesList key={property.id} property={property} fromDate={fromDate} toDate={toDate} />
           <EntriesFab propertyId={property.id} currencyCode={property.currencyCode} />
         </div>
       )}
@@ -1354,7 +1365,7 @@ export function RentalsPage({
           {
             key: 'entries',
             label: 'Income & expenses',
-            content: <EntriesTab properties={properties} property={property} propertyId={propertyId} setPropertyId={setPropertyId} />,
+            content: <EntriesTab properties={properties} property={property} propertyId={propertyId} setPropertyId={setPropertyId} fromDate={fromDate} toDate={toDate} />,
             headerEnd: hasRows ? (
               <div className="row gap-sm">
                 <Field label="From (optional)">
