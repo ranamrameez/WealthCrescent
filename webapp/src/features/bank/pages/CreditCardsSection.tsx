@@ -82,53 +82,147 @@ const KIND_LABELS: Record<CreditCardTransactionKind, string> = {
 /** `initialCurrency`/`onSaved(id)` — see `AddAccountForm`'s own doc
  * comment (`BankPage.tsx`) for why: `SideFields`' "+" quick-add reuses
  * this exact form. */
-export function AddCreditCardForm({ onSaved, initialCurrency }: { onSaved?: (id: string) => void; initialCurrency?: string } = {}) {
+function CreditCardForm({
+  card,
+  onSaved,
+  initialCurrency,
+}: {
+  card?: CreditCard;
+  onSaved?: (id: string) => void;
+  initialCurrency?: string;
+}) {
   const addCard = useCreditCardWorkbookStore((s) => s.addCard);
+  const updateCard = useCreditCardWorkbookStore((s) => s.updateCard);
   const primaryCurrency = usePrimaryCurrency();
   const [lastCurrency, setLastCurrency] = useLastCurrency('creditCard', primaryCurrency ?? 'USD');
   const ensureSignedIn = useEnsureSignedIn();
-  const [c, setC] = useState<Omit<CreditCard, 'id'>>(() => emptyCard(initialCurrency ?? lastCurrency));
-  const currencyOptions = useEnabledCurrencies(c.currencyCode);
+  const [draft, setDraft] = useState<Omit<CreditCard, 'id'>>(() => card ? {
+    name: card.name,
+    bankId: card.bankId,
+    currencyCode: card.currencyCode,
+    openingBalance: card.openingBalance,
+    creditLimit: card.creditLimit,
+    statementDate: card.statementDate,
+    minDueDate: card.minDueDate,
+    paymentDueDate: card.paymentDueDate,
+    minPaymentMethod: card.minPaymentMethod,
+    minPaymentAmount: card.minPaymentAmount,
+    minPaymentPct: card.minPaymentPct,
+    lateFeeAfterDue: card.lateFeeAfterDue,
+    annualFee: card.annualFee,
+    markupMethod: card.markupMethod,
+    markupRatePct: card.markupRatePct,
+    markupThresholdAmount: card.markupThresholdAmount,
+    pendingMinDue: card.pendingMinDue,
+    cardNetwork: card.cardNetwork,
+    cardBin: card.cardBin,
+    isActive: card.isActive,
+    isFavorite: card.isFavorite,
+    color: card.color,
+    includeInNetWorth: card.includeInNetWorth,
+    seq: card.seq,
+  } : emptyCard(initialCurrency ?? lastCurrency));
+  const currencyOptions = useEnabledCurrencies(draft.currencyCode);
 
   const submit = async () => {
-    if (!c.name.trim()) return toast('Enter a card name.');
-    if (!(await ensureSignedIn('Sign in to save credit cards.'))) return;
-    const id = uid();
-    addCard({ ...c, id, name: c.name.trim() });
-    toast(`Card "${c.name.trim()}" added.`);
-    setC(emptyCard(c.currencyCode));
-    onSaved?.(id);
+    if (!draft.name.trim()) return toast('Enter a card name.');
+    if (!(await ensureSignedIn(card ? 'Sign in to update this credit card.' : 'Sign in to save credit cards.'))) return;
+    const clean = { ...draft, name: draft.name.trim() };
+    if (card) {
+      updateCard(card.id, clean);
+      toast('Credit card updated.');
+      onSaved?.(card.id);
+    } else {
+      const id = uid();
+      addCard({ ...clean, id });
+      toast(`Card "${clean.name}" added.`);
+      setDraft(emptyCard(draft.currencyCode));
+      onSaved?.(id);
+    }
   };
 
   return (
     <div>
       <div className="row gap-sm">
         <Field label="Card name" width={180} required>
-          <TextInput value={c.name} onChange={(e) => setC({ ...c, name: e.target.value })} placeholder="e.g. Sharia Card" />
+          <TextInput value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="e.g. Sharia Card" />
         </Field>
         <Field label="Currency" width={100} required>
-          <Select value={c.currencyCode} onChange={(e) => { setC({ ...c, currencyCode: e.target.value }); setLastCurrency(e.target.value); }}>
+          <Select value={draft.currencyCode} onChange={(e) => { setDraft({ ...draft, currencyCode: e.target.value }); setLastCurrency(e.target.value); }}>
             {currencyOptions.map((cur) => <option key={cur.code} value={cur.code}>{cur.code}</option>)}
           </Select>
         </Field>
         <Field label="Credit limit (optional)" width={140}>
-          <TextInput type="number" step="0.01" value={c.creditLimit ?? ''} onChange={(e) => setC({ ...c, creditLimit: e.target.value === '' ? undefined : Number(e.target.value) })} />
+          <TextInput type="number" step="0.01" value={draft.creditLimit ?? ''} onChange={(e) => setDraft({ ...draft, creditLimit: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        </Field>
+        <Field label="Already owed (optional)" width={140}>
+          <TextInput type="number" step="0.01" value={draft.openingBalance ?? ''} onChange={(e) => setDraft({ ...draft, openingBalance: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        </Field>
+        <Field label="Network">
+          <TextInput value={draft.cardNetwork ?? ''} onChange={(e) => setDraft({ ...draft, cardNetwork: e.target.value || undefined })} placeholder="e.g. Visa" />
         </Field>
         <Field label="Card color (optional)" width={150}>
           <div className="row" style={{ gap: 8, alignItems: 'center' }}>
-            <input type="color" value={c.color || '#5aa9c9'} onChange={(e) => setC({ ...c, color: e.target.value })} style={{ width: 44, height: 32, padding: 2, minWidth: 0 }} />
-            {c.color && <button type="button" className="btn secondary small" onClick={() => setC({ ...c, color: undefined })}>Reset</button>}
+            <input type="color" value={draft.color || '#5aa9c9'} onChange={(e) => setDraft({ ...draft, color: e.target.value })} style={{ width: 44, height: 32, padding: 2, minWidth: 0 }} />
+            {draft.color && <button type="button" className="btn secondary small" onClick={() => setDraft({ ...draft, color: undefined })}>Reset</button>}
           </div>
         </Field>
-        <Field label="Already owed (optional)" width={140} title="Debt that already exists on this card before you start tracking it here — e.g. from a real statement you already have. Leave blank for a brand-new card with nothing owed yet.">
-          <TextInput type="number" step="0.01" value={c.openingBalance ?? ''} onChange={(e) => setC({ ...c, openingBalance: e.target.value === '' ? undefined : Number(e.target.value) })} />
+      </div>
+      <div className="row gap-sm mt-sm">
+        <Field label="Cycle start date (day of month)">
+          <TextInput type="number" min={1} max={31} value={draft.statementDate ?? ''} onChange={(e) => setDraft({ ...draft, statementDate: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        </Field>
+        <Field label="Min due date (day of month)">
+          <TextInput type="number" min={1} max={31} value={draft.minDueDate ?? ''} onChange={(e) => setDraft({ ...draft, minDueDate: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        </Field>
+        <Field label="Full amount due date (day of month)">
+          <TextInput type="number" min={1} max={31} value={draft.paymentDueDate ?? ''} onChange={(e) => setDraft({ ...draft, paymentDueDate: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        </Field>
+        <Field label="Late fee after due">
+          <TextInput type="number" step="0.01" value={draft.lateFeeAfterDue ?? ''} onChange={(e) => setDraft({ ...draft, lateFeeAfterDue: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        </Field>
+        <Field label="Annual fee">
+          <TextInput type="number" step="0.01" value={draft.annualFee ?? ''} onChange={(e) => setDraft({ ...draft, annualFee: e.target.value === '' ? undefined : Number(e.target.value) })} />
         </Field>
       </div>
-      <button className="btn mt-12" onClick={submit}>
-        <PlusIcon />Add card
-      </button>
+      <div className="row gap-sm mt-sm">
+        <Field label="Minimum payment method">
+          <Select value={draft.minPaymentMethod ?? 'fixed'} onChange={(e) => setDraft({ ...draft, minPaymentMethod: e.target.value as CreditCard['minPaymentMethod'] })}>
+            <option value="fixed">Fixed amount</option>
+            <option value="percentOfBalance">% of statement balance</option>
+            <option value="greaterOfFixedOrPercent">Whichever is greater</option>
+          </Select>
+        </Field>
+        <Field label="Fixed minimum">
+          <TextInput type="number" step="0.01" value={draft.minPaymentAmount ?? ''} onChange={(e) => setDraft({ ...draft, minPaymentAmount: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        </Field>
+        <Field label="Minimum %">
+          <TextInput type="number" step="0.01" value={draft.minPaymentPct ?? ''} onChange={(e) => setDraft({ ...draft, minPaymentPct: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        </Field>
+      </div>
+      <div className="row gap-sm mt-sm">
+        <Field label="Markup method">
+          <Select value={draft.markupMethod ?? ''} onChange={(e) => setDraft({ ...draft, markupMethod: (e.target.value || undefined) as CreditCard['markupMethod'] })}>
+            <option value="">None</option>
+            <option value="flatOnCarried">Flat rate on carried balance</option>
+          </Select>
+        </Field>
+        <Field label="Markup rate %">
+          <TextInput type="number" step="0.01" value={draft.markupRatePct ?? ''} onChange={(e) => setDraft({ ...draft, markupRatePct: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        </Field>
+        <Field label="Markup threshold">
+          <TextInput type="number" step="0.01" value={draft.markupThresholdAmount ?? ''} onChange={(e) => setDraft({ ...draft, markupThresholdAmount: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        </Field>
+      </div>
+      <div className="d-flex justify-center mt-md">
+        <button className="btn" onClick={submit}>{card ? <SaveIcon /> : <PlusIcon />}{card ? 'Save card' : 'Add card'}</button>
+      </div>
     </div>
   );
+}
+
+export function AddCreditCardForm({ onSaved, initialCurrency }: { onSaved?: (id: string) => void; initialCurrency?: string } = {}) {
+  return <CreditCardForm onSaved={onSaved} initialCurrency={initialCurrency} />;
 }
 
 /** The user's own explicit requirement: "progress bar for limit
@@ -511,13 +605,7 @@ export function CreditCardDetailPage() {
   const addTransaction = useCreditCardWorkbookStore((s) => s.addTransaction);
   const transactions = useCreditCardWorkbookStore((s) => s.workbook.transactions);
   const ensureSignedIn = useEnsureSignedIn();
-  const [editing, setEditing] = useState(false);
-  // Every hook below must run unconditionally on every render (rules of
-  // hooks) — the "card not found" guard has to come AFTER all of them, so
-  // this fallback just keeps the initial render safe for an id that
-  // doesn't resolve, same discipline `AccountDetailPage` already follows.
-  const [draft, setDraft] = useState<CreditCard>(() => card ?? { id: '', name: '', currencyCode: 'USD' });
-  const currencyOptions = useEnabledCurrencies(draft.currencyCode);
+  const [editCardOpen, setEditCardOpen] = useState(false);
 
   const balance = card ? outstandingBalanceByCard(card, transactions) : 0;
   const statement = card ? currentStatement(card, transactions) : null;
@@ -555,14 +643,6 @@ export function CreditCardDetailPage() {
       </div>
     );
   }
-
-  const saveDetails = async () => {
-    if (!draft.name.trim()) return toast('Enter a card name.');
-    if (!(await ensureSignedIn('Sign in to save card details.'))) return;
-    updateCard(card.id, { ...draft, name: draft.name.trim() });
-    toast('Card details saved.');
-    setEditing(false);
-  };
 
   const logMinPayment = async () => {
     if (!proposal) return;
@@ -612,7 +692,7 @@ export function CreditCardDetailPage() {
         </h1>
         <div style={{ display: 'flex', gap: 6 }}>
           <IconButton label={card.isFavorite ? 'Unfavorite' : 'Favorite'} icon={<StarIcon size={13} filled={card.isFavorite} />} align="right" onClick={toggleFavorite} />
-          <IconButton label={editing ? 'Cancel' : 'Edit'} icon={<EditIcon size={13} />} align="right" onClick={() => { setDraft(card); setEditing((v) => !v); }} />
+          <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => setEditCardOpen(true)} />
           <button className="btn secondary small" onClick={toggleArchived}>
             {card.isActive === false ? <><RestoreIcon size={13} />Reopen card</> : <><ArchiveIcon size={13} />Close card</>}
           </button>
@@ -639,85 +719,25 @@ export function CreditCardDetailPage() {
       </StandardCard>
 
       <StandardCard title="Card details" hue={card.color} className="mb-md">
-        {editing ? (
-          <div>
-            <div className="row gap-sm">
-              <Field label="Card name" required><TextInput value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></Field>
-              <Field label="Currency" width={100}>
-                <Select value={draft.currencyCode} onChange={(e) => setDraft({ ...draft, currencyCode: e.target.value })}>
-                  {currencyOptions.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
-                </Select>
-              </Field>
-              <Field label="Credit limit"><TextInput type="number" step="0.01" value={draft.creditLimit ?? ''} onChange={(e) => setDraft({ ...draft, creditLimit: e.target.value === '' ? undefined : Number(e.target.value) })} /></Field>
-              <Field label="Network"><TextInput value={draft.cardNetwork ?? ''} onChange={(e) => setDraft({ ...draft, cardNetwork: e.target.value })} placeholder="e.g. Visa" /></Field>
-              <Field label="Card color (optional)" width={150}>
-                <div className="row" style={{ gap: 8, alignItems: 'center' }}>
-                  <input type="color" value={draft.color || '#5aa9c9'} onChange={(e) => setDraft({ ...draft, color: e.target.value })} style={{ width: 44, height: 32, padding: 2, minWidth: 0 }} />
-                  {draft.color && <button type="button" className="btn secondary small" onClick={() => setDraft({ ...draft, color: undefined })}>Reset</button>}
-                </div>
-              </Field>
-              <Field label="Already owed" title="Debt that existed on this card before its own transaction log started here — see this card's own opening balance.">
-                <TextInput type="number" step="0.01" value={draft.openingBalance ?? ''} onChange={(e) => setDraft({ ...draft, openingBalance: e.target.value === '' ? undefined : Number(e.target.value) })} />
-              </Field>
-            </div>
-            <div className="row gap-sm mt-sm">
-              <Field label="Cycle start date (day of month)" title="The day of the month your billing cycle closes and a new one starts.">
-                <TextInput type="number" min={1} max={31} value={draft.statementDate ?? ''} onChange={(e) => setDraft({ ...draft, statementDate: e.target.value === '' ? undefined : Number(e.target.value) })} />
-              </Field>
-              <Field label="Min due date (day of month)" title="When the minimum payment is due — a different date from the full amount's due date on a real card.">
-                <TextInput type="number" min={1} max={31} value={draft.minDueDate ?? ''} onChange={(e) => setDraft({ ...draft, minDueDate: e.target.value === '' ? undefined : Number(e.target.value) })} />
-              </Field>
-              <Field label="Full amount due date (day of month)">
-                <TextInput type="number" min={1} max={31} value={draft.paymentDueDate ?? ''} onChange={(e) => setDraft({ ...draft, paymentDueDate: e.target.value === '' ? undefined : Number(e.target.value) })} />
-              </Field>
-              <Field label="Late fee after due"><TextInput type="number" step="0.01" value={draft.lateFeeAfterDue ?? ''} onChange={(e) => setDraft({ ...draft, lateFeeAfterDue: e.target.value === '' ? undefined : Number(e.target.value) })} /></Field>
-              <Field label="Annual fee"><TextInput type="number" step="0.01" value={draft.annualFee ?? ''} onChange={(e) => setDraft({ ...draft, annualFee: e.target.value === '' ? undefined : Number(e.target.value) })} /></Field>
-            </div>
-            <div className="row gap-sm mt-sm">
-              <Field label="Minimum payment method">
-                <Select value={draft.minPaymentMethod ?? 'fixed'} onChange={(e) => setDraft({ ...draft, minPaymentMethod: e.target.value as CreditCard['minPaymentMethod'] })}>
-                  <option value="fixed">Fixed amount</option>
-                  <option value="percentOfBalance">% of statement balance</option>
-                  <option value="greaterOfFixedOrPercent">Whichever is greater</option>
-                </Select>
-              </Field>
-              <Field label="Fixed minimum"><TextInput type="number" step="0.01" value={draft.minPaymentAmount ?? ''} onChange={(e) => setDraft({ ...draft, minPaymentAmount: e.target.value === '' ? undefined : Number(e.target.value) })} /></Field>
-              <Field label="Minimum %"><TextInput type="number" step="0.01" value={draft.minPaymentPct ?? ''} onChange={(e) => setDraft({ ...draft, minPaymentPct: e.target.value === '' ? undefined : Number(e.target.value) })} /></Field>
-            </div>
-            <div className="row gap-sm mt-sm">
-              <Field label="Markup method" title="How this card computes markup/interest on a carried balance. 'Flat on carried balance' is the only method built so far — a disclosed flat rate applied to whatever survives a real grace period.">
-                <Select value={draft.markupMethod ?? ''} onChange={(e) => setDraft({ ...draft, markupMethod: (e.target.value || undefined) as CreditCard['markupMethod'] })}>
-                  <option value="">None</option>
-                  <option value="flatOnCarried">Flat rate on carried balance</option>
-                </Select>
-              </Field>
-              <Field label="Markup rate %"><TextInput type="number" step="0.01" value={draft.markupRatePct ?? ''} onChange={(e) => setDraft({ ...draft, markupRatePct: e.target.value === '' ? undefined : Number(e.target.value) })} /></Field>
-              <Field label="Markup threshold" title="Below this carried amount, no markup is charged at all.">
-                <TextInput type="number" step="0.01" value={draft.markupThresholdAmount ?? ''} onChange={(e) => setDraft({ ...draft, markupThresholdAmount: e.target.value === '' ? undefined : Number(e.target.value) })} />
-              </Field>
-            </div>
-            <button className="btn mt-12" onClick={saveDetails}><SaveIcon size={13} />Save</button>
-          </div>
-        ) : (
-          <AttributeList
-            items={[
-              { label: 'Currency', value: card.currencyCode },
-              { label: 'Outstanding balance', value: fmtMoney(balance, card.currencyCode) },
-              { label: 'Already owed (opening balance)', value: card.openingBalance ? fmtMoney(card.openingBalance, card.currencyCode) : undefined },
-              { label: 'Credit limit', value: card.creditLimit ? fmtMoney(card.creditLimit, card.currencyCode) : undefined },
-              { label: 'Network', value: card.cardNetwork },
-              { label: 'BIN', value: card.cardBin },
-              { label: 'Cycle start date', value: card.statementDate ? `Day ${card.statementDate}` : undefined },
-              { label: 'Min due date', value: card.minDueDate ? `Day ${card.minDueDate}` : undefined },
-              { label: 'Full amount due date', value: card.paymentDueDate ? `Day ${card.paymentDueDate}` : undefined },
-              { label: 'Late fee after due', value: card.lateFeeAfterDue ? fmtMoney(card.lateFeeAfterDue, card.currencyCode) : undefined },
-              { label: 'Annual fee', value: card.annualFee ? fmtMoney(card.annualFee, card.currencyCode) : undefined },
-              { label: 'Minimum payment', value: card.minPaymentMethod === 'percentOfBalance' ? `${card.minPaymentPct ?? 0}% of balance` : card.minPaymentMethod === 'greaterOfFixedOrPercent' ? `Greater of ${fmtMoney(card.minPaymentAmount ?? 0, card.currencyCode)} or ${card.minPaymentPct ?? 0}%` : card.minPaymentAmount ? fmtMoney(card.minPaymentAmount, card.currencyCode) : undefined },
-              { label: 'Markup', value: card.markupMethod === 'flatOnCarried' ? `${card.markupRatePct ?? 0}% on carried balance ≥ ${fmtMoney(card.markupThresholdAmount ?? 0, card.currencyCode)}` : undefined },
-              { label: 'Status', value: card.isActive === false ? 'Closed' : 'Active' },
-            ]}
-          />
-        )}
+        <AttributeList
+          items={[
+            { label: 'Currency', value: card.currencyCode },
+            { label: 'Outstanding balance', value: fmtMoney(balance, card.currencyCode) },
+            { label: 'Already owed (opening balance)', value: card.openingBalance ? fmtMoney(card.openingBalance, card.currencyCode) : undefined },
+            { label: 'Credit limit', value: card.creditLimit ? fmtMoney(card.creditLimit, card.currencyCode) : undefined },
+            { label: 'Network', value: card.cardNetwork },
+            { label: 'BIN', value: card.cardBin },
+            { label: 'Cycle start date', value: card.statementDate ? `Day ${card.statementDate}` : undefined },
+            { label: 'Min due date', value: card.minDueDate ? `Day ${card.minDueDate}` : undefined },
+            { label: 'Full amount due date', value: card.paymentDueDate ? `Day ${card.paymentDueDate}` : undefined },
+            { label: 'Late fee after due', value: card.lateFeeAfterDue ? fmtMoney(card.lateFeeAfterDue, card.currencyCode) : undefined },
+            { label: 'Annual fee', value: card.annualFee ? fmtMoney(card.annualFee, card.currencyCode) : undefined },
+            { label: 'Minimum payment', value: card.minPaymentMethod === 'percentOfBalance' ? `${card.minPaymentPct ?? 0}% of balance` : card.minPaymentMethod === 'greaterOfFixedOrPercent' ? `Greater of ${fmtMoney(card.minPaymentAmount ?? 0, card.currencyCode)} or ${card.minPaymentPct ?? 0}%` : card.minPaymentAmount ? fmtMoney(card.minPaymentAmount, card.currencyCode) : undefined },
+            { label: 'Markup', value: card.markupMethod === 'flatOnCarried' ? `${card.markupRatePct ?? 0}% on carried balance ≥ ${fmtMoney(card.markupThresholdAmount ?? 0, card.currencyCode)}` : undefined },
+            { label: 'Status', value: card.isActive === false ? 'Closed' : 'Active' },
+            { label: 'Favorite', value: card.isFavorite ? 'Yes' : 'No' },
+          ]}
+        />
       </StandardCard>
 
       {statement && (
@@ -823,7 +843,12 @@ export function CreditCardDetailPage() {
         <TransactionsTable card={card} />
       </CollapsibleCard>
 
-      <CreditCardDetailFab card={card} />
+      {editCardOpen && (
+        <Modal title="Edit credit card" onClose={() => setEditCardOpen(false)}>
+          <CreditCardForm card={card} onSaved={() => setEditCardOpen(false)} />
+        </Modal>
+      )}
+            <CreditCardDetailFab card={card} />
     </div>
   );
 }
