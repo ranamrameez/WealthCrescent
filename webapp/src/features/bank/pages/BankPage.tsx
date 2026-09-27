@@ -1874,14 +1874,15 @@ function AccountPlans({ account, showActions }: { account: BankAccount; showActi
   return <BankPlanList account={account} horizonDays={null} fromDate={filters.fromDate} toDate={filters.toDate} showActions={showActions} />;
 }
 
-function AddBankPlanForm({ accountId, onSaved }: { accountId: string; onSaved?: () => void }) {
+export function AddBankPlanForm({ accountId, onSaved }: { accountId: string; onSaved?: () => void }) {
   const addPlan = usePlannedBankWorkbookStore((s) => s.addEntry);
   const ensureSignedIn = useEnsureSignedIn();
   const [p, setP] = useState<PlannedBankTransaction>(() => emptyBankPlan(accountId));
-  // Same magnitude+direction UI as the real transaction forms above (user-
-  // reported 2026-09-06) — `PlannedBankTransaction.amount` itself stays
-  // signed, same convention as the real `BankTransaction` it'll become.
-  const direction: 'in' | 'out' = p.amount >= 0 ? 'in' : 'out';
+  // Keep the user's direction choice independent from amount sign while the
+  // magnitude is zero. Deriving direction from `p.amount >= 0` made a fresh
+  // Withdrawal click write -0, which still compares >= 0 in JavaScript and
+  // immediately snapped the chip back to Deposit.
+  const [direction, setDirection] = useState<'in' | 'out'>(() => p.amount < 0 ? 'out' : 'in');
   const magnitude = Math.abs(p.amount);
 
   const submit = async () => {
@@ -1890,6 +1891,7 @@ function AddBankPlanForm({ accountId, onSaved }: { accountId: string; onSaved?: 
     addPlan({ ...p, id: crypto.randomUUID(), accountId, category: p.category?.trim() || undefined });
     toast('Plan added.');
     setP(emptyBankPlan(accountId));
+    setDirection('in');
     onSaved?.();
   };
 
@@ -1908,7 +1910,10 @@ function AddBankPlanForm({ accountId, onSaved }: { accountId: string; onSaved?: 
         <Field label="Direction">
           <DirectionChips
             value={direction}
-            onChange={(d) => setP({ ...p, amount: d === 'in' ? magnitude : -magnitude })}
+            onChange={(d) => {
+              setDirection(d);
+              setP({ ...p, amount: d === 'in' ? magnitude : -magnitude });
+            }}
             labels={{ in: 'Deposit', out: 'Withdrawal' }}
           />
         </Field>
