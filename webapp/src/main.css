@@ -154,6 +154,13 @@
 .standard-section-stack{display:flex;flex-direction:column;gap:16px;}
 .standard-section-anchor{scroll-margin-top:84px;}
 .standard-card{padding: 0 !important;overflow:visible;}
+.standard-card.standard-card-hued{
+  background:color-mix(in srgb,var(--card-hue) 18%,var(--panel));
+  border-color:color-mix(in srgb,var(--card-hue) 46%,var(--border));
+}
+.standard-card.standard-card-hued .standard-card-header{
+  background:color-mix(in srgb,var(--card-hue) 10%,transparent);
+}
 .standard-card-header{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(40px,1fr);align-items:center;gap:12px;padding:12px 14px;border-bottom:0px solid var(--border);}
 
 /* .standard-card-toggle{display:flex;align-items:center;gap:8px;min-width:0;border:0;background:transparent;color:var(--text);cursor:pointer;text-align:left;padding:0;} */
