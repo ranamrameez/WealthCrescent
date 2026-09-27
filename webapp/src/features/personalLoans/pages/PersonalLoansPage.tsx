@@ -3,6 +3,9 @@ import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bar, Line } from 'react-chartjs-2';
 import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
+import { StandardPageSections, type StandardPageSection } from '../../../components/StandardPageSections';
+import type { StandardCardAction } from '../../../components/StandardCard';
+import { AttributeList } from '../../../components/ui/AttributeList';
 import { Modal } from '../../../components/Modal';
 import { Notice } from '../../../components/Notice';
 import { confirmDialog } from '../../../components/ConfirmDialog';
@@ -742,129 +745,119 @@ function PayoffPlanner({ loan, outstanding }: { loan: PersonalLoan; outstanding:
   );
 }
 
-function LoanDetail({ loan, onBack, startInEditMode }: { loan: PersonalLoan; onBack: () => void; startInEditMode?: boolean }) {
+function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; startInEditMode?: boolean }) {
   const repayments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
   const deleteLoan = usePersonalLoansWorkbookStore((s) => s.deleteLoan);
   const updateLoan = usePersonalLoansWorkbookStore((s) => s.updateLoan);
   const ensureSignedIn = useEnsureSignedIn();
-  const [editing, setEditing] = useState(!!startInEditMode);
-  const [editRow, setEditRow] = useState<PersonalLoan>(loan);
-  const currencyOptions = useEnabledCurrencies(editRow.currencyCode);
   const outstanding = loanOutstanding(loan, repayments);
   const pendingImpact = loanPendingImpact(loan, repayments);
+  const [editLoanOpen, setEditLoanOpen] = useState(false);
+  const [editPayment, setEditPayment] = useState<PersonalLoanRepayment | null>(null);
+  const [addPaymentOpen, setAddPaymentOpen] = useState(false);
 
-  // User-requested (2026-09-03): "add isActive flag to all modules where
-  // applicable" — same archive/restore pattern as `BankAccount.isActive`.
-  // A reversible alternative to Delete; visibility only, never touches a
-  // total.
   const toggleArchived = async () => {
     if (!(await ensureSignedIn(loan.isActive === false ? 'Sign in to reopen this loan.' : 'Sign in to close this loan.'))) return;
     updateLoan(loan.id, { isActive: loan.isActive === false ? true : false });
     toast(loan.isActive === false ? 'Loan reopened.' : 'Loan closed.');
   };
 
-  return (
-    <div>
-      <button className="btn secondary small mb-12" onClick={onBack}>← All personal loans</button>
-      <Card className="mb-md">
-        {editing ? (
-          <div>
-            <div className="row gap-sm">
-              <Field label="Person / lender">
-                <TextInput value={editRow.person} onChange={(e) => setEditRow({ ...editRow, person: e.target.value })} />
-              </Field>
-              <Field label="Direction">
-                <Select value={editRow.direction} onChange={(e) => setEditRow({ ...editRow, direction: e.target.value as PersonalLoan['direction'] })}>
-                  <option value="owed_to_me">Money I lent out</option>
-                  <option value="i_owe">Money I owe</option>
-                </Select>
-              </Field>
-              <Field label="Currency">
-                <Select value={editRow.currencyCode} onChange={(e) => setEditRow({ ...editRow, currencyCode: e.target.value })}>
-                  {currencyOptions.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
-                </Select>
-              </Field>
-              <Field label="Principal">
-                <TextInput type="number" step="0.01" value={editRow.principal} onChange={(e) => setEditRow({ ...editRow, principal: Number(e.target.value) })} />
-              </Field>
-              <Field label="Date">
-                <TextInput type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} />
-              </Field>
-              <Field label="Note (optional)">
-                <TextInput value={editRow.note ?? ''} onChange={(e) => setEditRow({ ...editRow, note: e.target.value })} />
-              </Field>
+  const remove = async () => {
+    if (!(await confirmDialog('This deletes the loan and all its logged payments.', `Delete loan with ${loan.person}?`))) return;
+    if (!(await ensureSignedIn('Sign in to delete this loan.'))) return;
+    deleteLoan(loan.id);
+    onBack();
+  };
+
+  const summaryActions: StandardCardAction[] = [
+    { label: 'Edit loan', icon: <EditIcon size={14} />, onClick: () => setEditLoanOpen(true) },
+    {
+      label: loan.isActive === false ? 'Reopen loan' : 'Close loan',
+      icon: loan.isActive === false ? <RestoreIcon size={14} /> : <ArchiveIcon size={14} />,
+      onClick: () => { void toggleArchived(); },
+    },
+    {
+      label: loan.isFavorite ? 'Unfavorite' : 'Favorite',
+      icon: <StarIcon size={14} filled={loan.isFavorite} />,
+      onClick: () => { void updateLoan(loan.id, { isFavorite: !loan.isFavorite }); },
+    },
+    { label: 'Delete loan', icon: <TrashIcon size={14} />, tone: 'danger', onClick: () => { void remove(); } },
+  ];
+
+  const sections: StandardPageSection[] = [
+    {
+      key: 'summary',
+      label: 'Summary',
+      defaultOpen: true,
+      actions: summaryActions,
+      content: (
+        <div>
+          <AttributeList items={[
+            { label: 'Person', value: loan.person },
+            { label: 'Loan type', value: loan.direction === 'owed_to_me' ? 'I lent money' : 'I borrowed money' },
+            { label: 'Currency', value: loan.currencyCode },
+            { label: 'Date', value: loan.date },
+            { label: 'Note', value: loan.note },
+          ]} />
+          <div className="grid-auto mt-md" style={gridAutoStyle(160, 8)}>
+            <div className="stat-card card" style={hueStyle('var(--accent)')}>
+              <div className="label">Amount</div>
+              <MoneyValue n={loan.principal} currency={loan.currencyCode} />
             </div>
-            <div className="row gap-sm mt-sm">
-              <IconButton
-                label="Save"
-                icon={<SaveIcon size={13} />}
-                align="right"
-                onClick={() => { updateLoan(loan.id, editRow); toast('Loan updated.'); setEditing(false); }}
-              />
-              <IconButton label="Cancel" icon={<XIcon size={13} />} align="right" onClick={() => setEditing(false)} />
+            <div className="stat-card card" style={hueStyle(loan.direction === 'owed_to_me' ? 'var(--profit)' : 'var(--loss)')}>
+              <div className="label">Outstanding</div>
+              <MoneyValue n={outstanding} currency={loan.currencyCode} />
+              {pendingImpact !== 0 && (
+                <div className="sub">
+                  -{fmtMoney(pendingImpact, loan.currencyCode)} pending → {fmtMoney(Math.max(0, outstanding - pendingImpact), loan.currencyCode)} incl. pending
+                </div>
+              )}
             </div>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                {loan.person}
-                {loan.isActive === false && <span className="pill-warn fs-11">Closed</span>}
-              </div>
-              <div className="text-muted">
-                {loan.direction === 'owed_to_me' ? 'Money lent out' : 'Money I owe'} · {loan.currencyCode} · since {loan.date}
-              </div>
-              {loan.note && <div className="text-muted">{loan.note}</div>}
-            </div>
-            <div className="row gap-sm">
-              <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => { setEditRow(loan); setEditing(true); }} />
-              <IconButton
-                label={loan.isActive === false ? 'Reopen' : 'Close'}
-                icon={loan.isActive === false ? <RestoreIcon size={13} /> : <ArchiveIcon size={13} />}
-                align="right"
-                onClick={toggleArchived}
-              />
-              <IconButton
-                label="Delete"
-                icon={<TrashIcon size={13} />}
-                align="right"
-                onClick={async () => {
-                  if (await confirmDialog('This deletes the loan and all its logged repayments.', `Delete loan with ${loan.person}?`)) {
-                    deleteLoan(loan.id);
-                    onBack();
-                  }
-                }}
-              />
-            </div>
-          </div>
-        )}
-        <div className="grid-auto" style={{ ...gridAutoStyle(120, 8), marginTop: 12 }}>
-          <div className="stat-card card" style={hueStyle('var(--accent)')}>
-            <Tooltip text="The original amount of the loan, before any repayments.">
-              <div className="label clickable">Principal</div>
-            </Tooltip>
-            <MoneyValue n={loan.principal} currency={loan.currencyCode} />
-          </div>
-          <div className="stat-card card" style={hueStyle(loan.direction === 'owed_to_me' ? 'var(--profit)' : 'var(--loss)')}>
-            <Tooltip text="How much of this loan is still unpaid, after subtracting all repayments logged so far.">
-              <div className="label clickable">Outstanding</div>
-            </Tooltip>
-            <MoneyValue n={outstanding} currency={loan.currencyCode} />
-            {pendingImpact !== 0 && (
-              <div className="sub">
-                -{fmtMoney(pendingImpact, loan.currencyCode)} pending → {fmtMoney(Math.max(0, outstanding - pendingImpact), loan.currencyCode)} incl. pending
-              </div>
-            )}
           </div>
         </div>
-      </Card>
-      {/* README item 100 of a 2026-08-26 feedback batch: repayments (real
-         transactions) are more important than the payoff planner (a "what
-         if" estimate), so they come first. */}
-      <h3>Repayments</h3>
-      <RepaymentsSection loan={loan} />
-      <LoanBalanceChart loan={loan} repayments={repayments} />
-      <PayoffPlanner loan={loan} outstanding={outstanding} />
+      ),
+    },
+    {
+      key: 'payments',
+      label: 'Payments',
+      defaultOpen: true,
+      content: <RepaymentsSection loan={loan} onEditPayment={setEditPayment} />,
+    },
+    {
+      key: 'analytics',
+      label: 'Analytics',
+      content: (
+        <div>
+          <LoanBalanceChart loan={loan} repayments={repayments} />
+          <PayoffPlanner loan={loan} outstanding={outstanding} />
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="standard-page">
+      <button className="btn secondary small mb-12" onClick={onBack}>← All personal loans</button>
+      <StandardPageSections sections={sections} defaultKey="summary" />
+      <FabPanel actions={[{ label: 'Add payment', icon: <TransferIcon />, onClick: () => setAddPaymentOpen(true) }]} />
+      {editLoanOpen && (
+        <Modal title="Edit loan" onClose={() => setEditLoanOpen(false)}>
+          <LoanForm loan={loan} onSaved={() => setEditLoanOpen(false)} />
+        </Modal>
+      )}
+      {addPaymentOpen && (
+        <TransactionEntryModal
+          defaultFinance={{ module: 'personalLoans', ref: loan.id, currencyCode: loan.currencyCode }}
+          onClose={() => setAddPaymentOpen(false)}
+        />
+      )}
+      {editPayment && (
+        <TransactionEntryModal
+          defaultFinance={{ module: 'personalLoans', ref: loan.id, currencyCode: loan.currencyCode }}
+          editPersonalLoanPayment={editPayment}
+          onClose={() => setEditPayment(null)}
+        />
+      )}
     </div>
   );
 }
