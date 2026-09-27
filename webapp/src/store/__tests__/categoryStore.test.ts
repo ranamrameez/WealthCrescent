@@ -60,3 +60,16 @@ describe('categoryStore — app vs custom categories', () => {
     expect(categories.find((c) => c.id === 'user-added-1')?.scope).toBe('custom');
   });
 });
+
+it('backfills newly introduced app categories into an older saved registry', () => {
+  useCategoryStore.getState().setWorkbook({
+    categories: [
+      { id: 'cat_grocery', serialNumber: 1, name: 'Grocery', scope: 'app' },
+      { id: 'user-added-1', serialNumber: 99, name: 'Custom', scope: 'custom' },
+    ],
+  });
+  const ids = new Set(useCategoryStore.getState().workbook.categories.map((category) => category.id));
+  expect(ids.has('cat_loan_borrowed')).toBe(true);
+  expect(ids.has('cat_loan_lent')).toBe(true);
+  expect(ids.has('user-added-1')).toBe(true);
+});
