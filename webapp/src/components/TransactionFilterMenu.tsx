@@ -4,7 +4,7 @@ import { Field, Select } from './ui/Field';
 import { currentMonthRange, presetDateRange } from '../lib/dateRange';
 import type { TransactionPageFilters, TransactionPeriod } from '../hooks/useUrlTransactionFilters';
 import { FilterIcon } from './icons';
-export function TransactionFilterMenu({value,categories,activeCount,onChange,onClear}:{value:TransactionPageFilters;categories:string[];activeCount:number;onChange:(patch:Partial<TransactionPageFilters>)=>void;onClear:()=>void;}){
+export function TransactionFilterMenu({value,categories,accountOptions,activeCount,onChange,onClear}:{value:TransactionPageFilters;categories:string[];accountOptions?:Array<{value:string;label:string}>;activeCount:number;onChange:(patch:Partial<TransactionPageFilters>)=>void;onClear:()=>void;}){
  const [open,setOpen]=useState(false);
  const applyPreset=(period:TransactionPeriod)=>{if(period==='since-month'){const r=currentMonthRange();onChange({period,fromDate:r.startDate,toDate:r.endDate});return;}if(period==='all'){onChange({period,fromDate:'',toDate:''});return;}if(period==='custom'){onChange({period});return;}const r=presetDateRange(period);onChange({period,fromDate:r.startDate,toDate:r.endDate});};
  return <><button type="button" className="btn secondary small topbar-filter-btn" onClick={()=>setOpen(true)}><FilterIcon size={14}/> Filters{activeCount?` (${activeCount})`:''}</button>
@@ -15,6 +15,7 @@ export function TransactionFilterMenu({value,categories,activeCount,onChange,onC
    <Field label="To (blank = no end date)"><input type="date" value={value.toDate} min={value.fromDate||undefined} onChange={e=>onChange({period:'custom',toDate:e.target.value})}/></Field>
    <Field label="Direction"><Select value={value.direction} onChange={e=>onChange({direction:e.target.value as TransactionPageFilters['direction']})}><option value="all">All</option><option value="in">Money in</option><option value="out">Money out</option></Select></Field>
    <Field label="Category"><Select value={value.category} onChange={e=>onChange({category:e.target.value})}><option value="all">All categories</option>{categories.map(c=><option key={c} value={c}>{c}</option>)}</Select></Field>
+   {accountOptions?.length ? <Field label="Account"><Select value={value.accountId} onChange={e=>onChange({accountId:e.target.value})}><option value="all">All accounts</option>{accountOptions.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</Select></Field> : null}
    <Field label="Source"><Select value={value.source} onChange={e=>onChange({source:e.target.value as TransactionPageFilters['source']})}><option value="all">All</option><option value="manual">Manual</option><option value="statement-import">Imported</option></Select></Field>
   </div>
   <div className="modal-footer-actions"><button type="button" className="btn secondary small" onClick={onClear}>Reset</button><button type="button" className="btn small" onClick={()=>setOpen(false)}>Done</button></div>
