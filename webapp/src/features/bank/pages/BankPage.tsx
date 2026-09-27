@@ -2341,15 +2341,6 @@ export function PlanningTab({
 // data" stays here — a real, destructive, module-scoped action `/app-data`
 // has no equivalent for.
 function DataManagement() {
-  const setWorkbook = useBankWorkbookStore((s) => s.setWorkbook);
-
-  const clearAll = async () => {
-    const ok = await confirmDialog('This cannot be undone (export a backup first if unsure).', 'Clear all banking data?');
-    if (!ok) return;
-    setWorkbook(createEmptyBankWorkbook());
-    toast('All banking data cleared.');
-  };
-
   return (
     <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12 }}>
       <div className="text-muted" style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: 11, letterSpacing: '.04em', marginBottom: 8 }}>
@@ -2357,11 +2348,8 @@ function DataManagement() {
       </div>
       <p className="text-muted" style={{ marginTop: 0 }}>
         Currency preferences live on the <Link to="/account">Account page</Link>; whole-app JSON
-        export/import lives on the <Link to="/app-data">Data page</Link>.
+        export/import lives on the <Link to="/app-data">Data page</Link>. Destructive Banking actions live under this card's Actions menu.
       </p>
-      <div className="row gap-sm">
-        <button className="btn danger" onClick={clearAll}><TrashIcon size={12} />Clear all data</button>
-      </div>
     </div>
   );
 }
@@ -2401,6 +2389,7 @@ export function BankPage({
     [allAccounts],
   );
   const transactions = useBankWorkbookStore((state) => state.workbook.transactions);
+  const setWorkbook = useBankWorkbookStore((state) => state.setWorkbook);
   const creditCards = useCreditCardWorkbookStore((state) => state.workbook.cards);
   const categories = useCategoryStore((state) => state.workbook.categories);
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
@@ -2454,6 +2443,13 @@ export function BankPage({
       }]
     : [];
 
+  const clearBankingData = async () => {
+    const ok = await confirmDialog('This cannot be undone (export a backup first if unsure).', 'Clear all banking data?');
+    if (!ok) return;
+    setWorkbook(createEmptyBankWorkbook());
+    toast('All banking data cleared.');
+  };
+
   const sections: StandardPageSection[] = [
     {
       key: 'summary',
@@ -2502,6 +2498,7 @@ export function BankPage({
     {
       key: 'settings',
       label: 'Settings',
+      actions: [{ label: 'Clear all banking data', icon: <TrashIcon size={14} />, tone: 'danger', onClick: () => { void clearBankingData(); } }],
       content: (
         <div>
           <p className="text-muted mt-0">
