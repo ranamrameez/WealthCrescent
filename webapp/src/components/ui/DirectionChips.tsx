@@ -27,7 +27,7 @@ export function DirectionChips({
   labels: { in: string; out: string };
 }) {
   return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+    <div className="chip-tabs">
       {(['in', 'out'] as const).map((dir) => (
         <button
           key={dir}
