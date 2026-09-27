@@ -330,8 +330,9 @@ function TxRowFields({
         <Field label="Link to another finance">
           <YesNoChips
             value={row.linked}
+            disableYes={row.subscriptionMode}
+            title={row.subscriptionMode ? 'Subscription payments use the subscription\'s configured Paid via finance and are not two-sided transfer links.' : undefined}
             onChange={(linked) => {
-              if (row.subscriptionMode && linked) return;
               const remembered = linked ? getLastTransferSource(row.finance) : undefined;
               const rememberedIsUsable = remembered && (!linkSideRequiresRef(remembered) || !!remembered.ref);
               onChange({ ...row, linked, other: rememberedIsUsable ? remembered : row.other, toAmount: undefined, toAmountTouched: false });
