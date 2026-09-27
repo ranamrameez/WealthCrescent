@@ -772,11 +772,15 @@ function PersonalLoanAnalyticsSection({
   applyChartTheme();
 
   const inPeriod = (date: string) => (!fromDate || date >= fromDate) && (!toDate || date <= toDate);
+  const priorCleared = payments
+    .filter((payment) => !payment.isPending && !!fromDate && payment.date < fromDate)
+    .reduce((sum, payment) => sum + payment.amount, 0);
+  const startingBalance = Math.max(0, loan.principal - priorCleared);
   const cleared = [...payments].filter((payment) => !payment.isPending && inPeriod(payment.date)).sort((a, b) => a.date.localeCompare(b.date) || (a.seq ?? 0) - (b.seq ?? 0));
   const pending = payments.filter((payment) => payment.isPending && inPeriod(payment.date));
   const activePlans = plans.filter((plan) => !plan.executed && inPeriod(plan.date));
 
-  let balance = loan.principal;
+  let balance = startingBalance;
   const ledger = cleared.map((payment) => {
     balance = Math.max(0, balance - payment.amount);
     return { payment, balance };
@@ -789,10 +793,10 @@ function PersonalLoanAnalyticsSection({
 
   const dates = [...new Set([...cleared.map((p) => p.date), ...pending.map((p) => p.date), ...activePlans.map((p) => p.date)])].sort();
   const labels = ['Opening', ...dates.map((date) => formatDate(date, dateFormat)), 'Closing'];
-  const actualByDate = dates.map((date) => ledger.filter((row) => row.payment.date <= date).at(-1)?.balance ?? loan.principal);
+  const actualByDate = dates.map((date) => ledger.filter((row) => row.payment.date <= date).at(-1)?.balance ?? startingBalance);
   const pendingByDate = dates.map((date) => pending.filter((p) => p.date === date).reduce((sum, p) => sum + p.amount, 0));
   const plannedByDate = dates.map((date) => activePlans.filter((p) => p.date === date).reduce((sum, p) => sum + p.amount, 0));
-  let expected = loan.principal;
+  let expected = startingBalance;
   const expectedByDate = dates.map((date) => {
     const actualPaid = cleared.filter((p) => p.date === date).reduce((sum, p) => sum + p.amount, 0);
     const pendingPaid = pending.filter((p) => p.date === date).reduce((sum, p) => sum + p.amount, 0);
@@ -800,19 +804,19 @@ function PersonalLoanAnalyticsSection({
     expected = Math.max(0, expected - actualPaid - pendingPaid - plannedPaid);
     return expected;
   });
-  const actualChartData = [loan.principal, ...actualByDate, actualByDate.at(-1) ?? loan.principal];
-  const pendingChartData = [0, ...pendingByDate, 0];
-  const plannedChartData = [0, ...plannedByDate, 0];
-  const expectedChartData = [loan.principal, ...expectedByDate, expectedByDate.at(-1) ?? loan.principal];
+  const actualChartData = [startingBalance, ...actualByDate, actualByDate.at(-1) ?? startingBalance];
+  const pendingChartData = [0, ...pendingByDate.map((amount) => -amount), 0];
+  const plannedChartData = [0, ...plannedByDate.map((amount) => -amount), 0];
+  const expectedChartData = [startingBalance, ...expectedByDate, expectedByDate.at(-1) ?? startingBalance];
 
   const months = [...new Set([...cleared.map((p) => p.date.slice(0, 7)), ...pending.map((p) => p.date.slice(0, 7)), ...activePlans.map((p) => p.date.slice(0, 7))])].sort();
   const deposits = months.map((month) => loan.direction === 'owed_to_me' ? cleared.filter((p) => p.date.startsWith(month)).reduce((sum, p) => sum + p.amount, 0) : 0);
   const withdrawals = months.map((month) => loan.direction === 'i_owe' ? cleared.filter((p) => p.date.startsWith(month)).reduce((sum, p) => sum + p.amount, 0) : 0);
-  const monthlyActualBalance = months.map((month) => ledger.filter((row) => row.payment.date.slice(0, 7) <= month).at(-1)?.balance ?? loan.principal);
-  const monthlyExpectedAdjustment = months.map((month) =>
+  const monthlyActualBalance = months.map((month) => ledger.filter((row) => row.payment.date.slice(0, 7) <= month).at(-1)?.balance ?? startingBalance);
+  const monthlyExpectedAdjustment = months.map((month) => -(
     pending.filter((p) => p.date.startsWith(month)).reduce((sum, p) => sum + p.amount, 0)
     + activePlans.filter((p) => p.date.startsWith(month)).reduce((sum, p) => sum + p.amount, 0)
-  );
+  ));
 
   const periodEndActual = ledger.at(-1)?.balance ?? loan.principal;
   const periodEndPending = pending.reduce((sum, payment) => sum + payment.amount, 0);
@@ -829,7 +833,7 @@ function PersonalLoanAnalyticsSection({
 
   return <div className="analytics-grid">
     <AnalyticsChartEnhancer />
-    <div className="analytics-chart chart-height-lg"><Tooltip text="Outstanding loan amount after each cleared payment, using the same chart layout as Bank Account."><h4 className="clickable">Balance over time</h4></Tooltip><div className="chart-canvas-wrap"><Line plugins={[chartDepthPlugin]} data={({labels:['Opening', ...ledger.map((row)=>formatDate(row.payment.date,dateFormat)), 'Closing'],datasets:[{type:'bar' as never,label:'Balance columns',data:[loan.principal,...ledger.map((row)=>row.balance),periodEndActual],backgroundColor:chartAlpha('#38bdf8',.18),borderColor:chartAlpha('#38bdf8',.5),borderWidth:1,borderRadius:4},{label:'Balance by transaction',data:[loan.principal,...ledger.map((row)=>row.balance),periodEndActual],borderColor:chartAlpha('#38bdf8',.9),backgroundColor:chartAlpha('#38bdf8',.2),fill:true,tension:.24,pointRadius:0,pointHoverRadius:4},{label:'Start → end balance',data:[loan.principal,...ledger.map(()=>null),periodEndActual],borderColor:chartAlpha('#a78bfa',.95),backgroundColor:'transparent',borderDash:[6,4],borderWidth:2,pointRadius:3,pointHoverRadius:5,spanGaps:true}]} as any)} options={{responsive:true,maintainAspectRatio:false,scales:{x:axisOptions,y:balanceAxis},interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,labels:{filter:(item)=>item.datasetIndex!==0}},tooltip:{enabled:true,filter:(item)=>item.datasetIndex!==0},datalabels:{display:false}}}} /></div></div>
+    <div className="analytics-chart chart-height-lg"><Tooltip text="Outstanding loan amount after each cleared payment, using the same chart layout as Bank Account."><h4 className="clickable">Balance over time</h4></Tooltip><div className="chart-canvas-wrap"><Line plugins={[chartDepthPlugin]} data={({labels:['Opening', ...ledger.map((row)=>formatDate(row.payment.date,dateFormat)), 'Closing'],datasets:[{type:'bar' as never,label:'Balance columns',data:[startingBalance,...ledger.map((row)=>row.balance),periodEndActual],backgroundColor:chartAlpha('#38bdf8',.18),borderColor:chartAlpha('#38bdf8',.5),borderWidth:1,borderRadius:4},{label:'Balance by transaction',data:[loan.principal,...ledger.map((row)=>row.balance),periodEndActual],borderColor:chartAlpha('#38bdf8',.9),backgroundColor:chartAlpha('#38bdf8',.2),fill:true,tension:.24,pointRadius:0,pointHoverRadius:4},{label:'Start → end balance',data:[startingBalance,...ledger.map(()=>null),periodEndActual],borderColor:chartAlpha('#a78bfa',.95),backgroundColor:'transparent',borderDash:[6,4],borderWidth:2,pointRadius:3,pointHoverRadius:5,spanGaps:true}]} as any)} options={{responsive:true,maintainAspectRatio:false,scales:{x:axisOptions,y:balanceAxis},interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,labels:{filter:(item)=>item.datasetIndex!==0}},tooltip:{enabled:true,filter:(item)=>item.datasetIndex!==0},datalabels:{display:false}}}} /></div></div>
     <div className="analytics-chart chart-height-lg"><Tooltip text="Payments by month, with actual outstanding and pending/planned expected change."><h4 className="clickable">Net Flows Over Time</h4></Tooltip><div className="chart-canvas-wrap"><Bar plugins={[chartDepthPlugin]} data={({labels:months,datasets:[{label:'Deposits',data:deposits,backgroundColor:chartAlpha(profit,.72),borderColor:chartAlpha(profit,.95),borderWidth:2,borderRadius:6},{label:'Withdrawals',data:withdrawals,backgroundColor:chartAlpha(loss,.72),borderColor:chartAlpha(loss,.95),borderWidth:2,borderRadius:6},{label:'Actual balance',data:monthlyActualBalance,backgroundColor:chartAlpha('#38bdf8',.42),borderColor:chartAlpha('#38bdf8',.85),borderWidth:1,borderRadius:4,stack:'balance'},{label:'Expected balance',data:monthlyExpectedAdjustment,backgroundColor:chartAlpha('#a78bfa',.5),borderColor:chartAlpha('#a78bfa',.9),borderWidth:1,borderRadius:4,stack:'balance'},{type:'line' as never,label:'Actual balance',data:monthlyActualBalance,borderColor:chartAlpha('#38bdf8',.95),backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.2}]} as any)} options={{interaction:{mode:'index',intersect:false},scales:{x:{...axisOptions,stacked:true},y:axisOptions},plugins:{legend:{labels:{filter:(item)=>item.datasetIndex!==2}},tooltip:{filter:(item)=>item.datasetIndex!==2},datalabels:dlBarV((v)=>fmtMoney(v,loan.currencyCode))}}} /></div></div>
     <div className="analytics-chart"><Tooltip text="Total payment amount grouped by category."><h4 className="clickable">Transactions by category</h4></Tooltip><div className="chart-canvas-wrap"><Doughnut plugins={[chartDepthPlugin]} data={({labels:categoryTotals.map(([name])=>name),datasets:[{label:'Payments',data:categoryTotals.map(([,amount])=>amount),backgroundColor:categoryTotals.map(([name])=>chartAlpha(tickerColor(name),.72)),borderColor:categoryTotals.map(([name])=>chartAlpha(tickerColor(name),.95)),borderWidth:2,hoverOffset:8}]} as any)} options={{responsive:true,maintainAspectRatio:false,cutout:'48%',rotation:-25,plugins:{legend:{display:true,position:'right',labels:{boxWidth:10,padding:8}},datalabels:dlDoughnut((v)=>fmtMoney(v,loan.currencyCode))},layout:{padding:8}}} /></div></div>
     <div className="analytics-chart"><Tooltip text="Opening outstanding, actual payments, pending payments, plans, and expected outstanding."><h4 className="clickable">Actual vs Expected Balance (Pending &amp; Planned)</h4></Tooltip><div className="chart-canvas-wrap"><Bar plugins={[chartDepthPlugin]} data={({labels,datasets:[{type:'bar' as never,label:'Actual balance',data:actualChartData,backgroundColor:chartAlpha('#38bdf8',.42),borderColor:chartAlpha('#38bdf8',.85),borderWidth:2,borderRadius:6,stack:'balance'},{type:'line' as never,label:'Actual balance',data:actualChartData,borderColor:chartAlpha('#38bdf8',.95),backgroundColor:'transparent',borderWidth:2,pointRadius:0,tension:.2},{type:'line' as never,label:'Pending balance',data:pendingChartData,borderColor:chartAlpha('#f59e0b',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[5,4],pointRadius:0},{type:'line' as never,label:'Planned balance',data:plannedChartData,borderColor:chartAlpha('#22c55e',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[8,3],pointRadius:0},{type:'line' as never,label:'Expected balance',data:expectedChartData,borderColor:chartAlpha('#a78bfa',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[2,3],pointRadius:0}]} as any)} options={{interaction:{mode:'index',intersect:false},scales:{x:{...axisOptions,stacked:true},y:balanceAxis},plugins:{legend:{display:true,labels:{filter:(item)=>item.datasetIndex!==0}},tooltip:{filter:(item)=>item.datasetIndex!==0},datalabels:{display:false}}}} /></div></div>
