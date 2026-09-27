@@ -318,7 +318,7 @@ export function SideFields({
     if (!candidates.length || candidates.some((entity) => entity.id === cfg.ref)) return;
     const first = candidates[0];
     onChange({ ...cfg, ref: first.id, currencyCode: first.currencyCode });
-  }, [subscriptionMode, hasRefPicker, cfg, entities, filteredEntities, onChange]);
+  }, [disabled, subscriptionMode, hasRefPicker, cfg, entities, filteredEntities, onChange]);
 
   return (
     <div className="row gap-sm" style={{ alignItems: 'flex-end', flexWrap: 'nowrap', overflowX: 'auto' }}>
