@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { RentalPlanEditor } from '../../features/rentals/pages/RentalPlanEditor';
 import { OrphanPlanCleanup } from '../OrphanPlanCleanup';
+import { AddBankPlanForm } from '../../features/bank/pages/BankPage';
 import { usePlannedRentalsWorkbookStore as rentals } from '../../store/plannedRentalsWorkbookStore';
 import { usePlannedBankWorkbookStore as bankPlans } from '../../store/plannedBankWorkbookStore';
 import { useBankWorkbookStore as bank } from '../../store/bankWorkbookStore';
@@ -43,4 +44,27 @@ it('repairs legacy orphan plans only on request and retains completed and valid 
   expect(bankPlans.getState().workbook.entries).toHaveLength(3);
   fireEvent.click(screen.getByRole('button', { name: 'Remove orphaned plans' }));
   await waitFor(() => expect(bankPlans.getState().workbook.entries.map(plan => plan.id)).toEqual(['done', 'valid']));
+});
+
+it('keeps Bank plan Withdrawal selected before an amount is entered and saves a negative amount', async () => {
+  render(<AddBankPlanForm accountId="bank-account" />);
+
+  const withdrawal = screen.getByRole('button', { name: 'Withdrawal' });
+  const deposit = screen.getByRole('button', { name: 'Deposit' });
+
+  fireEvent.click(withdrawal);
+  expect(withdrawal).toHaveClass('active');
+  expect(deposit).not.toHaveClass('active');
+
+  fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Planned transfer' } });
+  fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '250' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Add plan' }));
+
+  await waitFor(() => {
+    expect(bankPlans.getState().workbook.entries[0]).toMatchObject({
+      accountId: 'bank-account',
+      description: 'Planned transfer',
+      amount: -250,
+    });
+  });
 });
