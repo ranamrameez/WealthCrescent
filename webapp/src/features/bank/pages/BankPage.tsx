@@ -2403,9 +2403,12 @@ export function BankPage({
   const categories = useCategoryStore((state) => state.workbook.categories);
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
   const categoryOptions = useMemo(() => [...new Set(transactions.map((tx) => categoryName(tx.categoryID, categories)))].sort(), [transactions, categories]);
-  usePageTopBarRightSlot(<TopBarControls>
-    <TransactionFilterMenu value={filters} categories={categoryOptions} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} />
-  </TopBarControls>);
+  const topBarFilters = useMemo(() => (
+    <TopBarControls>
+      <TransactionFilterMenu value={filters} categories={categoryOptions} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} />
+    </TopBarControls>
+  ), [filters, categoryOptions, activeCount, setFilters, resetFilters]);
+  usePageTopBarRightSlot(topBarFilters);
   const sections: StandardPageSection[] = [
     { key: 'summary', label: 'Banking summary', summary: <SummaryChip label="Accounts" value={accounts.length} />, content: <BankingScopeSummary accounts={accounts} filters={filters} /> },
     { key: 'banks', label: 'Banks', content: <BanksList /> },
