@@ -191,62 +191,94 @@ function AddLoanFab() {
   );
 }
 
-/** `initialCurrency`/`onSaved(id)` — see `AddAccountForm`'s own comment
- * (`features/bank/pages/BankPage.tsx`) for why: the shared "+" quick-add in
- * `SideFields` reuses this exact form from `TransactionEntryModal`. */
-export function AddLoanForm({ onSaved, initialCurrency }: { onSaved?: (id: string) => void; initialCurrency?: string } = {}) {
+/** One shared Add/Edit form for the Personal Loan entity, mirroring
+ * Banking's shared Account/Bank forms so fields cannot drift between create
+ * and edit. The model keeps the historical `principal` property for data
+ * compatibility, but the UI calls it Amount — these are informal personal
+ * loans, not an interest-bearing principal/interest contract. */
+function LoanForm({
+  loan,
+  onSaved,
+  initialCurrency,
+}: {
+  loan?: PersonalLoan;
+  onSaved?: (id: string) => void;
+  initialCurrency?: string;
+}) {
   const addLoan = usePersonalLoansWorkbookStore((s) => s.addLoan);
+  const updateLoan = usePersonalLoansWorkbookStore((s) => s.updateLoan);
   const primaryCurrency = usePrimaryCurrency();
   const workbookDefaultCurrency = usePersonalLoansWorkbookStore((s) => s.workbook.settings.defaultCurrency);
   const defaultCurrency = primaryCurrency ?? workbookDefaultCurrency;
   const [lastCurrency, setLastCurrency] = useLastCurrency('personalLoans', defaultCurrency);
   const ensureSignedIn = useEnsureSignedIn();
-  const [l, setL] = useState<PersonalLoan>(() => emptyLoan(initialCurrency ?? lastCurrency));
-  const currencyOptions = useEnabledCurrencies(l.currencyCode);
+  const [draft, setDraft] = useState<PersonalLoan>(() => loan ? { ...loan } : emptyLoan(initialCurrency ?? lastCurrency));
+  const currencyOptions = useEnabledCurrencies(draft.currencyCode);
 
   const submit = async () => {
-    if (!l.person.trim()) return toast('Enter a person/lender name.');
-    if (!l.principal || l.principal <= 0) return toast('Enter a principal amount.');
-    if (!(await ensureSignedIn('Sign in to save personal loans.'))) return;
+    if (!draft.person.trim()) return toast('Enter a person name.');
+    if (!draft.principal || draft.principal <= 0) return toast('Enter an amount.');
+    if (!(await ensureSignedIn(loan ? 'Sign in to update this loan.' : 'Sign in to save this loan.'))) return;
+    const normalized = { ...draft, person: draft.person.trim(), note: draft.note?.trim() || undefined };
+    if (loan) {
+      updateLoan(loan.id, normalized);
+      toast('Loan updated.');
+      onSaved?.(loan.id);
+      return;
+    }
     const id = crypto.randomUUID();
-    addLoan({ ...l, id, person: l.person.trim(), note: l.note?.trim() || undefined });
-    toast(`Loan with ${l.person.trim()} saved.`);
-    setL(emptyLoan(l.currencyCode));
+    addLoan({ ...normalized, id });
+    toast(`Loan with ${normalized.person} saved.`);
+    setDraft(emptyLoan(draft.currencyCode));
     onSaved?.(id);
   };
 
   return (
     <div>
       <div className="row gap-sm">
-        <Field label="Person / lender" width={160} required>
-          <TextInput value={l.person} onChange={(e) => setL({ ...l, person: e.target.value })} placeholder="e.g. Bilal" />
+        <Field label="Person" width={180} required>
+          <TextInput value={draft.person} onChange={(e) => setDraft({ ...draft, person: e.target.value })} placeholder="e.g. Bilal" />
         </Field>
-        <Field label="Direction" width={160}>
-          <Select value={l.direction} onChange={(e) => setL({ ...l, direction: e.target.value as PersonalLoan['direction'] })}>
-            <option value="owed_to_me">Money I lent out</option>
-            <option value="i_owe">Money I owe</option>
+        <Field label="Loan type" width={180}>
+          <Select value={draft.direction} onChange={(e) => setDraft({ ...draft, direction: e.target.value as PersonalLoan['direction'] })}>
+            <option value="owed_to_me">I lent money</option>
+            <option value="i_owe">I borrowed money</option>
           </Select>
         </Field>
-        <Field label="Currency" width={100} required>
-          <Select value={l.currencyCode} onChange={(e) => { setL({ ...l, currencyCode: e.target.value }); setLastCurrency(e.target.value); }}>
-            {currencyOptions.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
+        <Field label="Currency" width={110} required>
+          <Select
+            value={draft.currencyCode}
+            onChange={(e) => {
+              setDraft({ ...draft, currencyCode: e.target.value });
+              setLastCurrency(e.target.value);
+            }}
+          >
+            {currencyOptions.map((currency) => <option key={currency.code} value={currency.code}>{currency.code}</option>)}
           </Select>
         </Field>
-        <Field label="Principal" width={110} required title="The original amount of the loan, before any repayments.">
-          <TextInput type="number" step="0.01" value={l.principal || ''} onChange={(e) => setL({ ...l, principal: Number(e.target.value) })} />
-        </Field>
-        <Field label="Date">
-          <TextInput type="date" value={l.date} onChange={(e) => setL({ ...l, date: e.target.value })} />
-        </Field>
-        <Field label="Note (optional)" width={180}>
-          <TextInput value={l.note} onChange={(e) => setL({ ...l, note: e.target.value })} />
+        <Field label="Amount" width={130} required title="The original amount exchanged between you and this person.">
+          <TextInput type="number" step="0.01" min={0} value={draft.principal || ''} onChange={(e) => setDraft({ ...draft, principal: Number(e.target.value) })} />
         </Field>
       </div>
-      <button className="btn mt-12" onClick={submit}>
-        <PlusIcon />Add loan
-      </button>
+      <div className="row gap-sm mt-sm">
+        <Field label="Date">
+          <TextInput type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
+        </Field>
+        <Field label="Note (optional)" width={280}>
+          <TextInput value={draft.note ?? ''} onChange={(e) => setDraft({ ...draft, note: e.target.value })} />
+        </Field>
+      </div>
+      <div className="d-flex justify-center mt-md">
+        <button className="btn" onClick={submit}><SaveIcon />{loan ? 'Save loan' : 'Add loan'}</button>
+      </div>
     </div>
   );
+}
+
+/** Kept as the exported quick-add entry point used by the centralized
+ * transfer picker. It delegates to the same form used for editing. */
+export function AddLoanForm({ onSaved, initialCurrency }: { onSaved?: (id: string) => void; initialCurrency?: string } = {}) {
+  return <LoanForm onSaved={onSaved} initialCurrency={initialCurrency} />;
 }
 
 /** Pending item 62: the direct transfer-link shortcut already on PSX/QSE/
