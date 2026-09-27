@@ -283,10 +283,12 @@ export function SideFields({
   };
 
   useEffect(() => {
-    if (subscriptionMode || !hasRefPicker || cfg.ref || !filteredEntities.length) return;
-    const first = filteredEntities[0];
-    onChange({ ...cfg, ref: first.id, currencyCode: cfg.currencyCode ?? first.currencyCode });
-  }, [subscriptionMode, hasRefPicker, cfg, filteredEntities, onChange]);
+    if (subscriptionMode || !hasRefPicker) return;
+    const candidates = filteredEntities.length ? filteredEntities : entities;
+    if (!candidates.length || candidates.some((entity) => entity.id === cfg.ref)) return;
+    const first = candidates[0];
+    onChange({ ...cfg, ref: first.id, currencyCode: first.currencyCode });
+  }, [subscriptionMode, hasRefPicker, cfg, entities, filteredEntities, onChange]);
 
   return (
     <div className="row gap-sm">
