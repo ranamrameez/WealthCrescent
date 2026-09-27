@@ -547,57 +547,61 @@ export function BankDetailPage() {
   const bank = banks.find((b) => b.id === id);
   const accounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
   const transactions = useBankWorkbookStore((s) => s.workbook.transactions);
-  const updateBank = useBankWorkbookStore((s) => s.updateBank);
   const deleteBank = useBankWorkbookStore((s) => s.deleteBank);
   const ensureSignedIn = useEnsureSignedIn();
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
   const categories = useCategoryStore((state) => state.workbook.categories);
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState({ name: bank?.name ?? '', notes: bank?.notes ?? '', color: bank?.color ?? '' });
-  // Excludes migrated accounts (see `BankAccount.migratedToCreditCardId`) —
-  // once converted to a real `CreditCard` record, the old account is a
-  // closed duplicate of the same real card, not a second account under
-  // this bank (real bug, user-reported 2026-09-13: a migrated account was
-  // still showing up here, clickable into its own separate, fully-editable
-  // page — see `RepairStaleMigrations` in `CreditCardsSection.tsx`).
-  const linkedAccounts = useMemo(() => accounts.filter((a) => a.bankId === id && !a.migratedToCreditCardId), [accounts, id]);
-  const totals = useMemo(() => (bank ? bankTotalsByCurrency(bank.id, accounts, transactions) : {}), [bank, accounts, transactions]);
-  const [addOpen, setAddOpen] = useState(false);
-  // User-requested (2026-09-14): "CCs should be listed in all banks. we
-  // can seperate it using <hr> after the accounts listing" — a card is a
-  // structurally distinct entity from a `BankAccount` (see
-  // `types/creditCard.ts`'s own file-level comment) but still belongs to
-  // this same real institution, so it's surfaced here too, not just under
-  // the module-wide "Credit Cards" tab.
+  const linkedAccounts = useMemo(
+    () => accounts.filter((a) => a.bankId === id && !a.migratedToCreditCardId),
+    [accounts, id],
+  );
+  const totals = useMemo(
+    () => (bank ? bankTotalsByCurrency(bank.id, accounts, transactions) : {}),
+    [bank, accounts, transactions],
+  );
   const allCards = useCreditCardWorkbookStore((s) => s.workbook.cards);
   const cardTransactions = useCreditCardWorkbookStore((s) => s.workbook.transactions);
-  const linkedCards = useMemo(() => allCards.filter((c) => c.bankId === id), [allCards, id]);
-  const categoryOptions = useMemo(() => [...new Set(transactions
-    .filter((tx) => linkedAccounts.some((account) => account.id === tx.accountId))
-    .map((tx) => categoryName(tx.categoryID, categories)))].sort(), [transactions, linkedAccounts, categories]);
+  const linkedCards = useMemo(() => allCards.filter((card) => card.bankId === id), [allCards, id]);
+  const categoryOptions = useMemo(
+    () => [...new Set(
+      transactions
+        .filter((tx) => linkedAccounts.some((account) => account.id === tx.accountId))
+        .map((tx) => categoryName(tx.categoryID, categories)),
+    )].sort(),
+    [transactions, linkedAccounts, categories],
+  );
+  const accountOptions = useMemo(
+    () => linkedAccounts.map((account) => ({ value: account.id, label: `${accountDisplayName(account)} (${account.currencyCode})` })),
+    [linkedAccounts],
+  );
+  const [bankModalOpen, setBankModalOpen] = useState(false);
+  const [addAccountOpen, setAddAccountOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
 
   usePageTopBarRightSlot(bank ? (
     <TopBarControls>
-      <TopBarSelect label="Switch bank" value={bank.id}
-        onChange={(event) => { setEditing(false); navigate(event.target.value ? `/bank/bank/${event.target.value}` : '/bank'); }}
-        options={[{ value: '', label: 'All banks' }, ...banks.filter(item => item.isActive !== false || item.id === bank.id).map(item => ({ value: item.id, label: item.name }))]} />
-      <TransactionFilterMenu value={filters} categories={categoryOptions} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} />
+      <TopBarSelect
+        label="Switch bank"
+        value={bank.id}
+        onChange={(event) => navigate(event.target.value ? `/bank/bank/${event.target.value}` : '/bank')}
+        options={[
+          { value: '', label: 'All banks' },
+          ...banks
+            .filter((item) => item.isActive !== false || item.id === bank.id)
+            .map((item) => ({ value: item.id, label: item.name })),
+        ]}
+      />
+      <TransactionFilterMenu
+        value={filters}
+        categories={categoryOptions}
+        accountOptions={accountOptions}
+        activeCount={activeCount}
+        onChange={setFilters}
+        onClear={resetFilters}
+      />
     </TopBarControls>
   ) : null);
 
-  const startEdit = () => {
-    if (!bank) return;
-    setDraft({ name: bank.name, notes: bank.notes ?? '', color: bank.color ?? '' });
-    setEditing(true);
-  };
-  const save = async () => {
-    if (!bank) return;
-    if (!draft.name.trim()) return toast('Enter a bank name.');
-    if (!(await ensureSignedIn('Sign in to save bank details.'))) return;
-    updateBank(bank.id, { name: draft.name.trim(), notes: draft.notes.trim() || undefined, color: draft.color || undefined });
-    toast('Bank updated.');
-    setEditing(false);
-  };
   const remove = async () => {
     if (!bank) return;
     if (!(await confirmDialog(`Delete "${bank.name}"? Its accounts stay, just no longer grouped under this bank.`))) return;
@@ -609,122 +613,133 @@ export function BankDetailPage() {
 
   if (!bank) {
     return (
-      <div>
+      <div className="standard-page">
         <Link to="/bank">← Back to Banking</Link>
         <p className="text-muted">Bank not found.</p>
       </div>
     );
   }
 
-  return (
-    <div>
-      <Link to="/bank">← Back to Banking</Link>
-      <CollapsibleCard
-        title={editing ? 'Edit bank' : bank.name}
-        defaultOpen
-        headerExtra={
-          !editing && (
-            <>
-              <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={startEdit} />
-              <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={remove} />
-            </>
-          )
-        }
-      >
-        {editing ? (
-          <div>
-            <Field label="Bank name" width={220} required>
-              <TextInput value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-            </Field>
-            <Field label="Notes (optional)" width={220}>
-              <TextInput value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
-            </Field>
-            {/* User-requested (2026-09-09): "Let the user choose color for
-               an entity for better distinction (user may choose blue as
-               UBL brand color is blue)." */}
-            <Field label="Card color (optional)" width={140} title="Colors this Bank's card so it's easy to spot at a glance — pick your bank's own brand color, or anything you like.">
-              <div className="row" style={{ gap: 8, alignItems: 'center' }}>
-                <input type="color" value={draft.color || '#5aa9c9'} onChange={(e) => setDraft({ ...draft, color: e.target.value })} style={{ width: 44, height: 32, padding: 2, minWidth: 0 }} />
-                {draft.color && (
-                  <button type="button" className="btn secondary small" onClick={() => setDraft({ ...draft, color: '' })}>Reset</button>
-                )}
-              </div>
-            </Field>
-            <div className="row gap-sm mt-sm">
-              <button className="btn" onClick={save}><SaveIcon />Save</button>
-              <button className="btn secondary" onClick={() => setEditing(false)}><XIcon />Cancel</button>
-            </div>
+  const summaryActions: StandardCardAction[] = [
+    { label: 'Edit bank', icon: <EditIcon size={14} />, onClick: () => setBankModalOpen(true) },
+    { label: 'Delete bank', icon: <TrashIcon size={14} />, tone: 'danger', onClick: remove },
+  ];
+
+  const sections: StandardPageSection[] = [
+    {
+      key: 'summary',
+      label: 'Summary',
+      defaultOpen: true,
+      summary: <SummaryChip label="Accounts" value={linkedAccounts.length} />,
+      actions: summaryActions,
+      content: (
+        <div>
+          <AttributeList items={[
+            { label: 'Full bank name', value: bank.name },
+            { label: 'Notes', value: bank.notes },
+          ]} />
+          <div className="row mt-md" style={{ gap: 16 }}>
+            {Object.keys(totals).length ? (
+              Object.entries(totals).map(([currency, total]) => (
+                <div key={currency} className="stat-card card" style={hueStyle(bank.color ?? 'var(--accent)')}>
+                  <div className="label">Total ({currency})</div>
+                  <MoneyValue n={total} currency={currency} />
+                </div>
+              ))
+            ) : (
+              <p className="text-muted">No accounts linked yet.</p>
+            )}
           </div>
-        ) : (
-          <div>
-            {bank.notes && <p className="text-muted mt-0">{bank.notes}</p>}
-            <div className="row" style={{ gap: 16 }}>
-              {Object.keys(totals).length ? (
-                Object.entries(totals).map(([c, n]) => (
-                  <div key={c} className="stat-card card" style={hueStyle('var(--accent)')}>
-                    <div className="label">Total ({c})</div>
-                    <MoneyValue n={n} currency={c} />
-                  </div>
-                ))
-              ) : (
-                <p className="text-muted">No accounts linked yet.</p>
-              )}
-            </div>
+          <div className="mt-md">
+            <BankingScopeSummary accounts={linkedAccounts} filters={filters} />
           </div>
-        )}
-      </CollapsibleCard>
-      <StandardPageSections key={bank.id} defaultKey="summary" sections={[
-        { key: 'summary', label: 'Bank summary', summary: <SummaryChip label="Accounts" value={linkedAccounts.length} />, content: <BankingScopeSummary accounts={linkedAccounts} filters={filters} /> },
-        { key: 'accounts', label: 'Accounts', content: (<div className="mt-md">
-        <div className="entity-card-grid">
-          {linkedAccounts.map((a) => (
-            <EntityCard
-              key={a.id}
-              title={accountDisplayName(a)}
-              subtitle={[a.accountType, a.branch].filter(Boolean).join(' · ') || undefined}
-              statLabel={a.isLiability ? 'Owed' : 'Balance'}
-              stat={<MoneyValue n={a.isLiability ? Math.max(0, -accountBalance(a, transactions)) : accountBalance(a, transactions)} currency={a.currencyCode} />}
-              hue={a.isLiability ? (accountBalance(a, transactions) < 0 ? 'var(--loss)' : 'var(--profit)') : (accountBalance(a, transactions) >= 0 ? 'var(--profit)' : 'var(--loss)')}
-              onClick={() => navigate(`/bank/account/${a.id}`)}
-            />
-          ))}
         </div>
-        {!linkedAccounts.length && <p className="text-muted">No accounts linked to this bank yet.</p>}
-      </div>) },
-        { key: 'creditCards', label: 'Credit cards', content: <>{!linkedCards.length && <p className="text-muted">No credit cards linked to this bank yet.</p>}{linkedCards.length > 0 && (
-        <>
-          <hr className="mt-md mb-md" />
-          <h3 className="mt-0 mb-sm">Credit cards</h3>
+      ),
+    },
+    {
+      key: 'accounts',
+      label: 'Accounts',
+      defaultOpen: true,
+      summary: <SummaryChip value={linkedAccounts.length + linkedCards.length} />,
+      content: (
+        <div>
           <div className="entity-card-grid">
-            {linkedCards.map((c) => {
-              const balance = Math.max(0, outstandingBalanceByCard(c, cardTransactions));
+            {linkedAccounts.map((account) => {
+              const balance = accountBalance(account, transactions);
               return (
                 <EntityCard
-                  key={c.id}
-                  title={c.name}
-                  subtitle={<>{c.currencyCode}{c.cardNetwork ? ` · ${c.cardNetwork}` : ''}{c.creditLimit ? ` · Limit ${fmtMoney(c.creditLimit, c.currencyCode)}` : ''}</>}
-                  badge={c.isActive === false ? <span className="pill-warn fs-10">Closed</span> : undefined}
-                  statLabel="Owed"
-                  stat={<MoneyValue n={balance} currency={c.currencyCode} />}
-                  hue={balance > 0 ? 'var(--loss)' : 'var(--profit)'}
-                  onClick={() => navigate(`/bank/card/${c.id}`)}
+                  key={account.id}
+                  title={accountDisplayName(account)}
+                  subtitle={[account.accountType, account.branch].filter(Boolean).join(' · ') || undefined}
+                  statLabel={account.isLiability ? 'Owed' : 'Balance'}
+                  stat={<MoneyValue n={account.isLiability ? Math.max(0, -balance) : balance} currency={account.currencyCode} />}
+                  hue={account.color ?? (account.isLiability ? (balance < 0 ? 'var(--loss)' : 'var(--profit)') : (balance >= 0 ? 'var(--profit)' : 'var(--loss)'))}
+                  onClick={() => navigate(`/bank/account/${account.id}`)}
                 />
               );
             })}
           </div>
-        </>
-      )}</> },
-        { key: 'plans', label: 'Plans', content: <BankingScopePlans accounts={linkedAccounts} filters={filters} /> },
-        { key: 'transactions', label: 'Transactions', summary: <SummaryChip label="Accounts" value={linkedAccounts.length} />, content: <BankingScopeTransactions accounts={linkedAccounts} filters={filters} /> },
-        { key: 'analytics', label: 'Analytics', content: <AnalyticsTab bankId={bank.id} /> },
+          {!linkedAccounts.length && <p className="text-muted">No accounts linked to this bank yet.</p>}
+          <hr className="mt-md mb-md" />
+          <h3 className="mt-0 mb-sm">Credit cards</h3>
+          {!linkedCards.length ? (
+            <p className="text-muted">No credit cards linked to this bank yet.</p>
+          ) : (
+            <div className="entity-card-grid">
+              {linkedCards.map((card) => {
+                const balance = Math.max(0, outstandingBalanceByCard(card, cardTransactions));
+                return (
+                  <EntityCard
+                    key={card.id}
+                    title={card.name}
+                    subtitle={<>{card.currencyCode}{card.cardNetwork ? ` · ${card.cardNetwork}` : ''}{card.creditLimit ? ` · Limit ${fmtMoney(card.creditLimit, card.currencyCode)}` : ''}</>}
+                    badge={card.isActive === false ? <span className="pill-warn fs-10">Closed</span> : undefined}
+                    statLabel="Owed"
+                    stat={<MoneyValue n={balance} currency={card.currencyCode} />}
+                    hue={balance > 0 ? 'var(--loss)' : 'var(--profit)'}
+                    onClick={() => navigate(`/bank/card/${card.id}`)}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    { key: 'plans', label: 'Plans', content: <BankingScopePlans accounts={linkedAccounts} filters={filters} /> },
+    {
+      key: 'transactions',
+      label: 'Transactions',
+      summary: <SummaryChip label="Accounts" value={linkedAccounts.length} />,
+      content: <BankingScopeTransactions accounts={linkedAccounts} filters={filters} />,
+    },
+    { key: 'analytics', label: 'Analytics', content: <AnalyticsTab bankId={bank.id} filters={filters} /> },
+  ];
+
+  const transferDefault = linkedAccounts[0]
+    ? { module: 'bank' as const, ref: linkedAccounts[0].id, currencyCode: linkedAccounts[0].currencyCode }
+    : { module: 'bank' as const };
+
+  return (
+    <div className="standard-page">
+      <Link to="/bank">← Back to Banking</Link>
+      <StandardPageSections key={bank.id} defaultKey="summary" sections={sections} />
+      <FabPanel actions={[
+        { label: 'Add an account', icon: <ListIcon />, onClick: () => setAddAccountOpen(true) },
+        { label: 'Transfers', icon: <TransferIcon />, onClick: () => setTransferOpen(true) },
       ]} />
-      <FabButton label="Add account" onClick={() => setAddOpen(true)}>
-        <PlusIcon />
-      </FabButton>
-      {addOpen && (
-        <Modal title="Add an account" onClose={() => setAddOpen(false)}>
-          <AddAccountForm initialBankId={bank.id} onSaved={() => setAddOpen(false)} />
+      {bankModalOpen && (
+        <Modal title="Edit bank" onClose={() => setBankModalOpen(false)}>
+          <BankForm bank={bank} onSaved={() => setBankModalOpen(false)} />
         </Modal>
+      )}
+      {addAccountOpen && (
+        <Modal title="Add an account" onClose={() => setAddAccountOpen(false)}>
+          <AddAccountForm initialBankId={bank.id} onSaved={() => setAddAccountOpen(false)} />
+        </Modal>
+      )}
+      {transferOpen && (
+        <TransactionEntryModal defaultFinance={transferDefault} onClose={() => setTransferOpen(false)} />
       )}
     </div>
   );
