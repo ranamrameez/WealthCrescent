@@ -1586,13 +1586,17 @@ function BankingScopeSummary({ accounts, filters }: { accounts: BankAccount[]; f
   const transactions = useBankWorkbookStore((state) => state.workbook.transactions);
   const plans = usePlannedBankWorkbookStore((state) => state.workbook.entries);
   const categories = useCategoryStore((state) => state.workbook.categories);
-  const accountIds = useMemo(() => new Set(accounts.map((account) => account.id)), [accounts]);
+  const scopedAccounts = useMemo(
+    () => filters.accountId === 'all' ? accounts : accounts.filter((account) => account.id === filters.accountId),
+    [accounts, filters.accountId],
+  );
+  const accountIds = useMemo(() => new Set(scopedAccounts.map((account) => account.id)), [scopedAccounts]);
   const rows = transactions.filter((tx) => accountIds.has(tx.accountId) && transactionMatchesFilters(tx, filters, categories));
   const visiblePlans = plans.filter((plan) => accountIds.has(plan.accountId) && !plan.executed && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate));
-  const currencies = [...new Set(accounts.map((account) => account.currencyCode))].sort();
+  const currencies = [...new Set(scopedAccounts.map((account) => account.currencyCode))].sort();
   if (!currencies.length) return <p className="text-muted m-0">No bank accounts in this scope yet.</p>;
   return <div className="account-summary-grid">{currencies.map((currency) => {
-    const currencyAccounts = accounts.filter((account) => account.currencyCode === currency);
+    const currencyAccounts = scopedAccounts.filter((account) => account.currencyCode === currency);
     const currencyIds = new Set(currencyAccounts.map((account) => account.id));
     const currencyRows = rows.filter((tx) => currencyIds.has(tx.accountId));
     const pending = currencyRows.filter((tx) => tx.isPending).reduce((sum, tx) => sum + tx.amount, 0);
@@ -1616,8 +1620,9 @@ function BankingScopeSummary({ accounts, filters }: { accounts: BankAccount[]; f
 
 function BankingScopePlans({ accounts, filters }: { accounts: BankAccount[]; filters: BankingFilters }) {
   const [addingAccountId, setAddingAccountId] = useState<string | null>(null);
-  if (!accounts.length) return <p className="text-muted m-0">No accounts available for plans.</p>;
-  return <div className="standard-section-stack">{accounts.map((account) => <div key={account.id}>
+  const scopedAccounts = filters.accountId === 'all' ? accounts : accounts.filter((account) => account.id === filters.accountId);
+  if (!scopedAccounts.length) return <p className="text-muted m-0">No accounts available for plans.</p>;
+  return <div className="standard-section-stack">{scopedAccounts.map((account) => <div key={account.id}>
     <div className="section-toolbar" style={{ justifyContent: 'space-between' }}><h4 className="m-0">{accountDisplayName(account)} <span className="text-muted">({account.currencyCode})</span></h4><StandardButton tone="secondary" size="small" icon={<PlusIcon size={12} />} onClick={() => setAddingAccountId(account.id)}>Add plan</StandardButton></div>
     <BankPlanList account={account} horizonDays={null} fromDate={filters.fromDate} toDate={filters.toDate} />
   </div>)}{addingAccountId && <Modal title="Add a plan" onClose={() => setAddingAccountId(null)}><AddBankPlanForm accountId={addingAccountId} onSaved={() => setAddingAccountId(null)} /></Modal>}</div>;
@@ -1638,7 +1643,7 @@ function BankingScopeTransactions({ accounts, filters }: { accounts: BankAccount
   const pageRows = rows.slice((safePage - 1) * pageSize, safePage * pageSize);
   useEffect(() => {
     setPage(1);
-  }, [filters.period, filters.fromDate, filters.toDate, filters.direction, filters.category, filters.source, pageSize]);
+  }, [filters.period, filters.fromDate, filters.toDate, filters.direction, filters.category, filters.source, filters.accountId, pageSize]);
   const exportRows = (items: BankTransaction[], suffix: string) => {
     const csvRows = items.map((tx) => { const account = accountById.get(tx.accountId)!; return [tx.date, accountDisplayName(account), tx.description, categoryName(tx.categoryID, categories), tx.amount, account.currencyCode, tx.isPending ? 'Pending' : 'Cleared']; });
     const blob = new Blob([toCSV([['Date', 'Account', 'Description', 'Category', 'Amount', 'Currency', 'Status'], ...csvRows])], { type: 'text/csv' });
