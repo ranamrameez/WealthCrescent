@@ -1533,6 +1533,54 @@ function BankingScopePlans({ accounts, filters }: { accounts: BankAccount[]; fil
   </div>)}{addingAccountId && <Modal title="Add a plan" onClose={() => setAddingAccountId(null)}><AddBankPlanForm accountId={addingAccountId} onSaved={() => setAddingAccountId(null)} /></Modal>}</div>;
 }
 
+function bankingTransactionRows(
+  accounts: BankAccount[],
+  transactions: BankTransaction[],
+  filters: BankingFilters,
+  categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories'],
+) {
+  const accountIds = new Set(accounts.map((account) => account.id));
+  const scopedRows = transactions
+    .filter((tx) => accountIds.has(tx.accountId))
+    .sort((a, b) => b.date.localeCompare(a.date) || (b.serialNumber ?? 0) - (a.serialNumber ?? 0));
+  return { scopedRows, rows: scopedRows.filter((tx) => transactionMatchesFilters(tx, filters, categories)) };
+}
+
+function exportBankingRows(
+  items: BankTransaction[],
+  accounts: BankAccount[],
+  categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories'],
+  suffix: string,
+) {
+  const accountById = new Map(accounts.map((account) => [account.id, account]));
+  const csvRows = items.flatMap((tx) => {
+    const account = accountById.get(tx.accountId);
+    return account
+      ? [[tx.date, accountDisplayName(account), tx.description, categoryName(tx.categoryID, categories), tx.amount, account.currencyCode, tx.isPending ? 'Pending' : 'Cleared']]
+      : [];
+  });
+  const blob = new Blob([toCSV([['Date', 'Account', 'Description', 'Category', 'Amount', 'Currency', 'Status'], ...csvRows])], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `banking_${suffix}_transactions.csv`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function bankingTransactionActions(
+  accounts: BankAccount[],
+  transactions: BankTransaction[],
+  filters: BankingFilters,
+  categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories'],
+): StandardCardAction[] {
+  const { scopedRows, rows } = bankingTransactionRows(accounts, transactions, filters, categories);
+  return [
+    { label: 'Export filtered', disabled: !rows.length, onClick: () => exportBankingRows(rows, accounts, categories, 'filtered') },
+    { label: 'Export all', disabled: !scopedRows.length, onClick: () => exportBankingRows(scopedRows, accounts, categories, 'all') },
+  ];
+}
+
 function BankingScopeTransactions({ accounts, filters }: { accounts: BankAccount[]; filters: BankingFilters }) {
   const navigate = useNavigate();
   const transactions = useBankWorkbookStore((state) => state.workbook.transactions);
@@ -1541,20 +1589,17 @@ function BankingScopeTransactions({ accounts, filters }: { accounts: BankAccount
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const accountById = useMemo(() => new Map(accounts.map((account) => [account.id, account])), [accounts]);
-  const scopedRows = useMemo(() => transactions.filter((tx) => accountById.has(tx.accountId)).sort((a, b) => b.date.localeCompare(a.date) || (b.serialNumber ?? 0) - (a.serialNumber ?? 0)), [transactions, accountById]);
-  const rows = useMemo(() => scopedRows.filter((tx) => transactionMatchesFilters(tx, filters, categories)), [scopedRows, filters, categories]);
+  const { scopedRows, rows } = useMemo(
+    () => bankingTransactionRows(accounts, transactions, filters, categories),
+    [accounts, transactions, filters, categories],
+  );
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   const safePage = Math.min(page, pageCount);
   const pageRows = rows.slice((safePage - 1) * pageSize, safePage * pageSize);
   useEffect(() => {
     setPage(1);
   }, [filters.period, filters.fromDate, filters.toDate, filters.direction, filters.category, filters.source, filters.accountId, pageSize]);
-  const exportRows = (items: BankTransaction[], suffix: string) => {
-    const csvRows = items.map((tx) => { const account = accountById.get(tx.accountId)!; return [tx.date, accountDisplayName(account), tx.description, categoryName(tx.categoryID, categories), tx.amount, account.currencyCode, tx.isPending ? 'Pending' : 'Cleared']; });
-    const blob = new Blob([toCSV([['Date', 'Account', 'Description', 'Category', 'Amount', 'Currency', 'Status'], ...csvRows])], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `banking_${suffix}_transactions.csv`; anchor.click(); URL.revokeObjectURL(url);
-  };
-  return <><div className="section-toolbar"><StandardButton tone="secondary" size="small" disabled={!rows.length} onClick={() => exportRows(rows, 'filtered')}>Export filtered</StandardButton><StandardButton tone="secondary" size="small" disabled={!scopedRows.length} onClick={() => exportRows(scopedRows, 'all')}>Export all</StandardButton></div><div className="table-responsive"><table>
+  return <><div className="table-responsive"><table>
     <thead><tr><th>Date</th><th>Account</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th></tr></thead>
     <tbody>{pageRows.map((tx) => { const account = accountById.get(tx.accountId)!; return <tr key={tx.id} className="clickable" onClick={() => navigate(`/bank/account/${account.id}`)}>
       <td>{formatDate(tx.date, dateFormat)}</td><td>{accountDisplayName(account)}</td><td>{tx.description}</td><td><span className="pill-info">{categoryName(tx.categoryID, categories)}</span></td>
