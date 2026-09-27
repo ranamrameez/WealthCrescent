@@ -298,6 +298,7 @@ export function propagateLinkedEdit(
     toAmount,
     from: fromCfg,
     to: toCfg,
+    categoryID: link.categoryID,
     note: changes.note !== undefined ? changes.note : link.note,
     rateSource: link.rateSource,
   };
