@@ -927,6 +927,7 @@ function CreditUsageBar({ used, limit, currency }: { used: number; limit: number
 }
 
 export function AccountDetailPage() {
+  const { search } = useLocation();
   const { id } = useParams();
   const navigate = useNavigate();
   const accounts = useBankWorkbookStore((state) => state.workbook.settings.accounts);

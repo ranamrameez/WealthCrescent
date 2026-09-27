@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal } from './Modal';
 import { CheckIcon } from './icons';
+import { fetchProfile, saveModulePreference } from '../lib/firebase/profile';
+import { toast } from './Toast';
 
 export const APP_MODULES = [
   ['netWorth', 'Dashboard'], ['stocks', 'Stock Exchanges'], ['funds', 'Funds'], ['bank', 'Banking'],
@@ -20,8 +22,13 @@ export function readSelectedModules(uid?: string): AppModuleKey[] {
 
 export function ModuleSelectionModal({ uid, onClose, onSaved }: { uid?: string; onClose: () => void; onSaved?: (modules: AppModuleKey[]) => void }) {
   const [selected, setSelected] = useState<AppModuleKey[]>(() => readSelectedModules(uid));
+  useEffect(() => { if (uid) fetchProfile(uid).then((profile) => { if (profile.selectedModules?.length) setSelected(profile.selectedModules.filter((key): key is AppModuleKey => APP_MODULES.some(([id]) => id === key))); }).catch(() => {}); }, [uid]);
   const toggle = (key: AppModuleKey) => setSelected((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
-  const save = () => { localStorage.setItem(storageKey(uid), JSON.stringify(selected)); onSaved?.(selected); onClose(); };
+  const save = async () => {
+    if (!uid) { toast('Sign in to save module preferences.'); return; }
+    try { await saveModulePreference(uid, selected); localStorage.setItem(storageKey(uid), JSON.stringify(selected)); onSaved?.(selected); onClose(); toast('Module preferences saved.'); }
+    catch (error) { toast(error instanceof Error ? error.message : 'Could not save module preferences.'); }
+  };
   return <Modal title="Choose your modules" onClose={onClose}>
     <p className="text-muted mt-0">Select the areas you want to use. You can change this anytime from Account settings.</p>
     <div className="module-selection-grid">{APP_MODULES.map(([key, label]) => <button type="button" key={key} className={`module-selection-option${selected.includes(key) ? ' selected' : ''}`} onClick={() => toggle(key)} aria-pressed={selected.includes(key)}><span>{label}</span>{selected.includes(key) && <CheckIcon size={15} />}</button>)}</div>
