@@ -722,6 +722,185 @@ function PayoffPlanner({ loan, outstanding }: { loan: PersonalLoan; outstanding:
   );
 }
 
+
+function PersonalLoanPlanForm({ loan, onSaved }: { loan: PersonalLoan; onSaved?: () => void }) {
+  const addPlan = usePersonalLoansWorkbookStore((s) => s.addPlan);
+  const ensureSignedIn = useEnsureSignedIn();
+  const [draft, setDraft] = useState<Omit<PersonalLoanPlan, 'id' | 'loanId'>>({
+    date: today(),
+    amount: 0,
+    description: 'Planned payment',
+    categoryID: loanCategoryForDirection(loan.direction),
+    executed: false,
+  });
+
+  const submit = async () => {
+    if (!(draft.amount > 0)) return toast('Enter a planned payment amount.');
+    if (!(await ensureSignedIn('Sign in to save this plan.'))) return;
+    addPlan({ id: crypto.randomUUID(), loanId: loan.id, ...draft });
+    toast('Plan added.');
+    onSaved?.();
+  };
+
+  return (
+    <div>
+      <div className="row gap-sm">
+        <Field label="Amount" required><TextInput type="number" step="0.01" min={0} value={draft.amount || ''} onChange={(e) => setDraft({ ...draft, amount: Number(e.target.value) })} /></Field>
+        <Field label="Description"><TextInput value={draft.description ?? ''} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Field>
+        <Field label="Category"><CategorySelect value={draft.categoryID ?? loanCategoryForDirection(loan.direction)} onChange={(categoryID) => setDraft({ ...draft, categoryID })} /></Field>
+      </div>
+      <div className="row gap-sm mt-sm">
+        <Field label="Date"><TextInput type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} /></Field>
+      </div>
+      <div className="d-flex justify-center mt-md">
+        <button className="btn" onClick={submit}><SaveIcon />Add plan</button>
+      </div>
+    </div>
+  );
+}
+
+function PersonalLoanPlansSection({ loan }: { loan: PersonalLoan }) {
+  const plans = usePersonalLoansWorkbookStore((s) => s.workbook.plans ?? []);
+  const addRepayment = usePersonalLoansWorkbookStore((s) => s.addRepayment);
+  const updatePlan = usePersonalLoansWorkbookStore((s) => s.updatePlan);
+  const deletePlan = usePersonalLoansWorkbookStore((s) => s.deletePlan);
+  const ensureSignedIn = useEnsureSignedIn();
+  const categories = useCategoryStore((s) => s.workbook.categories);
+  const [addOpen, setAddOpen] = useState(false);
+  const rows = useMemo(
+    () => plans.filter((plan) => plan.loanId === loan.id).sort((a, b) => a.date.localeCompare(b.date)),
+    [plans, loan.id],
+  );
+
+  const execute = async (plan: PersonalLoanPlan) => {
+    if (plan.executed) return;
+    if (!(await ensureSignedIn('Sign in to execute this plan.'))) return;
+    addRepayment({
+      id: crypto.randomUUID(),
+      loanId: loan.id,
+      date: plan.date,
+      amount: plan.amount,
+      description: plan.description ?? 'Planned payment',
+      categoryID: plan.categoryID ?? loanCategoryForDirection(loan.direction),
+      source: 'manual',
+    });
+    updatePlan(plan.id, { executed: true });
+    toast('Plan executed and payment logged.');
+  };
+
+  return (
+    <div>
+      <div className="table-responsive">
+        <table>
+          <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {rows.map((plan) => (
+              <tr key={plan.id}>
+                <td>{plan.date}</td>
+                <td>{plan.description || '—'}</td>
+                <td>{categoryName(plan.categoryID, categories)}</td>
+                <td>{fmtMoney(plan.amount, loan.currencyCode)}</td>
+                <td>{plan.executed ? 'Executed' : 'Planned'}</td>
+                <td>
+                  {!plan.executed && <IconButton label="Execute" icon={<CheckIcon size={13} />} align="right" onClick={() => { void execute(plan); }} />}{' '}
+                  <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => deletePlan(plan.id)} />
+                </td>
+              </tr>
+            ))}
+            {!rows.length && <tr><td colSpan={6} className="text-muted">No plans for this loan yet.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <button className="btn secondary small mt-sm" onClick={() => setAddOpen(true)}><PlusIcon size={12} />Add plan</button>
+      {addOpen && <Modal title="Add a plan" onClose={() => setAddOpen(false)}><PersonalLoanPlanForm loan={loan} onSaved={() => setAddOpen(false)} /></Modal>}
+    </div>
+  );
+}
+
+function PersonalLoanAnalyticsSection({
+  loan,
+  payments,
+  plans,
+  fromDate,
+  toDate,
+}: {
+  loan: PersonalLoan;
+  payments: PersonalLoanRepayment[];
+  plans: PersonalLoanPlan[];
+  fromDate?: string;
+  toDate?: string;
+}) {
+  const categories = useCategoryStore((s) => s.workbook.categories);
+  const dateFormat = useAppearanceStore((s) => s.appearance.dateFormat ?? 'DD-MMM-YYYY');
+  useAppearanceStore((s) => s.appearance);
+  applyChartTheme();
+
+  const inPeriod = (date: string) => (!fromDate || date >= fromDate) && (!toDate || date <= toDate);
+  const cleared = [...payments].filter((payment) => !payment.isPending && inPeriod(payment.date)).sort((a, b) => a.date.localeCompare(b.date) || (a.seq ?? 0) - (b.seq ?? 0));
+  const pending = payments.filter((payment) => payment.isPending && inPeriod(payment.date));
+  const activePlans = plans.filter((plan) => !plan.executed && inPeriod(plan.date));
+
+  let balance = loan.principal;
+  const ledger = cleared.map((payment) => {
+    balance = Math.max(0, balance - payment.amount);
+    return { payment, balance };
+  });
+  const categoryTotals = Object.entries(cleared.reduce<Record<string, number>>((out, payment) => {
+    const name = categoryName(payment.categoryID, categories);
+    out[name] = (out[name] ?? 0) + payment.amount;
+    return out;
+  }, {})).sort((a, b) => b[1] - a[1]);
+
+  const dates = [...new Set([...cleared.map((p) => p.date), ...pending.map((p) => p.date), ...activePlans.map((p) => p.date)])].sort();
+  const labels = ['Opening', ...dates.map((date) => formatDate(date, dateFormat)), 'Closing'];
+  const actualByDate = dates.map((date) => ledger.filter((row) => row.payment.date <= date).at(-1)?.balance ?? loan.principal);
+  const pendingByDate = dates.map((date) => pending.filter((p) => p.date === date).reduce((sum, p) => sum + p.amount, 0));
+  const plannedByDate = dates.map((date) => activePlans.filter((p) => p.date === date).reduce((sum, p) => sum + p.amount, 0));
+  let expected = loan.principal;
+  const expectedByDate = dates.map((date) => {
+    const actualPaid = cleared.filter((p) => p.date === date).reduce((sum, p) => sum + p.amount, 0);
+    const pendingPaid = pending.filter((p) => p.date === date).reduce((sum, p) => sum + p.amount, 0);
+    const plannedPaid = activePlans.filter((p) => p.date === date).reduce((sum, p) => sum + p.amount, 0);
+    expected = Math.max(0, expected - actualPaid - pendingPaid - plannedPaid);
+    return expected;
+  });
+  const actualChartData = [loan.principal, ...actualByDate, actualByDate.at(-1) ?? loan.principal];
+  const pendingChartData = [0, ...pendingByDate, 0];
+  const plannedChartData = [0, ...plannedByDate, 0];
+  const expectedChartData = [loan.principal, ...expectedByDate, expectedByDate.at(-1) ?? loan.principal];
+
+  const months = [...new Set([...cleared.map((p) => p.date.slice(0, 7)), ...pending.map((p) => p.date.slice(0, 7)), ...activePlans.map((p) => p.date.slice(0, 7))])].sort();
+  const deposits = months.map((month) => loan.direction === 'owed_to_me' ? cleared.filter((p) => p.date.startsWith(month)).reduce((sum, p) => sum + p.amount, 0) : 0);
+  const withdrawals = months.map((month) => loan.direction === 'i_owe' ? cleared.filter((p) => p.date.startsWith(month)).reduce((sum, p) => sum + p.amount, 0) : 0);
+  const monthlyActualBalance = months.map((month) => ledger.filter((row) => row.payment.date.slice(0, 7) <= month).at(-1)?.balance ?? loan.principal);
+  const monthlyExpectedAdjustment = months.map((month) =>
+    pending.filter((p) => p.date.startsWith(month)).reduce((sum, p) => sum + p.amount, 0)
+    + activePlans.filter((p) => p.date.startsWith(month)).reduce((sum, p) => sum + p.amount, 0)
+  );
+
+  const periodEndActual = ledger.at(-1)?.balance ?? loan.principal;
+  const periodEndPending = pending.reduce((sum, payment) => sum + payment.amount, 0);
+  const periodEndPlanned = activePlans.reduce((sum, plan) => sum + plan.amount, 0);
+  const periodEndExpected = Math.max(0, periodEndActual - periodEndPending - periodEndPlanned);
+
+  if (!cleared.length && !pending.length && !activePlans.length) return <p className="text-muted m-0">No payments or plans match the page filters.</p>;
+
+  const profit = cssVar('--profit') || '#3ecf8e';
+  const loss = cssVar('--loss') || '#e5484d';
+  const gridColor = chartAlpha(cssVar('--border') || '#94a3b8', .28);
+  const axisOptions = { grid: { color: gridColor }, ticks: { color: cssVar('--muted') || '#94a3b8', autoSkip: true, maxTicksLimit: 6, maxRotation: 0 } };
+  const balanceAxis = { ...axisOptions, beginAtZero: true };
+
+  return <div className="analytics-grid">
+    <AnalyticsChartEnhancer />
+    <div className="analytics-chart chart-height-lg"><Tooltip text="Outstanding loan amount after each cleared payment, using the same chart layout as Bank Account."><h4 className="clickable">Balance over time</h4></Tooltip><div className="chart-canvas-wrap"><Line plugins={[chartDepthPlugin]} data={({labels:['Opening', ...ledger.map((row)=>formatDate(row.payment.date,dateFormat)), 'Closing'],datasets:[{type:'bar' as never,label:'Balance columns',data:[loan.principal,...ledger.map((row)=>row.balance),periodEndActual],backgroundColor:chartAlpha('#38bdf8',.18),borderColor:chartAlpha('#38bdf8',.5),borderWidth:1,borderRadius:4},{label:'Balance by transaction',data:[loan.principal,...ledger.map((row)=>row.balance),periodEndActual],borderColor:chartAlpha('#38bdf8',.9),backgroundColor:chartAlpha('#38bdf8',.2),fill:true,tension:.24,pointRadius:0,pointHoverRadius:4},{label:'Start → end balance',data:[loan.principal,...ledger.map(()=>null),periodEndActual],borderColor:chartAlpha('#a78bfa',.95),backgroundColor:'transparent',borderDash:[6,4],borderWidth:2,pointRadius:3,pointHoverRadius:5,spanGaps:true}]} as any)} options={{responsive:true,maintainAspectRatio:false,scales:{x:axisOptions,y:balanceAxis},interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,labels:{filter:(item)=>item.datasetIndex!==0}},tooltip:{enabled:true,filter:(item)=>item.datasetIndex!==0},datalabels:{display:false}}}} /></div></div>
+    <div className="analytics-chart chart-height-lg"><Tooltip text="Payments by month, with actual outstanding and pending/planned expected change."><h4 className="clickable">Net Flows Over Time</h4></Tooltip><div className="chart-canvas-wrap"><Bar plugins={[chartDepthPlugin]} data={({labels:months,datasets:[{label:'Deposits',data:deposits,backgroundColor:chartAlpha(profit,.72),borderColor:chartAlpha(profit,.95),borderWidth:2,borderRadius:6},{label:'Withdrawals',data:withdrawals,backgroundColor:chartAlpha(loss,.72),borderColor:chartAlpha(loss,.95),borderWidth:2,borderRadius:6},{label:'Actual balance',data:monthlyActualBalance,backgroundColor:chartAlpha('#38bdf8',.42),borderColor:chartAlpha('#38bdf8',.85),borderWidth:1,borderRadius:4,stack:'balance'},{label:'Expected balance',data:monthlyExpectedAdjustment,backgroundColor:chartAlpha('#a78bfa',.5),borderColor:chartAlpha('#a78bfa',.9),borderWidth:1,borderRadius:4,stack:'balance'},{type:'line' as never,label:'Actual balance',data:monthlyActualBalance,borderColor:chartAlpha('#38bdf8',.95),backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.2}]} as any)} options={{interaction:{mode:'index',intersect:false},scales:{x:{...axisOptions,stacked:true},y:axisOptions},plugins:{legend:{labels:{filter:(item)=>item.datasetIndex!==2}},tooltip:{filter:(item)=>item.datasetIndex!==2},datalabels:dlBarV((v)=>fmtMoney(v,loan.currencyCode))}}} /></div></div>
+    <div className="analytics-chart"><Tooltip text="Total payment amount grouped by category."><h4 className="clickable">Transactions by category</h4></Tooltip><div className="chart-canvas-wrap"><Doughnut plugins={[chartDepthPlugin]} data={({labels:categoryTotals.map(([name])=>name),datasets:[{label:'Payments',data:categoryTotals.map(([,amount])=>amount),backgroundColor:categoryTotals.map(([name])=>chartAlpha(tickerColor(name),.72)),borderColor:categoryTotals.map(([name])=>chartAlpha(tickerColor(name),.95)),borderWidth:2,hoverOffset:8}]} as any)} options={{responsive:true,maintainAspectRatio:false,cutout:'48%',rotation:-25,plugins:{legend:{display:true,position:'right',labels:{boxWidth:10,padding:8}},datalabels:dlDoughnut((v)=>fmtMoney(v,loan.currencyCode))},layout:{padding:8}}} /></div></div>
+    <div className="analytics-chart"><Tooltip text="Opening outstanding, actual payments, pending payments, plans, and expected outstanding."><h4 className="clickable">Actual vs Expected Balance (Pending &amp; Planned)</h4></Tooltip><div className="chart-canvas-wrap"><Bar plugins={[chartDepthPlugin]} data={({labels,datasets:[{type:'bar' as never,label:'Actual balance',data:actualChartData,backgroundColor:chartAlpha('#38bdf8',.42),borderColor:chartAlpha('#38bdf8',.85),borderWidth:2,borderRadius:6,stack:'balance'},{type:'line' as never,label:'Actual balance',data:actualChartData,borderColor:chartAlpha('#38bdf8',.95),backgroundColor:'transparent',borderWidth:2,pointRadius:0,tension:.2},{type:'line' as never,label:'Pending balance',data:pendingChartData,borderColor:chartAlpha('#f59e0b',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[5,4],pointRadius:0},{type:'line' as never,label:'Planned balance',data:plannedChartData,borderColor:chartAlpha('#22c55e',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[8,3],pointRadius:0},{type:'line' as never,label:'Expected balance',data:expectedChartData,borderColor:chartAlpha('#a78bfa',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[2,3],pointRadius:0}]} as any)} options={{interaction:{mode:'index',intersect:false},scales:{x:{...axisOptions,stacked:true},y:balanceAxis},plugins:{legend:{display:true,labels:{filter:(item)=>item.datasetIndex!==0}},tooltip:{filter:(item)=>item.datasetIndex!==0},datalabels:{display:false}}}} /></div></div>
+    <div className="analytics-chart"><Tooltip text="Actual, pending, planned, and combined expected outstanding at period end."><h4 className="clickable">Period-end balance summary</h4></Tooltip><div className="chart-canvas-wrap"><Doughnut plugins={[chartDepthPlugin]} data={({labels:['Actual','Pending','Planned','Expected'],datasets:[{label:'Period end',data:[Math.abs(periodEndActual),Math.abs(periodEndPending),Math.abs(periodEndPlanned),Math.abs(periodEndExpected)],backgroundColor:['#38bdf8','#f59e0b','#22c55e','#a78bfa'].map((color)=>chartAlpha(color,.72)),borderColor:['#38bdf8','#f59e0b','#22c55e','#a78bfa'],borderWidth:2,hoverOffset:8}]} as any)} options={{responsive:true,maintainAspectRatio:false,cutout:'48%',plugins:{legend:{display:true,position:'right'},tooltip:{callbacks:{label:(item)=>`${item.label}: ${fmtMoney([periodEndActual,periodEndPending,periodEndPlanned,periodEndExpected][item.dataIndex],loan.currencyCode)}`}},datalabels:dlDoughnut((v)=>fmtMoney(v,loan.currencyCode))}}} /></div></div>
+  </div>;
+}
+
 function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; startInEditMode?: boolean }) {
   const repayments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
   const deleteLoan = usePersonalLoansWorkbookStore((s) => s.deleteLoan);
