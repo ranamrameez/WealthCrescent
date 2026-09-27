@@ -92,7 +92,7 @@ const HAS_NOTE: LinkModule[] = ['cash', 'rentals'];
  * "Blunder on CC page transfer" report above) — `CreditCardTransaction`
  * has its own `description` field (see `types/creditCard.ts`), and this
  * popup silently defaulted it to "Payment" with no way to type a real one. */
-const HAS_DESCRIPTION: LinkModule[] = ['bank', 'creditCard'];
+const HAS_DESCRIPTION: LinkModule[] = ['bank', 'cash', 'rentals', 'creditCard'];
 /** User-requested (2026-09-08): a "Pending" state — a real transaction the
  * user already knows is happening but hasn't cleared yet (a sent transfer
  * not yet reflected, a stock order not yet filled). Shipped first for
@@ -285,14 +285,14 @@ function TxRowFields({
       />
 
       <div className="row gap-sm mt-sm" style={{ alignItems: 'flex-end' }}>
+        <Field label="Amount" required title={!showDirection ? 'A repayment is always entered as a positive amount, regardless of which way the debt runs.' : 'You can type a math expression here too, e.g. 10.5+5 — it evaluates once you leave the field.'}>
+          <AmountInput value={row.amount} onChange={(amount) => onChange({ ...row, amount })} />
+        </Field>
         {showDirection && (
           <Field label="Direction">
             <DirectionChips value={row.direction} onChange={(d) => onChange({ ...row, direction: d })} labels={direction!} />
           </Field>
         )}
-        <Field label="Amount" required title={!showDirection ? 'A repayment is always entered as a positive amount, regardless of which way the debt runs.' : 'You can type a math expression here too, e.g. 10.5+5 — it evaluates once you leave the field.'}>
-          <AmountInput value={row.amount} onChange={(amount) => onChange({ ...row, amount })} />
-        </Field>
       </div>
 
       <div className="row gap-sm mt-sm">
@@ -575,7 +575,7 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
             // `buildSideRecord` fallback — `resolvedDefaultFinance` above
             // already guarantees a real currency by the time a row exists.
             currencyCode: r.finance.currencyCode || cashDefaultCurrency,
-            categoryID: r.categoryID, note: r.note.trim() || undefined, source: 'manual',
+            categoryID: r.categoryID, title: r.description.trim() || undefined, note: r.note.trim() || undefined, source: 'manual',
             isPending: r.pending || undefined,
           });
           break;
@@ -584,7 +584,7 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
           addRentalEntry({
             id: uid(), propertyId: r.finance.ref, date: r.date, time: r.time, timezone: r.timezone,
             isDeposit: r.direction === 'in', amount: Math.abs(r.amount),
-            categoryID: r.categoryID, note: r.note.trim() || undefined,
+            categoryID: r.categoryID, title: r.description.trim() || undefined, note: r.note.trim() || undefined,
             isPending: r.pending || undefined,
           });
           break;
