@@ -1141,6 +1141,89 @@ function LoanList({
   );
 }
 
+
+function PersonalLoansModulePlans({
+  filter,
+  onSelectLoan,
+}: {
+  filter: 'all' | 'owed_to_me' | 'i_owe';
+  onSelectLoan: (loan: PersonalLoan) => void;
+}) {
+  const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
+  const plans = usePersonalLoansWorkbookStore((s) => s.workbook.plans ?? []);
+  const visibleLoans = new Map(
+    loans.filter((loan) => filter === 'all' || loan.direction === filter).map((loan) => [loan.id, loan]),
+  );
+  const rows = plans
+    .filter((plan) => visibleLoans.has(plan.loanId))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  return (
+    <div className="table-responsive">
+      <table>
+        <thead><tr><th>Date</th><th>Loan</th><th>Description</th><th>Amount</th><th>Status</th></tr></thead>
+        <tbody>
+          {rows.map((plan) => {
+            const loan = visibleLoans.get(plan.loanId)!;
+            return (
+              <tr key={plan.id} className="clickable" onClick={() => onSelectLoan(loan)}>
+                <td>{plan.date}</td>
+                <td>{loan.person}</td>
+                <td>{plan.description || '—'}</td>
+                <td>{fmtMoney(plan.amount, loan.currencyCode)}</td>
+                <td>{plan.executed ? 'Executed' : 'Planned'}</td>
+              </tr>
+            );
+          })}
+          {!rows.length && <tr><td colSpan={5} className="text-muted">No plans match this loan filter.</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function PersonalLoansModulePayments({
+  filter,
+  onSelectLoan,
+}: {
+  filter: 'all' | 'owed_to_me' | 'i_owe';
+  onSelectLoan: (loan: PersonalLoan) => void;
+}) {
+  const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
+  const payments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
+  const categories = useCategoryStore((s) => s.workbook.categories);
+  const visibleLoans = new Map(
+    loans.filter((loan) => filter === 'all' || loan.direction === filter).map((loan) => [loan.id, loan]),
+  );
+  const rows = payments
+    .filter((payment) => visibleLoans.has(payment.loanId))
+    .sort((a, b) => b.date.localeCompare(a.date) || (b.seq ?? 0) - (a.seq ?? 0));
+
+  return (
+    <div className="table-responsive">
+      <table>
+        <thead><tr><th>Date</th><th>Loan</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th></tr></thead>
+        <tbody>
+          {rows.map((payment) => {
+            const loan = visibleLoans.get(payment.loanId)!;
+            return (
+              <tr key={payment.id} className="clickable" onClick={() => onSelectLoan(loan)}>
+                <td>{payment.date}</td>
+                <td>{loan.person}</td>
+                <td>{payment.description || '—'}</td>
+                <td>{categoryName(payment.categoryID, categories)}</td>
+                <td>{fmtMoney(payment.amount, loan.currencyCode)}</td>
+                <td>{payment.isPending ? 'Pending' : 'Cleared'}</td>
+              </tr>
+            );
+          })}
+          {!rows.length && <tr><td colSpan={6} className="text-muted">No payments match this loan filter.</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // User-reported (2026-08-27, then again 2026-08-28): duplicated the global
 // /account hub's own Sync status section — dropped the status text/heading
 // here, same fix already applied app-wide (see BankPage.tsx for the
@@ -1250,9 +1333,19 @@ export function PersonalLoansPage({
       content: <LoanList onSelect={setSelected} filter={filter} showArchived={showArchived} />,
     },
     {
+      key: 'plans',
+      label: 'Plans',
+      content: <PersonalLoansModulePlans filter={filter} onSelectLoan={setSelected} />,
+    },
+    {
+      key: 'payments',
+      label: 'Payments',
+      content: <PersonalLoansModulePayments filter={filter} onSelectLoan={setSelected} />,
+    },
+    {
       key: 'analytics',
       label: 'Analytics',
-      content: <AnalyticsTab />,
+      content: <AnalyticsTab filter={filter} />,
     },
     {
       key: 'settings',
