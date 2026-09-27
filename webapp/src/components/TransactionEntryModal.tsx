@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Modal } from './Modal';
 import { toast } from './Toast';
 import { PlusIcon, SaveIcon, TrashIcon } from './icons';
-import { Field, Select, TextInput } from './ui/Field';
+import { Field, TextInput } from './ui/Field';
 import { AmountInput } from './ui/AmountInput';
 import { DirectionChips } from './ui/DirectionChips';
 import { TimeZoneFields } from './ui/TimeZoneFields';
@@ -171,11 +171,8 @@ interface TxRow {
   timezone?: string;
   categoryID: string;
   description: string;
-  note: string;
   pending: boolean;
-  /** See `HAS_SUBSCRIPTION`'s own doc comment — set when this real
-   * transaction pays a specific subscription; not part of `LinkSideConfig`/
-   * the `linked` two-sided mechanism at all. */
+  /** Set when the Finance selector is in Subscriptions mode. */
   subscriptionId: string;
   subscriptionMode: boolean;
 }
@@ -208,7 +205,6 @@ function emptyRow(
     timezone: defaultTimezoneForCurrency(currencyCode),
     categoryID: UNCATEGORIZED_ID,
     description: defaultDescription,
-    note: '',
     pending: false,
     subscriptionId: '',
     subscriptionMode: false,
@@ -542,7 +538,7 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
           toAmount: r.direction === 'out' ? otherAmount : financeAmount,
           from: r.direction === 'out' ? resolvedFinance : resolvedOther,
           to: r.direction === 'out' ? resolvedOther : resolvedFinance,
-          note: r.note.trim() || r.description.trim() || undefined,
+          note: r.description.trim() || undefined,
           rateSource: r.rateSource.trim() || undefined,
         });
         if ('error' in result) {
@@ -579,7 +575,7 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
             // `buildSideRecord` fallback — `resolvedDefaultFinance` above
             // already guarantees a real currency by the time a row exists.
             currencyCode: r.finance.currencyCode || cashDefaultCurrency,
-            categoryID: r.categoryID, title: r.description.trim() || undefined, note: r.note.trim() || undefined, source: 'manual',
+            categoryID: r.categoryID, title: r.description.trim() || undefined, source: 'manual',
             isPending: r.pending || undefined,
           });
           break;
@@ -588,7 +584,7 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
           addRentalEntry({
             id: uid(), propertyId: r.finance.ref, date: r.date, time: r.time, timezone: r.timezone,
             isDeposit: r.direction === 'in', amount: Math.abs(r.amount),
-            categoryID: r.categoryID, title: r.description.trim() || undefined, note: r.note.trim() || undefined,
+            categoryID: r.categoryID, title: r.description.trim() || undefined,
             isPending: r.pending || undefined,
           });
           break;
