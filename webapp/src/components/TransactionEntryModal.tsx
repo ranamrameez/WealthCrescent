@@ -276,6 +276,7 @@ function TxRowFields({
             subscriptionMode: true,
             subscriptionId,
             linked: false,
+            direction: 'out',
             timezone: defaultTimezoneForCurrency(useSideCurrencyStatic(finance)),
             toAmount: undefined,
             toAmountTouched: false,
