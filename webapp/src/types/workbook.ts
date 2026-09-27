@@ -159,6 +159,8 @@ export interface Transfer {
   type: 'DEPOSIT' | 'WITHDRAWAL';
   gross: number;
   fee: number;
+  /** Optional description entered through the centralized Transfers popup. */
+  description?: string;
   /** Same reasoning as `Transaction.timestamp` above. */
   timestamp?: string;
 }
