@@ -91,7 +91,6 @@ const HAS_CATEGORY: LinkModule[] = ['bank', 'cash', 'rentals', 'creditCard'];
  * "Blunder on CC page transfer" report above) — `CreditCardTransaction`
  * has its own `description` field (see `types/creditCard.ts`), and this
  * popup silently defaulted it to "Payment" with no way to type a real one. */
-const HAS_DESCRIPTION: LinkModule[] = ['bank', 'cash', 'rentals', 'creditCard'];
 /** User-requested (2026-09-08): a "Pending" state — a real transaction the
  * user already knows is happening but hasn't cleared yet (a sent transfer
  * not yet reflected, a stock order not yet filled). Shipped first for
@@ -294,15 +293,13 @@ function TxRowFields({
       </div>
 
       <div className="row gap-sm mt-sm">
-        {HAS_DESCRIPTION.includes(row.finance.module) && (
-          <Field label="Description" required={row.finance.module === 'bank'}>
-            <TextInput
-              value={row.description}
-              onChange={(e) => onChange({ ...row, description: e.target.value })}
-              placeholder="Transfer By Default"
-            />
-          </Field>
-        )}
+        <Field label="Description" required={row.finance.module === 'bank'}>
+          <TextInput
+            value={row.description}
+            onChange={(e) => onChange({ ...row, description: e.target.value })}
+            placeholder="Transfer By Default"
+          />
+        </Field>
         {HAS_CATEGORY.includes(row.finance.module) && !row.linked && (
           <Field label="Category">
             <CategorySelect value={row.categoryID} onChange={(categoryID) => onChange({ ...row, categoryID })} />
@@ -570,24 +567,24 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
           if (!r.finance.ref) { toast('Pick a loan first.'); continue; }
           addPersonalLoanRepayment({
             id: uid(), loanId: r.finance.ref, date: r.date, time: r.time, timezone: r.timezone,
-            amount: Math.abs(r.amount), isPending: r.pending || undefined,
+            amount: Math.abs(r.amount), description: r.description.trim() || undefined, isPending: r.pending || undefined,
           });
           break;
         case 'emi': {
           if (!r.finance.ref) { toast('Pick a loan first.'); continue; }
           const loan = emiLoans.find((l) => l.id === r.finance.ref);
           if (!loan) { toast('Pick a loan first.'); continue; }
-          addEMIRepayment({ id: uid(), loanId: r.finance.ref, month: nextUnpaidEmiMonth(loan), amount: Math.abs(r.amount), date: r.date, source: 'manual' });
+          addEMIRepayment({ id: uid(), loanId: r.finance.ref, month: nextUnpaidEmiMonth(loan), amount: Math.abs(r.amount), date: r.date, description: r.description.trim() || undefined, source: 'manual' });
           break;
         }
         case 'qse':
-          addQSETransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: 0 });
+          addQSETransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: 0, description: r.description.trim() || undefined });
           break;
         case 'psx':
-          addPSXTransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: 0 });
+          addPSXTransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: 0, description: r.description.trim() || undefined });
           break;
         case 'funds':
-          addFundsTransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: 0 });
+          addFundsTransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: 0, description: r.description.trim() || undefined });
           break;
         case 'creditCard': {
           // User-reported (2026-09-14): "no choice of expense or payment,
