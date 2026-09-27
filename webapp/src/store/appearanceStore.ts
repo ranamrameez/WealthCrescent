@@ -12,7 +12,7 @@ export const DEFAULT_APPEARANCE: Appearance = {
   density: 'comfortable',
   numberDisplay: 'compact',
   dateFormat: 'DD-MMM-YYYY',
-  transferDefaultDescription: 'Transfer By Default',
+  transferDefaultDescription: 'Transfer',
 };
 
 const DATE_FORMATS = new Set([
@@ -29,7 +29,17 @@ function load(): Appearance {
       const dateFormat = typeof legacy === 'string' && DATE_FORMATS.has(legacy)
         ? legacy
         : DEFAULT_APPEARANCE.dateFormat;
-      return { ...DEFAULT_APPEARANCE, ...parsed, dateFormat, colorTheme: normalizeColorTheme(parsed.colorTheme) } as Appearance;
+      const transferDefaultDescription =
+        parsed.transferDefaultDescription === 'Transfer By Default'
+          ? 'Transfer'
+          : parsed.transferDefaultDescription;
+      return {
+        ...DEFAULT_APPEARANCE,
+        ...parsed,
+        transferDefaultDescription,
+        dateFormat,
+        colorTheme: normalizeColorTheme(parsed.colorTheme),
+      } as Appearance;
     }
   } catch {
     /* ignore, fall through to defaults */
