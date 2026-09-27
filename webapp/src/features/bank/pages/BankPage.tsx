@@ -14,7 +14,7 @@ import { Tooltip } from '../../../components/Tooltip';
 import { ChartCard } from '../../qse/components/ChartCard';
 import { AnalyticsChartEnhancer } from '../../../components/AnalyticsChartCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
-import { ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, CheckIcon, EditIcon, ListIcon, PlusIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
+import { ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, BankIcon, CheckIcon, EditIcon, ListIcon, PlusIcon, SaveIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { StandardButton } from '../../../components/standard';
 import { Modal } from '../../../components/Modal';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
@@ -24,7 +24,7 @@ import { PendingToggle } from '../../../components/ui/PendingToggle';
 import { DirectionChips } from '../../../components/ui/DirectionChips';
 import { IconButton } from '../../../components/ui/IconButton';
 import { AttributeList } from '../../../components/ui/AttributeList';
-import { FabButton, FabPanel } from '../../../components/ui/Fab';
+import { FabPanel } from '../../../components/ui/Fab';
 import { TransactionEntryModal } from '../../../components/TransactionEntryModal';
 import { CategorySelect } from '../../../components/CategorySelect';
 import { FinanceEditModal } from '../../../components/FinanceEditModal';
@@ -57,7 +57,6 @@ import { formatDate, fmtMoney, parseDateInput } from '../../../lib/format';
 import { dateOnlyMs } from '../../../lib/datetime';
 import { confirmAndDeleteLinkable, propagateLinkedEdit, resolveLinkedEdit } from '../../../lib/linkCascade';
 import { isValidIbanFormat, lookupIban } from '../../../lib/ibanLookup';
-import { banksForCurrency } from '../../../lib/bankDirectory';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { firebaseReady } from '../../../lib/firebase/client';
 import { useAppearanceStore } from '../../../store/appearanceStore';
@@ -68,8 +67,7 @@ import { usePlannedBankWorkbookStore } from '../../../store/plannedBankWorkbookS
 import { useInterEntityTransfersStore } from '../../../store/interEntityTransfersStore';
 import { linkTargetPath, useLinkSideLabel } from '../../transfers/pages/TransferLinksPage';
 import { CreditCardsTab } from './CreditCardsSection';
-import type { BankAccount, BankTransaction } from '../../../types/bankWorkbook';
-import type { CreditCard } from '../../../types/creditCard';
+import type { Bank, BankAccount, BankTransaction } from '../../../types/bankWorkbook';
 import type { PlannedBankTransaction } from '../../../types/plannedBank';
 import { gridAutoStyle } from '../../../lib/gridStyle';
 
@@ -152,66 +150,29 @@ function IbanLookupFields({ value, onChange, onBankNameFound }: { value: IbanLoo
   );
 }
 
-/** The ONE place an account's bank identity lives — replaces what used to
- * be two disconnected controls (a `Bank`-entity `<Select>`, only shown once
- * at least one Bank existed, and a free-text "Bank name" field IBAN lookup
- * also wrote to). A single type-to-search field: typing an EXISTING bank's
- * name (case-insensitively) links to that real `Bank` entity; typing a new
- * name creates one on blur — "still able to add new Bank in this easy
- * way," per the user's own wording — rather than a fixed enum. Suggestions
- * are the user's own existing banks plus `bankDirectory.ts`'s prefilled
- * Pakistani/Qatari banks FILTERED BY THE ACCOUNT'S OWN CURRENCY ("list
- * banks by currency"). Deliberately not a live bank-lookup API call (the
- * user's own suggested implementation) — this app's locked design
- * decision is no live third-party API calls from a page load/user action;
- * the bundled directory plus the user's own already-created Bank entities
- * serves the same "don't make the user type it from scratch" goal without
- * one. `bankName` (the old free-text field) is kept ONLY as a read fallback
- * for accounts that predate this — for anything typed here going forward,
- * `bankId` is authoritative and `bankName` is cleared. */
-function BankIdentityField({ value, onChange, idSuffix }: { value: Pick<BankAccount, 'bankId' | 'bankName' | 'currencyCode'>; onChange: (patch: Partial<BankAccount>) => void; idSuffix: string }) {
+/** The ONE place an account's Bank-entity link is chosen. New Bank
+ * creation deliberately does not happen here: Banks are added/edited
+ * through the shared Banking popup so full name, notes, and custom color
+ * are captured consistently. `bankName` remains only as a read fallback
+ * for older accounts that predate Bank entities; `bankId` is authoritative
+ * once an existing Bank is selected. */
+function BankIdentityField({ value, onChange }: { value: Pick<BankAccount, 'bankId' | 'bankName' | 'currencyCode'>; onChange: (patch: Partial<BankAccount>) => void }) {
   const banks = useBankWorkbookStore((s) => s.workbook.settings.banks ?? []);
-  const addBank = useBankWorkbookStore((s) => s.addBank);
-  const ensureSignedIn = useEnsureSignedIn();
-  const visibleBanks = useMemo(() => banks.filter((b) => b.isActive !== false), [banks]);
-  const currentName = useMemo(() => {
-    if (value.bankId) return visibleBanks.find((b) => b.id === value.bankId)?.name ?? '';
-    return value.bankName ?? '';
-  }, [value.bankId, value.bankName, visibleBanks]);
-  const [draft, setDraft] = useState(currentName);
-  const [dirty, setDirty] = useState(false);
-  if (!dirty && draft !== currentName) setDraft(currentName);
-
-  const resolve = async () => {
-    const name = draft.trim();
-    setDirty(false);
-    if (!name) { onChange({ bankId: undefined, bankName: undefined }); return; }
-    const existing = visibleBanks.find((b) => b.name.toLowerCase() === name.toLowerCase());
-    if (existing) { onChange({ bankId: existing.id, bankName: undefined }); return; }
-    if (!(await ensureSignedIn('Sign in to add a new bank.'))) { setDraft(currentName); return; }
-    const id = uid();
-    addBank({ id, name });
-    onChange({ bankId: id, bankName: undefined });
-  };
-
-  const suggestions = useMemo(() => {
-    const existingNames = visibleBanks.map((b) => b.name);
-    return [...new Set([...existingNames, ...banksForCurrency(value.currencyCode)])];
-  }, [value.currencyCode, visibleBanks]);
-  const datalistId = `bank-identity-datalist-${idSuffix}`;
+  const visibleBanks = useMemo(() => banks.filter((bank) => bank.isActive !== false), [banks]);
 
   return (
-    <Field label="Bank (optional)" width={220} title="Type to search your own banks or common Pakistani/Qatari banks/wallets. Typing a new name adds it as a real Bank entity so you can later see a combined total for everything at that bank.">
-      <TextInput
-        list={datalistId}
-        value={draft}
-        onChange={(e) => { setDraft(e.target.value); setDirty(true); }}
-        onBlur={resolve}
-        placeholder="e.g. UBL"
-      />
-      <datalist id={datalistId}>
-        {suggestions.map((n) => <option key={n} value={n} />)}
-      </datalist>
+    <Field label="Bank (optional)" width={220} title="Choose an existing Bank entity. Add new banks from the Banking Actions menu so the same popup can capture the full name, notes, and custom color.">
+      <Select
+        value={value.bankId ?? ''}
+        onChange={(event) => {
+          const bankId = event.target.value || undefined;
+          onChange({ bankId, bankName: bankId ? undefined : value.bankName });
+        }}
+      >
+        <option value="">{value.bankName ? `Ungrouped — ${value.bankName}` : 'No bank'}</option>
+        {visibleBanks.map((bank) => <option key={bank.id} value={bank.id}>{bank.name}</option>)}
+      </Select>
+      <span className="text-muted">Need a new bank? Use Actions → Add a bank.</span>
     </Field>
   );
 }
@@ -235,28 +196,61 @@ function BankIdentityField({ value, onChange, idSuffix }: { value: Pick<BankAcco
  * Fixed by registering via the keyed `usePageFabActions` (same mechanism
  * QSE's/PSX's Transfers FAB already used for the single-writer case) —
  * `BankPage` itself renders the one merged `FabPanel` for the whole page. */
+function BankForm({ bank, onSaved }: { bank?: Bank; onSaved?: () => void }) {
+  const addBank = useBankWorkbookStore((s) => s.addBank);
+  const updateBank = useBankWorkbookStore((s) => s.updateBank);
+  const ensureSignedIn = useEnsureSignedIn();
+  const [draft, setDraft] = useState(() => ({
+    name: bank?.name ?? '',
+    notes: bank?.notes ?? '',
+    color: bank?.color ?? '',
+  }));
+
+  const submit = async () => {
+    const name = draft.name.trim();
+    if (!name) return toast('Enter a bank name.');
+    if (!(await ensureSignedIn(bank ? 'Sign in to update this bank.' : 'Sign in to save a bank.'))) return;
+    const patch = { name, notes: draft.notes.trim() || undefined, color: draft.color || undefined };
+    if (bank) {
+      updateBank(bank.id, patch);
+      toast('Bank updated.');
+    } else {
+      addBank({ id: uid(), ...patch });
+      toast('Bank added.');
+    }
+    onSaved?.();
+  };
+
+  return (
+    <div>
+      <div className="row gap-sm">
+        <Field label="Full bank name" width={220} required>
+          <TextInput value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="e.g. United Bank Limited" />
+        </Field>
+        <Field label="Card color (optional)" width={150} title="Choose a custom color for this bank's cards.">
+          <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+            <input type="color" value={draft.color || '#5aa9c9'} onChange={(e) => setDraft({ ...draft, color: e.target.value })} style={{ width: 44, height: 32, padding: 2, minWidth: 0 }} />
+            {draft.color && <button type="button" className="btn secondary small" onClick={() => setDraft({ ...draft, color: '' })}>Reset</button>}
+          </div>
+        </Field>
+      </div>
+      <Field label="Notes (optional)" width={320}>
+        <TextInput value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
+      </Field>
+      <div className="d-flex justify-center mt-md">
+        <button className="btn" onClick={submit}><SaveIcon />{bank ? 'Save bank' : 'Add bank'}</button>
+      </div>
+    </div>
+  );
+}
+
 function AccountsFab() {
   const [open, setOpen] = useState<'account' | 'transfer' | 'bank' | null>(null);
-  const addBank = useBankWorkbookStore((s) => s.addBank);
-  const ensureSignedIn = useEnsureSignedIn();
-  const [bankName, setBankName] = useState('');
-  const submitBank = async () => {
-    if (!bankName.trim()) return toast('Enter a bank name.');
-    if (!(await ensureSignedIn('Sign in to save a bank.'))) return;
-    addBank({ id: uid(), name: bankName.trim() });
-    toast('Bank added.');
-    setBankName('');
-    setOpen(null);
-  };
   const actions = useMemo(
     () => [
-      { label: 'Add an account', icon: <PlusIcon />, onClick: () => setOpen('account') },
+      { label: 'Add an account', icon: <ListIcon />, onClick: () => setOpen('account') },
       { label: 'Transfers', icon: <TransferIcon />, onClick: () => setOpen('transfer') },
-      // Pending item 115(a): grouped here rather than a second floating
-      // button, so it can't stack/overlap with this panel (same class
-      // of bug already fixed once for the app-wide Transfers FAB —
-      // see Done item 239).
-      { label: 'Add a bank', icon: <PlusIcon />, onClick: () => setOpen('bank') },
+      { label: 'Add a bank', icon: <BankIcon />, onClick: () => setOpen('bank') },
     ],
     [],
   );
@@ -271,12 +265,7 @@ function AccountsFab() {
       {open === 'transfer' && <TransactionEntryModal onClose={() => setOpen(null)} />}
       {open === 'bank' && (
         <Modal title="Add a bank" onClose={() => setOpen(null)}>
-          <Field label="Bank name" width={220} required>
-            <TextInput value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. UBL" />
-          </Field>
-          <div className="d-flex justify-center mt-md">
-            <button className="btn" onClick={submitBank}><SaveIcon />Save</button>
-          </div>
+          <BankForm onSaved={() => setOpen(null)} />
         </Modal>
       )}
     </>
@@ -317,7 +306,7 @@ function AccountFormFields({
          Select shown only once a Bank existed, and it's typing-to-create
          so "no bank yet" costs nothing extra. */}
       <div className="row gap-sm mb-sm">
-        <BankIdentityField value={value} onChange={onChange} idSuffix={idSuffix} />
+        <BankIdentityField value={value} onChange={onChange} />
       </div>
       <div className="row gap-sm">
         <Field label="Nickname" width={120} required title="A short account label used in cards and selectors (maximum 11 characters).">
@@ -333,6 +322,12 @@ function AccountFormFields({
         </Field>
         <Field label="Opening balance (optional)" width={140}>
           <TextInput type="number" step="0.01" value={value.openingBalance || ''} onChange={(e) => onChange({ openingBalance: Number(e.target.value) })} />
+        </Field>
+        <Field label="Card color (optional)" width={150} title="Choose a custom color for this account's cards.">
+          <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+            <input type="color" value={value.color || '#5aa9c9'} onChange={(e) => onChange({ color: e.target.value })} style={{ width: 44, height: 32, padding: 2, minWidth: 0 }} />
+            {value.color && <button type="button" className="btn secondary small" onClick={() => onChange({ color: undefined })}>Reset</button>}
+          </div>
         </Field>
       </div>
       {/* README item 82: branch/account-type, free-form (not a fixed enum) —
@@ -451,53 +446,48 @@ export function AddAccountForm({ onSaved, initialCurrency, initialBankId }: { on
  * the PAGE level (see `BankPage`, above the whole `Tabs` component) — the
  * first thing on the page after the title, not nested one level down
  * inside a specific tab. */
-function BanksList() {
+function BanksList({ showArchived = false }: { showArchived?: boolean }) {
   const banks = useBankWorkbookStore((s) => s.workbook.settings.banks ?? []);
   const accounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
   const transactions = useBankWorkbookStore((s) => s.workbook.transactions);
   const navigate = useNavigate();
-  const [showArchived, setShowArchived] = useState(false);
-  const archivedCount = useMemo(() => banks.filter((b) => b.isActive === false).length, [banks]);
   const visibleBanks = useMemo(
-    () => (showArchived ? banks : banks.filter((b) => b.isActive !== false)).sort((a, b) => Number(!!b.isFavorite) - Number(!!a.isFavorite)),
+    () => (showArchived ? banks : banks.filter((bank) => bank.isActive !== false))
+      .sort((a, b) => Number(!!b.isFavorite) - Number(!!a.isFavorite)),
     [banks, showArchived],
   );
-  if (!banks.length) return null;
+
+  if (!banks.length) return <p className="text-muted">No banks yet. Use Actions → Add a bank.</p>;
+  if (!visibleBanks.length) return <p className="text-muted">No active banks to show.</p>;
+
   return (
-    <CollapsibleCard title="Banks" defaultOpen={false}>
-      {archivedCount > 0 && (
-        <button className="btn secondary small mb-12" onClick={() => setShowArchived((v) => !v)}>
-          {showArchived ? 'Hide' : 'Show'} closed ({archivedCount})
-        </button>
-      )}
-      <div className="entity-card-grid">
-        {visibleBanks.map((b) => {
-          const totals = bankTotalsByCurrency(b.id, accounts, transactions);
-          const currencies = Object.keys(totals);
-          const accountCount = accounts.filter((a) => a.bankId === b.id).length;
-          return (
-            <EntityCard
-              key={b.id}
-              title={b.name}
-              subtitle={`${accountCount} account${accountCount === 1 ? '' : 's'}`}
-              badge={b.isActive === false ? <span className="pill-warn fs-10">Closed</span> : undefined}
-              statLabel={currencies.length > 1 ? 'Total (by currency)' : 'Total'}
-              stat={
-                currencies.length ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {currencies.map((c) => <MoneyValue key={c} n={totals[c]} currency={c} />)}
-                  </div>
-                ) : (
-                  <span className="text-muted">No accounts yet</span>
-                )
-              }
-              hue={b.color}
-              onClick={() => navigate(`/bank/bank/${b.id}`)}
-            />
-          );
-        })}
-      </div>
-    </CollapsibleCard>
+    <div className="entity-card-grid">
+      {visibleBanks.map((bank) => {
+        const totals = bankTotalsByCurrency(bank.id, accounts, transactions);
+        const currencies = Object.keys(totals);
+        const accountCount = accounts.filter((account) => account.bankId === bank.id).length;
+        return (
+          <EntityCard
+            key={bank.id}
+            title={bank.name}
+            subtitle={`${accountCount} account${accountCount === 1 ? '' : 's'}`}
+            badge={bank.isActive === false ? <span className="pill-warn fs-10">Closed</span> : undefined}
+            statLabel={currencies.length > 1 ? 'Total (by currency)' : 'Total'}
+            stat={
+              currencies.length ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {currencies.map((currency) => <MoneyValue key={currency} n={totals[currency]} currency={currency} />)}
+                </div>
+              ) : (
+                <span className="text-muted">No accounts yet</span>
+              )
+            }
+            hue={bank.color}
+            onClick={() => navigate(`/bank/bank/${bank.id}`)}
+          />
+        );
+      })}
+    </div>
   );
 }
 
@@ -513,57 +503,61 @@ export function BankDetailPage() {
   const bank = banks.find((b) => b.id === id);
   const accounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
   const transactions = useBankWorkbookStore((s) => s.workbook.transactions);
-  const updateBank = useBankWorkbookStore((s) => s.updateBank);
   const deleteBank = useBankWorkbookStore((s) => s.deleteBank);
   const ensureSignedIn = useEnsureSignedIn();
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
   const categories = useCategoryStore((state) => state.workbook.categories);
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState({ name: bank?.name ?? '', notes: bank?.notes ?? '', color: bank?.color ?? '' });
-  // Excludes migrated accounts (see `BankAccount.migratedToCreditCardId`) —
-  // once converted to a real `CreditCard` record, the old account is a
-  // closed duplicate of the same real card, not a second account under
-  // this bank (real bug, user-reported 2026-09-13: a migrated account was
-  // still showing up here, clickable into its own separate, fully-editable
-  // page — see `RepairStaleMigrations` in `CreditCardsSection.tsx`).
-  const linkedAccounts = useMemo(() => accounts.filter((a) => a.bankId === id && !a.migratedToCreditCardId), [accounts, id]);
-  const totals = useMemo(() => (bank ? bankTotalsByCurrency(bank.id, accounts, transactions) : {}), [bank, accounts, transactions]);
-  const [addOpen, setAddOpen] = useState(false);
-  // User-requested (2026-09-14): "CCs should be listed in all banks. we
-  // can seperate it using <hr> after the accounts listing" — a card is a
-  // structurally distinct entity from a `BankAccount` (see
-  // `types/creditCard.ts`'s own file-level comment) but still belongs to
-  // this same real institution, so it's surfaced here too, not just under
-  // the module-wide "Credit Cards" tab.
+  const linkedAccounts = useMemo(
+    () => accounts.filter((a) => a.bankId === id && !a.migratedToCreditCardId),
+    [accounts, id],
+  );
+  const totals = useMemo(
+    () => (bank ? bankTotalsByCurrency(bank.id, accounts, transactions) : {}),
+    [bank, accounts, transactions],
+  );
   const allCards = useCreditCardWorkbookStore((s) => s.workbook.cards);
   const cardTransactions = useCreditCardWorkbookStore((s) => s.workbook.transactions);
-  const linkedCards = useMemo(() => allCards.filter((c) => c.bankId === id), [allCards, id]);
-  const categoryOptions = useMemo(() => [...new Set(transactions
-    .filter((tx) => linkedAccounts.some((account) => account.id === tx.accountId))
-    .map((tx) => categoryName(tx.categoryID, categories)))].sort(), [transactions, linkedAccounts, categories]);
+  const linkedCards = useMemo(() => allCards.filter((card) => card.bankId === id), [allCards, id]);
+  const categoryOptions = useMemo(
+    () => [...new Set(
+      transactions
+        .filter((tx) => linkedAccounts.some((account) => account.id === tx.accountId))
+        .map((tx) => categoryName(tx.categoryID, categories)),
+    )].sort(),
+    [transactions, linkedAccounts, categories],
+  );
+  const accountOptions = useMemo(
+    () => linkedAccounts.map((account) => ({ value: account.id, label: `${accountDisplayName(account)} (${account.currencyCode})` })),
+    [linkedAccounts],
+  );
+  const [bankModalOpen, setBankModalOpen] = useState(false);
+  const [addAccountOpen, setAddAccountOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
 
   usePageTopBarRightSlot(bank ? (
     <TopBarControls>
-      <TopBarSelect label="Switch bank" value={bank.id}
-        onChange={(event) => { setEditing(false); navigate(event.target.value ? `/bank/bank/${event.target.value}` : '/bank'); }}
-        options={[{ value: '', label: 'All banks' }, ...banks.filter(item => item.isActive !== false || item.id === bank.id).map(item => ({ value: item.id, label: item.name }))]} />
-      <TransactionFilterMenu value={filters} categories={categoryOptions} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} />
+      <TopBarSelect
+        label="Switch bank"
+        value={bank.id}
+        onChange={(event) => navigate(event.target.value ? `/bank/bank/${event.target.value}` : '/bank')}
+        options={[
+          { value: '', label: 'All banks' },
+          ...banks
+            .filter((item) => item.isActive !== false || item.id === bank.id)
+            .map((item) => ({ value: item.id, label: item.name })),
+        ]}
+      />
+      <TransactionFilterMenu
+        value={filters}
+        categories={categoryOptions}
+        accountOptions={accountOptions}
+        activeCount={activeCount}
+        onChange={setFilters}
+        onClear={resetFilters}
+      />
     </TopBarControls>
   ) : null);
 
-  const startEdit = () => {
-    if (!bank) return;
-    setDraft({ name: bank.name, notes: bank.notes ?? '', color: bank.color ?? '' });
-    setEditing(true);
-  };
-  const save = async () => {
-    if (!bank) return;
-    if (!draft.name.trim()) return toast('Enter a bank name.');
-    if (!(await ensureSignedIn('Sign in to save bank details.'))) return;
-    updateBank(bank.id, { name: draft.name.trim(), notes: draft.notes.trim() || undefined, color: draft.color || undefined });
-    toast('Bank updated.');
-    setEditing(false);
-  };
   const remove = async () => {
     if (!bank) return;
     if (!(await confirmDialog(`Delete "${bank.name}"? Its accounts stay, just no longer grouped under this bank.`))) return;
@@ -575,122 +569,134 @@ export function BankDetailPage() {
 
   if (!bank) {
     return (
-      <div>
+      <div className="standard-page">
         <Link to="/bank">← Back to Banking</Link>
         <p className="text-muted">Bank not found.</p>
       </div>
     );
   }
 
-  return (
-    <div>
-      <Link to="/bank">← Back to Banking</Link>
-      <CollapsibleCard
-        title={editing ? 'Edit bank' : bank.name}
-        defaultOpen
-        headerExtra={
-          !editing && (
-            <>
-              <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={startEdit} />
-              <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={remove} />
-            </>
-          )
-        }
-      >
-        {editing ? (
-          <div>
-            <Field label="Bank name" width={220} required>
-              <TextInput value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-            </Field>
-            <Field label="Notes (optional)" width={220}>
-              <TextInput value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
-            </Field>
-            {/* User-requested (2026-09-09): "Let the user choose color for
-               an entity for better distinction (user may choose blue as
-               UBL brand color is blue)." */}
-            <Field label="Card color (optional)" width={140} title="Colors this Bank's card so it's easy to spot at a glance — pick your bank's own brand color, or anything you like.">
-              <div className="row" style={{ gap: 8, alignItems: 'center' }}>
-                <input type="color" value={draft.color || '#5aa9c9'} onChange={(e) => setDraft({ ...draft, color: e.target.value })} style={{ width: 44, height: 32, padding: 2, minWidth: 0 }} />
-                {draft.color && (
-                  <button type="button" className="btn secondary small" onClick={() => setDraft({ ...draft, color: '' })}>Reset</button>
-                )}
-              </div>
-            </Field>
-            <div className="row gap-sm mt-sm">
-              <button className="btn" onClick={save}><SaveIcon />Save</button>
-              <button className="btn secondary" onClick={() => setEditing(false)}><XIcon />Cancel</button>
-            </div>
+  const summaryActions: StandardCardAction[] = [
+    { label: 'Edit bank', icon: <EditIcon size={14} />, onClick: () => setBankModalOpen(true) },
+    { label: 'Delete bank', icon: <TrashIcon size={14} />, tone: 'danger', onClick: remove },
+  ];
+
+  const sections: StandardPageSection[] = [
+    {
+      key: 'summary',
+      label: 'Summary',
+      defaultOpen: true,
+      summary: <SummaryChip label="Accounts" value={linkedAccounts.length} />,
+      actions: summaryActions,
+      content: (
+        <div>
+          <AttributeList items={[
+            { label: 'Full bank name', value: bank.name },
+            { label: 'Notes', value: bank.notes },
+          ]} />
+          <div className="row mt-md" style={{ gap: 16 }}>
+            {Object.keys(totals).length ? (
+              Object.entries(totals).map(([currency, total]) => (
+                <div key={currency} className="stat-card card" style={hueStyle(bank.color ?? 'var(--accent)')}>
+                  <div className="label">Total ({currency})</div>
+                  <MoneyValue n={total} currency={currency} />
+                </div>
+              ))
+            ) : (
+              <p className="text-muted">No accounts linked yet.</p>
+            )}
           </div>
-        ) : (
-          <div>
-            {bank.notes && <p className="text-muted mt-0">{bank.notes}</p>}
-            <div className="row" style={{ gap: 16 }}>
-              {Object.keys(totals).length ? (
-                Object.entries(totals).map(([c, n]) => (
-                  <div key={c} className="stat-card card" style={hueStyle('var(--accent)')}>
-                    <div className="label">Total ({c})</div>
-                    <MoneyValue n={n} currency={c} />
-                  </div>
-                ))
-              ) : (
-                <p className="text-muted">No accounts linked yet.</p>
-              )}
-            </div>
+          <div className="mt-md">
+            <BankingScopeSummary accounts={linkedAccounts} filters={filters} />
           </div>
-        )}
-      </CollapsibleCard>
-      <StandardPageSections key={bank.id} defaultKey="summary" sections={[
-        { key: 'summary', label: 'Bank summary', summary: <SummaryChip label="Accounts" value={linkedAccounts.length} />, content: <BankingScopeSummary accounts={linkedAccounts} filters={filters} /> },
-        { key: 'accounts', label: 'Accounts', content: (<div className="mt-md">
-        <div className="entity-card-grid">
-          {linkedAccounts.map((a) => (
-            <EntityCard
-              key={a.id}
-              title={accountDisplayName(a)}
-              subtitle={[a.accountType, a.branch].filter(Boolean).join(' · ') || undefined}
-              statLabel={a.isLiability ? 'Owed' : 'Balance'}
-              stat={<MoneyValue n={a.isLiability ? Math.max(0, -accountBalance(a, transactions)) : accountBalance(a, transactions)} currency={a.currencyCode} />}
-              hue={a.isLiability ? (accountBalance(a, transactions) < 0 ? 'var(--loss)' : 'var(--profit)') : (accountBalance(a, transactions) >= 0 ? 'var(--profit)' : 'var(--loss)')}
-              onClick={() => navigate(`/bank/account/${a.id}`)}
-            />
-          ))}
         </div>
-        {!linkedAccounts.length && <p className="text-muted">No accounts linked to this bank yet.</p>}
-      </div>) },
-        { key: 'creditCards', label: 'Credit cards', content: <>{!linkedCards.length && <p className="text-muted">No credit cards linked to this bank yet.</p>}{linkedCards.length > 0 && (
-        <>
-          <hr className="mt-md mb-md" />
-          <h3 className="mt-0 mb-sm">Credit cards</h3>
+      ),
+    },
+    {
+      key: 'accounts',
+      label: 'Accounts',
+      defaultOpen: true,
+      summary: <SummaryChip value={linkedAccounts.length + linkedCards.length} />,
+      content: (
+        <div>
           <div className="entity-card-grid">
-            {linkedCards.map((c) => {
-              const balance = Math.max(0, outstandingBalanceByCard(c, cardTransactions));
+            {linkedAccounts.map((account) => {
+              const balance = accountBalance(account, transactions);
               return (
                 <EntityCard
-                  key={c.id}
-                  title={c.name}
-                  subtitle={<>{c.currencyCode}{c.cardNetwork ? ` · ${c.cardNetwork}` : ''}{c.creditLimit ? ` · Limit ${fmtMoney(c.creditLimit, c.currencyCode)}` : ''}</>}
-                  badge={c.isActive === false ? <span className="pill-warn fs-10">Closed</span> : undefined}
-                  statLabel="Owed"
-                  stat={<MoneyValue n={balance} currency={c.currencyCode} />}
-                  hue={balance > 0 ? 'var(--loss)' : 'var(--profit)'}
-                  onClick={() => navigate(`/bank/card/${c.id}`)}
+                  key={account.id}
+                  title={accountDisplayName(account)}
+                  subtitle={[account.accountType, account.branch].filter(Boolean).join(' · ') || undefined}
+                  statLabel={account.isLiability ? 'Owed' : 'Balance'}
+                  stat={<MoneyValue n={account.isLiability ? Math.max(0, -balance) : balance} currency={account.currencyCode} />}
+                  hue={account.color ?? (account.isLiability ? (balance < 0 ? 'var(--loss)' : 'var(--profit)') : (balance >= 0 ? 'var(--profit)' : 'var(--loss)'))}
+                  onClick={() => navigate(`/bank/account/${account.id}`)}
                 />
               );
             })}
           </div>
-        </>
-      )}</> },
-        { key: 'plans', label: 'Plans', content: <BankingScopePlans accounts={linkedAccounts} filters={filters} /> },
-        { key: 'transactions', label: 'Transactions', summary: <SummaryChip label="Accounts" value={linkedAccounts.length} />, content: <BankingScopeTransactions accounts={linkedAccounts} filters={filters} /> },
-        { key: 'analytics', label: 'Analytics', content: <AnalyticsTab bankId={bank.id} /> },
+          {!linkedAccounts.length && <p className="text-muted">No accounts linked to this bank yet.</p>}
+          <hr className="mt-md mb-md" />
+          <h3 className="mt-0 mb-sm">Credit cards</h3>
+          {!linkedCards.length ? (
+            <p className="text-muted">No credit cards linked to this bank yet.</p>
+          ) : (
+            <div className="entity-card-grid">
+              {linkedCards.map((card) => {
+                const balance = Math.max(0, outstandingBalanceByCard(card, cardTransactions));
+                return (
+                  <EntityCard
+                    key={card.id}
+                    title={card.name}
+                    subtitle={<>{card.currencyCode}{card.cardNetwork ? ` · ${card.cardNetwork}` : ''}{card.creditLimit ? ` · Limit ${fmtMoney(card.creditLimit, card.currencyCode)}` : ''}</>}
+                    badge={card.isActive === false ? <span className="pill-warn fs-10">Closed</span> : undefined}
+                    statLabel="Owed"
+                    stat={<MoneyValue n={balance} currency={card.currencyCode} />}
+                    hue={balance > 0 ? 'var(--loss)' : 'var(--profit)'}
+                    onClick={() => navigate(`/bank/card/${card.id}`)}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    { key: 'plans', label: 'Plans', content: <BankingScopePlans accounts={linkedAccounts} filters={filters} /> },
+    {
+      key: 'transactions',
+      label: 'Transactions',
+      summary: <SummaryChip label="Accounts" value={linkedAccounts.length} />,
+      actions: bankingTransactionActions(linkedAccounts, transactions, filters, categories),
+      content: <BankingScopeTransactions accounts={linkedAccounts} filters={filters} />,
+    },
+    { key: 'analytics', label: 'Analytics', content: <AnalyticsTab bankId={bank.id} filters={filters} /> },
+  ];
+
+  const transferDefault = linkedAccounts[0]
+    ? { module: 'bank' as const, ref: linkedAccounts[0].id, currencyCode: linkedAccounts[0].currencyCode }
+    : { module: 'bank' as const };
+
+  return (
+    <div className="standard-page">
+      <Link to="/bank">← Back to Banking</Link>
+      <StandardPageSections key={bank.id} defaultKey="summary" sections={sections} />
+      <FabPanel actions={[
+        { label: 'Add an account', icon: <ListIcon />, onClick: () => setAddAccountOpen(true) },
+        { label: 'Transfers', icon: <TransferIcon />, onClick: () => setTransferOpen(true) },
       ]} />
-      <FabButton label="Add account" onClick={() => setAddOpen(true)}>
-        <PlusIcon />
-      </FabButton>
-      {addOpen && (
-        <Modal title="Add an account" onClose={() => setAddOpen(false)}>
-          <AddAccountForm initialBankId={bank.id} onSaved={() => setAddOpen(false)} />
+      {bankModalOpen && (
+        <Modal title="Edit bank" onClose={() => setBankModalOpen(false)}>
+          <BankForm bank={bank} onSaved={() => setBankModalOpen(false)} />
         </Modal>
+      )}
+      {addAccountOpen && (
+        <Modal title="Add an account" onClose={() => setAddAccountOpen(false)}>
+          <AddAccountForm initialBankId={bank.id} onSaved={() => setAddAccountOpen(false)} />
+        </Modal>
+      )}
+      {transferOpen && (
+        <TransactionEntryModal defaultFinance={transferDefault} onClose={() => setTransferOpen(false)} />
       )}
     </div>
   );
@@ -713,169 +719,75 @@ export function BankDetailPage() {
  * groups BOTH by currency — a currency group can now exist from a card
  * alone (no plain account in that currency yet), from an account alone, or
  * both; the divider only renders when a group actually has cards. */
-function AccountsList() {
+function AccountsList({ showArchived = false }: { showArchived?: boolean }) {
   const accounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
   const transactions = useBankWorkbookStore((s) => s.workbook.transactions);
-  const updateAccount = useBankWorkbookStore((s) => s.updateAccount);
-  const cards = useCreditCardWorkbookStore((s) => s.workbook.cards);
-  const cardTransactions = useCreditCardWorkbookStore((s) => s.workbook.transactions);
   const navigate = useNavigate();
-  const ensureSignedIn = useEnsureSignedIn();
-  const [showArchived, setShowArchived] = useState(false);
   const { num } = useAmountFormat();
 
-  // Pending item 115(c): "add numeric sequence Id with each entity... for
-  // correct data ordering" — the account's own stable position in the
-  // underlying array (creation order), NOT the currency-grouped/favorite-
-  // sorted display order below. Same convention Funds' own Sr# column
-  // already established (Done item 226).
-  const srNumOf = useMemo(() => new Map(accounts.map((a, i) => [a.id, i + 1])), [accounts]);
-  const cardSrNumOf = useMemo(() => new Map(cards.map((c, i) => [c.id, i + 1])), [cards]);
-
-  const archivedCount = useMemo(
-    () => accounts.filter((a) => a.isActive === false).length + cards.filter((c) => c.isActive === false).length,
-    [accounts, cards],
-  );
   const visibleAccounts = useMemo(
-    () => (showArchived ? accounts : accounts.filter((a) => a.isActive !== false)),
+    () => (showArchived ? accounts : accounts.filter((account) => account.isActive !== false))
+      .filter((account) => !account.migratedToCreditCardId),
     [accounts, showArchived],
   );
-  const visibleCards = useMemo(
-    () => (showArchived ? cards : cards.filter((c) => c.isActive !== false)),
-    [cards, showArchived],
-  );
-
-  const toggleFavorite = async (a: BankAccount) => {
-    if (!(await ensureSignedIn(a.isFavorite ? 'Sign in to unfavorite this account.' : 'Sign in to favorite this account.'))) return;
-    updateAccount(a.id, { isFavorite: !a.isFavorite });
-  };
-
+  const srNumOf = useMemo(() => new Map(accounts.map((account, index) => [account.id, index + 1])), [accounts]);
   const currencyGroups = useMemo(() => {
-    const byCurrency = new Map<string, { accounts: BankAccount[]; cards: CreditCard[] }>();
-    const groupFor = (code: string) => {
-      let g = byCurrency.get(code);
-      if (!g) { g = { accounts: [], cards: [] }; byCurrency.set(code, g); }
-      return g;
-    };
-    for (const a of visibleAccounts) groupFor(a.currencyCode).accounts.push(a);
-    for (const c of visibleCards) groupFor(c.currencyCode).cards.push(c);
-    // Favorites float to the top of each currency group; a stable sort
-    // otherwise leaves creation order (matching Sr#) as the tiebreak.
-    for (const g of byCurrency.values()) {
-      g.accounts.sort((a, b) => Number(!!b.isFavorite) - Number(!!a.isFavorite));
-      g.cards.sort((a, b) => Number(!!b.isFavorite) - Number(!!a.isFavorite));
+    const byCurrency = new Map<string, BankAccount[]>();
+    for (const account of visibleAccounts) {
+      const group = byCurrency.get(account.currencyCode) ?? [];
+      group.push(account);
+      byCurrency.set(account.currencyCode, group);
+    }
+    for (const group of byCurrency.values()) {
+      group.sort((a, b) => Number(!!b.isFavorite) - Number(!!a.isFavorite));
     }
     return [...byCurrency.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [visibleAccounts, visibleCards]);
+  }, [visibleAccounts]);
 
-  if (!accounts.length && !cards.length) {
-    return <p className="text-muted">No accounts yet — use the + button below to add one.</p>;
+  if (!accounts.some((account) => !account.migratedToCreditCardId)) {
+    return <p className="text-muted">No accounts yet — use Actions → Add an account.</p>;
+  }
+  if (!visibleAccounts.length) {
+    return <p className="text-muted">Every account is closed — use this card's Actions menu to show closed accounts.</p>;
   }
 
   return (
     <div>
-      {archivedCount > 0 && (
-        <button
-          className="btn secondary small mb-12"
-          onClick={() => setShowArchived((v) => !v)}
-        >
-          {showArchived ? 'Hide' : 'Show'} closed ({archivedCount})
-        </button>
-      )}
-      {!visibleAccounts.length && !visibleCards.length && (
-        <p className="text-muted">Every account is closed — click "Show closed" above to see them.</p>
-      )}
       {currencyGroups.map(([currency, group]) => {
-        // User-requested (2026-09-06): "give sums in a tag for each
-        // currency in header/label" — a quick total for whichever accounts
-        // are actually visible in THIS group right now (respects the
-        // "Show archived" toggle above), distinct from `TotalBalances`'
-        // own top-of-page stat cards (which always include archived
-        // accounts in their true grand total) — this is "what am I looking
-        // at in this group," not "the real overall total." Credit card debt
-        // is deliberately excluded from this tag (it's an amount OWED, the
-        // opposite sense from a plain balance) — its own "Owed" figure sits
-        // on each card's own EntityCard instead.
-        const groupSum = group.accounts.reduce((s, a) => s + accountBalance(a, transactions), 0);
+        const groupSum = group.reduce((sum, account) => sum + accountBalance(account, transactions), 0);
         return (
-        <div key={currency} style={{ marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <span className="text-muted" style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: 11, letterSpacing: '.04em' }}>
-              {currency}
-            </span>
-            {group.accounts.length > 0 && <span className="pill-info fs-11">{num(groupSum)} {currency}</span>}
-          </div>
-          {group.accounts.length > 0 && (
-            <div className="entity-card-grid">
-              {group.accounts.map((a) => (
-                <EntityCard
-                  key={a.id}
-                  title={<><span className="text-muted entity-card-sr">#{srNumOf.get(a.id)}</span>{accountDisplayName(a)}</>}
-                  subtitle={[a.accountType, a.branch].filter(Boolean).join(' · ') || undefined}
-                  badge={
-                    a.isLiability || a.isActive === false ? (
-                      <span style={{ display: 'flex', gap: 4 }}>
-                        {a.isLiability && <span className="pill-negative fs-10">Credit card</span>}
-                        {a.isActive === false && <span className="pill-warn fs-10">Closed</span>}
-                      </span>
-                    ) : undefined
-                  }
-                  statLabel={a.isLiability ? 'Owed' : 'Balance'}
-                  stat={
-                    <MoneyValue
-                      n={a.isLiability ? Math.max(0, -accountBalance(a, transactions)) : accountBalance(a, transactions)}
-                      currency={a.currencyCode}
-                    />
-                  }
-                  hue={
-                    a.isLiability
-                      ? (accountBalance(a, transactions) < 0 ? 'var(--loss)' : 'var(--profit)')
-                      : (accountBalance(a, transactions) >= 0 ? 'var(--profit)' : 'var(--loss)')
-                  }
-                  onClick={() => navigate(`/bank/account/${a.id}`)}
-                  actions={
-                    <>
-                      <IconButton
-                        label={a.isFavorite ? 'Unfavorite' : 'Favorite'}
-                        icon={<StarIcon size={13} filled={a.isFavorite} />}
-                        align="right"
-                        onClick={() => toggleFavorite(a)}
-                      />
-                      <IconButton
-                        label="Transactions"
-                        icon={<ListIcon size={13} />}
-                        align="right"
-                        onClick={() => navigate(`/bank/account/${a.id}`)}
-                      />
-                    </>
-                  }
-                />
-              ))}
+          <div key={currency} style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <span className="text-muted" style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: 11, letterSpacing: '.04em' }}>
+                {currency}
+              </span>
+              <span className="pill-info fs-11">{num(groupSum)} {currency}</span>
             </div>
-          )}
-          {group.cards.length > 0 && (
-            <>
-              {group.accounts.length > 0 && <hr className="mt-sm mb-sm" />}
-              <div className="entity-card-grid">
-                {group.cards.map((c) => {
-                  const balance = Math.max(0, outstandingBalanceByCard(c, cardTransactions));
-                  return (
-                    <EntityCard
-                      key={c.id}
-                      title={<><span className="text-muted entity-card-sr">#{cardSrNumOf.get(c.id)}</span>{c.name}</>}
-                      subtitle={<>{c.cardNetwork ? `Credit card · ${c.cardNetwork}` : 'Credit card'}{c.creditLimit ? ` · Limit ${fmtMoney(c.creditLimit, c.currencyCode)}` : ''}</>}
-                      badge={c.isActive === false ? <span className="pill-warn fs-10">Closed</span> : undefined}
-                      statLabel="Owed"
-                      stat={<MoneyValue n={balance} currency={c.currencyCode} />}
-                      hue={balance > 0 ? 'var(--loss)' : 'var(--profit)'}
-                      onClick={() => navigate(`/bank/card/${c.id}`)}
-                    />
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
+            <div className="entity-card-grid">
+              {group.map((account) => {
+                const balance = accountBalance(account, transactions);
+                return (
+                  <EntityCard
+                    key={account.id}
+                    title={<><span className="text-muted entity-card-sr">#{srNumOf.get(account.id)}</span>{accountDisplayName(account)}</>}
+                    subtitle={[account.accountType, account.branch].filter(Boolean).join(' · ') || undefined}
+                    badge={
+                      account.isLiability || account.isActive === false ? (
+                        <span style={{ display: 'flex', gap: 4 }}>
+                          {account.isLiability && <span className="pill-negative fs-10">Liability</span>}
+                          {account.isActive === false && <span className="pill-warn fs-10">Closed</span>}
+                        </span>
+                      ) : undefined
+                    }
+                    statLabel={account.isLiability ? 'Owed' : 'Balance'}
+                    stat={<MoneyValue n={account.isLiability ? Math.max(0, -balance) : balance} currency={account.currencyCode} />}
+                    hue={account.color ?? (account.isLiability ? (balance < 0 ? 'var(--loss)' : 'var(--profit)') : (balance >= 0 ? 'var(--profit)' : 'var(--loss)'))}
+                    onClick={() => navigate(`/bank/account/${account.id}`)}
+                  />
+                );
+              })}
+            </div>
+          </div>
         );
       })}
     </div>
@@ -938,6 +850,7 @@ export function AccountDetailPage() {
     cardNetwork: value?.cardNetwork,
     cardBin: value?.cardBin,
     bankId: value?.bankId,
+    color: value?.color,
   });
   const [meta, setMeta] = useState<Omit<BankAccount, 'id'>>(() => accountToFormValue(account));
   const [editingMeta, setEditingMeta] = useState(false);
@@ -1528,6 +1441,7 @@ function AccountAnalyticsSection({ ledger, pendingRows, plans, startingBalance, 
 type BankingFilters = ReturnType<typeof useUrlTransactionFilters>['filters'];
 
 function transactionMatchesFilters(tx: BankTransaction, filters: BankingFilters, categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories']) {
+  if (filters.accountId !== 'all' && tx.accountId !== filters.accountId) return false;
   if ((filters.fromDate && tx.date < filters.fromDate) || (filters.toDate && tx.date > filters.toDate)) return false;
   if (filters.direction === 'in' && tx.amount < 0) return false;
   if (filters.direction === 'out' && tx.amount >= 0) return false;
@@ -1540,13 +1454,17 @@ function BankingScopeSummary({ accounts, filters }: { accounts: BankAccount[]; f
   const transactions = useBankWorkbookStore((state) => state.workbook.transactions);
   const plans = usePlannedBankWorkbookStore((state) => state.workbook.entries);
   const categories = useCategoryStore((state) => state.workbook.categories);
-  const accountIds = useMemo(() => new Set(accounts.map((account) => account.id)), [accounts]);
+  const scopedAccounts = useMemo(
+    () => filters.accountId === 'all' ? accounts : accounts.filter((account) => account.id === filters.accountId),
+    [accounts, filters.accountId],
+  );
+  const accountIds = useMemo(() => new Set(scopedAccounts.map((account) => account.id)), [scopedAccounts]);
   const rows = transactions.filter((tx) => accountIds.has(tx.accountId) && transactionMatchesFilters(tx, filters, categories));
   const visiblePlans = plans.filter((plan) => accountIds.has(plan.accountId) && !plan.executed && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate));
-  const currencies = [...new Set(accounts.map((account) => account.currencyCode))].sort();
+  const currencies = [...new Set(scopedAccounts.map((account) => account.currencyCode))].sort();
   if (!currencies.length) return <p className="text-muted m-0">No bank accounts in this scope yet.</p>;
   return <div className="account-summary-grid">{currencies.map((currency) => {
-    const currencyAccounts = accounts.filter((account) => account.currencyCode === currency);
+    const currencyAccounts = scopedAccounts.filter((account) => account.currencyCode === currency);
     const currencyIds = new Set(currencyAccounts.map((account) => account.id));
     const currencyRows = rows.filter((tx) => currencyIds.has(tx.accountId));
     const pending = currencyRows.filter((tx) => tx.isPending).reduce((sum, tx) => sum + tx.amount, 0);
@@ -1570,11 +1488,60 @@ function BankingScopeSummary({ accounts, filters }: { accounts: BankAccount[]; f
 
 function BankingScopePlans({ accounts, filters }: { accounts: BankAccount[]; filters: BankingFilters }) {
   const [addingAccountId, setAddingAccountId] = useState<string | null>(null);
-  if (!accounts.length) return <p className="text-muted m-0">No accounts available for plans.</p>;
-  return <div className="standard-section-stack">{accounts.map((account) => <div key={account.id}>
+  const scopedAccounts = filters.accountId === 'all' ? accounts : accounts.filter((account) => account.id === filters.accountId);
+  if (!scopedAccounts.length) return <p className="text-muted m-0">No accounts available for plans.</p>;
+  return <div className="standard-section-stack">{scopedAccounts.map((account) => <div key={account.id}>
     <div className="section-toolbar" style={{ justifyContent: 'space-between' }}><h4 className="m-0">{accountDisplayName(account)} <span className="text-muted">({account.currencyCode})</span></h4><StandardButton tone="secondary" size="small" icon={<PlusIcon size={12} />} onClick={() => setAddingAccountId(account.id)}>Add plan</StandardButton></div>
     <BankPlanList account={account} horizonDays={null} fromDate={filters.fromDate} toDate={filters.toDate} />
   </div>)}{addingAccountId && <Modal title="Add a plan" onClose={() => setAddingAccountId(null)}><AddBankPlanForm accountId={addingAccountId} onSaved={() => setAddingAccountId(null)} /></Modal>}</div>;
+}
+
+function bankingTransactionRows(
+  accounts: BankAccount[],
+  transactions: BankTransaction[],
+  filters: BankingFilters,
+  categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories'],
+) {
+  const accountIds = new Set(accounts.map((account) => account.id));
+  const scopedRows = transactions
+    .filter((tx) => accountIds.has(tx.accountId))
+    .sort((a, b) => b.date.localeCompare(a.date) || (b.serialNumber ?? 0) - (a.serialNumber ?? 0));
+  return { scopedRows, rows: scopedRows.filter((tx) => transactionMatchesFilters(tx, filters, categories)) };
+}
+
+function exportBankingRows(
+  items: BankTransaction[],
+  accounts: BankAccount[],
+  categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories'],
+  suffix: string,
+) {
+  const accountById = new Map(accounts.map((account) => [account.id, account]));
+  const csvRows = items.flatMap((tx) => {
+    const account = accountById.get(tx.accountId);
+    return account
+      ? [[tx.date, accountDisplayName(account), tx.description, categoryName(tx.categoryID, categories), tx.amount, account.currencyCode, tx.isPending ? 'Pending' : 'Cleared']]
+      : [];
+  });
+  const blob = new Blob([toCSV([['Date', 'Account', 'Description', 'Category', 'Amount', 'Currency', 'Status'], ...csvRows])], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `banking_${suffix}_transactions.csv`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function bankingTransactionActions(
+  accounts: BankAccount[],
+  transactions: BankTransaction[],
+  filters: BankingFilters,
+  categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories'],
+): StandardCardAction[] {
+  const { scopedRows, rows } = bankingTransactionRows(accounts, transactions, filters, categories);
+  return [
+    { label: 'Export filtered', disabled: !rows.length, onClick: () => exportBankingRows(rows, accounts, categories, 'filtered') },
+    { label: 'Export all', disabled: !scopedRows.length, onClick: () => exportBankingRows(scopedRows, accounts, categories, 'all') },
+  ];
 }
 
 function BankingScopeTransactions({ accounts, filters }: { accounts: BankAccount[]; filters: BankingFilters }) {
@@ -1585,20 +1552,17 @@ function BankingScopeTransactions({ accounts, filters }: { accounts: BankAccount
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const accountById = useMemo(() => new Map(accounts.map((account) => [account.id, account])), [accounts]);
-  const scopedRows = useMemo(() => transactions.filter((tx) => accountById.has(tx.accountId)).sort((a, b) => b.date.localeCompare(a.date) || (b.serialNumber ?? 0) - (a.serialNumber ?? 0)), [transactions, accountById]);
-  const rows = useMemo(() => scopedRows.filter((tx) => transactionMatchesFilters(tx, filters, categories)), [scopedRows, filters, categories]);
+  const { rows } = useMemo(
+    () => bankingTransactionRows(accounts, transactions, filters, categories),
+    [accounts, transactions, filters, categories],
+  );
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   const safePage = Math.min(page, pageCount);
   const pageRows = rows.slice((safePage - 1) * pageSize, safePage * pageSize);
   useEffect(() => {
     setPage(1);
-  }, [filters.period, filters.fromDate, filters.toDate, filters.direction, filters.category, filters.source, pageSize]);
-  const exportRows = (items: BankTransaction[], suffix: string) => {
-    const csvRows = items.map((tx) => { const account = accountById.get(tx.accountId)!; return [tx.date, accountDisplayName(account), tx.description, categoryName(tx.categoryID, categories), tx.amount, account.currencyCode, tx.isPending ? 'Pending' : 'Cleared']; });
-    const blob = new Blob([toCSV([['Date', 'Account', 'Description', 'Category', 'Amount', 'Currency', 'Status'], ...csvRows])], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `banking_${suffix}_transactions.csv`; anchor.click(); URL.revokeObjectURL(url);
-  };
-  return <><div className="section-toolbar"><StandardButton tone="secondary" size="small" disabled={!rows.length} onClick={() => exportRows(rows, 'filtered')}>Export filtered</StandardButton><StandardButton tone="secondary" size="small" disabled={!scopedRows.length} onClick={() => exportRows(scopedRows, 'all')}>Export all</StandardButton></div><div className="table-responsive"><table>
+  }, [filters.period, filters.fromDate, filters.toDate, filters.direction, filters.category, filters.source, filters.accountId, pageSize]);
+  return <><div className="table-responsive"><table>
     <thead><tr><th>Date</th><th>Account</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th></tr></thead>
     <tbody>{pageRows.map((tx) => { const account = accountById.get(tx.accountId)!; return <tr key={tx.id} className="clickable" onClick={() => navigate(`/bank/account/${account.id}`)}>
       <td>{formatDate(tx.date, dateFormat)}</td><td>{accountDisplayName(account)}</td><td>{tx.description}</td><td><span className="pill-info">{categoryName(tx.categoryID, categories)}</span></td>
@@ -2139,7 +2103,7 @@ function PlanningAccountSection({
  * "simple budget/spend-plan tool" MODULES_PLAN.md §11 asks for: editable
  * monthly category targets (persisted in `settings.budgets`) compared
  * against this month's actual spend for the selected account. */
-function AnalyticsTab({ bankId }: { bankId?: string } = {}) {
+function AnalyticsTab({ bankId, filters }: { bankId?: string; filters: BankingFilters }) {
   const allAccounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
   const accounts = useMemo(() => allAccounts.filter(account => !account.migratedToCreditCardId && (!bankId || account.bankId === bankId)), [allAccounts, bankId]);
   const transactions = useBankWorkbookStore((s) => s.workbook.transactions);
@@ -2149,21 +2113,24 @@ function AnalyticsTab({ bankId }: { bankId?: string } = {}) {
   const dateFormat = useAppearanceStore((s) => s.appearance.dateFormat ?? 'DD-MMM-YYYY');
   applyChartTheme();
 
-  const [accountId, setAccountId] = useState(accounts[0]?.id ?? '');
-  const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
+  const account = (filters.accountId !== 'all' ? accounts.find((item) => item.id === filters.accountId) : undefined) ?? accounts[0];
   const categoryList = useCategoryStore((s) => s.workbook.categories);
+  const periodTransactions = useMemo(
+    () => transactions.filter((tx) => (!filters.fromDate || tx.date >= filters.fromDate) && (!filters.toDate || tx.date <= filters.toDate)),
+    [transactions, filters.fromDate, filters.toDate],
+  );
 
-  const byCategory = useMemo(() => (account ? accountByCategory(account, transactions, categoryList) : {}), [account, transactions, categoryList]);
-  const categories = Object.keys(byCategory).filter((c) => byCategory[c] < 0); // spend categories only — a doughnut of net credit/debit mixed together isn't meaningful
-  // Keep the module-level Analytics tab on the same one-account source of
-  // truth as Account Detail. With no period bounds this preserves its current
-  // full-history charts while preventing any parent-Bank aggregation.
+  const byCategory = useMemo(
+    () => (account ? accountByCategory(account, periodTransactions, categoryList) : {}),
+    [account, periodTransactions, categoryList],
+  );
+  const categories = Object.keys(byCategory).filter((c) => byCategory[c] < 0);
   const analytics = useMemo(
-    () => (account ? accountPeriodAnalytics(account, transactions) : null),
-    [account, transactions],
+    () => (account ? accountPeriodAnalytics(account, transactions, filters.fromDate, filters.toDate) : null),
+    [account, transactions, filters.fromDate, filters.toDate],
   );
   const monthlyFlow = analytics?.monthlyFlow ?? [];
-  const balanceOverTime = analytics?.ledger ?? [];
+  const balanceOverTime = analytics?.periodLedger ?? [];
 
   const thisMonth = today().slice(0, 7);
   const budgetRows = useMemo(
@@ -2179,11 +2146,6 @@ function AnalyticsTab({ bankId }: { bankId?: string } = {}) {
 
   return (
     <div>
-      <Field label="Account" width={200}>
-        <Select value={account?.id ?? ''} onChange={(e) => setAccountId(e.target.value)}>
-          {accounts.map((a) => <option key={a.id} value={a.id}>{accountDisplayName(a)} ({a.currencyCode})</option>)}
-        </Select>
-      </Field>
       {account && (
         <>
           <div className="grid-auto" style={{ ...gridAutoStyle(320, 16), marginTop: 12 }}>
@@ -2341,15 +2303,6 @@ export function PlanningTab({
 // data" stays here — a real, destructive, module-scoped action `/app-data`
 // has no equivalent for.
 function DataManagement() {
-  const setWorkbook = useBankWorkbookStore((s) => s.setWorkbook);
-
-  const clearAll = async () => {
-    const ok = await confirmDialog('This cannot be undone (export a backup first if unsure).', 'Clear all banking data?');
-    if (!ok) return;
-    setWorkbook(createEmptyBankWorkbook());
-    toast('All banking data cleared.');
-  };
-
   return (
     <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12 }}>
       <div className="text-muted" style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: 11, letterSpacing: '.04em', marginBottom: 8 }}>
@@ -2357,11 +2310,8 @@ function DataManagement() {
       </div>
       <p className="text-muted" style={{ marginTop: 0 }}>
         Currency preferences live on the <Link to="/account">Account page</Link>; whole-app JSON
-        export/import lives on the <Link to="/app-data">Data page</Link>.
+        export/import lives on the <Link to="/app-data">Data page</Link>. Destructive Banking actions live under this card's Actions menu.
       </p>
-      <div className="row gap-sm">
-        <button className="btn danger" onClick={clearAll}><TrashIcon size={12} />Clear all data</button>
-      </div>
     </div>
   );
 }
@@ -2384,50 +2334,152 @@ export function BankPage({
   plannedCreditCardCloudEmpty: boolean;
   uploadPlannedCreditCardLocalToCloud: () => Promise<void>;
 }) {
-  // Real bug, user-reported (2026-09-11): `Tabs.tsx`'s own "a chip click
-  // force-opens a section without closing the others" design means this
-  // page's Accounts/Credit Cards/Planning tabs can all be open, hence all
-  // mounted, at once — each used to render its OWN independent `FabPanel`
-  // at the identical fixed corner (confirmed live: two "Open actions"
-  // buttons stacked at the exact same coordinates). Fixed by having each
-  // of those tabs register its own actions via the keyed
-  // `usePageFabActions` instead, merged into the ONE panel rendered here —
-  // same mechanism `CalculatorLauncher` already uses for Stock Exchanges
-  // routes, just consumed directly by this page instead of a second
-  // globally-mounted component.
   const actionsByKey = useFabActionsStore((s) => s.actionsByKey);
-  const fabActions = allExtraActions(actionsByKey);
+  const fabActions = useMemo(() => {
+    const seen = new Set<string>();
+    return allExtraActions(actionsByKey).filter((action) => {
+      if (seen.has(action.label)) return false;
+      seen.add(action.label);
+      return true;
+    });
+  }, [actionsByKey]);
+
+  const banks = useBankWorkbookStore((state) => state.workbook.settings.banks ?? []);
   const allAccounts = useBankWorkbookStore((state) => state.workbook.settings.accounts);
-  const accounts = useMemo(() => allAccounts.filter((account) => !account.migratedToCreditCardId), [allAccounts]);
+  const accounts = useMemo(
+    () => allAccounts.filter((account) => !account.migratedToCreditCardId),
+    [allAccounts],
+  );
   const transactions = useBankWorkbookStore((state) => state.workbook.transactions);
+  const setWorkbook = useBankWorkbookStore((state) => state.setWorkbook);
+  const creditCards = useCreditCardWorkbookStore((state) => state.workbook.cards);
   const categories = useCategoryStore((state) => state.workbook.categories);
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
-  const categoryOptions = useMemo(() => [...new Set(transactions.map((tx) => categoryName(tx.categoryID, categories)))].sort(), [transactions, categories]);
+  const [showArchivedBanks, setShowArchivedBanks] = useState(false);
+  const [showArchivedAccounts, setShowArchivedAccounts] = useState(false);
+
+  const categoryOptions = useMemo(
+    () => [...new Set(transactions.map((tx) => categoryName(tx.categoryID, categories)))].sort(),
+    [transactions, categories],
+  );
+  const accountOptions = useMemo(
+    () => accounts
+      .filter((account) => account.isActive !== false)
+      .map((account) => ({ value: account.id, label: `${accountDisplayName(account)} (${account.currencyCode})` })),
+    [accounts],
+  );
+  const archivedBankCount = useMemo(
+    () => banks.filter((bank) => bank.isActive === false).length,
+    [banks],
+  );
+  const archivedAccountCount = useMemo(
+    () => accounts.filter((account) => account.isActive === false).length + creditCards.filter((card) => card.isActive === false).length,
+    [accounts, creditCards],
+  );
+
   const topBarFilters = useMemo(() => (
     <TopBarControls>
-      <TransactionFilterMenu value={filters} categories={categoryOptions} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} />
+      <TransactionFilterMenu
+        value={filters}
+        categories={categoryOptions}
+        accountOptions={accountOptions}
+        activeCount={activeCount}
+        onChange={setFilters}
+        onClear={resetFilters}
+      />
     </TopBarControls>
-  ), [filters, categoryOptions, activeCount, setFilters, resetFilters]);
+  ), [filters, categoryOptions, accountOptions, activeCount, setFilters, resetFilters]);
   usePageTopBarRightSlot(topBarFilters);
+
+  const bankActions: StandardCardAction[] = archivedBankCount
+    ? [{
+        label: showArchivedBanks ? 'Hide closed banks' : `Show closed banks (${archivedBankCount})`,
+        onClick: () => setShowArchivedBanks((value) => !value),
+      }]
+    : [];
+
+  const accountActions: StandardCardAction[] = archivedAccountCount
+    ? [{
+        label: showArchivedAccounts ? 'Hide closed accounts/cards' : `Show closed accounts/cards (${archivedAccountCount})`,
+        onClick: () => setShowArchivedAccounts((value) => !value),
+      }]
+    : [];
+
+  const clearBankingData = async () => {
+    const ok = await confirmDialog('This cannot be undone (export a backup first if unsure).', 'Clear all banking data?');
+    if (!ok) return;
+    setWorkbook(createEmptyBankWorkbook());
+    toast('All banking data cleared.');
+  };
+
   const sections: StandardPageSection[] = [
-    { key: 'summary', label: 'Banking summary', summary: <SummaryChip label="Accounts" value={accounts.length} />, content: <BankingScopeSummary accounts={accounts} filters={filters} /> },
-    { key: 'banks', label: 'Banks', content: <BanksList /> },
-    { key: 'accounts', label: 'All accounts', content: <><AccountsList /><AccountsFab /></> },
-    { key: 'creditCards', label: 'Credit cards', content: <CreditCardsTab plannedCreditCardCloudEmpty={plannedCreditCardCloudEmpty} uploadPlannedCreditCardLocalToCloud={uploadPlannedCreditCardLocalToCloud} /> },
-    { key: 'planning', label: 'Planning', content: <PlanningTab plannedCloudEmpty={plannedCloudEmpty} uploadPlannedLocalToCloud={uploadPlannedLocalToCloud} /> },
-    { key: 'transactions', label: 'Transactions', summary: <SummaryChip label="Filtered" value={transactions.filter((tx) => transactionMatchesFilters(tx, filters, categories)).length} />, content: <BankingScopeTransactions accounts={accounts} filters={filters} /> },
-    { key: 'analytics', label: 'Analytics', content: <AnalyticsTab /> },
-    { key: 'settings', label: 'Settings', content: <div><p className="text-muted mt-0">Sign-in, profile, appearance, and a whole-app backup live on the <Link to="/account">Account page →</Link>. What's below is specific to Banking.</p><AccountSection cloudEmpty={cloudEmpty} uploadLocalToCloud={uploadLocalToCloud} /><DataManagement /></div> },
+    {
+      key: 'summary',
+      label: 'Summary',
+      defaultOpen: true,
+      summary: <SummaryChip label="Accounts" value={accounts.length} />,
+      content: <BankingScopeSummary accounts={accounts} filters={filters} />,
+    },
+    {
+      key: 'banks',
+      label: 'Banks',
+      actions: bankActions,
+      content: <BanksList showArchived={showArchivedBanks} />,
+    },
+    {
+      key: 'accounts',
+      label: 'Accounts',
+      defaultOpen: true,
+      actions: accountActions,
+      content: (
+        <div>
+          <AccountsList showArchived={showArchivedAccounts} />
+          <hr className="mt-md mb-md" />
+          <h3 className="mt-0 mb-sm">Credit cards</h3>
+          <CreditCardsTab
+            plannedCreditCardCloudEmpty={plannedCreditCardCloudEmpty}
+            uploadPlannedCreditCardLocalToCloud={uploadPlannedCreditCardLocalToCloud}
+            showArchived={showArchivedAccounts}
+          />
+        </div>
+      ),
+    },
+    {
+      key: 'planning',
+      label: 'Planning',
+      content: <PlanningTab plannedCloudEmpty={plannedCloudEmpty} uploadPlannedLocalToCloud={uploadPlannedLocalToCloud} />,
+    },
+    {
+      key: 'transactions',
+      label: 'Transactions',
+      summary: <SummaryChip label="Filtered" value={transactions.filter((tx) => transactionMatchesFilters(tx, filters, categories)).length} />,
+      actions: bankingTransactionActions(accounts, transactions, filters, categories),
+      content: <BankingScopeTransactions accounts={accounts} filters={filters} />,
+    },
+    { key: 'analytics', label: 'Analytics', content: <AnalyticsTab filters={filters} /> },
+    {
+      key: 'settings',
+      label: 'Settings',
+      actions: [{ label: 'Clear all banking data', icon: <TrashIcon size={14} />, tone: 'danger', onClick: () => { void clearBankingData(); } }],
+      content: (
+        <div>
+          <p className="text-muted mt-0">
+            Sign-in, profile, appearance, and a whole-app backup live on the <Link to="/account">Account page →</Link>. What's below is specific to Banking.
+          </p>
+          <AccountSection cloudEmpty={cloudEmpty} uploadLocalToCloud={uploadLocalToCloud} />
+          <DataManagement />
+        </div>
+      ),
+    },
   ];
+
   return (
     <div className="standard-page">
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
         <h1 className="pagetitle m-0">Banking</h1>
         <Tooltip text="Bank account balances and transaction history, entered manually or imported from a CSV statement — no live bank connection (see Disclaimer & Privacy for why)." />
       </div>
-      {/* User-requested (2026-09-14): Parent Banks "extracted on top,
-         collapsed by default" — a page-level section, above the whole
-         tabbed area, not nested inside the "Accounts" tab's own content. */}
+      <AccountsFab />
       <StandardPageSections sections={sections} defaultKey="summary" />
       <FabPanel actions={fabActions} />
     </div>

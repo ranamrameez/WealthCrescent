@@ -12,6 +12,7 @@ export interface TransactionPageFilters {
   direction: TransactionDirectionFilter;
   category: string;
   source: TransactionSourceFilter;
+  accountId: string;
 }
 
 export function useUrlTransactionFilters() {
@@ -23,6 +24,7 @@ export function useUrlTransactionFilters() {
   const direction = (params.get('direction') as TransactionDirectionFilter | null) ?? 'all';
   const category = params.get('category') || 'all';
   const source = (params.get('source') as TransactionSourceFilter | null) ?? 'all';
+  const accountId = params.get('account') || 'all';
   const filters = useMemo<TransactionPageFilters>(() => ({
     period,
     fromDate,
@@ -30,7 +32,8 @@ export function useUrlTransactionFilters() {
     direction,
     category,
     source,
-  }), [period, fromDate, toDate, direction, category, source]);
+    accountId,
+  }), [period, fromDate, toDate, direction, category, source, accountId]);
   useEffect(() => {
     if (params.has('from') && params.has('to') && params.has('period')) return;
     const next = new URLSearchParams(params);
@@ -47,12 +50,13 @@ export function useUrlTransactionFilters() {
     value.direction === 'all' ? next.delete('direction') : next.set('direction', value.direction);
     value.category === 'all' ? next.delete('category') : next.set('category', value.category);
     value.source === 'all' ? next.delete('source') : next.set('source', value.source);
+    value.accountId === 'all' ? next.delete('account') : next.set('account', value.accountId);
     setParams(next);
   }, [filters, params, setParams]);
   const resetFilters = useCallback(() => {
     const range = currentMonthRange();
-    setFilters({ period: 'since-month', fromDate: range.startDate, toDate: range.endDate, direction: 'all', category: 'all', source: 'all' });
+    setFilters({ period: 'since-month', fromDate: range.startDate, toDate: range.endDate, direction: 'all', category: 'all', source: 'all', accountId: 'all' });
   }, [setFilters]);
-  const activeCount = (filters.period !== 'since-month' ? 1 : 0) + (filters.direction !== 'all' ? 1 : 0) + (filters.category !== 'all' ? 1 : 0) + (filters.source !== 'all' ? 1 : 0);
+  const activeCount = (filters.period !== 'since-month' ? 1 : 0) + (filters.direction !== 'all' ? 1 : 0) + (filters.category !== 'all' ? 1 : 0) + (filters.source !== 'all' ? 1 : 0) + (filters.accountId !== 'all' ? 1 : 0);
   return { filters, setFilters, resetFilters, activeCount };
 }

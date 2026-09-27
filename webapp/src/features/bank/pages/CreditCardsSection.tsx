@@ -6,7 +6,7 @@ import { StandardPageSections } from '../../../components/StandardPageSections';
 import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
 import { confirmDialog } from '../../../components/ConfirmDialog';
-import { ArchiveIcon, EditIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
+import { ArchiveIcon, EditIcon, ListIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { Modal } from '../../../components/Modal';
 import { FabPanel } from '../../../components/ui/Fab';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
@@ -972,7 +972,7 @@ function CreditCardsFab() {
   const [open, setOpen] = useState<'card' | 'transfer' | null>(null);
   const actions = useMemo(
     () => [
-      { label: 'Add a card', icon: <PlusIcon />, onClick: () => setOpen('card') },
+      { label: 'Add a card', icon: <ListIcon />, onClick: () => setOpen('card') },
       { label: 'Transfers', icon: <TransferIcon />, onClick: () => setOpen('transfer') },
     ],
     [],
@@ -990,26 +990,19 @@ function CreditCardsFab() {
   );
 }
 
-function CreditCardsList() {
+function CreditCardsList({ showArchived = false }: { showArchived?: boolean }) {
   const navigate = useNavigate();
   const allCards = useCreditCardWorkbookStore((s) => s.workbook.cards);
   const transactions = useCreditCardWorkbookStore((s) => s.workbook.transactions);
-  const [showArchived, setShowArchived] = useState(false);
-  const archivedCount = useMemo(() => allCards.filter((c) => c.isActive === false).length, [allCards]);
   const cards = useMemo(() => (showArchived ? allCards : allCards.filter((c) => c.isActive !== false)), [allCards, showArchived]);
   const srNumOf = useMemo(() => new Map(allCards.map((c, i) => [c.id, i + 1])), [allCards]);
   const sorted = useMemo(() => [...cards].sort((a, b) => Number(!!b.isFavorite) - Number(!!a.isFavorite)), [cards]);
 
   return (
     <div>
-      {archivedCount > 0 && (
-        <button className="btn secondary small mb-sm" onClick={() => setShowArchived((v) => !v)}>
-          {showArchived ? 'Hide' : 'Show'} closed ({archivedCount})
-        </button>
-      )}
       {!sorted.length ? (
         <p className="text-muted">
-          {allCards.length ? 'Every card is closed — click "Show closed" above to see them.' : 'No credit cards yet — add one with the + button.'}
+          {allCards.length ? 'Every card is closed — use this card\'s Actions menu to show closed cards.' : 'No credit cards yet — use Actions to add one.'}
         </p>
       ) : (
         <div className="entity-card-grid">
@@ -1025,7 +1018,6 @@ function CreditCardsList() {
                 stat={<MoneyValue n={balance} currency={c.currencyCode} />}
                 hue={balance > 0 ? 'var(--loss)' : 'var(--profit)'}
                 onClick={() => navigate(`/bank/card/${c.id}`)}
-                actions={<IconButton label="Open" icon={<EditIcon size={13} />} align="right" onClick={() => navigate(`/bank/card/${c.id}`)} />}
               />
             );
           })}
@@ -1042,15 +1034,17 @@ function CreditCardsList() {
 export function CreditCardsTab({
   plannedCreditCardCloudEmpty,
   uploadPlannedCreditCardLocalToCloud,
+  showArchived = false,
 }: {
   plannedCreditCardCloudEmpty: boolean;
   uploadPlannedCreditCardLocalToCloud: () => Promise<void>;
+  showArchived?: boolean;
 }) {
   return (
     <div>
       <RepairStaleMigrations />
       <MigrateLegacyCreditCards />
-      <CreditCardsList />
+      <CreditCardsList showArchived={showArchived} />
       <CardPlanningCloudNotice cloudEmpty={plannedCreditCardCloudEmpty} uploadLocalToCloud={uploadPlannedCreditCardLocalToCloud} />
       <CreditCardsFab />
     </div>

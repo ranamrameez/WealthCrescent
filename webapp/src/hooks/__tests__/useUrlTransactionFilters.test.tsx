@@ -47,3 +47,15 @@ it('keeps filter and callback references stable across unrelated rerenders', () 
   expect(result.current.setFilters).toBe(firstSetFilters);
   expect(result.current.resetFilters).toBe(firstResetFilters);
 });
+
+it('stores account scope in the centralized filter URL and clears it on reset', () => {
+  const { result } = setup('/bank?section=analytics');
+  act(() => result.current.setFilters({ accountId: 'a2' }));
+  expect(result.current.filters.accountId).toBe('a2');
+  expect(new URLSearchParams(result.current.location.search).get('account')).toBe('a2');
+  expect(result.current.activeCount).toBe(1);
+
+  act(() => result.current.resetFilters());
+  expect(result.current.filters.accountId).toBe('all');
+  expect(new URLSearchParams(result.current.location.search).get('account')).toBeNull();
+});
