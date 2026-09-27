@@ -71,6 +71,16 @@ export interface PersonalLoanRepayment {
   isPending?: boolean;
 }
 
+export interface PersonalLoanPlan {
+  id: string;
+  loanId: string;
+  date: string;
+  amount: number;
+  description?: string;
+  categoryID?: string;
+  executed?: boolean;
+}
+
 export interface PersonalLoansSettings {
   /** Pre-fills new entries only — never converts existing ones. */
   defaultCurrency: string;
@@ -80,4 +90,5 @@ export interface PersonalLoansWorkbook {
   settings: PersonalLoansSettings;
   loans: PersonalLoan[];
   repayments: PersonalLoanRepayment[];
+  plans?: PersonalLoanPlan[];
 }
