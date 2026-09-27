@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Chart, Doughnut } from 'react-chartjs-2';
 import { Card, CollapsibleCard, MoneyValue, StatCard } from '../../../components/Card';
+import { StandardPageSections } from '../../../components/StandardPageSections';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { Modal } from '../../../components/Modal';
 import { Notice } from '../../../components/Notice';
@@ -506,7 +507,7 @@ export function NetWorthPage({
           roughly-equal Cards side by side — "Net worth summary" (the
           currency picker grouped directly with the big number it controls)
           and "Exchange rates" (its own Card, with a From/To pair). */}
-      <div className="grid-auto" style={{ ...gridAutoStyle(320, 16), marginBottom: 16, alignItems: 'start' }}>
+      <StandardPageSections sections={[{ key: 'summary', label: 'Summary', defaultOpen: true, content: <div className="grid-auto" style={{ ...gridAutoStyle(320, 16), marginBottom: 16, alignItems: 'start' }}>
         <Card>
           <h3 className="mt-0">Net worth summary</h3>
           <div className="mt-12">
@@ -656,7 +657,7 @@ export function NetWorthPage({
           )}
         </CollapsibleCard>
         )}
-      </div>
+      </div> }]} />
 
       {/* User-requested (2026-08-26): subscription renewal/expiry alerts on
           the "homepage" — a compact list, not the full per-subscription
