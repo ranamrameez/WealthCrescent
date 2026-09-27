@@ -219,7 +219,7 @@
 .pagination-actions{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;}
 .analytics-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding-inline:16px;}
 .analytics-grid > .analytics-chart:nth-child(1), .analytics-grid > .analytics-chart:nth-child(2){grid-column:1 / -1;}
-.analytics-chart{min-width:0;padding:10px 0;}
+.analytics-chart{min-width:0;padding:14px;border:1px solid var(--border);border-radius:12px;background:var(--panel);box-shadow:0 2px 8px rgba(0,0,0,.08);}
 .analytics-chart h4{margin:0 0 8px;text-align:center;text-transform:capitalize;}
 .analytics-chart > .tooltip-trigger{display:block!important;text-align:center;}
 .analytics-chart > .tooltip-trigger h4{display:inline-block;vertical-align:middle;}
