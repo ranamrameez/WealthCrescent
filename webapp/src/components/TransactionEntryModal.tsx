@@ -289,7 +289,11 @@ function TxRowFields({
                 const wantedDirection = loanDirectionForTransfer(d);
                 const current = personalLoans.find((loan) => loan.id === row.finance.ref);
                 if (current?.direction === wantedDirection) {
-                  onChange({ ...row, direction: d });
+                  onChange({
+                    ...row,
+                    direction: d,
+                    categoryID: row.categoryTouched ? row.categoryID : loanCategoryForDirection(current.direction),
+                  });
                   return;
                 }
                 const replacement = personalLoans.find((loan) =>
@@ -328,7 +332,7 @@ function TxRowFields({
             placeholder="Transfer"
           />
         </Field>
-        {HAS_CATEGORY.includes(row.finance.module) && !row.linked && (
+        {HAS_CATEGORY.includes(row.finance.module) && (
           <Field label="Category">
             <CategorySelect value={row.categoryID} onChange={(categoryID) => onChange({ ...row, categoryID, categoryTouched: true })} />
           </Field>
@@ -507,6 +511,9 @@ export function TransactionEntryModal({
     ?? (resolvedDefaultFinance.module === 'bank'
       ? bankAccounts.find((account) => account.id === resolvedDefaultFinance.ref)?.currencyCode
       : undefined);
+  const initialPersonalLoan = resolvedDefaultFinance.module === 'personalLoans'
+    ? personalLoans.find((loan) => loan.id === resolvedDefaultFinance.ref)
+    : undefined;
 
   const [rows, setRows] = useState<TxRow[]>(() => {
     const base = emptyRow(
@@ -517,7 +524,10 @@ export function TransactionEntryModal({
       resolvedDefaultCurrency,
     );
     if (!editPersonalLoanPayment) {
-      if (editingLoan && !base.categoryTouched) base.categoryID = loanCategoryForDirection(editingLoan.direction);
+      if (initialPersonalLoan && !base.categoryTouched) {
+        base.direction = transferDirectionForLoan(initialPersonalLoan.direction);
+        base.categoryID = loanCategoryForDirection(initialPersonalLoan.direction);
+      }
       return [base];
     }
     return [{
@@ -616,6 +626,7 @@ export function TransactionEntryModal({
           toAmount: r.direction === 'out' ? otherAmount : financeAmount,
           from: r.direction === 'out' ? resolvedFinance : resolvedOther,
           to: r.direction === 'out' ? resolvedOther : resolvedFinance,
+          categoryID: r.categoryID,
           note: r.description.trim() || undefined,
           rateSource: r.rateSource.trim() || undefined,
         });
