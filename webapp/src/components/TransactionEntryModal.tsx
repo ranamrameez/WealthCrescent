@@ -195,11 +195,13 @@ function TxRowFields({
   onChange,
   onRemove,
   canRemove,
+  financeLocked = false,
 }: {
   row: TxRow;
   onChange: (row: TxRow) => void;
   onRemove: () => void;
   canRemove: boolean;
+  financeLocked?: boolean;
 }) {
   const personalLoans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const otherCurrency = useSideCurrency(row.other);
@@ -234,6 +236,7 @@ function TxRowFields({
       <SideFields
         label="Finance"
         cfg={row.finance}
+        disabled={financeLocked}
         allowSubscriptions
         subscriptionMode={row.subscriptionMode}
         subscriptionId={row.subscriptionId}
@@ -752,6 +755,7 @@ export function TransactionEntryModal({
           onChange={(row) => updateRow(r.key, row)}
           onRemove={() => removeRow(r.key)}
           canRemove={!editPersonalLoanPayment && rows.length > 1}
+          financeLocked={!!editPersonalLoanPayment}
         />
       ))}
       {!editPersonalLoanPayment && (
