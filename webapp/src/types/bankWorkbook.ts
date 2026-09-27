@@ -43,6 +43,9 @@ export interface BankAccount {
    * that bank" rollup. `undefined` means this account isn't grouped
    * under any Bank yet. */
   bankId?: string;
+  /** Optional user-selected card color for distinguishing accounts visually.
+   * Like Bank.color, this is presentation-only and never affects balances. */
+  color?: string;
   /** An account has one currency (real-world bank accounts do) — unlike
    * Cash/Personal Loans, currency isn't repeated per-transaction here. */
   currencyCode: string;
