@@ -2356,9 +2356,11 @@ export function BankPage({
     [allAccounts],
   );
   const transactions = useBankWorkbookStore((state) => state.workbook.transactions);
+  const creditCards = useCreditCardWorkbookStore((state) => state.workbook.cards);
   const categories = useCategoryStore((state) => state.workbook.categories);
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
   const [showArchivedBanks, setShowArchivedBanks] = useState(false);
+  const [showArchivedAccounts, setShowArchivedAccounts] = useState(false);
 
   const categoryOptions = useMemo(
     () => [...new Set(transactions.map((tx) => categoryName(tx.categoryID, categories)))].sort(),
@@ -2373,6 +2375,10 @@ export function BankPage({
   const archivedBankCount = useMemo(
     () => banks.filter((bank) => bank.isActive === false).length,
     [banks],
+  );
+  const archivedAccountCount = useMemo(
+    () => accounts.filter((account) => account.isActive === false).length + creditCards.filter((card) => card.isActive === false).length,
+    [accounts, creditCards],
   );
 
   const topBarFilters = useMemo(() => (
@@ -2396,6 +2402,13 @@ export function BankPage({
       }]
     : [];
 
+  const accountActions: StandardCardAction[] = archivedAccountCount
+    ? [{
+        label: showArchivedAccounts ? 'Hide closed accounts/cards' : `Show closed accounts/cards (${archivedAccountCount})`,
+        onClick: () => setShowArchivedAccounts((value) => !value),
+      }]
+    : [];
+
   const sections: StandardPageSection[] = [
     {
       key: 'summary',
@@ -2414,14 +2427,16 @@ export function BankPage({
       key: 'accounts',
       label: 'Accounts',
       defaultOpen: true,
+      actions: accountActions,
       content: (
         <div>
-          <AccountsList />
+          <AccountsList showArchived={showArchivedAccounts} />
           <hr className="mt-md mb-md" />
           <h3 className="mt-0 mb-sm">Credit cards</h3>
           <CreditCardsTab
             plannedCreditCardCloudEmpty={plannedCreditCardCloudEmpty}
             uploadPlannedCreditCardLocalToCloud={uploadPlannedCreditCardLocalToCloud}
+            showArchived={showArchivedAccounts}
           />
         </div>
       ),
