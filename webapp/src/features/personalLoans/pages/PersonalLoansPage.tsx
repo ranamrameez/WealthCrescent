@@ -871,6 +871,19 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
     }),
     [repayments, paymentFilters],
   );
+  const filteredPlans = useMemo(
+    () => plans.filter((plan) =>
+      plan.loanId === loan.id
+      && !plan.executed
+      && (!paymentFilters.fromDate || plan.date >= paymentFilters.fromDate)
+      && (!paymentFilters.toDate || plan.date <= paymentFilters.toDate),
+    ),
+    [plans, loan.id, paymentFilters.fromDate, paymentFilters.toDate],
+  );
+  const actualPaid = filteredPayments.filter((payment) => !payment.isPending).reduce((sum, payment) => sum + payment.amount, 0);
+  const pendingPaid = filteredPayments.filter((payment) => payment.isPending).reduce((sum, payment) => sum + payment.amount, 0);
+  const plannedPaid = filteredPlans.reduce((sum, plan) => sum + plan.amount, 0);
+
 
   const toggleArchived = async () => {
     if (!(await ensureSignedIn(loan.isActive === false ? 'Sign in to reopen this loan.' : 'Sign in to close this loan.'))) return;
@@ -942,29 +955,29 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
       hue: loan.color,
       defaultOpen: true,
       actions: summaryActions,
+      summary: <SummaryChip label="Outstanding" value={fmtMoney(outstanding, loan.currencyCode)} />,
       content: (
-        <div>
-          <AttributeList items={[
-            { label: 'Person', value: loan.person },
-            { label: 'Loan type', value: loan.direction === 'owed_to_me' ? 'I lent money' : 'I borrowed money' },
-            { label: 'Currency', value: loan.currencyCode },
-            { label: 'Date', value: loan.date },
-            { label: 'Note', value: loan.note },
-          ]} />
-          <div className="grid-auto mt-md" style={gridAutoStyle(160, 8)}>
-            <div className="stat-card card" style={hueStyle(loan.color ?? 'var(--accent)')}>
-              <div className="label">Amount</div>
-              <MoneyValue n={loan.principal} currency={loan.currencyCode} />
-            </div>
-            <div className="stat-card card" style={hueStyle(loan.color ?? (loan.direction === 'owed_to_me' ? 'var(--profit)' : 'var(--loss)'))}>
-              <div className="label">Outstanding</div>
-              <MoneyValue n={outstanding} currency={loan.currencyCode} />
-              {pendingImpact !== 0 && (
-                <div className="sub">
-                  -{fmtMoney(pendingImpact, loan.currencyCode)} pending → {fmtMoney(Math.max(0, outstanding - pendingImpact), loan.currencyCode)} incl. pending
-                </div>
-              )}
-            </div>
+        <div className="grid-auto" style={gridAutoStyle(170, 8)}>
+          <div className="stat-card card" style={hueStyle(loan.color ?? 'var(--accent)')}>
+            <div className="label">Amount</div>
+            <MoneyValue n={loan.principal} currency={loan.currencyCode} />
+          </div>
+          <div className="stat-card card" style={hueStyle(loan.color ?? (loan.direction === 'owed_to_me' ? 'var(--profit)' : 'var(--loss)'))}>
+            <div className="label">Outstanding</div>
+            <MoneyValue n={outstanding} currency={loan.currencyCode} />
+          </div>
+          <div className="stat-card card" style={hueStyle(loan.color ?? 'var(--accent)')}>
+            <div className="label">Actual payments</div>
+            <MoneyValue n={actualPaid} currency={loan.currencyCode} />
+          </div>
+          <div className="stat-card card" style={hueStyle(loan.color ?? 'var(--accent)')}>
+            <div className="label">Pending payments</div>
+            <MoneyValue n={pendingPaid} currency={loan.currencyCode} />
+            {pendingImpact !== 0 && <div className="sub">Expected outstanding: {fmtMoney(Math.max(0, outstanding - pendingImpact), loan.currencyCode)}</div>}
+          </div>
+          <div className="stat-card card" style={hueStyle(loan.color ?? 'var(--accent)')}>
+            <div className="label">Planned payments</div>
+            <MoneyValue n={plannedPaid} currency={loan.currencyCode} />
           </div>
         </div>
       ),
