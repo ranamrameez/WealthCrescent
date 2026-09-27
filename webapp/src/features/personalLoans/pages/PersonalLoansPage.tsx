@@ -4,14 +4,15 @@ import { Link } from 'react-router-dom';
 import { Bar, Line } from 'react-chartjs-2';
 import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
 import { StandardPageSections, type StandardPageSection } from '../../../components/StandardPageSections';
-import type { StandardCardAction } from '../../../components/StandardCard';
+import { SummaryChip, type StandardCardAction } from '../../../components/StandardCard';
 import { AttributeList } from '../../../components/ui/AttributeList';
+import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls';
+import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { Modal } from '../../../components/Modal';
 import { Notice } from '../../../components/Notice';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { hueStyle } from '../../../lib/statCardHues';
 import { ArchiveIcon, CheckIcon, EditIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
-import { Tabs } from '../../../components/Tabs';
 import { toast } from '../../../components/Toast';
 import { Tooltip } from '../../../components/Tooltip';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
@@ -842,77 +843,53 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
  * favorite-first (same "favorites float to the top" convention every
  * other `EntityCard` grid in the app already uses), with Sr# still shown
  * from the loan's own stable creation-order position. */
-function LoanList({ onSelect, onEdit }: { onSelect: (loan: PersonalLoan) => void; onEdit: (loan: PersonalLoan) => void }) {
+function LoanList({
+  onSelect,
+  filter,
+  showArchived,
+}: {
+  onSelect: (loan: PersonalLoan) => void;
+  filter: 'all' | 'owed_to_me' | 'i_owe';
+  showArchived: boolean;
+}) {
   const allLoans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const repayments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
-  const updateLoan = usePersonalLoansWorkbookStore((s) => s.updateLoan);
-  const ensureSignedIn = useEnsureSignedIn();
-  const [filter, setFilter] = useState<'all' | 'owed_to_me' | 'i_owe'>('all');
-  const [showArchived, setShowArchived] = useState(false);
-  const archivedCount = useMemo(() => allLoans.filter((l) => l.isActive === false).length, [allLoans]);
-  const loans = useMemo(() => (showArchived ? allLoans : allLoans.filter((l) => l.isActive !== false)), [allLoans, showArchived]);
-  const filtered = useMemo(
-    () => (filter === 'all' ? loans : loans.filter((l) => l.direction === filter)).sort((a, b) => Number(!!b.isFavorite) - Number(!!a.isFavorite)),
-    [loans, filter],
+  const visibleLoans = useMemo(
+    () => (showArchived ? allLoans : allLoans.filter((loan) => loan.isActive !== false)),
+    [allLoans, showArchived],
   );
-  // Pending item 115(c): Sr# = the loan's own stable position in the
-  // underlying (unfiltered) array, creation order — not this grid's own
-  // favorite-first display order. Same convention as Bank/Funds.
-  const srNumOf = useMemo(() => new Map(allLoans.map((l, i) => [l.id, i + 1])), [allLoans]);
+  const filtered = useMemo(
+    () => (filter === 'all' ? visibleLoans : visibleLoans.filter((loan) => loan.direction === filter))
+      .sort((a, b) => Number(!!b.isFavorite) - Number(!!a.isFavorite)),
+    [visibleLoans, filter],
+  );
+  const srNumOf = useMemo(() => new Map(allLoans.map((loan, index) => [loan.id, index + 1])), [allLoans]);
 
-  const toggleFavorite = async (l: PersonalLoan) => {
-    if (!(await ensureSignedIn(l.isFavorite ? 'Sign in to unfavorite this loan.' : 'Sign in to favorite this loan.'))) return;
-    updateLoan(l.id, { isFavorite: !l.isFavorite });
-  };
+  if (!filtered.length) {
+    return (
+      <p className="text-muted">
+        {allLoans.length ? 'No loans match the current filter.' : 'No personal loans yet. Use Actions → Add a loan.'}
+      </p>
+    );
+  }
 
   return (
-    <div>
-      <div className="row gap-sm mb-sm">
-        <select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)}>
-          <option value="all">All directions</option>
-          <option value="owed_to_me">Money I lent out</option>
-          <option value="i_owe">Money I owe</option>
-        </select>
-        {archivedCount > 0 && (
-          <button className="btn secondary small" onClick={() => setShowArchived((v) => !v)}>
-            {showArchived ? 'Hide' : 'Show'} closed ({archivedCount})
-          </button>
-        )}
-      </div>
-      {!filtered.length ? (
-        <p className="text-muted">
-          {allLoans.length ? 'Every loan is closed — click "Show closed" above to see them.' : 'No personal loans yet.'}
-        </p>
-      ) : (
-        <div className="entity-card-grid">
-          {filtered.map((l) => {
-            const outstanding = loanOutstanding(l, repayments);
-            return (
-              <EntityCard
-                key={l.id}
-                title={<><span className="text-muted entity-card-sr">#{srNumOf.get(l.id)}</span>{l.person}</>}
-                subtitle={l.direction === 'owed_to_me' ? 'Lent out' : 'I owe'}
-                badge={l.isActive === false ? <span className="pill-warn fs-10">Closed</span> : undefined}
-                statLabel="Outstanding"
-                stat={<MoneyValue n={outstanding} currency={l.currencyCode} />}
-                hue={l.direction === 'owed_to_me' ? 'var(--profit)' : 'var(--loss)'}
-                onClick={() => onSelect(l)}
-                actions={
-                  <>
-                    <IconButton
-                      label={l.isFavorite ? 'Unfavorite' : 'Favorite'}
-                      icon={<StarIcon size={13} filled={l.isFavorite} />}
-                      align="right"
-                      onClick={() => toggleFavorite(l)}
-                    />
-                    <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => onEdit(l)} />
-                  </>
-                }
-              />
-            );
-          })}
-        </div>
-      )}
+    <div className="entity-card-grid">
+      {filtered.map((loan) => {
+        const outstanding = loanOutstanding(loan, repayments);
+        return (
+          <EntityCard
+            key={loan.id}
+            title={<><span className="text-muted entity-card-sr">#{srNumOf.get(loan.id)}</span>{loan.person}</>}
+            subtitle={loan.direction === 'owed_to_me' ? 'I lent money' : 'I borrowed money'}
+            badge={loan.isActive === false ? <span className="pill-warn fs-10">Closed</span> : undefined}
+            statLabel="Outstanding"
+            stat={<MoneyValue n={outstanding} currency={loan.currencyCode} />}
+            hue={loan.direction === 'owed_to_me' ? 'var(--profit)' : 'var(--loss)'}
+            onClick={() => onSelect(loan)}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -976,46 +953,75 @@ export function PersonalLoansPage({
   uploadLocalToCloud: () => Promise<void>;
 }) {
   const [selected, setSelected] = useState<PersonalLoan | null>(null);
-  const [editOnOpen, setEditOnOpen] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'owed_to_me' | 'i_owe'>('all');
+  const [showArchived, setShowArchived] = useState(false);
   const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
-  const liveSelected = selected ? loans.find((l) => l.id === selected.id) ?? null : null;
+  const repayments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
+  const liveSelected = selected ? loans.find((loan) => loan.id === selected.id) ?? null : null;
+  const archivedCount = useMemo(() => loans.filter((loan) => loan.isActive === false).length, [loans]);
 
-  const openLoan = (loan: PersonalLoan) => { setEditOnOpen(false); setSelected(loan); };
-  const editLoan = (loan: PersonalLoan) => { setEditOnOpen(true); setSelected(loan); };
+  usePageTopBarRightSlot(liveSelected ? null : (
+    <TopBarControls>
+      <TopBarSelect
+        label="Loan type"
+        value={filter}
+        onChange={(event) => setFilter(event.target.value as typeof filter)}
+        options={[
+          { value: 'all', label: 'All loans' },
+          { value: 'owed_to_me', label: 'I lent money' },
+          { value: 'i_owe', label: 'I borrowed money' },
+        ]}
+      />
+    </TopBarControls>
+  ));
+
+  if (liveSelected) {
+    return <LoanDetail loan={liveSelected} onBack={() => setSelected(null)} />;
+  }
+
+  const loanActions: StandardCardAction[] = archivedCount
+    ? [{
+        label: showArchived ? 'Hide closed loans' : `Show closed loans (${archivedCount})`,
+        onClick: () => setShowArchived((value) => !value),
+      }]
+    : [];
+
+  const sections: StandardPageSection[] = [
+    {
+      key: 'summary',
+      label: 'Summary',
+      defaultOpen: true,
+      summary: <SummaryChip label="Loans" value={loans.length} />,
+      content: <NetPositionSummary />,
+    },
+    {
+      key: 'loans',
+      label: 'Loans',
+      defaultOpen: true,
+      actions: loanActions,
+      summary: <SummaryChip label="Open" value={loans.filter((loan) => loan.isActive !== false).length} />,
+      content: <LoanList onSelect={setSelected} filter={filter} showArchived={showArchived} />,
+    },
+    {
+      key: 'analytics',
+      label: 'Analytics',
+      content: <AnalyticsTab />,
+    },
+    {
+      key: 'settings',
+      label: 'Settings',
+      content: <AccountSection cloudEmpty={cloudEmpty} uploadLocalToCloud={uploadLocalToCloud} />,
+    },
+  ];
 
   return (
-    <div>
+    <div className="standard-page">
       <h1 className="pagetitle">Personal Loans</h1>
       <p className="text-muted mb-12">
-        Informal loans with another person, tracked in either direction — money you lent out, or money you owe —
-        with a combined net position. No repayment schedule automation; if this loan actually has a real interest
-        schedule, it probably belongs in EMI/Loans instead.
+        Informal money borrowed from or lent to another person, with payments, linked transfers, categories, and net position tracking.
       </p>
-      {liveSelected ? (
-        <LoanDetail loan={liveSelected} onBack={() => setSelected(null)} startInEditMode={editOnOpen} />
-      ) : (
-        <div>
-          <Tabs
-            tabs={[
-              {
-                key: 'loans',
-                label: 'Loans',
-                content: (
-                  <div>
-                    <NetPositionSummary />
-                    <LoanList onSelect={openLoan} onEdit={editLoan} />
-                    <AddLoanFab />
-                  </div>
-                ),
-              },
-              { key: 'analytics', label: 'Analytics', content: <AnalyticsTab /> },
-            ]}
-          />
-          <div className="mt-md">
-            <AccountSection cloudEmpty={cloudEmpty} uploadLocalToCloud={uploadLocalToCloud} />
-          </div>
-        </div>
-      )}
+      <StandardPageSections sections={sections} defaultKey="summary" />
+      <AddLoanFab />
     </div>
   );
 }
