@@ -485,53 +485,48 @@ export function AddAccountForm({ onSaved, initialCurrency, initialBankId }: { on
  * the PAGE level (see `BankPage`, above the whole `Tabs` component) — the
  * first thing on the page after the title, not nested one level down
  * inside a specific tab. */
-function BanksList() {
+function BanksList({ showArchived = false }: { showArchived?: boolean }) {
   const banks = useBankWorkbookStore((s) => s.workbook.settings.banks ?? []);
   const accounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
   const transactions = useBankWorkbookStore((s) => s.workbook.transactions);
   const navigate = useNavigate();
-  const [showArchived, setShowArchived] = useState(false);
-  const archivedCount = useMemo(() => banks.filter((b) => b.isActive === false).length, [banks]);
   const visibleBanks = useMemo(
-    () => (showArchived ? banks : banks.filter((b) => b.isActive !== false)).sort((a, b) => Number(!!b.isFavorite) - Number(!!a.isFavorite)),
+    () => (showArchived ? banks : banks.filter((bank) => bank.isActive !== false))
+      .sort((a, b) => Number(!!b.isFavorite) - Number(!!a.isFavorite)),
     [banks, showArchived],
   );
-  if (!banks.length) return null;
+
+  if (!banks.length) return <p className="text-muted">No banks yet. Use Actions → Add a bank.</p>;
+  if (!visibleBanks.length) return <p className="text-muted">No active banks to show.</p>;
+
   return (
-    <CollapsibleCard title="Banks" defaultOpen={false}>
-      {archivedCount > 0 && (
-        <button className="btn secondary small mb-12" onClick={() => setShowArchived((v) => !v)}>
-          {showArchived ? 'Hide' : 'Show'} closed ({archivedCount})
-        </button>
-      )}
-      <div className="entity-card-grid">
-        {visibleBanks.map((b) => {
-          const totals = bankTotalsByCurrency(b.id, accounts, transactions);
-          const currencies = Object.keys(totals);
-          const accountCount = accounts.filter((a) => a.bankId === b.id).length;
-          return (
-            <EntityCard
-              key={b.id}
-              title={b.name}
-              subtitle={`${accountCount} account${accountCount === 1 ? '' : 's'}`}
-              badge={b.isActive === false ? <span className="pill-warn fs-10">Closed</span> : undefined}
-              statLabel={currencies.length > 1 ? 'Total (by currency)' : 'Total'}
-              stat={
-                currencies.length ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {currencies.map((c) => <MoneyValue key={c} n={totals[c]} currency={c} />)}
-                  </div>
-                ) : (
-                  <span className="text-muted">No accounts yet</span>
-                )
-              }
-              hue={b.color}
-              onClick={() => navigate(`/bank/bank/${b.id}`)}
-            />
-          );
-        })}
-      </div>
-    </CollapsibleCard>
+    <div className="entity-card-grid">
+      {visibleBanks.map((bank) => {
+        const totals = bankTotalsByCurrency(bank.id, accounts, transactions);
+        const currencies = Object.keys(totals);
+        const accountCount = accounts.filter((account) => account.bankId === bank.id).length;
+        return (
+          <EntityCard
+            key={bank.id}
+            title={bank.name}
+            subtitle={`${accountCount} account${accountCount === 1 ? '' : 's'}`}
+            badge={bank.isActive === false ? <span className="pill-warn fs-10">Closed</span> : undefined}
+            statLabel={currencies.length > 1 ? 'Total (by currency)' : 'Total'}
+            stat={
+              currencies.length ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {currencies.map((currency) => <MoneyValue key={currency} n={totals[currency]} currency={currency} />)}
+                </div>
+              ) : (
+                <span className="text-muted">No accounts yet</span>
+              )
+            }
+            hue={bank.color}
+            onClick={() => navigate(`/bank/bank/${bank.id}`)}
+          />
+        );
+      })}
+    </div>
   );
 }
 
