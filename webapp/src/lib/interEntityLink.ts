@@ -48,7 +48,7 @@ function buildSideRecord(
           // filling default currency").
           currencyCode: cfg.currencyCode || 'USD',
           categoryID: TRANSFER_CATEGORY_ID,
-          note,
+          title: note,
           source: 'manual',
         },
       };
@@ -75,7 +75,7 @@ function buildSideRecord(
     case 'funds':
       return {
         module: cfg.module,
-        record: { id, date, type: direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: amount, fee: 0 },
+        record: { id, date, type: direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: amount, fee: 0, description: note },
       };
     case 'rentals':
       // Unlike Bank/Cash/QSE/PSX/Funds, Rentals has no real balance of its
@@ -109,7 +109,7 @@ function buildSideRecord(
           // "normally" here).
           isDeposit: direction !== 'in',
           amount,
-          note,
+          title: note,
         },
       };
     case 'personalLoans':
@@ -121,7 +121,7 @@ function buildSideRecord(
       if (!cfg.ref) throw new Error('Personal Loans side of a linked transfer needs a loan.');
       return {
         module: 'personalLoans',
-        record: { id, loanId: cfg.ref, date, amount },
+        record: { id, loanId: cfg.ref, date, amount, description: note },
       };
     case 'emi':
       // Same "direction doesn't flip the sign" exception as personalLoans
@@ -134,7 +134,7 @@ function buildSideRecord(
       if (!cfg.emiMonth) throw new Error("Couldn't determine which installment this payment applies to.");
       return {
         module: 'emi',
-        record: { id, loanId: cfg.ref, month: cfg.emiMonth, amount, date },
+        record: { id, loanId: cfg.ref, month: cfg.emiMonth, amount, date, description: note },
       };
     case 'creditCard':
       // Same "direction doesn't flip the sign" exception as personalLoans/
