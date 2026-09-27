@@ -61,7 +61,7 @@ export function StandardCard({ title, summary, actions=[], headerEnd, defaultOpe
   const enterFullScreen = () => { setFullScreen(true); if (!open) { if (onToggle) onToggle(true); else setInternalOpen(true); } };
   return <>{fullScreen && <div className="standard-card-backdrop" onClick={() => setFullScreen(false)} />}
   <section
-    className={`card standard-card${fullScreen ? ' standard-card-fullscreen' : ''} ${className}`.trim()}
+    className={`card standard-card${hue ? ' standard-card-hued' : ''}${fullScreen ? ' standard-card-fullscreen' : ''} ${className}`.trim()}
     style={hue ? ({ '--card-hue': hue } as CSSProperties) : undefined}
   >
     <header className="standard-card-header">
