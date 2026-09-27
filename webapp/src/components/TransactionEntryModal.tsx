@@ -228,9 +228,6 @@ function TxRowFields({
 }) {
   const otherCurrency = useSideCurrency(row.other);
   const financeCurrency = useSideCurrency(row.finance);
-  const subscriptions = useSubscriptionsWorkbookStore((s) => s.workbook.entries);
-  const activeSubscriptions = subscriptions.filter((s) => s.active).sort((a, b) => a.name.localeCompare(b.name));
-  const showSubscriptionPicker = !row.linked && HAS_SUBSCRIPTION.includes(row.finance.module) && activeSubscriptions.length > 0;
   const currencyMismatch = row.linked && !!otherCurrency && !!financeCurrency && otherCurrency !== financeCurrency;
   const direction = DIRECTION_LABELS[row.finance.module];
   // See `DIRECTION_LABELS`'s own doc comment on `creditCard` — a linked
@@ -261,6 +258,17 @@ function TxRowFields({
       <SideFields
         label="Finance"
         cfg={row.finance}
+        allowSubscriptions
+        subscriptionMode={row.subscriptionMode}
+        subscriptionId={row.subscriptionId}
+        onSubscriptionChange={(subscriptionId) =>
+          onChange({
+            ...row,
+            subscriptionMode: !!subscriptionId,
+            subscriptionId,
+            linked: subscriptionId ? false : row.linked,
+          })
+        }
         onChange={(finance) =>
           onChange({
             ...row,
@@ -271,6 +279,40 @@ function TxRowFields({
           })
         }
       />
+
+      <div className="row gap-sm mt-sm" style={{ alignItems: 'flex-end' }}>
+        {showDirection && (
+          <Field label="Direction">
+            <DirectionChips value={row.direction} onChange={(d) => onChange({ ...row, direction: d })} labels={direction!} />
+          </Field>
+        )}
+        <Field label="Amount" required title={!showDirection ? 'A repayment is always entered as a positive amount, regardless of which way the debt runs.' : 'You can type a math expression here too, e.g. 10.5+5 — it evaluates once you leave the field.'}>
+          <AmountInput value={row.amount} onChange={(amount) => onChange({ ...row, amount })} />
+        </Field>
+      </div>
+
+      <div className="row gap-sm mt-sm">
+        {HAS_DESCRIPTION.includes(row.finance.module) && (
+          <Field label="Description" required={row.finance.module === 'bank'}>
+            <TextInput
+              value={row.description}
+              onChange={(e) => onChange({ ...row, description: e.target.value })}
+              placeholder="Transfer By Default"
+            />
+          </Field>
+        )}
+        {HAS_CATEGORY.includes(row.finance.module) && !row.linked && (
+          <Field label="Category">
+            <CategorySelect value={row.categoryID} onChange={(categoryID) => onChange({ ...row, categoryID })} />
+          </Field>
+        )}
+        {HAS_NOTE.includes(row.finance.module) && (
+          <Field label="Note (optional)">
+            <TextInput value={row.note} onChange={(e) => onChange({ ...row, note: e.target.value })} />
+          </Field>
+        )}
+      </div>
+
       <div className="row gap-sm mt-sm">
         <Field label="Date">
           <TextInput
@@ -282,47 +324,6 @@ function TxRowFields({
             }}
           />
         </Field>
-        {showDirection && (
-          <Field label="Direction">
-            <DirectionChips value={row.direction} onChange={(d) => onChange({ ...row, direction: d })} labels={direction!} />
-          </Field>
-        )}
-        <Field label="Amount" required title={!showDirection ? 'A repayment is always entered as a positive amount, regardless of which way the debt runs.' : 'You can type a math expression here too, e.g. 10.5+5 — it evaluates once you leave the field.'}>
-          <AmountInput value={row.amount} onChange={(amount) => onChange({ ...row, amount })} />
-        </Field>
-        {HAS_DESCRIPTION.includes(row.finance.module) && (
-          // Bank's own `submit()` case actually enforces this (toasts if
-          // left blank) — a credit card row doesn't (it defaults to
-          // "Charge"/"Payment" instead, same as before this field existed
-          // for it), so only Bank shows it as `required` — the asterisk
-          // should never claim a stronger constraint than `submit()` really
-          // checks.
-          <Field label="Description" required={row.finance.module === 'bank'}>
-            <TextInput
-              value={row.description}
-              onChange={(e) => onChange({ ...row, description: e.target.value })}
-              placeholder={row.finance.module === 'creditCard' ? 'e.g. Grocery run (optional — defaults to Charge/Payment)' : 'e.g. Rent, Grocery run'}
-            />
-          </Field>
-        )}
-        {HAS_CATEGORY.includes(row.finance.module) && !row.linked && (
-          <Field label="Category">
-            <CategorySelect value={row.categoryID} onChange={(categoryID) => onChange({ ...row, categoryID })} />
-          </Field>
-        )}
-        {showSubscriptionPicker && (
-          <Field label="Subscription (optional)" title="Marks this as paying a specific subscription — moves that subscription's own billing anchor to this transaction's date once saved.">
-            <Select value={row.subscriptionId} onChange={(e) => onChange({ ...row, subscriptionId: e.target.value })}>
-              <option value="">— None —</option>
-              {activeSubscriptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </Select>
-          </Field>
-        )}
-        {HAS_NOTE.includes(row.finance.module) && (
-          <Field label="Note (optional)">
-            <TextInput value={row.note} onChange={(e) => onChange({ ...row, note: e.target.value })} />
-          </Field>
-        )}
         <TimeZoneFields
           time={row.time}
           timezone={row.timezone}
@@ -330,29 +331,24 @@ function TxRowFields({
           onTimezoneChange={(timezone) => onChange({ ...row, timezone })}
         />
       </div>
-      <div className="mt-sm">
-        <ToggleChip
-          checked={row.linked}
-          onChange={(linked) => {
-            // Same "remember the last used source" convenience every other
-            // linking entry point already has — prefills, never forces.
-            const remembered = linked ? getLastTransferSource(row.finance) : undefined;
-            onChange({ ...row, linked, other: remembered ?? row.other, toAmount: undefined, toAmountTouched: false });
-          }}
-          label="Link to another finance (a transfer between two accounts)"
-          title={HAS_CATEGORY.includes(row.finance.module) ? 'A linked transfer is always categorized as Transfer on this side — the Category picker above is hidden while this is checked, not silently ignored.' : undefined}
-        />
-      </div>
-      {!row.linked && HAS_PENDING.includes(row.finance.module) && (
-        <div className="mt-sm">
-          <PendingToggle
-            checked={row.pending}
-            onChange={(v) => onChange({ ...row, pending: v })}
-            label="Pending (not yet cleared)"
-            title="Money already sent/placed but not yet reflected or filled — excluded from the current balance until you mark it cleared."
+
+      <div className="row gap-sm mt-sm" style={{ alignItems: 'flex-end' }}>
+        <Field label="Link to another finance">
+          <YesNoChips
+            value={row.linked}
+            onChange={(linked) => {
+              if (row.subscriptionMode && linked) return;
+              const remembered = linked ? getLastTransferSource(row.finance) : undefined;
+              onChange({ ...row, linked, other: remembered ?? row.other, toAmount: undefined, toAmountTouched: false });
+            }}
           />
-        </div>
-      )}
+        </Field>
+        {HAS_PENDING.includes(row.finance.module) && !row.linked && (
+          <Field label="Pending transaction">
+            <YesNoChips value={row.pending} onChange={(pending) => onChange({ ...row, pending })} />
+          </Field>
+        )}
+      </div>
       {row.linked && (
         <div className="mt-sm">
           <SideFields
@@ -626,7 +622,7 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
       // saved successfully (we only get here past every case's own
       // validation `continue`), so it's safe to move the subscription's
       // billing anchor to match.
-      if (r.subscriptionId && HAS_SUBSCRIPTION.includes(r.finance.module)) {
+      if (r.subscriptionMode && r.subscriptionId) {
         updateSubscription(r.subscriptionId, { startDate: r.date });
       }
     }
