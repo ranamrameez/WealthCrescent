@@ -593,6 +593,7 @@ export function TransactionEntryModal({
           date: r.date,
           amount: Math.abs(r.amount),
           note: r.description.trim() || undefined,
+          categoryID: r.categoryID,
           direction: r.direction,
         });
         if (propagated.error) message = propagated.error;
