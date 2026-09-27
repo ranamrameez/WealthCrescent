@@ -1626,6 +1626,7 @@ th.sortable .arrow {
 	font-size: 12.5px;
 	cursor: pointer;
 	font-weight: 500;
+	transition: background-color .18s ease, color .18s ease, transform .14s ease, box-shadow .18s ease;
 }
 
 .chip:hover {
@@ -1637,7 +1638,11 @@ th.sortable .arrow {
 	color: #fff;
 	border-color: transparent;
 	font-weight: 700;
+	animation: chip-select-in .2s ease-out;
+	box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 30%, transparent);
 }
+.chip:active { transform: scale(.96); }
+@keyframes chip-select-in { from { transform: scale(.94); opacity: .72; } to { transform: scale(1); opacity: 1; } }
 
 .text-muted {
 	color: var(--muted);

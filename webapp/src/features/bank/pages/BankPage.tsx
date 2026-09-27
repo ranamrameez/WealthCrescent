@@ -1,7 +1,7 @@
 import type { User } from 'firebase/auth';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
 import { SummaryChip, type StandardCardAction } from '../../../components/StandardCard';
@@ -934,7 +934,6 @@ function CreditUsageBar({ used, limit, currency }: { used: number; limit: number
 }
 
 export function AccountDetailPage() {
-  const { search } = useLocation();
   const { id } = useParams();
   const navigate = useNavigate();
   const accounts = useBankWorkbookStore((state) => state.workbook.settings.accounts);
@@ -985,7 +984,7 @@ export function AccountDetailPage() {
     const onScroll = () => setShowScrollTop(window.scrollY > 360);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
-  }, [id, search]);
+  }, [id]);
   const [addingPlan, setAddingPlan] = useState(false);
 
   const allLedger = useMemo(() => account ? accountRunningLedger(account, transactions, true) : [], [account, transactions]);
