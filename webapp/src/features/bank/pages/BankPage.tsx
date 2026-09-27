@@ -377,23 +377,69 @@ function AccountFormFields({
  * the caller (still optional, still fires with no meaningful argument for
  * the existing `AddAccountFab` caller, which only used it to close its own
  * modal) so that same picker can auto-select the new account immediately. */
-export function AddAccountForm({ onSaved, initialCurrency, initialBankId }: { onSaved?: (id: string) => void; initialCurrency?: string; initialBankId?: string }) {
+export function AddAccountForm({ onSaved, initialCurrency, initialBankId, account }: { onSaved?: (id: string) => void; initialCurrency?: string; initialBankId?: string; account?: BankAccount }) {
   const addAccount = useBankWorkbookStore((s) => s.addAccount);
+  const updateAccount = useBankWorkbookStore((s) => s.updateAccount);
   const primaryCurrency = usePrimaryCurrency();
   const [lastCurrency, setLastCurrency] = useLastCurrency('bank-account', primaryCurrency ?? 'USD');
   const ensureSignedIn = useEnsureSignedIn();
-  const [a, setA] = useState(() => emptyAccount(initialCurrency ?? lastCurrency, initialBankId));
+  const [a, setA] = useState<Omit<BankAccount, 'id'>>(() => account ? {
+    name: account.name,
+    nickname: account.nickname,
+    currencyCode: account.currencyCode,
+    openingBalance: account.openingBalance,
+    accountNumber: account.accountNumber,
+    smsSenderId: account.smsSenderId,
+    smsSenderNumber: account.smsSenderNumber,
+    branch: account.branch,
+    accountType: account.accountType,
+    iban: account.iban,
+    bankName: account.bankName,
+    bic: account.bic,
+    isLiability: account.isLiability,
+    creditLimit: account.creditLimit,
+    annualFee: account.annualFee,
+    statementDate: account.statementDate,
+    paymentDueDate: account.paymentDueDate,
+    lateFeeAfterDue: account.lateFeeAfterDue,
+    minPaymentAmount: account.minPaymentAmount,
+    cardNetwork: account.cardNetwork,
+    cardBin: account.cardBin,
+    bankId: account.bankId,
+    color: account.color,
+    isActive: account.isActive,
+    isFavorite: account.isFavorite,
+  } : emptyAccount(initialCurrency ?? lastCurrency, initialBankId));
 
   const submit = async () => {
     if (!a.name.trim()) return toast('Enter an account name.');
     if (!a.nickname?.trim()) return toast('Enter an account nickname.');
     if (a.nickname.trim().length > 11) return toast('Nickname must be fewer than 12 characters.');
-    if (!(await ensureSignedIn('Sign in to save bank accounts.'))) return;
-    const id = uid();
-    addAccount({ ...a, id, name: a.name.trim(), nickname: a.nickname.trim() });
-    toast(`Account "${a.name.trim()}" added.`);
-    setA(emptyAccount(a.currencyCode, initialBankId));
-    onSaved?.(id);
+    if (!(await ensureSignedIn(account ? 'Sign in to update this account.' : 'Sign in to save bank accounts.'))) return;
+    const clean = {
+      ...a,
+      name: a.name.trim(),
+      nickname: a.nickname.trim(),
+      accountNumber: a.accountNumber?.trim() || undefined,
+      smsSenderId: a.smsSenderId?.trim() || undefined,
+      smsSenderNumber: a.smsSenderNumber?.trim() || undefined,
+      branch: a.branch?.trim() || undefined,
+      accountType: a.accountType?.trim() || undefined,
+      iban: a.iban?.trim() || undefined,
+      bankName: a.bankName?.trim() || undefined,
+      bic: a.bic?.trim() || undefined,
+    };
+    if (account) {
+      updateAccount(account.id, clean);
+      toast('Account updated.');
+      onSaved?.(account.id);
+    } else {
+      const id = uid();
+      addAccount({ ...clean, id });
+      toast(`Account "${clean.name}" added.`);
+      setA(emptyAccount(a.currencyCode, initialBankId));
+      onSaved?.(id);
+    }
   };
 
   return (
@@ -404,10 +450,10 @@ export function AddAccountForm({ onSaved, initialCurrency, initialBankId }: { on
           setA((prev) => ({ ...prev, ...patch }));
           if (patch.currencyCode) setLastCurrency(patch.currencyCode);
         }}
-        idSuffix="add"
+        idSuffix={account ? 'edit' : 'add'}
       />
       <button className="btn mt-12" onClick={submit}>
-        <PlusIcon />Add account
+        {account ? <SaveIcon /> : <PlusIcon />}{account ? 'Save account' : 'Add account'}
       </button>
       <p className="text-muted mt-sm"><span className="text-loss">*</span> Required. Everything else on this form is optional.</p>
     </div>
@@ -841,33 +887,7 @@ export function AccountDetailPage() {
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
   const dateFormat = useAppearanceStore((state) => state.appearance.dateFormat ?? 'DD-MMM-YYYY');
 
-  const accountToFormValue = (value: BankAccount | undefined): Omit<BankAccount, 'id'> => ({
-    name: value?.name ?? '',
-    nickname: value?.nickname ?? '',
-    currencyCode: value?.currencyCode ?? 'USD',
-    openingBalance: value?.openingBalance ?? 0,
-    accountNumber: value?.accountNumber,
-    smsSenderId: value?.smsSenderId,
-    smsSenderNumber: value?.smsSenderNumber,
-    branch: value?.branch,
-    accountType: value?.accountType,
-    iban: value?.iban,
-    bankName: value?.bankName,
-    bic: value?.bic,
-    isLiability: value?.isLiability,
-    creditLimit: value?.creditLimit,
-    annualFee: value?.annualFee,
-    statementDate: value?.statementDate,
-    paymentDueDate: value?.paymentDueDate,
-    lateFeeAfterDue: value?.lateFeeAfterDue,
-    minPaymentAmount: value?.minPaymentAmount,
-    cardNetwork: value?.cardNetwork,
-    cardBin: value?.cardBin,
-    bankId: value?.bankId,
-    color: value?.color,
-  });
-  const [meta, setMeta] = useState<Omit<BankAccount, 'id'>>(() => accountToFormValue(account));
-  const [editingMeta, setEditingMeta] = useState(false);
+  const [editAccountOpen, setEditAccountOpen] = useState(false);
   const [showTransactionActions, setShowTransactionActions] = useState(false);
   const [showPlanActions, setShowPlanActions] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -946,7 +966,7 @@ export function AccountDetailPage() {
         className="account-switch-select"
         value={account.id}
         onChange={(event) => {
-          setEditingMeta(false);
+          setEditAccountOpen(false);
           navigate(`/bank/account/${event.target.value}`);
         }}
         options={accounts
@@ -967,28 +987,6 @@ export function AccountDetailPage() {
     return <div className="standard-page"><Link to="/bank" className="text-muted">← Back to Banking</Link><p className="text-muted mt-12">Account not found.</p></div>;
   }
 
-  const saveMeta = async () => {
-    if (!meta.name.trim()) return toast('Enter an account name.');
-    if (!meta.nickname?.trim()) return toast('Enter an account nickname.');
-    if (meta.nickname.trim().length > 11) return toast('Nickname must be fewer than 12 characters.');
-    if (!(await ensureSignedIn('Sign in to save account details.'))) return;
-    updateAccount(account.id, {
-      ...meta,
-      name: meta.name.trim(),
-      nickname: meta.nickname.trim(),
-      accountNumber: meta.accountNumber?.trim() || undefined,
-      smsSenderId: meta.smsSenderId?.trim() || undefined,
-      smsSenderNumber: meta.smsSenderNumber?.trim() || undefined,
-      branch: meta.branch?.trim() || undefined,
-      accountType: meta.accountType?.trim() || undefined,
-      iban: meta.iban?.trim() || undefined,
-      bankName: meta.bankName?.trim() || undefined,
-      bic: meta.bic?.trim() || undefined,
-    });
-    setEditingMeta(false);
-    toast('Account details saved.');
-  };
-  const cancelMetaEdit = () => { setMeta(accountToFormValue(account)); setEditingMeta(false); };
   const deleteThisAccount = async () => {
     if (!(await confirmDialog('This deletes the account and all its transactions — this cannot be undone.', `Delete "${account.name}"?`))) return;
     deleteAccount(account.id);
@@ -1032,20 +1030,16 @@ export function AccountDetailPage() {
     ? (() => { const days = Math.round((new Date(filters.toDate).getTime() - new Date(filters.fromDate).getTime()) / 86400000) + 1; return days <= 31 ? 'This month' : days <= 93 ? '3 months' : `${formatDate(filters.fromDate, dateFormat)} to ${formatDate(filters.toDate, dateFormat)}`; })()
     : filters.fromDate ? `${formatDate(filters.fromDate, dateFormat)} onward` : 'All time';
 
-  const detailActions: StandardCardAction[] = editingMeta
-    ? [
-        { label: account.isFavorite ? 'Unfavorite account' : 'Favorite account', icon: <StarIcon size={14} filled={account.isFavorite} />, onClick: () => updateAccount(account.id, { isFavorite: !account.isFavorite }) },
-        { label: 'Save', onClick: saveMeta },
-        { label: 'Cancel', onClick: cancelMetaEdit },
-        { label: account.isActive === false ? 'Reopen account' : 'Close account', onClick: toggleArchived },
-        { label: 'Delete account', onClick: deleteThisAccount, tone: 'danger' },
-      ]
-    : [
-        { label: account.isFavorite ? 'Unfavorite account' : 'Favorite account', icon: <StarIcon size={14} filled={account.isFavorite} />, onClick: () => updateAccount(account.id, { isFavorite: !account.isFavorite }) },
-        { label: 'Edit', onClick: () => { setMeta(accountToFormValue(account)); setEditingMeta(true); } },
-        { label: account.isActive === false ? 'Reopen account' : 'Close account', onClick: toggleArchived },
-        { label: 'Delete account', onClick: deleteThisAccount, tone: 'danger' },
-      ];
+  const detailActions: StandardCardAction[] = [
+    { label: account.isFavorite ? 'Unfavorite account' : 'Favorite account', icon: <StarIcon size={14} filled={account.isFavorite} />, onClick: () => updateAccount(account.id, { isFavorite: !account.isFavorite }) },
+    { label: 'Edit account', icon: <EditIcon size={14} />, onClick: () => setEditAccountOpen(true) },
+    {
+      label: account.isActive === false ? 'Reopen account' : 'Close account',
+      icon: account.isActive === false ? <RestoreIcon size={14} /> : <ArchiveIcon size={14} />,
+      onClick: () => { void toggleArchived(); },
+    },
+    { label: 'Delete account', icon: <TrashIcon size={14} />, tone: 'danger', onClick: () => { void deleteThisAccount(); } },
+  ];
 
   const sections: StandardPageSection[] = [
     {
@@ -1093,24 +1087,20 @@ export function AccountDetailPage() {
       </>,
       actions: detailActions,
       content: <>
-        {!editingMeta ? (
-          <AttributeList items={[
-            { label: 'Nickname', value: account.nickname },
-            { label: 'Name', value: account.name },
-            { label: 'Currency', value: account.currencyCode },
-            { label: 'Opening balance', value: fmtMoney(account.openingBalance, account.currencyCode) },
-            { label: 'Branch', value: account.branch },
-            { label: 'Account type', value: account.accountType },
-            { label: 'IBAN', value: account.iban },
-            { label: 'Bank name', value: account.bankName },
-            { label: 'BIC', value: account.bic },
-            { label: 'Account number', value: account.accountNumber },
-            { label: 'SMS sender ID', value: account.smsSenderId },
-            { label: 'SMS sender number', value: account.smsSenderNumber },
-          ]} />
-        ) : (
-          <AccountFormFields value={meta} onChange={(patch) => setMeta((current) => ({ ...current, ...patch }))} idSuffix="detail" />
-        )}
+        <AttributeList items={[
+          { label: 'Nickname', value: account.nickname },
+          { label: 'Name', value: account.name },
+          { label: 'Currency', value: account.currencyCode },
+          { label: 'Opening balance', value: fmtMoney(account.openingBalance, account.currencyCode) },
+          { label: 'Branch', value: account.branch },
+          { label: 'Account type', value: account.accountType },
+          { label: 'IBAN', value: account.iban },
+          { label: 'Bank name', value: account.bankName },
+          { label: 'BIC', value: account.bic },
+          { label: 'Account number', value: account.accountNumber },
+          { label: 'SMS sender ID', value: account.smsSenderId },
+          { label: 'SMS sender number', value: account.smsSenderNumber },
+        ]} />
         {account.isLiability && account.creditLimit ? <CreditUsageBar used={Math.max(0, -currentBalance)} limit={account.creditLimit} currency={account.currencyCode} /> : null}
       </>,
     },
@@ -1163,6 +1153,11 @@ export function AccountDetailPage() {
       </div>
       {account.migratedToCreditCardId && <Notice tone="info" className="mb-md">This account was migrated to a real Credit Card record — its transactions and balance now live there.{' '}<Link to={`/bank/card/${account.migratedToCreditCardId}`}>View the Credit Card →</Link></Notice>}
       <StandardPageSections key={account.id} sections={sections} defaultKey="summary" />
+      {editAccountOpen && (
+        <Modal title="Edit account" onClose={() => setEditAccountOpen(false)}>
+          <AddAccountForm account={account} onSaved={() => setEditAccountOpen(false)} />
+        </Modal>
+      )}
       {addingPlan && <Modal title="Add a plan" onClose={() => setAddingPlan(false)}>
         <AddBankPlanForm accountId={account.id} onSaved={() => setAddingPlan(false)} />
       </Modal>}
@@ -1895,10 +1890,11 @@ function AccountPlans({ account, showActions }: { account: BankAccount; showActi
   return <BankPlanList account={account} horizonDays={null} fromDate={filters.fromDate} toDate={filters.toDate} showActions={showActions} />;
 }
 
-export function AddBankPlanForm({ accountId, onSaved }: { accountId: string; onSaved?: () => void }) {
+export function AddBankPlanForm({ accountId, onSaved, plan }: { accountId: string; onSaved?: () => void; plan?: PlannedBankTransaction }) {
   const addPlan = usePlannedBankWorkbookStore((s) => s.addEntry);
+  const updatePlan = usePlannedBankWorkbookStore((s) => s.updateEntry);
   const ensureSignedIn = useEnsureSignedIn();
-  const [p, setP] = useState<PlannedBankTransaction>(() => emptyBankPlan(accountId));
+  const [p, setP] = useState<PlannedBankTransaction>(() => plan ? { ...plan } : emptyBankPlan(accountId));
   // Keep the user's direction choice independent from amount sign while the
   // magnitude is zero. Deriving direction from `p.amount >= 0` made a fresh
   // Withdrawal click write -0, which still compares >= 0 in JavaScript and
@@ -1908,11 +1904,17 @@ export function AddBankPlanForm({ accountId, onSaved }: { accountId: string; onS
 
   const submit = async () => {
     if (!p.amount || !p.description.trim()) return toast('Enter a description and a non-zero amount.');
-    if (!(await ensureSignedIn('Sign in to save plans.'))) return;
-    addPlan({ ...p, id: crypto.randomUUID(), accountId, category: p.category?.trim() || undefined });
-    toast('Plan added.');
-    setP(emptyBankPlan(accountId));
-    setDirection('in');
+    if (!(await ensureSignedIn(plan ? 'Sign in to update this plan.' : 'Sign in to save plans.'))) return;
+    const clean = { ...p, accountId, category: p.category?.trim() || undefined };
+    if (plan) {
+      updatePlan(plan.id, clean);
+      toast('Plan updated.');
+    } else {
+      addPlan({ ...clean, id: crypto.randomUUID() });
+      toast('Plan added.');
+      setP(emptyBankPlan(accountId));
+      setDirection('in');
+    }
     onSaved?.();
   };
 
@@ -1953,7 +1955,7 @@ export function AddBankPlanForm({ accountId, onSaved }: { accountId: string; onS
         <RecurrenceFields startDate={p.date} value={p.recurrence} onChange={(recurrence) => setP({ ...p, recurrence })} />
       </div>
       <button className="btn mt-12" onClick={submit}>
-        <PlusIcon />Add plan
+        {plan ? <SaveIcon /> : <PlusIcon />}{plan ? 'Save plan' : 'Add plan'}
       </button>
     </div>
   );
@@ -1966,8 +1968,7 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
   const deletePlan = usePlannedBankWorkbookStore((s) => s.deleteEntry);
   const addTransaction = useBankWorkbookStore((s) => s.addTransaction);
   const ensureSignedIn = useEnsureSignedIn();
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editRow, setEditRow] = useState<PlannedBankTransaction | null>(null);
+  const [editingPlan, setEditingPlan] = useState<PlannedBankTransaction | null>(null);
   const asOf = useMemo(() => new Date(), []);
 
   const plans = useMemo(
@@ -1975,15 +1976,6 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
     [allPlans, account.id, horizonDays, asOf, fromDate, toDate],
   );
   const sorted = useMemo(() => [...plans].sort((a, b) => a.date.localeCompare(b.date)), [plans]);
-
-  const startEdit = (p: PlannedBankTransaction) => { setEditId(p.id); setEditRow({ ...p }); };
-  const saveEdit = () => {
-    if (!editId || !editRow) return;
-    updatePlan(editId, editRow);
-    toast('Plan updated.');
-    setEditId(null);
-    setEditRow(null);
-  };
 
   const markDone = async (p: PlannedBankTransaction) => {
     const occurrenceDate = p.recurrence ? nextRecurrenceOccurrence(p.recurrence)?.toISOString().slice(0, 10) : p.date;
@@ -2016,61 +2008,38 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
             <tr><th>Date</th><th>Description</th><th>Amount</th><th>Category</th><th>Repeats / status</th><th></th></tr>
           </thead>
           <tbody>
-            {sorted.map((p) =>
-              editId === p.id && editRow ? (
-                <tr key={p.id}>
-                  <td>
-                    <DateInput
-                      value={editRow.date}
-                      onChange={(e) => setEditRow({ ...editRow, date: e.target.value, recurrence: editRow.recurrence ? { ...editRow.recurrence, startDate: e.target.value } : undefined })}
-                      width={130}
-                    />
-                  </td>
-                  <td><input value={editRow.description} onChange={(e) => setEditRow({ ...editRow, description: e.target.value })} /></td>
-                  <td><input type="number" step="0.01" value={editRow.amount} onChange={(e) => setEditRow({ ...editRow, amount: Number(e.target.value) })} className="w-100" /></td>
-                  <td><input value={editRow.category ?? ''} onChange={(e) => setEditRow({ ...editRow, category: e.target.value })} className="w-100" /></td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                      <RecurrenceFields
-                        startDate={editRow.date}
-                        value={editRow.recurrence}
-                        onChange={(recurrence) => setEditRow({ ...editRow, recurrence })}
-                      />
-                    </div>
-                  </td>
-                  <td>
-                    <IconButton label="Save" icon={<SaveIcon size={13} />} align="right" onClick={saveEdit} />{' '}
-                    <IconButton label="Cancel" icon={<XIcon size={13} />} align="right" onClick={() => setEditId(null)} />
-                  </td>
-                </tr>
-              ) : (
-                <tr key={p.id}>
-                  <td>{formatDate(p.date, dateFormat)}</td>
-                  <td><Link to={`/planning?plan=${encodeURIComponent(p.id)}`} className="plan-link">{p.description}</Link></td>
-                  <td className={p.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(p.amount, account.currencyCode)}</td>
-                  <td>{p.category || '—'}</td>
-                  <td className="text-muted">{p.recurrence ? recurrenceLabel(p.recurrence) : p.executed ? 'Done' : 'Planned'}</td>
-                  <td>
-                    {(p.recurrence || !p.executed) && (
-                      <button className="btn secondary small" onClick={() => markDone(p)}><CheckIcon size={12} />Mark as done</button>
-                    )}{' '}
-                    {showActions && <><IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => startEdit(p)} />{' '}
-                    <IconButton
-                      label="Delete"
-                      icon={<TrashIcon size={13} />}
-                      align="right"
-                      onClick={async () => {
-                        if (await confirmDialog('This cannot be undone.', 'Delete this plan?')) deletePlan(p.id);
-                      }}
-                    /></>}
-                  </td>
-                </tr>
-              ),
-            )}
+            {sorted.map((p) => (
+              <tr key={p.id}>
+                <td>{formatDate(p.date, dateFormat)}</td>
+                <td><Link to={`/planning?plan=${encodeURIComponent(p.id)}`} className="plan-link">{p.description}</Link></td>
+                <td className={p.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(p.amount, account.currencyCode)}</td>
+                <td>{p.category || '—'}</td>
+                <td className="text-muted">{p.recurrence ? recurrenceLabel(p.recurrence) : p.executed ? 'Done' : 'Planned'}</td>
+                <td>
+                  {(p.recurrence || !p.executed) && (
+                    <button className="btn secondary small" onClick={() => markDone(p)}><CheckIcon size={12} />Mark as done</button>
+                  )}{' '}
+                  {showActions && <><IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => setEditingPlan(p)} />{' '}
+                  <IconButton
+                    label="Delete"
+                    icon={<TrashIcon size={13} />}
+                    align="right"
+                    onClick={async () => {
+                      if (await confirmDialog('This cannot be undone.', 'Delete this plan?')) deletePlan(p.id);
+                    }}
+                  /></>}
+                </td>
+              </tr>
+            ))}
             {!sorted.length && <tr><td colSpan={6} className="text-muted">No plans for this account yet.</td></tr>}
           </tbody>
         </table>
       </div>
+      {editingPlan && (
+        <Modal title="Edit plan" onClose={() => setEditingPlan(null)}>
+          <AddBankPlanForm accountId={account.id} plan={editingPlan} onSaved={() => setEditingPlan(null)} />
+        </Modal>
+      )}
     </div>
   );
 }
