@@ -14,7 +14,7 @@ import { Tooltip } from '../../../components/Tooltip';
 import { ChartCard } from '../../qse/components/ChartCard';
 import { AnalyticsChartEnhancer } from '../../../components/AnalyticsChartCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
-import { ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, BankIcon, CheckIcon, EditIcon, ListIcon, PlusIcon, SaveIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
+import { ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, BankIcon, CheckIcon, EditIcon, ListIcon, PlusIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { StandardButton } from '../../../components/standard';
 import { Modal } from '../../../components/Modal';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
@@ -45,10 +45,10 @@ import { recurrenceLabel } from '../../../lib/recurrenceLabel';
 import { hueStyle } from '../../../lib/statCardHues';
 import { categoryName, UNCATEGORIZED_ID } from '../../../lib/categories';
 import { useCategoryStore } from '../../../store/categoryStore';
-import { accountBalance, accountByCategory, accountPendingBalance, accountPeriodAnalytics, accountRunningLedger, bankAnalyticsFromLedger, bankTotalsByCurrency, budgetVsActual } from '../../../lib/calc/bankModule';
+import { accountBalance, accountPendingBalance, accountRunningLedger, bankAnalyticsFromLedger, bankTotalsByCurrency, budgetVsActual } from '../../../lib/calc/bankModule';
 import { outstandingBalanceByCard } from '../../../lib/calc/creditCardModule';
 import { planWithinHorizon, plannedBankProjection, type PlanningHorizonDays } from '../../../lib/calc/plannedBalance';
-import { dlBarV, dlDoughnut, dlLine } from '../../../lib/chartLabels';
+import { dlBarV, dlDoughnut } from '../../../lib/chartLabels';
 import { applyChartTheme } from '../../../lib/chartSetup';
 import { cssVar, tickerColor } from '../../../lib/cssVar';
 import { chartAlpha, chartDepthPlugin } from '../../../lib/chartVisuals';
@@ -616,6 +616,16 @@ export function BankDetailPage() {
       ),
     },
     {
+      key: 'details',
+      label: 'Bank details',
+      hue: bank.color,
+      content: <AttributeList items={[
+        { label: 'Full bank name', value: bank.name },
+        { label: 'Notes', value: bank.notes },
+        { label: 'Favorite', value: bank.isFavorite ? 'Yes' : 'No' },
+      ]} />,
+    },
+    {
       key: 'accounts',
       label: 'Accounts',
       defaultOpen: true,
@@ -670,7 +680,6 @@ export function BankDetailPage() {
     {
       key: 'transactions',
       label: 'Transactions',
-      hue: account.color,
       summary: <SummaryChip label="Accounts" value={linkedAccounts.length} />,
       actions: bankingTransactionActions(linkedAccounts, transactions, filters, categories),
       hue: bank.color,
@@ -1121,6 +1130,7 @@ export function AccountDetailPage() {
     {
       key: 'transactions',
       label: 'Transactions',
+      hue: account.color,
       summary: <SummaryChip label="Filtered" value={filteredLedger.length} />,
       actions: [
         { label: 'Import transactions', onClick: () => window.dispatchEvent(new Event('bank:open-import')) },
