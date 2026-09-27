@@ -214,7 +214,7 @@ function resolveSideCurrency(cfg: LinkSideConfig): string | null {
     case 'bank': return useBankWorkbookStore.getState().workbook.settings.accounts.find((a) => a.id === cfg.ref)?.currencyCode ?? null;
     case 'qse': return useWorkbookStore.getState().workbook.settings.currency;
     case 'psx': return usePSXWorkbookStore.getState().workbook.settings.currency;
-    case 'funds': return useFundsWorkbookStore.getState().workbook.settings.defaultCurrency;
+    case 'funds': return cfg.currencyCode || useFundsWorkbookStore.getState().workbook.settings.defaultCurrency;
     case 'rentals': return useRentalsWorkbookStore.getState().workbook.settings.properties.find((p) => p.id === cfg.ref)?.currencyCode ?? null;
     case 'personalLoans': return usePersonalLoansWorkbookStore.getState().workbook.loans.find((l) => l.id === cfg.ref)?.currencyCode ?? null;
     case 'emi': return useEMIWorkbookStore.getState().workbook.entries.find((l) => l.id === cfg.ref)?.currencyCode ?? null;
@@ -251,38 +251,63 @@ function resolveSideCurrency(cfg: LinkSideConfig): string | null {
 export function propagateLinkedEdit(
   module: LinkModule,
   id: string,
-  changes: { date?: string; amount?: number; note?: string },
+  changes: { date?: string; amount?: number; note?: string; direction?: 'in' | 'out' },
 ): { error?: string; message?: string } {
   const link = findLinkForRecord(module, id);
   if (!link) return {};
-  const isFromSide = link.fromRecordId === id;
-  let fromAmount = link.fromAmount;
-  let toAmount = link.toAmount;
+
+  const wasFromSide = link.fromRecordId === id;
+  // For money-pool modules, OUT means this record is the link's from side
+  // and IN means it is the to side. Rentals is deliberately inverted by
+  // buildSideRecord: rent income lives on the link's from side and an
+  // expense on its to side. If a native edit flips direction and the user
+  // chooses "both sides", rotate the link itself so the peer record gets
+  // the opposite direction instead of ending up with the same direction.
+  const wantsFromSide =
+    changes.direction === undefined
+      ? wasFromSide
+      : module === 'rentals'
+        ? changes.direction === 'in'
+        : changes.direction === 'out';
+  const swapSides = wantsFromSide !== wasFromSide;
+
+  const fromCfg = swapSides ? link.to : link.from;
+  const toCfg = swapSides ? link.from : link.to;
+  const fromRecordId = swapSides ? link.toRecordId : link.fromRecordId;
+  const toRecordId = swapSides ? link.fromRecordId : link.toRecordId;
+  let fromAmount = swapSides ? link.toAmount : link.fromAmount;
+  let toAmount = swapSides ? link.fromAmount : link.toAmount;
   let message: string | undefined;
+
   if (changes.amount !== undefined) {
-    const fromCurrency = resolveSideCurrency(link.from);
-    const toCurrency = resolveSideCurrency(link.to);
+    const fromCurrency = resolveSideCurrency(fromCfg);
+    const toCurrency = resolveSideCurrency(toCfg);
     if (fromCurrency && toCurrency && fromCurrency === toCurrency) {
       fromAmount = changes.amount;
       toAmount = changes.amount;
     } else {
-      if (isFromSide) fromAmount = changes.amount; else toAmount = changes.amount;
-      message = "Entry updated — the linked entry's currency differs, so only the date synced; its own amount is unchanged.";
+      if (wantsFromSide) fromAmount = changes.amount;
+      else toAmount = changes.amount;
+      message = "Entry updated — the linked entry's currency differs, so only the date/direction synced; its own amount is unchanged.";
     }
   }
+
   const input: InterEntityTransferInput = {
     date: changes.date ?? link.date,
     fromAmount,
     toAmount,
-    from: link.from,
-    to: link.to,
+    from: fromCfg,
+    to: toCfg,
     note: changes.note !== undefined ? changes.note : link.note,
     rateSource: link.rateSource,
   };
+
   try {
-    const ids = { linkId: link.id, fromRecordId: link.fromRecordId, toRecordId: link.toRecordId };
+    const ids = { linkId: link.id, fromRecordId, toRecordId };
     const { from, to, link: updatedLink } = buildLinkedRecords(input, ids);
-    dispatchUpdate(isFromSide ? to : from);
+    const otherSide = from.record.id === id ? to : to.record.id === id ? from : null;
+    if (!otherSide) throw new Error('Linked transfer record IDs no longer match this entry.');
+    dispatchUpdate(otherSide);
     useInterEntityTransfersStore.getState().updateEntry(link.id, updatedLink);
     return { message };
   } catch (e) {
