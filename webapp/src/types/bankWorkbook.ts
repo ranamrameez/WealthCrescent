@@ -35,6 +35,9 @@ export interface Bank {
 export interface BankAccount {
   id: string;
   name: string;
+  /** Short UI label. New and edited accounts require 1-11 characters;
+   * optional here so existing cloud records remain readable. */
+  nickname?: string;
   /** Optional link to a `Bank` (`BankSettings.banks`) — which real
    * institution this account belongs to, for the "total balance with
    * that bank" rollup. `undefined` means this account isn't grouped

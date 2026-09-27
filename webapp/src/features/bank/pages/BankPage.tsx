@@ -77,8 +77,10 @@ const today = () => new Date().toISOString().slice(0, 10);
 const uid = () => crypto.randomUUID();
 
 function emptyAccount(defaultCurrency: string, bankId?: string): Omit<BankAccount, 'id'> {
-  return { name: '', currencyCode: defaultCurrency, openingBalance: 0, bankId };
+  return { name: '', nickname: '', currencyCode: defaultCurrency, openingBalance: 0, bankId };
 }
+
+const accountDisplayName = (account: Pick<BankAccount, 'name' | 'nickname'>) => account.nickname?.trim() || account.name;
 
 const ACCOUNT_TYPES = ['Savings', 'Current', 'Checking', 'Salary', 'Business', 'Fixed deposit'];
 
@@ -361,6 +363,9 @@ function AccountFormFields({
         <BankIdentityField value={value} onChange={onChange} idSuffix={idSuffix} />
       </div>
       <div className="row gap-sm">
+        <Field label="Nickname" width={120} required title="A short account label used in cards and selectors (maximum 11 characters).">
+          <TextInput maxLength={11} value={value.nickname ?? ''} onChange={(e) => onChange({ nickname: e.target.value })} placeholder="e.g. Salary" />
+        </Field>
         <Field label="Account name" width={180} required>
           <TextInput value={value.name} onChange={(e) => onChange({ name: e.target.value })} placeholder="e.g. Meezan Checking" />
         </Field>
@@ -430,9 +435,11 @@ export function AddAccountForm({ onSaved, initialCurrency, initialBankId }: { on
 
   const submit = async () => {
     if (!a.name.trim()) return toast('Enter an account name.');
+    if (!a.nickname?.trim()) return toast('Enter an account nickname.');
+    if (a.nickname.trim().length > 11) return toast('Nickname must be fewer than 12 characters.');
     if (!(await ensureSignedIn('Sign in to save bank accounts.'))) return;
     const id = uid();
-    addAccount({ ...a, id, name: a.name.trim() });
+    addAccount({ ...a, id, name: a.name.trim(), nickname: a.nickname.trim() });
     toast(`Account "${a.name.trim()}" added.`);
     setA(emptyAccount(a.currencyCode, initialBankId));
     onSaved?.(id);
@@ -675,7 +682,7 @@ export function BankDetailPage() {
           {linkedAccounts.map((a) => (
             <EntityCard
               key={a.id}
-              title={a.name}
+              title={accountDisplayName(a)}
               subtitle={[a.accountType, a.branch].filter(Boolean).join(' · ') || undefined}
               statLabel={a.isLiability ? 'Owed' : 'Balance'}
               stat={<MoneyValue n={a.isLiability ? Math.max(0, -accountBalance(a, transactions)) : accountBalance(a, transactions)} currency={a.currencyCode} />}
@@ -837,7 +844,7 @@ function AccountsList() {
               {group.accounts.map((a) => (
                 <EntityCard
                   key={a.id}
-                  title={<><span className="text-muted entity-card-sr">#{srNumOf.get(a.id)}</span>{a.name}</>}
+                  title={<><span className="text-muted entity-card-sr">#{srNumOf.get(a.id)}</span>{accountDisplayName(a)}</>}
                   subtitle={[a.accountType, a.branch].filter(Boolean).join(' · ') || undefined}
                   badge={
                     a.isLiability || a.isActive === false ? (
@@ -945,6 +952,7 @@ export function AccountDetailPage() {
 
   const accountToFormValue = (value: BankAccount | undefined): Omit<BankAccount, 'id'> => ({
     name: value?.name ?? '',
+    nickname: value?.nickname ?? '',
     currencyCode: value?.currencyCode ?? 'USD',
     openingBalance: value?.openingBalance ?? 0,
     accountNumber: value?.accountNumber,
@@ -1051,7 +1059,7 @@ export function AccountDetailPage() {
         }}
         options={accounts
           .filter((item) => !item.migratedToCreditCardId && (item.isActive !== false || item.id === account.id))
-          .map((item) => ({ value: item.id, label: `${item.name} (${item.currencyCode})${item.bankId ? ' · ' + (banks.find(bank => bank.id === item.bankId)?.name ?? '') : ''}` }))}
+          .map((item) => ({ value: item.id, label: `${accountDisplayName(item)} (${item.currencyCode})` }))}
       />
       <TransactionFilterMenu
         value={filters}
@@ -1069,10 +1077,13 @@ export function AccountDetailPage() {
 
   const saveMeta = async () => {
     if (!meta.name.trim()) return toast('Enter an account name.');
+    if (!meta.nickname?.trim()) return toast('Enter an account nickname.');
+    if (meta.nickname.trim().length > 11) return toast('Nickname must be fewer than 12 characters.');
     if (!(await ensureSignedIn('Sign in to save account details.'))) return;
     updateAccount(account.id, {
       ...meta,
       name: meta.name.trim(),
+      nickname: meta.nickname.trim(),
       accountNumber: meta.accountNumber?.trim() || undefined,
       smsSenderId: meta.smsSenderId?.trim() || undefined,
       smsSenderNumber: meta.smsSenderNumber?.trim() || undefined,
@@ -1188,6 +1199,7 @@ export function AccountDetailPage() {
       content: <>
         {!editingMeta ? (
           <AttributeList items={[
+            { label: 'Nickname', value: account.nickname },
             { label: 'Name', value: account.name },
             { label: 'Currency', value: account.currencyCode },
             { label: 'Opening balance', value: fmtMoney(account.openingBalance, account.currencyCode) },
@@ -1212,7 +1224,7 @@ export function AccountDetailPage() {
       summary: <SummaryChip label="Visible" value={upcoming.length} />,
       actions: [
         { label: 'Add a plan', onClick: () => setAddingPlan(true) },
-        { label: showPlanActions ? 'Hide modifications' : 'Show modifications', icon: <EditIcon size={14} />, onClick: () => setShowPlanActions((value) => !value) },
+        { label: showPlanActions ? 'Done modifying' : 'Modify', icon: <EditIcon size={14} />, onClick: () => setShowPlanActions((value) => !value) },
       ],
       headerEnd: showPlanActions ? <IconButton label="Hide modification options" icon={<XIcon size={13} />} align="right" onClick={() => setShowPlanActions(false)} /> : undefined,
       content: <AccountPlans account={account} showActions={showPlanActions} />,
@@ -1225,7 +1237,7 @@ export function AccountDetailPage() {
         { label: 'Import transactions', onClick: () => window.dispatchEvent(new Event('bank:open-import')) },
         { label: 'Export filtered', onClick: exportTransactions, disabled: !filteredLedger.length },
         { label: 'Export all', onClick: exportAllTransactions, disabled: !allLedger.length },
-        { label: showTransactionActions ? 'Hide modifications' : 'Show modifications', icon: <EditIcon size={14} />, onClick: () => setShowTransactionActions((value) => !value) },
+        { label: showTransactionActions ? 'Done modifying' : 'Modify', icon: <EditIcon size={14} />, onClick: () => setShowTransactionActions((value) => !value) },
       ],
       headerEnd: showTransactionActions ? <IconButton label="Hide modification options" icon={<XIcon size={13} />} align="right" onClick={() => setShowTransactionActions(false)} /> : undefined,
       content: <TransactionsList account={account} ledger={filteredLedger} allLedgerCount={allLedger.length} showActions={showTransactionActions} />,
@@ -1247,7 +1259,7 @@ export function AccountDetailPage() {
       <div className="page-heading">
         <div>
           <Link to="/bank" className="text-muted">← Back to Banking</Link>
-          <div className="page-heading-title-row"><h1 className="pagetitle m-0">{account.name}</h1>{account.isActive === false && <span className="pill-warn fs-11">Closed</span>}</div>
+          <div className="page-heading-title-row"><h1 className="pagetitle m-0">{accountDisplayName(account)}</h1>{account.isActive === false && <span className="pill-warn fs-11">Closed</span>}</div>
         </div>
       </div>
       {account.migratedToCreditCardId && <Notice tone="info" className="mb-md">This account was migrated to a real Credit Card record — its transactions and balance now live there.{' '}<Link to={`/bank/card/${account.migratedToCreditCardId}`}>View the Credit Card →</Link></Notice>}
@@ -1649,7 +1661,7 @@ function ImportStatementSection({ account, compact = false }: { account: BankAcc
     <div>
       {compact && null}
       {!compact && <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-        <span className="text-muted">Import a CSV export from your bank into {account.name}.</span>
+        <span className="text-muted">Import a CSV export from your bank into {accountDisplayName(account)}.</span>
         <Tooltip text="Choose a CSV, map its columns, review the import, then confirm. Existing matching transactions are detected by date + description + amount so importing the same statement again does not create duplicates." />
       </div>}
       {!compact && <button className="btn secondary" onClick={() => fileInput.current?.click()}>Choose CSV file</button>}
@@ -2125,7 +2137,7 @@ function AnalyticsTab({ bankId }: { bankId?: string } = {}) {
     <div>
       <Field label="Account" width={200}>
         <Select value={account?.id ?? ''} onChange={(e) => setAccountId(e.target.value)}>
-          {accounts.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.currencyCode})</option>)}
+          {accounts.map((a) => <option key={a.id} value={a.id}>{accountDisplayName(a)} ({a.currencyCode})</option>)}
         </Select>
       </Field>
       {account && (
@@ -2170,7 +2182,7 @@ function AnalyticsTab({ bankId }: { bankId?: string } = {}) {
 
           <CollapsibleCard title={<h3 className="m-0">Budget — {thisMonth}</h3>} className="mt-md">
             <p className="text-muted mt-0">
-              Set a monthly spend target per category for {account.name}; compared against what you've actually
+              Set a monthly spend target per category for {accountDisplayName(account)}; compared against what you've actually
               spent there this month.
             </p>
             <div>
@@ -2263,7 +2275,7 @@ export function PlanningTab({
       <BalanceProjectionSummary horizonDays={horizonDays} />
       <Field label="Plans for account" width={220}>
         <Select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-          {accounts.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.currencyCode})</option>)}
+          {accounts.map((a) => <option key={a.id} value={a.id}>{accountDisplayName(a)} ({a.currencyCode})</option>)}
         </Select>
       </Field>
       {account && (

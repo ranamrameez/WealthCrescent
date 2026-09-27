@@ -14,7 +14,7 @@ export function SummaryChip({ label, value }: { label?: string; value: ReactNode
   return <span className="summary-chip">{label && <span className="summary-chip-label">{label}</span>}<span className="summary-chip-value">{value}</span></span>;
 }
 
-function CardActionMenu({ actions }: { actions: StandardCardAction[] }) {
+function CardActionMenu({ actions, onAction }: { actions: StandardCardAction[]; onAction?: () => void }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -41,7 +41,7 @@ function CardActionMenu({ actions }: { actions: StandardCardAction[] }) {
   };
   return <div className="standard-card-menu" ref={rootRef}>
     <StandardIconButton type="button" className="standard-card-menu-trigger" label="Card options" icon={<MenuIcon size={16}/>} aria-expanded={open} onClick={(e)=>{e.stopPropagation();setOpen(v=>!v);}} />
-    {open && <div className="standard-card-menu-popover" role="menu">{actions.map(a=><button key={a.label} type="button" className={`standard-card-menu-item${a.tone==='danger'?' danger':''}`} disabled={a.disabled} onClick={()=>{setOpen(false);a.onClick();}}>{a.icon ?? actionIcon(a.label)}<span>{a.label}</span></button>)}</div>}
+    {open && <div className="standard-card-menu-popover" role="menu">{actions.map(a=><button key={a.label} type="button" className={`standard-card-menu-item${a.tone==='danger'?' danger':''}`} disabled={a.disabled} onClick={()=>{setOpen(false);onAction?.();a.onClick();}}>{a.icon ?? actionIcon(a.label)}<span>{a.label}</span></button>)}</div>}
   </div>;
 }
 
@@ -72,7 +72,7 @@ export function StandardCard({ title, summary, actions=[], headerEnd, defaultOpe
           className="standard-card-menu-trigger standard-card-fullscreen-trigger"
           onClick={() => fullScreen ? setFullScreen(false) : enterFullScreen()}
         />
-        <CardActionMenu actions={actions}/>
+        <CardActionMenu actions={actions} onAction={()=>{if(!open){if(onToggle)onToggle(true);else setInternalOpen(true);}}}/>
       </div>
     </header>
     {open && <div className="standard-card-body">{children}</div>}
