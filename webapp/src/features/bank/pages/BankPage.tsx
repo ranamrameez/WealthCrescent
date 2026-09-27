@@ -1573,6 +1573,7 @@ function AccountAnalyticsSection({ ledger, pendingRows, plans, startingBalance, 
 type BankingFilters = ReturnType<typeof useUrlTransactionFilters>['filters'];
 
 function transactionMatchesFilters(tx: BankTransaction, filters: BankingFilters, categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories']) {
+  if (filters.accountId !== 'all' && tx.accountId !== filters.accountId) return false;
   if ((filters.fromDate && tx.date < filters.fromDate) || (filters.toDate && tx.date > filters.toDate)) return false;
   if (filters.direction === 'in' && tx.amount < 0) return false;
   if (filters.direction === 'out' && tx.amount >= 0) return false;
