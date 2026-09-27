@@ -350,7 +350,15 @@ export function AddLoanForm({ onSaved, initialCurrency }: { onSaved?: (id: strin
   return <LoanForm onSaved={onSaved} initialCurrency={initialCurrency} />;
 }
 
-function RepaymentsSection({ loan, onEditPayment }: { loan: PersonalLoan; onEditPayment: (payment: PersonalLoanRepayment) => void }) {
+function RepaymentsSection({
+  loan,
+  filters,
+  onEditPayment,
+}: {
+  loan: PersonalLoan;
+  filters: PersonalLoanPaymentFilters;
+  onEditPayment: (payment: PersonalLoanRepayment) => void;
+}) {
   // Select the raw array (a stable reference from the store) and filter it
   // in a memo — filtering *inside* the zustand selector would return a new
   // array identity on every render, which zustand's useSyncExternalStore
@@ -368,8 +376,6 @@ function RepaymentsSection({ loan, onEditPayment }: { loan: PersonalLoan; onEdit
   const ensureSignedIn = useEnsureSignedIn();
   const sideLabel = useLinkSideLabel();
   const [detailRow, setDetailRow] = useState<PersonalLoanRepayment | null>(null);
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
 
   const linkByRecordId = useMemo(() => {
     const map = new Map<string, (typeof links)[number]>();
@@ -380,31 +386,15 @@ function RepaymentsSection({ loan, onEditPayment }: { loan: PersonalLoan; onEdit
     return map;
   }, [links]);
 
-  /** README item 40: extends Banking's account-detail statement export
-   * (Done item 58) to this module's own primary record — a loan's
-   * "statement" is its repayment history, with the same running-balance
-   * ("Remaining") column already shown in the table. */
-  const exportStatement = () => {
-    const rows = [...repayments]
-      .filter((r) => (!fromDate || r.date >= fromDate) && (!toDate || r.date <= toDate))
-      .sort((a, b) => a.date.localeCompare(b.date));
-    const header = ['Date', 'Amount', 'Remaining', 'Source'];
-    const body = rows.map((r) => [r.date, r.amount, remaining.get(r.id) ?? 0, r.source === 'statement-import' ? 'Import' : 'Manual']);
-    const blob = new Blob([toCSV([header, ...body])], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    const suffix = fromDate || toDate ? `_${fromDate || 'start'}_to_${toDate || 'now'}` : '';
-    a.download = `${loan.person.replace(/\s+/g, '_')}_repayments${suffix}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast('Statement downloaded.');
-  };
-
-  const [sourceFilter, setSourceFilter] = useState<'all' | 'manual' | 'statement-import'>('all');
   const filteredRepayments = useMemo(
-    () => (sourceFilter === 'all' ? repayments : repayments.filter((r) => (r.source ?? 'manual') === sourceFilter)),
-    [repayments, sourceFilter],
+    () => repayments.filter((payment) => {
+      if (filters.fromDate && payment.date < filters.fromDate) return false;
+      if (filters.toDate && payment.date > filters.toDate) return false;
+      if (filters.source !== 'all' && (payment.source ?? 'manual') !== filters.source) return false;
+      if (filters.categoryID !== 'all' && payment.categoryID !== filters.categoryID) return false;
+      return true;
+    }),
+    [repayments, filters],
   );
 
   // User-reported (2026-09-06): "we may stop sorting options for
@@ -427,40 +417,6 @@ function RepaymentsSection({ loan, onEditPayment }: { loan: PersonalLoan; onEdit
 
   return (
     <div>
-      {/* README item 42's remainder: this component's add-form and list used
-       * to have no clean seam for a CollapsibleCard — the form itself is
-       * deliberately left outside it (collapsing a form mid-fill is a UX
-       * trap, per the same rule every other module's rollout followed), but
-       * the table + export controls below it split off cleanly into their
-       * own collapsible section. */}
-      <CollapsibleCard
-        title={<h4 className="m-0">Payment history</h4>}
-        headerExtra={
-          repayments.length > 0 ? (
-            <div className="row gap-sm">
-              <Field label="From (optional)">
-                <TextInput type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-              </Field>
-              <Field label="To (optional)">
-                <TextInput type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-              </Field>
-              <button className="btn secondary" onClick={exportStatement}>Export CSV</button>
-            </div>
-          ) : undefined
-        }
-        className="mb-md"
-      >
-        {/* User-requested (2026-09-03): "add filters to other tables as
-           well." */}
-        <div className="row gap-sm mb-sm">
-          <Field label="Source" width={140}>
-            <Select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value as typeof sourceFilter)}>
-              <option value="all">All</option>
-              <option value="manual">Manual</option>
-              <option value="statement-import">Imported</option>
-            </Select>
-          </Field>
-        </div>
         <div className="table-scroll">
           <table>
             <thead><tr><th>Date</th><th>Description</th><th>Amount</th><th>Category</th><th>Remaining</th><th>Source</th><th></th></tr></thead>
@@ -540,8 +496,6 @@ function RepaymentsSection({ loan, onEditPayment }: { loan: PersonalLoan; onEdit
             </tbody>
           </table>
         </div>
-      </CollapsibleCard>
-      <ImportRepaymentsSection loan={loan} />
       {detailRow && (
         <RecordDetailModal
           title="Payment"
