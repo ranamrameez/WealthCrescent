@@ -756,7 +756,7 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
     onBack();
   };
 
-  usePageTopBarRightSlot(
+  const paymentFilterBar = useMemo(() => (
     <TopBarControls>
       <PersonalLoanPaymentFilterMenu
         value={paymentFilters}
@@ -764,8 +764,9 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
         onChange={(patch) => setPaymentFilters((current) => ({ ...current, ...patch }))}
         onClear={() => setPaymentFilters({ fromDate: '', toDate: '', source: 'all', categoryID: 'all' })}
       />
-    </TopBarControls>,
-  );
+    </TopBarControls>
+  ), [paymentFilters, categories]);
+  usePageTopBarRightSlot(paymentFilterBar);
 
   const exportPayments = () => {
     const remaining = repaymentRunningOutstanding(loan, repayments);
@@ -964,7 +965,7 @@ function AccountSection({
 
   if (!firebaseReady || !cloudEmpty) return null;
   return (
-    <Card>
+    <>
       {cloudEmpty && (
         <Notice tone="warning" className="mt-sm">
           <p className="mt-0">
@@ -993,7 +994,7 @@ function AccountSection({
           </button>
         </Notice>
       )}
-    </Card>
+    </>
   );
 }
 
@@ -1010,11 +1011,10 @@ export function PersonalLoansPage({
   const [filter, setFilter] = useState<'all' | 'owed_to_me' | 'i_owe'>('all');
   const [showArchived, setShowArchived] = useState(false);
   const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
-  const repayments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
   const liveSelected = selected ? loans.find((loan) => loan.id === selected.id) ?? null : null;
   const archivedCount = useMemo(() => loans.filter((loan) => loan.isActive === false).length, [loans]);
 
-  usePageTopBarRightSlot(liveSelected ? null : (
+  const landingTopBar = useMemo(() => liveSelected ? null : (
     <TopBarControls>
       <TopBarSelect
         label="Loan type"
@@ -1027,7 +1027,8 @@ export function PersonalLoansPage({
         ]}
       />
     </TopBarControls>
-  ));
+  ), [liveSelected, filter]);
+  usePageTopBarRightSlot(landingTopBar);
 
   if (liveSelected) {
     return <LoanDetail loan={liveSelected} onBack={() => setSelected(null)} />;
