@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { RentalPlanEditor } from '../../features/rentals/pages/RentalPlanEditor';
 import { OrphanPlanCleanup } from '../OrphanPlanCleanup';
