@@ -14,7 +14,7 @@ import { UNCATEGORIZED_ID } from '../lib/categories';
 import { defaultTimeForDate, defaultTimezoneForCurrency, nowTime } from '../lib/datetime';
 import { convertAmount, loadCachedFxRates } from '../lib/fx';
 import { useEnsureSignedIn } from '../lib/firebase/useEnsureSignedIn';
-import { isSupportedLinkPair } from '../lib/interEntityLink';
+import { defaultLinkedOtherSide, isSupportedLinkPair, linkSideRequiresRef } from '../lib/interEntityLink';
 import { createLinkedTransfer } from '../lib/linkCascade';
 import { useBankWorkbookStore } from '../store/bankWorkbookStore';
 import { useCashWorkbookStore } from '../store/cashWorkbookStore';
@@ -103,14 +103,6 @@ const HAS_DESCRIPTION: LinkModule[] = ['bank', 'cash', 'rentals', 'creditCard'];
  * for a link needs its own design (does one side clear independently of
  * the other?) not attempted here. */
 const HAS_PENDING: LinkModule[] = ['cash', 'bank', 'rentals', 'personalLoans'];
-
-function linkSideRequiresRef(side: LinkSideConfig): boolean {
-  return side.module === 'bank'
-    || side.module === 'rentals'
-    || side.module === 'personalLoans'
-    || side.module === 'emi'
-    || side.module === 'creditCard';
-}
 
 /** User-requested (2026-09-20): "list the subscriptions in the transfer
  * features. and update their date according to the transaction." Only
@@ -468,34 +460,20 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
     ? (defaultFinance.module === 'cash' && !defaultFinance.currencyCode ? { ...defaultFinance, currencyCode: cashDefaultCurrency } : defaultFinance)
     : { module: 'cash', currencyCode: cashDefaultCurrency };
 
-  const defaultOtherFor = (finance: LinkSideConfig): LinkSideConfig => {
-    const financeCurrency = finance.currencyCode ?? (
-      finance.module === 'bank' ? bankAccounts.find((account) => account.id === finance.ref)?.currencyCode : undefined
-    );
-    const bank = bankAccounts.find((account) =>
-      account.isActive !== false
-      && account.id !== (finance.module === 'bank' ? finance.ref : undefined)
-      && (!financeCurrency || account.currencyCode === financeCurrency),
-    ) ?? bankAccounts.find((account) => account.isActive !== false && account.id !== (finance.module === 'bank' ? finance.ref : undefined));
-    return bank
-      ? { module: 'bank', ref: bank.id, currencyCode: bank.currencyCode }
-      : { module: 'cash', currencyCode: financeCurrency ?? cashDefaultCurrency };
-  };
-
   const resolvedDefaultCurrency = resolvedDefaultFinance.currencyCode
     ?? (resolvedDefaultFinance.module === 'bank'
       ? bankAccounts.find((account) => account.id === resolvedDefaultFinance.ref)?.currencyCode
       : undefined);
 
   const [rows, setRows] = useState<TxRow[]>(() => [
-    emptyRow(0, resolvedDefaultFinance, defaultOtherFor(resolvedDefaultFinance), transferDefaultDescription, resolvedDefaultCurrency),
+    emptyRow(0, resolvedDefaultFinance, defaultLinkedOtherSide(resolvedDefaultFinance, bankAccounts, cashDefaultCurrency), transferDefaultDescription, resolvedDefaultCurrency),
   ]);
   const [nextKey, setNextKey] = useState(1);
 
   const updateRow = (key: number, patch: TxRow) => setRows((rs) => rs.map((r) => (r.key === key ? patch : r)));
   const removeRow = (key: number) => setRows((rs) => rs.filter((r) => r.key !== key));
   const addRow = () => {
-    setRows((rs) => [...rs, emptyRow(nextKey, resolvedDefaultFinance, defaultOtherFor(resolvedDefaultFinance), transferDefaultDescription, resolvedDefaultCurrency)]);
+    setRows((rs) => [...rs, emptyRow(nextKey, resolvedDefaultFinance, defaultLinkedOtherSide(resolvedDefaultFinance, bankAccounts, cashDefaultCurrency), transferDefaultDescription, resolvedDefaultCurrency)]);
     setNextKey((k) => k + 1);
   };
 
