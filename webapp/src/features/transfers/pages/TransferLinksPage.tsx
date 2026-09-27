@@ -395,11 +395,13 @@ export function SideFields({
                 {!filteredEntities.length && <option value="">None in this currency</option>}
                 {filteredEntities.map((en) => <option key={en.id} value={en.id}>{en.label}</option>)}
               </Select>
-              <IconButton
-                label={`Add a missing ${(refLabel ?? 'finance').toLowerCase()}`}
-                icon={<PlusIcon size={13} />}
-                onClick={() => setAddOpen(true)}
-              />
+              {!disabled && (
+                <IconButton
+                  label={`Add a missing ${(refLabel ?? 'finance').toLowerCase()}`}
+                  icon={<PlusIcon size={13} />}
+                  onClick={() => setAddOpen(true)}
+                />
+              )}
             </div>
           </Field>
         </>
