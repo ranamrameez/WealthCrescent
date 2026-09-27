@@ -20,6 +20,7 @@ import { mergeCategoriesEverywhere } from '../../../lib/categoryMerge';
 import { useEnabledCurrenciesStore } from '../../../store/enabledCurrenciesStore';
 import { useCategoryStore } from '../../../store/categoryStore';
 import { useCategoryGroupStore } from '../../../store/categoryGroupStore';
+import { useAppearanceStore } from '../../../store/appearanceStore';
 import { ModuleSelectionModal } from '../../../components/ModuleSelectionModal';
 import type { CategoryGroup } from '../../../types/finance';
 
@@ -156,6 +157,26 @@ function CurrenciesSection() {
         <CurrencyQuickAdd excludeCodes={enabledCodes ?? []} onAdd={addCode} />
       </div>
       <CurrencyRanking />
+    </CollapsibleCard>
+  );
+}
+
+function TransactionDefaultsSection() {
+  const description = useAppearanceStore((s) => s.appearance.transferDefaultDescription ?? 'Transfer By Default');
+  const updateAppearance = useAppearanceStore((s) => s.update);
+
+  return (
+    <CollapsibleCard title={<h3 className="m-0">Transaction defaults</h3>}>
+      <p className="text-muted mt-0">
+        Defaults used by the centralized Transfers popup. You can still edit the description on each transaction before saving.
+      </p>
+      <Field label="Default transfer description" width={260}>
+        <TextInput
+          value={description}
+          onChange={(e) => updateAppearance({ transferDefaultDescription: e.target.value })}
+          placeholder="Transfer By Default"
+        />
+      </Field>
     </CollapsibleCard>
   );
 }
@@ -475,6 +496,8 @@ export function AccountPage({ syncStatuses }: { syncStatuses: ModuleSyncStatus[]
             <AppearanceFields />
           </div>
             </CollapsibleCard>
+
+            <TransactionDefaultsSection />
 
             <CollapsibleCard title={<h3 className="m-0">Modules</h3>}>
               <p className="text-muted mt-0">Choose which areas appear in your workspace. You can change this anytime.</p>
