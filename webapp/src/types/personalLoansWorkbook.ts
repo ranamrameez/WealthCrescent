@@ -26,6 +26,8 @@ export interface PersonalLoan {
    * a display/sort preference — see `BankAccount.isFavorite`'s own comment
    * for why this is a separate field from `isActive`/`includeInNetWorth`. */
   isFavorite?: boolean;
+  /** User-selected entity hue, matching Bank/BankAccount/CreditCard. */
+  color?: string;
 }
 
 export interface PersonalLoanRepayment {
