@@ -12,7 +12,7 @@ import { Modal } from '../../../components/Modal';
 import { Notice } from '../../../components/Notice';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { hueStyle } from '../../../lib/statCardHues';
-import { ArchiveIcon, CheckIcon, EditIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
+import { ArchiveIcon, CheckIcon, EditIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon } from '../../../components/icons';
 import { toast } from '../../../components/Toast';
 import { Tooltip } from '../../../components/Tooltip';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
@@ -29,7 +29,7 @@ import { dateOnlyMs } from '../../../lib/datetime';
 import { parseCSV, toCSV } from '../../../lib/csv';
 import { fmtMoney } from '../../../lib/format';
 import { categoryName } from '../../../lib/categories';
-import { confirmAndDeleteLinkable, propagateLinkedEdit, resolveLinkedEdit } from '../../../lib/linkCascade';
+import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
 import {
   loanBalanceHistory,
   loanOutstanding,
@@ -151,11 +151,11 @@ function AnalyticsTab() {
             }}
           />
         </ChartCard>
-        <ChartCard title="Repayments by month" empty={!monthlyRepayments.length}>
+        <ChartCard title="Payments by month" empty={!monthlyRepayments.length}>
           <Bar
             data={{
               labels: monthlyRepayments.map((f) => f.month),
-              datasets: [{ label: 'Repayments', data: monthlyRepayments.map((f) => f.amount), backgroundColor: '#5aa9c9' }],
+              datasets: [{ label: 'Payments', data: monthlyRepayments.map((f) => f.amount), backgroundColor: '#5aa9c9' }],
             }}
             options={{ plugins: { legend: { display: false }, datalabels: dlBarV((v) => fmtMoney(v, effectiveCurrency)) } }}
           />
@@ -287,28 +287,6 @@ export function AddLoanForm({ onSaved, initialCurrency }: { onSaved?: (id: strin
   return <LoanForm onSaved={onSaved} initialCurrency={initialCurrency} />;
 }
 
-/** Pending item 62: the direct transfer-link shortcut already on PSX/QSE/
- * Rentals, now on a Personal Loans repayment add-form. `PersonalLoanRepayment`
- * ignores link direction (always positive, see `interEntityLink.ts`'s own
- * documented exception), but which side the REAL Bank/Cash account occupies
- * still depends on the loan's own `direction`: `owed_to_me` means a
- * repayment is money arriving from the other person (Bank/Cash = `to`,
- * receiving), `i_owe` means it's money leaving to pay them back (Bank/Cash
- * = `from`, paying). */
-/** User-requested (2026-08-28): the loan's own "Transfers" FAB, replacing
- * the old always-visible add-repayment row AND its own bank/cash-only
- * `LinkedRepaymentFields` shortcut — the shared `TransactionEntryModal`
- * supersedes both, defaulted to THIS loan. */
-function RepaymentsFab({ loan }: { loan: PersonalLoan }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <FabPanel actions={[{ label: 'Transfers', icon: <TransferIcon />, onClick: () => setOpen(true) }]} />
-      {open && <TransactionEntryModal defaultFinance={{ module: 'personalLoans', ref: loan.id, currencyCode: loan.currencyCode }} onClose={() => setOpen(false)} />}
-    </>
-  );
-}
-
 function RepaymentsSection({ loan, onEditPayment }: { loan: PersonalLoan; onEditPayment: (payment: PersonalLoanRepayment) => void }) {
   // Select the raw array (a stable reference from the store) and filter it
   // in a memo — filtering *inside* the zustand selector would return a new
@@ -393,7 +371,7 @@ function RepaymentsSection({ loan, onEditPayment }: { loan: PersonalLoan; onEdit
        * the table + export controls below it split off cleanly into their
        * own collapsible section. */}
       <CollapsibleCard
-        title={<h4 className="m-0">Repayment history</h4>}
+        title={<h4 className="m-0">Payment history</h4>}
         headerExtra={
           repayments.length > 0 ? (
             <div className="row gap-sm">
@@ -492,7 +470,7 @@ function RepaymentsSection({ loan, onEditPayment }: { loan: PersonalLoan; onEdit
               {!sorted.length && (
                 <tr>
                   <td colSpan={7} className="text-muted">
-                    {repayments.length ? 'No repayments match this filter.' : 'No repayments logged yet.'}
+                    {repayments.length ? 'No payments match this filter.' : 'No payments logged yet.'}
                   </td>
                 </tr>
               )}
@@ -501,7 +479,6 @@ function RepaymentsSection({ loan, onEditPayment }: { loan: PersonalLoan; onEdit
         </div>
       </CollapsibleCard>
       <ImportRepaymentsSection loan={loan} />
-      <RepaymentsFab loan={loan} />
       {detailRow && (
         <RecordDetailModal
           title="Payment"
@@ -586,7 +563,7 @@ function ImportRepaymentsSection({ loan }: { loan: PersonalLoan }) {
       }));
     if (!imported.length) return toast('No valid rows to import after mapping — check your column choices.');
     addRepayments(imported);
-    toast(`Imported ${imported.length} repayment${imported.length === 1 ? '' : 's'} from ${fileName}.`);
+    toast(`Imported ${imported.length} payment${imported.length === 1 ? '' : 's'} from ${fileName}.`);
     setHeaders([]);
     setRows([]);
     setFileName('');
@@ -594,10 +571,10 @@ function ImportRepaymentsSection({ loan }: { loan: PersonalLoan }) {
 
   return (
     <Card className="mt-12">
-      <h4 className="mt-0">Import repayments (CSV)</h4>
+      <h4 className="mt-0">Import payments (CSV)</h4>
       <p className="text-muted mb-12">
-        Import a CSV export of repayments against this loan. This is a simple "map these columns" tool —
-        pick which column is which below; every repayment is recorded as a positive amount regardless of
+        Import a CSV export of payments against this loan. This is a simple "map these columns" tool —
+        pick which column is which below; every payment is recorded as a positive amount regardless of
         the loan's direction. Date values must be in YYYY-MM-DD format (e.g. 2026-01-15) — other date
         formats will sort incorrectly once imported.
       </p>
@@ -699,9 +676,9 @@ function PayoffPlanner({ loan, outstanding }: { loan: PersonalLoan; outstanding:
       <h4 className="mt-0">Payoff planner</h4>
       <p className="text-muted mt-0">
         A quick "what if" — see how many months it'd take to clear the remaining {fmtMoney(outstanding, loan.currencyCode)}
-        {' '}at a repayment rate you pick. Not saved anywhere, just a live estimate.
+        {' '}at a payment rate you pick. Not saved anywhere, just a live estimate.
       </p>
-      <Field label={`Planned monthly repayment (${loan.currencyCode})`} width={200}>
+      <Field label={`Planned monthly payment (${loan.currencyCode})`} width={200}>
         <TextInput type="number" step="0.01" value={monthly || ''} onChange={(e) => setMonthly(Number(e.target.value))} />
       </Field>
       {monthly > 0 && (
