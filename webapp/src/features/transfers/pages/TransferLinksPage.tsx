@@ -69,7 +69,7 @@ function resolveCurrency(cfg: LinkSideConfig, ctx: CurrencyContext): string | nu
     // stand-in, same simplification the unused `cashSummary`/
     // `buildCashLedger` calls in `useFundsDerived` already made implicitly
     // by treating every Transfer as one currency.
-    case 'funds': return ctx.fundsCurrency;
+    case 'funds': return cfg.currencyCode || ctx.fundsCurrency;
     case 'rentals': return ctx.properties.find((p) => p.id === cfg.ref)?.currencyCode ?? null;
     case 'personalLoans': return ctx.loans.find((l) => l.id === cfg.ref)?.currencyCode ?? null;
     case 'emi': return ctx.emiLoans.find((l) => l.id === cfg.ref)?.currencyCode ?? null;
@@ -220,6 +220,7 @@ export function SideFields({ label, cfg, onChange, preferredCurrency }: { label:
   const emiLoans = useEMIWorkbookStore((s) => s.workbook.entries);
   const creditCards = useCreditCardWorkbookStore((s) => s.workbook.cards);
   const cashCurrency = useCashWorkbookStore((s) => s.workbook.settings.defaultCurrency);
+  const fundsCurrency = useFundsWorkbookStore((s) => s.workbook.settings.defaultCurrency);
   const currency = useSideCurrency(cfg);
   const [addOpen, setAddOpen] = useState(false);
 
@@ -260,7 +261,12 @@ export function SideFields({ label, cfg, onChange, preferredCurrency }: { label:
             onChange({
               module,
               ref: preferred?.id ?? list[0]?.id,
-              currencyCode: module === 'cash' ? (preferredCurrency ?? cashCurrency) : (preferred?.currencyCode ?? list[0]?.currencyCode),
+              currencyCode:
+                module === 'cash'
+                  ? (preferredCurrency ?? cashCurrency)
+                  : module === 'funds'
+                    ? (preferredCurrency ?? fundsCurrency)
+                    : (preferred?.currencyCode ?? list[0]?.currencyCode),
             });
           }}
         >
@@ -335,12 +341,15 @@ export function SideFields({ label, cfg, onChange, preferredCurrency }: { label:
          — this is also what fixes `buildSideRecord`'s own currencyCode
          actually being populated instead of falling back to a hardcoded
          'USD' (see that function's own comment). */}
-      {cfg.module === 'cash' && (
+      {(cfg.module === 'cash' || cfg.module === 'funds') && (
         <Field label="Currency">
-          <CurrencyChips value={cfg.currencyCode ?? cashCurrency} onChange={(code) => onChange({ ...cfg, currencyCode: code })} />
+          <CurrencyChips
+            value={cfg.currencyCode ?? (cfg.module === 'cash' ? cashCurrency : fundsCurrency)}
+            onChange={(code) => onChange({ ...cfg, currencyCode: code })}
+          />
         </Field>
       )}
-      {currency && !hasRefPicker && cfg.module !== 'cash' && <span className="text-muted">{currency}</span>}
+      {currency && !hasRefPicker && cfg.module !== 'cash' && cfg.module !== 'funds' && <span className="text-muted">{currency}</span>}
       {addOpen && cfg.module === 'bank' && (
         <Modal title="Add a missing account" onClose={() => setAddOpen(false)}>
           <AddAccountForm initialCurrency={cfg.currencyCode} onSaved={(id) => { onChange({ ...cfg, ref: id }); setAddOpen(false); }} />
