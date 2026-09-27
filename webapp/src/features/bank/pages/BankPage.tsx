@@ -2425,7 +2425,7 @@ export function BankPage({
     },
     {
       key: 'planning',
-      label: 'Planning',
+      label: 'Plans',
       content: <PlanningTab plannedCloudEmpty={plannedCloudEmpty} uploadPlannedLocalToCloud={uploadPlannedLocalToCloud} />,
     },
     {
