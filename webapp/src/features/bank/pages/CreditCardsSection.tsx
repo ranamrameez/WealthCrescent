@@ -9,7 +9,7 @@ import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
 import { AnalyticsChartEnhancer } from '../../../components/AnalyticsChartCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
-import { ArchiveIcon, EditIcon, ListIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
+import { ArchiveIcon, EditIcon, ListIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon } from '../../../components/icons';
 import { Modal } from '../../../components/Modal';
 import { FabPanel } from '../../../components/ui/Fab';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
