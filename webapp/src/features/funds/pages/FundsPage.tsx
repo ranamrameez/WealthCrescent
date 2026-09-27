@@ -1594,7 +1594,7 @@ function FundsTransfersSection() {
     updateTransfer(editId, editRow);
     let msg = 'Transfer updated.';
     if (choice === 'both') {
-      const result = propagateLinkedEdit('funds', editId, { date: editRow.date, amount: editRow.gross });
+      const result = propagateLinkedEdit('funds', editId, { date: editRow.date, amount: editRow.gross, direction: editRow.type === 'DEPOSIT' ? 'in' : 'out' });
       if (result.error) msg = result.error;
       else if (result.message) msg = result.message;
     }

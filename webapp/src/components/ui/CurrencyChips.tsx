@@ -38,7 +38,7 @@ export function CurrencyChips({ value, onChange }: { value: string; onChange: (c
   const hiddenCount = options.length - visible.length;
 
   return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+    <div className="chip-tabs" style={{ alignItems: 'center' }}>
       {visible.map((c) => (
         <button
           key={c.code}

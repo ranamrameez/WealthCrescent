@@ -19,16 +19,17 @@ export function ToggleChip({
   title?: string;
 }) {
   return (
-    <button
-      type="button"
-      className={`chip${checked ? ' active' : ''}`}
-      onClick={() => onChange(!checked)}
-      aria-pressed={checked}
-      title={title}
-      style={{ alignSelf: 'flex-start' }}
-    >
-      {checked && <CheckIcon size={11} />}
-      {label}
-    </button>
+    <div className="chip-tabs" style={{ alignSelf: 'flex-start' }}>
+      <button
+        type="button"
+        className={`chip${checked ? ' active' : ''}`}
+        onClick={() => onChange(!checked)}
+        aria-pressed={checked}
+        title={title}
+      >
+        {checked && <CheckIcon size={11} />}
+        {label}
+      </button>
+    </div>
   );
 }

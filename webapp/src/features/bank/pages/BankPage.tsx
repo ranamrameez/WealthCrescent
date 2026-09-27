@@ -1299,7 +1299,7 @@ function EditTransactionModal({ tx, onClose }: { tx: BankTransaction; onClose: (
     updateTransaction(tx.id, draft);
     let msg = 'Transaction updated.';
     if (choice === 'both') {
-      const result = propagateLinkedEdit('bank', tx.id, { date: draft.date, amount: Math.abs(draft.amount), note: draft.description });
+      const result = propagateLinkedEdit('bank', tx.id, { date: draft.date, amount: Math.abs(draft.amount), note: draft.description, direction });
       if (result.error) msg = result.error;
       else if (result.message) msg = result.message;
     }
