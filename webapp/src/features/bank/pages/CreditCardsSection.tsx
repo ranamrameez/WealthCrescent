@@ -315,6 +315,44 @@ function emptyTx(cardId: string, currencyCode: string): Omit<CreditCardTransacti
   };
 }
 
+function CreditCardTransactionFields({
+  value,
+  onChange,
+  required = false,
+}: {
+  value: Omit<CreditCardTransaction, 'id'>;
+  onChange: (patch: Partial<CreditCardTransaction>) => void;
+  required?: boolean;
+}) {
+  return (
+    <>
+      <Field label="Type" width={190} required={required}>
+        <Select value={value.kind} onChange={(e) => onChange({ kind: e.target.value as CreditCardTransactionKind })}>
+          {(Object.keys(KIND_LABELS) as CreditCardTransactionKind[]).map((k) => <option key={k} value={k}>{KIND_LABELS[k]}</option>)}
+        </Select>
+      </Field>
+      <Field label="Date" width={140}>
+        <TextInput type="date" value={value.date} onChange={(e) => onChange({ date: e.target.value })} />
+      </Field>
+      <Field label="Amount" required={required}>
+        <AmountInput value={value.amount} onChange={(amount) => onChange({ amount })} />
+      </Field>
+      <Field label="Description" required={required} width={200}>
+        <TextInput value={value.description} onChange={(e) => onChange({ description: e.target.value })} placeholder="e.g. Groceries, Fuel" />
+      </Field>
+      <Field label="Category">
+        <CategorySelect value={value.categoryID ?? UNCATEGORIZED_ID} onChange={(categoryID) => onChange({ categoryID })} />
+      </Field>
+      <TimeZoneFields
+        time={value.time}
+        timezone={value.timezone}
+        onTimeChange={(time) => onChange({ time })}
+        onTimezoneChange={(timezone) => onChange({ timezone })}
+      />
+    </>
+  );
+}
+
 /** User-reported (2026-09-14): "No FAB capable of multiple enteries at a
  * time" — this used to add exactly one transaction per submit (add, form
  * resets, sign-in-gate re-runs) with no way to queue several from one
@@ -354,29 +392,7 @@ function AddCardTransactionForm({ card, onDone }: { card: CreditCard; onDone?: (
     <div>
       {rows.map((row, i) => (
         <div key={row.key} className="row gap-sm mb-sm" style={{ alignItems: 'flex-end' }}>
-          <Field label="Type" width={190} required={i === 0}>
-            <Select value={row.kind} onChange={(e) => updateRow(row.key, { kind: e.target.value as CreditCardTransactionKind })}>
-              {(Object.keys(KIND_LABELS) as CreditCardTransactionKind[]).map((k) => <option key={k} value={k}>{KIND_LABELS[k]}</option>)}
-            </Select>
-          </Field>
-          <Field label="Date" width={140}>
-            <TextInput type="date" value={row.date} onChange={(e) => updateRow(row.key, { date: e.target.value })} />
-          </Field>
-          <Field label="Amount" required={i === 0}>
-            <AmountInput value={row.amount} onChange={(amount) => updateRow(row.key, { amount })} />
-          </Field>
-          <Field label="Description" required={i === 0} width={200}>
-            <TextInput value={row.description} onChange={(e) => updateRow(row.key, { description: e.target.value })} placeholder="e.g. Groceries, Fuel" />
-          </Field>
-          <Field label="Category">
-            <CategorySelect value={row.categoryID ?? UNCATEGORIZED_ID} onChange={(categoryID) => updateRow(row.key, { categoryID })} />
-          </Field>
-          <TimeZoneFields
-            time={row.time}
-            timezone={row.timezone}
-            onTimeChange={(time) => updateRow(row.key, { time })}
-            onTimezoneChange={(timezone) => updateRow(row.key, { timezone })}
-          />
+          <CreditCardTransactionFields value={row} required={i === 0} onChange={(patch) => updateRow(row.key, patch)} />
           <IconButton label="Remove row" icon={<TrashIcon size={12} />} align="right" onClick={() => removeRow(row.key)} />
         </div>
       ))}
@@ -393,85 +409,80 @@ function AddCardTransactionForm({ card, onDone }: { card: CreditCard; onDone?: (
  * read-only detail popup; there was no way to correct a typo'd amount or
  * description without deleting and re-adding the row. Mirrors Bank's own
  * `TransactionsList` inline-edit-row pattern (`BankPage.tsx`). */
+function CreditCardTransactionEditModal({
+  transaction,
+  onClose,
+}: {
+  transaction: CreditCardTransaction;
+  onClose: () => void;
+}) {
+  const updateTransaction = useCreditCardWorkbookStore((s) => s.updateTransaction);
+  const [draft, setDraft] = useState<CreditCardTransaction>({ ...transaction });
+
+  const save = () => {
+    if (!(draft.amount > 0)) return toast('Enter an amount greater than zero.');
+    if (!draft.description.trim()) return toast('Enter a description.');
+    updateTransaction(draft.id, { ...draft, description: draft.description.trim() });
+    toast('Transaction updated.');
+    onClose();
+  };
+
+  return (
+    <Modal title="Edit transaction" onClose={onClose}>
+      <div className="row gap-sm">
+        <CreditCardTransactionFields
+          value={draft}
+          required
+          onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
+        />
+      </div>
+      <div className="d-flex justify-center mt-md">
+        <button className="btn" onClick={save}><SaveIcon size={13} />Save transaction</button>
+      </div>
+    </Modal>
+  );
+}
+
 function TransactionsTable({ card }: { card: CreditCard }) {
   const transactions = useCreditCardWorkbookStore((s) => s.workbook.transactions);
-  const updateTransaction = useCreditCardWorkbookStore((s) => s.updateTransaction);
   const deleteTransaction = useCreditCardWorkbookStore((s) => s.deleteTransaction);
   const categories = useCategoryStore((s) => s.workbook.categories);
   const [detail, setDetail] = useState<CreditCardTransaction | null>(null);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editRow, setEditRow] = useState<CreditCardTransaction | null>(null);
+  const [editingTransaction, setEditingTransaction] = useState<CreditCardTransaction | null>(null);
   const cardTxs = useMemo(
     () => [...transactions].filter((t) => t.cardId === card.id).sort((a, b) => b.date.localeCompare(a.date) || (b.seq ?? 0) - (a.seq ?? 0)),
     [transactions, card.id],
   );
 
-  const startEdit = (t: CreditCardTransaction) => { setEditId(t.id); setEditRow({ ...t }); };
-  const saveEdit = () => {
-    if (!editRow) return;
-    if (!(editRow.amount > 0)) return toast('Enter an amount greater than zero.');
-    if (!editRow.description.trim()) return toast('Enter a description.');
-    updateTransaction(editRow.id, { ...editRow, description: editRow.description.trim() });
-    toast('Transaction updated.');
-    setEditId(null);
-    setEditRow(null);
-  };
-
   if (!cardTxs.length) return <p className="text-muted m-0">No transactions yet.</p>;
   return (
     <div className="table-responsive">
       <table>
-        <thead>
-          <tr><th>Date</th><th>Type</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr>
-        </thead>
+        <thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr></thead>
         <tbody>
           {cardTxs.map((t) => (
-            editId === t.id && editRow ? (
-              <tr key={t.id}>
-                <td><input type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} className="w-130" /></td>
-                <td>
-                  <select value={editRow.kind} onChange={(e) => setEditRow({ ...editRow, kind: e.target.value as CreditCardTransactionKind })}>
-                    {(Object.keys(KIND_LABELS) as CreditCardTransactionKind[]).map((k) => <option key={k} value={k}>{KIND_LABELS[k]}</option>)}
-                  </select>
-                </td>
-                <td><input value={editRow.description} onChange={(e) => setEditRow({ ...editRow, description: e.target.value })} className="w-140" /></td>
-                <td><CategorySelect value={editRow.categoryID ?? UNCATEGORIZED_ID} onChange={(categoryID) => setEditRow({ ...editRow, categoryID })} /></td>
-                <td><input type="number" value={editRow.amount} onChange={(e) => setEditRow({ ...editRow, amount: Number(e.target.value) })} className="w-90" /></td>
-                <td onClick={(e) => e.stopPropagation()}>
-                  <IconButton label="Save" icon={<SaveIcon size={12} />} align="right" onClick={saveEdit} />
-                  <IconButton label="Cancel" icon={<XIcon size={12} />} align="right" onClick={() => { setEditId(null); setEditRow(null); }} />
-                </td>
-              </tr>
-            ) : (
-              <tr key={t.id} className="clickable" onClick={() => setDetail(t)}>
-                <td>{t.date}</td>
-                {/* A payment reduces debt / a charge (or fee/markup/cash
-                   advance) increases it — a real profit/loss-like outcome,
-                   not a Buy/Sell trade action, so this stays on the
-                   green/red `.pill-positive`/`.pill-negative` convention;
-                   see `.pill-buy`/`.pill-sell`'s own doc comment in
-                   main.css for why those two are reserved for an actual
-                   trade action now. */}
-                <td className={t.kind === 'payment' ? 'pill pill-positive' : 'pill pill-negative'} style={{ display: 'inline-block' }}>{KIND_LABELS[t.kind]}</td>
-                <td className="cell-clip" title={t.description}>{t.description}</td>
-                <td>{categoryName(t.categoryID, categories)}</td>
-                <td>{fmtMoney(t.amount, card.currencyCode)}</td>
-                <td onClick={(e) => e.stopPropagation()}>
-                  <IconButton label="Edit" icon={<EditIcon size={12} />} align="right" onClick={() => startEdit(t)} />
-                  <IconButton
-                    label="Delete"
-                    icon={<TrashIcon size={12} />}
-                    align="right"
-                    onClick={async () => {
-                      if (await confirmDialog('This cannot be undone.', 'Delete this transaction?')) deleteTransaction(t.id);
-                    }}
-                  />
-                </td>
-              </tr>
-            )
+            <tr key={t.id} className="clickable" onClick={() => setDetail(t)}>
+              <td>{t.date}</td>
+              <td className={t.kind === 'payment' ? 'pill pill-positive' : 'pill pill-negative'} style={{ display: 'inline-block' }}>{KIND_LABELS[t.kind]}</td>
+              <td className="cell-clip" title={t.description}>{t.description}</td>
+              <td>{categoryName(t.categoryID, categories)}</td>
+              <td>{fmtMoney(t.amount, card.currencyCode)}</td>
+              <td onClick={(e) => e.stopPropagation()}>
+                <IconButton label="Edit" icon={<EditIcon size={12} />} align="right" onClick={() => setEditingTransaction(t)} />
+                <IconButton
+                  label="Delete"
+                  icon={<TrashIcon size={12} />}
+                  align="right"
+                  onClick={async () => {
+                    if (await confirmDialog('This cannot be undone.', 'Delete this transaction?')) deleteTransaction(t.id);
+                  }}
+                />
+              </td>
+            </tr>
           ))}
         </tbody>
       </table>
+      {editingTransaction && <CreditCardTransactionEditModal transaction={editingTransaction} onClose={() => setEditingTransaction(null)} />}
       {detail && (
         <RecordDetailModal
           title="Transaction"
