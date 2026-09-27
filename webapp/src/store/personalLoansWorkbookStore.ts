@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { toInstantMs } from '../lib/datetime';
 import { assignSeqForEntities, backfillSeq, nextSeqForEntity } from '../lib/seq';
 import { createEmptyPersonalLoansWorkbook } from './defaultPersonalLoansWorkbook';
-import type { PersonalLoan, PersonalLoanRepayment, PersonalLoansWorkbook } from '../types/personalLoansWorkbook';
+import type { PersonalLoan, PersonalLoanPlan, PersonalLoanRepayment, PersonalLoansWorkbook } from '../types/personalLoansWorkbook';
 
 const STORAGE_KEY = 'WealthCrescent_personal_loans_workbook_v1';
 
@@ -24,6 +24,9 @@ interface PersonalLoansStoreState {
   addRepayments: (repayments: PersonalLoanRepayment[]) => void;
   updateRepayment: (id: string, patch: Partial<PersonalLoanRepayment>) => void;
   deleteRepayment: (id: string) => void;
+  addPlan: (plan: PersonalLoanPlan) => void;
+  updatePlan: (id: string, patch: Partial<PersonalLoanPlan>) => void;
+  deletePlan: (id: string) => void;
   updateSettings: (patch: Partial<PersonalLoansWorkbook['settings']>) => void;
 }
 
@@ -43,7 +46,7 @@ function normalize(wb: PersonalLoansWorkbook): PersonalLoansWorkbook {
   const chronological = [...withIds].sort(
     (a, b) => toInstantMs(a.date, a.time, a.timezone) - toInstantMs(b.date, b.time, b.timezone),
   );
-  return { ...wb, repayments: backfillSeq(withIds, chronological) };
+  return { ...wb, repayments: backfillSeq(withIds, chronological), plans: wb.plans ?? [] };
 }
 
 function loadFromLocalStorage(): PersonalLoansWorkbook {
@@ -90,6 +93,7 @@ export const usePersonalLoansWorkbookStore = create<PersonalLoansStoreState>((se
         ...wb,
         loans: wb.loans.filter((l) => l.id !== id),
         repayments: wb.repayments.filter((r) => r.loanId !== id),
+        plans: (wb.plans ?? []).filter((p) => p.loanId !== id),
       })),
 
     // Scoped by loan — same reasoning as Cash's scoping-by-currency in
@@ -113,6 +117,10 @@ export const usePersonalLoansWorkbookStore = create<PersonalLoansStoreState>((se
       mutate((wb) => ({ ...wb, repayments: wb.repayments.map((r) => (r.id === id ? { ...r, ...patch } : r)) })),
 
     deleteRepayment: (id) => mutate((wb) => ({ ...wb, repayments: wb.repayments.filter((r) => r.id !== id) })),
+
+    addPlan: (plan) => mutate((wb) => ({ ...wb, plans: [...(wb.plans ?? []), plan] })),
+    updatePlan: (id, patch) => mutate((wb) => ({ ...wb, plans: (wb.plans ?? []).map((plan) => plan.id === id ? { ...plan, ...patch } : plan) })),
+    deletePlan: (id) => mutate((wb) => ({ ...wb, plans: (wb.plans ?? []).filter((plan) => plan.id !== id) })),
 
     updateSettings: (patch) => mutate((wb) => ({ ...wb, settings: { ...wb.settings, ...patch } })),
   };
