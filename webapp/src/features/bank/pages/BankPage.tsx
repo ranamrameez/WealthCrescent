@@ -967,6 +967,7 @@ export function AccountDetailPage() {
   });
   const [meta, setMeta] = useState<Omit<BankAccount, 'id'>>(() => accountToFormValue(account));
   const [editingMeta, setEditingMeta] = useState(false);
+  const [showTransactionActions, setShowTransactionActions] = useState(false);
   const [addingPlan, setAddingPlan] = useState(false);
 
   const allLedger = useMemo(() => account ? accountRunningLedger(account, transactions, true) : [], [account, transactions]);
@@ -1199,8 +1200,9 @@ export function AccountDetailPage() {
       actions: [
         { label: 'Import transactions', onClick: () => window.dispatchEvent(new Event('bank:open-import')) },
         { label: 'Export filtered CSV', onClick: exportTransactions, disabled: !filteredLedger.length },
+        { label: showTransactionActions ? 'Hide row actions' : 'Show row actions', onClick: () => setShowTransactionActions((value) => !value) },
       ],
-      content: <TransactionsList account={account} ledger={filteredLedger} allLedgerCount={allLedger.length} />,
+      content: <TransactionsList account={account} ledger={filteredLedger} allLedgerCount={allLedger.length} showActions={showTransactionActions} />,
     },
     {
       key: 'analytics',
@@ -1354,7 +1356,7 @@ function EditTransactionModal({ tx, onClose }: { tx: BankTransaction; onClose: (
 /** User-requested (2026-09-03): "add filters to other tables as well" —
  * extends the Type/Category filter treatment Cash's statement tables got
  * (README Done item 224) here too. */
-function TransactionsList({ account, ledger, allLedgerCount }: { account: BankAccount; ledger: ReturnType<typeof accountRunningLedger>; allLedgerCount: number }) {
+function TransactionsList({ account, ledger, allLedgerCount, showActions }: { account: BankAccount; ledger: ReturnType<typeof accountRunningLedger>; allLedgerCount: number; showActions: boolean }) {
   const dateFormat = useAppearanceStore((state) => state.appearance.dateFormat ?? 'DD-MMM-YYYY');
   const updateTransaction = useBankWorkbookStore((state) => state.updateTransaction);
   const deleteTransaction = useBankWorkbookStore((state) => state.deleteTransaction);
@@ -1392,27 +1394,27 @@ function TransactionsList({ account, ledger, allLedgerCount }: { account: BankAc
   return <>
     <div className="section-toolbar"><ImportStatementSection account={account} compact /></div>
     <div className="table-responsive"><table>
-      <thead><tr><th>#</th><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>Balance</th><th>Source</th><th></th></tr></thead>
+      <thead><tr><th>#</th><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>Balance</th><th>Source</th>{showActions && <th></th>}</tr></thead>
       <tbody>
         {pageRows.map(({ tx, balance }, index) => {
           const link = linkByRecordId.get(tx.id);
           const otherSide = link ? (link.from.module === 'bank' && link.fromRecordId === tx.id ? link.to : link.from) : undefined;
           return <tr key={tx.id} onClick={() => setDetailTx(tx)} className="clickable">
-            <td className="text-muted">{tx.serialNumber ?? '—'}{' '}<span onClick={(event) => event.stopPropagation()}><ReorderButtons rows={sorted} index={(safePage - 1) * pageSize + index} instantOf={instantOf} idOf={(row) => row.tx.id} orderOf={(row) => row.tx.serialNumber} onMove={reorder} /></span></td>
+            <td className="text-muted">{tx.serialNumber ?? '—'}{showActions && <> {' '}<span onClick={(event) => event.stopPropagation()}><ReorderButtons rows={sorted} index={(safePage - 1) * pageSize + index} instantOf={instantOf} idOf={(row) => row.tx.id} orderOf={(row) => row.tx.serialNumber} onMove={reorder} /></span></>}</td>
             <td>{formatDate(tx.date, dateFormat)}</td>
             <td className="cell-clip" title={tx.description} onClick={(event) => event.stopPropagation()}>{tx.description}{tx.isPending && <span className="pill-warn ml-6">Pending</span>}{link && <Link to={linkTargetPath(otherSide!)} className="pill-info ml-6">🔗 {sideLabel(link.from)} → {sideLabel(link.to)}</Link>}</td>
             <td><span className="pill-info">{categoryName(tx.categoryID, categories)}</span></td>
             <td className={tx.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(tx.amount, account.currencyCode)}</td>
             <td>{fmtMoney(balance, account.currencyCode)}</td>
             <td className="text-muted cell-clip">{tx.source === 'statement-import' ? `Import${tx.statementRef ? ` (${tx.statementRef})` : ''}` : 'Manual'}</td>
-            <td onClick={(event) => event.stopPropagation()}>
+            {showActions && <td onClick={(event) => event.stopPropagation()}>
               {tx.isPending && <IconButton label="Mark cleared" icon={<CheckIcon size={13} />} align="right" onClick={async()=>{if(!(await ensureSignedIn('Sign in to update this transaction.')))return;updateTransaction(tx.id,{isPending:false});toast('Marked cleared.');}} />}{' '}
               <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => setEditingTx(tx)} />{' '}
               <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => confirmAndDeleteLinkable('bank', tx.id, () => deleteTransaction(tx.id))} />
-            </td>
+            </td>}
           </tr>;
         })}
-        {!sorted.length && <tr><td colSpan={8} className="text-muted">{allLedgerCount ? 'No transactions match the page filters.' : 'No transactions for this account yet.'}</td></tr>}
+        {!sorted.length && <tr><td colSpan={showActions ? 8 : 7} className="text-muted">{allLedgerCount ? 'No transactions match the page filters.' : 'No transactions for this account yet.'}</td></tr>}
       </tbody>
     </table></div>
     <div className="pagination-bar">
