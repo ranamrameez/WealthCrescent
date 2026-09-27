@@ -12,7 +12,7 @@ import { getLastTransferSource, rememberTransferSource } from '../hooks/useLastT
 import { CategorySelect } from './CategorySelect';
 import { UNCATEGORIZED_ID } from '../lib/categories';
 import { defaultTimeForDate, defaultTimezoneForCurrency, nowTime } from '../lib/datetime';
-import { loanDirectionForTransfer, transferDirectionForLoan } from '../lib/calc/personalLoansModule';
+import { loanCategoryForDirection, loanDirectionForTransfer, transferDirectionForLoan } from '../lib/calc/personalLoansModule';
 import { convertAmount, loadCachedFxRates } from '../lib/fx';
 import { useEnsureSignedIn } from '../lib/firebase/useEnsureSignedIn';
 import { defaultLinkedOtherSide, isSupportedLinkPair, linkSideRequiresRef } from '../lib/interEntityLink';
@@ -80,7 +80,7 @@ const DIRECTION_LABELS: Partial<Record<LinkModule, { in: string; out: string }>>
   creditCard: { in: 'Payment', out: 'Charge' },
   personalLoans: { in: 'Borrow', out: 'Lent' },
 };
-const HAS_CATEGORY: LinkModule[] = ['bank', 'cash', 'rentals', 'creditCard'];
+const HAS_CATEGORY: LinkModule[] = ['bank', 'cash', 'rentals', 'creditCard', 'personalLoans'];
 /** Bank has no `Finance.title` — its own pre-existing `description` field
  * already fills that role (see `types/finance.ts`'s file-level comment) —
  * so this is the one module that needs its own "what is this" text input
@@ -145,6 +145,7 @@ interface TxRow {
   timeTouched: boolean;
   timezone?: string;
   categoryID: string;
+  categoryTouched: boolean;
   description: string;
   pending: boolean;
   /** Set when the Finance selector is in Subscriptions mode. */
@@ -174,6 +175,7 @@ function emptyRow(
     timeTouched: false,
     timezone: defaultTimezoneForCurrency(currencyCode),
     categoryID: UNCATEGORIZED_ID,
+    categoryTouched: false,
     description: defaultDescription,
     pending: false,
     subscriptionId: '',
@@ -252,12 +254,17 @@ function TxRowFields({
           const selectedLoan = finance.module === 'personalLoans'
             ? personalLoans.find((loan) => loan.id === finance.ref)
             : undefined;
+          const nextDirection = selectedLoan ? transferDirectionForLoan(selectedLoan.direction) : row.direction;
           onChange({
             ...row,
             finance,
             subscriptionMode: false,
             subscriptionId: '',
-            direction: selectedLoan ? transferDirectionForLoan(selectedLoan.direction) : row.direction,
+            direction: nextDirection,
+            categoryID:
+              selectedLoan && !row.categoryTouched
+                ? loanCategoryForDirection(selectedLoan.direction)
+                : row.categoryID,
             timezone: defaultTimezoneForCurrency(useSideCurrencyStatic(finance)),
             toAmount: undefined,
             toAmountTouched: false,
@@ -317,12 +324,12 @@ function TxRowFields({
           <TextInput
             value={row.description}
             onChange={(e) => onChange({ ...row, description: e.target.value })}
-            placeholder="Transfer By Default"
+            placeholder="Transfer"
           />
         </Field>
         {HAS_CATEGORY.includes(row.finance.module) && !row.linked && (
           <Field label="Category">
-            <CategorySelect value={row.categoryID} onChange={(categoryID) => onChange({ ...row, categoryID })} />
+            <CategorySelect value={row.categoryID} onChange={(categoryID) => onChange({ ...row, categoryID, categoryTouched: true })} />
           </Field>
         )}
       </div>
@@ -458,7 +465,7 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
   const addCreditCardTransaction = useCreditCardWorkbookStore((s) => s.addTransaction);
   const updateSubscription = useSubscriptionsWorkbookStore((s) => s.updateEntry);
   const bankAccounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
-  const transferDefaultDescription = useAppearanceStore((s) => s.appearance.transferDefaultDescription ?? 'Transfer By Default');
+  const transferDefaultDescription = useAppearanceStore((s) => s.appearance.transferDefaultDescription ?? 'Transfer');
 
   // User-reported (2026-09-14): "Cash Statements/tables are under wrong
   // currencies" — root cause: a caller opening this modal with NO
