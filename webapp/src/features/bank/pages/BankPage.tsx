@@ -2190,7 +2190,7 @@ function PlanningAccountSection({
  * "simple budget/spend-plan tool" MODULES_PLAN.md §11 asks for: editable
  * monthly category targets (persisted in `settings.budgets`) compared
  * against this month's actual spend for the selected account. */
-function AnalyticsTab({ bankId }: { bankId?: string } = {}) {
+function AnalyticsTab({ bankId, filters }: { bankId?: string; filters: BankingFilters }) {
   const allAccounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
   const accounts = useMemo(() => allAccounts.filter(account => !account.migratedToCreditCardId && (!bankId || account.bankId === bankId)), [allAccounts, bankId]);
   const transactions = useBankWorkbookStore((s) => s.workbook.transactions);
@@ -2200,21 +2200,24 @@ function AnalyticsTab({ bankId }: { bankId?: string } = {}) {
   const dateFormat = useAppearanceStore((s) => s.appearance.dateFormat ?? 'DD-MMM-YYYY');
   applyChartTheme();
 
-  const [accountId, setAccountId] = useState(accounts[0]?.id ?? '');
-  const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
+  const account = (filters.accountId !== 'all' ? accounts.find((item) => item.id === filters.accountId) : undefined) ?? accounts[0];
   const categoryList = useCategoryStore((s) => s.workbook.categories);
+  const periodTransactions = useMemo(
+    () => transactions.filter((tx) => (!filters.fromDate || tx.date >= filters.fromDate) && (!filters.toDate || tx.date <= filters.toDate)),
+    [transactions, filters.fromDate, filters.toDate],
+  );
 
-  const byCategory = useMemo(() => (account ? accountByCategory(account, transactions, categoryList) : {}), [account, transactions, categoryList]);
-  const categories = Object.keys(byCategory).filter((c) => byCategory[c] < 0); // spend categories only — a doughnut of net credit/debit mixed together isn't meaningful
-  // Keep the module-level Analytics tab on the same one-account source of
-  // truth as Account Detail. With no period bounds this preserves its current
-  // full-history charts while preventing any parent-Bank aggregation.
+  const byCategory = useMemo(
+    () => (account ? accountByCategory(account, periodTransactions, categoryList) : {}),
+    [account, periodTransactions, categoryList],
+  );
+  const categories = Object.keys(byCategory).filter((c) => byCategory[c] < 0);
   const analytics = useMemo(
-    () => (account ? accountPeriodAnalytics(account, transactions) : null),
-    [account, transactions],
+    () => (account ? accountPeriodAnalytics(account, transactions, filters.fromDate, filters.toDate) : null),
+    [account, transactions, filters.fromDate, filters.toDate],
   );
   const monthlyFlow = analytics?.monthlyFlow ?? [];
-  const balanceOverTime = analytics?.ledger ?? [];
+  const balanceOverTime = analytics?.periodLedger ?? [];
 
   const thisMonth = today().slice(0, 7);
   const budgetRows = useMemo(
@@ -2230,11 +2233,6 @@ function AnalyticsTab({ bankId }: { bankId?: string } = {}) {
 
   return (
     <div>
-      <Field label="Account" width={200}>
-        <Select value={account?.id ?? ''} onChange={(e) => setAccountId(e.target.value)}>
-          {accounts.map((a) => <option key={a.id} value={a.id}>{accountDisplayName(a)} ({a.currencyCode})</option>)}
-        </Select>
-      </Field>
       {account && (
         <>
           <div className="grid-auto" style={{ ...gridAutoStyle(320, 16), marginTop: 12 }}>
