@@ -32,18 +32,15 @@ import { fmtMoney } from '../../../lib/format';
 import { categoryName } from '../../../lib/categories';
 import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
 import {
-  loanBalanceHistory,
   loanCategoryForDirection,
   loanOutstanding,
   loanPendingImpact,
   netPendingByCurrency,
   netPositionByCurrency,
-  outstandingByLoan,
   projectPayoff,
   repaymentRunningOutstanding,
-  repaymentsByMonth,
 } from '../../../lib/calc/personalLoansModule';
-import { dlBarV, dlDoughnut, dlLine } from '../../../lib/chartLabels';
+import { dlBarV, dlDoughnut } from '../../../lib/chartLabels';
 import { applyChartTheme } from '../../../lib/chartSetup';
 import { cssVar, tickerColor } from '../../../lib/cssVar';
 import { chartAlpha, chartDepthPlugin } from '../../../lib/chartVisuals';
@@ -55,7 +52,6 @@ import { useCategoryStore } from '../../../store/categoryStore';
 import { useInterEntityTransfersStore } from '../../../store/interEntityTransfersStore';
 import { linkTargetPath, useLinkSideLabel } from '../../transfers/pages/TransferLinksPage';
 import type { PersonalLoan, PersonalLoanPlan, PersonalLoanRepayment } from '../../../types/personalLoansWorkbook';
-import { ChartCard } from '../../qse/components/ChartCard';
 import { gridAutoStyle } from '../../../lib/gridStyle';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -632,32 +628,6 @@ function ImportRepaymentsSection({ loan, onClose }: { loan: PersonalLoan; onClos
  * are all scoped across every loan, not this one. A single balance-over-
  * time line is enough to show progress at a glance without duplicating
  * the full repayments table right below it. */
-function LoanBalanceChart({ loan, repayments }: { loan: PersonalLoan; repayments: PersonalLoanRepayment[] }) {
-  useAppearanceStore((s) => s.appearance);
-  applyChartTheme();
-  const history = useMemo(() => loanBalanceHistory(loan, repayments), [loan, repayments]);
-  if (history.length < 2) return null; // nothing to chart until at least one repayment exists
-
-  return (
-    <ChartCard title="Balance over time">
-      <Line
-        data={{
-          labels: history.map((p) => p.date),
-          datasets: [{
-            label: 'Outstanding',
-            data: history.map((p) => p.balance),
-            borderColor: '#5aa9c9',
-            backgroundColor: '#5aa9c933',
-            fill: true,
-            tension: 0.2,
-          }],
-        }}
-        options={{ plugins: { legend: { display: false }, datalabels: dlLine((v) => fmtMoney(v, loan.currencyCode)) } }}
-      />
-    </ChartCard>
-  );
-}
-
 function PayoffPlanner({ loan, outstanding }: { loan: PersonalLoan; outstanding: number }) {
   const [monthly, setMonthly] = useState(0);
   const projection = monthly > 0 ? projectPayoff(outstanding, monthly, today()) : null;
