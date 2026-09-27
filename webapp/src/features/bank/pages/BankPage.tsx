@@ -503,6 +503,7 @@ export function BankDetailPage() {
   const bank = banks.find((b) => b.id === id);
   const accounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
   const transactions = useBankWorkbookStore((s) => s.workbook.transactions);
+  const updateBank = useBankWorkbookStore((s) => s.updateBank);
   const deleteBank = useBankWorkbookStore((s) => s.deleteBank);
   const ensureSignedIn = useEnsureSignedIn();
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
@@ -577,6 +578,7 @@ export function BankDetailPage() {
   }
 
   const summaryActions: StandardCardAction[] = [
+    { label: bank.isFavorite ? 'Unfavorite bank' : 'Favorite bank', icon: <StarIcon size={14} filled={bank.isFavorite} />, onClick: () => updateBank(bank.id, { isFavorite: !bank.isFavorite }) },
     { label: 'Edit bank', icon: <EditIcon size={14} />, onClick: () => setBankModalOpen(true) },
     { label: 'Delete bank', icon: <TrashIcon size={14} />, tone: 'danger', onClick: remove },
   ];
@@ -588,6 +590,7 @@ export function BankDetailPage() {
       defaultOpen: true,
       summary: <SummaryChip label="Accounts" value={linkedAccounts.length} />,
       actions: summaryActions,
+      hue: bank.color,
       content: (
         <div>
           <AttributeList items={[
@@ -617,6 +620,7 @@ export function BankDetailPage() {
       label: 'Accounts',
       defaultOpen: true,
       summary: <SummaryChip value={linkedAccounts.length + linkedCards.length} />,
+      hue: bank.color,
       content: (
         <div>
           <div className="entity-card-grid">
@@ -652,7 +656,7 @@ export function BankDetailPage() {
                     badge={card.isActive === false ? <span className="pill-warn fs-10">Closed</span> : undefined}
                     statLabel="Owed"
                     stat={<MoneyValue n={balance} currency={card.currencyCode} />}
-                    hue={balance > 0 ? 'var(--loss)' : 'var(--profit)'}
+                    hue={card.color ?? (balance > 0 ? 'var(--loss)' : 'var(--profit)')}
                     onClick={() => navigate(`/bank/card/${card.id}`)}
                   />
                 );
@@ -662,15 +666,17 @@ export function BankDetailPage() {
         </div>
       ),
     },
-    { key: 'plans', label: 'Plans', content: <BankingScopePlans accounts={linkedAccounts} filters={filters} /> },
+    { key: 'plans', label: 'Plans', hue: bank.color, content: <BankingScopePlans accounts={linkedAccounts} filters={filters} /> },
     {
       key: 'transactions',
       label: 'Transactions',
+      hue: account.color,
       summary: <SummaryChip label="Accounts" value={linkedAccounts.length} />,
       actions: bankingTransactionActions(linkedAccounts, transactions, filters, categories),
+      hue: bank.color,
       content: <BankingScopeTransactions accounts={linkedAccounts} filters={filters} />,
     },
-    { key: 'analytics', label: 'Analytics', content: <AnalyticsTab bankId={bank.id} filters={filters} /> },
+    { key: 'analytics', label: 'Analytics', hue: bank.color, content: <AnalyticsTab bankId={bank.id} filters={filters} /> },
   ];
 
   const transferDefault = linkedAccounts[0]
@@ -1020,12 +1026,14 @@ export function AccountDetailPage() {
 
   const detailActions: StandardCardAction[] = editingMeta
     ? [
+        { label: account.isFavorite ? 'Unfavorite account' : 'Favorite account', icon: <StarIcon size={14} filled={account.isFavorite} />, onClick: () => updateAccount(account.id, { isFavorite: !account.isFavorite }) },
         { label: 'Save', onClick: saveMeta },
         { label: 'Cancel', onClick: cancelMetaEdit },
         { label: account.isActive === false ? 'Reopen account' : 'Close account', onClick: toggleArchived },
         { label: 'Delete account', onClick: deleteThisAccount, tone: 'danger' },
       ]
     : [
+        { label: account.isFavorite ? 'Unfavorite account' : 'Favorite account', icon: <StarIcon size={14} filled={account.isFavorite} />, onClick: () => updateAccount(account.id, { isFavorite: !account.isFavorite }) },
         { label: 'Edit', onClick: () => { setMeta(accountToFormValue(account)); setEditingMeta(true); } },
         { label: account.isActive === false ? 'Reopen account' : 'Close account', onClick: toggleArchived },
         { label: 'Delete account', onClick: deleteThisAccount, tone: 'danger' },
@@ -1035,6 +1043,7 @@ export function AccountDetailPage() {
     {
       key: 'summary',
       label: 'Account summary',
+      hue: account.color,
       summary: <span className="text-muted">{periodSummary}</span>,
       content: <div className="account-summary-grid">
         {summaryCard('Actual balance', <>
@@ -1069,6 +1078,7 @@ export function AccountDetailPage() {
     {
       key: 'details',
       label: 'Account details',
+      hue: account.color,
       summary: <>
         <SummaryChip label={account.isLiability ? 'Owed' : 'Balance'} value={`${num(displayBalance)} ${account.currencyCode}`} />
         {pendingAmount !== 0 && <SummaryChip label="Pending" value={`${pendingAmount > 0 ? '+' : ''}${num(pendingAmount)} ${account.currencyCode}`} />}
@@ -1099,6 +1109,7 @@ export function AccountDetailPage() {
     {
       key: 'plans',
       label: 'Plans',
+      hue: account.color,
       summary: <SummaryChip label="Visible" value={upcoming.length} />,
       actions: [
         { label: 'Add a plan', onClick: () => setAddingPlan(true) },
@@ -1123,6 +1134,7 @@ export function AccountDetailPage() {
     {
       key: 'analytics',
       label: 'Analytics',
+      hue: account.color,
       summary: <>
         <SummaryChip label="Deposits" value={fmtMoney(analytics.deposits, account.currencyCode)} />
         <SummaryChip label="Withdrawals" value={fmtMoney(analytics.withdrawals, account.currencyCode)} />
