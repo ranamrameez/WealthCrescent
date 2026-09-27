@@ -51,9 +51,11 @@ it('provides a bank switcher and bank-scoped analytics on bank details', () => {
   expect(screen.queryByLabelText('Switch bank')).not.toBeNull();
   expect(screen.queryAllByText('Analytics').length).toBeGreaterThan(0);
   expect(screen.queryByText('Line chart')).not.toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: /Filters/ }));
   const options = screen.getAllByRole('option').map(option => option.textContent);
   expect(options).toContain('Checking (USD)');
   expect(options).not.toContain('Savings (USD)');
+  fireEvent.click(screen.getByRole('button', { name: 'Done' }));
   fireEvent.change(screen.getByLabelText('Switch bank'), { target: { value: 'b2' } });
   expect(screen.queryByText('Savings')).not.toBeNull();
 });
