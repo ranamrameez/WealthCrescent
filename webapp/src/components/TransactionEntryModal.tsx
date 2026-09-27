@@ -103,29 +103,11 @@ const HAS_CATEGORY: LinkModule[] = ['bank', 'cash', 'rentals', 'creditCard'];
  * the other?) not attempted here. */
 const HAS_PENDING: LinkModule[] = ['cash', 'bank', 'rentals', 'personalLoans'];
 
-/** User-requested (2026-09-20): "list the subscriptions in the transfer
- * features. and update their date according to the transaction." Only
- * offered for a PLAIN (non-linked) row on the three modules that can
- * realistically pay a subscription — Bank, Cash, Credit Card — since a
- * linked row already means "move money between two of my own accounts,"
- * a different question from "what was this specific charge for."
- * Deliberately NOT wired into the general `LinkModule`/`InterEntityTransfer`
- * system (Subscriptions has no per-payment ledger of its own — a
- * `Subscription` is a single record with a `startDate`/`billingCycle`, not
- * an array of transactions — so it can't participate in that system's
- * add/update/delete-by-id, rollback, and `findLinkForRecord` machinery the
- * way Bank/Cash/Rentals/Personal Loans/EMI/Funds/Credit Card all do). This
- * is a lighter one-directional annotation instead: picking a subscription
- * just updates that subscription's own `startDate` to the transaction's
- * date once the transaction saves — `nextBillingDate()`'s recurrence engine
- * already walks forward from `startDate` regardless of how stale it is, so
- * this is purely about keeping the cycle's day-of-month anchor aligned with
- * when you actually paid, not something the app was silently getting wrong
- * before. Subscriptions' own separate "Link to a paying account" feature
- * (its Planning-tab-based "Generate renewal plans") is unaffected — this is
- * an additional, independent way to log one REAL payment right now, the
- * same "both a Planning-based path and a direct Transfers-linking path"
- * pattern EMI/Rentals already have for their own entities. */
+/** Subscriptions are exposed as a Finance choice in the centralized popup.
+ * Selecting one resolves its configured `paidVia` Bank/Cash/Credit Card
+ * into the real ledger side and updates the subscription's billing anchor
+ * after that real transaction saves. Subscriptions still are not
+ * InterEntityTransfer sides because they have no payment ledger of their own. */
 
 interface TxRow {
   key: number;
@@ -168,14 +150,9 @@ interface TxRow {
   subscriptionMode: boolean;
 }
 
-/** User-reported (2026-09-08): "try to choose the same/logical module by
- * default for max UX. like Bank to Bank, Cash to Bank." `bank` is the most
- * likely real "other side" for every module — including Bank itself
- * (Bank-to-Bank, the user's own first example) — so this is a plain
- * constant default rather than a per-module lookup table; still named and
- * documented so a future session doesn't have to re-derive why. Only a
- * prefill: `getLastTransferSource()` (checked first, wherever this is
- * used) and the user's own pick both still win over it. */
+/** Creates one popup row from already-resolved primary and secondary finance
+ * sides. The secondary side is supplied by `defaultLinkedOtherSide()`, so
+ * its visible account and persisted `ref` cannot drift apart. */
 function emptyRow(
   key: number,
   finance: LinkSideConfig,
