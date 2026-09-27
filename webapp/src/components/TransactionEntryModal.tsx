@@ -682,7 +682,8 @@ export function TransactionEntryModal({
           if (!r.finance.ref) { toast('Pick a loan first.'); continue; }
           addPersonalLoanRepayment({
             id: uid(), loanId: r.finance.ref, date: r.date, time: r.time, timezone: r.timezone,
-            amount: Math.abs(r.amount), description: r.description.trim() || undefined, isPending: r.pending || undefined,
+            amount: Math.abs(r.amount), description: r.description.trim() || undefined,
+            categoryID: r.categoryID, isPending: r.pending || undefined,
           });
           break;
         case 'emi': {
