@@ -1043,7 +1043,7 @@ function CreditCardsList({ showArchived = false }: { showArchived?: boolean }) {
                 badge={c.isActive === false ? <span className="pill-warn fs-10">Closed</span> : undefined}
                 statLabel="Owed"
                 stat={<MoneyValue n={balance} currency={c.currencyCode} />}
-                hue={card.color ?? (balance > 0 ? 'var(--loss)' : 'var(--profit)')}
+                hue={c.color ?? (balance > 0 ? 'var(--loss)' : 'var(--profit)')}
                 onClick={() => navigate(`/bank/card/${c.id}`)}
               />
             );
