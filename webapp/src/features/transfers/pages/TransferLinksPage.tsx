@@ -231,7 +231,7 @@ export function SideFields({
   allowSubscriptions?: boolean;
   subscriptionMode?: boolean;
   subscriptionId?: string;
-  onSubscriptionChange?: (subscriptionId: string) => void;
+  onSubscriptionChange?: (subscriptionId: string, finance?: LinkSideConfig) => void;
 }) {
   const bankAccounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
   const properties = useRentalsWorkbookStore((s) => s.workbook.settings.properties);
@@ -298,11 +298,9 @@ export function SideFields({
               if (!first) return;
               const side = sideForSubscription(first.id);
               if (!side) return;
-              onSubscriptionChange?.(first.id);
-              onChange(side);
+              onSubscriptionChange?.(first.id, side);
               return;
             }
-            onSubscriptionChange?.('');
             const module = e.target.value as LinkModule;
             const list = entitiesForModule(module);
             // Prefer an entity matching `preferredCurrency` (Account 1's own
@@ -332,8 +330,7 @@ export function SideFields({
             onChange={(e) => {
               const side = sideForSubscription(e.target.value);
               if (!side) return;
-              onSubscriptionChange?.(e.target.value);
-              onChange(side);
+              onSubscriptionChange?.(e.target.value, side);
             }}
           >
             {activeSubscriptions.map((subscription) => <option key={subscription.id} value={subscription.id}>{subscription.name}</option>)}
