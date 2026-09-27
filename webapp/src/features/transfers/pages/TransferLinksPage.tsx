@@ -223,6 +223,7 @@ export function SideFields({
   subscriptionMode = false,
   subscriptionId = '',
   onSubscriptionChange,
+  disabled = false,
 }: {
   label: string;
   cfg: LinkSideConfig;
@@ -232,6 +233,7 @@ export function SideFields({
   subscriptionMode?: boolean;
   subscriptionId?: string;
   onSubscriptionChange?: (subscriptionId: string, finance?: LinkSideConfig) => void;
+  disabled?: boolean;
 }) {
   const bankAccounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
   const properties = useRentalsWorkbookStore((s) => s.workbook.settings.properties);
@@ -295,6 +297,7 @@ export function SideFields({
       <Field label={label} width={150}>
         <Select
           value={subscriptionMode ? '__subscription__' : cfg.module}
+          disabled={disabled}
           onChange={(e) => {
             if (e.target.value === '__subscription__') {
               const first = activeSubscriptions[0];
@@ -330,6 +333,7 @@ export function SideFields({
         <Field label="Subscription" width={190}>
           <Select
             value={subscriptionId}
+            disabled={disabled}
             onChange={(e) => {
               const side = sideForSubscription(e.target.value);
               if (!side) return;
@@ -344,6 +348,7 @@ export function SideFields({
         <>
           <Field label="Currency" width={210}>
             <CurrencyChips
+              disabled={disabled}
               // User-reported (2026-09-07): restoring a remembered account
               // (which sets `cfg.ref` directly, without going through this
               // component's own module-change handler) left `cfg.currencyCode`
@@ -386,7 +391,7 @@ export function SideFields({
              BOTH together actually shrinks the rendered element. */}
           <Field label={refLabel} width={190}>
             <div className="row" style={{ gap: 4, alignItems: 'center' }}>
-              <Select value={cfg.ref ?? ''} onChange={(e) => onChange({ ...cfg, ref: e.target.value })} width={110} style={{ minWidth: 110 }}>
+              <Select value={cfg.ref ?? ''} disabled={disabled} onChange={(e) => onChange({ ...cfg, ref: e.target.value })} width={110} style={{ minWidth: 110 }}>
                 {!filteredEntities.length && <option value="">None in this currency</option>}
                 {filteredEntities.map((en) => <option key={en.id} value={en.id}>{en.label}</option>)}
               </Select>
@@ -411,6 +416,7 @@ export function SideFields({
       {!subscriptionMode && (cfg.module === 'cash' || cfg.module === 'funds') && (
         <Field label="Currency" width={210}>
           <CurrencyChips
+            disabled={disabled}
             value={cfg.currencyCode ?? (cfg.module === 'cash' ? cashCurrency : fundsCurrency)}
             onChange={(code) => onChange({ ...cfg, currencyCode: code })}
           />
