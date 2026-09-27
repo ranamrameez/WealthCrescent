@@ -2122,32 +2122,47 @@ function PlanningAccountSection({
  * against this month's actual spend for the selected account. */
 function AnalyticsTab({ bankId, filters }: { bankId?: string; filters: BankingFilters }) {
   const allAccounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
-  const accounts = useMemo(() => allAccounts.filter(account => !account.migratedToCreditCardId && (!bankId || account.bankId === bankId)), [allAccounts, bankId]);
+  const accounts = useMemo(
+    () => allAccounts.filter((account) => !account.migratedToCreditCardId && (!bankId || account.bankId === bankId)),
+    [allAccounts, bankId],
+  );
   const transactions = useBankWorkbookStore((s) => s.workbook.transactions);
+  const plannedEntries = usePlannedBankWorkbookStore((s) => s.workbook.entries);
   const budgets = useBankWorkbookStore((s) => s.workbook.settings.budgets);
   const setBudget = useBankWorkbookStore((s) => s.setBudget);
   const ensureSignedIn = useEnsureSignedIn();
-  const dateFormat = useAppearanceStore((s) => s.appearance.dateFormat ?? 'DD-MMM-YYYY');
-  applyChartTheme();
-
-  const account = (filters.accountId !== 'all' ? accounts.find((item) => item.id === filters.accountId) : undefined) ?? accounts[0];
   const categoryList = useCategoryStore((s) => s.workbook.categories);
-  const periodTransactions = useMemo(
-    () => transactions.filter((tx) => (!filters.fromDate || tx.date >= filters.fromDate) && (!filters.toDate || tx.date <= filters.toDate)),
-    [transactions, filters.fromDate, filters.toDate],
-  );
+  const account = (filters.accountId !== 'all' ? accounts.find((item) => item.id === filters.accountId) : undefined) ?? accounts[0];
 
-  const byCategory = useMemo(
-    () => (account ? accountByCategory(account, periodTransactions, categoryList) : {}),
-    [account, periodTransactions, categoryList],
+  const allLedger = useMemo(
+    () => account ? accountRunningLedger(account, transactions, true) : [],
+    [account, transactions],
   );
-  const categories = Object.keys(byCategory).filter((c) => byCategory[c] < 0);
-  const analytics = useMemo(
-    () => (account ? accountPeriodAnalytics(account, transactions, filters.fromDate, filters.toDate) : null),
-    [account, transactions, filters.fromDate, filters.toDate],
+  const filteredLedger = useMemo(() => allLedger.filter((row) => {
+    if ((filters.fromDate && row.tx.date < filters.fromDate) || (filters.toDate && row.tx.date > filters.toDate)) return false;
+    if (filters.direction === 'in' && row.tx.amount < 0) return false;
+    if (filters.direction === 'out' && row.tx.amount >= 0) return false;
+    if (filters.category !== 'all' && categoryName(row.tx.categoryID, categoryList) !== filters.category) return false;
+    if (filters.source !== 'all' && (row.tx.source ?? 'manual') !== filters.source) return false;
+    return true;
+  }), [allLedger, filters, categoryList]);
+  const clearedLedger = useMemo(() => filteredLedger.filter(({ tx }) => !tx.isPending), [filteredLedger]);
+  const pendingRows = useMemo(() => filteredLedger.filter(({ tx }) => tx.isPending), [filteredLedger]);
+  const periodStartBalance = useMemo(() => {
+    if (!account) return 0;
+    const before = allLedger.filter(({ tx }) => !tx.isPending && filters.fromDate && tx.date < filters.fromDate);
+    return before.length ? before[before.length - 1].balance : account.openingBalance;
+  }, [account, allLedger, filters.fromDate]);
+  const upcoming = useMemo(
+    () => account
+      ? plannedEntries
+          .filter((plan) => plan.accountId === account.id && !plan.executed)
+          .filter((plan) => (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate))
+          .filter((plan) => filters.direction === 'all' || (filters.direction === 'in' ? plan.amount >= 0 : plan.amount < 0))
+          .sort((a, b) => a.date.localeCompare(b.date))
+      : [],
+    [plannedEntries, account, filters.fromDate, filters.toDate, filters.direction],
   );
-  const monthlyFlow = analytics?.monthlyFlow ?? [];
-  const balanceOverTime = analytics?.periodLedger ?? [];
 
   const thisMonth = today().slice(0, 7);
   const budgetRows = useMemo(
@@ -2157,118 +2172,56 @@ function AnalyticsTab({ bankId, filters }: { bankId?: string; filters: BankingFi
   const [newBudgetCategory, setNewBudgetCategory] = useState('');
   const [newBudgetAmount, setNewBudgetAmount] = useState(0);
 
-  if (!accounts.length) {
-    return <p className="text-muted">Add a bank account first (Accounts tab) to see charts here.</p>;
-  }
+  if (!account) return <p className="text-muted">Add a bank account first to see analytics.</p>;
 
   return (
     <div>
-      {account && (
-        <>
-          <div className="grid-auto" style={{ ...gridAutoStyle(320, 16), marginTop: 12 }}>
-            <ChartCard flat title="Balance over time" empty={!balanceOverTime.length}>
-              <Line
-                data={{
-                  labels: balanceOverTime.map((r) => formatDate(r.tx.date, dateFormat)),
-                  datasets: [{ label: 'Balance', data: balanceOverTime.map((r) => r.balance), borderColor: '#5aa9c9', backgroundColor: '#5aa9c933', fill: true, tension: 0.2 }],
-                }}
-                options={{ scales: { x: { ticks: { autoSkip: true, maxTicksLimit: 6, maxRotation: 0 } }, y: { ticks: { maxTicksLimit: 6 } } }, plugins: { legend: { display: false }, datalabels: dlLine((v) => fmtMoney(v, account.currencyCode)) } }}
-              />
-            </ChartCard>
-            <ChartCard flat title="Category breakdown (spend)" empty={!categories.length}>
-              <Doughnut
-                data={{
-                  labels: categories,
-                  datasets: [{ data: categories.map((c) => Math.abs(byCategory[c])), backgroundColor: categories.map((c) => tickerColor(c)) }],
-                }}
-                options={{ cutout: '55%', plugins: { legend: { display: true, position: 'right', labels: { boxWidth: 10, padding: 8 } }, datalabels: dlDoughnut((v) => fmtMoney(v, account.currencyCode)) } }}
-              />
-            </ChartCard>
-            <ChartCard
-              flat
-              title="Deposits vs. withdrawals by month"
-              titleTooltip="Every deposit vs. withdrawal across the selected account(s), including any inter-account transfer — this is a raw cash-flow view, not a categorized income/expense breakdown."
-              empty={!monthlyFlow.length}
-            >
-              <Bar
-                data={{
-                  labels: monthlyFlow.map((f) => f.month),
-                  datasets: [
-                    { label: 'Deposits', data: monthlyFlow.map((f) => f.income), backgroundColor: cssVar('--profit') || '#3ecf8e' },
-                    { label: 'Withdrawals', data: monthlyFlow.map((f) => f.expense), backgroundColor: cssVar('--loss') || '#e5484d' },
-                  ],
-                }}
-                options={{ scales: { x: { ticks: { autoSkip: true, maxTicksLimit: 6, maxRotation: 0 } }, y: { ticks: { maxTicksLimit: 6 } } }, plugins: { datalabels: dlBarV((v) => fmtMoney(v, account.currencyCode)) } }}
-              />
-            </ChartCard>
-          </div>
-
-          <CollapsibleCard title={<h3 className="m-0">Budget — {thisMonth}</h3>} className="mt-md">
-            <p className="text-muted mt-0">
-              Set a monthly spend target per category for {accountDisplayName(account)}; compared against what you've actually
-              spent there this month.
-            </p>
-            <div>
-              <table>
-                <thead><tr><th>Category</th><th>Budget</th><th>Actual</th><th>Remaining</th></tr></thead>
-                <tbody>
-                  {budgetRows.map((r) => (
-                    <tr key={r.category}>
-                      <td>{r.category}</td>
-                      <td>
-                        <input
-                          type="number"
-                          step="0.01"
-                          className="price-input w-96"
-                          defaultValue={r.budget || ''}
-                          placeholder="—"
-                          
-                          onKeyDown={async (e) => {
-                            if (e.key === 'Enter') {
-                              const val = parseFloat((e.target as HTMLInputElement).value) || 0;
-                              if (await ensureSignedIn('Sign in to save a budget target.')) setBudget(r.category, val);
-                              (e.target as HTMLInputElement).blur();
-                            }
-                          }}
-                        />
-                      </td>
-                      <td className={r.budget > 0 && r.actual > r.budget ? 'pill-negative' : ''}>{fmtMoney(r.actual, account.currencyCode)}</td>
-                      <td className={r.budget > 0 ? (r.budget - r.actual >= 0 ? 'pill-positive' : 'pill-negative') : ''}>
-                        {r.budget > 0 ? fmtMoney(r.budget - r.actual, account.currencyCode) : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                  {!budgetRows.length && <tr><td colSpan={4} className="text-muted">No spend or budget targets for this account yet.</td></tr>}
-                </tbody>
-              </table>
-            </div>
-            <div className="row gap-sm mt-sm">
-              <TextInput placeholder="New category" value={newBudgetCategory} onChange={(e) => setNewBudgetCategory(e.target.value)} className="w-140" />
-              <input
-                type="number"
-                step="0.01"
-                placeholder="Monthly target"
-                value={newBudgetAmount || ''}
-                onChange={(e) => setNewBudgetAmount(Number(e.target.value))}
-                className="w-120"
-              />
-              <button
-                className="btn secondary small"
-                onClick={async () => {
-                  if (!newBudgetCategory.trim() || !newBudgetAmount) return toast('Enter a category name and a target amount.');
-                  if (!(await ensureSignedIn('Sign in to save a budget target.'))) return;
-                  setBudget(newBudgetCategory.trim(), newBudgetAmount);
-                  toast(`Budget set for ${newBudgetCategory.trim()}.`);
-                  setNewBudgetCategory('');
-                  setNewBudgetAmount(0);
-                }}
-              >
-                <PlusIcon size={12} />Add budget category
-              </button>
-            </div>
-          </CollapsibleCard>
-        </>
-      )}
+      <AccountAnalyticsSection
+        ledger={clearedLedger}
+        pendingRows={pendingRows}
+        plans={upcoming}
+        startingBalance={periodStartBalance}
+        currencyCode={account.currencyCode}
+        fromDate={filters.fromDate}
+        toDate={filters.toDate}
+      />
+      <CollapsibleCard title={<h3 className="m-0">Budget — {thisMonth}</h3>} className="mt-md">
+        <p className="text-muted mt-0">
+          Monthly spend targets for {accountDisplayName(account)}. Account selection and period come from the same centralized Filters control used by the charts.
+        </p>
+        <div>
+          <table>
+            <thead><tr><th>Category</th><th>Budget</th><th>Actual</th><th>Remaining</th></tr></thead>
+            <tbody>
+              {budgetRows.map((row) => (
+                <tr key={row.category}>
+                  <td>{row.category}</td>
+                  <td><input type="number" step="0.01" className="price-input w-96" defaultValue={row.budget || ''} placeholder="—" onKeyDown={async (event) => {
+                    if (event.key !== 'Enter') return;
+                    const value = parseFloat((event.target as HTMLInputElement).value) || 0;
+                    if (await ensureSignedIn('Sign in to save a budget target.')) setBudget(row.category, value);
+                    (event.target as HTMLInputElement).blur();
+                  }} /></td>
+                  <td className={row.budget > 0 && row.actual > row.budget ? 'pill-negative' : ''}>{fmtMoney(row.actual, account.currencyCode)}</td>
+                  <td className={row.budget > 0 ? (row.budget - row.actual >= 0 ? 'pill-positive' : 'pill-negative') : ''}>{row.budget > 0 ? fmtMoney(row.budget - row.actual, account.currencyCode) : '—'}</td>
+                </tr>
+              ))}
+              {!budgetRows.length && <tr><td colSpan={4} className="text-muted">No spend or budget targets for this account yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        <div className="row gap-sm mt-sm">
+          <TextInput placeholder="New category" value={newBudgetCategory} onChange={(e) => setNewBudgetCategory(e.target.value)} className="w-140" />
+          <input type="number" step="0.01" placeholder="Monthly target" value={newBudgetAmount || ''} onChange={(e) => setNewBudgetAmount(Number(e.target.value))} className="w-120" />
+          <button className="btn secondary small" onClick={async () => {
+            if (!newBudgetCategory.trim() || !newBudgetAmount) return toast('Enter a category name and a target amount.');
+            if (!(await ensureSignedIn('Sign in to save a budget target.'))) return;
+            setBudget(newBudgetCategory.trim(), newBudgetAmount);
+            setNewBudgetCategory('');
+            setNewBudgetAmount(0);
+          }}><PlusIcon size={12} />Add budget category</button>
+        </div>
+      </CollapsibleCard>
     </div>
   );
 }
