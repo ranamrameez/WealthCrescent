@@ -104,6 +104,15 @@ const HAS_DESCRIPTION: LinkModule[] = ['bank', 'cash', 'rentals', 'creditCard'];
  * for a link needs its own design (does one side clear independently of
  * the other?) not attempted here. */
 const HAS_PENDING: LinkModule[] = ['cash', 'bank', 'rentals', 'personalLoans'];
+
+function linkSideRequiresRef(side: LinkSideConfig): boolean {
+  return side.module === 'bank'
+    || side.module === 'rentals'
+    || side.module === 'personalLoans'
+    || side.module === 'emi'
+    || side.module === 'creditCard';
+}
+
 /** User-requested (2026-09-20): "list the subscriptions in the transfer
  * features. and update their date according to the transaction." Only
  * offered for a PLAIN (non-linked) row on the three modules that can
@@ -343,7 +352,8 @@ function TxRowFields({
             onChange={(linked) => {
               if (row.subscriptionMode && linked) return;
               const remembered = linked ? getLastTransferSource(row.finance) : undefined;
-              onChange({ ...row, linked, other: remembered ?? row.other, toAmount: undefined, toAmountTouched: false });
+              const rememberedIsUsable = remembered && (!linkSideRequiresRef(remembered) || !!remembered.ref);
+              onChange({ ...row, linked, other: rememberedIsUsable ? remembered : row.other, toAmount: undefined, toAmountTouched: false });
             }}
           />
         </Field>
@@ -492,20 +502,13 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
     setNextKey((k) => k + 1);
   };
 
-  const sideNeedsRef = (side: LinkSideConfig) =>
-    side.module === 'bank'
-    || side.module === 'rentals'
-    || side.module === 'personalLoans'
-    || side.module === 'emi'
-    || side.module === 'creditCard';
-
   const submit = async () => {
     const valid = rows.filter((r) => r.amount !== 0);
     if (!valid.length) return toast('Enter an amount on at least one row.');
     for (const r of valid) {
       if (r.linked) {
-        if (sideNeedsRef(r.finance) && !r.finance.ref) return toast('Pick the account/entity for the first finance side.');
-        if (sideNeedsRef(r.other) && !r.other.ref) return toast('Pick the account/entity for the linked finance side.');
+        if (linkSideRequiresRef(r.finance) && !r.finance.ref) return toast('Pick the account/entity for the first finance side.');
+        if (linkSideRequiresRef(r.other) && !r.other.ref) return toast('Pick the account/entity for the linked finance side.');
         const sameEntity = r.finance.module === r.other.module && !!r.finance.ref && r.finance.ref === r.other.ref;
         if (sameEntity) return toast('One row links a finance to itself — pick a different account.');
         if (!isSupportedLinkPair(r.finance.module, r.other.module) || !isSupportedLinkPair(r.other.module, r.finance.module)) {
