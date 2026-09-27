@@ -1590,7 +1590,9 @@ function BankingScopeTransactions({ accounts, filters }: { accounts: BankAccount
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   const safePage = Math.min(page, pageCount);
   const pageRows = rows.slice((safePage - 1) * pageSize, safePage * pageSize);
-  useEffect(() => setPage(1), [filters, pageSize, accounts]);
+  useEffect(() => {
+    setPage(1);
+  }, [filters.period, filters.fromDate, filters.toDate, filters.direction, filters.category, filters.source, pageSize]);
   const exportRows = (items: BankTransaction[], suffix: string) => {
     const csvRows = items.map((tx) => { const account = accountById.get(tx.accountId)!; return [tx.date, accountDisplayName(account), tx.description, categoryName(tx.categoryID, categories), tx.amount, account.currencyCode, tx.isPending ? 'Pending' : 'Cleared']; });
     const blob = new Blob([toCSV([['Date', 'Account', 'Description', 'Category', 'Amount', 'Currency', 'Status'], ...csvRows])], { type: 'text/csv' });
@@ -2395,7 +2397,8 @@ export function BankPage({
   // globally-mounted component.
   const actionsByKey = useFabActionsStore((s) => s.actionsByKey);
   const fabActions = allExtraActions(actionsByKey);
-  const accounts = useBankWorkbookStore((state) => state.workbook.settings.accounts.filter((account) => !account.migratedToCreditCardId));
+  const allAccounts = useBankWorkbookStore((state) => state.workbook.settings.accounts);
+  const accounts = useMemo(() => allAccounts.filter((account) => !account.migratedToCreditCardId), [allAccounts]);
   const transactions = useBankWorkbookStore((state) => state.workbook.transactions);
   const categories = useCategoryStore((state) => state.workbook.categories);
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
