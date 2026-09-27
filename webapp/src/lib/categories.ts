@@ -50,6 +50,8 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'cat_rent_car_wash', serialNumber: 25, name: 'Rent: Car Wash', scope: 'app' },
   { id: 'cat_opening_balance', serialNumber: 26, name: 'Opening balance', scope: 'app' },
   { id: 'cat_uncategorized', serialNumber: 27, name: 'Uncategorized', scope: 'app' },
+  { id: 'cat_loan_borrowed', serialNumber: 28, name: 'Loan: Borrowed', scope: 'app' },
+  { id: 'cat_loan_lent', serialNumber: 29, name: 'Loan: Lent', scope: 'app' },
 ];
 
 /** Every id from `DEFAULT_CATEGORIES`, for cheap membership checks
@@ -65,6 +67,8 @@ export const TRANSFER_CATEGORY_ID = 'cat_transfer';
  * category a logged rent-income entry gets, same as the pre-restructure
  * hardcoded `category: 'Rent'`. */
 export const RENT_CATEGORY_ID = 'cat_rent';
+export const PERSONAL_LOAN_BORROWED_CATEGORY_ID = 'cat_loan_borrowed';
+export const PERSONAL_LOAN_LENT_CATEGORY_ID = 'cat_loan_lent';
 
 /** Matches how two category strings are compared for a "safe" merge: trim,
  * lowercase, and collapse any run of hyphens/spaces to one space — enough
