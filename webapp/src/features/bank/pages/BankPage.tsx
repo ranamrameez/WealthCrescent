@@ -11,7 +11,6 @@ import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu
 import { UsageBar } from '../../../components/ui/UsageBar';
 import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
-import { ChartCard } from '../../qse/components/ChartCard';
 import { AnalyticsChartEnhancer } from '../../../components/AnalyticsChartCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, BankIcon, CheckIcon, EditIcon, ListIcon, PlusIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
