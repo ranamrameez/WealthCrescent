@@ -20,6 +20,7 @@ import { mergeCategoriesEverywhere } from '../../../lib/categoryMerge';
 import { useEnabledCurrenciesStore } from '../../../store/enabledCurrenciesStore';
 import { useCategoryStore } from '../../../store/categoryStore';
 import { useCategoryGroupStore } from '../../../store/categoryGroupStore';
+import { ModuleSelectionModal } from '../../../components/ModuleSelectionModal';
 import type { CategoryGroup } from '../../../types/finance';
 
 /** Index 0 = Primary, index 1 = Secondary, everything else = Other — see
@@ -405,6 +406,7 @@ function CategoriesSection() {
  * just surfacing what already exists in one place. */
 export function AccountPage({ syncStatuses }: { syncStatuses: ModuleSyncStatus[] }) {
   const { user } = useAuthState();
+  const [modulePickerOpen, setModulePickerOpen] = useState(false);
   const providers = user?.providerData.map((p) => PROVIDER_LABEL[p.providerId] ?? p.providerId) ?? [];
 
   const switchAccount = async () => {
@@ -468,11 +470,16 @@ export function AccountPage({ syncStatuses }: { syncStatuses: ModuleSyncStatus[]
           </>
         )}
 
-        <CollapsibleCard title={<h3 className="m-0">Appearance</h3>}>
+            <CollapsibleCard title={<h3 className="m-0">Appearance</h3>}>
           <div style={{ maxWidth: 320 }}>
             <AppearanceFields />
           </div>
-        </CollapsibleCard>
+            </CollapsibleCard>
+
+            <CollapsibleCard title={<h3 className="m-0">Modules</h3>}>
+              <p className="text-muted mt-0">Choose which areas appear in your workspace. You can change this anytime.</p>
+              <button className="btn secondary" onClick={() => setModulePickerOpen(true)}>Choose modules</button>
+            </CollapsibleCard>
 
         <CurrenciesSection />
 
@@ -484,6 +491,7 @@ export function AccountPage({ syncStatuses }: { syncStatuses: ModuleSyncStatus[]
           <Link to="/app-data" className="btn secondary">Backup / restore all data →</Link>
         </CollapsibleCard>
       </div>
+      {modulePickerOpen && <ModuleSelectionModal uid={user?.uid} onClose={() => setModulePickerOpen(false)} />}
 
       {/* Its own full-width section, not squeezed into the grid above — a
          group's expandable category checklist needs more room than a

@@ -198,6 +198,10 @@
 .standard-card-menu-item.danger{color:var(--loss);}
 .standard-card-fullscreen{animation:ui-fullscreen-in .2s ease-out both;}
 .scroll-top-button{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:600;width:40px;height:40px;border:1px solid var(--border);border-radius:999px;background:var(--accent);color:#fff;display:grid;place-items:center;box-shadow:0 8px 22px rgba(0,0,0,.25);cursor:pointer;animation:ui-scroll-in .2s ease-out both;}
+.module-selection-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:14px;}
+.module-selection-option{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel-2);color:var(--text);cursor:pointer;text-align:left;transition:background .15s ease,border-color .15s ease,transform .15s ease;}
+.module-selection-option:hover{transform:translateY(-1px);}
+.module-selection-option.selected{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--panel-2));}
 @keyframes ui-popover-in{from{opacity:0;transform:translateY(-5px) scale(.96)}to{opacity:1;transform:none}}
 @keyframes ui-fullscreen-in{from{opacity:.7;transform:scale(.98)}to{opacity:1;transform:none}}
 @keyframes ui-scroll-in{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
