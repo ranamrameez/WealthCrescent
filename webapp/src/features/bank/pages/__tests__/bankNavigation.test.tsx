@@ -41,7 +41,7 @@ it('shows future and pending rows from month start, and switches accounts', () =
   expect(screen.queryByText('Future pending payment')).toBeNull();
   expect(screen.queryByText('Prior month')).toBeNull();
   expect(screen.queryByLabelText('Switch bank')).toBeNull();
-  fireEvent.change(screen.getByLabelText('Switch account'), { target: { value: 'a2' } });
+  fireEvent.change(screen.getByLabelText('Account'), { target: { value: 'a2' } });
   expect(screen.queryByText('Savings deposit')).not.toBeNull();
   expect(screen.queryByText('Future cleared payment')).toBeNull();
 });
