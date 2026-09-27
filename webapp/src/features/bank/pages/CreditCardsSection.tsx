@@ -311,7 +311,7 @@ function TransactionsTable({ card }: { card: CreditCard }) {
 
   if (!cardTxs.length) return <p className="text-muted m-0">No transactions yet.</p>;
   return (
-    <div className="table-scroll">
+    <div className="table-responsive">
       <table>
         <thead>
           <tr><th>Date</th><th>Type</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr>
@@ -678,7 +678,7 @@ export function CreditCardDetailPage() {
       }]} />
 
       <CollapsibleCard title={<h3 className="m-0">Last 6 months</h3>} defaultOpen={false} className="mb-md">
-        <div className="table-scroll">
+        <div className="table-responsive">
           <table>
             <thead>
               <tr><th>Month</th><th>Spent</th><th>Paid</th><th>Balance</th></tr>
@@ -890,8 +890,8 @@ function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: Pl
   };
 
   return (
-    <CollapsibleCard title={<h3 className="m-0">Planned charges &amp; payments</h3>} defaultOpen={false} className="mb-md">
-      <div className="table-scroll">
+    <div>
+      <div className="table-responsive">
         <table>
           <thead>
             <tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>Repeats / status</th><th></th></tr>
@@ -957,7 +957,7 @@ function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: Pl
           </tbody>
         </table>
       </div>
-    </CollapsibleCard>
+    </div>
   );
 }
 
@@ -1254,3 +1254,4 @@ function MigrateLegacyCreditCards() {
     </Notice>
   );
 }
+

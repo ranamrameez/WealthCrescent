@@ -123,9 +123,13 @@ export function CalendarIcon({ size = 14 }: IconProps) {
 export function FilterIcon({ size = 14 }: IconProps) {
   return (
     <svg width={size} height={size} {...base} aria-hidden>
-      <path d="M4 5h16M7 12h10M10 19h4" />
+      <path d="M3 4h18l-7 8v6l-4 2v-8Z" />
     </svg>
   );
+}
+
+export function FlaskIcon({ size = 14 }: IconProps) {
+  return <svg width={size} height={size} {...base} aria-hidden><path d="M9 3h6M10 3v6l-5.5 9.2A1.2 1.2 0 0 0 5.5 20h13a1.2 1.2 0 0 0 1-1.8L14 9V3" /><path d="M7.3 15h9.4" /></svg>;
 }
 
 /** "More actions" — `FabPanel`'s own toggle icon when it offers more than
@@ -252,6 +256,8 @@ export function ArrowDownIcon({ size = 14 }: IconProps) {
     </svg>
   );
 }
+export function ArrowLeftIcon({ size = 14 }: IconProps) { return <svg width={size} height={size} {...base} aria-hidden><path d="M19 12H5M11 6l-6 6 6 6" /></svg>; }
+export function ArrowRightIcon({ size = 14 }: IconProps) { return <svg width={size} height={size} {...base} aria-hidden><path d="M5 12h14M13 6l6 6-6 6" /></svg>; }
 
 /** Full-screen toggle for `Modal` (UI_DESIGN_GUIDELINES.md: every popup
  * must offer a full-screen escape hatch, since the default width is

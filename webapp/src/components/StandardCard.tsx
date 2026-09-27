@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { MenuIcon } from './icons';
+import { ArchiveIcon, CheckIcon, CollapseIcon, EditIcon, ExpandIcon, ExportIcon, FlaskIcon, MenuIcon, PlanningIcon, PlusIcon, SaveIcon, TrashIcon, XIcon } from './icons';
+import { StandardIconButton } from './standard';
 
 export interface StandardCardAction {
   label: string;
+  icon?: ReactNode;
   onClick: () => void;
   disabled?: boolean;
   tone?: 'default' | 'danger';
@@ -23,9 +25,23 @@ function CardActionMenu({ actions }: { actions: StandardCardAction[] }) {
     return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc); };
   }, [open]);
   if (!actions.length) return null;
+  const actionIcon = (label: string) => {
+    const name = label.toLowerCase();
+    if (name.includes('delete')) return <TrashIcon size={14} />;
+    if (name.includes('edit')) return <EditIcon size={14} />;
+    if (name.includes('plan')) return <PlanningIcon size={14} />;
+    if (name.includes('import')) return <PlusIcon size={14} />;
+    if (name.includes('export')) return <ExportIcon size={14} />;
+    if (name.includes('filter')) return <FlaskIcon size={14} />;
+    if (name.includes('save')) return <SaveIcon size={14} />;
+    if (name.includes('done') || name.includes('complete')) return <CheckIcon size={14} />;
+    if (name.includes('cancel')) return <XIcon size={14} />;
+    if (name.includes('close') || name.includes('archive')) return <ArchiveIcon size={14} />;
+    return null;
+  };
   return <div className="standard-card-menu" ref={rootRef}>
-    <button type="button" className="standard-card-menu-trigger" aria-label="Card options" aria-expanded={open} onClick={(e)=>{e.stopPropagation();setOpen(v=>!v);}}><MenuIcon size={16}/></button>
-    {open && <div className="standard-card-menu-popover" role="menu">{actions.map(a=><button key={a.label} type="button" className={`standard-card-menu-item${a.tone==='danger'?' danger':''}`} disabled={a.disabled} onClick={()=>{setOpen(false);a.onClick();}}>{a.label}</button>)}</div>}
+    <StandardIconButton type="button" className="standard-card-menu-trigger" label="Card options" icon={<MenuIcon size={16}/>} aria-expanded={open} onClick={(e)=>{e.stopPropagation();setOpen(v=>!v);}} />
+    {open && <div className="standard-card-menu-popover" role="menu">{actions.map(a=><button key={a.label} type="button" className={`standard-card-menu-item${a.tone==='danger'?' danger':''}`} disabled={a.disabled} onClick={()=>{setOpen(false);a.onClick();}}>{a.icon ?? actionIcon(a.label)}<span>{a.label}</span></button>)}</div>}
   </div>;
 }
 
@@ -33,14 +49,32 @@ export function StandardCard({ title, summary, actions=[], headerEnd, defaultOpe
   title:string; summary?:ReactNode; actions?:StandardCardAction[]; headerEnd?:ReactNode; defaultOpen?:boolean; open?:boolean; onToggle?:(open:boolean)=>void; children:ReactNode; className?:string;
 }) {
   const [internalOpen,setInternalOpen]=useState(defaultOpen);
+  const [fullScreen, setFullScreen] = useState(false);
+  useEffect(() => {
+    if (!fullScreen) return;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') setFullScreen(false); };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [fullScreen]);
   const open=controlledOpen??internalOpen;
   const toggle=()=>{const next=!open; if(onToggle)onToggle(next); else setInternalOpen(next);};
-  return <section className={`card standard-card ${className}`.trim()}>
+  const enterFullScreen = () => { setFullScreen(true); if (!open) { if (onToggle) onToggle(true); else setInternalOpen(true); } };
+  return <>{fullScreen && <div className="standard-card-backdrop" onClick={() => setFullScreen(false)} />}
+  <section className={`card standard-card${fullScreen ? ' standard-card-fullscreen' : ''} ${className}`.trim()}>
     <header className="standard-card-header">
       <button type="button" className="standard-card-toggle" aria-expanded={open} onClick={toggle}><span className={`standard-card-arrow${open?' open':''}`} aria-hidden>▸</span><span className="standard-card-title">{title}</span></button>
       <div className="standard-card-summary">{summary}</div>
-      <div className="standard-card-actions" onClick={e=>e.stopPropagation()}>{headerEnd}<CardActionMenu actions={actions}/></div>
+      <div className="standard-card-actions" onClick={e=>e.stopPropagation()}>
+        {headerEnd}
+        <StandardIconButton
+          label={fullScreen ? 'Exit full screen' : 'Full screen'}
+          icon={fullScreen ? <CollapseIcon size={15} /> : <ExpandIcon size={15} />}
+          className="standard-card-menu-trigger standard-card-fullscreen-trigger"
+          onClick={() => fullScreen ? setFullScreen(false) : enterFullScreen()}
+        />
+        <CardActionMenu actions={actions}/>
+      </div>
     </header>
     {open && <div className="standard-card-body">{children}</div>}
-  </section>;
+  </section></>;
 }

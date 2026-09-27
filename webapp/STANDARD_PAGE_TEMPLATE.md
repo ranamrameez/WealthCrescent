@@ -6,17 +6,18 @@ Banking is the verified reference implementation for an app-wide page-template m
 
 1. **Document user instructions.** Standing UI/architecture instructions must be recorded in the repository when implemented.
 2. **Shared implementation only.** Do not hard-code reusable page HTML/CSS in module pages. Create or reuse shared components and generic classes.
-3. **One page filter set.** Tables, summaries, charts, exports and other compatible derived views consume the same filtered dataset. Do not keep independent per-card date/category filters for the same records.
-4. **URL-aware state.** Page section selection and meaningful filter state must live in the URL so refresh, back/forward and deep links restore the same view.
-5. **TopBar is part of the template.** Page sections use the shared fixed TopBar. Entity switchers and the page filter control belong in its right-side control cluster where applicable.
-6. **StandardCard is the migration target.** Header layout:
+3. **Standard components for every UI.** Existing and new pages must use the shared standard components for buttons, icon buttons, action menus, cards, modals, filters, pagination, table wrappers and other recurring controls. If a required reusable pattern is missing, add it under `src/components/standard/` (or extend the appropriate shared component) before using it in a module. Never duplicate a reusable control locally.
+4. **One page filter set.** Tables, summaries, charts, exports and other compatible derived views consume the same filtered dataset. Do not keep independent per-card date/category filters for the same records.
+5. **URL-aware state.** Page section selection and meaningful filter state must live in the URL so refresh, back/forward and deep links restore the same view.
+6. **TopBar is part of the template.** Page sections use the shared fixed TopBar. Entity switchers and the page filter control belong in its right-side control cluster where applicable.
+7. **StandardCard is the migration target.** Header layout:
    - left: collapse arrow + CAPITALIZED title
    - center: compact summary chips
    - right: options/menu actions such as Edit/Delete
-7. **Avoid duplicate views.** Consolidate cards/charts that communicate the same breakdown.
-8. **Transactions before Analytics.** Detail pages should show the ledger before derived analytics unless a module has a documented semantic reason not to.
-9. **Chart presentation.** Reuse shared translucent colors and the shared depth treatment rather than opaque one-off palettes.
-10. **Migrate all existing modules.** Cash, Funds, Rentals, Personal Loans, EMI/Loans, Subscriptions, QSE, PSX, Banking, Credit Cards and other existing modules move to the shared template step by step.
+8. **Avoid duplicate views.** Consolidate cards/charts that communicate the same breakdown.
+9. **Transactions before Analytics.** Detail pages should show the ledger before derived analytics unless a module has a documented semantic reason not to.
+10. **Chart presentation.** Reuse shared translucent colors and the shared depth treatment rather than opaque one-off palettes.
+11. **Migrate all existing modules.** Cash, Funds, Rentals, Personal Loans, EMI/Loans, Subscriptions, QSE, PSX, Banking, Credit Cards and other existing modules move to the shared template step by step.
 
 ## Shared building blocks
 
@@ -62,3 +63,4 @@ Modules may add semantically necessary parameters, but meaningful navigation/fil
 7. Remaining dashboards/settings/data pages where the same pattern applies.
 
 Each migration removes replaced one-off markup/classes instead of leaving parallel implementations behind.
+

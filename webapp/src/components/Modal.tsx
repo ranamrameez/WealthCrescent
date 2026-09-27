@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { CollapseIcon, ExpandIcon } from './icons';
 
 export function Modal({
@@ -7,6 +7,7 @@ export function Modal({
   children,
   zIndex,
   width,
+  widthClass,
 }: {
   title: string;
   onClose: () => void;
@@ -15,12 +16,18 @@ export function Modal({
   zIndex?: number;
   /** Overrides `.modal-box`'s default width cap. */
   width?: string;
+  widthClass?: '40' | '50' | '60';
 }) {
   const [fullScreen, setFullScreen] = useState(false);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') { if (fullScreen) setFullScreen(false); else onClose(); } };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [fullScreen, onClose]);
   return (
     <div className="modal-overlay show" style={zIndex ? { zIndex } : undefined} onClick={onClose}>
       <div
-        className={`modal-box${fullScreen ? ' fullscreen' : ''}`}
+        className={`modal-box${fullScreen ? ' fullscreen' : ''}${!fullScreen && widthClass ? ` modal-width-${widthClass}` : ''}`}
         style={!fullScreen && width ? { maxWidth: width } : undefined}
         onClick={(e) => e.stopPropagation()}
       >
@@ -31,9 +38,10 @@ export function Modal({
               aria-label={fullScreen ? 'Exit full screen' : 'Full screen'}
               title={fullScreen ? 'Exit full screen' : 'Full screen'}
               onClick={() => setFullScreen((v) => !v)}
-              className="modal-icon-btn"
+              className="modal-icon-btn modal-screen-toggle"
             >
               {fullScreen ? <CollapseIcon /> : <ExpandIcon />}
+              <span>{fullScreen ? 'Exit full screen' : 'Full screen'}</span>
             </button>
             <button aria-label="Close" title="Close" onClick={onClose} className="modal-icon-btn modal-icon-btn-close">
               ✕

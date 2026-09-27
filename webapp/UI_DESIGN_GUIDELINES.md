@@ -77,6 +77,18 @@ the work is not done — re-open it.
 
 ## Shared implementation system
 
+### Standard shared components are mandatory
+
+All existing and new UI must use shared standard components for recurring
+controls and surfaces. This includes buttons, icon buttons, action menus,
+modals, cards, filters, table wrappers, pagination, form controls and other
+repeated items. Reuse the components in `src/components/standard/`, `ui/`,
+and the shared page components before adding markup in a feature page. If a
+needed pattern does not exist, create it in the shared components directory,
+document its reusable API, and then use it from the feature page. Do not add
+another local button or one-off CSS implementation for a pattern that can be
+shared.
+
 1. `webapp/src/main/site.css` owns generic, class-based layout and component
    rules: grids, spacing, card sizes, toolbars, modal sizing, table wrappers,
    navigation positioning, and reusable visual primitives.

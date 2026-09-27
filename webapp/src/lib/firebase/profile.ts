@@ -20,6 +20,7 @@ export interface UserProfile {
   currencyOnboardingSeen?: boolean;
   /** Account-level UI settings, synced across devices. */
   appearance?: Partial<Appearance>;
+  selectedModules?: string[] | null;
 }
 
 const DEFAULT_PROFILE: UserProfile = { displayName: '', avatarEmoji: '' };
@@ -78,4 +79,9 @@ export async function saveCurrencyPreference(uid: string, patch: { enabledCurren
 export async function saveAppearancePreference(uid: string, appearance: Appearance): Promise<void> {
   if (!db) throw new Error('Cloud sync is unavailable — Firebase failed to load in this browser.');
   await update(ref(db, profilePath(uid)), { appearance });
+}
+
+export async function saveModulePreference(uid: string, selectedModules: string[]): Promise<void> {
+  if (!db) throw new Error('Cloud sync is unavailable — Firebase failed to load in this browser.');
+  await update(ref(db, profilePath(uid)), { selectedModules });
 }
