@@ -1,7 +1,7 @@
 import type { User } from 'firebase/auth';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
 import { SummaryChip, type StandardCardAction } from '../../../components/StandardCard';
