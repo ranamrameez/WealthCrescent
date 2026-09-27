@@ -83,6 +83,8 @@ export interface InterEntityTransferInput {
   toAmount: number;
   from: LinkSideConfig;
   to: LinkSideConfig;
+  /** Shared category applied to category-capable ledger sides. */
+  categoryID?: string;
   note?: string;
   /** User-requested (2026-09-08): "for inter-currency transfer, we should
    * store source as well like FX name" — a free-text record of WHERE the
