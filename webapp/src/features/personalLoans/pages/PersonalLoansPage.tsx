@@ -27,6 +27,7 @@ import { ReorderButtons } from '../../../components/ui/ReorderButtons';
 import { dateOnlyMs } from '../../../lib/datetime';
 import { parseCSV, toCSV } from '../../../lib/csv';
 import { fmtMoney } from '../../../lib/format';
+import { categoryName } from '../../../lib/categories';
 import { confirmAndDeleteLinkable, propagateLinkedEdit, resolveLinkedEdit } from '../../../lib/linkCascade';
 import {
   loanBalanceHistory,
@@ -46,6 +47,7 @@ import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { firebaseReady } from '../../../lib/firebase/client';
 import { useAppearanceStore } from '../../../store/appearanceStore';
 import { usePersonalLoansWorkbookStore } from '../../../store/personalLoansWorkbookStore';
+import { useCategoryStore } from '../../../store/categoryStore';
 import { useInterEntityTransfersStore } from '../../../store/interEntityTransfersStore';
 import { linkTargetPath, useLinkSideLabel } from '../../transfers/pages/TransferLinksPage';
 import type { PersonalLoan, PersonalLoanRepayment } from '../../../types/personalLoansWorkbook';
@@ -306,12 +308,13 @@ function RepaymentsFab({ loan }: { loan: PersonalLoan }) {
   );
 }
 
-function RepaymentsSection({ loan }: { loan: PersonalLoan }) {
+function RepaymentsSection({ loan, onEditPayment }: { loan: PersonalLoan; onEditPayment: (payment: PersonalLoanRepayment) => void }) {
   // Select the raw array (a stable reference from the store) and filter it
   // in a memo — filtering *inside* the zustand selector would return a new
   // array identity on every render, which zustand's useSyncExternalStore
   // reads as "state changed", risking an infinite re-render loop.
   const allRepayments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
+  const categories = useCategoryStore((s) => s.workbook.categories);
   const repayments = useMemo(() => allRepayments.filter((r) => r.loanId === loan.id), [allRepayments, loan.id]);
   // Independent of the table's own sort order, same reasoning as
   // transferRunningBalance — "Remaining" must reflect the true
@@ -322,8 +325,6 @@ function RepaymentsSection({ loan }: { loan: PersonalLoan }) {
   const links = useInterEntityTransfersStore((s) => s.workbook.entries);
   const ensureSignedIn = useEnsureSignedIn();
   const sideLabel = useLinkSideLabel();
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editRow, setEditRow] = useState<PersonalLoanRepayment | null>(null);
   const [detailRow, setDetailRow] = useState<PersonalLoanRepayment | null>(null);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -356,23 +357,6 @@ function RepaymentsSection({ loan }: { loan: PersonalLoan }) {
     a.click();
     URL.revokeObjectURL(url);
     toast('Statement downloaded.');
-  };
-
-  const startEdit = (r: PersonalLoanRepayment) => { setEditId(r.id); setEditRow({ ...r }); };
-  const saveEdit = async () => {
-    if (editId === null || !editRow) return;
-    const choice = await resolveLinkedEdit('personalLoans', editId);
-    if (choice === 'cancel') return;
-    updateRepayment(editId, editRow);
-    let msg = 'Repayment updated.';
-    if (choice === 'both') {
-      const result = propagateLinkedEdit('personalLoans', editId, { date: editRow.date, amount: editRow.amount });
-      if (result.error) msg = result.error;
-      else if (result.message) msg = result.message;
-    }
-    toast(msg);
-    setEditId(null);
-    setEditRow(null);
   };
 
   const [sourceFilter, setSourceFilter] = useState<'all' | 'manual' | 'statement-import'>('all');
@@ -437,28 +421,12 @@ function RepaymentsSection({ loan }: { loan: PersonalLoan }) {
         </div>
         <div className="table-scroll">
           <table>
-            <thead><tr><th>Date</th><th>Amount</th><th>Remaining</th><th>Source</th><th></th></tr></thead>
+            <thead><tr><th>Date</th><th>Description</th><th>Amount</th><th>Category</th><th>Remaining</th><th>Source</th><th></th></tr></thead>
             <tbody>
               {sorted.map((r, i) => {
                 const link = linkByRecordId.get(r.id);
                 const otherSide = link ? (link.from.module === 'personalLoans' && link.fromRecordId === r.id ? link.to : link.from) : undefined;
-                return editId === r.id && editRow ? (
-                  <tr key={r.id}>
-                    <td><input type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} className="w-130" /></td>
-                    <td><input type="number" step="0.01" value={editRow.amount} onChange={(e) => setEditRow({ ...editRow, amount: Number(e.target.value) })} className="w-90" /></td>
-                    <td></td>
-                    <td className="text-muted cell-clip">{r.source === 'statement-import' ? `Import${r.statementRef ? ` (${r.statementRef})` : ''}` : 'Manual'}</td>
-                    <td>
-                      <PendingToggle
-                        checked={!!editRow.isPending}
-                        onChange={(v) => setEditRow({ ...editRow, isPending: v })}
-                        title="Not yet cleared — excluded from Outstanding until unchecked."
-                      />{' '}
-                      <IconButton label="Save" icon={<SaveIcon size={13} />} align="right" onClick={saveEdit} />{' '}
-                      <IconButton label="Cancel" icon={<XIcon size={13} />} align="right" onClick={() => setEditId(null)} />
-                    </td>
-                  </tr>
-                ) : (
+                return (
                   <tr key={r.id} onClick={() => setDetailRow(r)} className="clickable">
                     <td>
                       {r.date}{' '}
@@ -473,6 +441,7 @@ function RepaymentsSection({ loan }: { loan: PersonalLoan }) {
                         />
                       </span>
                     </td>
+                    <td>{r.description || '—'}</td>
                     <td>
                       {fmtMoney(r.amount, loan.currencyCode)}
                       {r.isPending && (
@@ -486,8 +455,9 @@ function RepaymentsSection({ loan }: { loan: PersonalLoan }) {
                         </Link>
                       )}
                     </td>
+                    <td>{categoryName(r.categoryID, categories)}</td>
                     <td>
-                      <Tooltip text="Loan balance still remaining after this repayment, in date order.">
+                      <Tooltip text="Loan balance still remaining after this payment, in date order.">
                         <span>{fmtMoney(remaining.get(r.id) ?? 0, loan.currencyCode)}</span>
                       </Tooltip>
                     </td>
@@ -501,13 +471,13 @@ function RepaymentsSection({ loan }: { loan: PersonalLoan }) {
                           icon={<CheckIcon size={13} />}
                           align="right"
                           onClick={async () => {
-                            if (!(await ensureSignedIn('Sign in to update this repayment.'))) return;
+                            if (!(await ensureSignedIn('Sign in to update this payment.'))) return;
                             updateRepayment(r.id, { isPending: false });
                             toast('Marked cleared.');
                           }}
                         />
                       )}{' '}
-                      <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => startEdit(r)} />{' '}
+                      <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => onEditPayment(r)} />{' '}
                       <IconButton
                         label="Delete"
                         icon={<TrashIcon size={13} />}
@@ -520,7 +490,7 @@ function RepaymentsSection({ loan }: { loan: PersonalLoan }) {
               })}
               {!sorted.length && (
                 <tr>
-                  <td colSpan={5} className="text-muted">
+                  <td colSpan={7} className="text-muted">
                     {repayments.length ? 'No repayments match this filter.' : 'No repayments logged yet.'}
                   </td>
                 </tr>
@@ -533,14 +503,16 @@ function RepaymentsSection({ loan }: { loan: PersonalLoan }) {
       <RepaymentsFab loan={loan} />
       {detailRow && (
         <RecordDetailModal
-          title="Repayment"
+          title="Payment"
           onClose={() => setDetailRow(null)}
           fields={[
             { label: 'Date', value: detailRow.date },
             { label: 'Time', value: detailRow.time ?? '— (defaults to noon)' },
             { label: 'Timezone', value: detailRow.timezone ?? '—' },
+            { label: 'Description', value: detailRow.description ?? '—' },
             { label: 'Amount', value: fmtMoney(detailRow.amount, loan.currencyCode) },
-            { label: 'Remaining after this repayment', value: fmtMoney(remaining.get(detailRow.id) ?? 0, loan.currencyCode) },
+            { label: 'Category', value: categoryName(detailRow.categoryID, categories) },
+            { label: 'Remaining after this payment', value: fmtMoney(remaining.get(detailRow.id) ?? 0, loan.currencyCode) },
             { label: 'Source', value: detailRow.source === 'statement-import' ? `Import${detailRow.statementRef ? ` (${detailRow.statementRef})` : ''}` : 'Manual' },
             { label: 'Status', value: detailRow.isPending ? 'Pending (not yet cleared)' : 'Cleared' },
             ...(linkByRecordId.get(detailRow.id)
