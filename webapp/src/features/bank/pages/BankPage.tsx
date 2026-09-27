@@ -16,6 +16,7 @@ import { confirmDialog } from '../../../components/ConfirmDialog';
 import { ArchiveIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, BankIcon, CheckIcon, EditIcon, ListIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { StandardButton } from '../../../components/standard';
 import { Modal } from '../../../components/Modal';
+import { BankPlansBatchEditor, BankTransactionsBatchEditor } from '../../../components/LazyFinanceBatchEditors';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
 import { toast } from '../../../components/Toast';
 import { DateInput, Field, Select, TextInput } from '../../../components/ui/Field';
@@ -888,6 +889,7 @@ export function AccountDetailPage() {
   const dateFormat = useAppearanceStore((state) => state.appearance.dateFormat ?? 'DD-MMM-YYYY');
 
   const [editAccountOpen, setEditAccountOpen] = useState(false);
+  const [batchEditor, setBatchEditor] = useState<'transactions' | 'plans' | null>(null);
   const [showTransactionActions, setShowTransactionActions] = useState(false);
   const [showPlanActions, setShowPlanActions] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -1111,6 +1113,7 @@ export function AccountDetailPage() {
       summary: <SummaryChip label="Visible" value={upcoming.length} />,
       actions: [
         { label: 'Add a plan', onClick: () => setAddingPlan(true) },
+        { label: 'Batch edit', disabled: !!account.migratedToCreditCardId, onClick: () => setBatchEditor('plans') },
         { label: showPlanActions ? 'Done modifying' : 'Modify', icon: <EditIcon size={14} />, onClick: () => setShowPlanActions((value) => !value) },
       ],
       headerEnd: showPlanActions ? <IconButton label="Hide modification options" icon={<XIcon size={13} />} align="right" onClick={() => setShowPlanActions(false)} /> : undefined,
@@ -1125,6 +1128,7 @@ export function AccountDetailPage() {
         { label: 'Import transactions', onClick: () => window.dispatchEvent(new Event('bank:open-import')) },
         { label: 'Export filtered', onClick: exportTransactions, disabled: !filteredLedger.length },
         { label: 'Export all', onClick: exportAllTransactions, disabled: !allLedger.length },
+        { label: 'Batch edit', disabled: !filteredLedger.length || !!account.migratedToCreditCardId, onClick: () => setBatchEditor('transactions') },
         { label: showTransactionActions ? 'Done modifying' : 'Modify', icon: <EditIcon size={14} />, onClick: () => setShowTransactionActions((value) => !value) },
       ],
       headerEnd: showTransactionActions ? <IconButton label="Hide modification options" icon={<XIcon size={13} />} align="right" onClick={() => setShowTransactionActions(false)} /> : undefined,
@@ -1153,6 +1157,8 @@ export function AccountDetailPage() {
       </div>
       {account.migratedToCreditCardId && <Notice tone="info" className="mb-md">This account was migrated to a real Credit Card record — its transactions and balance now live there.{' '}<Link to={`/bank/card/${account.migratedToCreditCardId}`}>View the Credit Card →</Link></Notice>}
       <StandardPageSections key={account.id} sections={sections} defaultKey="summary" />
+      {batchEditor === 'transactions' && <BankTransactionsBatchEditor key={account.id} account={account} rows={[...filteredLedger].reverse().map(row => row.tx)} onClose={() => setBatchEditor(null)} />}
+      {batchEditor === 'plans' && <BankPlansBatchEditor key={account.id} account={account} rows={plannedEntries.filter(plan => plan.accountId === account.id && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).sort((a, b) => a.date.localeCompare(b.date))} onClose={() => setBatchEditor(null)} />}
       {editAccountOpen && (
         <Modal title="Edit account" onClose={() => setEditAccountOpen(false)}>
           <AddAccountForm account={account} onSaved={() => setEditAccountOpen(false)} />

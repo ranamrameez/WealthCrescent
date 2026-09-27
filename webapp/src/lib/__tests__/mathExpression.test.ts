@@ -62,6 +62,11 @@ describe('evalMathExpression', () => {
 });
 
 describe('resolveNumericInput', () => {
+  it('supports spreadsheet equals prefixes and rejects non-finite or oversized input', () => {
+    expect(resolveNumericInput('=5*986.5')).toBe(4932.5);
+    expect(resolveNumericInput(' = (5 + 2) * -3 ')).toBe(-21);
+    for (const value of ['=', '==5', '=5+', '=1/0', 'Infinity', '1e999', '('.repeat(2000)]) expect(resolveNumericInput(value)).toBeNull();
+  });
   it('parses a plain number without going through the expression evaluator', () => {
     expect(resolveNumericInput('42')).toBe(42);
     expect(resolveNumericInput('-3.5')).toBe(-3.5);

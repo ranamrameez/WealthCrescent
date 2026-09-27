@@ -11,6 +11,7 @@ import { AnalyticsChartEnhancer } from '../../../components/AnalyticsChartCard';
 import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { Modal } from '../../../components/Modal';
+import { LoanPaymentsBatchEditor, LoanPlansBatchEditor } from '../../../components/LazyFinanceBatchEditors';
 import { Notice } from '../../../components/Notice';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { hueStyle } from '../../../lib/statCardHues';
@@ -850,6 +851,7 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
   const outstanding = loanOutstanding(loan, repayments);
   const pendingImpact = loanPendingImpact(loan, repayments);
   const [editLoanOpen, setEditLoanOpen] = useState(false);
+  const [batchEditor, setBatchEditor] = useState<'payments' | 'plans' | null>(null);
   const [editPayment, setEditPayment] = useState<PersonalLoanRepayment | null>(null);
   const [addPaymentOpen, setAddPaymentOpen] = useState(false);
   const [addPlanOpen, setAddPlanOpen] = useState(false);
@@ -1008,6 +1010,7 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
       hue: loan.color,
       actions: [
         { label: 'Add a plan', onClick: () => setAddPlanOpen(true) },
+        { label: 'Batch edit', onClick: () => setBatchEditor('plans') },
         { label: showPlanActions ? 'Done modifying' : 'Modify', icon: <EditIcon size={14} />, onClick: () => setShowPlanActions((value) => !value) },
       ],
       headerEnd: showPlanActions ? <IconButton label="Hide modification options" icon={<XIcon size={13} />} align="right" onClick={() => setShowPlanActions(false)} /> : undefined,
@@ -1022,6 +1025,7 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
       actions: [
         { label: 'Import payments', onClick: () => setImportOpen(true) },
         { label: 'Export filtered payments', disabled: !filteredPayments.length, onClick: exportPayments },
+        { label: 'Batch edit', disabled: !filteredPayments.length, onClick: () => setBatchEditor('payments') },
         { label: showPaymentActions ? 'Done modifying' : 'Modify', icon: <EditIcon size={14} />, onClick: () => setShowPaymentActions((value) => !value) },
       ],
       headerEnd: showPaymentActions ? <IconButton label="Hide modification options" icon={<XIcon size={13} />} align="right" onClick={() => setShowPaymentActions(false)} /> : undefined,
@@ -1050,6 +1054,8 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
     <div className="standard-page">
       <button className="btn secondary small mb-12" onClick={onBack}>← All personal loans</button>
       <StandardPageSections sections={sections} defaultKey="summary" />
+      {batchEditor === 'payments' && <LoanPaymentsBatchEditor key={loan.id} loan={loan} rows={[...filteredPayments].sort((a, b) => b.date.localeCompare(a.date) || (b.seq ?? 0) - (a.seq ?? 0))} onClose={() => setBatchEditor(null)} />}
+      {batchEditor === 'plans' && <LoanPlansBatchEditor key={loan.id} loan={loan} rows={plans.filter(plan => plan.loanId === loan.id).sort((a, b) => a.date.localeCompare(b.date))} onClose={() => setBatchEditor(null)} />}
       <FabPanel actions={[
         { label: 'Add payment', icon: <TransferIcon />, onClick: () => setAddPaymentOpen(true) },
         { label: 'Add a plan', icon: <PlusIcon />, onClick: () => setAddPlanOpen(true) },

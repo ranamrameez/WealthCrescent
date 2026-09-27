@@ -1,0 +1,32 @@
+.batch-edit-overlay { position: fixed; inset: 0; z-index: 600; background: var(--panel); color: var(--text); }
+.batch-edit-dialog { height: 100%; display: flex; flex-direction: column; padding: 16px; gap: 8px; box-sizing: border-box; }
+.batch-edit-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.batch-edit-header h2 { margin: 0; font-size: 20px; }
+.batch-edit-header p, .batch-edit-help { margin: 4px 0; color: var(--muted); font-size: 12px; }
+.batch-edit-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+.batch-edit-status { font-size: 13px; font-weight: 600; }
+.batch-edit-scroll { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--border); }
+.batch-edit-table { table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+.batch-edit-table thead th { position: sticky; top: 0; z-index: 2; background: var(--panel-2); }
+.batch-edit-table th, .batch-edit-table td { padding: 0; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); vertical-align: top; white-space: normal; }
+.batch-edit-table th { padding: 8px; text-align: left; }
+.batch-edit-table tbody th { background: var(--panel-2); font-weight: 400; }
+.batch-edit-table small { display: block; font-size: 11px; }
+.batch-edit-linked-pill { display: inline-block; margin: 4px 0 0 4px; padding: 2px 6px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 10px; white-space: nowrap; }
+.batch-edit-table input:not([type=checkbox]), .batch-edit-table select { width: 100%; min-width: 0; height: 34px; padding: 6px 8px; border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; box-sizing: border-box; }
+.batch-edit-table input[type=checkbox] { margin: 10px; }
+.batch-edit-table input:focus, .batch-edit-table select:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+.batch-edit-table select option { background: var(--panel); color: var(--text); }
+.batch-edit-readonly { display: block; padding: 8px; color: var(--muted); overflow-wrap: anywhere; }
+.batch-edit-table td.batch-edit-dirty { background: color-mix(in srgb, var(--accent) 22%, var(--panel)); box-shadow: inset 3px 0 var(--accent); }
+.batch-edit-table thead th.batch-edit-column-dirty { background: color-mix(in srgb, var(--accent) 30%, var(--panel-2)); box-shadow: inset 0 -3px var(--accent); }
+.batch-edit-table td.batch-edit-column-changed:not(.batch-edit-dirty) { background: color-mix(in srgb, var(--accent) 7%, var(--panel)); }
+.batch-edit-filters { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; font-size: 12px; }
+.batch-edit-filters label { display: flex; flex-direction: column; gap: 4px; margin: 0; }
+.batch-edit-filters input, .batch-edit-filters select { max-width: 180px; }
+.batch-edit-load { margin: 12px; }
+.formula-input-result { display: block; padding: 2px 8px; font-size: 11px; color: var(--muted); }
+.batch-edit-table td.batch-edit-invalid { box-shadow: inset 0 0 0 2px var(--loss); }
+.batch-edit-error { padding: 4px 8px; color: var(--loss); }
+.batch-edit-warning { padding: 8px; background: var(--panel-2); border: 1px solid var(--loss); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+@media (max-width: 600px) { .batch-edit-dialog { padding: 8px; } .batch-edit-header h2 { font-size: 17px; } }

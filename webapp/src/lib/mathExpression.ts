@@ -113,8 +113,8 @@ function parse(tokens: Token[]): number | null {
  * `Number(input)` first and only fall back to this for anything that
  * isn't already a clean number). */
 export function evalMathExpression(input: string): number | null {
-  const trimmed = input.trim();
-  if (!trimmed) return null;
+  const trimmed = input.trim().replace(/^=/, '').trim();
+  if (!trimmed || trimmed.length > 1024) return null;
   const tokens = tokenize(trimmed);
   if (!tokens || !tokens.length) return null;
   const result = parse(tokens);
@@ -126,8 +126,8 @@ export function evalMathExpression(input: string): number | null {
  * falling back to expression evaluation when that fails. Returns `null`
  * for empty/invalid input either way. */
 export function resolveNumericInput(input: string): number | null {
-  if (input.trim() === '') return null;
+  if (input.trim() === '' || input.length > 1024) return null;
   const plain = Number(input);
-  if (!Number.isNaN(plain)) return plain;
+  if (Number.isFinite(plain)) return plain;
   return evalMathExpression(input);
 }

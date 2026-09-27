@@ -179,6 +179,20 @@ from the lot system."*
 
 ## Done
 
+- **Spreadsheet batch editing (2026-09-27):** Bank Account Transactions/Plans and
+  Personal Loan Payments/Plans now expose **Batch edit** in their card Actions menus.
+  The reusable `BatchEditGrid<T>` stages cells locally, highlights dirty rows/cells,
+  validates the whole changed batch, and saves once through the existing workbook
+  store. Includes fullscreen layout, sticky headers, horizontal scrolling, Tab/Enter
+  navigation, explicit discard, and stale-record detection. Linked transfers and
+  executed plans are read-only; recurring/generated Bank plans retain their dedicated
+  workflows. IDs, entity ownership, provenance, ordering and currencies stay locked.
+  Existing single-record forms and analytics remain intact. Architecture details:
+  [BATCH_EDIT.md](BATCH_EDIT.md).
+  Shared formula input accepts `=5*986.5` (4932.5), edited columns are highlighted,
+  editor code loads on demand, rows render in batches of 50, and an in-sheet date
+  period filter preserves drafts outside the current view.
+
 3. QSE numbers in calculation are 4 digits (2.155, 21.55) — prices now display at 4
    significant figures (`fmtPrice` in `webapp/src/lib/format.ts`).
 4. Multiple pages treated as one website: React rewrite (`webapp/`) with centralized CSS,
@@ -10083,6 +10097,12 @@ from the lot system."*
   covers all three. `node --check` clean. Manifest bumped to 0.1.3.
 
 ## Pending
+
+- Batch editing follow-ups: extend the shared grid to other modules; design explicit
+  linked-side and recurring/generated-plan editing; add clipboard range paste and
+  virtualization if large-ledger usage warrants it. Current release edits existing
+  records only and selects existing registry categories (new categories use the
+  existing category-management flow).
 
 1. QSE: H1 EPS/fundamentals data is still hard-coded in `webapp/src/lib/stockData/qseSeed.ts`
    as a fallback. The intended shared `stockData/QSE` Firebase node (finance data belonging

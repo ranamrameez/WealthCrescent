@@ -13,6 +13,12 @@ function input(): HTMLInputElement {
 }
 
 describe('AmountInput', () => {
+  it('accepts spreadsheet formulas through the shared FormulaInput', () => {
+    render(<Harness initial={0} />);
+    fireEvent.change(input(), { target: { value: '=5*986.5' } });
+    fireEvent.blur(input());
+    expect(input().value).toBe('4932.5');
+  });
   it('shows the initial numeric value as plain text', () => {
     render(<Harness initial={42} />);
     expect(input().value).toBe('42');

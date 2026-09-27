@@ -7995,3 +7995,6 @@ for this path, that's the RTDB rules and needs the user to change them. The
 Firebase client config in `lib/firebase/client.ts` is intentionally public
 (client-side Firebase keys aren't secrets — access control is enforced by
 RTDB security rules, not by hiding the config).
+
+## Batch editing update (2026-09-27)
+Bank Account Transactions/Plans and Personal Loan Payments/Plans use the shared BatchEditGrid. See webapp/BATCH_EDIT.md for the assessed editing/link architecture and safety boundaries. Single-record forms remain unchanged. Linked rows and executed plans are locked; recurring/generated Bank plans use their existing workflows. New batch saves validate and check stale records before one workbook update. Future integrations should reuse this contract rather than add inline editing to normal rows.

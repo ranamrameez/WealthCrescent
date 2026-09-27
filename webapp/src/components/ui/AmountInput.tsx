@@ -1,5 +1,6 @@
 import { useEffect, useState, type InputHTMLAttributes } from 'react';
 import { resolveNumericInput } from '../../lib/mathExpression';
+import { FormulaInput } from './FormulaInput';
 
 /** User-requested (2026-09-08): "allow users to directly enter basic math
  * in the input boxes like a sheet rather than needing an external calc."
@@ -49,11 +50,11 @@ export function AmountInput({
   };
 
   return (
-    <input
-      type="text"
+    <FormulaInput
       inputMode="decimal"
       value={draft}
-      onChange={(e) => setDraft(e.target.value)}
+      onValueChange={setDraft}
+      showResult={false}
       onBlur={commit}
       onKeyDown={(e) => {
         if (e.key === 'Enter') commit();

@@ -28,6 +28,40 @@ statement before making financial decisions. You can revisit the full text any t
 
 ## 2. Browsing vs. saving
 
+### Editing several records together
+
+Open a Bank Account or Personal Loan detail page, then choose **Batch edit** from
+the Transactions, Payments, or Plans card's Actions menu. Transactions/payments use
+the current page filters across all pages of results. Bank plans use the selected
+date range; Personal Loan plans include every plan for that loan.
+
+Edit cells in the fullscreen sheet. Changed cells are highlighted and the header
+counts unsaved rows and cells. Bank amounts are signed: positive is a deposit,
+negative is a withdrawal. Personal Loan amounts must be positive for both borrowed
+and lent loans. Currency, account/loan identity, source and sequence stay fixed.
+
+Amount cells accept basic formulas such as **=5*986.5** (4932.5), **=(10+5)/3**,
+and **100-25**. A result preview appears below the input; invalid formulas must be
+corrected before saving. Edited column headers are highlighted and marked **Edited**.
+
+Use **Period**, **From**, and **To** to narrow the opening selection. The first 50
+matching rows load initially; scroll down or use **Load 50 more rows** for more.
+Edits outside the visible period remain staged and are included in **Save all changes**;
+the sheet shows how many changed rows are outside the current view.
+
+Use Tab / Shift+Tab between cells, or Enter / Shift+Enter to move down/up the same
+column. Arrow keys retain their normal behavior within a field. **Save all changes**
+validates every changed row before saving; correct any errors shown under cells.
+**Cancel / Discard** and Escape ask you to discard if there are unsaved changes.
+If another session changes or removes an edited record, saving stops: discard and
+reopen to load the latest records.
+
+Linked transfers are locked: use their existing single **Edit** action to decide
+how both sides should be handled. Executed plans are locked. Recurring Bank plans
+use the plan editor; generated plans use their source schedule. Choose existing
+categories in the sheet; create new categories through the existing category flow.
+No changes are saved until you press **Save all changes**, and saving requires sign-in.
+
 You can browse every page and use the Trade Calculator **without an account**. The moment
 you try to *save* something (add a transaction, update a price, change a setting), you'll
 be prompted to sign in (email/password, or Google). This is by design — there's no
