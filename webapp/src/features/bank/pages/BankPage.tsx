@@ -57,7 +57,6 @@ import { formatDate, fmtMoney, parseDateInput } from '../../../lib/format';
 import { dateOnlyMs } from '../../../lib/datetime';
 import { confirmAndDeleteLinkable, propagateLinkedEdit, resolveLinkedEdit } from '../../../lib/linkCascade';
 import { isValidIbanFormat, lookupIban } from '../../../lib/ibanLookup';
-import { banksForCurrency } from '../../../lib/bankDirectory';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { firebaseReady } from '../../../lib/firebase/client';
 import { useAppearanceStore } from '../../../store/appearanceStore';
@@ -168,49 +167,23 @@ function IbanLookupFields({ value, onChange, onBankNameFound }: { value: IbanLoo
  * one. `bankName` (the old free-text field) is kept ONLY as a read fallback
  * for accounts that predate this — for anything typed here going forward,
  * `bankId` is authoritative and `bankName` is cleared. */
-function BankIdentityField({ value, onChange, idSuffix }: { value: Pick<BankAccount, 'bankId' | 'bankName' | 'currencyCode'>; onChange: (patch: Partial<BankAccount>) => void; idSuffix: string }) {
+function BankIdentityField({ value, onChange }: { value: Pick<BankAccount, 'bankId' | 'bankName' | 'currencyCode'>; onChange: (patch: Partial<BankAccount>) => void; idSuffix: string }) {
   const banks = useBankWorkbookStore((s) => s.workbook.settings.banks ?? []);
-  const addBank = useBankWorkbookStore((s) => s.addBank);
-  const ensureSignedIn = useEnsureSignedIn();
-  const visibleBanks = useMemo(() => banks.filter((b) => b.isActive !== false), [banks]);
-  const currentName = useMemo(() => {
-    if (value.bankId) return visibleBanks.find((b) => b.id === value.bankId)?.name ?? '';
-    return value.bankName ?? '';
-  }, [value.bankId, value.bankName, visibleBanks]);
-  const [draft, setDraft] = useState(currentName);
-  const [dirty, setDirty] = useState(false);
-  if (!dirty && draft !== currentName) setDraft(currentName);
-
-  const resolve = async () => {
-    const name = draft.trim();
-    setDirty(false);
-    if (!name) { onChange({ bankId: undefined, bankName: undefined }); return; }
-    const existing = visibleBanks.find((b) => b.name.toLowerCase() === name.toLowerCase());
-    if (existing) { onChange({ bankId: existing.id, bankName: undefined }); return; }
-    if (!(await ensureSignedIn('Sign in to add a new bank.'))) { setDraft(currentName); return; }
-    const id = uid();
-    addBank({ id, name });
-    onChange({ bankId: id, bankName: undefined });
-  };
-
-  const suggestions = useMemo(() => {
-    const existingNames = visibleBanks.map((b) => b.name);
-    return [...new Set([...existingNames, ...banksForCurrency(value.currencyCode)])];
-  }, [value.currencyCode, visibleBanks]);
-  const datalistId = `bank-identity-datalist-${idSuffix}`;
+  const visibleBanks = useMemo(() => banks.filter((bank) => bank.isActive !== false), [banks]);
 
   return (
-    <Field label="Bank (optional)" width={220} title="Type to search your own banks or common Pakistani/Qatari banks/wallets. Typing a new name adds it as a real Bank entity so you can later see a combined total for everything at that bank.">
-      <TextInput
-        list={datalistId}
-        value={draft}
-        onChange={(e) => { setDraft(e.target.value); setDirty(true); }}
-        onBlur={resolve}
-        placeholder="e.g. UBL"
-      />
-      <datalist id={datalistId}>
-        {suggestions.map((n) => <option key={n} value={n} />)}
-      </datalist>
+    <Field label="Bank (optional)" width={220} title="Choose an existing Bank entity. Add new banks from the Banking Actions menu so the same popup can capture the full name, notes, and custom color.">
+      <Select
+        value={value.bankId ?? ''}
+        onChange={(event) => {
+          const bankId = event.target.value || undefined;
+          onChange({ bankId, bankName: bankId ? undefined : value.bankName });
+        }}
+      >
+        <option value="">{value.bankName ? `Ungrouped — ${value.bankName}` : 'No bank'}</option>
+        {visibleBanks.map((bank) => <option key={bank.id} value={bank.id}>{bank.name}</option>)}
+      </Select>
+      <span className="text-muted">Need a new bank? Use Actions → Add a bank.</span>
     </Field>
   );
 }
