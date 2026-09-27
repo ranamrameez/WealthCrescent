@@ -12,7 +12,7 @@ import { Modal } from '../../../components/Modal';
 import { Notice } from '../../../components/Notice';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { hueStyle } from '../../../lib/statCardHues';
-import { ArchiveIcon, CheckIcon, EditIcon, FilterIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon } from '../../../components/icons';
+import { ArchiveIcon, CheckIcon, EditIcon, FilterIcon, PersonalLoanIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon } from '../../../components/icons';
 import { toast } from '../../../components/Toast';
 import { Tooltip } from '../../../components/Tooltip';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
@@ -247,7 +247,7 @@ function AddLoanFab() {
     <>
       <FabPanel
         actions={[
-          { label: 'Add a loan', icon: <PlusIcon />, onClick: () => setOpen('loan') },
+          { label: 'Add a loan', icon: <PersonalLoanIcon />, onClick: () => setOpen('loan') },
           { label: 'Transfers', icon: <TransferIcon />, onClick: () => setOpen('transfer') },
         ]}
       />
@@ -412,7 +412,7 @@ function RepaymentsSection({
     [filteredRepayments],
   );
   const reorder = async (pair: [{ id: string; order: number }, { id: string; order: number }]) => {
-    if (!(await ensureSignedIn('Sign in to reorder repayments.'))) return;
+    if (!(await ensureSignedIn('Sign in to reorder payments.'))) return;
     for (const p of pair) updateRepayment(p.id, { seq: p.order });
   };
 
