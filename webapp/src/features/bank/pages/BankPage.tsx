@@ -2433,50 +2433,127 @@ export function BankPage({
   plannedCreditCardCloudEmpty: boolean;
   uploadPlannedCreditCardLocalToCloud: () => Promise<void>;
 }) {
-  // Real bug, user-reported (2026-09-11): `Tabs.tsx`'s own "a chip click
-  // force-opens a section without closing the others" design means this
-  // page's Accounts/Credit Cards/Planning tabs can all be open, hence all
-  // mounted, at once — each used to render its OWN independent `FabPanel`
-  // at the identical fixed corner (confirmed live: two "Open actions"
-  // buttons stacked at the exact same coordinates). Fixed by having each
-  // of those tabs register its own actions via the keyed
-  // `usePageFabActions` instead, merged into the ONE panel rendered here —
-  // same mechanism `CalculatorLauncher` already uses for Stock Exchanges
-  // routes, just consumed directly by this page instead of a second
-  // globally-mounted component.
   const actionsByKey = useFabActionsStore((s) => s.actionsByKey);
-  const fabActions = allExtraActions(actionsByKey);
+  const fabActions = useMemo(() => {
+    const seen = new Set<string>();
+    return allExtraActions(actionsByKey).filter((action) => {
+      if (seen.has(action.label)) return false;
+      seen.add(action.label);
+      return true;
+    });
+  }, [actionsByKey]);
+
+  const banks = useBankWorkbookStore((state) => state.workbook.settings.banks ?? []);
   const allAccounts = useBankWorkbookStore((state) => state.workbook.settings.accounts);
-  const accounts = useMemo(() => allAccounts.filter((account) => !account.migratedToCreditCardId), [allAccounts]);
+  const accounts = useMemo(
+    () => allAccounts.filter((account) => !account.migratedToCreditCardId),
+    [allAccounts],
+  );
   const transactions = useBankWorkbookStore((state) => state.workbook.transactions);
   const categories = useCategoryStore((state) => state.workbook.categories);
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
-  const categoryOptions = useMemo(() => [...new Set(transactions.map((tx) => categoryName(tx.categoryID, categories)))].sort(), [transactions, categories]);
+  const [showArchivedBanks, setShowArchivedBanks] = useState(false);
+
+  const categoryOptions = useMemo(
+    () => [...new Set(transactions.map((tx) => categoryName(tx.categoryID, categories)))].sort(),
+    [transactions, categories],
+  );
+  const accountOptions = useMemo(
+    () => accounts
+      .filter((account) => account.isActive !== false)
+      .map((account) => ({ value: account.id, label: `${accountDisplayName(account)} (${account.currencyCode})` })),
+    [accounts],
+  );
+  const archivedBankCount = useMemo(
+    () => banks.filter((bank) => bank.isActive === false).length,
+    [banks],
+  );
+
   const topBarFilters = useMemo(() => (
     <TopBarControls>
-      <TransactionFilterMenu value={filters} categories={categoryOptions} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} />
+      <TransactionFilterMenu
+        value={filters}
+        categories={categoryOptions}
+        accountOptions={accountOptions}
+        activeCount={activeCount}
+        onChange={setFilters}
+        onClear={resetFilters}
+      />
     </TopBarControls>
-  ), [filters, categoryOptions, activeCount, setFilters, resetFilters]);
+  ), [filters, categoryOptions, accountOptions, activeCount, setFilters, resetFilters]);
   usePageTopBarRightSlot(topBarFilters);
+
+  const bankActions: StandardCardAction[] = archivedBankCount
+    ? [{
+        label: showArchivedBanks ? 'Hide closed banks' : `Show closed banks (${archivedBankCount})`,
+        onClick: () => setShowArchivedBanks((value) => !value),
+      }]
+    : [];
+
   const sections: StandardPageSection[] = [
-    { key: 'summary', label: 'Banking summary', summary: <SummaryChip label="Accounts" value={accounts.length} />, content: <BankingScopeSummary accounts={accounts} filters={filters} /> },
-    { key: 'banks', label: 'Banks', content: <BanksList /> },
-    { key: 'accounts', label: 'All accounts', content: <><AccountsList /><AccountsFab /></> },
-    { key: 'creditCards', label: 'Credit cards', content: <CreditCardsTab plannedCreditCardCloudEmpty={plannedCreditCardCloudEmpty} uploadPlannedCreditCardLocalToCloud={uploadPlannedCreditCardLocalToCloud} /> },
-    { key: 'planning', label: 'Planning', content: <PlanningTab plannedCloudEmpty={plannedCloudEmpty} uploadPlannedLocalToCloud={uploadPlannedLocalToCloud} /> },
-    { key: 'transactions', label: 'Transactions', summary: <SummaryChip label="Filtered" value={transactions.filter((tx) => transactionMatchesFilters(tx, filters, categories)).length} />, content: <BankingScopeTransactions accounts={accounts} filters={filters} /> },
-    { key: 'analytics', label: 'Analytics', content: <AnalyticsTab /> },
-    { key: 'settings', label: 'Settings', content: <div><p className="text-muted mt-0">Sign-in, profile, appearance, and a whole-app backup live on the <Link to="/account">Account page →</Link>. What's below is specific to Banking.</p><AccountSection cloudEmpty={cloudEmpty} uploadLocalToCloud={uploadLocalToCloud} /><DataManagement /></div> },
+    {
+      key: 'summary',
+      label: 'Summary',
+      defaultOpen: true,
+      summary: <SummaryChip label="Accounts" value={accounts.length} />,
+      content: <BankingScopeSummary accounts={accounts} filters={filters} />,
+    },
+    {
+      key: 'banks',
+      label: 'Banks',
+      actions: bankActions,
+      content: <BanksList showArchived={showArchivedBanks} />,
+    },
+    {
+      key: 'accounts',
+      label: 'Accounts',
+      defaultOpen: true,
+      content: (
+        <div>
+          <AccountsList />
+          <hr className="mt-md mb-md" />
+          <h3 className="mt-0 mb-sm">Credit cards</h3>
+          <CreditCardsTab
+            plannedCreditCardCloudEmpty={plannedCreditCardCloudEmpty}
+            uploadPlannedCreditCardLocalToCloud={uploadPlannedCreditCardLocalToCloud}
+          />
+        </div>
+      ),
+    },
+    {
+      key: 'planning',
+      label: 'Planning',
+      content: <PlanningTab plannedCloudEmpty={plannedCloudEmpty} uploadPlannedLocalToCloud={uploadPlannedLocalToCloud} />,
+    },
+    {
+      key: 'transactions',
+      label: 'Transactions',
+      summary: <SummaryChip label="Filtered" value={transactions.filter((tx) => transactionMatchesFilters(tx, filters, categories)).length} />,
+      content: <BankingScopeTransactions accounts={accounts} filters={filters} />,
+    },
+    { key: 'analytics', label: 'Analytics', content: <AnalyticsTab filters={filters} /> },
+    {
+      key: 'settings',
+      label: 'Settings',
+      content: (
+        <div>
+          <p className="text-muted mt-0">
+            Sign-in, profile, appearance, and a whole-app backup live on the <Link to="/account">Account page →</Link>. What's below is specific to Banking.
+          </p>
+          <AccountSection cloudEmpty={cloudEmpty} uploadLocalToCloud={uploadLocalToCloud} />
+          <DataManagement />
+        </div>
+      ),
+    },
   ];
+
   return (
     <div className="standard-page">
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
         <h1 className="pagetitle m-0">Banking</h1>
         <Tooltip text="Bank account balances and transaction history, entered manually or imported from a CSV statement — no live bank connection (see Disclaimer & Privacy for why)." />
       </div>
-      {/* User-requested (2026-09-14): Parent Banks "extracted on top,
-         collapsed by default" — a page-level section, above the whole
-         tabbed area, not nested inside the "Accounts" tab's own content. */}
+      <AccountsFab />
       <StandardPageSections sections={sections} defaultKey="summary" />
       <FabPanel actions={fabActions} />
     </div>
