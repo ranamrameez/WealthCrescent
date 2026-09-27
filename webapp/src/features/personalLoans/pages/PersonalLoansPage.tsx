@@ -1,11 +1,13 @@
 import type { User } from 'firebase/auth';
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Bar, Line } from 'react-chartjs-2';
+import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { Card, EntityCard, MoneyValue } from '../../../components/Card';
 import { StandardPageSections, type StandardPageSection } from '../../../components/StandardPageSections';
 import { SummaryChip, type StandardCardAction } from '../../../components/StandardCard';
 import { AttributeList } from '../../../components/ui/AttributeList';
+import { CategorySelect } from '../../../components/CategorySelect';
+import { AnalyticsChartEnhancer } from '../../../components/AnalyticsChartCard';
 import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { Modal } from '../../../components/Modal';
@@ -41,9 +43,10 @@ import {
   repaymentRunningOutstanding,
   repaymentsByMonth,
 } from '../../../lib/calc/personalLoansModule';
-import { dlBarV, dlLine } from '../../../lib/chartLabels';
+import { dlBarV, dlDoughnut, dlLine } from '../../../lib/chartLabels';
 import { applyChartTheme } from '../../../lib/chartSetup';
-import { cssVar } from '../../../lib/cssVar';
+import { cssVar, tickerColor } from '../../../lib/cssVar';
+import { chartAlpha, chartDepthPlugin } from '../../../lib/chartVisuals';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { firebaseReady } from '../../../lib/firebase/client';
 import { useAppearanceStore } from '../../../store/appearanceStore';
@@ -51,7 +54,7 @@ import { usePersonalLoansWorkbookStore } from '../../../store/personalLoansWorkb
 import { useCategoryStore } from '../../../store/categoryStore';
 import { useInterEntityTransfersStore } from '../../../store/interEntityTransfersStore';
 import { linkTargetPath, useLinkSideLabel } from '../../transfers/pages/TransferLinksPage';
-import type { PersonalLoan, PersonalLoanRepayment } from '../../../types/personalLoansWorkbook';
+import type { PersonalLoan, PersonalLoanPlan, PersonalLoanRepayment } from '../../../types/personalLoansWorkbook';
 import { ChartCard } from '../../qse/components/ChartCard';
 import { gridAutoStyle } from '../../../lib/gridStyle';
 
