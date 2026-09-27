@@ -1,6 +1,17 @@
 import type { PersonalLoan, PersonalLoanRepayment } from '../../types/personalLoansWorkbook';
 import { dateOnlyMs } from '../datetime';
 
+export function transferDirectionForLoan(direction: PersonalLoan['direction']): 'in' | 'out' {
+  // From the Personal Loans side of a linked transfer:
+  // - i_owe (Borrow): repayment money leaves Bank/Cash, so the loan side is the receiver ('in').
+  // - owed_to_me (Lent): repayment money arrives in Bank/Cash, so the loan side is the sender ('out').
+  return direction === 'i_owe' ? 'in' : 'out';
+}
+
+export function loanDirectionForTransfer(direction: 'in' | 'out'): PersonalLoan['direction'] {
+  return direction === 'in' ? 'i_owe' : 'owed_to_me';
+}
+
 export function loanOutstanding(loan: PersonalLoan, repayments: PersonalLoanRepayment[]): number {
   const repaid = repayments.filter((r) => r.loanId === loan.id && !r.isPending).reduce((s, r) => s + r.amount, 0);
   return Math.max(0, loan.principal - repaid);
