@@ -16,7 +16,7 @@ import { loanCategoryForDirection, loanDirectionForTransfer, transferDirectionFo
 import { convertAmount, loadCachedFxRates } from '../lib/fx';
 import { useEnsureSignedIn } from '../lib/firebase/useEnsureSignedIn';
 import { defaultLinkedOtherSide, isSupportedLinkPair, linkSideRequiresRef } from '../lib/interEntityLink';
-import { createLinkedTransfer } from '../lib/linkCascade';
+import { createLinkedTransfer, propagateLinkedEdit, resolveLinkedEdit } from '../lib/linkCascade';
 import { useBankWorkbookStore } from '../store/bankWorkbookStore';
 import { useCashWorkbookStore } from '../store/cashWorkbookStore';
 import { useCreditCardWorkbookStore } from '../store/creditCardWorkbookStore';
@@ -29,6 +29,7 @@ import { useSubscriptionsWorkbookStore } from '../store/subscriptionsWorkbookSto
 import { useAppearanceStore } from '../store/appearanceStore';
 import { useWorkbookStore } from '../store/workbookStore';
 import type { LinkModule, LinkSideConfig } from '../types/interEntityTransfer';
+import type { PersonalLoanRepayment } from '../types/personalLoansWorkbook';
 
 const today = () => new Date().toISOString().slice(0, 10);
 const uid = () => crypto.randomUUID();
@@ -450,13 +451,23 @@ function useSideCurrencyStatic(cfg: LinkSideConfig): string | undefined {
  * already do for a link, generalized here to also cover the plain
  * single-account case by calling that module's own native "add" action
  * directly. */
-export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFinance?: LinkSideConfig; onClose: () => void }) {
+export function TransactionEntryModal({
+  defaultFinance,
+  editPersonalLoanPayment,
+  onClose,
+}: {
+  defaultFinance?: LinkSideConfig;
+  editPersonalLoanPayment?: PersonalLoanRepayment;
+  onClose: () => void;
+}) {
   const ensureSignedIn = useEnsureSignedIn();
   const addBankTransactions = useBankWorkbookStore((s) => s.addTransactions);
   const addCashEntry = useCashWorkbookStore((s) => s.addEntry);
   const cashDefaultCurrency = useCashWorkbookStore((s) => s.workbook.settings.defaultCurrency);
   const addRentalEntry = useRentalsWorkbookStore((s) => s.addEntry);
   const addPersonalLoanRepayment = usePersonalLoansWorkbookStore((s) => s.addRepayment);
+  const updatePersonalLoanRepayment = usePersonalLoansWorkbookStore((s) => s.updateRepayment);
+  const personalLoans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const addEMIRepayment = useEMIWorkbookStore((s) => s.addRepayment);
   const emiLoans = useEMIWorkbookStore((s) => s.workbook.entries);
   const addQSETransfer = useWorkbookStore((s) => s.addTransfer);
@@ -481,8 +492,15 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
   // no visible sign anything was wrong. Fixed at the source: a `cash`
   // finance side always starts with a REAL currency (the workbook's own
   // default), matching what the dropdown already visibly showed.
-  const resolvedDefaultFinance: LinkSideConfig = defaultFinance
-    ? (defaultFinance.module === 'cash' && !defaultFinance.currencyCode ? { ...defaultFinance, currencyCode: cashDefaultCurrency } : defaultFinance)
+  const editingLoan = editPersonalLoanPayment
+    ? personalLoans.find((loan) => loan.id === editPersonalLoanPayment.loanId)
+    : undefined;
+  const editFinance: LinkSideConfig | undefined = editPersonalLoanPayment
+    ? { module: 'personalLoans', ref: editPersonalLoanPayment.loanId, currencyCode: editingLoan?.currencyCode }
+    : undefined;
+  const baseFinance = editFinance ?? defaultFinance;
+  const resolvedDefaultFinance: LinkSideConfig = baseFinance
+    ? (baseFinance.module === 'cash' && !baseFinance.currencyCode ? { ...baseFinance, currencyCode: cashDefaultCurrency } : baseFinance)
     : { module: 'cash', currencyCode: cashDefaultCurrency };
 
   const resolvedDefaultCurrency = resolvedDefaultFinance.currencyCode
@@ -490,9 +508,32 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
       ? bankAccounts.find((account) => account.id === resolvedDefaultFinance.ref)?.currencyCode
       : undefined);
 
-  const [rows, setRows] = useState<TxRow[]>(() => [
-    emptyRow(0, resolvedDefaultFinance, defaultLinkedOtherSide(resolvedDefaultFinance, bankAccounts, cashDefaultCurrency), transferDefaultDescription, resolvedDefaultCurrency),
-  ]);
+  const [rows, setRows] = useState<TxRow[]>(() => {
+    const base = emptyRow(
+      0,
+      resolvedDefaultFinance,
+      defaultLinkedOtherSide(resolvedDefaultFinance, bankAccounts, cashDefaultCurrency),
+      transferDefaultDescription,
+      resolvedDefaultCurrency,
+    );
+    if (!editPersonalLoanPayment) {
+      if (editingLoan && !base.categoryTouched) base.categoryID = loanCategoryForDirection(editingLoan.direction);
+      return [base];
+    }
+    return [{
+      ...base,
+      amount: editPersonalLoanPayment.amount,
+      direction: editingLoan ? transferDirectionForLoan(editingLoan.direction) : base.direction,
+      date: editPersonalLoanPayment.date,
+      time: editPersonalLoanPayment.time,
+      timeTouched: !!editPersonalLoanPayment.time,
+      timezone: editPersonalLoanPayment.timezone,
+      categoryID: editPersonalLoanPayment.categoryID ?? (editingLoan ? loanCategoryForDirection(editingLoan.direction) : UNCATEGORIZED_ID),
+      categoryTouched: !!editPersonalLoanPayment.categoryID,
+      description: editPersonalLoanPayment.description ?? transferDefaultDescription,
+      pending: !!editPersonalLoanPayment.isPending,
+    }];
+  });
   const [nextKey, setNextKey] = useState(1);
 
   const updateRow = (key: number, patch: TxRow) => setRows((rs) => rs.map((r) => (r.key === key ? patch : r)));
@@ -516,7 +557,41 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
         }
       }
     }
-    if (!(await ensureSignedIn('Sign in to save transactions.'))) return;
+    if (!(await ensureSignedIn(editPersonalLoanPayment ? 'Sign in to update this payment.' : 'Sign in to save transactions.'))) return;
+
+    if (editPersonalLoanPayment) {
+      const r = valid[0];
+      if (r.finance.module !== 'personalLoans' || !r.finance.ref) return toast('Pick a personal loan first.');
+      if (r.finance.ref !== editPersonalLoanPayment.loanId) {
+        return toast('Move-to-another-loan is not supported while editing a payment. Add a new payment on the other loan instead.');
+      }
+      const choice = await resolveLinkedEdit('personalLoans', editPersonalLoanPayment.id);
+      if (choice === 'cancel') return;
+      updatePersonalLoanRepayment(editPersonalLoanPayment.id, {
+        loanId: r.finance.ref,
+        date: r.date,
+        time: r.time,
+        timezone: r.timezone,
+        amount: Math.abs(r.amount),
+        description: r.description.trim() || undefined,
+        categoryID: r.categoryID,
+        isPending: r.pending || undefined,
+      });
+      let message = 'Payment updated.';
+      if (choice === 'both') {
+        const propagated = propagateLinkedEdit('personalLoans', editPersonalLoanPayment.id, {
+          date: r.date,
+          amount: Math.abs(r.amount),
+          note: r.description.trim() || undefined,
+          direction: r.direction,
+        });
+        if (propagated.error) message = propagated.error;
+        else if (propagated.message) message = propagated.message;
+      }
+      toast(message);
+      onClose();
+      return;
+    }
 
     let plainCount = 0;
     let linkedCount = 0;
@@ -650,19 +725,21 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
   };
 
   return (
-    <Modal title="Transfers" onClose={onClose}>
+    <Modal title={editPersonalLoanPayment ? "Edit payment" : "Transfers"} onClose={onClose}>
       {rows.map((r) => (
         <TxRowFields
           key={r.key}
           row={r}
           onChange={(row) => updateRow(r.key, row)}
           onRemove={() => removeRow(r.key)}
-          canRemove={rows.length > 1}
+          canRemove={!editPersonalLoanPayment && rows.length > 1}
         />
       ))}
-      <div className="row" style={{ gap: 8, marginTop: 16 }}>
-        <button className="btn secondary" onClick={addRow}><PlusIcon size={12} />Add row</button>
-      </div>
+      {!editPersonalLoanPayment && (
+        <div className="row" style={{ gap: 8, marginTop: 16 }}>
+          <button className="btn secondary" onClick={addRow}><PlusIcon size={12} />Add row</button>
+        </div>
+      )}
       <div className="d-flex justify-center mt-md">
         <button className="btn" style={{ minWidth: 220 }} onClick={submit}><SaveIcon />Save</button>
       </div>
