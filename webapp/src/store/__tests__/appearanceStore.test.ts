@@ -42,7 +42,7 @@ it('normalizes invalid theme updates before saving', async () => {
 
 it('defaults and persists the centralized transfer description', async () => {
   const { useAppearanceStore } = await import('../appearanceStore');
-  expect(useAppearanceStore.getState().appearance.transferDefaultDescription).toBe('Transfer By Default');
+  expect(useAppearanceStore.getState().appearance.transferDefaultDescription).toBe('Transfer');
 
   useAppearanceStore.getState().update({ transferDefaultDescription: 'Internal transfer' });
   expect(JSON.parse(localStorage.getItem(key)!)).toMatchObject({ transferDefaultDescription: 'Internal transfer' });
@@ -50,4 +50,15 @@ it('defaults and persists the centralized transfer description', async () => {
   vi.resetModules();
   const reloaded = await import('../appearanceStore');
   expect(reloaded.useAppearanceStore.getState().appearance.transferDefaultDescription).toBe('Internal transfer');
+});
+
+it('migrates the old transfer description default to Transfer without changing a custom value', async () => {
+  localStorage.setItem(key, JSON.stringify({ transferDefaultDescription: 'Transfer By Default' }));
+  const first = await import('../appearanceStore');
+  expect(first.useAppearanceStore.getState().appearance.transferDefaultDescription).toBe('Transfer');
+
+  vi.resetModules();
+  localStorage.setItem(key, JSON.stringify({ transferDefaultDescription: 'Own wording' }));
+  const second = await import('../appearanceStore');
+  expect(second.useAppearanceStore.getState().appearance.transferDefaultDescription).toBe('Own wording');
 });
