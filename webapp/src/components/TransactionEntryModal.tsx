@@ -194,6 +194,7 @@ function emptyRow(
   finance: LinkSideConfig,
   other: LinkSideConfig,
   defaultDescription: string,
+  currencyCode?: string,
 ): TxRow {
   return {
     key,
@@ -490,15 +491,20 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
       : { module: 'cash', currencyCode: financeCurrency ?? cashDefaultCurrency };
   };
 
+  const resolvedDefaultCurrency = resolvedDefaultFinance.currencyCode
+    ?? (resolvedDefaultFinance.module === 'bank'
+      ? bankAccounts.find((account) => account.id === resolvedDefaultFinance.ref)?.currencyCode
+      : undefined);
+
   const [rows, setRows] = useState<TxRow[]>(() => [
-    emptyRow(0, resolvedDefaultFinance, defaultOtherFor(resolvedDefaultFinance), transferDefaultDescription),
+    emptyRow(0, resolvedDefaultFinance, defaultOtherFor(resolvedDefaultFinance), transferDefaultDescription, resolvedDefaultCurrency),
   ]);
   const [nextKey, setNextKey] = useState(1);
 
   const updateRow = (key: number, patch: TxRow) => setRows((rs) => rs.map((r) => (r.key === key ? patch : r)));
   const removeRow = (key: number) => setRows((rs) => rs.filter((r) => r.key !== key));
   const addRow = () => {
-    setRows((rs) => [...rs, emptyRow(nextKey, resolvedDefaultFinance, defaultOtherFor(resolvedDefaultFinance), transferDefaultDescription)]);
+    setRows((rs) => [...rs, emptyRow(nextKey, resolvedDefaultFinance, defaultOtherFor(resolvedDefaultFinance), transferDefaultDescription, resolvedDefaultCurrency)]);
     setNextKey((k) => k + 1);
   };
 
@@ -636,7 +642,7 @@ export function TransactionEntryModal({ defaultFinance, onClose }: { defaultFina
         }
       }
       plainCount++;
-      // See `HAS_SUBSCRIPTION`'s own doc comment — this transaction just
+      // A transaction entered through the Subscriptions finance choice just
       // saved successfully (we only get here past every case's own
       // validation `continue`), so it's safe to move the subscription's
       // billing anchor to match.
