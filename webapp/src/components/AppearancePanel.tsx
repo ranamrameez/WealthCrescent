@@ -66,6 +66,15 @@ export function AppearanceFields() {
         <option value="dddd, MMM DD, YYYY">Display dates: Tuesday, Sep 22, 2026</option>
         <option value="ddd, DD MMM, YYYY">Display dates: Tue, 22 Sep, 2026</option>
       </select>
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13 }}>
+        <span>Default transfer description</span>
+        <input
+          type="text"
+          value={appearance.transferDefaultDescription ?? 'Transfer By Default'}
+          onChange={(e) => updateAppearance({ transferDefaultDescription: e.target.value })}
+          placeholder="Transfer By Default"
+        />
+      </label>
       <button
         className="btn secondary small"
         type="button"
