@@ -1108,6 +1108,16 @@ export function AccountDetailPage() {
     URL.revokeObjectURL(url);
     toast(`${body.length} transaction${body.length === 1 ? '' : 's'} downloaded.`);
   };
+  const exportAllTransactions = () => {
+    const header = ['#', 'Date', 'Description', 'Category', 'Amount', 'Balance', 'Source', 'Status'];
+    const body = [...allLedger].reverse().map(({ tx, balance }) => [tx.serialNumber ?? '', tx.date, tx.description, categoryName(tx.categoryID, categories), tx.amount, balance, tx.source === 'statement-import' ? `Imported${tx.statementRef ? ` (${tx.statementRef})` : ''}` : 'Manual', tx.isPending ? 'Pending' : 'Cleared']);
+    const blob = new Blob([toCSV([header, ...body])], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `${account.name.replace(/\s+/g, '_')}_all_transactions.csv`; anchor.click(); URL.revokeObjectURL(url);
+    toast(`${body.length} transaction${body.length === 1 ? '' : 's'} downloaded.`);
+  };
+  const periodSummary = filters.fromDate && filters.toDate
+    ? (() => { const days = Math.round((new Date(filters.toDate).getTime() - new Date(filters.fromDate).getTime()) / 86400000) + 1; return days <= 31 ? 'This month' : days <= 93 ? '3 months' : `${formatDate(filters.fromDate, dateFormat)} to ${formatDate(filters.toDate, dateFormat)}`; })()
+    : filters.fromDate ? `${formatDate(filters.fromDate, dateFormat)} onward` : 'All time';
 
   const detailActions: StandardCardAction[] = editingMeta
     ? [
@@ -1126,7 +1136,7 @@ export function AccountDetailPage() {
     {
       key: 'summary',
       label: 'Account summary',
-      summary: <span className="pill pill-info">{filters.fromDate ? formatDate(filters.fromDate, dateFormat) : 'All time'}{filters.toDate ? ` to ${formatDate(filters.toDate, dateFormat)}` : filters.fromDate ? ' onward' : ''}</span>,
+      summary: <span className="text-muted">{periodSummary}</span>,
       content: <div className="account-summary-grid">
         {summaryCard('Actual balance', <>
           {summaryMetric('Current balance', fmtMoney(periodCurrentBalance, account.currencyCode), periodCurrentBalance >= 0 ? 'pill-positive' : 'pill-negative', true)}
@@ -1199,9 +1209,11 @@ export function AccountDetailPage() {
       summary: <SummaryChip label="Filtered" value={filteredLedger.length} />,
       actions: [
         { label: 'Import transactions', onClick: () => window.dispatchEvent(new Event('bank:open-import')) },
-        { label: 'Export filtered CSV', onClick: exportTransactions, disabled: !filteredLedger.length },
-        { label: showTransactionActions ? 'Hide row actions' : 'Show row actions', onClick: () => setShowTransactionActions((value) => !value) },
+        { label: 'Export filtered', onClick: exportTransactions, disabled: !filteredLedger.length },
+        { label: 'Export all', onClick: exportAllTransactions, disabled: !allLedger.length },
+        { label: showTransactionActions ? 'Hide modifications' : 'Show modifications', icon: <EditIcon size={14} />, onClick: () => setShowTransactionActions((value) => !value) },
       ],
+      headerEnd: showTransactionActions ? <IconButton label="Hide modification options" icon={<XIcon size={13} />} align="right" onClick={() => setShowTransactionActions(false)} /> : undefined,
       content: <TransactionsList account={account} ledger={filteredLedger} allLedgerCount={allLedger.length} showActions={showTransactionActions} />,
     },
     {
