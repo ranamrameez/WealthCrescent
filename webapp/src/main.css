@@ -159,7 +159,10 @@
   border-color:color-mix(in srgb,var(--card-hue) 46%,var(--border));
 }
 .standard-card.standard-card-hued .standard-card-header{
-  background:color-mix(in srgb,var(--card-hue) 10%,transparent);
+  /* Hue belongs to the card surface/content. Keep the section header in the
+     shared Banking chrome so an item's color does not look like a tab/header
+     highlight. */
+  background:transparent;
 }
 .standard-card-header{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(40px,1fr);align-items:center;gap:12px;padding:12px 14px;border-bottom:0px solid var(--border);}
 
