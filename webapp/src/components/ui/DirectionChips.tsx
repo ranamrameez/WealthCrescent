@@ -27,12 +27,13 @@ export function DirectionChips({
   labels: { in: string; out: string };
 }) {
   return (
-    <div className="chip-tabs">
+    <div className="chip-tabs" style={{ flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
       {(['in', 'out'] as const).map((dir) => (
         <button
           key={dir}
           type="button"
           className={`chip${value === dir ? ' active' : ''}`}
+          style={{ flexShrink: 0 }}
           onClick={() => onChange(dir)}
         >
           {value === dir && <CheckIcon size={11} />}
