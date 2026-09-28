@@ -1,4 +1,5 @@
 import { create, type UseBoundStore, type StoreApi } from 'zustand';
+import { scheduleLocalStorageWrite } from '../lib/localStoragePersistence';
 
 export interface BaseEntryWorkbook<TSettings, TEntry extends { id: string }> {
   settings: TSettings;
@@ -84,11 +85,9 @@ export function createEntryStore<TSettings, TEntry extends { id: string }>(
   }
 
   function persist(workbook: BaseEntryWorkbook<TSettings, TEntry>) {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(workbook));
-    } catch (e) {
+    scheduleLocalStorageWrite(storageKey, workbook, (e) => {
       console.error(`Failed to save workbook to localStorage (${storageKey}) — your last change may not have persisted.`, e);
-    }
+    });
   }
 
   return create<EntryStoreState<TSettings, TEntry>>((set, get) => {

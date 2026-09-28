@@ -3,6 +3,7 @@ import { toInstantMs } from '../lib/datetime';
 import { assignSeqForEntities, backfillSeq, nextSeq, nextSeqForEntity } from '../lib/seq';
 import { sortTransactionsChronological } from '../lib/calc/sortTransactions';
 import type { Adjustment, Dividend, PricePoint, Transaction, TradePlan, Transfer, WatchlistItem } from '../types/workbook';
+import { scheduleLocalStorageWrite } from '../lib/localStoragePersistence';
 
 function chronologicalByInstant<T extends { date: string; time?: string; timezone?: string }>(records: T[]): T[] {
   return [...records].sort((a, b) => toInstantMs(a.date, a.time, a.timezone) - toInstantMs(b.date, b.time, b.timezone));
@@ -92,11 +93,9 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
   }
 
   function persist(workbook: TWorkbook) {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(workbook));
-    } catch (e) {
+    scheduleLocalStorageWrite(storageKey, workbook, (e) => {
       console.error(`Failed to save workbook to localStorage (${storageKey}) — your last change may not have persisted.`, e);
-    }
+    });
   }
 
   return create<WorkbookStoreState<TWorkbook>>((set, get) => {
