@@ -441,7 +441,7 @@ function CreditCardTransactionEditModal({
   );
 }
 
-function TransactionsTable({ card, filters }: { card: CreditCard; filters: TransactionPageFilters }) {
+function TransactionsTable({ card, filters, showActions = false }: { card: CreditCard; filters: TransactionPageFilters; showActions?: boolean }) {
   const transactions = useCreditCardWorkbookStore((s) => s.workbook.transactions);
   const deleteTransaction = useCreditCardWorkbookStore((s) => s.deleteTransaction);
   const categories = useCategoryStore((s) => s.workbook.categories);
@@ -483,15 +483,15 @@ function TransactionsTable({ card, filters }: { card: CreditCard; filters: Trans
               <td>{categoryName(t.categoryID, categories)}</td>
               <td>{fmtMoney(t.amount, card.currencyCode)}</td>
               <td onClick={(e) => e.stopPropagation()}>
-                <IconButton label="Edit" icon={<EditIcon size={12} />} align="right" onClick={() => setEditingTransaction(t)} />
-                <IconButton
+                {showActions && <IconButton label="Edit" icon={<EditIcon size={12} />} align="right" onClick={() => setEditingTransaction(t)} />}
+                {showActions && <IconButton
                   label="Delete"
                   icon={<TrashIcon size={12} />}
                   align="right"
                   onClick={async () => {
                     if (await confirmDialog('This cannot be undone.', 'Delete this transaction?')) deleteTransaction(t.id);
                   }}
-                />
+                />}
               </td>
             </tr>
           ))}
@@ -693,6 +693,7 @@ export function CreditCardDetailPage() {
   // (2026-09-20) — one "Time period" control governs both the balance
   // projection and the plan list below.
   const [horizonDays, setHorizonDays] = useState<PlanningHorizonDays>(30);
+  const [showTransactionActions, setShowTransactionActions] = useState(false);
 
   usePageTopBarRightSlot(card ? (
     <TopBarControls>
@@ -847,8 +848,10 @@ export function CreditCardDetailPage() {
           <CardPlanList card={card} horizonDays={horizonDays} />
       </StandardCard></div>
 
-      <div id="card-transactions"><StandardCard title="Transactions" hue={card.color} defaultOpen={false}>
-        <TransactionsTable card={card} filters={filters} />
+      <div id="card-transactions"><StandardCard title="Transactions" hue={card.color} defaultOpen={false}
+        actions={[{ label: showTransactionActions ? 'Done modifying' : 'Modify', icon: <EditIcon size={14} />, onClick: () => setShowTransactionActions((value) => !value) }]}
+        headerEnd={showTransactionActions ? <IconButton label="Hide modification options" icon={<EditIcon size={13} />} align="right" onClick={() => setShowTransactionActions(false)} /> : undefined}>
+        <TransactionsTable card={card} filters={filters} showActions={showTransactionActions} />
       </StandardCard></div>
 
       <div id="card-history"><StandardCard title="Monthly history" hue={card.color} defaultOpen={false}>
