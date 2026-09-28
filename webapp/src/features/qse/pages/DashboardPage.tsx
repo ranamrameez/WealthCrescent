@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { EntityScopeMenu, selectedEntityValues } from '../../../components/EntityScopeMenu';
+import { TopBarControls } from '../../../components/TopBarControls';
+import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { StatCard } from '../../../components/Card';
 import { StandardCard } from '../../../components/StandardCard';
@@ -312,7 +315,11 @@ function DashboardPositionsView({ workbook, calcFee, positions, rows, summary, r
 }
 
 export function DashboardPage() {
-  const official = useQSEDerived();
+  const [params] = useSearchParams();
+  const rawWorkbook = useWorkbookStore((s) => s.workbook);
+  const tickerOptions = useMemo(() => [...new Set(rawWorkbook.transactions.map((tx) => tx.ticker))].sort(), [rawWorkbook.transactions]);
+  const selectedTickers = selectedEntityValues(params, tickerOptions);
+  const official = useQSEDerived(selectedTickers);
   const strategic = useQSEStrategicDerived();
   const { workbook, rows, summary } = official;
   const currency = workbook.settings.currency;
@@ -335,6 +342,7 @@ export function DashboardPage() {
   // shown once here, not duplicated per tab.
   const currentDeposit = summary.totalInward - summary.totalOutward;
   const growthVsDeposit = summary.netWorth - currentDeposit;
+  usePageTopBarRightSlot(<TopBarControls><EntityScopeMenu label="QSE tickers" options={tickerOptions.map((ticker) => ({ value: ticker, label: ticker }))} /></TopBarControls>);
 
   // Auto-hide popup once per browser session on first Dashboard visit,
   // summarizing alerts — the persistent Alerts card further down stays

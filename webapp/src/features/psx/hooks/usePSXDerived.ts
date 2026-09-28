@@ -30,40 +30,41 @@ export interface PSXRow {
  * numbers. `lots` exposes each open ticker's remaining lots for display;
  * it's empty under the weighted-average method, which has no discrete lots
  * to show. */
-export function usePSXDerived() {
+export function usePSXDerived(selectedTickers?: string[]) {
   const workbook = usePSXWorkbookStore((s) => s.workbook);
 
   return useMemo(() => {
-    const calcFee = makePSXFeeCalculator(workbook.settings, workbook.transactions);
+    const scoped = selectedTickers?.length ? workbook.transactions.filter((tx) => selectedTickers.includes(tx.ticker)) : workbook.transactions;
+    const calcFee = makePSXFeeCalculator(workbook.settings, scoped);
     const method = workbook.settings.costBasisMethod;
 
     let positions;
     let realizedSeries;
     let lots: Record<string, FIFOLot[]> = {};
     if (method === 'fifo' || method === 'lowestCostFirst') {
-      const fifo = computeFIFOPositions(workbook.transactions, calcFee, method);
+      const fifo = computeFIFOPositions(scoped, calcFee, method);
       positions = fifo.positions;
       realizedSeries = fifo.realizedSeries;
       lots = fifo.lotsByTicker;
     } else {
-      positions = computePositions(workbook.transactions, calcFee);
-      realizedSeries = computeRealizedPLTimeSeries(workbook.transactions, calcFee);
+      positions = computePositions(scoped, calcFee);
+      realizedSeries = computeRealizedPLTimeSeries(scoped, calcFee);
     }
 
     const summary = cashSummary(
-      workbook.transactions,
+      scoped,
       workbook.transfers,
       workbook.adjustments,
       workbook.marketPrices,
       calcFee,
       positions,
     );
-    const ledger = buildCashLedger(workbook.transactions, workbook.transfers, workbook.adjustments, calcFee);
+    const ledger = buildCashLedger(scoped, workbook.transfers, workbook.adjustments, calcFee);
 
     const rows: PSXRow[] = positions
       .filter((p) => p.shares > 0)
       .map((p) => {
-        const marketPrice = getMarketPrice(p.ticker, workbook.marketPrices, workbook.transactions);
+        const marketPrice = getMarketPrice(p.ticker, workbook.marketPrices, scoped);
         const value = p.shares * marketPrice;
         const sellFee = marketPrice > 0 ? calcFee(value, false, { shares: p.shares }) : 0;
         const profit = value - sellFee - p.invested;
@@ -72,5 +73,5 @@ export function usePSXDerived() {
       });
 
     return { workbook, calcFee, positions, summary, realizedSeries, ledger, rows, lots };
-  }, [workbook]);
+  }, [workbook, selectedTickers?.join('|')]);
 }

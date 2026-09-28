@@ -20,10 +20,11 @@ export interface QSERow {
  * all) needed the same opt-in lot-based methods PSX already had — this
  * mirrors `usePSXDerived`'s own branch exactly. Default ('average' /
  * undefined) is byte-for-byte unchanged from before this existed. */
-export function useQSEDerived() {
+export function useQSEDerived(selectedTickers?: string[]) {
   const workbook = useWorkbookStore((s) => s.workbook);
 
   return useMemo(() => {
+    const scoped = selectedTickers?.length ? workbook.transactions.filter((tx) => selectedTickers.includes(tx.ticker)) : workbook.transactions;
     const calcFee = makeQSEFeeCalculator(workbook.settings);
     const method = workbook.settings.costBasisMethod ?? 'average';
 
@@ -31,31 +32,31 @@ export function useQSEDerived() {
     let realizedSeries;
     let lots: Record<string, FIFOLot[]> = {};
     if (method === 'average') {
-      positions = computePositions(workbook.transactions, calcFee);
-      realizedSeries = computeRealizedPLTimeSeries(workbook.transactions, calcFee);
+      positions = computePositions(scoped, calcFee);
+      realizedSeries = computeRealizedPLTimeSeries(scoped, calcFee);
     } else {
-      const fifo = computeFIFOPositions(workbook.transactions, calcFee, method);
+      const fifo = computeFIFOPositions(scoped, calcFee, method);
       positions = fifo.positions;
       realizedSeries = fifo.realizedSeries;
       lots = fifo.lotsByTicker;
     }
 
     const summary = cashSummary(
-      workbook.transactions,
+      scoped,
       workbook.transfers,
       workbook.adjustments,
       workbook.marketPrices,
       calcFee,
       positions,
     );
-    const ledger = buildCashLedger(workbook.transactions, workbook.transfers, workbook.adjustments, calcFee);
+    const ledger = buildCashLedger(scoped, workbook.transfers, workbook.adjustments, calcFee);
 
     // Shared per-open-position rollup (mirrors the legacy dashboard's
     // `rows` variable) — feeds most of the ticker-level charts.
     const rows: QSERow[] = positions
       .filter((p) => p.shares > 0)
       .map((p) => {
-        const marketPrice = getMarketPrice(p.ticker, workbook.marketPrices, workbook.transactions);
+        const marketPrice = getMarketPrice(p.ticker, workbook.marketPrices, scoped);
         const value = p.shares * marketPrice;
         const sellFee = marketPrice > 0 ? calcFee(value, false) : 0;
         const profit = value - sellFee - p.invested;
@@ -64,5 +65,5 @@ export function useQSEDerived() {
       });
 
     return { workbook, calcFee, positions, summary, realizedSeries, ledger, rows, lots };
-  }, [workbook]);
+  }, [workbook, selectedTickers?.join('|')]);
 }

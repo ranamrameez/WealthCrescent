@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { EntityScopeMenu, selectedEntityValues } from '../../../components/EntityScopeMenu';
+import { TopBarControls } from '../../../components/TopBarControls';
+import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { StatCard } from '../../../components/Card';
 import { StandardCard } from '../../../components/StandardCard';
@@ -302,7 +305,11 @@ function DashboardPositionsView({ workbook, calcFee, positions, rows, summary, r
 }
 
 export function DashboardPage() {
-  const official = usePSXDerived();
+  const [params] = useSearchParams();
+  const rawWorkbook = usePSXWorkbookStore((s) => s.workbook);
+  const tickerOptions = useMemo(() => [...new Set(rawWorkbook.transactions.map((tx) => tx.ticker))].sort(), [rawWorkbook.transactions]);
+  const selectedTickers = selectedEntityValues(params, tickerOptions);
+  const official = usePSXDerived(selectedTickers);
   const strategic = usePSXStrategicDerived();
   const { workbook, rows, summary } = official;
   const currency = workbook.settings.currency;
@@ -316,6 +323,7 @@ export function DashboardPage() {
   const moneyTitle = (n: number) => (raw ? undefined : fmtMoney(n, currency));
   const currentDeposit = summary.totalInward - summary.totalOutward;
   const growthVsDeposit = summary.netWorth - currentDeposit;
+  usePageTopBarRightSlot(<TopBarControls><EntityScopeMenu label="PSX tickers" options={tickerOptions.map((ticker) => ({ value: ticker, label: ticker }))} /></TopBarControls>);
 
   useEffect(() => {
     if (alerts.length && !sessionStorage.getItem('psx-alerts-shown')) {
