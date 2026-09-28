@@ -1114,27 +1114,28 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
       >
         {bodyContent}
       </StandardCard>
-      {batchEditingLegs && <BatchEditGrid<TradePlanLeg>
+      {batchEditingLegs && <BatchEditGrid<TradePlanLeg & { _batchId: string }>
         title={`Batch edit planned legs — ${plan.name}`}
         description="Spreadsheet-style batch editing. Executed legs are read-only; save all changes together."
-        rows={plan.legs}
+        rows={plan.legs.map((leg, index) => ({ ...leg, _batchId: `${plan.id}:${index}` }))}
         columns={[
-          { key: 'date', label: 'Date', type: 'date', width: 150 },
+          { key: 'date', label: 'Date', type: 'date', editable: (row) => !row.executed, width: 150 },
           { key: 'ticker', label: 'Ticker', editable: false, width: 110 },
           { key: 'action', label: 'Action', type: 'select', editable: (row) => !row.executed, options: [{ value: 'BUY', label: 'BUY' }, { value: 'SELL', label: 'SELL' }], width: 110 },
           { key: 'shares', label: 'Shares', type: 'number', editable: (row) => !row.executed, width: 120 },
           { key: 'price', label: 'Price', type: 'number', editable: (row) => !row.executed, width: 130, formatter: (value, _row) => fmtPSXPrice(Number(value)) },
           { key: 'feeOverride', label: 'Fee override', type: 'number', editable: (row) => !row.executed, width: 140 },
-        ] as BatchColumn<TradePlanLeg>[]}
-        getRowId={(row) => `${row.date}:${row.ticker}:${row.action}:${row.shares}:${row.price}:${plan.legs.indexOf(row)}`}
+        ] as BatchColumn<TradePlanLeg & { _batchId: string }>[]}
+        getRowId={(row) => row._batchId}
         getRowDate={(row) => row.date}
-        onSave={(changes: BatchChange<TradePlanLeg>[]) => {
-          const legKey = (leg: TradePlanLeg, index: number) => `${leg.date}:${leg.ticker}:${leg.action}:${leg.shares}:${leg.price}:${index}`;
-          const replacements = new Map(changes.map(({ before, after }) => {
-            const index = plan.legs.findIndex((leg) => leg.date === before.date && leg.ticker === before.ticker && leg.action === before.action && leg.shares === before.shares && leg.price === before.price);
-            return [legKey(before, index), after] as const;
-          }));
-          updateTradePlan(plan.id, { legs: plan.legs.map((leg, index) => replacements.get(legKey(leg, index)) ?? leg) });
+        onSave={(changes: BatchChange<TradePlanLeg & { _batchId: string }>[]) => {
+          const replacements = new Map(changes.map(({ before, after }) => [before._batchId, after] as const));
+          updateTradePlan(plan.id, { legs: plan.legs.map((leg, index) => {
+            const replacement = replacements.get(`${plan.id}:${index}`);
+            if (!replacement) return leg;
+            const { _batchId: _ignored, ...savedLeg } = replacement;
+            return savedLeg;
+          }) });
         }}
         onClose={() => setBatchEditingLegs(false)}
       />}
