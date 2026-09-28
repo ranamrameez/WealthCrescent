@@ -8,9 +8,17 @@ const STORAGE_KEY = 'WealthCrescent_category_groups_v1';
 /** Backfills `serialNumber` onto any group missing it, same idiom as
  * `categoryStore.ts`'s own `normalize()`. */
 function normalize(wb: CategoryGroupsWorkbook): CategoryGroupsWorkbook {
-  let max = wb.groups.reduce((m, g) => Math.max(m, g.serialNumber ?? 0), 0);
-  const groups = wb.groups.map((g) => (g.serialNumber !== undefined ? g : { ...g, serialNumber: ++max }));
-  return { ...wb, groups };
+  const rawGroups = Array.isArray(wb?.groups) ? wb.groups : [];
+  let max = rawGroups.reduce((m, g) => Math.max(m, g?.serialNumber ?? 0), 0);
+  const groups = rawGroups
+    .filter((g): g is CategoryGroup => !!g && typeof g.id === 'string')
+    .map((g) => ({
+      ...g,
+      name: typeof g.name === 'string' ? g.name : 'Unnamed group',
+      categoryIds: Array.isArray(g.categoryIds) ? g.categoryIds.filter((id): id is string => typeof id === 'string') : [],
+      serialNumber: g.serialNumber !== undefined ? g.serialNumber : ++max,
+    }));
+  return { ...createEmptyCategoryGroupsWorkbook(), ...wb, groups };
 }
 
 interface CategoryGroupStoreState {
@@ -68,7 +76,7 @@ export const useCategoryGroupStore = create<CategoryGroupStoreState>((set, get) 
     addGroup: (name) => {
       const trimmed = name.trim();
       const wb = get().workbook;
-      const maxSerial = wb.groups.reduce((m, g) => Math.max(m, g.serialNumber), 0);
+      const maxSerial = wb.groups.reduce((m, g) => Math.max(m, g.serialNumber ?? 0), 0);
       const group: CategoryGroup = { id: crypto.randomUUID(), serialNumber: maxSerial + 1, name: trimmed, categoryIds: [] };
       mutate((w) => ({ ...w, groups: [...w.groups, group] }));
       return group;
@@ -77,7 +85,7 @@ export const useCategoryGroupStore = create<CategoryGroupStoreState>((set, get) 
     renameGroup: (id, name) => {
       const trimmed = name.trim();
       if (!trimmed) return toast('Group name cannot be empty.');
-      mutate((wb) => ({ ...wb, groups: wb.groups.map((g) => (g.id === id ? { ...g, name: trimmed } : g)) }));
+      mutate((wb) => normalize({ ...wb, groups: wb.groups.map((g) => (g.id === id ? { ...g, name: trimmed } : g)) }));
     },
 
     deleteGroup: (id) => {
@@ -85,7 +93,7 @@ export const useCategoryGroupStore = create<CategoryGroupStoreState>((set, get) 
     },
 
     setGroupCategories: (id, categoryIds) => {
-      mutate((wb) => ({ ...wb, groups: wb.groups.map((g) => (g.id === id ? { ...g, categoryIds } : g)) }));
+      mutate((wb) => normalize({ ...wb, groups: wb.groups.map((g) => (g.id === id ? { ...g, categoryIds: Array.isArray(categoryIds) ? categoryIds : [] } : g)) }));
     },
   };
 });

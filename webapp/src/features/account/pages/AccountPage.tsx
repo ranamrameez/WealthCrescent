@@ -201,7 +201,8 @@ function CategoryGroupRow({ group }: { group: CategoryGroup }) {
 
   const toggleCategory = async (id: string) => {
     if (!(await ensureSignedIn('Sign in to save this group.'))) return;
-    const next = group.categoryIds.includes(id) ? group.categoryIds.filter((c) => c !== id) : [...group.categoryIds, id];
+    const categoryIds = Array.isArray(group.categoryIds) ? group.categoryIds : [];
+    const next = categoryIds.includes(id) ? categoryIds.filter((c) => c !== id) : [...categoryIds, id];
     setGroupCategories(group.id, next);
   };
 
@@ -238,7 +239,7 @@ function CategoryGroupRow({ group }: { group: CategoryGroup }) {
             rename
           </button>
         )}
-        <span className="text-muted" style={{ fontSize: 12 }}>{group.categoryIds.length} categor{group.categoryIds.length === 1 ? 'y' : 'ies'}</span>
+        <span className="text-muted" style={{ fontSize: 12 }}>{(group.categoryIds ?? []).length} categor{(group.categoryIds ?? []).length === 1 ? 'y' : 'ies'}</span>
         <span style={{ flex: 1 }} />
         <IconButton label="Delete group" icon={<TrashIcon size={12} />} onClick={remove} />
       </div>
@@ -247,7 +248,7 @@ function CategoryGroupRow({ group }: { group: CategoryGroup }) {
           {[...categories].sort(byName).map((c) => (
             <button
               key={c.id} type="button"
-              className={`chip${group.categoryIds.includes(c.id) ? ' active' : ''}`}
+              className={`chip${(group.categoryIds ?? []).includes(c.id) ? ' active' : ''}`}
               onClick={() => toggleCategory(c.id)}
             >
               {c.name}

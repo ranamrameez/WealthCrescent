@@ -13,7 +13,7 @@ import type { Category, CategoryGroup } from '../../types/finance';
  * since it re-resolves the name from `categoryID` fresh every call rather
  * than caching a stale name inside the group itself. */
 export function groupCategoryNames(group: CategoryGroup, categories: Category[]): Set<string> {
-  return new Set(group.categoryIds.map((id) => categoryName(id, categories)));
+  return new Set((group.categoryIds ?? []).map((id) => categoryName(id, categories)));
 }
 
 /** Every activity (real + planned, Cash+Bank+Rentals — the exact
