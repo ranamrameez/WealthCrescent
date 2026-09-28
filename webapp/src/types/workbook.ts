@@ -243,6 +243,8 @@ export interface TradePlan {
    * starting blank, while a leg can still be changed to a different
    * ticker for the (less common) multi-ticker plan. */
   defaultTicker?: string;
+  /** One protected/default strategy plan per ticker. Extra plans remain deletable. */
+  isDefault?: boolean;
 }
 
 export interface PricePoint {
