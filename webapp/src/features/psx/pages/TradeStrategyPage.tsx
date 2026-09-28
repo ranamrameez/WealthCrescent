@@ -693,6 +693,18 @@ function PlanCard({ plan }: { plan: TradePlan }) {
         setEditingMeta(true);
       },
     },
+    ...(!plan.isDefault && guardTicker ? [{
+      label: 'Make default',
+      onClick: () => {
+        const state = usePSXWorkbookStore.getState();
+        for (const other of state.workbook.tradePlans) {
+          if (other.id !== plan.id && (other.defaultTicker || other.legs[0]?.ticker) === guardTicker && other.isDefault) {
+            state.updateTradePlan(other.id, { isDefault: false });
+          }
+        }
+        state.updateTradePlan(plan.id, { isDefault: true });
+      },
+    }] : []),
     ...(missedOpportunity ? [{
       label: 'Recent missed opportunities',
       onClick: () => setShowMissedOpportunities(true),
