@@ -105,6 +105,7 @@ export function PlanningPage({
       <CollapsibleCard title={<h3 className="m-0">Upcoming (next 30 days)</h3>} className="mb-md">
         <UpcomingList items={upcoming} emptyText="Nothing expected in the next 30 days." />
       </CollapsibleCard>
+      <BudgetOverview activities={activities} categories={categories} />
       <ActivityList activities={activities} />
       <CollapsibleCard title={<h3 className="m-0">Cash</h3>} className="mb-md">
         <CashPlanningTab
@@ -137,21 +138,61 @@ export function PlanningPage({
   );
 }
 
+function BudgetOverview({ activities, categories }: { activities: BudgetActivity[]; categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories'] }) {
+  const [month, setMonth] = useState(() => today().slice(0, 7));
+  const [mode, setMode] = useState<'budget' | 'modules'>('budget');
+  const monthRows = useMemo(() => activities.filter((a) => !a.executed && a.date.startsWith(month)), [activities, month]);
+  const income = monthRows.filter((a) => a.amount >= 0).reduce((sum, a) => sum + a.amount, 0);
+  const expenses = monthRows.filter((a) => a.amount < 0).reduce((sum, a) => sum + Math.abs(a.amount), 0);
+  const categoryTotals = useMemo(() => {
+    const out = new Map<string, { income: number; expense: number }>();
+    monthRows.forEach((row) => {
+      const category = row.category || 'Uncategorized';
+      const current = out.get(category) ?? { income: 0, expense: 0 };
+      row.amount >= 0 ? current.income += row.amount : current.expense += Math.abs(row.amount);
+      out.set(category, current);
+    });
+    return [...out.entries()].sort((a, b) => (b[1].expense + b[1].income) - (a[1].expense + a[1].income));
+  }, [monthRows]);
+  const moduleTotals = useMemo(() => {
+    const out = new Map<BudgetModule, number>();
+    monthRows.forEach((row) => out.set(row.module, (out.get(row.module) ?? 0) + row.amount));
+    return [...out.entries()];
+  }, [monthRows]);
+  return <CollapsibleCard title={<h3 className="m-0">Monthly Budget Plan</h3>} className="mb-md">
+    <p className="text-muted mt-0">Cross-module, category-aware view of planned activity. Transfers remain visible by source and category so they can be reviewed without being mistaken for income.</p>
+    <div className="row gap-sm mb-md">
+      <Field label="Budget month"><TextInput type="month" value={month} onChange={(e) => setMonth(e.target.value)} /></Field>
+      <Field label="View"><Select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)}><option value="budget">Budget by category</option><option value="modules">Module plan details</option></Select></Field>
+    </div>
+    <div className="grid-auto mb-md" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))' }}>
+      <div className="stat-card card"><div className="label">Planned income</div><div className="value pill-positive">{fmtMoney(income, 'USD')}</div></div>
+      <div className="stat-card card"><div className="label">Planned expenses</div><div className="value pill-negative">{fmtMoney(expenses, 'USD')}</div></div>
+      <div className="stat-card card"><div className="label">Planned net</div><div className={`value ${income - expenses >= 0 ? 'pill-positive' : 'pill-negative'}`}>{fmtMoney(income - expenses, 'USD')}</div></div>
+      <div className="stat-card card"><div className="label">Planned items</div><div className="value">{monthRows.length}</div></div>
+    </div>
+    {mode === 'budget' ? <div className="table-scroll"><table><thead><tr><th>Category</th><th>Income</th><th>Expenses</th><th>Net</th></tr></thead><tbody>{categoryTotals.map(([category, totals]) => <tr key={category}><td>{category}</td><td className="pill-positive">{fmtMoney(totals.income, 'USD')}</td><td className="pill-negative">{fmtMoney(totals.expense, 'USD')}</td><td>{fmtMoney(totals.income - totals.expense, 'USD')}</td></tr>)}{!categoryTotals.length && <tr><td colSpan={4} className="text-muted">No planned items for this month.</td></tr>}</tbody></table></div> : <div className="account-summary-grid">{moduleTotals.map(([module, total]) => <div className="card" key={module}><strong>{module === 'bank' ? 'Banking' : module[0].toUpperCase() + module.slice(1)}</strong><div className={total >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(total, 'USD')} net planned</div></div>)}</div>}
+  </CollapsibleCard>;
+}
+
 /** User-requested (2026-09-03): "add filters to other tables as well." */
 function ActivityList({ activities }: { activities: BudgetActivity[] }) {
   const moduleLabel: Record<BudgetModule, string> = { cash: 'Cash', bank: 'Banking', rentals: 'Rentals' };
   const [moduleFilter, setModuleFilter] = useState<'all' | BudgetModule>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'actual' | 'planned'>('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
 
   const filtered = useMemo(
     () => activities.filter((a) => {
       if (moduleFilter !== 'all' && a.module !== moduleFilter) return false;
       if (statusFilter === 'actual' && !a.executed) return false;
       if (statusFilter === 'planned' && a.executed) return false;
+      if (categoryFilter !== 'all' && (a.category || 'Uncategorized') !== categoryFilter) return false;
       return true;
     }),
-    [activities, moduleFilter, statusFilter],
+    [activities, moduleFilter, statusFilter, categoryFilter],
   );
+  const categoryOptions = useMemo(() => [...new Set(activities.map((a) => a.category || 'Uncategorized'))].sort(), [activities]);
 
   type Col = 'date' | 'module' | 'source' | 'category' | 'amount' | 'status';
   const sortValue = (a: BudgetActivity, col: Col): number | string => {
@@ -184,6 +225,7 @@ function ActivityList({ activities }: { activities: BudgetActivity[] }) {
             <option value="planned">Planned</option>
           </Select>
         </Field>
+        <Field label="Category" width={180}><Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}><option value="all">All categories</option>{categoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}</Select></Field>
       </div>
       <div className="table-scroll">
         <table>
