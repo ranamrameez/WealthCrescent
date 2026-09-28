@@ -1057,6 +1057,7 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
             const replacement = replacements.get(`${plan.id}:${index}`);
             if (!replacement) return leg;
             const { _batchId: _ignored, ...savedLeg } = replacement;
+            void _ignored;
             return savedLeg;
           }) });
         }}
