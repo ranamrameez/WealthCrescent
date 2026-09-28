@@ -821,7 +821,7 @@ function PlanCard({ plan }: { plan: TradePlan }) {
                     <input
                       key={row?.marketPrice}
                       type="number"
-                      step="0.001"
+                      step="0.01"
                       className="price-input w-96"
                       defaultValue={row?.marketPrice || ''}
                       placeholder="—"
