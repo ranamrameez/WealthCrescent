@@ -1,7 +1,10 @@
 import { ModuleDetailTemplate } from '../../../components/ModuleDetailTemplate';
 import type { User } from 'firebase/auth';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { EntityScopeMenu, selectedEntityValues } from '../../../components/EntityScopeMenu';
+import { TopBarControls } from '../../../components/TopBarControls';
+import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { Doughnut, Line } from 'react-chartjs-2';
 import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
 import { Modal } from '../../../components/Modal';
@@ -492,12 +495,13 @@ function AddFundForm({ onSaved, initialBrokerId }: { onSaved?: () => void; initi
  * meaningful to sum/average across funds bought at different times, so
  * this only totals invested/value/profit, same convention as every other
  * module's currency-grouped totals (never blended across currencies). */
-function OverallSummary() {
+function OverallSummary({ selectedIds }: { selectedIds?: string[] } = {}) {
   const funds = useFundsWorkbookStore((s) => s.workbook.funds);
+  const scopedFunds = selectedIds ? funds.filter((fund) => selectedIds.includes(fund.id)) : funds;
   const { positions, workbook } = useFundsDerived();
 
   const totals: Record<string, { invested: number; value: number; profit: number; expDaily: number; expMonthly: number }> = {};
-  funds.forEach((fund) => {
+  scopedFunds.forEach((fund) => {
     const p = positions.find((pos) => pos.ticker === fund.id);
     const invested = p?.invested ?? 0;
     const units = p?.shares ?? 0;
@@ -577,7 +581,7 @@ function OverallSummary() {
 // card shows Name+logo, Code, Value, and Net P/L (with XIRR folded into
 // the subtitle), same "group related figures, don't drop them" pattern
 // as every other converted list's own regrouping.
-function FundList({ onSelect }: { onSelect: (fund: Fund) => void }) {
+function FundList({ onSelect, selectedIds }: { onSelect: (fund: Fund) => void; selectedIds?: string[] }) {
   const allFunds = useFundsWorkbookStore((s) => s.workbook.funds);
   const setWorkbook = useFundsWorkbookStore((s) => s.setWorkbook);
   const ensureSignedIn = useEnsureSignedIn();
@@ -585,7 +589,7 @@ function FundList({ onSelect }: { onSelect: (fund: Fund) => void }) {
   const categoryRegistry = useCategoryStore((s) => s.workbook.categories);
   const [showClosed, setShowClosed] = useState(false);
   const closedCount = useMemo(() => allFunds.filter((f) => f.isActive === false).length, [allFunds]);
-  const funds = useMemo(() => (showClosed ? allFunds : allFunds.filter((f) => f.isActive !== false)), [allFunds, showClosed]);
+  const funds = useMemo(() => (showClosed ? allFunds : allFunds.filter((f) => f.isActive !== false)).filter((f) => !selectedIds || selectedIds.includes(f.id)), [allFunds, showClosed, selectedIds]);
 
   // Pending item 115(c): "favorite an entity, to view it on top." Fund CRUD
   // goes through `setWorkbook` directly (no dedicated `updateFund` store
@@ -1847,6 +1851,9 @@ export function FundsPage({
   const brokers = useFundsWorkbookStore((s) => s.workbook.brokers);
   const liveSelected = selected ? funds.find((f) => f.id === selected.id) ?? null : null;
   const liveSelectedBroker = selectedBroker ? brokers.find((b) => b.id === selectedBroker.id) ?? null : null;
+  const [params] = useSearchParams();
+  const selectedIds = selectedEntityValues(params, funds.map((fund) => fund.id));
+  usePageTopBarRightSlot(!liveSelected && !liveSelectedBroker && funds.length ? <TopBarControls><EntityScopeMenu label="Funds" options={funds.map((fund) => ({ value: fund.id, label: fund.name }))} /></TopBarControls> : null);
 
   return (
     <div>
@@ -1865,7 +1872,7 @@ export function FundsPage({
         />
       ) : (
         <StandardPageSections sections={[
-            { key: 'summary', label: 'Summary', content: <OverallSummary /> },
+            { key: 'summary', label: 'Summary', content: <OverallSummary selectedIds={selectedIds} /> },
             {
               key: 'funds',
               label: 'Funds',
@@ -1873,7 +1880,7 @@ export function FundsPage({
                 <div>
 
                   <BrokersList onSelect={setSelectedBroker} />
-                  <FundList onSelect={setSelected} />
+                  <FundList onSelect={setSelected} selectedIds={selectedIds} />
                   <AddFundFab />
                 </div>
               ),
