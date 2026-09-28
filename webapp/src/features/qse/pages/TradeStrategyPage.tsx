@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { StandardCard, type StandardCardAction } from '../../../components/StandardCard';
 import { TickerLogo } from '../../../components/TickerLogo';
 import { QSE_TICKER_DATALIST_ID } from '../../../components/TickerDatalist';
@@ -10,7 +10,7 @@ import { Notice } from '../../../components/Notice';
 import { Modal } from '../../../components/Modal';
 import { StatSourceBadge } from '../../../components/StatSourceBadge';
 import { usePageFabActions } from '../../../hooks/usePageFabActions';
-import { usePageTopBarChips } from '../../../hooks/usePageTopBar';
+import { usePageTopBarChips, usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { Field, TextInput } from '../../../components/ui/Field';
 import { IconButton } from '../../../components/ui/IconButton';
 import { useSortableRows } from '../../../hooks/useSortableRows';
@@ -97,22 +97,21 @@ function BuySellAvgDownCalculator() {
       : null;
 
   return (
-    <div className="card" style={{ padding: 12, marginBottom: 16 }}>
-      <h3 style={{ marginTop: 0 }}>Buy/Sell &amp; Avg Down</h3>
+    <StandardCard title="Buy/Sell & Avg Down" defaultOpen className="mb-md">
       <div className="row gap-sm mb-sm">
-        <Field label="Ticker" width={140}>
+        <Field label="Ticker">
           <TextInput value={ticker} onChange={(e) => setTicker(e.target.value.toUpperCase())} list={QSE_TICKER_DATALIST_ID} placeholder="e.g. QIBK" />
         </Field>
-        <Field label="Buy price" width={110}>
+        <Field label="Buy price">
           <TextInput type="number" step="0.01" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)} />
         </Field>
-        <Field label="Shares" width={100}>
+        <Field label="Shares">
           <TextInput type="number" value={shares} onChange={(e) => setShares(e.target.value)} />
         </Field>
-        <Field label="Target sell price (optional)" width={150}>
+        <Field label="Target sell price (optional)">
           <TextInput type="number" step="0.01" value={targetSell} onChange={(e) => setTargetSell(e.target.value)} />
         </Field>
-        <Field label=" " width={130}>
+        <Field label=" ">
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, height: 30 }} title={canAvgDown ? 'Blend this purchase with what you already hold.' : 'Averaging down needs an existing position in this ticker.'}>
             <input type="checkbox" checked={avgDown} disabled={!canAvgDown} onChange={(e) => setAvgDown(e.target.checked)} />
             Average down
@@ -158,7 +157,7 @@ function BuySellAvgDownCalculator() {
           </div>
         </div>
       )}
-    </div>
+    </StandardCard>
   );
 }
 
@@ -561,7 +560,7 @@ function PlanCard({ plan }: { plan: TradePlan }) {
   // statement would show) and the ADVISORY Strategic Trades view, so both
   // are directly comparable without leaving this card. Defaults to Broker
   // Style — the real, trustworthy figure first.
-  const [statsView, setStatsView] = useState<'broker' | 'strategic'>('broker');
+  const [statsView, setStatsView] = useState<'broker' | 'strategic'>('strategic');
 
   const addLeg = () => {
     if (!addingLeg || !addingLeg.shares || !addingLeg.price) return toast('Fill in shares and price first.');
@@ -690,7 +689,7 @@ function PlanCard({ plan }: { plan: TradePlan }) {
     }] : []),
     {
       label: 'Delete plan',
-      disabled: hasOpenShares,
+      disabled: hasOpenShares && !!plan.isDefault,
       tone: 'danger',
       onClick: () => {
         void (async () => {
@@ -1010,7 +1009,7 @@ function PlanCard({ plan }: { plan: TradePlan }) {
   return (
     <>
       <StandardCard
-        title={plan.name}
+        title={<span>{plan.name}{plan.isDefault && <span className="pill pill-info ml-6">Default</span>}</span>}
         summary={cardSummary}
         actions={cardActions}
         defaultOpen={false}
@@ -1047,12 +1046,33 @@ export function TradeStrategyPage() {
   const tradePlans = useWorkbookStore((s) => s.workbook.tradePlans);
   const addTradePlan = useWorkbookStore((s) => s.addTradePlan);
   const sorted = [...tradePlans].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  usePageTopBarChips(useMemo(() => sorted.map((plan) => ({
-    key: plan.id,
-    label: plan.name,
-    active: false,
-    onClick: () => document.getElementById(`trade-plan-${plan.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
-  })), [tradePlans]));
+  const navigate = useNavigate();
+  const exchange = "QSE";
+  usePageTopBarRightSlot(
+    <Select
+      aria-label="Stock exchange"
+      value={exchange}
+      width={110}
+      onChange={(event) => navigate(event.target.value === 'QSE' ? '/trade-strategy' : '/psx/trade-strategy')}
+    >
+      <option value="QSE">QSE</option>
+      <option value="PSX">PSX</option>
+    </Select>,
+  );
+  usePageTopBarChips(useMemo(() => [
+    {
+      key: 'buy-sell-avg-down',
+      label: 'Buy/Sell & Avg Down',
+      active: false,
+      onClick: () => document.getElementById('buy-sell-avg-down')?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+    },
+    ...sorted.map((plan) => ({
+      key: plan.id,
+      label: plan.name,
+      active: false,
+      onClick: () => document.getElementById(`trade-plan-${plan.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+    })),
+  ], [tradePlans]));
   const alertsEnabled = useWorkbookStore((s) => !!s.workbook.settings.partialTradeAlertsEnabled);
   const updateSettings = useWorkbookStore((s) => s.updateSettings);
   const { rows } = useQSEDerived();
@@ -1068,9 +1088,15 @@ export function TradeStrategyPage() {
     if (!user) return;
     const openTickers = rows.filter((r) => r.shares > 0).map((r) => r.ticker);
     for (const ticker of openTickers) {
-      const hasPlan = tradePlans.some((p) => (p.defaultTicker || p.legs[0]?.ticker) === ticker);
-      if (!hasPlan) {
-        addTradePlan({ id: crypto.randomUUID(), name: `${ticker} Plan`, createdAt: today(), legs: [], defaultTicker: ticker });
+      const hasDefaultPlan = tradePlans.some((p) => (p.defaultTicker || p.legs[0]?.ticker) === ticker && p.isDefault);
+      if (!hasDefaultPlan) {
+        const existing = tradePlans.find((p) => (p.defaultTicker || p.legs[0]?.ticker) === ticker);
+        if (existing) {
+          useWorkbookStore.getState().updateTradePlan(existing.id, { isDefault: true });
+        } else {
+          addTradePlan({ id: crypto.randomUUID(), name: `${ticker} Plan`, createdAt: today(), legs: [], defaultTicker: ticker, isDefault: true });
+        }
+        }
       }
     }
   }, [user, rows, tradePlans, addTradePlan]);
@@ -1087,7 +1113,7 @@ export function TradeStrategyPage() {
         Show Partial Trade Alerts popup on app load
       </label>
 
-      <BuySellAvgDownCalculator />
+      <div id="buy-sell-avg-down" style={{ scrollMarginTop: 96 }}><BuySellAvgDownCalculator /></div>
 
       <h2 style={{ marginTop: 20, marginBottom: 8, fontSize: 16 }}>Trade Planner</h2>
       <NewPlanFab />
