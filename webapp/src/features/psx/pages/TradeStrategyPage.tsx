@@ -1127,7 +1127,7 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
           { key: 'feeOverride', label: 'Fee override', type: 'number', editable: (row) => !row.executed, width: 140 },
         ] as BatchColumn<TradePlanLeg & { _batchId: string }>[]}
         getRowId={(row) => row._batchId}
-        getRowDate={(row) => row.date}
+        getRowDate={(row) => row.date ?? ''}
         onSave={(changes: BatchChange<TradePlanLeg & { _batchId: string }>[]) => {
           const replacements = new Map(changes.map(({ before, after }) => [before._batchId, after] as const));
           updateTradePlan(plan.id, { legs: plan.legs.map((leg, index) => {
