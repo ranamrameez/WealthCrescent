@@ -1127,6 +1127,7 @@ export function TradeStrategyPage() {
   usePageTopBarChips(useMemo(() => sorted.map((plan) => ({
     key: plan.id,
     label: plan.name,
+    active: false,
     onClick: () => document.getElementById(`trade-plan-${plan.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
   })), [tradePlans]));
   const alertsEnabled = usePSXWorkbookStore((s) => !!s.workbook.settings.partialTradeAlertsEnabled);
