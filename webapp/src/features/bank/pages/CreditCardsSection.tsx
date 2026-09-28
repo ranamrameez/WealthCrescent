@@ -3,13 +3,14 @@ import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { CollapsibleCard, MoneyValue } from '../../../components/Card';
 import { CreditCardVisual } from '../../../components/CreditCardVisual';
+import { SummaryGroupCard, SummaryMetric } from '../../../components/SummaryGroupCard';
 import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls';
 import { StandardCard, SummaryChip } from '../../../components/StandardCard';
 import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
 import { AnalyticsChartEnhancer } from '../../../components/AnalyticsChartCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
-import { ArchiveIcon, EditIcon, ListIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon } from '../../../components/icons';
+import { EditIcon, ListIcon, PlusIcon, SaveIcon, TransferIcon, TrashIcon } from '../../../components/icons';
 import { Modal } from '../../../components/Modal';
 import { FabPanel } from '../../../components/ui/Fab';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
@@ -41,7 +42,6 @@ import { recurrenceLabel } from '../../../lib/recurrenceLabel';
 import { planWithinHorizon, plannedCreditCardProjection, type PlanningHorizonDays } from '../../../lib/calc/plannedBalance';
 import { useCategoryStore } from '../../../store/categoryStore';
 import {
-  availableCredit,
   creditCardMonthlyHistory,
   currentStatement,
   latestClosedStatement,
@@ -696,38 +696,54 @@ export function CreditCardDetailPage() {
     toast('Card deleted.');
     navigate('/bank');
   };
+  const cardActions = [
+    { label: 'Edit card', onClick: () => setEditCardOpen(true) },
+    { label: card.isActive === false ? 'Reopen card' : 'Close card', onClick: () => { void toggleArchived(); } },
+    { label: 'Delete card', tone: 'danger' as const, onClick: () => { void deleteThisCard(); } },
+  ];
+  const openCycleNet = openCycle ? openCycle.chargesThisCycle - openCycle.paymentsThisCycle : 0;
 
   return (
     <div>
       <Link to="/bank" className="text-muted">← Back to Banking</Link>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, marginBottom: 4, flexWrap: 'wrap', gap: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <h1 className="pagetitle" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
           {card.name}
           {card.isActive === false && <span className="pill-warn fs-11">Closed</span>}
         </h1>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <IconButton label={card.isFavorite ? 'Unfavorite' : 'Favorite'} icon={<StarIcon size={13} filled={card.isFavorite} />} align="right" onClick={toggleFavorite} />
-          <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => setEditCardOpen(true)} />
-          <button className="btn secondary small" onClick={toggleArchived}>
-            {card.isActive === false ? <><RestoreIcon size={13} />Reopen card</> : <><ArchiveIcon size={13} />Close card</>}
-          </button>
-          <button className="btn danger small" onClick={deleteThisCard}>
-            <TrashIcon size={13} />Delete card
-          </button>
-        </div>
       </div>
+
+      <div className="mb-md"><CreditCardVisual card={card} balance={balance} favorite={card.isFavorite} onToggleFavorite={() => { void toggleFavorite(); }} actions={cardActions} /></div>
 
       <div id="card-summary"><StandardCard
         title="Summary"
         hue={card.color}
         summary={<SummaryChip label="Outstanding" value={fmtMoney(balance, card.currencyCode)} />}
       >
-        <div className="grid-auto" style={gridAutoStyle(310, 12)}>
-          <CreditCardVisual card={card} balance={balance} />
-          <div className="grid-auto" style={gridAutoStyle(160, 10)}>
-            <div className="stat-card card" style={hueStyle(card.color ?? (balance > 0 ? 'var(--loss)' : 'var(--profit)'))}><div className="label">Outstanding</div><MoneyValue n={balance} currency={card.currencyCode} /></div>
-            {card.creditLimit ? <div className="stat-card card" style={hueStyle(card.color ?? 'var(--accent)')}><div className="label">Available credit</div><MoneyValue n={availableCredit(card, balance)} currency={card.currencyCode} /><div className="sub">Limit {fmtMoney(card.creditLimit, card.currencyCode)}</div></div> : null}
-          </div>
+        <div className="grid-auto" style={gridAutoStyle(300, 12)}>
+          <SummaryGroupCard title="Locked billing cycle" hue="var(--loss)" tooltip="The completed billing cycle. New purchases cannot change these bill figures; eligible payments reduce what remains due.">
+            {statement ? <>
+              <SummaryMetric label="Remaining total due" value={fmtMoney(statement.remainingStatementBalance, card.currencyCode)} tone={statement.remainingStatementBalance > 0 ? 'pill-negative' : 'pill-positive'} large />
+              <SummaryMetric label="Original bill" value={fmtMoney(statement.statementBalance, card.currencyCode)} />
+              <SummaryMetric label="Paid after billing" value={fmtMoney(statement.paymentsAfterClose, card.currencyCode)} tone="pill-positive" />
+              <SummaryMetric label="Minimum still due" value={fmtMoney(statement.remainingMinimumDue, card.currencyCode)} tone={statement.remainingMinimumDue > 0 ? 'pill-negative' : 'pill-positive'} />
+              <SummaryMetric label="Minimum date" value={statement.minDueDate ?? 'Not set'} />
+              <SummaryMetric label="Full-payment date" value={statement.dueDate ?? 'Not set'} />
+              {markup > 0 && <SummaryMetric label="Markup if carried" value={fmtMoney(markup, card.currencyCode)} tone="pill-negative" />}
+              <SummaryMetric label="Cycle" value={`${statement.cycleStart} → ${statement.cycleEnd}`} />
+            </> : <p className="text-muted m-0">Add the last billing date in Card details.</p>}
+          </SummaryGroupCard>
+          <SummaryGroupCard title="Open billing cycle" hue="var(--accent)" tooltip="Activity accumulating since the last billing cut-off. It belongs to the next bill and does not alter the locked cycle.">
+            {openCycle ? <>
+              <SummaryMetric label="Net new balance" value={fmtMoney(openCycleNet, card.currencyCode)} tone={openCycleNet > 0 ? 'pill-negative' : 'pill-positive'} large />
+              <SummaryMetric label="Spent" value={fmtMoney(openCycle.chargesThisCycle, card.currencyCode)} tone="pill-negative" />
+              <SummaryMetric label="Paid" value={fmtMoney(openCycle.paymentsThisCycle, card.currencyCode)} tone="pill-positive" />
+              <SummaryMetric label="Current outstanding" value={fmtMoney(balance, card.currencyCode)} tone={balance > 0 ? 'pill-negative' : 'pill-positive'} />
+              {card.creditLimit ? <SummaryMetric label="Available credit" value={fmtMoney(Math.max(0, card.creditLimit - Math.max(0, balance)), card.currencyCode)} tone="pill-positive" /> : null}
+              <SummaryMetric label="Next billing date" value={openCycle.cycleEnd} />
+              <SummaryMetric label="Cycle" value={`${openCycle.cycleStart} → ${openCycle.cycleEnd}`} />
+            </> : <p className="text-muted m-0">Add the last billing date in Card details.</p>}
+          </SummaryGroupCard>
         </div>
       </StandardCard></div>
 

@@ -2,19 +2,25 @@ import type { KeyboardEvent, ReactNode } from 'react';
 import type { CreditCard } from '../types/creditCard';
 import { fmtMoney } from '../lib/format';
 import { UsageBar } from './ui/UsageBar';
+import { CardActionMenu, type StandardCardAction } from './StandardCard';
+import { StarIcon } from './icons';
+import { StandardIconButton } from './standard';
 
 interface CreditCardVisualProps {
   card: CreditCard;
   balance: number;
   onClick?: () => void;
   badge?: ReactNode;
+  favorite?: boolean;
+  onToggleFavorite?: () => void;
+  actions?: StandardCardAction[];
 }
 
 /** One issuer-style card surface used everywhere a credit card is shown.
  * It intentionally displays only the stored BIN (never invents or stores a
  * full card number) while keeping the most important credit fact—the limit
  * and how much remains—visible without opening the detail page. */
-export function CreditCardVisual({ card, balance, onClick, badge }: CreditCardVisualProps) {
+export function CreditCardVisual({ card, balance, onClick, badge, favorite, onToggleFavorite, actions = [] }: CreditCardVisualProps) {
   const used = Math.max(0, balance);
   const limit = Math.max(0, card.creditLimit ?? 0);
   const available = Math.max(0, limit - used);
@@ -38,7 +44,11 @@ export function CreditCardVisual({ card, balance, onClick, badge }: CreditCardVi
           <div className="credit-card-visual-bank">{card.cardNetwork || 'Credit card'}</div>
           <div className="credit-card-visual-name">{card.name}</div>
         </div>
-        {badge ?? (card.isActive === false ? <span className="pill-warn fs-10">Closed</span> : null)}
+        <div className="credit-card-visual-controls" onClick={(event) => event.stopPropagation()}>
+          {badge ?? (card.isActive === false ? <span className="pill-warn fs-10">Closed</span> : null)}
+          {onToggleFavorite && <StandardIconButton label={favorite ? 'Remove from favorites' : 'Add to favorites'} icon={<StarIcon size={17} filled={favorite} />} onClick={onToggleFavorite} />}
+          <CardActionMenu actions={actions} />
+        </div>
       </div>
       <div className="credit-card-visual-number" aria-label={card.cardBin ? `BIN ${card.cardBin}` : 'Card number hidden'}>
         {card.cardBin ? `${card.cardBin}  ••••  ••••` : '••••  ••••  ••••  ••••'}

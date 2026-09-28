@@ -68,6 +68,7 @@ import { useInterEntityTransfersStore } from '../../../store/interEntityTransfer
 import { linkTargetPath, useLinkSideLabel } from '../../transfers/pages/TransferLinksPage';
 import { CreditCardsTab } from './CreditCardsSection';
 import { CreditCardVisual } from '../../../components/CreditCardVisual';
+import { SummaryGroupCard, SummaryMetric } from '../../../components/SummaryGroupCard';
 import type { Bank, BankAccount, BankTransaction } from '../../../types/bankWorkbook';
 import type { PlannedBankTransaction } from '../../../types/plannedBank';
 import { gridAutoStyle } from '../../../lib/gridStyle';
@@ -938,9 +939,9 @@ export function AccountDetailPage() {
       : hasValue && tone === 'pill-negative'
         ? (isFlow ? <span aria-hidden>↗</span> : <span aria-hidden>▼</span>)
         : null;
-    return <div className={`summary-metric${large ? ' summary-metric-large' : ''}`}><Tooltip text={`${label} for the selected period.`}><span className="summary-metric-label clickable">{label}</span></Tooltip><strong className={`pill ${tone}`}>{indicator}{value}{suffix}</strong></div>;
+    return <SummaryMetric label={label} value={<>{indicator}{value}</>} tone={tone} large={large} suffix={suffix} tooltip={`${label} for the selected period.`} />;
   };
-  const summaryCard = (title: string, metrics: ReactNode, tooltip: string, className = '') => <div className={`stat-card card account-summary-card ${className}`}><Tooltip text={tooltip}><h4 className="clickable">{title}</h4></Tooltip><div className="account-summary-card-metrics">{metrics}</div></div>;
+  const summaryCard = (title: string, metrics: ReactNode, tooltip: string, className = '') => <SummaryGroupCard title={title} tooltip={tooltip} className={className}>{metrics}</SummaryGroupCard>;
   const upcoming = useMemo(
     () => account
       ? plannedEntries

@@ -14,7 +14,7 @@ export function SummaryChip({ label, value }: { label?: string; value: ReactNode
   return <span className="summary-chip">{label && <span className="summary-chip-label">{label}</span>}<span className="summary-chip-value">{value}</span></span>;
 }
 
-function CardActionMenu({ actions, onAction }: { actions: StandardCardAction[]; onAction?: () => void }) {
+export function CardActionMenu({ actions, onAction }: { actions: StandardCardAction[]; onAction?: () => void }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {

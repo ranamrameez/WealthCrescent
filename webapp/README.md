@@ -10116,6 +10116,10 @@ from the lot system."*
   show live Avg, BE, RT, P/L, value, and projected-share figures instead of descriptive text.
   Credit-card calculation tests cover both twice-monthly cutoffs and payment allocation around
   the due date; production build passes.
+  Follow-up parity pass: the issuer-style card is the standalone entity header, Favorite stays
+  directly visible, and Edit/Close/Delete live in the card's action menu instead of floating by
+  the page title. Locked and open cycles use the same extracted `SummaryGroupCard` and
+  `SummaryMetric` components as Bank Account summaries.
 
 ## Pending
 

@@ -515,6 +515,9 @@ licensing is required for that, so it's manual entry or statement import only).
 Credit cards live inside Banking but keep their own debt ledger and billing rules. The Banking
 Summary includes current card debt and available credit by currency. Card tiles resemble an
 issuer card and always show Outstanding, Used, Available, and Limit.
+On a card detail page, Favorite remains visible on the card itself; its adjacent action menu
+contains Edit, Close/Reopen, and Delete. The Summary groups the completed locked bill and the
+currently open billing cycle into two Account-style cards rather than scattering their figures.
 
 In a card's setup, enter the actual **Last billing date**, **Last minimum-payment date**, and
 **Last full-payment due date** shown by the issuer. The app keeps their monthly schedule updated
