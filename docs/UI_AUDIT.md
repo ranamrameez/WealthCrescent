@@ -4,7 +4,7 @@
 
 - Banking, Cash, Rentals, Subscriptions, Personal Loans, EMI, Funds, QSE, PSX, Net Worth, Credit Cards, and Planning compile together.
 - Theme contrast contract passes for all 28 theme cases.
-- Planning and Banking use centralized top-bar scope/date filters; Banking projections are separated by account and currency.
+- Planning, Banking, and Cash use centralized top-bar scope/date filters. Cash now applies the same URL-backed date, direction, category, and source filters to summary figures, transactions, analytics, and category totals; its module-home analytics render each selected currency in a separate section.
 - Net Worth source scope changes the shared aggregation hook.
 
 ## Findings to keep visible

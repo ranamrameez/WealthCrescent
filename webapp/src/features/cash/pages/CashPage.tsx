@@ -11,6 +11,7 @@ import { RecordDetailModal } from '../../../components/RecordDetailModal';
 import { StandardPageSections } from '../../../components/StandardPageSections';
 import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls';
 import { EntityScopeMenu, selectedEntityValues } from '../../../components/EntityScopeMenu';
+import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu';
 import { toast } from '../../../components/Toast';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
 import { PendingToggle } from '../../../components/ui/PendingToggle';
@@ -25,6 +26,7 @@ import { useEnabledCurrencies } from '../../../hooks/useEnabledCurrencies';
 import { useLastCurrency } from '../../../hooks/useLastCurrency';
 import { usePrimaryCurrency } from '../../../hooks/usePrimaryCurrency';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
+import { useUrlTransactionFilters, type TransactionPageFilters } from '../../../hooks/useUrlTransactionFilters';
 import { useSortableRows } from '../../../hooks/useSortableRows';
 import { ReorderButtons } from '../../../components/ui/ReorderButtons';
 import { RecurrenceFields } from '../../../components/ui/RecurrenceFields';
@@ -58,6 +60,18 @@ import type { PlannedCashEntry } from '../../../types/plannedCash';
 import { gridAutoStyle } from '../../../lib/gridStyle';
 
 const today = () => new Date().toISOString().slice(0, 10);
+
+function filterCashEntries(entries: CashEntry[], filters: TransactionPageFilters, categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories']) {
+  return entries.filter((entry) => {
+    if (filters.fromDate && entry.date < filters.fromDate) return false;
+    if (filters.toDate && entry.date > filters.toDate) return false;
+    if (filters.direction === 'in' && !entry.isDeposit) return false;
+    if (filters.direction === 'out' && entry.isDeposit) return false;
+    if (filters.category !== 'all' && categoryName(entry.categoryID, categories) !== filters.category) return false;
+    if (filters.source !== 'all' && (entry.source ?? 'manual') !== filters.source) return false;
+    return true;
+  });
+}
 
 /** User-requested (2026-09-03): "No FAB for logging Cash Transfer!" — the
  * old `LedgerFab` lived inside `LedgerTab`'s own content, which is
@@ -102,14 +116,15 @@ function CashPageFab({ defaultCurrencyOverride }: { defaultCurrencyOverride?: st
   );
 }
 
-function BalancesSummary({ selectedCurrencies }: { selectedCurrencies?: string[] } = {}) {
+function BalancesSummary({ selectedCurrencies, entries: suppliedEntries }: { selectedCurrencies?: string[]; entries?: CashEntry[] } = {}) {
   const navigate = useNavigate();
-  const entries = useCashWorkbookStore((s) => s.workbook.entries);
+  const storedEntries = useCashWorkbookStore((s) => s.workbook.entries);
+  const entries = suppliedEntries ?? storedEntries;
   const plannedEntries = usePlannedCashWorkbookStore((s) => s.workbook.entries);
   const { num } = useAmountFormat();
   const balances = cashBalanceByCurrency(entries);
   const pendingBalances = cashPendingByCurrency(entries);
-  const codes = Object.keys(balances).filter((code) => !selectedCurrencies || selectedCurrencies.includes(code));
+  const codes = selectedCurrencies ?? Object.keys(balances);
   if (!codes.length) return null;
 
   // Not-yet-executed, near-term plans, per currency — surfaced here (not
@@ -171,27 +186,23 @@ function BalancesSummary({ selectedCurrencies }: { selectedCurrencies?: string[]
  * own card side by side in a responsive `.detail-grid`, replacing the old
  * stacked-vertically list. Also gained a category-name filter, per "All
  * tables should have filter options to view filtered table data." */
-function CategoryBreakdown({ currencyCode }: { currencyCode?: string } = {}) {
-  const entries = useCashWorkbookStore((s) => s.workbook.entries);
+function CategoryBreakdown({ currencyCode, entries: suppliedEntries }: { currencyCode?: string; entries?: CashEntry[] } = {}) {
+  const storedEntries = useCashWorkbookStore((s) => s.workbook.entries);
+  const entries = suppliedEntries ?? storedEntries;
   const categories = useCategoryStore((s) => s.workbook.categories);
   const byCategory = cashByCategory(entries, categories);
   const currencies = Object.keys(byCategory).filter((code) => !currencyCode || code === currencyCode);
-  const [search, setSearch] = useState('');
 
   if (!currencies.length) return <p className="text-muted">No cash entries yet.</p>;
 
-  const q = search.trim().toLowerCase();
   const filtered = currencies.map((code) => ({
     code,
-    rows: Object.entries(byCategory[code]).filter(([cat]) => !q || cat.toLowerCase().includes(q)),
+    rows: Object.entries(byCategory[code]),
   }));
 
   return (
     <div>
-      <Field label="Filter by category" width={220}>
-        <TextInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="e.g. Rent" />
-      </Field>
-      <div className="detail-grid mt-12">
+      <div className="detail-grid">
         {filtered.map(({ code, rows }) => (
           <Card key={code}>
             <h4 className="mt-0">{code}</h4>
@@ -290,8 +301,6 @@ function EditEntryModal({ entry, onClose }: { entry: CashEntry; onClose: () => v
  * filter options to view filtered table data." */
 function CashStatementTable({ code, rows: allRows }: { code: string; rows: CashLedgerRow[] }) {
   const [batchOpen, setBatchOpen] = useState(false);
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
   const dateFormat = useAppearanceStore(s => s.appearance.dateFormat);
   const deleteEntry = useCashWorkbookStore((s) => s.deleteEntry);
   const updateEntry = useCashWorkbookStore((s) => s.updateEntry);
@@ -301,12 +310,8 @@ function CashStatementTable({ code, rows: allRows }: { code: string; rows: CashL
   const sideLabel = useLinkSideLabel();
   const [editingEntry, setEditingEntry] = useState<CashEntry | null>(null);
   const [detailEntry, setDetailEntry] = useState<CashEntry | null>(null);
-  const [typeFilter, setTypeFilter] = useState<'all' | 'in' | 'out'>('all');
-  const [categoryFilter, setCategoryFilter] = useState('all');
   // User-requested (2026-09-06): "although we are removing sorting, we
-  // must add all fields as filters in all tables" — a Source filter
-  // (Manual/Imported) for parity with Personal Loans' repayments table.
-  const [sourceFilter, setSourceFilter] = useState<'all' | 'manual' | 'statement-import'>('all');
+  // All page-wide filters are supplied by the centralized top-bar menu.
 
   // User-requested (2026-08-28): "Tag/Mark and also add nav link between
   // the linked trcs" — same recordId -> link map as Bank's TransactionsList.
@@ -319,23 +324,7 @@ function CashStatementTable({ code, rows: allRows }: { code: string; rows: CashL
     return map;
   }, [links]);
 
-  const categoryOptions = useMemo(
-    () => [...new Set(allRows.map((r) => categoryName(r.entry.categoryID, categories)))].sort(),
-    [allRows, categories],
-  );
-
-  const rows = useMemo(
-    () => allRows.filter((r) => {
-      if (fromDate && r.entry.date < fromDate) return false;
-      if (toDate && r.entry.date > toDate) return false;
-      if (typeFilter === 'in' && !r.entry.isDeposit) return false;
-      if (typeFilter === 'out' && r.entry.isDeposit) return false;
-      if (categoryFilter !== 'all' && categoryName(r.entry.categoryID, categories) !== categoryFilter) return false;
-      if (sourceFilter !== 'all' && (r.entry.source ?? 'manual') !== sourceFilter) return false;
-      return true;
-    }),
-    [allRows, typeFilter, categoryFilter, sourceFilter, categories, fromDate, toDate],
-  );
+  const rows = allRows;
 
   // User-reported (2026-09-06): "we may stop sorting options for
   // chronologically important tables (only sequence-aware tables) to
@@ -356,32 +345,8 @@ function CashStatementTable({ code, rows: allRows }: { code: string; rows: CashL
     <Card>
       <h4 className="mt-0">{code}</h4>
       {batchOpen && <CashTransactionsBatchEditor currencyCode={code} rows={rows.map(row => row.entry)} onClose={() => setBatchOpen(false)} />}
-      <div className="row gap-sm mb-sm">
-        <Field label="From"><TextInput type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} /></Field>
-        <Field label="To"><TextInput type="date" value={toDate} onChange={e => setToDate(e.target.value)} /></Field>
+      <div className="row gap-sm mb-sm justify-end">
         <button className="btn secondary" disabled={!rows.length} onClick={() => setBatchOpen(true)}>Batch edit</button>
-      </div>
-      <div className="row gap-sm mb-sm">
-        <Field label="Type" width={120}>
-          <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}>
-            <option value="all">All</option>
-            <option value="in">Cash in</option>
-            <option value="out">Cash out</option>
-          </Select>
-        </Field>
-        <Field label="Category" width={170}>
-          <Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
-            <option value="all">All categories</option>
-            {categoryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
-          </Select>
-        </Field>
-        <Field label="Source" width={130}>
-          <Select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value as typeof sourceFilter)}>
-            <option value="all">All</option>
-            <option value="manual">Manual</option>
-            <option value="statement-import">Imported</option>
-          </Select>
-        </Field>
       </div>
       <div className="table-scroll">
         <table>
@@ -509,9 +474,15 @@ function CashStatementTable({ code, rows: allRows }: { code: string; rows: CashL
  * meant for. Switched to `.stack-lg` — each currency's table is now its
  * own full-width, stacked block, matching `AccountsList`'s own
  * per-currency layout ("make sections like Bank Accounts"). */
-function CashStatementGrid() {
-  const entries = useCashWorkbookStore((s) => s.workbook.entries);
-  const ledger = useMemo(() => cashRunningLedger(entries), [entries]);
+function CashStatementGrid({ entries: suppliedEntries, selectedCurrencies, filters, categories }: { entries?: CashEntry[]; selectedCurrencies?: string[]; filters?: TransactionPageFilters; categories?: ReturnType<typeof useCategoryStore.getState>['workbook']['categories'] } = {}) {
+  const storedEntries = useCashWorkbookStore((s) => s.workbook.entries);
+  const entries = suppliedEntries ?? storedEntries;
+  const ledger = useMemo(() => {
+    const completeLedger = cashRunningLedger(entries);
+    if (!filters || !categories) return completeLedger;
+    const included = new Set(filterCashEntries(entries, filters, categories).map((entry) => entry.id));
+    return completeLedger.filter((row) => included.has(row.entry.id));
+  }, [entries, filters, categories]);
   const byCurrency = useMemo(() => {
     const map = new Map<string, CashLedgerRow[]>();
     for (const row of ledger) {
@@ -519,8 +490,10 @@ function CashStatementGrid() {
       list.push(row);
       map.set(row.entry.currencyCode, list);
     }
-    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [ledger]);
+    return [...map.entries()]
+      .filter(([code]) => !selectedCurrencies || selectedCurrencies.includes(code))
+      .sort(([a], [b]) => a.localeCompare(b));
+  }, [ledger, selectedCurrencies]);
 
   if (!byCurrency.length) return <p className="text-muted">No cash entries yet — use the + button below to add one.</p>;
 
@@ -531,11 +504,11 @@ function CashStatementGrid() {
   );
 }
 
-function CashStatementTab() {
+function CashStatementTab({ entries, selectedCurrencies, filters, categories }: { entries: CashEntry[]; selectedCurrencies: string[]; filters: TransactionPageFilters; categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories'] }) {
   return (
     <div>
 
-      <CashStatementGrid />
+      <CashStatementGrid entries={entries} selectedCurrencies={selectedCurrencies} filters={filters} categories={categories} />
     </div>
   );
 }
@@ -547,8 +520,9 @@ function CashStatementTab() {
  * per the app's cross-cutting rule), a currency picker selects which
  * currency's charts to show — QSE/PSX don't need this since each exchange
  * has exactly one settings.currency. */
-function AnalyticsTab({ currencyCode }: { currencyCode?: string } = {}) {
-  const entries = useCashWorkbookStore((s) => s.workbook.entries);
+function AnalyticsTab({ currencyCode, entries: suppliedEntries }: { currencyCode?: string; entries?: CashEntry[] } = {}) {
+  const storedEntries = useCashWorkbookStore((s) => s.workbook.entries);
+  const entries = suppliedEntries ?? storedEntries;
   // Charts read CSS-var-derived colors — subscribe so this re-renders (and
   // recomputes those colors) on a live theme switch, same pattern as every
   // other chart-bearing page in this app.
@@ -793,9 +767,20 @@ function emptyPlan(defaultCurrency: string): PlannedCashEntry {
   return { id: crypto.randomUUID(), date: today(), type: 'OUT', amount: 0, currencyCode: defaultCurrency, category: '', note: '' };
 }
 
-function BalanceProjectionSummary({ horizonDays }: { horizonDays: PlanningHorizonDays }) {
-  const entries = useCashWorkbookStore((s) => s.workbook.entries);
-  const plannedEntries = usePlannedCashWorkbookStore((s) => s.workbook.entries);
+function BalanceProjectionSummary({ horizonDays, selectedCurrencies, filters }: { horizonDays: PlanningHorizonDays; selectedCurrencies?: string[]; filters?: TransactionPageFilters }) {
+  const allEntries = useCashWorkbookStore((s) => s.workbook.entries);
+  const categories = useCategoryStore((s) => s.workbook.categories);
+  const allPlannedEntries = usePlannedCashWorkbookStore((s) => s.workbook.entries);
+  const entries = useMemo(() => allEntries.filter((entry) => (!selectedCurrencies || selectedCurrencies.includes(entry.currencyCode)) && (!filters || filterCashEntries([entry], filters, categories).length > 0)), [allEntries, selectedCurrencies, filters, categories]);
+  const plannedEntries = useMemo(() => allPlannedEntries.filter((plan) => {
+    if (selectedCurrencies && !selectedCurrencies.includes(plan.currencyCode)) return false;
+    if (filters?.fromDate && plan.date < filters.fromDate) return false;
+    if (filters?.toDate && plan.date > filters.toDate) return false;
+    if (filters?.direction === 'in' && plan.type !== 'IN') return false;
+    if (filters?.direction === 'out' && plan.type !== 'OUT') return false;
+    if (filters?.category !== 'all' && (plan.category || 'Uncategorized') !== filters.category) return false;
+    return true;
+  }), [allPlannedEntries, selectedCurrencies, filters]);
   const settings = usePlannedCashWorkbookStore((s) => s.workbook.settings);
   const updateSettings = usePlannedCashWorkbookStore((s) => s.updateSettings);
   const projection = useMemo(
@@ -1048,25 +1033,26 @@ function PlanCurrencyTable({
   );
 }
 
-function PlanList({ horizonDays }: { horizonDays: PlanningHorizonDays }) {
+function PlanList({ horizonDays, selectedCurrencies, filters }: { horizonDays: PlanningHorizonDays; selectedCurrencies?: string[]; filters?: TransactionPageFilters }) {
   const allPlans = usePlannedCashWorkbookStore((s) => s.workbook.entries);
   const updatePlan = usePlannedCashWorkbookStore((s) => s.updateEntry);
   const deletePlan = usePlannedCashWorkbookStore((s) => s.deleteEntry);
   const addEntry = useCashWorkbookStore((s) => s.addEntry);
   const ensureSignedIn = useEnsureSignedIn();
-  const [statusFilter, setStatusFilter] = useState<'all' | 'planned' | 'done'>('all');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'IN' | 'OUT'>('all');
   const asOf = useMemo(() => new Date(), []);
 
   const plans = useMemo(
     () => allPlans.filter((p) => {
-      if (statusFilter === 'planned' && p.executed) return false;
-      if (statusFilter === 'done' && !p.executed) return false;
-      if (typeFilter !== 'all' && p.type !== typeFilter) return false;
+      if (selectedCurrencies && !selectedCurrencies.includes(p.currencyCode)) return false;
+      if (filters?.fromDate && p.date < filters.fromDate) return false;
+      if (filters?.toDate && p.date > filters.toDate) return false;
+      if (filters?.direction === 'in' && p.type !== 'IN') return false;
+      if (filters?.direction === 'out' && p.type !== 'OUT') return false;
+      if (filters?.category !== 'all' && (p.category || 'Uncategorized') !== filters.category) return false;
       if (!planWithinHorizon(p, asOf, horizonDays)) return false;
       return true;
     }),
-    [allPlans, statusFilter, typeFilter, horizonDays, asOf],
+    [allPlans, selectedCurrencies, filters, horizonDays, asOf],
   );
 
   const byCurrency = useMemo(() => {
@@ -1104,22 +1090,6 @@ function PlanList({ horizonDays }: { horizonDays: PlanningHorizonDays }) {
 
   return (
     <div>
-      <div className="row gap-sm mb-sm">
-        <Field label="Status" width={120}>
-          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'all' | 'planned' | 'done')}>
-            <option value="all">All</option>
-            <option value="planned">Planned</option>
-            <option value="done">Done</option>
-          </Select>
-        </Field>
-        <Field label="Type" width={120}>
-          <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as 'all' | 'IN' | 'OUT')}>
-            <option value="all">All</option>
-            <option value="IN">Cash in</option>
-            <option value="OUT">Cash out</option>
-          </Select>
-        </Field>
-      </div>
       {byCurrency.length ? (
         // User-reported (2026-09-14): "Plans also look messy bcz of this
         // complicated ui cluttering" — same root cause as the Cash
@@ -1186,6 +1156,8 @@ export function PlanningTab({
   plannedCloudEmpty,
   uploadPlannedLocalToCloud,
   showFab = true,
+  selectedCurrencies,
+  filters,
 }: {
   plannedSyncStatus?: string;
   plannedCloudEmpty: boolean;
@@ -1200,6 +1172,8 @@ export function PlanningTab({
    * content could silently disappear — same bug class as the page-level
    * Transfers fix). */
   showFab?: boolean;
+  selectedCurrencies?: string[];
+  filters?: TransactionPageFilters;
 }) {
   // Shared by both children below (2026-09-20) — one "Time period" control
   // for the whole Planning view, not two independently-set pickers that'd
@@ -1208,8 +1182,8 @@ export function PlanningTab({
   return (
     <div>
       <PlanningHorizonField value={horizonDays} onChange={setHorizonDays} />
-      <BalanceProjectionSummary horizonDays={horizonDays} />
-      <PlanList horizonDays={horizonDays} />
+      <BalanceProjectionSummary horizonDays={horizonDays} selectedCurrencies={selectedCurrencies} filters={filters} />
+      <PlanList horizonDays={horizonDays} selectedCurrencies={selectedCurrencies} filters={filters} />
       {showFab && <AddPlanFab />}
       <PlanningAccountSection cloudEmpty={plannedCloudEmpty} uploadLocalToCloud={uploadPlannedLocalToCloud} />
     </div>
@@ -1311,10 +1285,23 @@ export function CashPage({
   uploadPlannedLocalToCloud: () => Promise<void>;
 }) {
   const entries = useCashWorkbookStore((s) => s.workbook.entries);
+  const categories = useCategoryStore((s) => s.workbook.categories);
   const currencies = useMemo(() => [...new Set(entries.map((entry) => entry.currencyCode))].sort(), [entries]);
   const [params] = useSearchParams();
   const selectedCurrencies = selectedEntityValues(params, currencies);
-  usePageTopBarRightSlot(currencies.length ? <TopBarControls><EntityScopeMenu label="Cash currencies" options={currencies.map((code) => ({ value: code, label: code }))} /></TopBarControls> : null);
+  const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
+  const filterCategories = useMemo(
+    () => [...new Set(entries.filter((entry) => selectedCurrencies.includes(entry.currencyCode)).map((entry) => categoryName(entry.categoryID, categories)))].sort(),
+    [entries, selectedCurrencies, categories],
+  );
+  const filteredEntries = useMemo(
+    () => filterCashEntries(entries, filters, categories).filter((entry) => selectedCurrencies.includes(entry.currencyCode)),
+    [entries, filters, categories, selectedCurrencies],
+  );
+  usePageTopBarRightSlot(currencies.length ? <TopBarControls>
+    <EntityScopeMenu label="Cash currencies" options={currencies.map((code) => ({ value: code, label: code }))} />
+    <TransactionFilterMenu value={filters} categories={filterCategories} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} />
+  </TopBarControls> : null);
   return (
     <div className="standard-page">
       <h1 className="pagetitle">Cash</h1>
@@ -1328,8 +1315,8 @@ export function CashPage({
          statement itself; it's now its own tab, moved to the end. Import/
          Settings (not named in the request) stay after, unchanged. */}
       <StandardPageSections sections={[
-          { key: 'summary', label: 'Summary', content: <BalancesSummary selectedCurrencies={selectedCurrencies} /> },
-          { key: 'statement', label: 'Transactions', content: <CashStatementTab /> },
+          { key: 'summary', label: 'Summary', content: <BalancesSummary selectedCurrencies={selectedCurrencies} entries={filteredEntries} /> },
+          { key: 'statement', label: 'Transactions', content: <CashStatementTab entries={entries} selectedCurrencies={selectedCurrencies} filters={filters} categories={categories} /> },
           {
             key: 'plans',
             label: 'Plans',
@@ -1338,11 +1325,17 @@ export function CashPage({
                 plannedCloudEmpty={plannedCloudEmpty}
                 uploadPlannedLocalToCloud={uploadPlannedLocalToCloud}
                 showFab={false}
+                selectedCurrencies={selectedCurrencies}
+                filters={filters}
               />
             ),
           },
-          { key: 'analytics', label: 'Analytics', content: <AnalyticsTab /> },
-          { key: 'categories', label: 'Categories', content: <CategoryBreakdown /> },
+          {
+            key: 'analytics',
+            label: 'Analytics',
+            content: <div className="stack-lg">{selectedCurrencies.map((code) => <Card key={code}><h3 className="mt-0">{code}</h3><AnalyticsTab currencyCode={code} entries={filteredEntries} /></Card>)}</div>,
+          },
+          { key: 'categories', label: 'Categories', content: <CategoryBreakdown entries={filteredEntries} /> },
           { key: 'import', label: 'Import', content: <ImportTab /> },
           {
             key: 'settings',
@@ -1372,12 +1365,11 @@ export function CashCurrencyPage() {
   const navigate = useNavigate();
   const currency = decodeURIComponent(rawCurrency ?? '').toUpperCase();
   const entries = useCashWorkbookStore((state) => state.workbook.entries);
+  const categories = useCategoryStore((state) => state.workbook.categories);
+  const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
+  const filteredEntries = useMemo(() => filterCashEntries(entries, filters, categories).filter((entry) => entry.currencyCode === currency), [entries, filters, categories, currency]);
+  const filterCategories = useMemo(() => [...new Set(entries.filter((entry) => entry.currencyCode === currency).map((entry) => categoryName(entry.categoryID, categories)))].sort(), [entries, categories, currency]);
   const allBalances = useMemo(() => cashBalanceByCurrency(entries), [entries]);
-  const allPending = useMemo(() => cashPendingByCurrency(entries), [entries]);
-  const ledger = useMemo(
-    () => cashRunningLedger(entries).filter((row) => row.entry.currencyCode === currency),
-    [entries, currency],
-  );
   const currencies = useMemo(() => Object.keys(allBalances).sort(), [allBalances]);
   usePageTopBarRightSlot(currencies.length ? (
     <TopBarControls>
@@ -1387,6 +1379,7 @@ export function CashCurrencyPage() {
         onChange={(event) => navigate(`/cash/${encodeURIComponent(event.target.value)}`)}
         options={currencies.map((code) => ({ value: code, label: code }))}
       />
+      <TransactionFilterMenu value={filters} categories={filterCategories} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} />
     </TopBarControls>
   ) : null);
 
@@ -1394,8 +1387,10 @@ export function CashCurrencyPage() {
     return <div className="standard-page"><Link to="/cash" className="text-muted">← Back to Cash</Link><p className="text-muted mt-12">Cash currency not found.</p></div>;
   }
 
-  const balance = allBalances[currency] ?? 0;
-  const pending = allPending[currency] ?? 0;
+  const filteredBalances = cashBalanceByCurrency(filteredEntries);
+  const filteredPending = cashPendingByCurrency(filteredEntries);
+  const balance = filteredBalances[currency] ?? 0;
+  const pending = filteredPending[currency] ?? 0;
   return <div className="standard-page">
     <Link to="/cash" className="text-muted">← Back to Cash</Link>
     <div className="module-detail-heading"><h1>{currency} cash</h1><div className="muted">Account-like view for this currency balance</div></div>
@@ -1407,12 +1402,12 @@ export function CashCurrencyPage() {
           <div className="stat-card card" style={hueStyle(balance >= 0 ? 'var(--profit)' : 'var(--loss)')}><div className="label">Cleared balance</div><MoneyValue n={balance} currency={currency} /></div>
           <div className="stat-card card" style={hueStyle(pending >= 0 ? 'var(--profit)' : 'var(--loss)')}><div className="label">Pending movement</div><MoneyValue n={pending} currency={currency} /></div>
           <div className="stat-card card"><div className="label">Including pending</div><MoneyValue n={balance + pending} currency={currency} /></div>
-          <div className="stat-card card"><div className="label">Transactions</div><div className="value">{ledger.length}</div></div>
+          <div className="stat-card card"><div className="label">Transactions</div><div className="value">{filteredEntries.length}</div></div>
         </div>,
       },
-      { key: 'transactions', label: 'Transactions', content: <CashStatementTable code={currency} rows={ledger} /> },
-      { key: 'analytics', label: 'Analytics', content: <AnalyticsTab currencyCode={currency} /> },
-      { key: 'categories', label: 'Categories', content: <CategoryBreakdown currencyCode={currency} /> },
+      { key: 'transactions', label: 'Transactions', content: <CashStatementGrid entries={entries} selectedCurrencies={[currency]} filters={filters} categories={categories} /> },
+      { key: 'analytics', label: 'Analytics', content: <AnalyticsTab currencyCode={currency} entries={filteredEntries} /> },
+      { key: 'categories', label: 'Categories', content: <CategoryBreakdown currencyCode={currency} entries={filteredEntries} /> },
     ]} />
     <CashPageFab defaultCurrencyOverride={currency} />
   </div>;
