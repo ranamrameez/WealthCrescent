@@ -1827,11 +1827,7 @@ function BalanceProjectionSummary({ horizonDays }: { horizonDays: PlanningHorizo
   const plannedEntries = usePlannedBankWorkbookStore((s) => s.workbook.entries);
   const settings = usePlannedBankWorkbookStore((s) => s.workbook.settings);
   const updateSettings = usePlannedBankWorkbookStore((s) => s.updateSettings);
-  const projection = useMemo(
-    () => plannedBankProjection(accounts, transactions, plannedEntries, new Date(), horizonDays),
-    [accounts, transactions, plannedEntries, horizonDays],
-  );
-  const codes = Object.keys(projection);
+  const projections = useMemo(() => accounts.map((account) => ({ account, projection: plannedBankProjection([account], transactions.filter((tx) => tx.accountId === account.id), plannedEntries.filter((plan) => plan.accountId === account.id), new Date(), horizonDays) })), [accounts, transactions, plannedEntries, horizonDays]);
 
   return (
     <CollapsibleCard
@@ -1852,13 +1848,13 @@ function BalanceProjectionSummary({ horizonDays }: { horizonDays: PlanningHorizo
           Planned balance
         </label>
       </div>
-      {!codes.length ? (
+      {!projections.length ? (
         <p className="text-muted">No balance yet — add an account or a plan below.</p>
       ) : (
         <div className="grid-auto" style={gridAutoStyle(180, 8)}>
-          {codes.map((code) => (
-            <div key={code} className="stat-card card" style={hueStyle('var(--accent)')}>
-              <div className="label">{code}</div>
+          {projections.flatMap(({ account, projection }) => Object.keys(projection).map((code) => (
+            <div key={`${account.id}:${code}`} className="stat-card card" style={{ borderTop: `3px solid ${account.color ?? 'var(--accent)'}` }}>
+              <div className="label">{accountDisplayName(account)} · {code}</div>
               {settings.showRealBalance && (
                 <div className={projection[code].real >= 0 ? 'pill-positive' : 'pill-negative'}>Real: {fmtMoney(projection[code].real, code)}</div>
               )}
@@ -1868,7 +1864,7 @@ function BalanceProjectionSummary({ horizonDays }: { horizonDays: PlanningHorizo
                 </div>
               )}
             </div>
-          ))}
+          )))}
         </div>
       )}
     </CollapsibleCard>
@@ -2230,7 +2226,7 @@ export function PlanningTab({
   plannedCloudEmpty: boolean;
   uploadPlannedLocalToCloud: () => Promise<void>;
 }) {
-  const { accounts, account, accountId, setAccountId } = useAccountPicker();
+  const { accounts } = useAccountPicker();
   // Same shared-picker reasoning as Cash's own PlanningTab (2026-09-20) —
   // one "Time period" control governs both the projection and the list
   // below. Declared before the early return so this hook always runs
@@ -2245,17 +2241,7 @@ export function PlanningTab({
     <div>
       <PlanningHorizonField value={horizonDays} onChange={setHorizonDays} />
       <BalanceProjectionSummary horizonDays={horizonDays} />
-      <Field label="Plans for account" width={220}>
-        <Select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-          {accounts.map((a) => <option key={a.id} value={a.id}>{accountDisplayName(a)} ({a.currencyCode})</option>)}
-        </Select>
-      </Field>
-      {account && (
-        <div className="mt-12">
-          <BankPlanList account={account} horizonDays={horizonDays} />
-          <AddBankPlanFab accountId={account.id} />
-        </div>
-      )}
+      <div className="standard-section-stack">{accounts.map((account) => <div key={account.id} className="mt-12"><h3>{accountDisplayName(account)} <span className="text-muted">({account.currencyCode})</span></h3><BankPlanList account={account} horizonDays={horizonDays} /><AddBankPlanFab accountId={account.id} /></div>)}</div>
       <PlanningAccountSection cloudEmpty={plannedCloudEmpty} uploadLocalToCloud={uploadPlannedLocalToCloud} />
     </div>
   );
