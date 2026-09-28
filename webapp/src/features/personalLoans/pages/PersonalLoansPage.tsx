@@ -1,6 +1,6 @@
 import type { User } from 'firebase/auth';
 import { useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { Card, EntityCard, MoneyValue } from '../../../components/Card';
 import { StandardPageSections, type StandardPageSection } from '../../../components/StandardPageSections';
@@ -10,6 +10,7 @@ import { AttributeList } from '../../../components/ui/AttributeList';
 import { CategorySelect } from '../../../components/CategorySelect';
 import { AnalyticsChartEnhancer } from '../../../components/AnalyticsChartCard';
 import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls';
+import { EntityScopeMenu, selectedEntityValues } from '../../../components/EntityScopeMenu';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { Modal } from '../../../components/Modal';
 import { LoanPaymentsBatchEditor, LoanPlansBatchEditor } from '../../../components/LazyFinanceBatchEditors';
@@ -125,11 +126,13 @@ function PersonalLoanPaymentFilterMenu({
   );
 }
 
-function NetPositionSummary() {
+function NetPositionSummary({ selectedIds }: { selectedIds?: string[] } = {}) {
   const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const repayments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
-  const net = netPositionByCurrency(loans, repayments);
-  const pending = netPendingByCurrency(loans, repayments);
+  const scopedLoans = selectedIds ? loans.filter((loan) => selectedIds.includes(loan.id)) : loans;
+  const scopedRepayments = selectedIds ? repayments.filter((repayment) => selectedIds.includes(repayment.loanId)) : repayments;
+  const net = netPositionByCurrency(scopedLoans, scopedRepayments);
+  const pending = netPendingByCurrency(scopedLoans, scopedRepayments);
   const codes = Object.keys(net);
   if (!codes.length) return null;
 
@@ -161,13 +164,13 @@ function NetPositionSummary() {
  * person, and a repayment timeline; the "payoff planner" from that same
  * sketch lives inside `LoanDetail` below instead, since it needs one
  * specific loan's outstanding balance to project from. */
-function AnalyticsTab({ filter }: { filter: 'all' | 'owed_to_me' | 'i_owe' }) {
+function AnalyticsTab({ filter, selectedIds }: { filter: 'all' | 'owed_to_me' | 'i_owe'; selectedIds?: string[] }) {
   const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const repayments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
   const plans = usePersonalLoansWorkbookStore((s) => s.workbook.plans ?? []);
   const candidates = useMemo(
-    () => loans.filter((loan) => loan.isActive !== false && (filter === 'all' || loan.direction === filter)),
-    [loans, filter],
+    () => loans.filter((loan) => (!selectedIds || selectedIds.includes(loan.id)) && loan.isActive !== false && (filter === 'all' || loan.direction === filter)),
+    [loans, selectedIds, filter],
   );
   const [loanId, setLoanId] = useState('');
   const selected = candidates.find((loan) => loan.id === loanId) ?? candidates[0];
@@ -1102,16 +1105,18 @@ function LoanList({
   onSelect,
   filter,
   showArchived,
+  selectedIds,
 }: {
   onSelect: (loan: PersonalLoan) => void;
   filter: 'all' | 'owed_to_me' | 'i_owe';
   showArchived: boolean;
+  selectedIds?: string[];
 }) {
   const allLoans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const repayments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
   const visibleLoans = useMemo(
-    () => (showArchived ? allLoans : allLoans.filter((loan) => loan.isActive !== false)),
-    [allLoans, showArchived],
+    () => (showArchived ? allLoans : allLoans.filter((loan) => loan.isActive !== false)).filter((loan) => !selectedIds || selectedIds.includes(loan.id)),
+    [allLoans, showArchived, selectedIds],
   );
   const filtered = useMemo(
     () => (filter === 'all' ? visibleLoans : visibleLoans.filter((loan) => loan.direction === filter))
@@ -1295,6 +1300,8 @@ export function PersonalLoansPage({
   const [showArchived, setShowArchived] = useState(false);
   const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const liveSelected = selected ? loans.find((loan) => loan.id === selected.id) ?? null : null;
+  const [params] = useSearchParams();
+  const selectedIds = selectedEntityValues(params, loans.map((loan) => loan.id));
   const archivedCount = useMemo(() => loans.filter((loan) => loan.isActive === false).length, [loans]);
 
   const landingTopBar = useMemo(() => liveSelected ? null : (
@@ -1309,8 +1316,9 @@ export function PersonalLoansPage({
           { value: 'i_owe', label: 'I borrowed money' },
         ]}
       />
+      <EntityScopeMenu label="Loans" options={loans.map((loan) => ({ value: loan.id, label: loan.person }))} />
     </TopBarControls>
-  ), [liveSelected, filter]);
+  ), [liveSelected, filter, loans]);
   usePageTopBarRightSlot(landingTopBar);
 
   if (liveSelected) {
@@ -1330,7 +1338,7 @@ export function PersonalLoansPage({
       label: 'Summary',
       defaultOpen: true,
       summary: <SummaryChip label="Loans" value={loans.length} />,
-      content: <NetPositionSummary />,
+      content: <NetPositionSummary selectedIds={selectedIds} />,
     },
     {
       key: 'loans',
@@ -1338,7 +1346,7 @@ export function PersonalLoansPage({
       defaultOpen: true,
       actions: loanActions,
       summary: <SummaryChip label="Open" value={loans.filter((loan) => loan.isActive !== false).length} />,
-      content: <LoanList onSelect={setSelected} filter={filter} showArchived={showArchived} />,
+      content: <LoanList onSelect={setSelected} filter={filter} showArchived={showArchived} selectedIds={selectedIds} />,
     },
     {
       key: 'plans',
@@ -1353,7 +1361,7 @@ export function PersonalLoansPage({
     {
       key: 'analytics',
       label: 'Analytics',
-      content: <AnalyticsTab filter={filter} />,
+      content: <AnalyticsTab filter={filter} selectedIds={selectedIds} />,
     },
     {
       key: 'settings',
