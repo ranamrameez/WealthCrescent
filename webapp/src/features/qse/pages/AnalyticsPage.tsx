@@ -309,8 +309,8 @@ function FundamentalsCard({
                     <td>{tickerNames[t] || f.name}</td>
                     <td>{f.period}</td>
                     <td>{f.eps === null ? '—' : fmtQSEPrice(f.eps)}</td>
-                    <td>{f.priorEps === null ? '—' : fmtPrice(f.priorEps)}</td>
-                    <td>{f.dps === null ? '—' : fmtPrice(f.dps)}</td>
+                    <td>{f.priorEps === null ? '—' : fmtQSEPrice(f.priorEps)}</td>
+                    <td>{f.dps === null ? '—' : fmtQSEPrice(f.dps)}</td>
                     <td>{f.status}</td>
                   </tr>
                 );
