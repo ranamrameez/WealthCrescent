@@ -1,16 +1,17 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { CollapsibleCard } from '../../../components/Card';
+import { StandardCard, type StandardCardAction } from '../../../components/StandardCard';
 import { TickerLogo } from '../../../components/TickerLogo';
 import { PSX_TICKER_DATALIST_ID } from '../../../components/PSXTickerDatalist';
 import { confirmDialog } from '../../../components/ConfirmDialog';
-import { CheckIcon, CollapseIcon, EditIcon, ExpandIcon, InfoIcon, PlusIcon, SaveIcon, TrashIcon } from '../../../components/icons';
+import { CheckIcon, EditIcon, InfoIcon, PlusIcon, SaveIcon, TrashIcon } from '../../../components/icons';
 import { toast } from '../../../components/Toast';
 import { Tooltip } from '../../../components/Tooltip';
 import { Notice } from '../../../components/Notice';
 import { Modal } from '../../../components/Modal';
 import { StatSourceBadge } from '../../../components/StatSourceBadge';
 import { usePageFabActions } from '../../../hooks/usePageFabActions';
+import { usePageTopBarChips } from '../../../hooks/usePageTopBar';
 import { Field, TextInput } from '../../../components/ui/Field';
 import { FeeModeControl, feeModeFor } from '../../../components/ui/FeeModeControl';
 import { IconButton } from '../../../components/ui/IconButton';
@@ -220,7 +221,6 @@ function PartialTradeAdvisor({ ticker, onSellLot }: { ticker: string; onSellLot:
 
   const advice = computeLotAdvice(lots, calcFee, currentPrice, feePct, tick);
   const { sellable, total } = sellableShareSummary(advice);
-  const missed = findMissedOpportunity(workbook.priceHistory[ticker.toUpperCase()] || [], lots, calcFee);
 
   return (
     <div style={{ marginBottom: 16 }}>
@@ -258,18 +258,6 @@ function PartialTradeAdvisor({ ticker, onSellLot }: { ticker: string; onSellLot:
           </tbody>
         </table>
       </div>
-      {missed && (
-        <Notice tone="info" className="mt-sm">
-          <div>Recent missed opportunities (only prices on/after each buy date):</div>
-          <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
-            {missed.lots.map((l, i) => (
-              <li key={i}>
-                {l.buyDate} buy @ {fmtPrice(l.buyPrice)} → peak {fmtPrice(l.peakPrice)} ({l.peakDate}) → {fmtMoney(l.wouldHaveProfited, currency)} P/L
-              </li>
-            ))}
-          </ul>
-        </Notice>
-      )}
     </div>
   );
 }
@@ -491,6 +479,22 @@ function PlanCard({ plan }: { plan: TradePlan }) {
   // stats right away instead of only once a leg exists.
   const guardTicker = plan.defaultTicker || plan.legs[0]?.ticker || '';
   const hasOpenShares = (rows.find((r) => r.ticker === guardTicker)?.shares || 0) > 0;
+  const currentPlanDate = today();
+  useEffect(() => {
+    if (!plan.legs.some((leg) => !leg.executed && leg.date !== currentPlanDate)) return;
+    updateTradePlan(plan.id, {
+      legs: plan.legs.map((leg) => leg.executed ? leg : { ...leg, date: currentPlanDate }),
+    });
+  }, [currentPlanDate, plan.id, plan.legs, updateTradePlan]);
+
+  const planLots = useMemo(
+    () => computeFIFOPositions(workbook.transactions, calcFee, 'lowestCostFirst').lotsByTicker[guardTicker.toUpperCase()] || [],
+    [workbook.transactions, calcFee, guardTicker],
+  );
+  const missedOpportunity = guardTicker
+    ? findMissedOpportunity(workbook.priceHistory[guardTicker.toUpperCase()] || [], planLots, calcFee)
+    : null;
+  const [showMissedOpportunities, setShowMissedOpportunities] = useState(false);
 
   // Fee estimates for legs still pending need to know about this plan's
   // OTHER pending legs (and any real same-day transaction) to apply PSX's
@@ -575,7 +579,6 @@ function PlanCard({ plan }: { plan: TradePlan }) {
   const [editLegIndex, setEditLegIndex] = useState<number | null>(null);
   const [editLeg, setEditLeg] = useState<TradePlanLeg | null>(null);
   const [addingLeg, setAddingLeg] = useState<Omit<TradePlanLeg, 'ticker'> | null>(null);
-  const [fullscreen, setFullscreen] = useState(false);
   // Trust-restoration (2026-09-16) — see the identical state in QSE's
   // TradeStrategyPage.tsx for the full reasoning.
   const [statsView, setStatsView] = useState<'broker' | 'strategic'>('broker');
@@ -669,82 +672,71 @@ function PlanCard({ plan }: { plan: TradePlan }) {
   };
   const { sorted: sortedLegRows, Th: LegTh } = useSortableRows(legRows, legSortValue, 'date', 'asc');
 
-  const titleBlock: ReactNode = editingMeta ? (
-    <div className="row" style={{ gap: 8 }} onClick={(e) => e.stopPropagation()}>
-      <TextInput value={name} onChange={(e) => setName(e.target.value)} />
-      <TextInput value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes" />
-      <TextInput value={planTicker} onChange={(e) => setPlanTicker(e.target.value.toUpperCase())} list={PSX_TICKER_DATALIST_ID} placeholder="Ticker" className="w-100" />
-      <button className="btn secondary small" onClick={saveMeta}><SaveIcon size={12} />Save</button>
-      <button className="btn secondary small" onClick={() => setEditingMeta(false)}>Cancel</button>
-    </div>
-  ) : (
-    <div>
-      <strong>{plan.name}</strong>{' '}
-      {(plan.defaultTicker || plan.legs[0]?.ticker) && (
+  const cardSummary: ReactNode = (
+    <>
+      {guardTicker && (
         <span className="pill pill-info" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <TickerLogo ticker={plan.defaultTicker || plan.legs[0]?.ticker || ''} exchange="psx" size="sm" />
-          {plan.defaultTicker || plan.legs[0]?.ticker}
+          <TickerLogo ticker={guardTicker} exchange="psx" size="sm" />
+          {guardTicker}
         </span>
       )}{' '}
       <span className="text-muted">{plan.createdAt} · {doneCount}/{plan.legs.length} executed</span>
-      {plan.notes && <p className="text-muted" style={{ margin: '4px 0 0' }}>{plan.notes}</p>}
-    </div>
+    </>
   );
 
-  const actionButtons = (onFullScreenClick: () => void, isFullscreen: boolean): ReactNode => (
-    <div className="row" style={{ gap: 8, justifyContent: 'flex-end' }}>
-      <IconButton
-        label={isFullscreen ? 'Exit full screen' : 'Full screen'}
-        icon={isFullscreen ? <CollapseIcon size={13} /> : <ExpandIcon size={13} />}
-        align="right"
-        onClick={onFullScreenClick}
-      />
-      {!editingMeta && (
-        <IconButton
-          label="Edit"
-          icon={<EditIcon size={13} />}
-          align="right"
-          onClick={() => {
-            setName(plan.name);
-            setNotes(plan.notes || '');
-            setPlanTicker(plan.defaultTicker || plan.legs[0]?.ticker || '');
-            setEditingMeta(true);
-          }}
-        />
-      )}
-      {plan.legs.length > 0 && (
-        <button
-          className="btn secondary small"
-          title="Removes every leg from this plan so you can start fresh — keeps the plan's name, notes, and default ticker. Does not touch any transactions already logged from marking a leg done."
-          onClick={async () => {
-            const ok = await confirmDialog(
-              'This removes every leg from the plan for a fresh start — the plan itself, its name/notes, and any transactions already logged from marking a leg done are untouched.',
-              `Clear all legs from "${plan.name}"?`,
-            );
-            if (ok) updateTradePlan(plan.id, { legs: [] });
-          }}
-        >
-          Clear plan
-        </button>
-      )}
-      <button
-        className="btn secondary small"
-        disabled={hasOpenShares}
-        title={hasOpenShares ? `This ticker still has open shares — close the position first.` : undefined}
-        onClick={async () => {
-          const ok = await confirmDialog('This deletes the plan itself, not any transactions already logged from it.', `Delete plan "${plan.name}"?`);
+  const cardActions: StandardCardAction[] = [
+    {
+      label: 'Edit plan',
+      onClick: () => {
+        setName(plan.name);
+        setNotes(plan.notes || '');
+        setPlanTicker(guardTicker);
+        setEditingMeta(true);
+      },
+    },
+    ...(missedOpportunity ? [{
+      label: 'Recent missed opportunities',
+      onClick: () => setShowMissedOpportunities(true),
+    }] : []),
+    ...(doneCount > 0 ? [{
+      label: 'Clear executed trades',
+      onClick: () => {
+        void (async () => {
+          const ok = await confirmDialog(
+            'This removes executed rows from this plan only. Their linked transactions remain in transaction history.',
+            `Clear ${doneCount} executed trade${doneCount === 1 ? '' : 's'} from "${plan.name}"?`,
+          );
+          if (ok) updateTradePlan(plan.id, { legs: plan.legs.filter((leg) => !leg.executed) });
+        })();
+      },
+    }] : []),
+    ...(plan.legs.length > 0 ? [{
+      label: 'Clear plan',
+      onClick: () => {
+        void (async () => {
+          const ok = await confirmDialog(
+            'This removes every leg from the plan for a fresh start — the plan itself, its name/notes, and any transactions already logged from marking a leg done are untouched.',
+            `Clear all legs from "${plan.name}"?`,
+          );
+          if (ok) updateTradePlan(plan.id, { legs: [] });
+        })();
+      },
+    }] : []),
+    {
+      label: 'Delete plan',
+      disabled: hasOpenShares,
+      tone: 'danger',
+      onClick: () => {
+        void (async () => {
+          const ok = await confirmDialog(
+            'This deletes the plan itself, not any transactions already logged from it.',
+            `Delete plan "${plan.name}"?`,
+          );
           if (ok) deleteTradePlan(plan.id);
-        }}
-      >
-        <TrashIcon size={12} />Delete plan
-      </button>
-    </div>
-  );
-
-  // Summary-first (user-reported, screenshot-confirmed): the per-lot
-  // Partial Trade advice and the plan's own per-ticker blended analysis
-  // now render BEFORE the (potentially long, horizontally-scrolling) legs
-  // table, not buried underneath it.
+        })();
+      },
+    },
+  ];
   const addLotToPlan = (lot: LotAdvice) => {
     const row = rows.find((r) => r.ticker === guardTicker);
     const price = row?.marketPrice || lot.breakEven;
@@ -756,6 +748,15 @@ function PlanCard({ plan }: { plan: TradePlan }) {
 
   const bodyContent = (
     <>
+      {editingMeta && (
+        <div className="row mb-sm" style={{ gap: 8 }}>
+          <TextInput value={name} onChange={(e) => setName(e.target.value)} />
+          <TextInput value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes" />
+          <TextInput value={planTicker} onChange={(e) => setPlanTicker(e.target.value.toUpperCase())} list={PSX_TICKER_DATALIST_ID} placeholder="Ticker" className="w-100" />
+          <button className="btn secondary small" onClick={saveMeta}><SaveIcon size={12} />Save</button>
+          <button className="btn secondary small" onClick={() => setEditingMeta(false)}>Cancel</button>
+        </div>
+      )}
       <div className="row gap-sm mb-sm" style={{ alignItems: 'center' }}>
         <span className="text-muted">Compare:</span>
         <button type="button" className={`chip${statsView === 'broker' ? ' active' : ''}`} onClick={() => setStatsView('broker')}>
@@ -1085,19 +1086,35 @@ function PlanCard({ plan }: { plan: TradePlan }) {
 
   return (
     <>
-      {fullscreen && <div className="modal-overlay show" style={{ zIndex: 999 }} />}
-      {fullscreen ? (
-        <div className="card" style={{ position: 'fixed', inset: 12, zIndex: 1000, overflow: 'auto', padding: 16, boxShadow: '0 8px 40px rgba(0,0,0,.4)' }}>
-          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-            {titleBlock}
-            {actionButtons(() => setFullscreen(false), true)}
+      <StandardCard
+        title={plan.name}
+        summary={cardSummary}
+        actions={cardActions}
+        defaultOpen={false}
+        className="trade-plan-card"
+      >
+        {bodyContent}
+      </StandardCard>
+      {showMissedOpportunities && missedOpportunity && (
+        <Modal title={`Recent missed opportunities — ${guardTicker}`} onClose={() => setShowMissedOpportunities(false)}>
+          <p className="text-muted">Only prices on or after each buy date are considered.</p>
+          <div className="table-scroll">
+            <table>
+              <thead><tr><th>Buy date</th><th>Buy price</th><th>Peak</th><th>Peak date</th><th>Potential P/L</th></tr></thead>
+              <tbody>
+                {missedOpportunity.lots.map((lot, index) => (
+                  <tr key={index}>
+                    <td>{lot.buyDate}</td>
+                    <td>{fmtPrice(lot.buyPrice)}</td>
+                    <td>{fmtPrice(lot.peakPrice)}</td>
+                    <td>{lot.peakDate}</td>
+                    <td className={lot.wouldHaveProfited >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(lot.wouldHaveProfited, currency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          {bodyContent}
-        </div>
-      ) : (
-        <CollapsibleCard title={titleBlock} headerExtra={actionButtons(() => setFullscreen(true), false)} defaultOpen={false} style={{ marginBottom: 28, padding: 12 }}>
-          {bodyContent}
-        </CollapsibleCard>
+        </Modal>
       )}
     </>
   );
@@ -1107,6 +1124,11 @@ export function TradeStrategyPage() {
   const tradePlans = usePSXWorkbookStore((s) => s.workbook.tradePlans);
   const addTradePlan = usePSXWorkbookStore((s) => s.addTradePlan);
   const sorted = [...tradePlans].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  usePageTopBarChips(useMemo(() => sorted.map((plan) => ({
+    key: plan.id,
+    label: plan.name,
+    onClick: () => document.getElementById(`trade-plan-${plan.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+  })), [tradePlans]));
   const alertsEnabled = usePSXWorkbookStore((s) => !!s.workbook.settings.partialTradeAlertsEnabled);
   const updateSettings = usePSXWorkbookStore((s) => s.updateSettings);
   const { rows } = usePSXDerived();
@@ -1145,7 +1167,7 @@ export function TradeStrategyPage() {
 
       <h2 style={{ marginTop: 20, marginBottom: 8, fontSize: 16 }}>Trade Planner</h2>
       <NewPlanFab />
-      {sorted.length ? sorted.map((p) => <PlanCard key={p.id} plan={p} />) : <p className="text-muted">No trade plans yet.</p>}
+      {sorted.length ? sorted.map((p) => <div key={p.id} id={`trade-plan-${p.id}`} style={{ scrollMarginTop: 96 }}><PlanCard plan={p} /></div>) : <p className="text-muted">No trade plans yet.</p>}
     </div>
   );
 }
