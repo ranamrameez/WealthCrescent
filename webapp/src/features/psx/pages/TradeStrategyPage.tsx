@@ -106,7 +106,7 @@ function BuySellAvgDownCalculator() {
       : null;
 
   return (
-    <StandardCard title="Buy/Sell & Avg Down" defaultOpen open={calculatorOpen} onToggle={setCalculatorOpen}>
+    <StandardCard title="Buy/Sell & Avg Down" defaultOpen>
       <div className="row gap-sm mb-sm">
         <Field label="Ticker">
           <TextInput value={ticker} onChange={(e) => setTicker(e.target.value.toUpperCase())} list={PSX_TICKER_DATALIST_ID} placeholder="e.g. OGDC" />
@@ -1139,7 +1139,6 @@ export function TradeStrategyPage() {
   const sorted = [...tradePlans].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const navigate = useNavigate();
   const exchange = "PSX";
-  const [calculatorOpen, setCalculatorOpen] = useState(true);
   const [openPlans, setOpenPlans] = useState<Record<string, boolean>>({});
   usePageTopBarRightSlot(
     <Select
@@ -1158,7 +1157,7 @@ export function TradeStrategyPage() {
       label: 'Buy/Sell & Avg Down',
       active: false,
       onClick: () => {
-        setCalculatorOpen(true);
+        document.getElementById('buy-sell-avg-down')?.querySelector<HTMLButtonElement>('.standard-card-toggle[aria-expanded="false"]')?.click();
         requestAnimationFrame(() => document.getElementById('buy-sell-avg-down')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
       },
     },
