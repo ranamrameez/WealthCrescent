@@ -142,8 +142,15 @@ function BudgetOverview({ activities, categories }: { activities: BudgetActivity
   const [month, setMonth] = useState(() => today().slice(0, 7));
   const [mode, setMode] = useState<'budget' | 'modules'>('budget');
   const monthRows = useMemo(() => activities.filter((a) => !a.executed && a.date.startsWith(month)), [activities, month]);
-  const income = monthRows.filter((a) => a.amount >= 0).reduce((sum, a) => sum + a.amount, 0);
-  const expenses = monthRows.filter((a) => a.amount < 0).reduce((sum, a) => sum + Math.abs(a.amount), 0);
+  const currencyTotals = useMemo(() => {
+    const out = new Map<string, { income: number; expenses: number }>();
+    monthRows.forEach((row) => {
+      const current = out.get(row.currencyCode) ?? { income: 0, expenses: 0 };
+      row.amount >= 0 ? current.income += row.amount : current.expenses += Math.abs(row.amount);
+      out.set(row.currencyCode, current);
+    });
+    return [...out.entries()];
+  }, [monthRows]);
   const categoryTotals = useMemo(() => {
     const out = new Map<string, { income: number; expense: number }>();
     monthRows.forEach((row) => {
@@ -166,12 +173,10 @@ function BudgetOverview({ activities, categories }: { activities: BudgetActivity
       <Field label="View"><Select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)}><option value="budget">Budget by category</option><option value="modules">Module plan details</option></Select></Field>
     </div>
     <div className="grid-auto mb-md" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))' }}>
-      <div className="stat-card card"><div className="label">Planned income</div><div className="value pill-positive">{fmtMoney(income, 'USD')}</div></div>
-      <div className="stat-card card"><div className="label">Planned expenses</div><div className="value pill-negative">{fmtMoney(expenses, 'USD')}</div></div>
-      <div className="stat-card card"><div className="label">Planned net</div><div className={`value ${income - expenses >= 0 ? 'pill-positive' : 'pill-negative'}`}>{fmtMoney(income - expenses, 'USD')}</div></div>
+      {currencyTotals.map(([currency, totals]) => <div className="card" key={currency}><div className="label">{currency} budget</div><div className="sub pill-positive">Income {fmtMoney(totals.income, currency)}</div><div className="sub pill-negative">Expenses {fmtMoney(totals.expenses, currency)}</div><div className={`value ${totals.income - totals.expenses >= 0 ? 'pill-positive' : 'pill-negative'}`}>Net {fmtMoney(totals.income - totals.expenses, currency)}</div></div>)}
       <div className="stat-card card"><div className="label">Planned items</div><div className="value">{monthRows.length}</div></div>
     </div>
-    {mode === 'budget' ? <div className="table-scroll"><table><thead><tr><th>Category</th><th>Income</th><th>Expenses</th><th>Net</th></tr></thead><tbody>{categoryTotals.map(([category, totals]) => <tr key={category}><td>{category}</td><td className="pill-positive">{fmtMoney(totals.income, 'USD')}</td><td className="pill-negative">{fmtMoney(totals.expense, 'USD')}</td><td>{fmtMoney(totals.income - totals.expense, 'USD')}</td></tr>)}{!categoryTotals.length && <tr><td colSpan={4} className="text-muted">No planned items for this month.</td></tr>}</tbody></table></div> : <div className="account-summary-grid">{moduleTotals.map(([module, total]) => <div className="card" key={module}><strong>{module === 'bank' ? 'Banking' : module[0].toUpperCase() + module.slice(1)}</strong><div className={total >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(total, 'USD')} net planned</div></div>)}</div>}
+    {mode === 'budget' ? <div className="table-scroll"><table><thead><tr><th>Category</th><th>Income</th><th>Expenses</th><th>Net</th></tr></thead><tbody>{categoryTotals.map(([category, totals]) => <tr key={category}><td>{category}</td><td className="pill-positive">{fmtMoney(totals.income, monthRows.find((row) => row.category === category)?.currencyCode ?? 'USD')}</td><td className="pill-negative">{fmtMoney(totals.expense, monthRows.find((row) => row.category === category)?.currencyCode ?? 'USD')}</td><td>{fmtMoney(totals.income - totals.expense, monthRows.find((row) => row.category === category)?.currencyCode ?? 'USD')}</td></tr>)}{!categoryTotals.length && <tr><td colSpan={4} className="text-muted">No planned items for this month.</td></tr>}</tbody></table></div> : <div className="account-summary-grid">{moduleTotals.map(([module, total]) => <div className="card" key={module}><strong>{module === 'bank' ? 'Banking' : module[0].toUpperCase() + module.slice(1)}</strong><div className={total >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(total, monthRows.find((row) => row.module === module)?.currencyCode ?? 'USD')} net planned</div></div>)}</div>}
   </CollapsibleCard>;
 }
 

@@ -384,6 +384,13 @@ export function NetWorthPage({
   const monthStart = `${todayISO.slice(0, 7)}-01`;
   const todayFlow = flowByCurrency(cashEntries, bank.settings.accounts, bank.transactions, todayISO, todayISO);
   const monthFlow = flowByCurrency(cashEntries, bank.settings.accounts, bank.transactions, monthStart, todayISO);
+  const plannedMonthByCurrency = useMemo(() => {
+    const totals: Record<string, number> = {};
+    activities.filter((activity) => !activity.executed && activity.date.startsWith(todayISO.slice(0, 7))).forEach((activity) => {
+      totals[activity.currencyCode] = (totals[activity.currencyCode] ?? 0) + activity.amount;
+    });
+    return totals;
+  }, [activities, todayISO]);
   const sumFlow = (flow: Record<string, number>) => {
     let total = 0;
     let anyUnconverted = false;
@@ -555,6 +562,12 @@ export function NetWorthPage({
                 explanation: `Each currency's own real (unconverted) net Cash+Bank movement from ${monthStart} through ${todayISO}, converted above to ${preferredCurrency} for the headline figure. Click that currency's own card further down the page for the real itemized transactions.`,
                 rows: Object.entries(monthFlow).map(([code, amount]) => ({ label: code, currency: code, amount })),
               })}
+            />
+            <StatCard
+              label="Planned month-end change"
+              value={fmtMoney(plannedMonthByCurrency[preferredCurrency] ?? 0, preferredCurrency)}
+              hue={(plannedMonthByCurrency[preferredCurrency] ?? 0) >= 0 ? 'var(--profit)' : 'var(--loss)'}
+              title="Planned income and expenses across Cash, Banking, and Rentals for the current month. Linked inter-account transfers are excluded from income/expense totals."
             />
             {netWorthDelta !== null ? (
               <StatCard
