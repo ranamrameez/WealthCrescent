@@ -12,7 +12,7 @@ import { Modal } from '../../../components/Modal';
 import { StatSourceBadge } from '../../../components/StatSourceBadge';
 import { usePageFabActions } from '../../../hooks/usePageFabActions';
 import { usePageTopBarChips, usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
-import { Field, TextInput } from '../../../components/ui/Field';
+import { Field, Select, TextInput } from '../../../components/ui/Field';
 import { FeeModeControl, feeModeFor } from '../../../components/ui/FeeModeControl';
 import { IconButton } from '../../../components/ui/IconButton';
 import { useSortableRows } from '../../../hooks/useSortableRows';

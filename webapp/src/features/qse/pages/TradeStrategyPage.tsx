@@ -11,7 +11,7 @@ import { Modal } from '../../../components/Modal';
 import { StatSourceBadge } from '../../../components/StatSourceBadge';
 import { usePageFabActions } from '../../../hooks/usePageFabActions';
 import { usePageTopBarChips, usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
-import { Field, TextInput } from '../../../components/ui/Field';
+import { Field, Select, TextInput } from '../../../components/ui/Field';
 import { IconButton } from '../../../components/ui/IconButton';
 import { useSortableRows } from '../../../hooks/useSortableRows';
 import { HUES, hueStyle } from '../../../lib/statCardHues';
