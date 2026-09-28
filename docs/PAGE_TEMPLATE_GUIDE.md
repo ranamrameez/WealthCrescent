@@ -19,6 +19,36 @@ This is the implementation contract for every new page and every parity pass on 
 13. **Responsive/accessibility** – keyboard-accessible controls, labels for icon buttons, visible focus states, readable table overflow, mobile-safe action menus, and no clipped card details.
 14. **Performance** – memoize derived ledgers, avoid repeated filtering in child components, lazy-load batch editors and charts, paginate long lists, and keep secondary cards closed initially.
 
+## Module homepage rule
+
+A module homepage is an aggregate view, not the first entity's detail page. It must combine every active entity owned by that module by default: all bank accounts and cards, all cash currencies, all rental properties, all loans, all subscriptions, all funds, and all market portfolios/strategies. The homepage summary, totals, plans, history, alerts, and analytics must be calculated from that complete set.
+
+The pinned top bar must expose entity inclusion/exclusion controls appropriate to the module. Selecting one or more entities narrows the same shared scope used by every section; clearing the selection restores the all-entities aggregate. The selected scope must be URL-backed, survive refresh, be reflected in the page title/summary chip, and never silently change the underlying detail-page accounting rules.
+
+Required aggregate behavior:
+
+- **Summary:** totals and counts across all included entities, grouped by currency or entity where conversion is not valid.
+- **Plans:** only plans belonging to included entities and the selected date/direction range.
+- **History:** aggregate history plus an entity breakdown; preserve domain cycles separately from calendar months.
+- **Analytics:** every metric and chart uses the same scoped, filtered dataset as the visible ledger.
+- **Ledger/activity:** show the combined activity with an entity column and pagination; entity filters include/exclude rows.
+- **Empty state:** explain whether there is no data at all or the current scope excluded all entities, with a clear reset action.
+
+## Module audit matrix
+
+Use this matrix during every parity pass. A module is conformant only when its homepage aggregates all entities and exposes a shared entity scope.
+
+| Module | Homepage aggregate set | Required entity scope | Detail pages | Domain-specific history |
+| --- | --- | --- | --- | --- |
+| Banking | banks, accounts, credit cards | bank/account/card | bank, account, card | statement and billing cycles |
+| Cash | cash currencies | currency | currency | calendar months |
+| Rentals | properties | property | property | lease/rent cycles |
+| Loans/EMI | loans and repayment schedules | loan | loan | repayment/amortization periods |
+| Subscriptions | subscriptions | subscription | subscription | renewal periods |
+| Funds | funds and holdings | fund | fund/position | valuation periods |
+| QSE/PSX | portfolios, positions, strategies | portfolio/strategy/position | stock/strategy | trade/holding periods |
+| Net Worth | all supported asset/liability entities | source module, currency | source detail pages | monthly snapshots |
+
 ## Bank Account reference feature inventory
 
 The Account page currently provides: bank/account switching; centralized period/date, direction, category, source, and account filters; summary cards for balance, pending activity, inflow/outflow, net change, and selected-period comparison; account details and credit usage; account edit/close/delete/favorite actions; add transaction; transfer; import; filtered export; all-data export; plans with horizon selection; plan add/edit/delete; plan batch edit; transaction modify mode; row edit/delete/detail actions; transaction batch edit; pending versus cleared separation; running balance; period opening balance; filtered analytics; planned inflow/outflow; responsive tables; lazy batch editors; confirmations/toasts; and URL-preserved state.

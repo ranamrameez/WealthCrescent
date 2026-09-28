@@ -7,6 +7,8 @@ transfers, budgeting, and a net-worth dashboard — all in one place.
 This file is a short, general pointer. Each component below keeps its own detailed
 docs inside its own directory — see the linked README for anything specific to it.
 
+Cross-module UI, aggregation, filtering, ledger, and parity requirements are documented in the [Page Template and Parity Guide](docs/PAGE_TEMPLATE_GUIDE.md).
+
 ## Components in this repo
 
 | Component | What it is | Status |
