@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
-import { CollapsibleCard, StatCard } from '../../../components/Card';
+import { StatCard } from '../../../components/Card';
+import { StandardCard } from '../../../components/StandardCard';
 import { Sparkline } from '../../../components/Sparkline';
 import { TickerLogo } from '../../../components/TickerLogo';
 import { RoundTripCostModal } from '../../../components/RoundTripCostModal';
@@ -403,9 +404,9 @@ export function DashboardPage() {
         ]}
       />
 
-      <CollapsibleCard className="mt-md" title={<h3 className="m-0">Alerts</h3>} defaultOpen={false}>
+      <StandardCard className="mt-md" title="Alerts" defaultOpen={false}>
         <AlertsBox />
-      </CollapsibleCard>
+      </StandardCard>
 
       <div style={{ marginTop: 16, marginBottom: 16, textAlign: 'center' }}>
         <Link to="/psx/analytics" className="btn secondary">

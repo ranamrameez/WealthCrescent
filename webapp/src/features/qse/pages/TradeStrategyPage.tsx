@@ -97,7 +97,7 @@ function BuySellAvgDownCalculator() {
       : null;
 
   return (
-    <StandardCard title="Buy/Sell & Avg Down" defaultOpen className="mb-md">
+    <StandardCard title="Buy/Sell & Avg Down" defaultOpen open={calculatorOpen} onToggle={setCalculatorOpen}>
       <div className="row gap-sm mb-sm">
         <Field label="Ticker">
           <TextInput value={ticker} onChange={(e) => setTicker(e.target.value.toUpperCase())} list={QSE_TICKER_DATALIST_ID} placeholder="e.g. QIBK" />
@@ -463,7 +463,7 @@ function BrokerStyleView({ ticker }: { ticker: string }) {
   );
 }
 
-function PlanCard({ plan }: { plan: TradePlan }) {
+function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; onToggle?: (open: boolean) => void }) {
   const updateTradePlan = useWorkbookStore((s) => s.updateTradePlan);
   const deleteTradePlan = useWorkbookStore((s) => s.deleteTradePlan);
   const executeTradePlanLeg = useWorkbookStore((s) => s.executeTradePlanLeg);
@@ -1025,6 +1025,8 @@ function PlanCard({ plan }: { plan: TradePlan }) {
         summary={cardSummary}
         actions={cardActions}
         defaultOpen={false}
+        open={open}
+        onToggle={onToggle}
         className="trade-plan-card"
       >
         {bodyContent}
@@ -1060,6 +1062,8 @@ export function TradeStrategyPage() {
   const sorted = [...tradePlans].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const navigate = useNavigate();
   const exchange = "QSE";
+  const [calculatorOpen, setCalculatorOpen] = useState(true);
+  const [openPlans, setOpenPlans] = useState<Record<string, boolean>>({});
   usePageTopBarRightSlot(
     <Select
       aria-label="Stock exchange"
@@ -1076,13 +1080,19 @@ export function TradeStrategyPage() {
       key: 'buy-sell-avg-down',
       label: 'Buy/Sell & Avg Down',
       active: false,
-      onClick: () => document.getElementById('buy-sell-avg-down')?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+      onClick: () => {
+        setCalculatorOpen(true);
+        requestAnimationFrame(() => document.getElementById('buy-sell-avg-down')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      },
     },
     ...sorted.map((plan) => ({
       key: plan.id,
       label: plan.name,
       active: false,
-      onClick: () => document.getElementById(`trade-plan-${plan.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+      onClick: () => {
+        setOpenPlans((current) => ({ ...current, [plan.id]: true }));
+        requestAnimationFrame(() => document.getElementById(`trade-plan-${plan.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      },
     })),
   ], [tradePlans]));
   const alertsEnabled = useWorkbookStore((s) => !!s.workbook.settings.partialTradeAlertsEnabled);
@@ -1113,7 +1123,7 @@ export function TradeStrategyPage() {
   }, [user, rows, tradePlans, addTradePlan]);
 
   return (
-    <div>
+    <div className="standard-page">
       <h1 className="pagetitle">QSE Trade Strategy</h1>
       <p className="text-muted" style={{ marginBottom: 12 }}>
         Buy/Sell &amp; Avg Down, and Trade Planner &amp; Partial Trade — sketch out trades ahead of time, or get
@@ -1124,11 +1134,11 @@ export function TradeStrategyPage() {
         Show Partial Trade Alerts popup on app load
       </label>
 
-      <div id="buy-sell-avg-down" style={{ scrollMarginTop: 96 }}><BuySellAvgDownCalculator /></div>
+      <div id="buy-sell-avg-down" className="standard-section-anchor" style={{ scrollMarginTop: 96 }}><BuySellAvgDownCalculator /></div>
 
       <h2 style={{ marginTop: 20, marginBottom: 8, fontSize: 16 }}>Trade Planner</h2>
       <NewPlanFab />
-      {sorted.length ? sorted.map((p) => <div key={p.id} id={`trade-plan-${p.id}`} style={{ scrollMarginTop: 96 }}><PlanCard plan={p} /></div>) : <p className="text-muted">No trade plans yet.</p>}
+      {sorted.length ? <div className="standard-section-stack">{sorted.map((p) => <div key={p.id} id={`trade-plan-${p.id}`} className="standard-section-anchor" style={{ scrollMarginTop: 96 }}><PlanCard plan={p} open={!!openPlans[p.id]} onToggle={(open) => setOpenPlans((current) => ({ ...current, [p.id]: open }))} /></div>)}</div> : <p className="text-muted">No trade plans yet.</p>}
     </div>
   );
 }
