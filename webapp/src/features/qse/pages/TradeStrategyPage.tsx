@@ -1051,7 +1051,7 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
         ] as BatchColumn<TradePlanLeg>[]}
         getRowId={(row) => `${row.date}:${row.ticker}:${row.action}:${row.shares}:${row.price}:${plan.legs.indexOf(row)}`}
         getRowDate={(row) => row.date}
-        rowReadOnly={(row) => row.executed ? 'Executed leg: edit its linked transaction instead.' : undefined}
+        rowReadOnly={(row): string | undefined => row.executed ? 'Executed leg: edit its linked transaction instead.' : undefined}
         onSave={(changes: BatchChange<TradePlanLeg>[]) => {
           const replacements = new Map(changes.map(({ before, after }) => [before, after]));
           updateTradePlan(plan.id, { legs: plan.legs.map((leg) => replacements.get(leg) ?? leg) });
