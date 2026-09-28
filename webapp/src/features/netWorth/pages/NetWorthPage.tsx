@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { EntityScopeMenu, selectedEntityValues } from '../../../components/EntityScopeMenu';
+import { TopBarControls } from '../../../components/TopBarControls';
 import { Chart, Doughnut } from 'react-chartjs-2';
 import { Card, CollapsibleCard, MoneyValue, StatCard } from '../../../components/Card';
 import { StandardPageSections } from '../../../components/StandardPageSections';
@@ -234,7 +236,10 @@ export function NetWorthPage({
   // currency the user actually has the largest (absolute) net exposure in —
   // a much more likely "the one they care about" than an arbitrary global
   // default — falling back to 'USD' only when there's no data yet to judge by.
-  const { rows, biggestExposureCurrency } = useNetWorthSummary();
+  const [scopeParams] = useSearchParams();
+  const moduleOptions = ['cash', 'bank', 'creditCards', 'personalLoans', 'emi', 'funds', 'qse', 'psx'];
+  const selectedModules = selectedEntityValues(scopeParams, moduleOptions);
+  const { rows, biggestExposureCurrency } = useNetWorthSummary(selectedModules);
   const currencyRank = useCurrencyRankComparator();
   const primaryCurrency = usePrimaryCurrency();
   // Explicit user preference (Primary currency, set on the Account page)
@@ -251,11 +256,7 @@ export function NetWorthPage({
   // inside the "Net worth summary" card; now the page's own top-bar
   // right-slot (see usePageTopBar.ts), pinned regardless of scroll.
   usePageTopBarRightSlot(
-    <Field label="Show total in" width={150}>
-      <Select value={preferredCurrency} onChange={(e) => setPreferredCurrency(e.target.value)} width={150}>
-        {preferredCurrencyOptions.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
-      </Select>
-    </Field>,
+    <TopBarControls><EntityScopeMenu label="Sources" options={moduleOptions.map((module) => ({ value: module, label: module === 'creditCards' ? 'Credit cards' : module === 'personalLoans' ? 'Personal loans' : module.toUpperCase() }))} /><Field label="Show total in" width={150}><Select value={preferredCurrency} onChange={(e) => setPreferredCurrency(e.target.value)} width={150}>{preferredCurrencyOptions.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}</Select></Field></TopBarControls>,
   );
 
   const categories = useCategoryStore((s) => s.workbook.categories);

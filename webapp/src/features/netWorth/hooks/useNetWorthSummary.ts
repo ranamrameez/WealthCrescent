@@ -35,7 +35,8 @@ export interface NetWorthSummary {
  * exchange-unused-skip logic. `NetWorthPage.tsx` itself now calls this too
  * — single source of truth for "what counts toward net worth," not two
  * copies that could drift. */
-export function useNetWorthSummary(): NetWorthSummary {
+export function useNetWorthSummary(selectedModules?: string[]): NetWorthSummary {
+  const enabled = (module: string) => !selectedModules?.length || selectedModules.includes(module);
   const cashEntries = useCashWorkbookStore((s) => s.workbook.entries);
   const cashSettings = useCashWorkbookStore((s) => s.workbook.settings);
   const bank = useBankWorkbookStore((s) => s.workbook);
@@ -56,19 +57,19 @@ export function useNetWorthSummary(): NetWorthSummary {
   // whole module below instead, since they're a single per-currency ledger
   // each with nothing more granular to toggle.
   const includedAccounts = includedBankAccounts(bank.settings.accounts);
-  const cash = cashSettings.includeInNetWorth === false ? {} : cashBalanceByCurrency(cashEntries);
-  const bankTotals = assetBalanceByCurrency(includedAccounts, bank.transactions);
+  const cash = !enabled('cash') || cashSettings.includeInNetWorth === false ? {} : cashBalanceByCurrency(cashEntries);
+  const bankTotals = enabled('bank') ? assetBalanceByCurrency(includedAccounts, bank.transactions) : {};
   // Merges both sources during the isLiability -> real-CreditCard-entity
   // migration transition — see `mergeCurrencyTotals`'s own doc comment for
   // why this is always a correct sum, never a double-count.
   const creditCards = mergeCurrencyTotals(
-    legacyCreditCardLiabilityByCurrency(includedAccounts, bank.transactions),
-    creditCardLiabilityByCurrency(includedCreditCards(creditCardsWb.cards), creditCardsWb.transactions),
+    enabled('creditCards') ? legacyCreditCardLiabilityByCurrency(includedAccounts, bank.transactions) : {},
+    enabled('creditCards') ? creditCardLiabilityByCurrency(includedCreditCards(creditCardsWb.cards), creditCardsWb.transactions) : {},
   );
-  const personalLoansNet = netPositionByCurrency(includedPersonalLoans(personalLoans.loans), personalLoans.repayments);
+  const personalLoansNet = enabled('personalLoans') ? netPositionByCurrency(includedPersonalLoans(personalLoans.loans), personalLoans.repayments) : {};
   const emiOutstanding: Record<string, number> = {};
-  Object.entries(emiTotalsByCurrency(includedEmiLoans(emiLoans))).forEach(([code, t]) => { emiOutstanding[code] = t.outstanding; });
-  const fundsValues = fundsValueByCurrency(includedFunds(funds.funds), funds.transactions, funds.marketPrices);
+  if (enabled('emi')) Object.entries(emiTotalsByCurrency(includedEmiLoans(emiLoans))).forEach(([code, t]) => { emiOutstanding[code] = t.outstanding; });
+  const fundsValues = enabled('funds') ? fundsValueByCurrency(includedFunds(funds.funds), funds.transactions, funds.marketPrices) : {};
 
   // Skip an exchange entirely if it's never been touched — otherwise an
   // unused QSE/PSX account always contributes a spurious "0" row in its
@@ -80,8 +81,8 @@ export function useNetWorthSummary(): NetWorthSummary {
   const rows = computeNetWorthByCurrency({
     cash,
     bank: bankTotals,
-    qse: qseUsed && qseSettings.includeInNetWorth !== false ? { [qseSettings.currency]: qse.summary.netWorth } : {},
-    psx: psxUsed && psxSettings.includeInNetWorth !== false ? { [psxSettings.currency]: psx.summary.netWorth } : {},
+    qse: enabled('qse') && qseUsed && qseSettings.includeInNetWorth !== false ? { [qseSettings.currency]: qse.summary.netWorth } : {},
+    psx: enabled('psx') && psxUsed && psxSettings.includeInNetWorth !== false ? { [psxSettings.currency]: psx.summary.netWorth } : {},
     funds: fundsValues,
     personalLoansNet,
     emiOutstanding,
