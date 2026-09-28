@@ -2,7 +2,10 @@ import type { User } from 'firebase/auth';
 import { RentalPlanEditor } from './RentalPlanEditor';
 import type { PlannedRentalEntry } from '../../../types/plannedRentals';
 import { useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { EntityScopeMenu, selectedEntityValues } from '../../../components/EntityScopeMenu';
+import { TopBarControls } from '../../../components/TopBarControls';
+import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
 import { Notice } from '../../../components/Notice';
@@ -59,11 +62,12 @@ function emptyProperty(defaultCurrency: string): Property {
 
 /* ============================== Properties ============================== */
 
-function NetIncomeSummary() {
+function NetIncomeSummary({ selectedIds }: { selectedIds?: string[] } = {}) {
   const properties = useRentalsWorkbookStore((s) => s.workbook.settings.properties);
   const entries = useRentalsWorkbookStore((s) => s.workbook.entries);
-  const totals = netIncomeByCurrency(properties, entries);
-  const pending = netIncomePendingByCurrency(properties, entries);
+  const scopedProperties = selectedIds ? properties.filter((property) => selectedIds.includes(property.id)) : properties;
+  const totals = netIncomeByCurrency(scopedProperties, entries);
+  const pending = netIncomePendingByCurrency(scopedProperties, entries);
   const codes = Object.keys(totals);
   if (!codes.length) return null;
 
@@ -180,7 +184,7 @@ export function AddPropertyForm({ onSaved, initialCurrency }: { onSaved?: (id: s
 // follows. Archive/Restore/Delete stay in this list's own card actions
 // (not the modal) since `Modal` has no header-action slot — same reasoning
 // already documented for this module in README Done item 223.
-function PropertiesList() {
+function PropertiesList({ selectedIds }: { selectedIds?: string[] } = {}) {
   const allProperties = useRentalsWorkbookStore((s) => s.workbook.settings.properties);
   const entries = useRentalsWorkbookStore((s) => s.workbook.entries);
   const updateProperty = useRentalsWorkbookStore((s) => s.updateProperty);
@@ -189,7 +193,7 @@ function PropertiesList() {
   const [detailProperty, setDetailProperty] = useState<Property | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const archivedCount = useMemo(() => allProperties.filter((p) => p.isActive === false).length, [allProperties]);
-  const properties = useMemo(() => (showArchived ? allProperties : allProperties.filter((p) => p.isActive !== false)), [allProperties, showArchived]);
+  const properties = useMemo(() => (showArchived ? allProperties : allProperties.filter((p) => p.isActive !== false)).filter((p) => !selectedIds || selectedIds.includes(p.id)), [allProperties, showArchived, selectedIds]);
   // Pending item 115(c): Sr# = the property's own stable position in the
   // underlying (unfiltered) array, creation order — same convention as
   // Bank/Personal Loans/EMI/Funds.
@@ -613,11 +617,11 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
   );
 }
 
-function PropertiesTab() {
+function PropertiesTab({ selectedIds }: { selectedIds?: string[] } = {}) {
   return (
     <div>
 
-      <PropertiesList />
+      <PropertiesList selectedIds={selectedIds} />
       <AddPropertyFab />
     </div>
   );
@@ -645,8 +649,8 @@ function usePropertyPicker() {
  * one selected property — the latter two reuse `propertyByCategory`/
  * `propertyMonthlyRollup`, already computed for the plain tables in the
  * Entries tab (README item 23), just charted here instead. */
-function AnalyticsTab() {
-  const properties = useRentalsWorkbookStore((s) => s.workbook.settings.properties);
+function AnalyticsTab({ selectedIds }: { selectedIds?: string[] } = {}) {
+  const properties = useRentalsWorkbookStore((s) => s.workbook.settings.properties).filter((property) => !selectedIds || selectedIds.includes(property.id));
   const entries = useRentalsWorkbookStore((s) => s.workbook.entries);
   useAppearanceStore((s) => s.appearance);
   applyChartTheme();
@@ -1351,6 +1355,9 @@ export function RentalsPage({
 }) {
   const { properties, property, propertyId, setPropertyId } = usePropertyPicker();
   const { fromDate, setFromDate, toDate, setToDate, exportStatement, hasRows } = useEntriesExport(property);
+  const [params] = useSearchParams();
+  const selectedIds = selectedEntityValues(params, properties.map((item) => item.id));
+  usePageTopBarRightSlot(properties.length ? <TopBarControls><EntityScopeMenu label="Properties" options={properties.map((item) => ({ value: item.id, label: item.name }))} /></TopBarControls> : null);
 
   return (
     <div>
@@ -1360,8 +1367,8 @@ export function RentalsPage({
         management fees) against one or more properties, not discrete buy/sell trades.
       </p>
       <StandardPageSections sections={[
-          { key: 'summary', label: 'Summary', content: <NetIncomeSummary /> },
-          { key: 'properties', label: 'Properties', content: <PropertiesTab /> },
+          { key: 'summary', label: 'Summary', content: <NetIncomeSummary selectedIds={selectedIds} /> },
+          { key: 'properties', label: 'Properties', content: <PropertiesTab selectedIds={selectedIds} /> },
           {
             key: 'entries',
             label: 'Income & expenses',
@@ -1379,7 +1386,7 @@ export function RentalsPage({
             ) : undefined,
           },
           { key: 'import', label: 'Import', content: <ImportTab /> },
-          { key: 'analytics', label: 'Analytics', content: <AnalyticsTab /> },
+          { key: 'analytics', label: 'Analytics', content: <AnalyticsTab selectedIds={selectedIds} /> },
           {
             key: 'settings',
             label: 'Settings',
