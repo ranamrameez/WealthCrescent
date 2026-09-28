@@ -544,8 +544,7 @@ function TransactionsTable({ card, filters }: { card: CreditCard; filters: Trans
  * with a "Log markup" action, and the full transaction ledger with a
  * kind-based add-transaction form. */
 
-function CreditCardAnalyticsSection({ card }: { card: CreditCard }) {
-  const transactions = useCreditCardWorkbookStore((s) => s.workbook.transactions);
+function CreditCardAnalyticsSection({ card, transactions }: { card: CreditCard; transactions: CreditCardTransaction[] }) {
   const plans = usePlannedCreditCardWorkbookStore((s) => s.workbook.entries);
   const categories = useCategoryStore((s) => s.workbook.categories);
   const dateFormat = useAppearanceStore((s) => s.appearance.dateFormat ?? 'DD-MMM-YYYY');
@@ -669,10 +668,24 @@ export function CreditCardDetailPage() {
   // (deliberately separate from the card's own billing cycle above —
   // see `creditCardMonthlyHistory`'s own doc comment), matching Net
   // Worth's per-currency monthly window.
-  const monthlyHistory = useMemo(() => (card ? creditCardMonthlyHistory(card, transactions, 6) : []), [card, transactions]);
-  const cycleHistory = useMemo(() => (card ? creditCardCycleHistory(card, transactions, 6) : []), [card, transactions]);
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
   const filterCategories = useMemo(() => card ? [...new Set(transactions.filter((tx) => tx.cardId === card.id).map((tx) => categoryName(tx.categoryID, useCategoryStore.getState().workbook.categories)))].sort() : [], [card, transactions]);
+  const visibleTransactions = useMemo(() => {
+    if (!card) return [];
+    const categories = useCategoryStore.getState().workbook.categories;
+    return transactions.filter((tx) => {
+      if (tx.cardId !== card.id) return false;
+      if (filters.fromDate && tx.date < filters.fromDate) return false;
+      if (filters.toDate && tx.date > filters.toDate) return false;
+      if (filters.direction === 'in' && tx.kind !== 'payment') return false;
+      if (filters.direction === 'out' && tx.kind === 'payment') return false;
+      if (filters.category !== 'all' && categoryName(tx.categoryID, categories) !== filters.category) return false;
+      if (filters.source !== 'all' && (tx.source ?? 'manual') !== filters.source) return false;
+      return true;
+    });
+  }, [card, transactions, filters.fromDate, filters.toDate, filters.direction, filters.category, filters.source]);
+  const monthlyHistory = useMemo(() => (card ? creditCardMonthlyHistory(card, visibleTransactions, 6) : []), [card, visibleTransactions]);
+  const cycleHistory = useMemo(() => (card ? creditCardCycleHistory(card, visibleTransactions, 6) : []), [card, visibleTransactions]);
   const [collectAmount, setCollectAmount] = useState(proposal?.amount ?? 0);
   const [collectDate, setCollectDate] = useState(proposal?.dueDate ?? today());
   const [linkMode, setLinkMode] = useState(false);
@@ -858,7 +871,7 @@ export function CreditCardDetailPage() {
       </StandardCard></div>
 
       <div id="card-analytics"><StandardCard title="Analytics" hue={card.color} defaultOpen={false}>
-        <CreditCardAnalyticsSection card={card} />
+        <CreditCardAnalyticsSection card={card} transactions={visibleTransactions} />
       </StandardCard></div>
       </div>
 
