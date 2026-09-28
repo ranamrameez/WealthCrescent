@@ -1,6 +1,6 @@
 import type { User } from 'firebase/auth';
 import { useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
 import { Notice } from '../../../components/Notice';
@@ -10,6 +10,7 @@ import { Modal } from '../../../components/Modal';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
 import { StandardPageSections } from '../../../components/StandardPageSections';
 import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls';
+import { EntityScopeMenu, selectedEntityValues } from '../../../components/EntityScopeMenu';
 import { toast } from '../../../components/Toast';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
 import { PendingToggle } from '../../../components/ui/PendingToggle';
@@ -101,14 +102,14 @@ function CashPageFab({ defaultCurrencyOverride }: { defaultCurrencyOverride?: st
   );
 }
 
-function BalancesSummary() {
+function BalancesSummary({ selectedCurrencies }: { selectedCurrencies?: string[] } = {}) {
   const navigate = useNavigate();
   const entries = useCashWorkbookStore((s) => s.workbook.entries);
   const plannedEntries = usePlannedCashWorkbookStore((s) => s.workbook.entries);
   const { num } = useAmountFormat();
   const balances = cashBalanceByCurrency(entries);
   const pendingBalances = cashPendingByCurrency(entries);
-  const codes = Object.keys(balances);
+  const codes = Object.keys(balances).filter((code) => !selectedCurrencies || selectedCurrencies.includes(code));
   if (!codes.length) return null;
 
   // Not-yet-executed, near-term plans, per currency — surfaced here (not
@@ -1309,6 +1310,11 @@ export function CashPage({
   plannedCloudEmpty: boolean;
   uploadPlannedLocalToCloud: () => Promise<void>;
 }) {
+  const entries = useCashWorkbookStore((s) => s.workbook.entries);
+  const currencies = useMemo(() => [...new Set(entries.map((entry) => entry.currencyCode))].sort(), [entries]);
+  const [params] = useSearchParams();
+  const selectedCurrencies = selectedEntityValues(params, currencies);
+  usePageTopBarRightSlot(currencies.length ? <TopBarControls><EntityScopeMenu label="Cash currencies" options={currencies.map((code) => ({ value: code, label: code }))} /></TopBarControls> : null);
   return (
     <div className="standard-page">
       <h1 className="pagetitle">Cash</h1>
@@ -1322,7 +1328,7 @@ export function CashPage({
          statement itself; it's now its own tab, moved to the end. Import/
          Settings (not named in the request) stay after, unchanged. */}
       <StandardPageSections sections={[
-          { key: 'summary', label: 'Summary', content: <BalancesSummary /> },
+          { key: 'summary', label: 'Summary', content: <BalancesSummary selectedCurrencies={selectedCurrencies} /> },
           { key: 'statement', label: 'Transactions', content: <CashStatementTab /> },
           {
             key: 'plans',
