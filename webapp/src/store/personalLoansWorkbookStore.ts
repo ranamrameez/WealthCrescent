@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { scheduleLocalStorageWrite } from '../lib/localStoragePersistence';
 import { toInstantMs } from '../lib/datetime';
 import { assignSeqForEntities, backfillSeq, nextSeqForEntity } from '../lib/seq';
 import { createEmptyPersonalLoansWorkbook } from './defaultPersonalLoansWorkbook';
@@ -60,11 +61,9 @@ function loadFromLocalStorage(): PersonalLoansWorkbook {
 }
 
 function persist(workbook: PersonalLoansWorkbook) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(workbook));
-  } catch (e) {
+  scheduleLocalStorageWrite(STORAGE_KEY, workbook, (e) => {
     console.error('Failed to save workbook to localStorage — your last change may not have persisted.', e);
-  }
+  });
 }
 
 export const usePersonalLoansWorkbookStore = create<PersonalLoansStoreState>((set, get) => {
