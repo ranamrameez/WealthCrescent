@@ -1,7 +1,7 @@
 import { ModuleDetailTemplate } from '../../../components/ModuleDetailTemplate';
 import type { User } from 'firebase/auth';
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
 import { CategorySelect } from '../../../components/CategorySelect';
@@ -12,6 +12,9 @@ import { HUES, hueStyle } from '../../../lib/statCardHues';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { EditIcon, PlusIcon, SaveIcon, StarIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { StandardPageSections } from '../../../components/StandardPageSections';
+import { EntityScopeMenu, selectedEntityValues } from '../../../components/EntityScopeMenu';
+import { TopBarControls } from '../../../components/TopBarControls';
+import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { toast } from '../../../components/Toast';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
 import { IconButton } from '../../../components/ui/IconButton';
@@ -146,9 +149,10 @@ function AddSubscriptionForm({ onSaved }: { onSaved?: () => void } = {}) {
 
 /* ============================== Overall summary ============================== */
 
-function OverallSummary() {
+function OverallSummary({ selectedIds }: { selectedIds?: string[] } = {}) {
   const subs = useSubscriptionsWorkbookStore((s) => s.workbook.entries);
-  const totals = totalMonthlySpendByCurrency(subs);
+  const scoped = selectedIds ? subs.filter((s) => selectedIds.includes(s.id)) : subs;
+  const totals = totalMonthlySpendByCurrency(scoped);
   const codes = Object.keys(totals);
   if (!codes.length) return null;
 
@@ -186,7 +190,7 @@ function subCategoryLabel(s: Subscription, categoryRegistry: Category[]): string
 // this file) in favor of favorite-first ordering. The old table's "Open"
 // button was dropped as redundant (the whole card is already clickable),
 // matching every other converted list's own precedent.
-function SubscriptionList({ onSelect }: { onSelect: (sub: Subscription) => void }) {
+function SubscriptionList({ onSelect, selectedIds }: { onSelect: (sub: Subscription) => void; selectedIds?: string[] }) {
   const subs = useSubscriptionsWorkbookStore((s) => s.workbook.entries);
   const updateEntry = useSubscriptionsWorkbookStore((s) => s.updateEntry);
   const categoryRegistry = useCategoryStore((s) => s.workbook.categories);
@@ -209,12 +213,13 @@ function SubscriptionList({ onSelect }: { onSelect: (sub: Subscription) => void 
 
   const filteredSubs = useMemo(
     () => subs.filter((s) => {
+      if (selectedIds && !selectedIds.includes(s.id)) return false;
       if (statusFilter === 'active' && !s.active) return false;
       if (statusFilter === 'cancelled' && s.active) return false;
       if (categoryFilter !== 'all' && subCategoryLabel(s, categoryRegistry) !== categoryFilter) return false;
       return true;
     }),
-    [subs, statusFilter, categoryFilter, categoryRegistry],
+    [subs, selectedIds, statusFilter, categoryFilter, categoryRegistry],
   );
 
   const sorted = useMemo(
@@ -631,25 +636,26 @@ function SubscriptionDetail({ sub, onBack }: { sub: Subscription; onBack: () => 
 
 /* ============================== Analytics ============================== */
 
-function AnalyticsTab() {
+function AnalyticsTab({ selectedIds }: { selectedIds?: string[] } = {}) {
   const subs = useSubscriptionsWorkbookStore((s) => s.workbook.entries);
+  const scopedSubs = selectedIds ? subs.filter((s) => selectedIds.includes(s.id)) : subs;
   const categoryRegistry = useCategoryStore((s) => s.workbook.categories);
   useAppearanceStore((s) => s.appearance);
   applyChartTheme();
 
-  const currencies = useMemo(() => [...new Set(subs.map((s) => s.currencyCode))].sort(), [subs]);
+  const currencies = useMemo(() => [...new Set(scopedSubs.map((s) => s.currencyCode))].sort(), [scopedSubs]);
   const [currency, setCurrency] = useState(currencies[0] ?? 'USD');
   const effectiveCurrency = currencies.includes(currency) ? currency : (currencies[0] ?? currency);
 
-  const byCategory = useMemo(() => spendByCategory(subs, effectiveCurrency, categoryRegistry), [subs, effectiveCurrency, categoryRegistry]);
+  const byCategory = useMemo(() => spendByCategory(scopedSubs, effectiveCurrency, categoryRegistry), [scopedSubs, effectiveCurrency, categoryRegistry]);
   const categories = Object.keys(byCategory);
-  const renewals = useMemo(() => upcomingRenewals(subs, 30), [subs]);
+  const renewals = useMemo(() => upcomingRenewals(scopedSubs, 30), [scopedSubs]);
 
   const accounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
   const cards = useCreditCardWorkbookStore((s) => s.workbook.cards);
   const byAccount = useMemo(() => {
     const out: Record<string, number> = {};
-    subs.filter((s) => s.active && s.currencyCode === effectiveCurrency).forEach((s) => {
+    scopedSubs.filter((s) => s.active && s.currencyCode === effectiveCurrency).forEach((s) => {
       const label = !s.paidVia
         ? 'Not linked'
         : s.paidVia.module === 'cash'
@@ -808,6 +814,9 @@ export function SubscriptionsPage({
   const [selected, setSelected] = useState<Subscription | null>(null);
   const subs = useSubscriptionsWorkbookStore((s) => s.workbook.entries);
   const liveSelected = selected ? subs.find((s) => s.id === selected.id) ?? null : null;
+  const [params] = useSearchParams();
+  const selectedIds = selectedEntityValues(params, subs.map((s) => s.id));
+  usePageTopBarRightSlot(!liveSelected && subs.length ? <TopBarControls><EntityScopeMenu label="Subscriptions" options={subs.map((s) => ({ value: s.id, label: s.name }))} /></TopBarControls> : null);
 
   return (
     <div>
@@ -820,19 +829,19 @@ export function SubscriptionsPage({
         <SubscriptionDetail sub={liveSelected} onBack={() => setSelected(null)} />
       ) : (
         <StandardPageSections sections={[
-            { key: 'summary', label: 'Summary', content: <OverallSummary /> },
+            { key: 'summary', label: 'Summary', content: <OverallSummary selectedIds={selectedIds} /> },
             {
               key: 'subscriptions',
               label: 'Subscriptions',
               content: (
                 <div>
 
-                  <SubscriptionList onSelect={setSelected} />
+                  <SubscriptionList onSelect={setSelected} selectedIds={selectedIds} />
                   <AddSubscriptionFab />
                 </div>
               ),
             },
-            { key: 'analytics', label: 'Analytics', content: <AnalyticsTab /> },
+            { key: 'analytics', label: 'Analytics', content: <AnalyticsTab selectedIds={selectedIds} /> },
             {
               key: 'settings',
               label: 'Settings',
