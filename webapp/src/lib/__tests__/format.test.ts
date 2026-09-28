@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fmtCompact, fmtMoneyCompact, fmtPrice, fmtQSEPrice, fmtPSXPrice } from '../format';
+import { fmtCompact, fmtMoneyCompact, fmtPrice, fmtQSEPrice, fmtPSXPrice, qsePriceStep } from '../format';
 
 describe('fmtCompact', () => {
   it('leaves numbers under 1000 unabbreviated', () => {
@@ -73,5 +73,14 @@ describe('exchange price precision', () => {
     expect(fmtPSXPrice(12.123)).toBe('12.12');
     expect(fmtPSXPrice(1.2)).toBe('1.2');
     expect(fmtPSXPrice(123.456)).toBe('123.46');
+  });
+});
+
+
+describe('QSE four-digit price step', () => {
+  it('changes step with price magnitude', () => {
+    expect(qsePriceStep(1.212)).toBe(0.001);
+    expect(qsePriceStep(12.00)).toBe(0.01);
+    expect(qsePriceStep(123.5)).toBe(0.1);
   });
 });
