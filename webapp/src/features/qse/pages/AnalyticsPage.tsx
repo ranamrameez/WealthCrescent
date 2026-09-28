@@ -18,7 +18,7 @@ import {
 import { dimColor, dlBarH, dlBarV, dlDoughnut } from '../../../lib/chartLabels';
 import { profitColor } from '../../../lib/chartLabels';
 import { applyChartTheme } from '../../../lib/chartSetup';
-import { fmt, fmtMoney, fmtPrice } from '../../../lib/format';
+import { fmt, fmtMoney, fmtQSEPrice } from '../../../lib/format';
 import { ChartCard } from '../components/ChartCard';
 import { useChartData } from '../hooks/useChartData';
 import { useQSEDerived } from '../hooks/useQSEDerived';
@@ -308,7 +308,7 @@ function FundamentalsCard({
                     <td>{t}</td>
                     <td>{tickerNames[t] || f.name}</td>
                     <td>{f.period}</td>
-                    <td>{f.eps === null ? '—' : fmtPrice(f.eps)}</td>
+                    <td>{f.eps === null ? '—' : fmtQSEPrice(f.eps)}</td>
                     <td>{f.priorEps === null ? '—' : fmtPrice(f.priorEps)}</td>
                     <td>{f.dps === null ? '—' : fmtPrice(f.dps)}</td>
                     <td>{f.status}</td>
