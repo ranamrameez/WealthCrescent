@@ -1,4 +1,4 @@
-import { fmtPrice } from '../../../lib/format';
+import { fmtPSXPrice } from '../../../lib/format';
 import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
 import { usePSXDerived } from '../hooks/usePSXDerived';
 
@@ -26,7 +26,7 @@ export function usePSXAlerts(): Alert[] {
     if (w.current && w.current >= w.target) {
       alerts.push({
         ticker: w.ticker,
-        message: `Watchlist target reached (${fmtPrice(w.current)} ≥ ${fmtPrice(w.target)})`,
+        message: `Watchlist target reached (${fmtPSXPrice(w.current)} ≥ ${fmtPSXPrice(w.target)})`,
         cls: 'pos',
       });
     }
