@@ -60,8 +60,19 @@ export function fmtPSXPrice(n: number | undefined | null): string {
   return Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
-/** Legacy default remains QSE-compatible for non-exchange-specific callers. */
-export const fmtPrice = fmtQSEPrice;
+/** Generic price formatting used outside a known exchange context.
+ * Preserve the historic minimum precision for ordinary prices while the
+ * exchange-specific helpers enforce their own market rules. */
+export function fmtPrice(n: number | undefined | null): string {
+  if (n === undefined || n === null || Number.isNaN(n)) return '—';
+  if (n === 0) return '0.000';
+  const magnitude = Math.floor(Math.log10(Math.abs(n)));
+  const decimals = magnitude >= 3 ? 0 : Math.max(2, Math.min(6, 4 - magnitude - 1));
+  return Number(n).toLocaleString('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
 
 
 export type DateFormat =

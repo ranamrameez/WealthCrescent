@@ -1,14 +1,15 @@
 import type { User } from 'firebase/auth';
 import { useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
-import { Card, CollapsibleCard, MoneyValue } from '../../../components/Card';
+import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
 import { Notice } from '../../../components/Notice';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { CheckIcon, EditIcon, PlusIcon, SaveIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { Modal } from '../../../components/Modal';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
 import { StandardPageSections } from '../../../components/StandardPageSections';
+import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls';
 import { toast } from '../../../components/Toast';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
 import { PendingToggle } from '../../../components/ui/PendingToggle';
@@ -22,6 +23,7 @@ import { useAmountFormat } from '../../../hooks/useAmountFormat';
 import { useEnabledCurrencies } from '../../../hooks/useEnabledCurrencies';
 import { useLastCurrency } from '../../../hooks/useLastCurrency';
 import { usePrimaryCurrency } from '../../../hooks/usePrimaryCurrency';
+import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { useSortableRows } from '../../../hooks/useSortableRows';
 import { ReorderButtons } from '../../../components/ui/ReorderButtons';
 import { RecurrenceFields } from '../../../components/ui/RecurrenceFields';
@@ -70,12 +72,12 @@ const today = () => new Date().toISOString().slice(0, 10);
  * section is open/collapsed. `PlanningTab`'s own `AddPlanFab` (used
  * unchanged by the standalone `/planning` page — see `showFab` below) is
  * suppressed when rendered from here, so the two don't stack. */
-function CashPageFab() {
+function CashPageFab({ defaultCurrencyOverride }: { defaultCurrencyOverride?: string } = {}) {
   const [transferOpen, setTransferOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
   const primaryCurrency = usePrimaryCurrency();
   const workbookDefaultCurrency = useCashWorkbookStore((s) => s.workbook.settings.defaultCurrency);
-  const defaultCurrency = primaryCurrency ?? workbookDefaultCurrency;
+  const defaultCurrency = defaultCurrencyOverride ?? primaryCurrency ?? workbookDefaultCurrency;
   return (
     <>
       <FabPanel
@@ -100,6 +102,7 @@ function CashPageFab() {
 }
 
 function BalancesSummary() {
+  const navigate = useNavigate();
   const entries = useCashWorkbookStore((s) => s.workbook.entries);
   const plannedEntries = usePlannedCashWorkbookStore((s) => s.workbook.entries);
   const { num } = useAmountFormat();
@@ -120,15 +123,21 @@ function BalancesSummary() {
   const upcoming = plannedEntries.filter((p) => isPlanDue(p, new Date(), 30));
 
   return (
-    <div className="grid-auto" style={{ ...gridAutoStyle(140, 8), marginBottom: 16 }}>
+    <div className="entity-card-grid">
       {codes.map((code) => {
         const pending = upcoming.filter((p) => p.currencyCode === code);
         const net = pending.reduce((s, p) => s + (p.type === 'IN' ? p.amount : -p.amount), 0);
         const realPending = pendingBalances[code] ?? 0;
         return (
-          <div key={code} className="stat-card card" style={hueStyle(balances[code] >= 0 ? 'var(--profit)' : 'var(--loss)')}>
-            <div className="label">Balance ({code})</div>
-            <MoneyValue n={balances[code]} currency={code} />
+          <EntityCard
+            key={code}
+            title={`${code} cash`}
+            subtitle="Open currency details"
+            statLabel="Balance"
+            stat={<MoneyValue n={balances[code]} currency={code} />}
+            hue={balances[code] >= 0 ? 'var(--profit)' : 'var(--loss)'}
+            onClick={() => navigate(`/cash/${encodeURIComponent(code)}`)}
+            badge={<>
             {/* User-requested (2026-09-08): don't just exclude pending money
                from the headline balance — show it too, so nothing that's
                actually part of the picture is silently invisible. */}
@@ -143,7 +152,8 @@ function BalancesSummary() {
                 {num(net)} {code})
               </div>
             )}
-          </div>
+            </>}
+          />
         );
       })}
     </div>
@@ -160,11 +170,11 @@ function BalancesSummary() {
  * own card side by side in a responsive `.detail-grid`, replacing the old
  * stacked-vertically list. Also gained a category-name filter, per "All
  * tables should have filter options to view filtered table data." */
-function CategoryBreakdown() {
+function CategoryBreakdown({ currencyCode }: { currencyCode?: string } = {}) {
   const entries = useCashWorkbookStore((s) => s.workbook.entries);
   const categories = useCategoryStore((s) => s.workbook.categories);
   const byCategory = cashByCategory(entries, categories);
-  const currencies = Object.keys(byCategory);
+  const currencies = Object.keys(byCategory).filter((code) => !currencyCode || code === currencyCode);
   const [search, setSearch] = useState('');
 
   if (!currencies.length) return <p className="text-muted">No cash entries yet.</p>;
@@ -536,7 +546,7 @@ function CashStatementTab() {
  * per the app's cross-cutting rule), a currency picker selects which
  * currency's charts to show — QSE/PSX don't need this since each exchange
  * has exactly one settings.currency. */
-function AnalyticsTab() {
+function AnalyticsTab({ currencyCode }: { currencyCode?: string } = {}) {
   const entries = useCashWorkbookStore((s) => s.workbook.entries);
   // Charts read CSS-var-derived colors — subscribe so this re-renders (and
   // recomputes those colors) on a live theme switch, same pattern as every
@@ -545,8 +555,8 @@ function AnalyticsTab() {
   applyChartTheme();
 
   const currencies = useMemo(() => [...new Set(entries.map((e) => e.currencyCode))].sort(), [entries]);
-  const [currency, setCurrency] = useState(currencies[0] ?? 'USD');
-  const effectiveCurrency = currencies.includes(currency) ? currency : (currencies[0] ?? currency);
+  const [currency, setCurrency] = useState(currencyCode ?? currencies[0] ?? 'USD');
+  const effectiveCurrency = currencyCode ?? (currencies.includes(currency) ? currency : (currencies[0] ?? currency));
 
   const categoryList = useCategoryStore((s) => s.workbook.categories);
   const byCategory = useMemo(() => cashByCategory(entries, categoryList)[effectiveCurrency] ?? {}, [entries, categoryList, effectiveCurrency]);
@@ -563,7 +573,7 @@ function AnalyticsTab() {
 
   return (
     <div>
-      {currencies.length > 1 && (
+      {!currencyCode && currencies.length > 1 && (
         <Field label="Currency" width={120}>
           <Select value={effectiveCurrency} onChange={(e) => setCurrency(e.target.value)}>
             {currencies.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -1300,7 +1310,7 @@ export function CashPage({
   uploadPlannedLocalToCloud: () => Promise<void>;
 }) {
   return (
-    <div>
+    <div className="standard-page">
       <h1 className="pagetitle">Cash</h1>
       <p className="text-muted mb-12">
         Track physical/informal cash — cash in hand, gifts, small informal amounts. Each entry keeps its own
@@ -1347,4 +1357,57 @@ export function CashPage({
       <CashPageFab />
     </div>
   );
+}
+
+/** Banking-style detail page for one cash currency. Cash has no named
+ * accounts, so each currency balance is the stable account-like entity. */
+export function CashCurrencyPage() {
+  const { currency: rawCurrency } = useParams();
+  const navigate = useNavigate();
+  const currency = decodeURIComponent(rawCurrency ?? '').toUpperCase();
+  const entries = useCashWorkbookStore((state) => state.workbook.entries);
+  const allBalances = useMemo(() => cashBalanceByCurrency(entries), [entries]);
+  const allPending = useMemo(() => cashPendingByCurrency(entries), [entries]);
+  const ledger = useMemo(
+    () => cashRunningLedger(entries).filter((row) => row.entry.currencyCode === currency),
+    [entries, currency],
+  );
+  const currencies = useMemo(() => Object.keys(allBalances).sort(), [allBalances]);
+  usePageTopBarRightSlot(currencies.length ? (
+    <TopBarControls>
+      <TopBarSelect
+        label="Currency"
+        value={currency}
+        onChange={(event) => navigate(`/cash/${encodeURIComponent(event.target.value)}`)}
+        options={currencies.map((code) => ({ value: code, label: code }))}
+      />
+    </TopBarControls>
+  ) : null);
+
+  if (!currency || !(currency in allBalances)) {
+    return <div className="standard-page"><Link to="/cash" className="text-muted">← Back to Cash</Link><p className="text-muted mt-12">Cash currency not found.</p></div>;
+  }
+
+  const balance = allBalances[currency] ?? 0;
+  const pending = allPending[currency] ?? 0;
+  return <div className="standard-page">
+    <Link to="/cash" className="text-muted">← Back to Cash</Link>
+    <div className="module-detail-heading"><h1>{currency} cash</h1><div className="muted">Account-like view for this currency balance</div></div>
+    <StandardPageSections sections={[
+      {
+        key: 'summary',
+        label: 'Summary',
+        content: <div className="grid-auto" style={gridAutoStyle(180, 12)}>
+          <div className="stat-card card" style={hueStyle(balance >= 0 ? 'var(--profit)' : 'var(--loss)')}><div className="label">Cleared balance</div><MoneyValue n={balance} currency={currency} /></div>
+          <div className="stat-card card" style={hueStyle(pending >= 0 ? 'var(--profit)' : 'var(--loss)')}><div className="label">Pending movement</div><MoneyValue n={pending} currency={currency} /></div>
+          <div className="stat-card card"><div className="label">Including pending</div><MoneyValue n={balance + pending} currency={currency} /></div>
+          <div className="stat-card card"><div className="label">Transactions</div><div className="value">{ledger.length}</div></div>
+        </div>,
+      },
+      { key: 'transactions', label: 'Transactions', content: <CashStatementTable code={currency} rows={ledger} /> },
+      { key: 'analytics', label: 'Analytics', content: <AnalyticsTab currencyCode={currency} /> },
+      { key: 'categories', label: 'Categories', content: <CategoryBreakdown currencyCode={currency} /> },
+    ]} />
+    <CashPageFab defaultCurrencyOverride={currency} />
+  </div>;
 }

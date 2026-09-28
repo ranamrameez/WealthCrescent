@@ -37,7 +37,7 @@ import { StockPage as PSXStockPage } from './features/psx/pages/StockPage';
 import { SettingsPage as PSXSettingsPage } from './features/psx/pages/SettingsPage';
 import { TradeStrategyPage as PSXTradeStrategyPage } from './features/psx/pages/TradeStrategyPage';
 import { RiskAnalysisPage as PSXRiskAnalysisPage } from './features/psx/pages/RiskAnalysisPage';
-import { CashPage } from './features/cash/pages/CashPage';
+import { CashCurrencyPage, CashPage } from './features/cash/pages/CashPage';
 import { useCashFirebaseSync } from './lib/firebase/useCashFirebaseSync';
 import { usePlannedCashFirebaseSync } from './lib/firebase/usePlannedCashFirebaseSync';
 import { PersonalLoansPage } from './features/personalLoans/pages/PersonalLoansPage';
@@ -223,6 +223,7 @@ function App() {
                   />
                 }
               />
+              <Route path="/cash/:currency" element={<CashCurrencyPage />} />
               <Route
                 path="/personal-loans"
                 element={

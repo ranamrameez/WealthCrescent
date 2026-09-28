@@ -396,6 +396,9 @@ ledger, separate from any exchange.
   there's no reliable exchange rate to convert them with. If a currency has any upcoming
   (not-yet-marked-done) plans from the Planning tab below, the balance card shows a note
   with the count and net amount right there, so you don't have to open Planning to see it.
+- **Click a currency balance card** to open its Banking-style detail page. It has its own
+  Summary, Transactions, Analytics, and Categories sections. Use the fixed top-bar currency
+  selector to move between cash currencies, or **All** to expand every section.
 - **Analytics tab**: a category-breakdown chart, an income-vs-expense-by-month chart, and a
   balance-over-time chart. If you've logged entries in more than one currency, a currency
   picker at the top switches which currency's charts you're looking at.
@@ -416,6 +419,11 @@ ledger, separate from any exchange.
   you typed in by hand.
 - **Settings tab**: pick a default currency (only pre-fills new entries — never converts
   existing ones), plus the same export/import/clear-all data management as other modules.
+
+On a QSE or PSX stock page, the fixed section bar provides **Summary**, **Trades**,
+**Analytics**, and (for an open position) **Risk Analysis**. Analytics includes monthly
+trading value, buy/sell share mix, shares held over time, and monthly shares traded. The
+top-right selectors switch stock or exchange without returning to the portfolio first.
 
 ---
 

@@ -179,6 +179,16 @@ from the lot system."*
 
 ## Done
 
+- **Banking-style Cash and exchange detail completion (2026-09-28):** each Cash
+  currency balance is now a clickable account-like entity with its own URL,
+  Summary, Transactions, Analytics, and Categories sections plus a top-bar
+  currency switcher. QSE and PSX Stock Pages now use the shared standard-page
+  section stack, keep Summary's existing StandardCards un-nested, place Trades
+  before a dedicated four-chart Analytics section, retain Risk Analysis for open
+  positions, and expose exchange/ticker switchers in the fixed TopBar. The shared
+  **All** chip expands every section. Generic `fmtPrice` precision is separated
+  from QSE/PSX market-specific formatting again, restoring its regression test.
+
 - **Spreadsheet batch editing (2026-09-27):** Bank Account Transactions/Plans and
   Personal Loan Payments/Plans now expose **Batch edit** in their card Actions menus.
   The reusable `BatchEditGrid<T>` stages cells locally, highlights dirty rows/cells,

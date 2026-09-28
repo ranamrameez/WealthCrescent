@@ -1,9 +1,11 @@
 import { Fragment, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { CheckIcon, EditIcon, SaveIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { RiskCalculator } from '../../../components/RiskCalculator';
-import { Tabs } from '../../../components/Tabs';
+import { StandardPageSections } from '../../../components/StandardPageSections';
+import { ExchangeStockAnalytics } from '../../../components/ExchangeStockAnalytics';
+import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls';
 import { TickerLogo } from '../../../components/TickerLogo';
 import { toast } from '../../../components/Toast';
 import { Tooltip } from '../../../components/Tooltip';
@@ -13,6 +15,7 @@ import { PendingToggle } from '../../../components/ui/PendingToggle';
 import { TimeZoneFields } from '../../../components/ui/TimeZoneFields';
 import { LotAllocationFields, type LotAllocations } from '../../../components/ui/LotAllocationFields';
 import { useSortableRows } from '../../../hooks/useSortableRows';
+import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { defaultTimeForDate, defaultTimezoneForMarket, nowTime } from '../../../lib/datetime';
 import { toCSV } from '../../../lib/csv';
 import { fmt, fmtMoney, fmtQSEPrice } from '../../../lib/format';
@@ -280,15 +283,22 @@ function useTickerExport(ticker: string) {
 
 export function StockPage() {
   const { ticker: rawTicker } = useParams();
+  const navigate = useNavigate();
   const ticker = (rawTicker || '').toUpperCase();
   const { tickerNames } = useQSEStockData();
   const name = tickerNames[ticker];
   const { fromDate, setFromDate, toDate, setToDate, exportStatement, hasRows } = useTickerExport(ticker);
   const { workbook, rows, calcFee, positions } = useQSEDerived();
   const isOpen = (positions.find((p) => p.ticker === ticker)?.shares || 0) > 0;
+  usePageTopBarRightSlot(
+    <TopBarControls>
+      <TopBarSelect label="Stock exchange" value="qse" onChange={(event) => navigate(event.target.value === 'psx' ? `/psx/stock/${ticker}` : `/stock/${ticker}`)} options={[{ value: 'qse', label: 'QSE' }, { value: 'psx', label: 'PSX' }]} />
+      <TopBarSelect label="Stock" value={ticker} onChange={(event) => navigate(`/stock/${event.target.value}`)} options={Object.keys(tickerNames).sort().map((code) => ({ value: code, label: code }))} />
+    </TopBarControls>,
+  );
 
   return (
-    <div>
+    <div className="standard-page">
       <div className="d-flex gap-6">
         <Link to="/portfolio" className="text-muted">← Back to Portfolio</Link>
         <h1 className="pagetitle d-flex align-items-center">
@@ -297,14 +307,14 @@ export function StockPage() {
         </h1>
       </div>
 
-      <Tabs
-        tabs={[
-          { key: 'summary', label: 'Summary', content: <PositionDetail ticker={ticker} /> },
+      <StandardPageSections
+        sections={[
+          { key: 'summary', label: 'Summary', content: <PositionDetail ticker={ticker} />, unframed: true },
           {
             key: 'transactions',
             label: 'Trades',
             content: <TickerTransactions ticker={ticker} />,
-            headerExtra: hasRows ? (
+            headerEnd: hasRows ? (
               <div className="row gap-sm">
                 <Field label="From (optional)">
                   <TextInput type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
@@ -315,6 +325,11 @@ export function StockPage() {
                 <button className="btn secondary" onClick={exportStatement}>Export CSV</button>
               </div>
             ) : undefined,
+          },
+          {
+            key: 'analytics',
+            label: 'Analytics',
+            content: <ExchangeStockAnalytics ticker={ticker} transactions={workbook.transactions} currency={workbook.settings.currency} formatPrice={fmtQSEPrice} />,
           },
           // Pending item 49 ("assess a stock in one go"): Risk Analysis used
           // to only exist as a separate whole-portfolio page with its own
