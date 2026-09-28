@@ -10,6 +10,10 @@ import { UpcomingList } from '../../../components/UpcomingList';
 import { useUpcomingItems } from '../../../hooks/useUpcomingItems';
 import { useSortableRows } from '../../../hooks/useSortableRows';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
+import { useUrlTransactionFilters } from '../../../hooks/useUrlTransactionFilters';
+import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu';
+import { TopBarControls } from '../../../components/TopBarControls';
+import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { fmtMoney } from '../../../lib/format';
 import {
   collectBudgetActivities,
@@ -87,6 +91,9 @@ export function PlanningPage({
 
   const links = useInterEntityTransfersStore((s) => s.workbook.entries);
   const categories = useCategoryStore((s) => s.workbook.categories);
+  const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
+  const categoryOptions = useMemo(() => [...new Set(activities.map((a) => a.category || 'Uncategorized'))].sort(), [activities]);
+  usePageTopBarRightSlot(<TopBarControls><TransactionFilterMenu value={filters} categories={categoryOptions} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls>);
 
   const activities = useMemo(
     () => collectBudgetActivities({ cashEntries, plannedCash, bankAccounts, bankTransactions, plannedBank, rentalProperties, rentalEntries, plannedRentals, categories, links }),
@@ -106,7 +113,7 @@ export function PlanningPage({
         <UpcomingList items={upcoming} emptyText="Nothing expected in the next 30 days." />
       </CollapsibleCard>
       <BudgetOverview activities={activities} categories={categories} />
-      <ActivityList activities={activities} />
+      <ActivityList activities={activities} filters={filters} />
       <CollapsibleCard title={<h3 className="m-0">Cash</h3>} className="mb-md">
         <CashPlanningTab
           plannedSyncStatus={cashPlannedSyncStatus}
@@ -181,23 +188,19 @@ function BudgetOverview({ activities, categories }: { activities: BudgetActivity
 }
 
 /** User-requested (2026-09-03): "add filters to other tables as well." */
-function ActivityList({ activities }: { activities: BudgetActivity[] }) {
+function ActivityList({ activities, filters }: { activities: BudgetActivity[]; filters: ReturnType<typeof useUrlTransactionFilters>['filters'] }) {
   const moduleLabel: Record<BudgetModule, string> = { cash: 'Cash', bank: 'Banking', rentals: 'Rentals' };
-  const [moduleFilter, setModuleFilter] = useState<'all' | BudgetModule>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'actual' | 'planned'>('all');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-
   const filtered = useMemo(
     () => activities.filter((a) => {
-      if (moduleFilter !== 'all' && a.module !== moduleFilter) return false;
-      if (statusFilter === 'actual' && !a.executed) return false;
-      if (statusFilter === 'planned' && a.executed) return false;
-      if (categoryFilter !== 'all' && (a.category || 'Uncategorized') !== categoryFilter) return false;
+      if (filters.fromDate && a.date < filters.fromDate) return false;
+      if (filters.toDate && a.date > filters.toDate) return false;
+      if (filters.direction === 'in' && a.amount < 0) return false;
+      if (filters.direction === 'out' && a.amount >= 0) return false;
+      if (filters.category !== 'all' && (a.category || 'Uncategorized') !== filters.category) return false;
       return true;
     }),
-    [activities, moduleFilter, statusFilter, categoryFilter],
+    [activities, filters],
   );
-  const categoryOptions = useMemo(() => [...new Set(activities.map((a) => a.category || 'Uncategorized'))].sort(), [activities]);
 
   type Col = 'date' | 'module' | 'source' | 'category' | 'amount' | 'status';
   const sortValue = (a: BudgetActivity, col: Col): number | string => {
@@ -214,24 +217,7 @@ function ActivityList({ activities }: { activities: BudgetActivity[] }) {
 
   return (
     <CollapsibleCard title={<h3 className="m-0">All planned financial activity</h3>} className="mb-md">
-      <div className="row gap-sm mb-sm">
-        <Field label="Account" width={130}>
-          <Select value={moduleFilter} onChange={(e) => setModuleFilter(e.target.value as typeof moduleFilter)}>
-            <option value="all">All</option>
-            <option value="cash">Cash</option>
-            <option value="bank">Banking</option>
-            <option value="rentals">Rentals</option>
-          </Select>
-        </Field>
-        <Field label="Status" width={130}>
-          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}>
-            <option value="all">All</option>
-            <option value="actual">Actual</option>
-            <option value="planned">Planned</option>
-          </Select>
-        </Field>
-        <Field label="Category" width={180}><Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}><option value="all">All categories</option>{categoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}</Select></Field>
-      </div>
+      <p className="text-muted">Centralized top-bar filters control this activity view.</p>
       <div className="table-scroll">
         <table>
           <thead>
