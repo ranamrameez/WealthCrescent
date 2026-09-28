@@ -112,7 +112,7 @@ export function PlanningPage({
       <CollapsibleCard title={<h3 className="m-0">Upcoming (next 30 days)</h3>} className="mb-md">
         <UpcomingList items={upcoming} emptyText="Nothing expected in the next 30 days." />
       </CollapsibleCard>
-      <BudgetOverview activities={activities} categories={categories} />
+      <BudgetOverview activities={activities} categories={categories} filters={filters} />
       <ActivityList activities={activities} filters={filters} />
       <CollapsibleCard title={<h3 className="m-0">Cash</h3>} className="mb-md">
         <CashPlanningTab
@@ -145,8 +145,8 @@ export function PlanningPage({
   );
 }
 
-function BudgetOverview({ activities, categories }: { activities: BudgetActivity[]; categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories'] }) {
-  const [month, setMonth] = useState(() => today().slice(0, 7));
+function BudgetOverview({ activities, categories, filters }: { activities: BudgetActivity[]; categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories']; filters: ReturnType<typeof useUrlTransactionFilters>['filters'] }) {
+  const month = filters.fromDate.slice(0, 7);
   const [mode, setMode] = useState<'budget' | 'modules'>('budget');
   const monthRows = useMemo(() => activities.filter((a) => !a.executed && a.date.startsWith(month)), [activities, month]);
   const currencyTotals = useMemo(() => {
@@ -176,7 +176,6 @@ function BudgetOverview({ activities, categories }: { activities: BudgetActivity
   return <CollapsibleCard title={<h3 className="m-0">Monthly Budget Plan</h3>} className="mb-md">
     <p className="text-muted mt-0">Cross-module, category-aware view of planned activity. Transfers remain visible by source and category so they can be reviewed without being mistaken for income.</p>
     <div className="row gap-sm mb-md">
-      <Field label="Budget month"><TextInput type="month" value={month} onChange={(e) => setMonth(e.target.value)} /></Field>
       <Field label="View"><Select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)}><option value="budget">Budget by category</option><option value="modules">Module plan details</option></Select></Field>
     </div>
     <div className="grid-auto mb-md" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))' }}>
