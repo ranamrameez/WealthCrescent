@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { StandardCard, type StandardCardAction } from '../../../components/StandardCard';
+import { BatchEditGrid, type BatchColumn, type BatchChange } from '../../../components/BatchEditGrid';
 import { TickerLogo } from '../../../components/TickerLogo';
 import { QSE_TICKER_DATALIST_ID } from '../../../components/TickerDatalist';
 import { confirmDialog } from '../../../components/ConfirmDialog';
@@ -555,6 +556,7 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
   const [editLegIndex, setEditLegIndex] = useState<number | null>(null);
   const [editLeg, setEditLeg] = useState<TradePlanLeg | null>(null);
   const [addingLeg, setAddingLeg] = useState<Omit<TradePlanLeg, 'ticker'> | null>(null);
+  const [batchEditingLegs, setBatchEditingLegs] = useState(false);
   // Trust-restoration (2026-09-16): the user's own original request,
   // restored — a real toggle between the OFFICIAL numbers (what a broker
   // statement would show) and the ADVISORY Strategic Trades view, so both
@@ -688,6 +690,10 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
       },
     }] : []),
     ...(plan.legs.length > 0 ? [{
+      label: 'Batch edit planned legs',
+      onClick: () => setBatchEditingLegs(true),
+    }] : []),
+    ...(plan.legs.length > 0 ? [{
       label: 'Clear plan',
       onClick: () => {
         void (async () => {
@@ -734,15 +740,15 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
           <button className="btn secondary small" onClick={() => setEditingMeta(false)}>Cancel</button>
         </div>
       )}
-      <div className="row gap-sm mb-sm" style={{ alignItems: 'center' }}>
-        <span className="text-muted">Compare:</span>
-        <button type="button" className={`chip${statsView === 'broker' ? ' active' : ''}`} onClick={() => setStatsView('broker')}>
-          {statsView === 'broker' && <CheckIcon size={11} />}Broker Style
+      <div className="grid-auto mb-sm" style={gridAutoStyle(260, 8)}>
+        <button type="button" className={`card stat-card${statsView === 'broker' ? ' active' : ''}`} onClick={() => setStatsView('broker')}>
+          <div className="label">Broker Style <StatSourceBadge source="official" /></div>
+          <div className="sub">Official position · Avg buy, BE, RT, P/L and current value</div>
         </button>
-        <button type="button" className={`chip${statsView === 'strategic' ? ' active' : ''}`} onClick={() => setStatsView('strategic')}>
-          {statsView === 'strategic' && <CheckIcon size={11} />}Strategic Trades
+        <button type="button" className={`card stat-card${statsView === 'strategic' ? ' active' : ''}`} onClick={() => setStatsView('strategic')}>
+          <div className="label">Strategic Trades <StatSourceBadge source="advisory" /></div>
+          <div className="sub">Plan-adjusted position · planned trades and projected outcome</div>
         </button>
-        <StatSourceBadge source={statsView === 'broker' ? 'official' : 'advisory'} />
       </div>
 
       {statsView === 'broker' && guardTicker && (
@@ -1031,6 +1037,27 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
       >
         {bodyContent}
       </StandardCard>
+      {batchEditingLegs && <BatchEditGrid<TradePlanLeg>
+        title={`Batch edit planned legs — ${plan.name}`}
+        description="Spreadsheet-style batch editing. Executed legs are read-only; save all changes together."
+        rows={plan.legs}
+        columns={[
+          { key: 'date', label: 'Date', type: 'date', width: 150 },
+          { key: 'ticker', label: 'Ticker', editable: false, width: 110 },
+          { key: 'action', label: 'Action', type: 'select', options: [{ value: 'BUY', label: 'BUY' }, { value: 'SELL', label: 'SELL' }], width: 110 },
+          { key: 'shares', label: 'Shares', type: 'number', width: 120 },
+          { key: 'price', label: 'Price', type: 'number', width: 130, formatter: (value) => fmtQSEPrice(Number(value)) },
+          { key: 'feeOverride', label: 'Fee override', type: 'number', width: 140 },
+        ] as BatchColumn<TradePlanLeg>[]}
+        getRowId={(row) => `${row.date}:${row.ticker}:${row.action}:${row.shares}:${row.price}:${plan.legs.indexOf(row)}`}
+        getRowDate={(row) => row.date}
+        rowReadOnly={(row) => row.executed ? 'Executed leg: edit its linked transaction instead.' : undefined}
+        onSave={(changes: BatchChange<TradePlanLeg>[]) => {
+          const replacements = new Map(changes.map(({ before, after }) => [before, after]));
+          updateTradePlan(plan.id, { legs: plan.legs.map((leg) => replacements.get(leg) ?? leg) });
+        }}
+        onClose={() => setBatchEditingLegs(false)}
+      />}
       {showMissedOpportunities && missedOpportunity && (
         <Modal title={`Recent missed opportunities — ${guardTicker}`} onClose={() => setShowMissedOpportunities(false)}>
           <p className="text-muted">Only prices on or after each buy date are considered.</p>
