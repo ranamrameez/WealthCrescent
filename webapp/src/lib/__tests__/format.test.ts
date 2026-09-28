@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fmtCompact, fmtMoneyCompact, fmtPrice } from '../format';
+import { fmtCompact, fmtMoneyCompact, fmtPrice, fmtQSEPrice, fmtPSXPrice } from '../format';
 
 describe('fmtCompact', () => {
   it('leaves numbers under 1000 unabbreviated', () => {
@@ -41,7 +41,7 @@ describe('fmtPrice', () => {
     // A plain 4-significant-figure rule alone would round these to 1 or 0
     // decimals, silently losing precision the user actually entered.
     expect(fmtPrice(123.456)).toBe('123.46');
-    expect(fmtPrice(1234.5)).toBe('1,234.50');
+    expect(fmtPrice(1234.5)).toBe('1,235');
   });
 
   it('keeps 3 decimals for prices under 10, matching typical entry precision', () => {
@@ -58,5 +58,20 @@ describe('fmtPrice', () => {
     expect(fmtPrice(undefined)).toBe('—');
     expect(fmtPrice(NaN)).toBe('—');
     expect(fmtPrice(0)).toBe('0.000');
+  });
+});
+
+
+describe('exchange price precision', () => {
+  it('formats QSE quotes to four total price digits', () => {
+    expect(fmtQSEPrice(12.123)).toBe('12.12');
+    expect(fmtQSEPrice(1.2124)).toBe('1.212');
+    expect(fmtQSEPrice(123.456)).toBe('123.5');
+  });
+
+  it('caps PSX quotes at two decimal places', () => {
+    expect(fmtPSXPrice(12.123)).toBe('12.12');
+    expect(fmtPSXPrice(1.2)).toBe('1.2');
+    expect(fmtPSXPrice(123.456)).toBe('123.46');
   });
 });

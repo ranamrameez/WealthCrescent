@@ -15,7 +15,7 @@ import { LotAllocationFields, type LotAllocations } from '../../../components/ui
 import { useSortableRows } from '../../../hooks/useSortableRows';
 import { defaultTimeForDate, defaultTimezoneForMarket, nowTime } from '../../../lib/datetime';
 import { toCSV } from '../../../lib/csv';
-import { fmt, fmtMoney, fmtPrice } from '../../../lib/format';
+import { fmt, fmtMoney, fmtQSEPrice } from '../../../lib/format';
 import { computeFIFOPositions } from '../../../lib/calc/fifoPositions';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { shortenCompanyName } from '../../../lib/shortenName';
@@ -86,7 +86,7 @@ function TickerTransactions({ ticker }: { ticker: string }) {
     if (!shares || !price) return toast('Enter shares and price.');
     if (!(await ensureSignedIn('Sign in to save this transaction.'))) return;
     addTransaction({ date, ticker, action, shares, price, time, timezone, isPending: isPending || undefined, lotAllocations });
-    toast(`${action} ${shares} ${ticker} @ ${fmtPrice(price)} logged.`);
+    toast(`${action} ${shares} ${ticker} @ ${fmtQSEPrice(price)} logged.`);
     setSharesInput('');
     setPriceInput('');
     setIsPending(false);
@@ -209,7 +209,7 @@ function TickerTransactions({ ticker }: { ticker: string }) {
                   </td>
                   <td className={tx.action === 'BUY' ? 'pill-buy' : 'pill-sell'}>{tx.action}</td>
                   <td><span className="shares-box">{fmt(tx.shares, 0)}</span></td>
-                  <td>{fmtPrice(tx.price)}</td>
+                  <td>{fmtQSEPrice(tx.price)}</td>
                   <td>{fmtMoney(tx.shares * tx.price, currency)}</td>
                   <td>
                     {tx.isPending && (

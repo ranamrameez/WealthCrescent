@@ -15,7 +15,7 @@ import { LotAllocationFields, type LotAllocations } from '../../../components/ui
 import { useSortableRows } from '../../../hooks/useSortableRows';
 import { defaultTimeForDate, defaultTimezoneForMarket, nowTime } from '../../../lib/datetime';
 import { toCSV } from '../../../lib/csv';
-import { fmt, fmtMoney, fmtPrice } from '../../../lib/format';
+import { fmt, fmtMoney, fmtPSXPrice } from '../../../lib/format';
 import { computeFIFOPositions } from '../../../lib/calc/fifoPositions';
 import { isNettedLeg } from '../../../lib/calc/psxFees';
 import { FeeModeControl, feeModeFor, type FeeMode } from '../../../components/ui/FeeModeControl';
@@ -111,7 +111,7 @@ function TickerTransactions({ ticker }: { ticker: string }) {
       isPending: isPending || undefined,
       lotAllocations,
     });
-    toast(`${action} ${shares} ${ticker} @ ${fmtPrice(price)} logged.`);
+    toast(`${action} ${shares} ${ticker} @ ${fmtPSXPrice(price)} logged.`);
     setSharesInput('');
     setPriceInput('');
     setIsPending(false);
@@ -258,7 +258,7 @@ function TickerTransactions({ ticker }: { ticker: string }) {
                   </td>
                   <td className={tx.action === 'BUY' ? 'pill-buy' : 'pill-sell'}>{tx.action}</td>
                   <td><span className="shares-box">{fmt(tx.shares, 0)}</span></td>
-                  <td>{fmtPrice(tx.price)}</td>
+                  <td>{fmtPSXPrice(tx.price)}</td>
                   <td>{fmtMoney(tx.shares * tx.price, currency)}</td>
                   <td>
                     {fmtMoney(calcFee(tx.shares * tx.price, tx.action === 'BUY', { shares: tx.shares, tx }), currency)}

@@ -7,7 +7,7 @@ import { TickerLogo } from '../../../components/TickerLogo';
 import { toast } from '../../../components/Toast';
 import { useSortableRows } from '../../../hooks/useSortableRows';
 import { getDailyPriceHistory } from '../../../lib/calc';
-import { fmtPrice } from '../../../lib/format';
+import { fmtQSEPrice } from '../../../lib/format';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { shortenCompanyName } from '../../../lib/shortenName';
 import { useWorkbookStore } from '../../../store/workbookStore';
@@ -119,7 +119,7 @@ function WatchlistTable({
             <tr key={item.ticker}>
               <td><TickerLogo ticker={item.ticker} size="sm" exchange="qse" /><Link to={`/stock/${item.ticker}`}>{item.ticker}</Link></td>
               <td style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>{tickerNames[item.ticker] ? shortenCompanyName(tickerNames[item.ticker]) : ''}</td>
-              <td className="w-82"><Sparkline data={sparkData} formatValue={fmtPrice} /></td>
+              <td className="w-82"><Sparkline data={sparkData} formatValue={fmtQSEPrice} /></td>
               <td>
                 <input
                   type="number"

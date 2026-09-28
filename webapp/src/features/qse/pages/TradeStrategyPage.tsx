@@ -27,7 +27,7 @@ import {
   sellableShareSummary,
   type LotAdvice,
 } from '../../../lib/calc/partialTradeStrategy';
-import { fmt, fmtMoney, fmtPrice } from '../../../lib/format';
+import { fmt, fmtMoney, fmtQSEPrice } from '../../../lib/format';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { useAuthState } from '../../../lib/firebase/useAuthState';
 import { useWorkbookStore } from '../../../store/workbookStore';
@@ -103,13 +103,13 @@ function BuySellAvgDownCalculator() {
           <TextInput value={ticker} onChange={(e) => setTicker(e.target.value.toUpperCase())} list={QSE_TICKER_DATALIST_ID} placeholder="e.g. QIBK" />
         </Field>
         <Field label="Buy price">
-          <TextInput type="number" step="0.01" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)} />
+          <TextInput type="number" step="0.001" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)} />
         </Field>
         <Field label="Shares">
           <TextInput type="number" value={shares} onChange={(e) => setShares(e.target.value)} />
         </Field>
         <Field label="Target sell price (optional)">
-          <TextInput type="number" step="0.01" value={targetSell} onChange={(e) => setTargetSell(e.target.value)} />
+          <TextInput type="number" step="0.001" value={targetSell} onChange={(e) => setTargetSell(e.target.value)} />
         </Field>
         <Field label=" ">
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, height: 30 }} title={canAvgDown ? 'Blend this purchase with what you already hold.' : 'Averaging down needs an existing position in this ticker.'}>
@@ -121,7 +121,7 @@ function BuySellAvgDownCalculator() {
 
       {perShare && (
         <p className="text-muted mb-sm">
-          Commission per share @ {fmtPrice(price)}: Buy {fmtMoney(perShare.buy, currency)} · Sell {fmtMoney(perShare.sell, currency)}
+          Commission per share @ {fmtQSEPrice(price)}: Buy {fmtMoney(perShare.buy, currency)} · Sell {fmtMoney(perShare.sell, currency)}
         </p>
       )}
 
@@ -135,7 +135,7 @@ function BuySellAvgDownCalculator() {
       {!avgDown && shareCount > 0 && price > 0 && (
         <div className="grid-auto" style={gridAutoStyle(160, 8)}>
           <div className="card stat-card" style={hueStyle('var(--accent)')}><div className="label">Cost</div><div className="value">{fmtMoney(simpleCost + simpleFee, currency)}</div></div>
-          <div className="card stat-card" style={hueStyle('var(--gold)')}><div className="label">Break-even</div><div className="value">{fmtPrice(simpleBreakEven)}</div></div>
+          <div className="card stat-card" style={hueStyle('var(--gold)')}><div className="label">Break-even</div><div className="value">{fmtQSEPrice(simpleBreakEven)}</div></div>
           {simpleTargetPL !== null && (
             <div className="card stat-card" style={hueStyle('var(--accent)')}>
               <div className="label">P/L @ target</div>
@@ -148,8 +148,8 @@ function BuySellAvgDownCalculator() {
       {avgDown && scenario && (
         <div className="grid-auto" style={gridAutoStyle(160, 8)}>
           <div className="card stat-card" style={hueStyle('var(--info)')}><div className="label">New shares</div><div className="value">{fmt(scenario.newShares, 0)} ({fmt(scenario.newShares - scenario.extraShares, 0)} + {fmt(scenario.extraShares, 0)})</div></div>
-          <div className="card stat-card" style={hueStyle('var(--accent)')}><div className="label">New avg cost</div><div className="value">{fmtPrice(scenario.newAvg)}</div></div>
-          <div className="card stat-card" style={hueStyle('var(--gold)')}><div className="label">New break-even</div><div className="value">{fmtPrice(scenario.breakEven)}</div></div>
+          <div className="card stat-card" style={hueStyle('var(--accent)')}><div className="label">New avg cost</div><div className="value">{fmtQSEPrice(scenario.newAvg)}</div></div>
+          <div className="card stat-card" style={hueStyle('var(--gold)')}><div className="label">New break-even</div><div className="value">{fmtQSEPrice(scenario.breakEven)}</div></div>
           <div className="card stat-card" style={hueStyle('var(--accent)')}><div className="label">Recovery needed</div><div className="value">{scenario.recoveryNeededPct.toFixed(2)}%</div></div>
           <div className="card stat-card" style={hueStyle('var(--accent)')}>
             <div className="label">Net @ target</div>
@@ -215,10 +215,10 @@ function PartialTradeAdvisor({ ticker, onSellLot }: { ticker: string; onSellLot:
       )}
       {sellable > 0 ? (
         <p className="mb-sm">
-          <span className="pill-positive">{fmt(sellable, 0)} of {fmt(total, 0)} shares</span> of {ticker.toUpperCase()} are already profitable at the current price ({fmtPrice(currentPrice)}).
+          <span className="pill-positive">{fmt(sellable, 0)} of {fmt(total, 0)} shares</span> of {ticker.toUpperCase()} are already profitable at the current price ({fmtQSEPrice(currentPrice)}).
         </p>
       ) : (
-        <p className="text-muted mb-sm">No lot of {ticker.toUpperCase()} is profitable at the current price ({fmtPrice(currentPrice)}) yet.</p>
+        <p className="text-muted mb-sm">No lot of {ticker.toUpperCase()} is profitable at the current price ({fmtQSEPrice(currentPrice)}) yet.</p>
       )}
       <div className="table-scroll">
         <table>
@@ -229,10 +229,10 @@ function PartialTradeAdvisor({ ticker, onSellLot }: { ticker: string; onSellLot:
             {advice.map((a, i) => (
               <tr key={i}>
                 <td>{a.buyDate}</td>
-                <td>{fmtPrice(a.buyPrice)}</td>
+                <td>{fmtQSEPrice(a.buyPrice)}</td>
                 <td>{fmt(a.remainingShares, 0)}</td>
-                <td>{fmtPrice(a.costPerShare)}</td>
-                <td>{fmtPrice(a.breakEven)}</td>
+                <td>{fmtQSEPrice(a.costPerShare)}</td>
+                <td>{fmtQSEPrice(a.breakEven)}</td>
                 <td className={a.unrealizedPL >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(a.unrealizedPL, currency)}</td>
                 <td><span className={a.suggestion === 'sell' ? 'pill-positive' : 'text-muted'}>{a.suggestion === 'sell' ? 'Sell' : 'Hold'}</span></td>
                 <td>{a.suggestion === 'sell' && <button className="btn secondary small" onClick={() => onSellLot(a)}>Sell this lot</button>}</td>
@@ -283,7 +283,7 @@ function WhatIfExitCalculator({
               <Field label="Exit price" width={110}>
                 <TextInput
                   type="number"
-                  step="0.01"
+                  step="0.001"
                   value={price || ''}
                   onChange={(e) => setPrices((p) => ({ ...p, [t.ticker]: Number(e.target.value) }))}
                 />
@@ -397,7 +397,7 @@ function NewPlanFab() {
                 <option value="SELL">SELL</option>
               </select>
               <input type="number" placeholder="Shares" value={l.shares || ''} onChange={(e) => update(i, { shares: Number(e.target.value) })} className="w-90" />
-              <input type="number" step="0.01" placeholder="Price" value={l.price || ''} onChange={(e) => update(i, { price: Number(e.target.value) })} className="w-90" />
+              <input type="number" step="0.001" placeholder="Price" value={l.price || ''} onChange={(e) => update(i, { price: Number(e.target.value) })} className="w-90" />
               <button className="btn secondary small" onClick={() => setLegs((rs) => rs.filter((_, idx) => idx !== i))}>
                 <TrashIcon size={12} />Remove
               </button>
@@ -450,9 +450,9 @@ function BrokerStyleView({ ticker }: { ticker: string }) {
   return (
     <div className="grid-auto" style={gridAutoStyle(150, 8)}>
       <div className="card stat-card" style={hueStyle('var(--info)')}><div className="label">Shares held</div><div className="value">{fmt(shares, 0)}</div></div>
-      <div className="card stat-card" style={hueStyle('var(--accent)')}><div className="label">Avg cost</div><div className="value">{fmtPrice(avgCost)}</div></div>
-      <div className="card stat-card" style={hueStyle('var(--gold)')}><div className="label">Break-even</div><div className="value">{fmtPrice(be)}</div></div>
-      <div className="card stat-card" style={hueStyle('var(--accent)')}><div className="label">Current price</div><div className="value">{mp > 0 ? fmtPrice(mp) : '—'}</div></div>
+      <div className="card stat-card" style={hueStyle('var(--accent)')}><div className="label">Avg cost</div><div className="value">{fmtQSEPrice(avgCost)}</div></div>
+      <div className="card stat-card" style={hueStyle('var(--gold)')}><div className="label">Break-even</div><div className="value">{fmtQSEPrice(be)}</div></div>
+      <div className="card stat-card" style={hueStyle('var(--accent)')}><div className="label">Current price</div><div className="value">{mp > 0 ? fmtQSEPrice(mp) : '—'}</div></div>
       {Number.isFinite(profit) && (
         <div className="card stat-card" style={hueStyle('var(--accent)')}>
           <div className="label">Unrealized P/L</div>
@@ -602,7 +602,7 @@ function PlanCard({ plan }: { plan: TradePlan }) {
   };
   const markDone = async (i: number) => {
     const leg = plan.legs[i];
-    const ok = await confirmDialog(`Add ${leg.action} ${fmt(leg.shares, 0)} ${leg.ticker} @ ${fmtPrice(leg.price)} to your transaction history? This can't be undone from here.`, 'Mark leg as done?');
+    const ok = await confirmDialog(`Add ${leg.action} ${fmt(leg.shares, 0)} ${leg.ticker} @ ${fmtQSEPrice(leg.price)} to your transaction history? This can't be undone from here.`, 'Mark leg as done?');
     if (!ok) return;
     if (!(await ensureSignedIn('Sign in to record this transaction.'))) return;
     executeTradePlanLeg(plan.id, i);
@@ -720,7 +720,7 @@ function PlanCard({ plan }: { plan: TradePlan }) {
     updateTradePlan(plan.id, {
       legs: [...plan.legs, { date: today(), action: 'SELL', ticker: guardTicker, shares: lot.remainingShares, price, targetLotBuyId: lot.buyId }],
     });
-    toast(`Added SELL ${fmt(lot.remainingShares, 0)} ${guardTicker} @ ${fmtPrice(price)} to this plan.`);
+    toast(`Added SELL ${fmt(lot.remainingShares, 0)} ${guardTicker} @ ${fmtQSEPrice(price)} to this plan.`);
   };
 
   const bodyContent = (
@@ -775,9 +775,9 @@ function PlanCard({ plan }: { plan: TradePlan }) {
                     <TickerLogo ticker={t.ticker} exchange="qse" size="sm" />
                     {t.ticker}
                   </div>
-                  <div className="value" style={{ fontSize: 15 }}>{t.avgCost > 0 ? `Avg ${fmtPrice(t.avgCost)}` : 'No avg cost'}</div>
+                  <div className="value" style={{ fontSize: 15 }}>{t.avgCost > 0 ? `Avg ${fmtQSEPrice(t.avgCost)}` : 'No avg cost'}</div>
                   <div className="sub">
-                    BE {t.breakEven > 0 ? fmtPrice(t.breakEven) : '—'} · {fmt(row?.shares || 0, 0)} sh held now
+                    BE {t.breakEven > 0 ? fmtQSEPrice(t.breakEven) : '—'} · {fmt(row?.shares || 0, 0)} sh held now
                     {t.plannedSold > 0 && (<> · <span className={t.realizedPL >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(t.realizedPL, currency)} P/L</span></>)}
                   </div>
                   <div className="sub" onClick={(e) => e.stopPropagation()}>
@@ -795,7 +795,7 @@ function PlanCard({ plan }: { plan: TradePlan }) {
                           const val = parseFloat(target.value) || 0;
                           if (val > 0 && (await ensureSignedIn('Sign in to save price updates.'))) {
                             setMarketPrice(t.ticker, val);
-                            toast(`${t.ticker} price saved: ${fmtPrice(val)}`);
+                            toast(`${t.ticker} price saved: ${fmtQSEPrice(val)}`);
                           }
                           target.blur();
                         }
@@ -830,8 +830,8 @@ function PlanCard({ plan }: { plan: TradePlan }) {
                       {t.plannedSold > 0 && <>-{fmt(t.plannedSold, 0)} sell</>}
                       {!t.plannedBought && !t.plannedSold && '—'}
                     </td>
-                    <td>{t.avgCost > 0 ? fmtPrice(t.avgCost) : '—'}</td>
-                    <td>{t.breakEven > 0 ? fmtPrice(t.breakEven) : '—'}</td>
+                    <td>{t.avgCost > 0 ? fmtQSEPrice(t.avgCost) : '—'}</td>
+                    <td>{t.breakEven > 0 ? fmtQSEPrice(t.breakEven) : '—'}</td>
                     <td>{fmt(t.effectiveShares, 0)}</td>
                     <td className={t.plannedSold > 0 ? (t.realizedPL >= 0 ? 'pill-positive' : 'pill-negative') : ''}>{t.plannedSold > 0 ? fmtMoney(t.realizedPL, currency) : '—'}</td>
                   </tr>
@@ -872,12 +872,12 @@ function PlanCard({ plan }: { plan: TradePlan }) {
                     </select>
                   </td>
                   <td><input type="number" value={editLeg.shares} onChange={(e) => setEditLeg({ ...editLeg, shares: Number(e.target.value) })} className="w-70" /></td>
-                  <td><input type="number" step="0.01" value={editLeg.price} onChange={(e) => setEditLeg({ ...editLeg, price: Number(e.target.value) })} className="w-80" /></td>
+                  <td><input type="number" step="0.001" value={editLeg.price} onChange={(e) => setEditLeg({ ...editLeg, price: Number(e.target.value) })} className="w-80" /></td>
                   <td>{fmtMoney(editLeg.shares * editLeg.price, currency)}</td>
                   <td>
                     <input
                       type="number"
-                      step="0.01"
+                      step="0.001"
                       className="price-input"
                       placeholder="auto"
                       title="Leave blank to compute automatically, or type an exact fee from your statement."
@@ -904,7 +904,7 @@ function PlanCard({ plan }: { plan: TradePlan }) {
                     </select>
                   </td>
                   <td><input type="number" value={editTxRow.shares} onChange={(e) => setEditTxRow({ ...editTxRow, shares: Number(e.target.value) })} className="w-70" /></td>
-                  <td><input type="number" step="0.01" value={editTxRow.price} onChange={(e) => setEditTxRow({ ...editTxRow, price: Number(e.target.value) })} className="w-80" /></td>
+                  <td><input type="number" step="0.001" value={editTxRow.price} onChange={(e) => setEditTxRow({ ...editTxRow, price: Number(e.target.value) })} className="w-80" /></td>
                   <td>{fmtMoney(editTxRow.shares * editTxRow.price, currency)}</td>
                   <td>{fmtMoney(calcFee(editTxRow.shares * editTxRow.price, editTxRow.action === 'BUY', { shares: editTxRow.shares, tx: editTxRow }), currency)}</td>
                   <td><span className="pill-positive">Executed</span></td>
@@ -925,7 +925,7 @@ function PlanCard({ plan }: { plan: TradePlan }) {
                     <td style={{ display: 'flex', alignItems: 'center', gap: 4 }}><TickerLogo ticker={display.ticker} exchange="qse" size="sm" />{display.ticker}</td>
                     <td className={display.action === 'BUY' ? 'pill-buy' : 'pill-sell'}>{display.action}</td>
                     <td>{fmt(display.shares, 0)}</td>
-                    <td>{fmtPrice(display.price)}</td>
+                    <td>{fmtQSEPrice(display.price)}</td>
                     <td>{fmtMoney(display.shares * display.price, currency)}</td>
                     <td>{fmtMoney(legFee(leg), currency)}</td>
                     <td>
@@ -956,7 +956,7 @@ function PlanCard({ plan }: { plan: TradePlan }) {
                             <select value={linkChoice} onChange={(e) => setLinkChoice(e.target.value)}>
                               <option value="">— Select a transaction —</option>
                               {candidateTxsFor(leg.ticker).map((t) => (
-                                <option key={t.id} value={t.id}>{t.date} · {t.action} {fmt(t.shares, 0)} @ {fmtPrice(t.price)}</option>
+                                <option key={t.id} value={t.id}>{t.date} · {t.action} {fmt(t.shares, 0)} @ {fmtQSEPrice(t.price)}</option>
                               ))}
                             </select>
                             <button className="btn secondary small" disabled={!linkChoice} onClick={() => confirmLink(i)}>Confirm link</button>
@@ -981,12 +981,12 @@ function PlanCard({ plan }: { plan: TradePlan }) {
                   </select>
                 </td>
                 <td><input type="number" placeholder="Shares" value={addingLeg.shares || ''} onChange={(e) => setAddingLeg({ ...addingLeg, shares: Number(e.target.value) })} className="w-70" /></td>
-                <td><input type="number" step="0.01" placeholder="Price" value={addingLeg.price || ''} onChange={(e) => setAddingLeg({ ...addingLeg, price: Number(e.target.value) })} className="w-80" /></td>
+                <td><input type="number" step="0.001" placeholder="Price" value={addingLeg.price || ''} onChange={(e) => setAddingLeg({ ...addingLeg, price: Number(e.target.value) })} className="w-80" /></td>
                 <td>{fmtMoney(addingLeg.shares * addingLeg.price, currency)}</td>
                 <td>
                   <input
                     type="number"
-                    step="0.01"
+                    step="0.001"
                     className="price-input"
                     placeholder="auto"
                     title="Leave blank to compute automatically, or type an exact fee from your statement."
@@ -1039,8 +1039,8 @@ function PlanCard({ plan }: { plan: TradePlan }) {
                 {missedOpportunity.lots.map((lot, index) => (
                   <tr key={index}>
                     <td>{lot.buyDate}</td>
-                    <td>{fmtPrice(lot.buyPrice)}</td>
-                    <td>{fmtPrice(lot.peakPrice)}</td>
+                    <td>{fmtQSEPrice(lot.buyPrice)}</td>
+                    <td>{fmtQSEPrice(lot.peakPrice)}</td>
                     <td>{lot.peakDate}</td>
                     <td className={lot.wouldHaveProfited >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(lot.wouldHaveProfited, currency)}</td>
                   </tr>

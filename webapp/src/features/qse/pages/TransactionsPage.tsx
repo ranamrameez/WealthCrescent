@@ -13,7 +13,7 @@ import { RecordDetailModal } from '../../../components/RecordDetailModal';
 import { LotAllocationFields } from '../../../components/ui/LotAllocationFields';
 import { useSortableRows } from '../../../hooks/useSortableRows';
 import { usePageFabActions } from '../../../hooks/usePageFabActions';
-import { fmt, fmtMoney, fmtPrice } from '../../../lib/format';
+import { fmt, fmtMoney, fmtQSEPrice } from '../../../lib/format';
 import { closedPLBySellTxId, computeClosedTrades, type LotMatchOrder } from '../../../lib/calc/closedTrades';
 import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
 import { confirmAndDeleteLinkable, propagateLinkedEdit, resolveLinkedEdit } from '../../../lib/linkCascade';
@@ -531,7 +531,7 @@ function TransactionList() {
                     </td>
                     <td className={tx.action === 'BUY' ? 'pill-buy' : 'pill-sell'}>{tx.action}</td>
                     <td>{fmt(tx.shares, 0)}</td>
-                    <td>{fmtPrice(tx.price)}</td>
+                    <td>{fmtQSEPrice(tx.price)}</td>
                     <td>{fmtMoney(tx.shares * tx.price, currency)}</td>
                     <td className={tx.id && sellPLById[tx.id] ? (sellPLById[tx.id].netPL >= 0 ? 'pill-positive' : 'pill-negative') : undefined}>
                       {tx.id && sellPLById[tx.id] ? fmtMoney(sellPLById[tx.id].netPL, currency) : '—'}
@@ -646,7 +646,7 @@ function TransactionList() {
                 <tr key={i}>
                   <td><TickerLogo ticker={l.ticker} size="sm" exchange="qse" /><Link to={`/stock/${l.ticker}`}>{l.ticker}</Link></td>
                   <td>{l.buyDate}</td>
-                  <td>{fmtPrice(l.buyPrice)}</td>
+                  <td>{fmtQSEPrice(l.buyPrice)}</td>
                   <td>{fmt(l.remainingShares, 0)}</td>
                   <td>{fmtMoney(l.remainingShares * l.buyPrice, currency)}</td>
                   <td>{fmtMoney(l.buyFeeTotal, currency)}</td>
@@ -691,9 +691,9 @@ function TransactionList() {
                 <tr key={i}>
                   <td><TickerLogo ticker={t.ticker} size="sm" exchange="qse" /><Link to={`/stock/${t.ticker}`}>{t.ticker}</Link></td>
                   <td>{t.buyDate}</td>
-                  <td>{fmtPrice(t.buyPrice)}</td>
+                  <td>{fmtQSEPrice(t.buyPrice)}</td>
                   <td>{t.sellDate}</td>
-                  <td>{fmtPrice(t.sellPrice)}</td>
+                  <td>{fmtQSEPrice(t.sellPrice)}</td>
                   <td>{fmt(t.shares, 0)}</td>
                   <td>{fmtMoney(t.buyFee, currency)}</td>
                   <td>{fmtMoney(t.sellFee, currency)}</td>
@@ -721,7 +721,7 @@ function TransactionList() {
             { label: 'Ticker', value: detailTx.ticker },
             { label: 'Action', value: detailTx.action },
             { label: 'Shares', value: fmt(detailTx.shares, 0) },
-            { label: 'Price', value: fmtPrice(detailTx.price) },
+            { label: 'Price', value: fmtQSEPrice(detailTx.price) },
             { label: 'Amount', value: fmtMoney(detailTx.shares * detailTx.price, currency) },
             ...(detailTx.id && sellPLById[detailTx.id]
               ? [{ label: 'Realized P/L', value: fmtMoney(sellPLById[detailTx.id].netPL, currency) }]

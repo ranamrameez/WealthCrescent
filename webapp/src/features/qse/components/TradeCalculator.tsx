@@ -5,7 +5,7 @@ import { TickerLogo } from '../../../components/TickerLogo';
 import { toast } from '../../../components/Toast';
 import { Field, TextInput } from '../../../components/ui/Field';
 import { Tooltip } from '../../../components/Tooltip';
-import { fmt, fmtMoney, fmtPrice } from '../../../lib/format';
+import { fmt, fmtMoney, fmtQSEPrice } from '../../../lib/format';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { useWorkbookStore } from '../../../store/workbookStore';
 import { useQSEDerived } from '../hooks/useQSEDerived';
@@ -172,15 +172,15 @@ export function TradeCalculator({ initialTicker }: { initialTicker?: string } = 
       if (!ticker || sellCap <= 0 || sellPrice <= 0) return toast('Fill in shares and price.');
       if (!(await ensureSignedIn('Sign in to save this trade.'))) return;
       addTransaction({ date: new Date().toISOString().slice(0, 10), ticker, action: 'SELL', shares: sellCap, price: sellPrice });
-      toast(`Logged SELL ${sellCap} ${ticker} @ ${fmtPrice(sellPrice)}`);
+      toast(`Logged SELL ${sellCap} ${ticker} @ ${fmtQSEPrice(sellPrice)}`);
     } else {
       if (!ticker || newShares <= 0 || buyPrice <= 0) return toast('Fill in shares and price.');
       if (!(await ensureSignedIn('Sign in to save this trade.'))) return;
       addTransaction({ date: new Date().toISOString().slice(0, 10), ticker, action: 'BUY', shares: newShares, price: buyPrice });
       toast(
         mode === 'CYCLE'
-          ? `Logged the BUY leg: ${newShares} ${ticker} @ ${fmtPrice(buyPrice)}. The planned sell is not auto-logged — add it when you actually sell.`
-          : `Logged BUY ${newShares} ${ticker} @ ${fmtPrice(buyPrice)}`,
+          ? `Logged the BUY leg: ${newShares} ${ticker} @ ${fmtQSEPrice(buyPrice)}. The planned sell is not auto-logged — add it when you actually sell.`
+          : `Logged BUY ${newShares} ${ticker} @ ${fmtQSEPrice(buyPrice)}`,
       );
       setNewShares(0);
       setAmountInput('');
@@ -241,13 +241,13 @@ export function TradeCalculator({ initialTicker }: { initialTicker?: string } = 
             />
           </Field>
           {priceOverride !== '' && currentPrice > 0 && currentPrice !== mp && (
-            <Tooltip text={`Save ${fmtPrice(currentPrice)} as this ticker's real market price (used everywhere else in the app, not just here).`}>
+            <Tooltip text={`Save ${fmtQSEPrice(currentPrice)} as this ticker's real market price (used everywhere else in the app, not just here).`}>
               <button
                 className="btn secondary small"
                 onClick={async () => {
                   if (!(await ensureSignedIn('Sign in to save price updates.'))) return;
                   setMarketPrice(ticker, currentPrice);
-                  toast(`${ticker} market price saved: ${fmtPrice(currentPrice)}`);
+                  toast(`${ticker} market price saved: ${fmtQSEPrice(currentPrice)}`);
                   setPriceOverride('');
                 }}
               >
@@ -257,10 +257,10 @@ export function TradeCalculator({ initialTicker }: { initialTicker?: string } = 
           )}
           {position && (
             <div className="grid-auto" style={{ ...gridAutoStyle(120, 8), flex: 1 }}>
-              <div className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">Avg cost</div><div className="value">{fmtPrice(avg)}</div></div>
+              <div className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">Avg cost</div><div className="value">{fmtQSEPrice(avg)}</div></div>
               <div className="stat-card card" style={currentPrice > 0 ? hueStyle(currentPrice >= be ? 'var(--profit)' : 'var(--loss)') : undefined}>
                 <div className="label">Break-even</div>
-                <div className="value">{fmtPrice(be)}</div>
+                <div className="value">{fmtQSEPrice(be)}</div>
               </div>
               <div className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">Worth now</div><div className="value">{fmtMoney(worth, currency)}</div></div>
               <div className="stat-card card" style={currentPrice > 0 ? hueStyle(currentPL >= 0 ? 'var(--profit)' : 'var(--loss)') : undefined}><div className="label">Current P/L</div><div className="value">{fmtMoney(currentPL, currency)}</div></div>
@@ -285,7 +285,7 @@ export function TradeCalculator({ initialTicker }: { initialTicker?: string } = 
           {overCap && <p className="text-muted text-loss">Capped at {shares} shares held.</p>}
           {solvedSellPriceForProfit !== null && (
             <p className="text-muted">
-              Sell price needed for {fmtMoney(targetProfit, currency)} profit: {fmtPrice(solvedSellPriceForProfit)}{' '}
+              Sell price needed for {fmtMoney(targetProfit, currency)} profit: {fmtQSEPrice(solvedSellPriceForProfit)}{' '}
               <button className="btn secondary small" onClick={() => setSellPrice(roundTick(solvedSellPriceForProfit, tick))}>Use</button>
             </p>
           )}
@@ -345,7 +345,7 @@ export function TradeCalculator({ initialTicker }: { initialTicker?: string } = 
           </div>
           {solvedSharesForAvg !== null && (
             <p className="text-muted">
-              Buy ~{fmt(solvedSharesForAvg, 0)} shares to bring average cost to {fmtPrice(targetAvg)}{' '}
+              Buy ~{fmt(solvedSharesForAvg, 0)} shares to bring average cost to {fmtQSEPrice(targetAvg)}{' '}
               <button
                 className="btn secondary small"
                 onClick={() => {
@@ -363,7 +363,7 @@ export function TradeCalculator({ initialTicker }: { initialTicker?: string } = 
           )}
           {newShares > 0 && buyPrice > 0 && (
             <div className="text-muted mt-sm">
-              New avg cost {fmtPrice(newAvg)} · New break-even {fmtPrice(newBe)} · Needs {bounceRequired.toFixed(1)}% bounce from buy price
+              New avg cost {fmtQSEPrice(newAvg)} · New break-even {fmtQSEPrice(newBe)} · Needs {bounceRequired.toFixed(1)}% bounce from buy price
             </div>
           )}
           {mode === 'CYCLE' && totalShares > 0 && targetSell > 0 && (

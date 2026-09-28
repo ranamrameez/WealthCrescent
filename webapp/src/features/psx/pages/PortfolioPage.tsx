@@ -10,7 +10,7 @@ import { Tooltip } from '../../../components/Tooltip';
 import { useSortableRows } from '../../../hooks/useSortableRows';
 import { breakEvenPrice, getDailyPriceHistory, getMarketPrice } from '../../../lib/calc';
 import { perShareCommission } from '../../../lib/calc/partialTradeStrategy';
-import { fmt, fmtMoney, fmtPrice } from '../../../lib/format';
+import { fmt, fmtMoney, fmtPSXPrice } from '../../../lib/format';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { shortenCompanyName } from '../../../lib/shortenName';
 import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
@@ -117,12 +117,12 @@ function OpenPositionsTable({ onSelect }: { onSelect: (ticker: string) => void }
                   </div>
                 </div>
               </td>
-              <td onClick={(e) => e.stopPropagation()} className="w-82"><Sparkline data={r.sparkData} formatValue={fmtPrice} /></td>
+              <td onClick={(e) => e.stopPropagation()} className="w-82"><Sparkline data={r.sparkData} formatValue={fmtPSXPrice} /></td>
               <td onClick={() => onSelect(r.ticker)}><span className="shares-box">{fmt(r.shares, 0)}</span></td>
               <td onClick={() => onSelect(r.ticker)}>
-                <div>{fmtPrice(r.avgCost)}</div>
+                <div>{fmtPSXPrice(r.avgCost)}</div>
                 <div className="text-muted" style={{ color: r.hasMarket ? (r.mp >= r.be ? 'var(--profit)' : 'var(--loss)') : undefined }}>
-                  BE {fmtPrice(r.be)}
+                  BE {fmtPSXPrice(r.be)}
                 </div>
                 {r.rt && (
                   <div
@@ -149,7 +149,7 @@ function OpenPositionsTable({ onSelect }: { onSelect: (ticker: string) => void }
                       const val = parseFloat(target.value) || 0;
                       if (val > 0 && (await ensureSignedIn('Sign in to save price updates.'))) {
                         setMarketPrice(r.ticker, val);
-                        toast(`${r.ticker} price saved: ${fmtPrice(val)}`);
+                        toast(`${r.ticker} price saved: ${fmtPSXPrice(val)}`);
                       }
                       target.blur();
                     }
@@ -161,7 +161,7 @@ function OpenPositionsTable({ onSelect }: { onSelect: (ticker: string) => void }
                     onClick={() => setRtTicker(r.ticker)}
                     title="Round-trip commission cost (buy + sell) at the current price — click for the full breakdown."
                   >
-                    RTC +{fmtPrice(r.rt.buy + r.rt.sell)}
+                    RTC +{fmtPSXPrice(r.rt.buy + r.rt.sell)}
                   </div>
                 )}
               </td>
@@ -177,7 +177,7 @@ function OpenPositionsTable({ onSelect }: { onSelect: (ticker: string) => void }
                 <div className="text-muted">{Number.isFinite(r.netPct) ? `${r.netPct >= 0 ? '+' : ''}${r.netPct.toFixed(1)}%` : ''}</div>
               </td>
               <td onClick={() => onSelect(r.ticker)} className="text-muted" style={{ whiteSpace: 'nowrap' }}>
-                +1% {fmtPrice(r.t1)}<br />+2% {fmtPrice(r.t2)}<br />+5% {fmtPrice(r.t3)}
+                +1% {fmtPSXPrice(r.t1)}<br />+2% {fmtPSXPrice(r.t2)}<br />+5% {fmtPSXPrice(r.t3)}
               </td>
               <td onClick={() => onSelect(r.ticker)} className={r.statusClass}>{r.statusLabel}</td>
             </tr>

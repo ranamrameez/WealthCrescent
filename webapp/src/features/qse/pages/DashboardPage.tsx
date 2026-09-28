@@ -13,7 +13,7 @@ import { pendingShareDeltaByTicker } from '../../../lib/calc/positions';
 import { perShareCommission } from '../../../lib/calc/partialTradeStrategy';
 import { dimColor, dlBarV, dlDoughnut, dlLine, profitColor } from '../../../lib/chartLabels';
 import { applyChartTheme } from '../../../lib/chartSetup';
-import { fmt, fmtMoney, fmtPrice } from '../../../lib/format';
+import { fmt, fmtMoney, fmtQSEPrice } from '../../../lib/format';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { shortenCompanyName } from '../../../lib/shortenName';
 import { useWorkbookStore } from '../../../store/workbookStore';
@@ -162,7 +162,7 @@ function DashboardPositionsView({ workbook, calcFee, positions, rows, summary, r
                       </div>
                     </div>
                   </td>
-                  <td className="w-70"><Sparkline data={r.sparkData} formatValue={fmtPrice} width={56} height={20} /></td>
+                  <td className="w-70"><Sparkline data={r.sparkData} formatValue={fmtQSEPrice} width={56} height={20} /></td>
                   <td onClick={() => navigate(`/stock/${r.ticker}`)}>
                     <span className="shares-box">{fmt(r.shares, 0)}</span>
                     {!!pendingDelta[r.ticker] && (
@@ -172,12 +172,12 @@ function DashboardPositionsView({ workbook, calcFee, positions, rows, summary, r
                     )}
                   </td>
                   <td onClick={() => navigate(`/stock/${r.ticker}`)}>
-                    <div>{fmtPrice(r.avgCost)}</div>
+                    <div>{fmtQSEPrice(r.avgCost)}</div>
                     <div
                       className="text-muted"
                       style={{ color: r.mp > 0 ? (r.mp >= r.be ? 'var(--profit)' : 'var(--loss)') : undefined }}
                     >
-                      BE {fmtPrice(r.be)}
+                      BE {fmtQSEPrice(r.be)}
                     </div>
                     {r.rt && (
                       <div
@@ -204,7 +204,7 @@ function DashboardPositionsView({ workbook, calcFee, positions, rows, summary, r
                           const val = parseFloat(target.value) || 0;
                           if (val > 0 && (await ensureSignedIn('Sign in to save price updates.'))) {
                             setMarketPrice(r.ticker, val);
-                            toast(`${r.ticker} price saved: ${fmtPrice(val)}`);
+                            toast(`${r.ticker} price saved: ${fmtQSEPrice(val)}`);
                           }
                           target.blur();
                         }
@@ -216,7 +216,7 @@ function DashboardPositionsView({ workbook, calcFee, positions, rows, summary, r
                         onClick={() => setRtTicker(r.ticker)}
                         title="Round-trip commission cost (buy + sell) at the current price — click for the full breakdown."
                       >
-                        RTC +{fmtPrice(r.rt.buy + r.rt.sell)}
+                        RTC +{fmtQSEPrice(r.rt.buy + r.rt.sell)}
                       </div>
                     )}
                   </td>
@@ -232,7 +232,7 @@ function DashboardPositionsView({ workbook, calcFee, positions, rows, summary, r
                     <div className="text-muted">{Number.isFinite(r.profitPct) ? `${r.profitPct >= 0 ? '+' : ''}${r.profitPct.toFixed(1)}%` : ''}</div>
                   </td>
                   <td onClick={() => navigate(`/stock/${r.ticker}`)} className="text-muted" style={{ whiteSpace: 'nowrap' }}>
-                    +1% {fmtPrice(r.t1)}<br />+2% {fmtPrice(r.t2)}<br />+5% {fmtPrice(r.t3)}
+                    +1% {fmtQSEPrice(r.t1)}<br />+2% {fmtQSEPrice(r.t2)}<br />+5% {fmtQSEPrice(r.t3)}
                   </td>
                   <td onClick={() => navigate(`/stock/${r.ticker}`)} className={r.statusClass}>{r.statusLabel}</td>
                 </tr>
