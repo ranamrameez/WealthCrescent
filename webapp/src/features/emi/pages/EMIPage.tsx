@@ -1,7 +1,10 @@
 import { StandardPageSections } from '../../../components/StandardPageSections';
 import type { User } from 'firebase/auth';
 import { useMemo, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { EntityScopeMenu, selectedEntityValues } from '../../../components/EntityScopeMenu';
+import { TopBarControls } from '../../../components/TopBarControls';
+import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { Bar, Line } from 'react-chartjs-2';
 import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
 import { ModuleDetailTemplate } from '../../../components/ModuleDetailTemplate';
@@ -1082,9 +1085,9 @@ function RepaymentLog({ loan, repayments }: { loan: EMILoan; repayments: EMIRepa
 /** Overall stats across every loan, shown on the landing view before any
  * loan is opened — user feedback: every module needs an at-a-glance
  * accumulative summary, not just per-loan detail. */
-function OverallSummary() {
+function OverallSummary({ selectedIds }: { selectedIds?: string[] } = {}) {
   const loans = useEMIWorkbookStore((s) => s.workbook.entries);
-  const totals = totalsByCurrency(loans);
+  const totals = totalsByCurrency(selectedIds ? loans.filter((loan) => selectedIds.includes(loan.id)) : loans);
   const codes = Object.keys(totals);
   if (!codes.length) return null;
 
@@ -1116,13 +1119,13 @@ function OverallSummary() {
 // per-column reorder controls — dropped useSortableRows (this was its
 // only remaining caller in this file) in favor of a fixed favorite-first
 // ordering, matching every other converted list's own precedent.
-function LoanList({ onSelect, onEdit }: { onSelect: (loan: EMILoan) => void; onEdit: (loan: EMILoan) => void }) {
+function LoanList({ onSelect, onEdit, selectedIds }: { onSelect: (loan: EMILoan) => void; onEdit: (loan: EMILoan) => void; selectedIds?: string[] }) {
   const allLoans = useEMIWorkbookStore((s) => s.workbook.entries);
   const updateEntry = useEMIWorkbookStore((s) => s.updateEntry);
   const ensureSignedIn = useEnsureSignedIn();
   const [showArchived, setShowArchived] = useState(false);
   const archivedCount = useMemo(() => allLoans.filter((l) => l.isActive === false).length, [allLoans]);
-  const loans = useMemo(() => (showArchived ? allLoans : allLoans.filter((l) => l.isActive !== false)), [allLoans, showArchived]);
+  const loans = useMemo(() => (showArchived ? allLoans : allLoans.filter((l) => l.isActive !== false)).filter((l) => !selectedIds || selectedIds.includes(l.id)), [allLoans, showArchived, selectedIds]);
   // Pending item 115(c): Sr# = the loan's own stable position in the
   // underlying (unfiltered) array, creation order — same convention as
   // Bank/Personal Loans/Funds.
@@ -1243,6 +1246,9 @@ export function EMIPage({
   const [editOnOpen, setEditOnOpen] = useState(false);
   const loans = useEMIWorkbookStore((s) => s.workbook.entries);
   const liveSelected = selected ? loans.find((l) => l.id === selected.id) ?? null : null;
+  const [params] = useSearchParams();
+  const selectedIds = selectedEntityValues(params, loans.map((loan) => loan.id));
+  usePageTopBarRightSlot(!liveSelected && loans.length ? <TopBarControls><EntityScopeMenu label="EMI loans" options={loans.map((loan) => ({ value: loan.id, label: loan.name }))} /></TopBarControls> : null);
 
   const openLoan = (loan: EMILoan) => { setEditOnOpen(false); setSelected(loan); };
   const editLoan = (loan: EMILoan) => { setEditOnOpen(true); setSelected(loan); };
@@ -1265,8 +1271,8 @@ export function EMIPage({
              (same round-FAB pattern as the Calculator button) with the
              form itself in a popup, and the stats+list now render first. */}
           <StandardPageSections sections={[
-            { key: 'summary', label: 'Summary', content: <OverallSummary /> },
-            { key: 'loans', label: 'Loans', content: <LoanList onSelect={openLoan} onEdit={editLoan} /> },
+            { key: 'summary', label: 'Summary', content: <OverallSummary selectedIds={selectedIds} /> },
+            { key: 'loans', label: 'Loans', content: <LoanList onSelect={openLoan} onEdit={editLoan} selectedIds={selectedIds} /> },
             { key: 'settings', label: 'Settings', content: <AccountSection cloudEmpty={cloudEmpty} uploadLocalToCloud={uploadLocalToCloud} /> },
           ]} />
           <AddLoanFab
