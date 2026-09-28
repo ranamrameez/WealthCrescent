@@ -239,6 +239,35 @@ export function latestClosedStatement(
   };
 }
 
+/** The currently open cycle with payments allocated exclusively. Payments
+ * made after the prior cut-off but on/before that locked bill's final due
+ * date belong to the closed bill, so they are excluded here. Only payments
+ * after the final due date reduce the active cycle. Charges still enter the
+ * active cycle immediately after the cut-off. */
+export function activeCycleStatement(
+  card: CreditCard,
+  transactions: CreditCardTransaction[],
+  asOfDate: string = new Date().toISOString().slice(0, 10),
+): CreditCardStatement | null {
+  const open = currentStatement(card, transactions, asOfDate);
+  if (!open) return null;
+  const closed = latestClosedStatement(card, transactions, asOfDate);
+  const paymentBoundary = closed?.dueDate ?? open.cycleStart;
+  const activePayments = round2(transactions
+    .filter((tx) => tx.cardId === card.id && tx.kind === 'payment' && tx.date > paymentBoundary && tx.date <= asOfDate && tx.date <= open.cycleEnd)
+    .reduce((sum, tx) => sum + tx.amount, 0));
+  const statementBalance = round2(open.previousBalance + open.chargesThisCycle - activePayments);
+  const minimumDue = computeMinimumDue(card, statementBalance);
+  return {
+    ...open,
+    paymentsThisCycle: activePayments,
+    statementBalance,
+    minimumDue,
+    remainingMinimumDue: minimumDue,
+    remainingStatementBalance: Math.max(0, statementBalance),
+  };
+}
+
 /** Research: real minimum-payment formulas vary by issuer (a flat %, a
  * flat floor, or "floor OR %, whichever is greater"). Never exceeds the
  * statement balance itself (a tiny statement shouldn't demand a minimum

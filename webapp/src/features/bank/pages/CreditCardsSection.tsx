@@ -43,7 +43,7 @@ import { planWithinHorizon, plannedCreditCardProjection, type PlanningHorizonDay
 import { useCategoryStore } from '../../../store/categoryStore';
 import {
   creditCardMonthlyHistory,
-  currentStatement,
+  activeCycleStatement,
   latestClosedStatement,
   markupThisCycle,
   nextPendingMinDue,
@@ -615,7 +615,7 @@ export function CreditCardDetailPage() {
   const [editCardOpen, setEditCardOpen] = useState(false);
 
   const balance = card ? outstandingBalanceByCard(card, transactions) : 0;
-  const openCycle = card ? currentStatement(card, transactions) : null;
+  const openCycle = card ? activeCycleStatement(card, transactions) : null;
   const statement = card ? latestClosedStatement(card, transactions) : null;
   const markup = statement && card ? markupThisCycle(card, statement) : 0;
   const proposal = statement ? proposeMinPayment(card!, statement) : null;

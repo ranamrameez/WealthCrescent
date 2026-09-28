@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CreditCard, CreditCardTransaction } from '../../../types/creditCard';
 import {
   availableCredit,
+  activeCycleStatement,
   computeMinimumDue,
   creditCardLiabilityByCurrency,
   creditCardMonthlyHistory,
@@ -45,6 +46,9 @@ describe('multi-cycle locked statements', () => {
     expect(s.remainingMinimumDue).toBe(0);
     expect(s.remainingStatementBalance).toBe(500);
     expect(markupThisCycle(c, s)).toBe(5);
+    const active = activeCycleStatement(c, txs, '2026-09-28')!;
+    expect(active.chargesThisCycle).toBe(999);
+    expect(active.paymentsThisCycle).toBe(400);
   });
 });
 

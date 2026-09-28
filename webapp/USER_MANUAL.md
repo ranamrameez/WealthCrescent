@@ -524,7 +524,8 @@ In a card's setup, enter the actual **Last billing date**, **Last minimum-paymen
 internally, so you do not need to translate statement dates into raw day numbers. Once a cut-off
 passes, that bill is locked: later purchases belong to the new open cycle and cannot inflate it.
 Payments entered after cut-off and on or before the full-amount due date reduce the locked total
-due and the markup base; a payment after that due date does not rewrite the earlier bill. The
+due and the markup base, and do not appear as active-cycle payments. A payment after that due
+date belongs to the active cycle and does not rewrite the earlier bill. The
 Current Statement section shows the locked bill, how much post-cutoff payment was applied, and
 the separate open-cycle spending total.
 

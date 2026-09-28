@@ -10120,6 +10120,9 @@ from the lot system."*
   directly visible, and Edit/Close/Delete live in the card's action menu instead of floating by
   the page title. Locked and open cycles use the same extracted `SummaryGroupCard` and
   `SummaryMetric` components as Bank Account summaries.
+  Payment allocation is exclusive across those cycle cards: payments after cut-off through the
+  locked bill's final due date belong only to that closed bill; payments after the due date belong
+  only to the active cycle, preventing the same payment from reducing both views.
 
 ## Pending
 
