@@ -46,7 +46,7 @@ function CardActionMenu({ actions, onAction }: { actions: StandardCardAction[]; 
 }
 
 export function StandardCard({ title, summary, actions=[], headerEnd, defaultOpen=true, open:controlledOpen, onToggle, children, className='', hue }: {
-  title:string; summary?:ReactNode; actions?:StandardCardAction[]; headerEnd?:ReactNode; defaultOpen?:boolean; open?:boolean; onToggle?:(open:boolean)=>void; children:ReactNode; className?:string; hue?:string;
+  title:ReactNode; summary?:ReactNode; actions?:StandardCardAction[]; headerEnd?:ReactNode; defaultOpen?:boolean; open?:boolean; onToggle?:(open:boolean)=>void; children:ReactNode; className?:string; hue?:string;
 }) {
   const [internalOpen,setInternalOpen]=useState(defaultOpen);
   const [fullScreen, setFullScreen] = useState(false);
