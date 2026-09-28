@@ -39,6 +39,14 @@ export function fmtMoneyCompact(n: number, currency: string): string {
 /** Exchange price display rules.
  * QSE quotes use four total price digits: 12.12 / 1.212.
  * PSX quotes display at most two decimal places. */
+/** QSE four-digit quote step: 1.212 uses .001; 12.12 uses .01; 123.5 uses .1. */
+export function qsePriceStep(n: number | undefined | null): number {
+  const value = Math.abs(Number(n) || 0);
+  if (value === 0) return 0.001;
+  const magnitude = Math.floor(Math.log10(value));
+  return 10 ** Math.max(-3, magnitude - 3);
+}
+
 export function fmtQSEPrice(n: number | undefined | null): string {
   if (n === undefined || n === null || Number.isNaN(n)) return '—';
   if (n === 0) return '0.000';

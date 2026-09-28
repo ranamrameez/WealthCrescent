@@ -10,7 +10,7 @@ import { Tooltip } from '../../../components/Tooltip';
 import { useSortableRows } from '../../../hooks/useSortableRows';
 import { breakEvenPrice, getDailyPriceHistory, getMarketPrice } from '../../../lib/calc';
 import { perShareCommission } from '../../../lib/calc/partialTradeStrategy';
-import { fmt, fmtMoney, fmtQSEPrice } from '../../../lib/format';
+import { fmt, fmtMoney, fmtQSEPrice, qsePriceStep } from '../../../lib/format';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { shortenCompanyName } from '../../../lib/shortenName';
 import { useWorkbookStore } from '../../../store/workbookStore';
@@ -142,7 +142,7 @@ function OpenPositionsTable({ onSelect }: { onSelect: (ticker: string) => void }
                 <input
                   key={r.mp}
                   type="number"
-                  step="0.001"
+                  step={qsePriceStep(r.mp)}
                   className="price-input w-96"
                   defaultValue={r.mp || ''}
                   placeholder="—"
