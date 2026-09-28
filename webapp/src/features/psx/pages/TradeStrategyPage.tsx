@@ -1173,7 +1173,6 @@ export function TradeStrategyPage() {
         } else {
           addTradePlan({ id: crypto.randomUUID(), name: `${ticker} Plan`, createdAt: today(), legs: [], defaultTicker: ticker, isDefault: true });
         }
-        }
       }
     }
   }, [user, rows, tradePlans, addTradePlan]);
