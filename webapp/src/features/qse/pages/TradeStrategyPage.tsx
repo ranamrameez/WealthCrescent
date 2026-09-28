@@ -103,13 +103,13 @@ function BuySellAvgDownCalculator() {
           <TextInput value={ticker} onChange={(e) => setTicker(e.target.value.toUpperCase())} list={QSE_TICKER_DATALIST_ID} placeholder="e.g. QIBK" />
         </Field>
         <Field label="Buy price">
-          <TextInput type="number" step="0.01" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)} />
+          <TextInput type="number" step="0.001" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)} />
         </Field>
         <Field label="Shares">
           <TextInput type="number" value={shares} onChange={(e) => setShares(e.target.value)} />
         </Field>
         <Field label="Target sell price (optional)">
-          <TextInput type="number" step="0.01" value={targetSell} onChange={(e) => setTargetSell(e.target.value)} />
+          <TextInput type="number" step="0.001" value={targetSell} onChange={(e) => setTargetSell(e.target.value)} />
         </Field>
         <Field label=" ">
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, height: 30 }} title={canAvgDown ? 'Blend this purchase with what you already hold.' : 'Averaging down needs an existing position in this ticker.'}>
@@ -283,7 +283,7 @@ function WhatIfExitCalculator({
               <Field label="Exit price" width={110}>
                 <TextInput
                   type="number"
-                  step="0.01"
+                  step="0.001"
                   value={price || ''}
                   onChange={(e) => setPrices((p) => ({ ...p, [t.ticker]: Number(e.target.value) }))}
                 />
@@ -397,7 +397,7 @@ function NewPlanFab() {
                 <option value="SELL">SELL</option>
               </select>
               <input type="number" placeholder="Shares" value={l.shares || ''} onChange={(e) => update(i, { shares: Number(e.target.value) })} className="w-90" />
-              <input type="number" step="0.01" placeholder="Price" value={l.price || ''} onChange={(e) => update(i, { price: Number(e.target.value) })} className="w-90" />
+              <input type="number" step="0.001" placeholder="Price" value={l.price || ''} onChange={(e) => update(i, { price: Number(e.target.value) })} className="w-90" />
               <button className="btn secondary small" onClick={() => setLegs((rs) => rs.filter((_, idx) => idx !== i))}>
                 <TrashIcon size={12} />Remove
               </button>
@@ -872,12 +872,12 @@ function PlanCard({ plan }: { plan: TradePlan }) {
                     </select>
                   </td>
                   <td><input type="number" value={editLeg.shares} onChange={(e) => setEditLeg({ ...editLeg, shares: Number(e.target.value) })} className="w-70" /></td>
-                  <td><input type="number" step="0.01" value={editLeg.price} onChange={(e) => setEditLeg({ ...editLeg, price: Number(e.target.value) })} className="w-80" /></td>
+                  <td><input type="number" step="0.001" value={editLeg.price} onChange={(e) => setEditLeg({ ...editLeg, price: Number(e.target.value) })} className="w-80" /></td>
                   <td>{fmtMoney(editLeg.shares * editLeg.price, currency)}</td>
                   <td>
                     <input
                       type="number"
-                      step="0.01"
+                      step="0.001"
                       className="price-input"
                       placeholder="auto"
                       title="Leave blank to compute automatically, or type an exact fee from your statement."
@@ -904,7 +904,7 @@ function PlanCard({ plan }: { plan: TradePlan }) {
                     </select>
                   </td>
                   <td><input type="number" value={editTxRow.shares} onChange={(e) => setEditTxRow({ ...editTxRow, shares: Number(e.target.value) })} className="w-70" /></td>
-                  <td><input type="number" step="0.01" value={editTxRow.price} onChange={(e) => setEditTxRow({ ...editTxRow, price: Number(e.target.value) })} className="w-80" /></td>
+                  <td><input type="number" step="0.001" value={editTxRow.price} onChange={(e) => setEditTxRow({ ...editTxRow, price: Number(e.target.value) })} className="w-80" /></td>
                   <td>{fmtMoney(editTxRow.shares * editTxRow.price, currency)}</td>
                   <td>{fmtMoney(calcFee(editTxRow.shares * editTxRow.price, editTxRow.action === 'BUY', { shares: editTxRow.shares, tx: editTxRow }), currency)}</td>
                   <td><span className="pill-positive">Executed</span></td>
@@ -981,12 +981,12 @@ function PlanCard({ plan }: { plan: TradePlan }) {
                   </select>
                 </td>
                 <td><input type="number" placeholder="Shares" value={addingLeg.shares || ''} onChange={(e) => setAddingLeg({ ...addingLeg, shares: Number(e.target.value) })} className="w-70" /></td>
-                <td><input type="number" step="0.01" placeholder="Price" value={addingLeg.price || ''} onChange={(e) => setAddingLeg({ ...addingLeg, price: Number(e.target.value) })} className="w-80" /></td>
+                <td><input type="number" step="0.001" placeholder="Price" value={addingLeg.price || ''} onChange={(e) => setAddingLeg({ ...addingLeg, price: Number(e.target.value) })} className="w-80" /></td>
                 <td>{fmtMoney(addingLeg.shares * addingLeg.price, currency)}</td>
                 <td>
                   <input
                     type="number"
-                    step="0.01"
+                    step="0.001"
                     className="price-input"
                     placeholder="auto"
                     title="Leave blank to compute automatically, or type an exact fee from your statement."
