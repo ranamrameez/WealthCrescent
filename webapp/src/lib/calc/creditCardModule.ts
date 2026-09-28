@@ -239,6 +239,40 @@ export function latestClosedStatement(
   };
 }
 
+/** Locked statements for recent billing cut-offs, including payments posted
+ * through each cycle's final due date. Kept separate from calendar-month
+ * history because a card may close twice in one month. */
+export function creditCardCycleHistory(
+  card: CreditCard,
+  transactions: CreditCardTransaction[],
+  count = 6,
+  asOfDate: string = new Date().toISOString().slice(0, 10),
+): CreditCardStatement[] {
+  const [year, month] = asOfDate.split('-').map(Number);
+  const candidates = new Set<string>();
+  for (let offset = -18; offset <= 1; offset += 1) {
+    const d = new Date(Date.UTC(year, month - 1 + offset, 1));
+    for (const cutoff of cutoffCandidates(card, d.getUTCFullYear(), d.getUTCMonth())) {
+      if (cutoff <= asOfDate) candidates.add(cutoff);
+    }
+  }
+  return [...candidates].sort().slice(-count).map((cycleEnd) => {
+    const cycleStart = oneCutoffBack(card, cycleEnd);
+    const cardTxs = transactions.filter((t) => t.cardId === card.id);
+    const previousBalance = balanceAsOf(card, cardTxs, cycleStart);
+    const cycleTxs = cardTxs.filter((t) => t.date > cycleStart && t.date <= cycleEnd);
+    const chargesThisCycle = round2(cycleTxs.filter((t) => t.kind !== 'payment').reduce((sum, t) => sum + t.amount, 0));
+    const paymentsThisCycle = round2(cycleTxs.filter((t) => t.kind === 'payment').reduce((sum, t) => sum + t.amount, 0));
+    const statementBalance = round2(previousBalance + chargesThisCycle - paymentsThisCycle);
+    const minimumDue = computeMinimumDue(card, statementBalance);
+    const minDueDate = dueDateForDay(cycleEnd, configuredDueDay(card.lastMinPaymentDate, card.minDueDate));
+    const dueDate = dueDateForDay(cycleEnd, configuredDueDay(card.lastPaymentDueDate, card.paymentDueDate));
+    const paymentWindowEnd = [asOfDate, dueDate ?? asOfDate].sort()[0];
+    const paymentsAfterClose = round2(cardTxs.filter((t) => t.kind === 'payment' && t.date > cycleEnd && t.date <= paymentWindowEnd).reduce((sum, t) => sum + t.amount, 0));
+    return { cycleStart, cycleEnd, previousBalance: round2(previousBalance), chargesThisCycle, paymentsThisCycle, statementBalance, minimumDue, minDueDate, dueDate, paymentsAfterClose, remainingMinimumDue: Math.max(0, round2(minimumDue - paymentsAfterClose)), remainingStatementBalance: Math.max(0, round2(statementBalance - paymentsAfterClose)), isClosed: true };
+  });
+}
+
 /** The currently open cycle with payments allocated exclusively. Payments
  * made after the prior cut-off but on/before that locked bill's final due
  * date belong to the closed bill, so they are excluded here. Only payments

@@ -3,6 +3,7 @@ import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { CreditCardVisual } from '../../../components/CreditCardVisual';
 import { SummaryGroupCard, SummaryMetric } from '../../../components/SummaryGroupCard';
+import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu';
 import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls';
 import { StandardCard, SummaryChip } from '../../../components/StandardCard';
 import { Notice } from '../../../components/Notice';
@@ -29,6 +30,7 @@ import { useLastCurrency } from '../../../hooks/useLastCurrency';
 import { usePrimaryCurrency } from '../../../hooks/usePrimaryCurrency';
 import { usePageFabActions } from '../../../hooks/usePageFabActions';
 import { usePageTopBarChips, usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
+import { useUrlTransactionFilters, type TransactionPageFilters } from '../../../hooks/useUrlTransactionFilters';
 import { getLastTransferSource, rememberTransferSource } from '../../../hooks/useLastTransferSource';
 import { categoryName, UNCATEGORIZED_ID } from '../../../lib/categories';
 import { gridAutoStyle } from '../../../lib/gridStyle';
@@ -42,6 +44,7 @@ import { planWithinHorizon, plannedCreditCardProjection, type PlanningHorizonDay
 import { useCategoryStore } from '../../../store/categoryStore';
 import {
   creditCardMonthlyHistory,
+  creditCardCycleHistory,
   activeCycleStatement,
   latestClosedStatement,
   markupThisCycle,
@@ -438,16 +441,12 @@ function CreditCardTransactionEditModal({
   );
 }
 
-function TransactionsTable({ card }: { card: CreditCard }) {
+function TransactionsTable({ card, filters }: { card: CreditCard; filters: TransactionPageFilters }) {
   const transactions = useCreditCardWorkbookStore((s) => s.workbook.transactions);
   const deleteTransaction = useCreditCardWorkbookStore((s) => s.deleteTransaction);
   const categories = useCategoryStore((s) => s.workbook.categories);
   const [detail, setDetail] = useState<CreditCardTransaction | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<CreditCardTransaction | null>(null);
-  const [query, setQuery] = useState('');
-  const [kind, setKind] = useState<'all' | CreditCardTransactionKind>('all');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const cardTxs = useMemo(
@@ -455,26 +454,23 @@ function TransactionsTable({ card }: { card: CreditCard }) {
     [transactions, card.id],
   );
   const filtered = useMemo(() => cardTxs.filter((transaction) => {
-    if (kind !== 'all' && transaction.kind !== kind) return false;
-    if (fromDate && transaction.date < fromDate) return false;
-    if (toDate && transaction.date > toDate) return false;
-    const needle = query.trim().toLowerCase();
-    return !needle || transaction.description.toLowerCase().includes(needle) || categoryName(transaction.categoryID, categories).toLowerCase().includes(needle);
-  }), [cardTxs, kind, fromDate, toDate, query, categories]);
+    if (filters.fromDate && transaction.date < filters.fromDate) return false;
+    if (filters.toDate && transaction.date > filters.toDate) return false;
+    if (filters.direction === 'in' && transaction.kind !== 'payment') return false;
+    if (filters.direction === 'out' && transaction.kind === 'payment') return false;
+    if (filters.category !== 'all' && categoryName(transaction.categoryID, categories) !== filters.category) return false;
+    if (filters.source !== 'all' && (transaction.source ?? 'manual') !== filters.source) return false;
+    return true;
+  }), [cardTxs, filters, categories]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, pageCount);
   const pageRows = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
-  useEffect(() => setPage(1), [query, kind, fromDate, toDate, pageSize]);
+  useEffect(() => setPage(1), [filters.fromDate, filters.toDate, filters.direction, filters.category, filters.source, pageSize]);
 
   if (!cardTxs.length) return <p className="text-muted m-0">No transactions yet.</p>;
   return (
     <>
-    <div className="section-toolbar">
-      <Field label="Search" width={210}><TextInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Description or category" /></Field>
-      <Field label="Type" width={180}><Select value={kind} onChange={(event) => setKind(event.target.value as 'all' | CreditCardTransactionKind)}><option value="all">All types</option>{(Object.keys(KIND_LABELS) as CreditCardTransactionKind[]).map((value) => <option key={value} value={value}>{KIND_LABELS[value]}</option>)}</Select></Field>
-      <Field label="From"><TextInput type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></Field>
-      <Field label="To"><TextInput type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} /></Field>
-    </div>
+    <div className="section-toolbar"><span className="text-muted">Central filters apply to this ledger: {filtered.length} of {cardTxs.length} transactions</span></div>
     <div className="table-responsive">
       <table>
         <thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr></thead>
@@ -674,6 +670,9 @@ export function CreditCardDetailPage() {
   // see `creditCardMonthlyHistory`'s own doc comment), matching Net
   // Worth's per-currency monthly window.
   const monthlyHistory = useMemo(() => (card ? creditCardMonthlyHistory(card, transactions, 6) : []), [card, transactions]);
+  const cycleHistory = useMemo(() => (card ? creditCardCycleHistory(card, transactions, 6) : []), [card, transactions]);
+  const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
+  const filterCategories = useMemo(() => card ? [...new Set(transactions.filter((tx) => tx.cardId === card.id).map((tx) => categoryName(tx.categoryID, useCategoryStore.getState().workbook.categories)))].sort() : [], [card, transactions]);
   const [collectAmount, setCollectAmount] = useState(proposal?.amount ?? 0);
   const [collectDate, setCollectDate] = useState(proposal?.dueDate ?? today());
   const [linkMode, setLinkMode] = useState(false);
@@ -687,11 +686,12 @@ export function CreditCardDetailPage() {
       <TopBarSelect label="Switch card" value={card.id}
         onChange={(event) => navigate(event.target.value ? `/bank/card/${event.target.value}` : '/bank')}
         options={[{ value: '', label: 'All cards' }, ...cards.filter((item) => item.isActive !== false || item.id === card.id).map((item) => ({ value: item.id, label: item.name }))]} />
+      <TransactionFilterMenu value={filters} categories={filterCategories} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} />
     </TopBarControls>
   ) : null);
-  const sectionChips = useMemo(() => ['summary', 'statement', 'plans', 'transactions', 'history', 'analytics'].map((key) => ({
+  const sectionChips = useMemo(() => ['summary', 'statement', 'plans', 'transactions', 'history', 'cycles', 'analytics'].map((key) => ({
     key,
-    label: key === 'statement' ? 'Bill payment' : key === 'history' ? 'Monthly history' : key[0].toUpperCase() + key.slice(1),
+    label: key === 'statement' ? 'Bill payment' : key === 'history' ? 'Monthly history' : key === 'cycles' ? 'Cycle history' : key[0].toUpperCase() + key.slice(1),
     active: false,
     onClick: () => document.getElementById(`card-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
   })), []);
@@ -828,17 +828,17 @@ export function CreditCardDetailPage() {
         </StandardCard></div>
       )}
 
-      <div id="card-plans"><StandardCard title="Plans" hue={card.color}>
+      <div id="card-plans"><StandardCard title="Plans" hue={card.color} defaultOpen={false}>
           <PlanningHorizonField value={horizonDays} onChange={setHorizonDays} />
           <CardBalanceProjection card={card} horizonDays={horizonDays} />
           <CardPlanList card={card} horizonDays={horizonDays} />
       </StandardCard></div>
 
-      <div id="card-transactions"><StandardCard title="Transactions" hue={card.color}>
-        <TransactionsTable card={card} />
+      <div id="card-transactions"><StandardCard title="Transactions" hue={card.color} defaultOpen={false}>
+        <TransactionsTable card={card} filters={filters} />
       </StandardCard></div>
 
-      <div id="card-history"><StandardCard title="Monthly history" hue={card.color}>
+      <div id="card-history"><StandardCard title="Monthly history" hue={card.color} defaultOpen={false}>
         <div className="account-summary-grid">{monthlyHistory.map((month) => <SummaryGroupCard key={month.month} title={month.month} hue={month.spent - month.paid > 0 ? 'var(--loss)' : 'var(--profit)'} tooltip="Calendar-month spending, payments, net change, and closing card balance.">
           <SummaryMetric label="Closing balance" value={fmtMoney(month.balanceEnd, card.currencyCode)} tone={month.balanceEnd > 0 ? 'pill-negative' : 'pill-positive'} large />
           <SummaryMetric label="Spent" value={fmtMoney(month.spent, card.currencyCode)} tone="pill-negative" />
@@ -847,7 +847,17 @@ export function CreditCardDetailPage() {
         </SummaryGroupCard>)}</div>
       </StandardCard></div>
 
-      <div id="card-analytics"><StandardCard title="Analytics" hue={card.color}>
+      <div id="card-cycles"><StandardCard title="Billing cycle history" hue={card.color} defaultOpen={false}>
+        <div className="account-summary-grid">{cycleHistory.map((cycle) => <SummaryGroupCard key={`${cycle.cycleStart}-${cycle.cycleEnd}`} title={`${cycle.cycleStart} → ${cycle.cycleEnd}`} hue={cycle.remainingStatementBalance > 0 ? 'var(--loss)' : 'var(--profit)'} tooltip="Locked statement cycle. Payments through the final due date reduce this cycle; later payments belong to the next active cycle.">
+          <SummaryMetric label="Remaining total due" value={fmtMoney(cycle.remainingStatementBalance, card.currencyCode)} tone={cycle.remainingStatementBalance > 0 ? 'pill-negative' : 'pill-positive'} large />
+          <SummaryMetric label="Original bill" value={fmtMoney(cycle.statementBalance, card.currencyCode)} />
+          <SummaryMetric label="Paid after billing" value={fmtMoney(cycle.paymentsAfterClose, card.currencyCode)} tone="pill-positive" />
+          <SummaryMetric label="Minimum still due" value={fmtMoney(cycle.remainingMinimumDue, card.currencyCode)} tone={cycle.remainingMinimumDue > 0 ? 'pill-negative' : 'pill-positive'} />
+          <SummaryMetric label="Full-payment date" value={cycle.dueDate ?? 'Not set'} />
+        </SummaryGroupCard>)}</div>
+      </StandardCard></div>
+
+      <div id="card-analytics"><StandardCard title="Analytics" hue={card.color} defaultOpen={false}>
         <CreditCardAnalyticsSection card={card} />
       </StandardCard></div>
       </div>
