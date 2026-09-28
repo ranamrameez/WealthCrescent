@@ -1,0 +1,12 @@
+{
+  "cookies": [],
+  "origins": [{
+    "origin": "http://127.0.0.1:5173",
+    "localStorage": [
+      { "name": "WealthCrescent_terms_accepted_v1", "value": "true" },
+      { "name": "WealthCrescent_currency_onboarding_seen_v1", "value": "true" },
+      { "name": "WealthCrescent_bank_workbook_v1", "value": "{\"settings\":{\"banks\":[{\"id\":\"b1\",\"name\":\"Doha Bank\",\"country\":\"Qatar\",\"color\":\"#2563eb\"}],\"accounts\":[{\"id\":\"a1\",\"name\":\"Current Account\",\"nickname\":\"Everyday Account\",\"currencyCode\":\"QAR\",\"openingBalance\":25000,\"bankId\":\"b1\",\"accountType\":\"Current\",\"isActive\":true,\"color\":\"#2563eb\"}]},\"transactions\":[{\"id\":\"bt1\",\"accountId\":\"a1\",\"date\":\"2026-09-01\",\"description\":\"Salary\",\"amount\":12000},{\"id\":\"bt2\",\"accountId\":\"a1\",\"date\":\"2026-09-12\",\"description\":\"Rent\",\"amount\":-4500}]}" },
+      { "name": "WealthCrescent_credit_card_workbook_v1", "value": "{\"cards\":[{\"id\":\"cc1\",\"name\":\"Platinum Rewards\",\"bankId\":\"b1\",\"currencyCode\":\"QAR\",\"openingBalance\":1200,\"creditLimit\":20000,\"statementDate\":18,\"minDueDate\":5,\"paymentDueDate\":12,\"minPaymentMethod\":\"percentOfBalance\",\"minPaymentPct\":3,\"cardNetwork\":\"Visa Infinite\",\"cardBin\":\"432198\",\"isActive\":true,\"isFavorite\":true,\"color\":\"#4338ca\"}],\"transactions\":[{\"id\":\"ct1\",\"cardId\":\"cc1\",\"date\":\"2026-09-08\",\"kind\":\"charge\",\"amount\":2450,\"description\":\"Travel booking\"},{\"id\":\"ct2\",\"cardId\":\"cc1\",\"date\":\"2026-09-20\",\"kind\":\"payment\",\"amount\":800,\"description\":\"Card payment\"}]}" }
+    ]
+  }]
+}

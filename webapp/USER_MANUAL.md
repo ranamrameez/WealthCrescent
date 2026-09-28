@@ -510,6 +510,21 @@ licensing is required for that, so it's manual entry or statement import only).
 - **Settings tab**: same account/cloud-sync status and export/import/clear data management
   as other modules.
 
+### Credit cards
+
+Credit cards live inside Banking but keep their own debt ledger and billing rules. The Banking
+Summary includes current card debt and available credit by currency. Card tiles resemble an
+issuer card and always show Outstanding, Used, Available, and Limit.
+
+In a card's setup, enter the actual **Last billing date**, **Last minimum-payment date**, and
+**Last full-payment due date** shown by the issuer. The app keeps their monthly schedule updated
+internally, so you do not need to translate statement dates into raw day numbers. Once a cut-off
+passes, that bill is locked: later purchases belong to the new open cycle and cannot inflate it.
+Payments entered after cut-off and on or before the full-amount due date reduce the locked total
+due and the markup base; a payment after that due date does not rewrite the earlier bill. The
+Current Statement section shows the locked bill, how much post-cutoff payment was applied, and
+the separate open-cycle spending total.
+
 ---
 
 ## 18. EMI / Loans

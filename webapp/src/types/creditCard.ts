@@ -51,6 +51,16 @@ export interface CreditCard {
   /** Day of month (1-31, clamped to the actual month length) the billing
    * cycle closes / statement generates. */
   statementDate?: number;
+  /** One or more billing cut-off days. Some issuers close more than one
+   * cycle in a calendar month. `statementDate` remains the compatibility
+   * fallback for existing cards; when present, this list takes priority. */
+  statementDates?: number[];
+  /** User-facing calendar anchors. The settings form stores the real dates
+   * printed on the latest statement; recurring day values above/below are
+   * maintained internally for compatibility and future cycles. */
+  lastBillingDate?: string;
+  lastMinPaymentDate?: string;
+  lastPaymentDueDate?: string;
   /** Day of month (1-31, clamped) the MINIMUM payment is due — resolved
    * relative to `statementDate` the same way `paymentDueDate` is (same
    * month if `minDueDate >= statementDate`, the month after otherwise).

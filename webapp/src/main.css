@@ -234,6 +234,18 @@
 .usage-bar-track{height:10px;border-radius:999px;overflow:hidden;background:color-mix(in srgb,var(--profit) 30%,var(--panel-2));}
 .usage-bar-used{width:var(--usage-pct,0%);height:100%;background:var(--loss);}
 .usage-bar-labels{display:flex;justify-content:space-between;gap:12px;margin-top:4px;font-size:12px;}
+.credit-card-visual{position:relative;isolation:isolate;overflow:hidden;min-height:210px;padding:20px;border:1px solid color-mix(in srgb,var(--credit-card-hue) 55%,var(--border));border-radius:20px;background:linear-gradient(145deg,color-mix(in srgb,var(--credit-card-hue) 72%,#111827),color-mix(in srgb,var(--credit-card-hue) 30%,#060914));color:#fff;box-shadow:0 16px 35px rgba(0,0,0,.2);display:flex;flex-direction:column;justify-content:space-between;gap:14px}
+.credit-card-visual::after{content:"";position:absolute;z-index:-1;width:220px;height:220px;border-radius:50%;right:-80px;top:-110px;background:rgba(255,255,255,.1)}
+.credit-card-visual.clickable{cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+.credit-card-visual.clickable:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--credit-card-hue) 85%,white);box-shadow:0 20px 42px rgba(0,0,0,.28)}
+.credit-card-visual.clickable:focus-visible{outline:2px solid var(--focus);outline-offset:3px}
+.credit-card-visual-top,.credit-card-visual-balance{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.credit-card-visual-bank{font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.78}
+.credit-card-visual-name{font-size:18px;font-weight:750;margin-top:3px}
+.credit-card-visual-number{font:600 15px/1.3 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.08em;opacity:.92}
+.credit-card-visual-balance span{font-size:12px;opacity:.78}.credit-card-visual-balance strong{font-size:20px}
+.credit-card-visual .usage-bar{margin-top:0}.credit-card-visual .usage-bar-track{background:rgba(255,255,255,.2)}.credit-card-visual .usage-bar-labels span{color:#fff;opacity:.86}
+.credit-card-visual-limit{text-align:right;font-size:11px;opacity:.76}
 .section-toolbar{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:10px;}
 .pagination-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px;}
 .pagination-actions{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;}

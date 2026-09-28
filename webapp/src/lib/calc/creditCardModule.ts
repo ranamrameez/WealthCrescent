@@ -19,20 +19,30 @@ function cutoffDate(year: number, month0: number, day: number): string {
   return `${year}-${String(month0 + 1).padStart(2, '0')}-${String(clamped).padStart(2, '0')}`;
 }
 
+function statementDays(card: CreditCard): number[] {
+  const anchorDay = card.lastBillingDate ? Number(card.lastBillingDate.slice(8, 10)) : undefined;
+  const raw = card.statementDates?.length ? card.statementDates : anchorDay ? [anchorDay] : card.statementDate ? [card.statementDate] : [];
+  return [...new Set(raw.map(Number).filter((day) => day >= 1 && day <= 31))].sort((a, b) => a - b);
+}
+
+function cutoffCandidates(card: CreditCard, year: number, month0: number): string[] {
+  return statementDays(card).map((day) => cutoffDate(year, month0, day));
+}
+
 /** The most recent statement-cutoff date on or before `asOfDate` — the
  * close of the most recently completed billing cycle. `null` when the
  * card has no `statementDate` set at all (nothing to compute a cycle
  * from yet). */
 function mostRecentCutoff(card: CreditCard, asOfDate: string): string | null {
-  if (!card.statementDate) return null;
+  if (!statementDays(card).length) return null;
   const [y, m1] = asOfDate.split('-').map(Number);
-  const thisMonthCutoff = cutoffDate(y, m1 - 1, card.statementDate);
-  if (thisMonthCutoff <= asOfDate) return thisMonthCutoff;
-  // This month's cutoff hasn't happened yet — the most recent one is last month's.
-  const prevMonth0raw = m1 - 1 - 1;
-  const prevYear = y + Math.floor(prevMonth0raw / 12);
-  const prevMonth0 = ((prevMonth0raw % 12) + 12) % 12;
-  return cutoffDate(prevYear, prevMonth0, card.statementDate);
+  const candidates = [-1, 0].flatMap((offset) => {
+    const raw = m1 - 1 + offset;
+    const year = y + Math.floor(raw / 12);
+    const month0 = ((raw % 12) + 12) % 12;
+    return cutoffCandidates(card, year, month0);
+  }).filter((date) => date <= asOfDate).sort();
+  return candidates.at(-1) ?? null;
 }
 
 /** The cutoff one full cycle AFTER `cutoff` — the boundary the CURRENTLY
@@ -44,10 +54,24 @@ function mostRecentCutoff(card: CreditCard, asOfDate: string): string | null {
  * does) is safe pure integer arithmetic — no local/UTC `Date`-mixing. */
 function oneCutoffForward(card: CreditCard, cutoff: string): string {
   const [y, m1] = cutoff.split('-').map(Number);
-  const nextMonth0raw = m1; // (m1 - 1) + 1
-  const nextYear = y + Math.floor(nextMonth0raw / 12);
-  const nextMonth0 = ((nextMonth0raw % 12) + 12) % 12;
-  return cutoffDate(nextYear, nextMonth0, card.statementDate!);
+  const candidates = [0, 1].flatMap((offset) => {
+    const raw = m1 - 1 + offset;
+    const year = y + Math.floor(raw / 12);
+    const month0 = ((raw % 12) + 12) % 12;
+    return cutoffCandidates(card, year, month0);
+  }).filter((date) => date > cutoff).sort();
+  return candidates[0];
+}
+
+function oneCutoffBack(card: CreditCard, cutoff: string): string {
+  const [y, m1] = cutoff.split('-').map(Number);
+  const candidates = [-1, 0].flatMap((offset) => {
+    const raw = m1 - 1 + offset;
+    const year = y + Math.floor(raw / 12);
+    const month0 = ((raw % 12) + 12) % 12;
+    return cutoffCandidates(card, year, month0);
+  }).filter((date) => date < cutoff).sort();
+  return candidates.at(-1)!;
 }
 
 /** A due date resolved relative to `cycleEnd`: the SAME month as the
@@ -57,15 +81,20 @@ function oneCutoffForward(card: CreditCard, cutoff: string): string {
  * both the minimum-due date and the full-amount-due date — see
  * `CreditCard.minDueDate`'s own doc comment for why they're two separate
  * fields now, not one. */
-function dueDateForDay(card: CreditCard, cycleEnd: string, day: number | undefined): string | null {
+function dueDateForDay(cycleEnd: string, day: number | undefined): string | null {
   if (!day) return null;
   const [y, m1] = cycleEnd.split('-').map(Number);
-  const sameMonth = day >= (card.statementDate ?? day);
+  const cycleDay = Number(cycleEnd.slice(8, 10));
+  const sameMonth = day >= cycleDay;
   if (sameMonth) return cutoffDate(y, m1 - 1, day);
   const nextMonth0raw = m1; // (m1 - 1) + 1
   const nextYear = y + Math.floor(nextMonth0raw / 12);
   const nextMonth0 = ((nextMonth0raw % 12) + 12) % 12;
   return cutoffDate(nextYear, nextMonth0, day);
+}
+
+function configuredDueDay(anchor: string | undefined, fallback: number | undefined): number | undefined {
+  return anchor ? Number(anchor.slice(8, 10)) : fallback;
 }
 
 /** This card's real running balance as of (and including) `asOfDate` — the
@@ -127,6 +156,12 @@ export interface CreditCardStatement {
   minDueDate: string | null;
   /** When the FULL amount is due, from `card.paymentDueDate`. */
   dueDate: string | null;
+  /** Payments posted after the cycle locked, counted only through the
+   * bill's applicable due day. */
+  paymentsAfterClose: number;
+  remainingMinimumDue: number;
+  remainingStatementBalance: number;
+  isClosed: boolean;
 }
 
 /** The user's own "save bill cut-off date - the 100% amount to be charged
@@ -164,8 +199,43 @@ export function currentStatement(
     paymentsThisCycle,
     statementBalance,
     minimumDue: computeMinimumDue(card, statementBalance),
-    minDueDate: dueDateForDay(card, cycleEnd, card.minDueDate),
-    dueDate: dueDateForDay(card, cycleEnd, card.paymentDueDate),
+    minDueDate: dueDateForDay(cycleEnd, configuredDueDay(card.lastMinPaymentDate, card.minDueDate)),
+    dueDate: dueDateForDay(cycleEnd, configuredDueDay(card.lastPaymentDueDate, card.paymentDueDate)),
+    paymentsAfterClose: 0,
+    remainingMinimumDue: computeMinimumDue(card, statementBalance),
+    remainingStatementBalance: Math.max(0, statementBalance),
+    isClosed: cycleEnd <= asOfDate,
+  };
+}
+
+/** Latest locked bill. New spending after `cycleEnd` cannot change it.
+ * Payments posted after close are allocated to that locked bill through
+ * its due date, reducing both minimum and total still due. */
+export function latestClosedStatement(
+  card: CreditCard,
+  transactions: CreditCardTransaction[],
+  asOfDate: string = new Date().toISOString().slice(0, 10),
+): CreditCardStatement | null {
+  const cycleEnd = mostRecentCutoff(card, asOfDate);
+  if (!cycleEnd) return null;
+  const cycleStart = oneCutoffBack(card, cycleEnd);
+  const cardTxs = transactions.filter((t) => t.cardId === card.id);
+  const previousBalance = balanceAsOf(card, cardTxs, cycleStart);
+  const cycleTxs = cardTxs.filter((t) => t.date > cycleStart && t.date <= cycleEnd);
+  const chargesThisCycle = round2(cycleTxs.filter((t) => t.kind !== 'payment').reduce((sum, t) => sum + t.amount, 0));
+  const paymentsThisCycle = round2(cycleTxs.filter((t) => t.kind === 'payment').reduce((sum, t) => sum + t.amount, 0));
+  const statementBalance = round2(previousBalance + chargesThisCycle - paymentsThisCycle);
+  const minimumDue = computeMinimumDue(card, statementBalance);
+  const minDueDate = dueDateForDay(cycleEnd, configuredDueDay(card.lastMinPaymentDate, card.minDueDate));
+  const dueDate = dueDateForDay(cycleEnd, configuredDueDay(card.lastPaymentDueDate, card.paymentDueDate));
+  const paymentWindowEnd = [asOfDate, dueDate ?? asOfDate].sort()[0];
+  const paymentsAfterClose = round2(cardTxs.filter((t) => t.kind === 'payment' && t.date > cycleEnd && t.date <= paymentWindowEnd).reduce((sum, t) => sum + t.amount, 0));
+  return {
+    cycleStart, cycleEnd, previousBalance: round2(previousBalance), chargesThisCycle, paymentsThisCycle,
+    statementBalance, minimumDue, minDueDate, dueDate, paymentsAfterClose,
+    remainingMinimumDue: Math.max(0, round2(minimumDue - paymentsAfterClose)),
+    remainingStatementBalance: Math.max(0, round2(statementBalance - paymentsAfterClose)),
+    isClosed: true,
   };
 }
 
@@ -192,7 +262,9 @@ export function computeMinimumDue(card: CreditCard, statementBalance: number): n
  * `'flatOnCarried'` (none implemented in v1) always returns 0. */
 export function markupThisCycle(card: CreditCard, statement: CreditCardStatement): number {
   if (card.markupMethod !== 'flatOnCarried' || !card.markupRatePct) return 0;
-  const unpaidFromPrior = Math.max(0, round2(statement.previousBalance - statement.paymentsThisCycle));
+  const unpaidFromPrior = statement.isClosed
+    ? statement.remainingStatementBalance
+    : Math.max(0, round2(statement.previousBalance - statement.paymentsThisCycle));
   if (unpaidFromPrior <= 0) return 0; // grace period held — nothing carried, no markup.
   const threshold = card.markupThresholdAmount ?? 0;
   if (unpaidFromPrior < threshold) return 0;
@@ -221,7 +293,7 @@ export interface MinPaymentProposal {
 export function proposeMinPayment(card: CreditCard, statement: CreditCardStatement): MinPaymentProposal | null {
   const dueDate = statement.minDueDate ?? statement.dueDate;
   if (!dueDate) return null;
-  const amount = round2(statement.minimumDue + (card.pendingMinDue ?? 0));
+  const amount = round2(statement.remainingMinimumDue + (card.pendingMinDue ?? 0));
   if (amount <= 0) return null;
   const todayStr = new Date().toISOString().slice(0, 10);
   return { dueDate, amount, isDue: dueDate <= todayStr };

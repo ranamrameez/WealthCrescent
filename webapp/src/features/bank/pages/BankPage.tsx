@@ -67,6 +67,7 @@ import { usePlannedBankWorkbookStore } from '../../../store/plannedBankWorkbookS
 import { useInterEntityTransfersStore } from '../../../store/interEntityTransfersStore';
 import { linkTargetPath, useLinkSideLabel } from '../../transfers/pages/TransferLinksPage';
 import { CreditCardsTab } from './CreditCardsSection';
+import { CreditCardVisual } from '../../../components/CreditCardVisual';
 import type { Bank, BankAccount, BankTransaction } from '../../../types/bankWorkbook';
 import type { PlannedBankTransaction } from '../../../types/plannedBank';
 import { gridAutoStyle } from '../../../lib/gridStyle';
@@ -705,14 +706,11 @@ export function BankDetailPage() {
               {linkedCards.map((card) => {
                 const balance = Math.max(0, outstandingBalanceByCard(card, cardTransactions));
                 return (
-                  <EntityCard
+                  <CreditCardVisual
                     key={card.id}
-                    title={card.name}
-                    subtitle={<>{card.currencyCode}{card.cardNetwork ? ` · ${card.cardNetwork}` : ''}{card.creditLimit ? ` · Limit ${fmtMoney(card.creditLimit, card.currencyCode)}` : ''}</>}
+                    card={card}
+                    balance={balance}
                     badge={card.isActive === false ? <span className="pill-warn fs-10">Closed</span> : undefined}
-                    statLabel="Owed"
-                    stat={<MoneyValue n={balance} currency={card.currencyCode} />}
-                    hue={card.color ?? (balance > 0 ? 'var(--loss)' : 'var(--profit)')}
                     onClick={() => navigate(`/bank/card/${card.id}`)}
                   />
                 );
@@ -1474,6 +1472,8 @@ function transactionMatchesFilters(tx: BankTransaction, filters: BankingFilters,
 
 function BankingScopeSummary({ accounts, filters }: { accounts: BankAccount[]; filters: BankingFilters }) {
   const transactions = useBankWorkbookStore((state) => state.workbook.transactions);
+  const creditCards = useCreditCardWorkbookStore((state) => state.workbook.cards);
+  const creditCardTransactions = useCreditCardWorkbookStore((state) => state.workbook.transactions);
   const plans = usePlannedBankWorkbookStore((state) => state.workbook.entries);
   const categories = useCategoryStore((state) => state.workbook.categories);
   const scopedAccounts = useMemo(
@@ -1483,8 +1483,9 @@ function BankingScopeSummary({ accounts, filters }: { accounts: BankAccount[]; f
   const accountIds = useMemo(() => new Set(scopedAccounts.map((account) => account.id)), [scopedAccounts]);
   const rows = transactions.filter((tx) => accountIds.has(tx.accountId) && transactionMatchesFilters(tx, filters, categories));
   const visiblePlans = plans.filter((plan) => accountIds.has(plan.accountId) && !plan.executed && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate));
-  const currencies = [...new Set(scopedAccounts.map((account) => account.currencyCode))].sort();
-  if (!currencies.length) return <p className="text-muted m-0">No bank accounts in this scope yet.</p>;
+  const scopedCards = filters.accountId === 'all' ? creditCards.filter((card) => card.isActive !== false) : [];
+  const currencies = [...new Set([...scopedAccounts.map((account) => account.currencyCode), ...scopedCards.map((card) => card.currencyCode)])].sort();
+  if (!currencies.length) return <p className="text-muted m-0">No accounts or credit cards in this scope yet.</p>;
   return <div className="account-summary-grid">{currencies.map((currency) => {
     const currencyAccounts = scopedAccounts.filter((account) => account.currencyCode === currency);
     const currencyIds = new Set(currencyAccounts.map((account) => account.id));
@@ -1494,6 +1495,10 @@ function BankingScopeSummary({ accounts, filters }: { accounts: BankAccount[]; f
     const inflow = currencyRows.filter((tx) => !tx.isPending && tx.amount >= 0).reduce((sum, tx) => sum + tx.amount, 0);
     const outflow = currencyRows.filter((tx) => !tx.isPending && tx.amount < 0).reduce((sum, tx) => sum + tx.amount, 0);
     const actual = currencyAccounts.reduce((sum, account) => sum + accountBalance(account, transactions), 0);
+    const currencyCards = scopedCards.filter((card) => card.currencyCode === currency);
+    const cardOwed = currencyCards.reduce((sum, card) => sum + Math.max(0, outstandingBalanceByCard(card, creditCardTransactions)), 0);
+    const cardLimit = currencyCards.reduce((sum, card) => sum + Math.max(0, card.creditLimit ?? 0), 0);
+    const available = Math.max(0, cardLimit - cardOwed);
     return <div key={currency} className="stat-card card account-summary-card" style={hueStyle(actual >= 0 ? 'var(--profit)' : 'var(--loss)')}>
       <h4>{currency}</h4>
       <div className="account-summary-card-metrics">
@@ -1503,6 +1508,8 @@ function BankingScopeSummary({ accounts, filters }: { accounts: BankAccount[]; f
         <SummaryChip label="Outflow" value={fmtMoney(outflow, currency)} />
         <SummaryChip label="Pending" value={fmtMoney(pending, currency)} />
         <SummaryChip label="Planned" value={fmtMoney(planned, currency)} />
+        {!!currencyCards.length && <SummaryChip label="Card owed" value={fmtMoney(cardOwed, currency)} />}
+        {!!cardLimit && <SummaryChip label="Credit available" value={fmtMoney(available, currency)} />}
       </div>
     </div>;
   })}</div>;

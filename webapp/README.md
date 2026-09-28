@@ -10106,6 +10106,17 @@ from the lot system."*
   Options' "Test scrape") already funnels through via `runCycle()`/`TEST_SCRAPE` — one fix
   covers all three. `node --check` clean. Manifest bumped to 0.1.3.
 
+- **Banking/Credit Card parity and locked multi-cycle billing (2026-09-28).** Banking's
+  unfiltered Summary now consolidates bank balances with credit-card owed and available-credit
+  figures per currency. Every Credit Card listing and detail summary uses one issuer-style card
+  surface with a persistent Used/Available/Limit bar. Card settings ask for the real last billing,
+  minimum-payment, and full-payment dates (while retaining multi-cutoff calculation support); the latest closed bill is immutable, purchases after its
+  cutoff stay in the open cycle, and payments posted through the bill's due date reduce its
+  remaining minimum, total due, and markup base. QSE and PSX Trade Strategy plan selectors now
+  show live Avg, BE, RT, P/L, value, and projected-share figures instead of descriptive text.
+  Credit-card calculation tests cover both twice-monthly cutoffs and payment allocation around
+  the due date; production build passes.
+
 ## Pending
 
 - Batch editing follow-ups: extend the shared grid to other modules; design explicit

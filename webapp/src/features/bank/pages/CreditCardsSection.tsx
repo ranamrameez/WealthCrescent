@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
+import { CollapsibleCard, MoneyValue } from '../../../components/Card';
+import { CreditCardVisual } from '../../../components/CreditCardVisual';
 import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls';
-import { StandardPageSections } from '../../../components/StandardPageSections';
 import { StandardCard, SummaryChip } from '../../../components/StandardCard';
 import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
@@ -27,7 +27,7 @@ import { useEnabledCurrencies } from '../../../hooks/useEnabledCurrencies';
 import { useLastCurrency } from '../../../hooks/useLastCurrency';
 import { usePrimaryCurrency } from '../../../hooks/usePrimaryCurrency';
 import { usePageFabActions } from '../../../hooks/usePageFabActions';
-import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
+import { usePageTopBarChips, usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { getLastTransferSource, rememberTransferSource } from '../../../hooks/useLastTransferSource';
 import { hueStyle } from '../../../lib/statCardHues';
 import { categoryName, UNCATEGORIZED_ID } from '../../../lib/categories';
@@ -44,6 +44,7 @@ import {
   availableCredit,
   creditCardMonthlyHistory,
   currentStatement,
+  latestClosedStatement,
   markupThisCycle,
   nextPendingMinDue,
   outstandingBalanceByCard,
@@ -103,6 +104,10 @@ function CreditCardForm({
     openingBalance: card.openingBalance,
     creditLimit: card.creditLimit,
     statementDate: card.statementDate,
+    statementDates: card.statementDates,
+    lastBillingDate: card.lastBillingDate,
+    lastMinPaymentDate: card.lastMinPaymentDate,
+    lastPaymentDueDate: card.lastPaymentDueDate,
     minDueDate: card.minDueDate,
     paymentDueDate: card.paymentDueDate,
     minPaymentMethod: card.minPaymentMethod,
@@ -169,14 +174,24 @@ function CreditCardForm({
         </Field>
       </div>
       <div className="row gap-sm mt-sm">
-        <Field label="Cycle start date (day of month)">
-          <TextInput type="number" min={1} max={31} value={draft.statementDate ?? ''} onChange={(e) => setDraft({ ...draft, statementDate: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        <Field label="Last billing date">
+          <TextInput type="date" value={draft.lastBillingDate ?? ''} onChange={(e) => {
+            const date = e.target.value || undefined;
+            const day = date ? Number(date.slice(8, 10)) : undefined;
+            setDraft({ ...draft, lastBillingDate: date, statementDate: day, statementDates: day ? [day] : undefined });
+          }} />
         </Field>
-        <Field label="Min due date (day of month)">
-          <TextInput type="number" min={1} max={31} value={draft.minDueDate ?? ''} onChange={(e) => setDraft({ ...draft, minDueDate: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        <Field label="Last minimum-payment date">
+          <TextInput type="date" value={draft.lastMinPaymentDate ?? ''} onChange={(e) => {
+            const date = e.target.value || undefined;
+            setDraft({ ...draft, lastMinPaymentDate: date, minDueDate: date ? Number(date.slice(8, 10)) : undefined });
+          }} />
         </Field>
-        <Field label="Full amount due date (day of month)">
-          <TextInput type="number" min={1} max={31} value={draft.paymentDueDate ?? ''} onChange={(e) => setDraft({ ...draft, paymentDueDate: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        <Field label="Last full-payment due date">
+          <TextInput type="date" value={draft.lastPaymentDueDate ?? ''} onChange={(e) => {
+            const date = e.target.value || undefined;
+            setDraft({ ...draft, lastPaymentDueDate: date, paymentDueDate: date ? Number(date.slice(8, 10)) : undefined });
+          }} />
         </Field>
         <Field label="Late fee after due">
           <TextInput type="number" step="0.01" value={draft.lateFeeAfterDue ?? ''} onChange={(e) => setDraft({ ...draft, lateFeeAfterDue: e.target.value === '' ? undefined : Number(e.target.value) })} />
@@ -223,25 +238,6 @@ function CreditCardForm({
 
 export function AddCreditCardForm({ onSaved, initialCurrency }: { onSaved?: (id: string) => void; initialCurrency?: string } = {}) {
   return <CreditCardForm onSaved={onSaved} initialCurrency={initialCurrency} />;
-}
-
-/** The user's own explicit requirement: "progress bar for limit
- * tracking." A red (consumed) / green (available) two-segment bar, same
- * convention Banking's own (now-superseded) `isLiability` version already
- * used. */
-function CreditUsageBar({ used, limit, currency }: { used: number; limit: number; currency: string }) {
-  const usedPct = limit > 0 ? Math.min(100, Math.max(0, (used / limit) * 100)) : 0;
-  return (
-    <div className="mb-md">
-      <div style={{ display: 'flex', height: 10, borderRadius: 6, overflow: 'hidden', background: 'color-mix(in srgb, var(--profit) 30%, var(--panel-2))' }}>
-        <div style={{ width: `${usedPct}%`, background: 'var(--loss)' }} />
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 12 }}>
-        <span className="text-loss">Used: {fmtMoney(used, currency)}</span>
-        <span className="text-profit">Available: {fmtMoney(availableCredit({ id: '', name: '', currencyCode: currency, creditLimit: limit }, used), currency)} of {fmtMoney(limit, currency)}</span>
-      </div>
-    </div>
-  );
 }
 
 /** Cross-entity linking — the user's own explicit "account linking option
@@ -619,7 +615,8 @@ export function CreditCardDetailPage() {
   const [editCardOpen, setEditCardOpen] = useState(false);
 
   const balance = card ? outstandingBalanceByCard(card, transactions) : 0;
-  const statement = card ? currentStatement(card, transactions) : null;
+  const openCycle = card ? currentStatement(card, transactions) : null;
+  const statement = card ? latestClosedStatement(card, transactions) : null;
   const markup = statement && card ? markupThisCycle(card, statement) : 0;
   const proposal = statement ? proposeMinPayment(card!, statement) : null;
   // User-reported (2026-09-14): "Previous balance is irrelevant or
@@ -645,6 +642,13 @@ export function CreditCardDetailPage() {
         options={[{ value: '', label: 'All cards' }, ...cards.filter((item) => item.isActive !== false || item.id === card.id).map((item) => ({ value: item.id, label: item.name }))]} />
     </TopBarControls>
   ) : null);
+  const sectionChips = useMemo(() => ['summary', 'details', 'statement', 'plans', 'transactions', 'history', 'analytics'].map((key) => ({
+    key,
+    label: key === 'details' ? 'Card details' : key === 'statement' ? 'Current statement' : key === 'history' ? 'Last 6 months' : key[0].toUpperCase() + key.slice(1),
+    active: false,
+    onClick: () => document.getElementById(`card-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+  })), []);
+  usePageTopBarChips(card ? [{ key: 'all', label: 'All', active: true, onClick: () => document.getElementById('card-summary')?.scrollIntoView({ behavior: 'smooth' }) }, ...sectionChips] : []);
 
   if (!card) {
     return (
@@ -713,23 +717,21 @@ export function CreditCardDetailPage() {
         </div>
       </div>
 
-      {card.creditLimit ? <CreditUsageBar used={Math.max(0, balance)} limit={card.creditLimit} currency={card.currencyCode} /> : null}
-
-      <StandardCard
+      <div id="card-summary"><StandardCard
         title="Summary"
         hue={card.color}
         summary={<SummaryChip label="Outstanding" value={fmtMoney(balance, card.currencyCode)} />}
       >
-        <div className="grid-auto" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10 }}>
-          <div className="stat-card card" style={hueStyle(card.color ?? (balance > 0 ? 'var(--loss)' : 'var(--profit)'))}>
-            <div className="label">Outstanding</div>
-            <MoneyValue n={balance} currency={card.currencyCode} />
+        <div className="grid-auto" style={gridAutoStyle(310, 12)}>
+          <CreditCardVisual card={card} balance={balance} />
+          <div className="grid-auto" style={gridAutoStyle(160, 10)}>
+            <div className="stat-card card" style={hueStyle(card.color ?? (balance > 0 ? 'var(--loss)' : 'var(--profit)'))}><div className="label">Outstanding</div><MoneyValue n={balance} currency={card.currencyCode} /></div>
+            {card.creditLimit ? <div className="stat-card card" style={hueStyle(card.color ?? 'var(--accent)')}><div className="label">Available credit</div><MoneyValue n={availableCredit(card, balance)} currency={card.currencyCode} /><div className="sub">Limit {fmtMoney(card.creditLimit, card.currencyCode)}</div></div> : null}
           </div>
-          {card.creditLimit ? <div className="stat-card card" style={hueStyle(card.color ?? 'var(--accent)')}><div className="label">Credit limit</div><MoneyValue n={card.creditLimit} currency={card.currencyCode} /></div> : null}
         </div>
-      </StandardCard>
+      </StandardCard></div>
 
-      <StandardCard title="Card details" hue={card.color} className="mb-md">
+      <div id="card-details"><StandardCard title="Card details" hue={card.color} className="mb-md">
         <AttributeList
           items={[
             { label: 'Currency', value: card.currencyCode },
@@ -738,9 +740,9 @@ export function CreditCardDetailPage() {
             { label: 'Credit limit', value: card.creditLimit ? fmtMoney(card.creditLimit, card.currencyCode) : undefined },
             { label: 'Network', value: card.cardNetwork },
             { label: 'BIN', value: card.cardBin },
-            { label: 'Cycle start date', value: card.statementDate ? `Day ${card.statementDate}` : undefined },
-            { label: 'Min due date', value: card.minDueDate ? `Day ${card.minDueDate}` : undefined },
-            { label: 'Full amount due date', value: card.paymentDueDate ? `Day ${card.paymentDueDate}` : undefined },
+            { label: 'Last billing date', value: card.lastBillingDate ?? (card.statementDate ? `Monthly on day ${card.statementDate} (legacy)` : undefined) },
+            { label: 'Last minimum-payment date', value: card.lastMinPaymentDate ?? (card.minDueDate ? `Monthly on day ${card.minDueDate} (legacy)` : undefined) },
+            { label: 'Last full-payment due date', value: card.lastPaymentDueDate ?? (card.paymentDueDate ? `Monthly on day ${card.paymentDueDate} (legacy)` : undefined) },
             { label: 'Late fee after due', value: card.lateFeeAfterDue ? fmtMoney(card.lateFeeAfterDue, card.currencyCode) : undefined },
             { label: 'Annual fee', value: card.annualFee ? fmtMoney(card.annualFee, card.currencyCode) : undefined },
             { label: 'Minimum payment', value: card.minPaymentMethod === 'percentOfBalance' ? `${card.minPaymentPct ?? 0}% of balance` : card.minPaymentMethod === 'greaterOfFixedOrPercent' ? `Greater of ${fmtMoney(card.minPaymentAmount ?? 0, card.currencyCode)} or ${card.minPaymentPct ?? 0}%` : card.minPaymentAmount ? fmtMoney(card.minPaymentAmount, card.currencyCode) : undefined },
@@ -749,10 +751,10 @@ export function CreditCardDetailPage() {
             { label: 'Favorite', value: card.isFavorite ? 'Yes' : 'No' },
           ]}
         />
-      </StandardCard>
+      </StandardCard></div>
 
       {statement && (
-        <CollapsibleCard title={<h3 className="m-0">Current statement</h3>} className="mb-md">
+        <div id="card-statement"><StandardCard title="Current statement" hue={card.color} className="mb-md">
           <p className="text-muted" style={{ marginTop: 0, marginBottom: 10 }}>
             Cycle {statement.cycleStart} → {statement.cycleEnd}
           </p>
@@ -773,14 +775,14 @@ export function CreditCardDetailPage() {
             </div>
             <div className="stat-card card" style={hueStyle('var(--accent)')}>
               <div className="label">Min due</div>
-              <MoneyValue n={statement.minimumDue} currency={card.currencyCode} />
+              <MoneyValue n={statement.remainingMinimumDue} currency={card.currencyCode} />
               <div className="sub">{statement.minDueDate ? `Due: ${statement.minDueDate}` : 'No min-due date set'}</div>
             </div>
             <div className="stat-card card" style={hueStyle(statement.statementBalance > 0 ? 'var(--loss)' : 'var(--profit)')}>
               <Tooltip text="Your bill for this cycle — the full amount due, not just the minimum.">
                 <div className="label clickable">Total due</div>
               </Tooltip>
-              <MoneyValue n={statement.statementBalance} currency={card.currencyCode} />
+              <MoneyValue n={statement.remainingStatementBalance} currency={card.currencyCode} />
               <div className="sub">{statement.dueDate ? `Due: ${statement.dueDate}` : 'No due date set'}</div>
             </div>
             {markup > 0 && (
@@ -792,6 +794,8 @@ export function CreditCardDetailPage() {
               </div>
             )}
           </div>
+          {statement.paymentsAfterClose > 0 && <p className="text-muted mb-0">Payments after billing date: {fmtMoney(statement.paymentsAfterClose, card.currencyCode)}. Applied to this locked bill through its due date.</p>}
+          {openCycle && <p className="text-muted mb-0">Open cycle {openCycle.cycleStart} → {openCycle.cycleEnd}: {fmtMoney(openCycle.chargesThisCycle, card.currencyCode)} spent so far. This does not change the locked bill above.</p>}
           {markup > 0 && (
             <button className="btn secondary small mt-sm" onClick={logMarkup}>Log markup for this cycle</button>
           )}
@@ -815,44 +819,31 @@ export function CreditCardDetailPage() {
               )}
             </div>
           )}
-        </CollapsibleCard>
+        </StandardCard></div>
       )}
 
-      <StandardPageSections key={`${card.id}-plans`} defaultKey="plans" sections={[{
-        key: 'plans', label: 'Plans', content: <>
+      <div id="card-plans"><StandardCard title="Plans" hue={card.color} className="mb-md">
           <PlanningHorizonField value={horizonDays} onChange={setHorizonDays} />
           <CardBalanceProjection card={card} horizonDays={horizonDays} />
           <CardPlanList card={card} horizonDays={horizonDays} />
-        </>,
-      }]} />
+      </StandardCard></div>
 
-      <StandardCard title="Analytics" hue={card.color} className="mb-md">
-        <CreditCardAnalyticsSection card={card} />
-      </StandardCard>
+      <div id="card-transactions"><StandardCard title="Transactions" hue={card.color} className="mb-md">
+        <TransactionsTable card={card} />
+      </StandardCard></div>
 
-      <CollapsibleCard title={<h3 className="m-0">Last 6 months</h3>} defaultOpen={false} className="mb-md">
+      <div id="card-history"><StandardCard title="Last 6 months" hue={card.color} className="mb-md">
         <div className="table-responsive">
           <table>
-            <thead>
-              <tr><th>Month</th><th>Spent</th><th>Paid</th><th>Balance</th></tr>
-            </thead>
-            <tbody>
-              {monthlyHistory.map((m) => (
-                <tr key={m.month}>
-                  <td>{m.month}</td>
-                  <td>{fmtMoney(m.spent, card.currencyCode)}</td>
-                  <td>{fmtMoney(m.paid, card.currencyCode)}</td>
-                  <td>{fmtMoney(m.balanceEnd, card.currencyCode)}</td>
-                </tr>
-              ))}
-            </tbody>
+            <thead><tr><th>Month</th><th>Spent</th><th>Paid</th><th>Balance</th></tr></thead>
+            <tbody>{monthlyHistory.map((m) => <tr key={m.month}><td>{m.month}</td><td>{fmtMoney(m.spent, card.currencyCode)}</td><td>{fmtMoney(m.paid, card.currencyCode)}</td><td>{fmtMoney(m.balanceEnd, card.currencyCode)}</td></tr>)}</tbody>
           </table>
         </div>
-      </CollapsibleCard>
+      </StandardCard></div>
 
-      <CollapsibleCard title={<h3 className="m-0">Transactions</h3>}>
-        <TransactionsTable card={card} />
-      </CollapsibleCard>
+      <div id="card-analytics"><StandardCard title="Analytics" hue={card.color} className="mb-md">
+        <CreditCardAnalyticsSection card={card} />
+      </StandardCard></div>
 
       {editCardOpen && (
         <Modal title="Edit credit card" onClose={() => setEditCardOpen(false)}>
@@ -1120,7 +1111,6 @@ function CreditCardsList({ showArchived = false }: { showArchived?: boolean }) {
   const allCards = useCreditCardWorkbookStore((s) => s.workbook.cards);
   const transactions = useCreditCardWorkbookStore((s) => s.workbook.transactions);
   const cards = useMemo(() => (showArchived ? allCards : allCards.filter((c) => c.isActive !== false)), [allCards, showArchived]);
-  const srNumOf = useMemo(() => new Map(allCards.map((c, i) => [c.id, i + 1])), [allCards]);
   const sorted = useMemo(() => [...cards].sort((a, b) => Number(!!b.isFavorite) - Number(!!a.isFavorite)), [cards]);
 
   return (
@@ -1134,14 +1124,11 @@ function CreditCardsList({ showArchived = false }: { showArchived?: boolean }) {
           {sorted.map((c) => {
             const balance = Math.max(0, outstandingBalanceByCard(c, transactions));
             return (
-              <EntityCard
+              <CreditCardVisual
                 key={c.id}
-                title={<><span className="text-muted entity-card-sr">#{srNumOf.get(c.id)}</span>{c.name}</>}
-                subtitle={<>{c.currencyCode}{c.cardNetwork ? ` · ${c.cardNetwork}` : ''}{c.creditLimit ? ` · Limit ${fmtMoney(c.creditLimit, c.currencyCode)}` : ''}</>}
+                card={c}
+                balance={balance}
                 badge={c.isActive === false ? <span className="pill-warn fs-10">Closed</span> : undefined}
-                statLabel="Owed"
-                stat={<MoneyValue n={balance} currency={c.currencyCode} />}
-                hue={c.color ?? (balance > 0 ? 'var(--loss)' : 'var(--profit)')}
                 onClick={() => navigate(`/bank/card/${c.id}`)}
               />
             );

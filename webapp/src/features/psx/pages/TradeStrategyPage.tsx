@@ -654,6 +654,10 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
     const v = resolvedLegValues(l);
     return s + (v.action === 'SELL' ? v.shares * v.price : 0);
   }, 0);
+  const brokerRow = rows.find((row) => row.ticker === guardTicker);
+  const brokerAvg = brokerRow && brokerRow.shares > 0 ? brokerRow.invested / brokerRow.shares : 0;
+  const brokerBE = brokerRow && brokerRow.shares > 0 ? breakEvenPrice(brokerRow.invested, brokerRow.shares, workbook.settings.feePct, workbook.settings.tick, calcFee) : 0;
+  const strategicRow = tickerAnalysis.find((row) => row.ticker === guardTicker) ?? tickerAnalysis[0];
 
   type LegRow = { leg: TradePlanLeg; originalIndex: number };
   const legRows: LegRow[] = plan.legs.map((leg, originalIndex) => ({ leg, originalIndex }));
@@ -777,11 +781,13 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
       <div className="grid-auto mb-sm" style={gridAutoStyle(260, 8)}>
         <button type="button" className={`card stat-card${statsView === 'broker' ? ' active' : ''}`} onClick={() => setStatsView('broker')}>
           <div className="label">Broker Style <StatSourceBadge source="official" /></div>
-          <div className="sub">Official position · Avg buy, BE, RT, P/L and current value</div>
+          <div className="value">Avg {brokerAvg > 0 ? fmtPSXPrice(brokerAvg) : '—'} · BE {brokerBE > 0 ? fmtPSXPrice(brokerBE) : '—'}</div>
+          <div className="sub">RT {brokerRow?.marketPrice ? fmtPSXPrice(brokerRow.marketPrice) : '—'} · <span className={(brokerRow?.profit ?? 0) >= 0 ? 'pill-positive' : 'pill-negative'}>P/L {brokerRow ? fmtMoney(brokerRow.profit, currency) : '—'}</span> · Value {brokerRow ? fmtMoney(brokerRow.value, currency) : '—'}</div>
         </button>
         <button type="button" className={`card stat-card${statsView === 'strategic' ? ' active' : ''}`} onClick={() => setStatsView('strategic')}>
           <div className="label">Strategic Trades <StatSourceBadge source="advisory" /></div>
-          <div className="sub">Plan-adjusted position · planned trades and projected outcome</div>
+          <div className="value">Avg {strategicRow?.avgCost ? fmtPSXPrice(strategicRow.avgCost) : '—'} · BE {strategicRow?.breakEven ? fmtPSXPrice(strategicRow.breakEven) : '—'}</div>
+          <div className="sub">RT {brokerRow?.marketPrice ? fmtPSXPrice(brokerRow.marketPrice) : '—'} · <span className={(strategicRow?.realizedPL ?? 0) >= 0 ? 'pill-positive' : 'pill-negative'}>Planned P/L {strategicRow?.plannedSold ? fmtMoney(strategicRow.realizedPL, currency) : '—'}</span> · {fmt(strategicRow?.effectiveShares ?? 0, 0)} shares</div>
         </button>
       </div>
 

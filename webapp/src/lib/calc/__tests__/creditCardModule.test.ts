@@ -6,12 +6,47 @@ import {
   creditCardLiabilityByCurrency,
   creditCardMonthlyHistory,
   currentStatement,
+  latestClosedStatement,
   markupThisCycle,
   nextPendingMinDue,
   outstandingBalanceByCard,
   proposeMinPayment,
   totalOwedByCurrency,
 } from '../creditCardModule';
+
+describe('multi-cycle locked statements', () => {
+  it('derives the recurring schedule from the user-facing last statement dates', () => {
+    const c = card({ statementDate: undefined, paymentDueDate: undefined, lastBillingDate: '2026-08-17', lastPaymentDueDate: '2026-09-05' });
+    const s = currentStatement(c, [], '2026-09-20');
+    expect(s?.cycleStart).toBe('2026-09-17');
+    expect(s?.cycleEnd).toBe('2026-10-17');
+    expect(s?.dueDate).toBe('2026-11-05');
+  });
+
+  it('uses the next configured cutoff when a card closes twice per month', () => {
+    const c = card({ statementDate: 5, statementDates: [5, 20], paymentDueDate: 28 });
+    const s = currentStatement(c, [], '2026-01-12');
+    expect(s?.cycleStart).toBe('2026-01-05');
+    expect(s?.cycleEnd).toBe('2026-01-20');
+  });
+
+  it('locks the closed bill and applies payments through the due day', () => {
+    const c = card({ statementDate: 17, statementDates: [17], minDueDate: 22, paymentDueDate: 25, minPaymentMethod: 'percentOfBalance', minPaymentPct: 10, markupMethod: 'flatOnCarried', markupRatePct: 1 });
+    const txs = [
+      tx({ date: '2026-09-10', kind: 'charge', amount: 1000 }),
+      tx({ date: '2026-09-20', kind: 'payment', amount: 200 }),
+      tx({ date: '2026-09-24', kind: 'payment', amount: 300 }),
+      tx({ date: '2026-09-26', kind: 'payment', amount: 400 }),
+      tx({ date: '2026-09-21', kind: 'charge', amount: 999 }),
+    ];
+    const s = latestClosedStatement(c, txs, '2026-09-28')!;
+    expect(s.statementBalance).toBe(1000);
+    expect(s.paymentsAfterClose).toBe(500);
+    expect(s.remainingMinimumDue).toBe(0);
+    expect(s.remainingStatementBalance).toBe(500);
+    expect(markupThisCycle(c, s)).toBe(5);
+  });
+});
 
 const card = (over: Partial<CreditCard> = {}): CreditCard => ({
   id: 'c1',
