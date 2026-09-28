@@ -1,7 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { CollapsibleCard, MoneyValue } from '../../../components/Card';
 import { CreditCardVisual } from '../../../components/CreditCardVisual';
 import { SummaryGroupCard, SummaryMetric } from '../../../components/SummaryGroupCard';
 import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls';
@@ -10,8 +9,9 @@ import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
 import { AnalyticsChartEnhancer } from '../../../components/AnalyticsChartCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
-import { EditIcon, ListIcon, PlusIcon, SaveIcon, TransferIcon, TrashIcon } from '../../../components/icons';
+import { ArrowLeftIcon, ArrowRightIcon, EditIcon, ListIcon, PlusIcon, SaveIcon, TransferIcon, TrashIcon } from '../../../components/icons';
 import { Modal } from '../../../components/Modal';
+import { StandardButton } from '../../../components/standard';
 import { FabPanel } from '../../../components/ui/Fab';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
 import { toast } from '../../../components/Toast';
@@ -30,7 +30,6 @@ import { usePrimaryCurrency } from '../../../hooks/usePrimaryCurrency';
 import { usePageFabActions } from '../../../hooks/usePageFabActions';
 import { usePageTopBarChips, usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { getLastTransferSource, rememberTransferSource } from '../../../hooks/useLastTransferSource';
-import { hueStyle } from '../../../lib/statCardHues';
 import { categoryName, UNCATEGORIZED_ID } from '../../../lib/categories';
 import { gridAutoStyle } from '../../../lib/gridStyle';
 import { dlBarV, dlDoughnut } from '../../../lib/chartLabels';
@@ -445,18 +444,42 @@ function TransactionsTable({ card }: { card: CreditCard }) {
   const categories = useCategoryStore((s) => s.workbook.categories);
   const [detail, setDetail] = useState<CreditCardTransaction | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<CreditCardTransaction | null>(null);
+  const [query, setQuery] = useState('');
+  const [kind, setKind] = useState<'all' | CreditCardTransactionKind>('all');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const cardTxs = useMemo(
     () => [...transactions].filter((t) => t.cardId === card.id).sort((a, b) => b.date.localeCompare(a.date) || (b.seq ?? 0) - (a.seq ?? 0)),
     [transactions, card.id],
   );
+  const filtered = useMemo(() => cardTxs.filter((transaction) => {
+    if (kind !== 'all' && transaction.kind !== kind) return false;
+    if (fromDate && transaction.date < fromDate) return false;
+    if (toDate && transaction.date > toDate) return false;
+    const needle = query.trim().toLowerCase();
+    return !needle || transaction.description.toLowerCase().includes(needle) || categoryName(transaction.categoryID, categories).toLowerCase().includes(needle);
+  }), [cardTxs, kind, fromDate, toDate, query, categories]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const pageRows = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+  useEffect(() => setPage(1), [query, kind, fromDate, toDate, pageSize]);
 
   if (!cardTxs.length) return <p className="text-muted m-0">No transactions yet.</p>;
   return (
+    <>
+    <div className="section-toolbar">
+      <Field label="Search" width={210}><TextInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Description or category" /></Field>
+      <Field label="Type" width={180}><Select value={kind} onChange={(event) => setKind(event.target.value as 'all' | CreditCardTransactionKind)}><option value="all">All types</option>{(Object.keys(KIND_LABELS) as CreditCardTransactionKind[]).map((value) => <option key={value} value={value}>{KIND_LABELS[value]}</option>)}</Select></Field>
+      <Field label="From"><TextInput type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} /></Field>
+      <Field label="To"><TextInput type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} /></Field>
+    </div>
     <div className="table-responsive">
       <table>
         <thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr></thead>
         <tbody>
-          {cardTxs.map((t) => (
+          {pageRows.map((t) => (
             <tr key={t.id} className="clickable" onClick={() => setDetail(t)}>
               <td>{t.date}</td>
               <td className={t.kind === 'payment' ? 'pill pill-positive' : 'pill pill-negative'} style={{ display: 'inline-block' }}>{KIND_LABELS[t.kind]}</td>
@@ -476,8 +499,14 @@ function TransactionsTable({ card }: { card: CreditCard }) {
               </td>
             </tr>
           ))}
+          {!pageRows.length && <tr><td colSpan={6} className="text-muted">No transactions match these filters.</td></tr>}
         </tbody>
       </table>
+    </div>
+      <div className="pagination-bar">
+        <div className="text-muted">{filtered.length ? `Showing ${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, filtered.length)} of ${filtered.length}` : 'No rows'}</div>
+        <div className="pagination-actions"><span className="text-muted">Page {safePage} of {pageCount}</span><Field label="Rows" width={78}><Select value={String(pageSize)} onChange={(event) => setPageSize(Number(event.target.value))}><option value="25">25</option><option value="50">50</option><option value="100">100</option></Select></Field><StandardButton tone="secondary" size="small" icon={<ArrowLeftIcon />} disabled={safePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</StandardButton><StandardButton tone="secondary" size="small" icon={<ArrowRightIcon />} disabled={safePage >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Next</StandardButton></div>
+      </div>
       {editingTransaction && <CreditCardTransactionEditModal transaction={editingTransaction} onClose={() => setEditingTransaction(null)} />}
       {detail && (
         <RecordDetailModal
@@ -495,7 +524,7 @@ function TransactionsTable({ card }: { card: CreditCard }) {
           ]}
         />
       )}
-    </div>
+    </>
   );
 }
 
@@ -546,7 +575,7 @@ function CreditCardAnalyticsSection({ card }: { card: CreditCard }) {
     balance = Math.max(0, balance + effect(tx));
     return { tx, balance };
   });
-  const categoryTotals = Object.entries(rows.reduce<Record<string, number>>((out, tx) => {
+  const categoryTotals = Object.entries(rows.filter((tx) => tx.kind !== 'payment').reduce<Record<string, number>>((out, tx) => {
     const name = categoryName(tx.categoryID, categories);
     out[name] = (out[name] ?? 0) + tx.amount;
     return out;
@@ -583,6 +612,10 @@ function CreditCardAnalyticsSection({ card }: { card: CreditCard }) {
   const periodEndPending = 0;
   const periodEndPlanned = activePlans.reduce((sum, plan) => sum + planEffectFor(plan), 0);
   const periodEndExpected = Math.max(0, periodEndActual + periodEndPlanned);
+  const totalSpent = rows.filter((tx) => tx.kind !== 'payment').reduce((sum, tx) => sum + tx.amount, 0);
+  const totalPaid = rows.filter((tx) => tx.kind === 'payment').reduce((sum, tx) => sum + tx.amount, 0);
+  const utilization = card.creditLimit ? (Math.max(0, periodEndActual) / card.creditLimit) * 100 : null;
+  const paymentCoverage = totalSpent > 0 ? (totalPaid / totalSpent) * 100 : null;
 
   if (!rows.length && !activePlans.length) return <p className="text-muted m-0">No transactions or plans yet.</p>;
 
@@ -592,14 +625,28 @@ function CreditCardAnalyticsSection({ card }: { card: CreditCard }) {
   const axisOptions = { grid: { color: gridColor }, ticks: { color: cssVar('--muted') || '#94a3b8', autoSkip: true, maxTicksLimit: 6, maxRotation: 0 } };
   const balanceAxis = { ...axisOptions, beginAtZero: true };
 
-  return <div className="analytics-grid">
+  return <>
+    <div className="account-summary-grid mb-md">
+      <SummaryGroupCard title="Credit utilization" hue={utilization !== null && utilization > 80 ? 'var(--loss)' : 'var(--accent)'} tooltip="Current outstanding balance as a percentage of the configured credit limit.">
+        <SummaryMetric label="Used of limit" value={utilization === null ? 'Limit not set' : `${utilization.toFixed(1)}%`} tone={utilization !== null && utilization > 80 ? 'pill-negative' : 'pill-positive'} large />
+        <SummaryMetric label="Outstanding" value={fmtMoney(periodEndActual, card.currencyCode)} tone="pill-negative" />
+        {card.creditLimit ? <SummaryMetric label="Available" value={fmtMoney(Math.max(0, card.creditLimit - Math.max(0, periodEndActual)), card.currencyCode)} tone="pill-positive" /> : null}
+      </SummaryGroupCard>
+      <SummaryGroupCard title="Payment coverage" hue={paymentCoverage !== null && paymentCoverage < 100 ? 'var(--gold)' : 'var(--profit)'} tooltip="Payments divided by charges across the visible card history. This is a trend signal, not a statement amount.">
+        <SummaryMetric label="Paid vs spent" value={paymentCoverage === null ? 'No charges yet' : `${paymentCoverage.toFixed(1)}%`} tone={paymentCoverage !== null && paymentCoverage < 100 ? 'pill-negative' : 'pill-positive'} large />
+        <SummaryMetric label="Total spent" value={fmtMoney(totalSpent, card.currencyCode)} tone="pill-negative" />
+        <SummaryMetric label="Total paid" value={fmtMoney(totalPaid, card.currencyCode)} tone="pill-positive" />
+      </SummaryGroupCard>
+    </div>
+    <div className="analytics-grid">
     <AnalyticsChartEnhancer />
     <div className="analytics-chart chart-height-lg"><Tooltip text="Outstanding card balance over time."><h4 className="clickable">Balance over time</h4></Tooltip><div className="chart-canvas-wrap"><Line plugins={[chartDepthPlugin]} data={({labels:['Opening',...ledger.map((row)=>formatDate(row.tx.date,dateFormat)),'Closing'],datasets:[{type:'bar' as never,label:'Balance columns',data:[opening,...ledger.map((row)=>row.balance),periodEndActual],backgroundColor:chartAlpha('#38bdf8',.18),borderColor:chartAlpha('#38bdf8',.5),borderWidth:1,borderRadius:4},{label:'Balance by transaction',data:[opening,...ledger.map((row)=>row.balance),periodEndActual],borderColor:chartAlpha('#38bdf8',.9),backgroundColor:chartAlpha('#38bdf8',.2),fill:true,tension:.24,pointRadius:0,pointHoverRadius:4},{label:'Start → end balance',data:[opening,...ledger.map(()=>null),periodEndActual],borderColor:chartAlpha('#a78bfa',.95),backgroundColor:'transparent',borderDash:[6,4],borderWidth:2,pointRadius:3,pointHoverRadius:5,spanGaps:true}]} as any)} options={{responsive:true,maintainAspectRatio:false,scales:{x:axisOptions,y:balanceAxis},interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,labels:{filter:(item)=>item.datasetIndex!==0}},tooltip:{enabled:true,filter:(item)=>item.datasetIndex!==0},datalabels:{display:false}}}} /></div></div>
-    <div className="analytics-chart chart-height-lg"><Tooltip text="Card payments and charges by month, with actual and planned expected outstanding."><h4 className="clickable">Net Flows Over Time</h4></Tooltip><div className="chart-canvas-wrap"><Bar plugins={[chartDepthPlugin]} data={({labels:months,datasets:[{label:'Deposits',data:deposits,backgroundColor:chartAlpha(profit,.72),borderColor:chartAlpha(profit,.95),borderWidth:2,borderRadius:6},{label:'Withdrawals',data:withdrawals,backgroundColor:chartAlpha(loss,.72),borderColor:chartAlpha(loss,.95),borderWidth:2,borderRadius:6},{label:'Actual balance',data:monthlyActualBalance,backgroundColor:chartAlpha('#38bdf8',.42),borderColor:chartAlpha('#38bdf8',.85),borderWidth:1,borderRadius:4,stack:'balance'},{label:'Expected balance',data:monthlyExpectedAdjustment,backgroundColor:chartAlpha('#a78bfa',.5),borderColor:chartAlpha('#a78bfa',.9),borderWidth:1,borderRadius:4,stack:'balance'},{type:'line' as never,label:'Actual balance',data:monthlyActualBalance,borderColor:chartAlpha('#38bdf8',.95),backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.2}]} as any)} options={{interaction:{mode:'index',intersect:false},scales:{x:{...axisOptions,stacked:true},y:axisOptions},plugins:{legend:{labels:{filter:(item)=>item.datasetIndex!==2}},tooltip:{filter:(item)=>item.datasetIndex!==2},datalabels:dlBarV((v)=>fmtMoney(v,card.currencyCode))}}} /></div></div>
+    <div className="analytics-chart chart-height-lg"><Tooltip text="Card spending and payments by calendar month, with the actual ending balance and planned adjustment."><h4 className="clickable">Spending, payments &amp; balance</h4></Tooltip><div className="chart-canvas-wrap"><Bar plugins={[chartDepthPlugin]} data={({labels:months,datasets:[{label:'Payments',data:deposits,backgroundColor:chartAlpha(profit,.72),borderColor:chartAlpha(profit,.95),borderWidth:2,borderRadius:6},{label:'Spending',data:withdrawals,backgroundColor:chartAlpha(loss,.72),borderColor:chartAlpha(loss,.95),borderWidth:2,borderRadius:6},{label:'Actual balance',data:monthlyActualBalance,backgroundColor:chartAlpha('#38bdf8',.42),borderColor:chartAlpha('#38bdf8',.85),borderWidth:1,borderRadius:4,stack:'balance'},{label:'Planned adjustment',data:monthlyExpectedAdjustment,backgroundColor:chartAlpha('#a78bfa',.5),borderColor:chartAlpha('#a78bfa',.9),borderWidth:1,borderRadius:4,stack:'balance'},{type:'line' as never,label:'Actual balance',data:monthlyActualBalance,borderColor:chartAlpha('#38bdf8',.95),backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.2}]} as any)} options={{interaction:{mode:'index',intersect:false},scales:{x:{...axisOptions,stacked:true},y:axisOptions},plugins:{legend:{labels:{filter:(item)=>item.datasetIndex!==2}},tooltip:{filter:(item)=>item.datasetIndex!==2},datalabels:dlBarV((v)=>fmtMoney(v,card.currencyCode))}}} /></div></div>
     <div className="analytics-chart"><Tooltip text="Total card transaction amount grouped by category."><h4 className="clickable">Transactions by category</h4></Tooltip><div className="chart-canvas-wrap"><Doughnut plugins={[chartDepthPlugin]} data={({labels:categoryTotals.map(([name])=>name),datasets:[{label:'Transactions',data:categoryTotals.map(([,amount])=>amount),backgroundColor:categoryTotals.map(([name])=>chartAlpha(tickerColor(name),.72)),borderColor:categoryTotals.map(([name])=>chartAlpha(tickerColor(name),.95)),borderWidth:2,hoverOffset:8}]} as any)} options={{responsive:true,maintainAspectRatio:false,cutout:'48%',rotation:-25,plugins:{legend:{display:true,position:'right',labels:{boxWidth:10,padding:8}},datalabels:dlDoughnut((v)=>fmtMoney(v,card.currencyCode))},layout:{padding:8}}} /></div></div>
     <div className="analytics-chart"><Tooltip text="Actual and planned expected outstanding balance. Credit Cards do not currently have pending ledger transactions, so Pending remains zero."><h4 className="clickable">Actual vs Expected Balance (Pending &amp; Planned)</h4></Tooltip><div className="chart-canvas-wrap"><Bar plugins={[chartDepthPlugin]} data={({labels:comparisonLabels,datasets:[{type:'bar' as never,label:'Actual balance',data:actualChartData,backgroundColor:chartAlpha('#38bdf8',.42),borderColor:chartAlpha('#38bdf8',.85),borderWidth:2,borderRadius:6,stack:'balance'},{type:'line' as never,label:'Actual balance',data:actualChartData,borderColor:chartAlpha('#38bdf8',.95),backgroundColor:'transparent',borderWidth:2,pointRadius:0,tension:.2},{type:'line' as never,label:'Pending balance',data:pendingChartData,borderColor:chartAlpha('#f59e0b',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[5,4],pointRadius:0},{type:'line' as never,label:'Planned balance',data:plannedChartData,borderColor:chartAlpha('#22c55e',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[8,3],pointRadius:0},{type:'line' as never,label:'Expected balance',data:expectedChartData,borderColor:chartAlpha('#a78bfa',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[2,3],pointRadius:0}]} as any)} options={{interaction:{mode:'index',intersect:false},scales:{x:{...axisOptions,stacked:true},y:balanceAxis},plugins:{legend:{display:true,labels:{filter:(item)=>item.datasetIndex!==0}},tooltip:{filter:(item)=>item.datasetIndex!==0},datalabels:{display:false}}}} /></div></div>
     <div className="analytics-chart"><Tooltip text="Actual, pending, planned, and combined expected outstanding at period end."><h4 className="clickable">Period-end balance summary</h4></Tooltip><div className="chart-canvas-wrap"><Doughnut plugins={[chartDepthPlugin]} data={({labels:['Actual','Pending','Planned','Expected'],datasets:[{label:'Period end',data:[Math.abs(periodEndActual),Math.abs(periodEndPending),Math.abs(periodEndPlanned),Math.abs(periodEndExpected)],backgroundColor:['#38bdf8','#f59e0b','#22c55e','#a78bfa'].map((color)=>chartAlpha(color,.72)),borderColor:['#38bdf8','#f59e0b','#22c55e','#a78bfa'],borderWidth:2,hoverOffset:8}]} as any)} options={{responsive:true,maintainAspectRatio:false,cutout:'48%',plugins:{legend:{display:true,position:'right'},tooltip:{callbacks:{label:(item)=>`${item.label}: ${fmtMoney([periodEndActual,periodEndPending,periodEndPlanned,periodEndExpected][item.dataIndex],card.currencyCode)}`}},datalabels:dlDoughnut((v)=>fmtMoney(v,card.currencyCode))}}} /></div></div>
-  </div>;
+    </div>
+  </>;
 }
 
 export function CreditCardDetailPage() {
@@ -613,6 +660,7 @@ export function CreditCardDetailPage() {
   const transactions = useCreditCardWorkbookStore((s) => s.workbook.transactions);
   const ensureSignedIn = useEnsureSignedIn();
   const [editCardOpen, setEditCardOpen] = useState(false);
+  const [cardDetailsOpen, setCardDetailsOpen] = useState(false);
 
   const balance = card ? outstandingBalanceByCard(card, transactions) : 0;
   const openCycle = card ? activeCycleStatement(card, transactions) : null;
@@ -626,7 +674,6 @@ export function CreditCardDetailPage() {
   // see `creditCardMonthlyHistory`'s own doc comment), matching Net
   // Worth's per-currency monthly window.
   const monthlyHistory = useMemo(() => (card ? creditCardMonthlyHistory(card, transactions, 6) : []), [card, transactions]);
-  const thisMonth = monthlyHistory[monthlyHistory.length - 1] ?? { month: '', spent: 0, paid: 0, balanceEnd: 0 };
   const [collectAmount, setCollectAmount] = useState(proposal?.amount ?? 0);
   const [collectDate, setCollectDate] = useState(proposal?.dueDate ?? today());
   const [linkMode, setLinkMode] = useState(false);
@@ -642,9 +689,9 @@ export function CreditCardDetailPage() {
         options={[{ value: '', label: 'All cards' }, ...cards.filter((item) => item.isActive !== false || item.id === card.id).map((item) => ({ value: item.id, label: item.name }))]} />
     </TopBarControls>
   ) : null);
-  const sectionChips = useMemo(() => ['summary', 'details', 'statement', 'plans', 'transactions', 'history', 'analytics'].map((key) => ({
+  const sectionChips = useMemo(() => ['summary', 'statement', 'plans', 'transactions', 'history', 'analytics'].map((key) => ({
     key,
-    label: key === 'details' ? 'Card details' : key === 'statement' ? 'Current statement' : key === 'history' ? 'Last 6 months' : key[0].toUpperCase() + key.slice(1),
+    label: key === 'statement' ? 'Bill payment' : key === 'history' ? 'Monthly history' : key[0].toUpperCase() + key.slice(1),
     active: false,
     onClick: () => document.getElementById(`card-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
   })), []);
@@ -697,6 +744,7 @@ export function CreditCardDetailPage() {
     navigate('/bank');
   };
   const cardActions = [
+    { label: 'View card details', onClick: () => setCardDetailsOpen(true) },
     { label: 'Edit card', onClick: () => setEditCardOpen(true) },
     { label: card.isActive === false ? 'Reopen card' : 'Close card', onClick: () => { void toggleArchived(); } },
     { label: 'Delete card', tone: 'danger' as const, onClick: () => { void deleteThisCard(); } },
@@ -715,7 +763,7 @@ export function CreditCardDetailPage() {
 
       <div className="mb-md"><CreditCardVisual card={card} balance={balance} favorite={card.isFavorite} onToggleFavorite={() => { void toggleFavorite(); }} actions={cardActions} /></div>
 
-      <div id="card-summary"><StandardCard
+      <div className="standard-section-stack"><div id="card-summary"><StandardCard
         title="Summary"
         hue={card.color}
         summary={<SummaryChip label="Outstanding" value={fmtMoney(balance, card.currencyCode)} />}
@@ -747,71 +795,13 @@ export function CreditCardDetailPage() {
         </div>
       </StandardCard></div>
 
-      <div id="card-details"><StandardCard title="Card details" hue={card.color} className="mb-md">
-        <AttributeList
-          items={[
-            { label: 'Currency', value: card.currencyCode },
-            { label: 'Outstanding balance', value: fmtMoney(balance, card.currencyCode) },
-            { label: 'Already owed (opening balance)', value: card.openingBalance ? fmtMoney(card.openingBalance, card.currencyCode) : undefined },
-            { label: 'Credit limit', value: card.creditLimit ? fmtMoney(card.creditLimit, card.currencyCode) : undefined },
-            { label: 'Network', value: card.cardNetwork },
-            { label: 'BIN', value: card.cardBin },
-            { label: 'Last billing date', value: card.lastBillingDate ?? (card.statementDate ? `Monthly on day ${card.statementDate} (legacy)` : undefined) },
-            { label: 'Last minimum-payment date', value: card.lastMinPaymentDate ?? (card.minDueDate ? `Monthly on day ${card.minDueDate} (legacy)` : undefined) },
-            { label: 'Last full-payment due date', value: card.lastPaymentDueDate ?? (card.paymentDueDate ? `Monthly on day ${card.paymentDueDate} (legacy)` : undefined) },
-            { label: 'Late fee after due', value: card.lateFeeAfterDue ? fmtMoney(card.lateFeeAfterDue, card.currencyCode) : undefined },
-            { label: 'Annual fee', value: card.annualFee ? fmtMoney(card.annualFee, card.currencyCode) : undefined },
-            { label: 'Minimum payment', value: card.minPaymentMethod === 'percentOfBalance' ? `${card.minPaymentPct ?? 0}% of balance` : card.minPaymentMethod === 'greaterOfFixedOrPercent' ? `Greater of ${fmtMoney(card.minPaymentAmount ?? 0, card.currencyCode)} or ${card.minPaymentPct ?? 0}%` : card.minPaymentAmount ? fmtMoney(card.minPaymentAmount, card.currencyCode) : undefined },
-            { label: 'Markup', value: card.markupMethod === 'flatOnCarried' ? `${card.markupRatePct ?? 0}% on carried balance ≥ ${fmtMoney(card.markupThresholdAmount ?? 0, card.currencyCode)}` : undefined },
-            { label: 'Status', value: card.isActive === false ? 'Closed' : 'Active' },
-            { label: 'Favorite', value: card.isFavorite ? 'Yes' : 'No' },
-          ]}
-        />
-      </StandardCard></div>
-
       {statement && (
-        <div id="card-statement"><StandardCard title="Current statement" hue={card.color} className="mb-md">
-          <p className="text-muted" style={{ marginTop: 0, marginBottom: 10 }}>
-            Cycle {statement.cycleStart} → {statement.cycleEnd}
-          </p>
-          <div className="grid-auto" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10 }}>
-            <div className="stat-card card" style={hueStyle('var(--loss)')}>
-              <Tooltip text="Everything added to this card's balance so far this CALENDAR month — same time window every other module in the app reports by.">
-                <div className="label clickable">Owed this month</div>
-              </Tooltip>
-              <MoneyValue n={thisMonth.spent} currency={card.currencyCode} />
-              <div className="sub">Paid: {fmtMoney(thisMonth.paid, card.currencyCode)}</div>
-            </div>
-            <div className="stat-card card" style={hueStyle('var(--loss)')}>
-              <Tooltip text="Everything added to this card's balance so far in the current BILLING cycle (not the calendar month) — a purchase, fee, markup, or cash advance.">
-                <div className="label clickable">Spent this cycle</div>
-              </Tooltip>
-              <MoneyValue n={statement.chargesThisCycle} currency={card.currencyCode} />
-              <div className="sub">Paid: {fmtMoney(statement.paymentsThisCycle, card.currencyCode)}</div>
-            </div>
-            <div className="stat-card card" style={hueStyle('var(--accent)')}>
-              <div className="label">Min due</div>
-              <MoneyValue n={statement.remainingMinimumDue} currency={card.currencyCode} />
-              <div className="sub">{statement.minDueDate ? `Due: ${statement.minDueDate}` : 'No min-due date set'}</div>
-            </div>
-            <div className="stat-card card" style={hueStyle(statement.statementBalance > 0 ? 'var(--loss)' : 'var(--profit)')}>
-              <Tooltip text="Your bill for this cycle — the full amount due, not just the minimum.">
-                <div className="label clickable">Total due</div>
-              </Tooltip>
-              <MoneyValue n={statement.remainingStatementBalance} currency={card.currencyCode} />
-              <div className="sub">{statement.dueDate ? `Due: ${statement.dueDate}` : 'No due date set'}</div>
-            </div>
-            {markup > 0 && (
-              <div className="stat-card card" style={hueStyle('var(--loss)')}>
-                <Tooltip text="Computed from this card's own markup rate, applied to whatever balance survived the grace period this cycle.">
-                  <div className="label clickable">Markup this cycle</div>
-                </Tooltip>
-                <MoneyValue n={markup} currency={card.currencyCode} />
-              </div>
-            )}
-          </div>
-          {statement.paymentsAfterClose > 0 && <p className="text-muted mb-0">Payments after billing date: {fmtMoney(statement.paymentsAfterClose, card.currencyCode)}. Applied to this locked bill through its due date.</p>}
-          {openCycle && <p className="text-muted mb-0">Open cycle {openCycle.cycleStart} → {openCycle.cycleEnd}: {fmtMoney(openCycle.chargesThisCycle, card.currencyCode)} spent so far. This does not change the locked bill above.</p>}
+        <div id="card-statement"><StandardCard title="Bill payment" hue={card.color}>
+          <Notice tone={statement.remainingStatementBalance > 0 ? 'warning' : 'success'}>
+            <strong>{fmtMoney(statement.remainingStatementBalance, card.currencyCode)} remains on the locked bill</strong>
+            <div className="text-muted mt-4">Billing period {statement.cycleStart} → {statement.cycleEnd}. Payments through {statement.dueDate ?? 'the configured final due date'} reduce this bill; later payments belong to the open cycle.</div>
+            <div className="text-muted mt-4">Original bill {fmtMoney(statement.statementBalance, card.currencyCode)} · Applied after billing {fmtMoney(statement.paymentsAfterClose, card.currencyCode)} · Minimum still due {fmtMoney(statement.remainingMinimumDue, card.currencyCode)}</div>
+          </Notice>
           {markup > 0 && (
             <button className="btn secondary small mt-sm" onClick={logMarkup}>Log markup for this cycle</button>
           )}
@@ -838,34 +828,49 @@ export function CreditCardDetailPage() {
         </StandardCard></div>
       )}
 
-      <div id="card-plans"><StandardCard title="Plans" hue={card.color} className="mb-md">
+      <div id="card-plans"><StandardCard title="Plans" hue={card.color}>
           <PlanningHorizonField value={horizonDays} onChange={setHorizonDays} />
           <CardBalanceProjection card={card} horizonDays={horizonDays} />
           <CardPlanList card={card} horizonDays={horizonDays} />
       </StandardCard></div>
 
-      <div id="card-transactions"><StandardCard title="Transactions" hue={card.color} className="mb-md">
+      <div id="card-transactions"><StandardCard title="Transactions" hue={card.color}>
         <TransactionsTable card={card} />
       </StandardCard></div>
 
-      <div id="card-history"><StandardCard title="Last 6 months" hue={card.color} className="mb-md">
-        <div className="table-responsive">
-          <table>
-            <thead><tr><th>Month</th><th>Spent</th><th>Paid</th><th>Balance</th></tr></thead>
-            <tbody>{monthlyHistory.map((m) => <tr key={m.month}><td>{m.month}</td><td>{fmtMoney(m.spent, card.currencyCode)}</td><td>{fmtMoney(m.paid, card.currencyCode)}</td><td>{fmtMoney(m.balanceEnd, card.currencyCode)}</td></tr>)}</tbody>
-          </table>
-        </div>
+      <div id="card-history"><StandardCard title="Monthly history" hue={card.color}>
+        <div className="account-summary-grid">{monthlyHistory.map((month) => <SummaryGroupCard key={month.month} title={month.month} hue={month.spent - month.paid > 0 ? 'var(--loss)' : 'var(--profit)'} tooltip="Calendar-month spending, payments, net change, and closing card balance.">
+          <SummaryMetric label="Closing balance" value={fmtMoney(month.balanceEnd, card.currencyCode)} tone={month.balanceEnd > 0 ? 'pill-negative' : 'pill-positive'} large />
+          <SummaryMetric label="Spent" value={fmtMoney(month.spent, card.currencyCode)} tone="pill-negative" />
+          <SummaryMetric label="Paid" value={fmtMoney(month.paid, card.currencyCode)} tone="pill-positive" />
+          <SummaryMetric label="Net change" value={fmtMoney(month.spent - month.paid, card.currencyCode)} tone={month.spent - month.paid > 0 ? 'pill-negative' : 'pill-positive'} />
+        </SummaryGroupCard>)}</div>
       </StandardCard></div>
 
-      <div id="card-analytics"><StandardCard title="Analytics" hue={card.color} className="mb-md">
+      <div id="card-analytics"><StandardCard title="Analytics" hue={card.color}>
         <CreditCardAnalyticsSection card={card} />
       </StandardCard></div>
+      </div>
 
       {editCardOpen && (
         <Modal title="Edit credit card" onClose={() => setEditCardOpen(false)}>
           <CreditCardForm card={card} onSaved={() => setEditCardOpen(false)} />
         </Modal>
       )}
+      {cardDetailsOpen && <Modal title="Card details" onClose={() => setCardDetailsOpen(false)}>
+        <AttributeList items={[
+          { label: 'Currency', value: card.currencyCode }, { label: 'Outstanding balance', value: fmtMoney(balance, card.currencyCode) },
+          { label: 'Already owed (opening balance)', value: card.openingBalance ? fmtMoney(card.openingBalance, card.currencyCode) : undefined }, { label: 'Credit limit', value: card.creditLimit ? fmtMoney(card.creditLimit, card.currencyCode) : undefined },
+          { label: 'Network', value: card.cardNetwork }, { label: 'BIN', value: card.cardBin },
+          { label: 'Last billing date', value: card.lastBillingDate ?? (card.statementDate ? `Monthly on day ${card.statementDate} (legacy)` : undefined) },
+          { label: 'Last minimum-payment date', value: card.lastMinPaymentDate ?? (card.minDueDate ? `Monthly on day ${card.minDueDate} (legacy)` : undefined) },
+          { label: 'Last full-payment due date', value: card.lastPaymentDueDate ?? (card.paymentDueDate ? `Monthly on day ${card.paymentDueDate} (legacy)` : undefined) },
+          { label: 'Late fee after due', value: card.lateFeeAfterDue ? fmtMoney(card.lateFeeAfterDue, card.currencyCode) : undefined }, { label: 'Annual fee', value: card.annualFee ? fmtMoney(card.annualFee, card.currencyCode) : undefined },
+          { label: 'Minimum payment', value: card.minPaymentMethod === 'percentOfBalance' ? `${card.minPaymentPct ?? 0}% of balance` : card.minPaymentMethod === 'greaterOfFixedOrPercent' ? `Greater of ${fmtMoney(card.minPaymentAmount ?? 0, card.currencyCode)} or ${card.minPaymentPct ?? 0}%` : card.minPaymentAmount ? fmtMoney(card.minPaymentAmount, card.currencyCode) : undefined },
+          { label: 'Markup', value: card.markupMethod === 'flatOnCarried' ? `${card.markupRatePct ?? 0}% on carried balance ≥ ${fmtMoney(card.markupThresholdAmount ?? 0, card.currencyCode)}` : undefined }, { label: 'Status', value: card.isActive === false ? 'Closed' : 'Active' }, { label: 'Favorite', value: card.isFavorite ? 'Yes' : 'No' },
+        ]} />
+        <button className="btn mt-md" onClick={() => { setCardDetailsOpen(false); setEditCardOpen(true); }}><EditIcon size={13} />Edit card</button>
+      </Modal>}
             <CreditCardDetailFab card={card} />
     </div>
   );
@@ -925,47 +930,25 @@ function CardBalanceProjection({ card, horizonDays }: { card: CreditCard; horizo
   const cards = useCreditCardWorkbookStore((s) => s.workbook.cards);
   const transactions = useCreditCardWorkbookStore((s) => s.workbook.transactions);
   const plannedEntries = usePlannedCreditCardWorkbookStore((s) => s.workbook.entries);
-  const settings = usePlannedCreditCardWorkbookStore((s) => s.workbook.settings);
-  const updateSettings = usePlannedCreditCardWorkbookStore((s) => s.updateSettings);
   const projection = useMemo(
     () => plannedCreditCardProjection(cards, transactions, plannedEntries, new Date(), horizonDays),
     [cards, transactions, plannedEntries, horizonDays],
   );
   const p = projection[card.currencyCode] ?? { real: 0, planned: 0 };
 
-  return (
-    <CollapsibleCard
-      title={
-        <Tooltip text="See what you'd owe on this card if every plan due within the chosen time period actually happened — a reality check before you spend.">
-          <h3 style={{ margin: 0, cursor: 'pointer' }}>Balance projection</h3>
-        </Tooltip>
-      }
-      defaultOpen={false}
-      className="mb-md"
-    >
-      <div className="row" style={{ gap: 16, marginBottom: 12 }}>
-        <label className="text-muted flex-center-gap4">
-          <input type="checkbox" checked={settings.showRealBalance} onChange={(e) => updateSettings({ showRealBalance: e.target.checked })} />
-          Real owed
-        </label>
-        <label className="text-muted flex-center-gap4">
-          <input type="checkbox" checked={settings.showPlannedBalance} onChange={(e) => updateSettings({ showPlannedBalance: e.target.checked })} />
-          Planned owed
-        </label>
-      </div>
-      <div className="grid-auto" style={gridAutoStyle(180, 8)}>
-        <div className="stat-card card" style={hueStyle('var(--accent)')}>
-          <div className="label">{card.currencyCode}</div>
-          {settings.showRealBalance && (
-            <div className={p.real <= 0 ? 'pill-positive' : 'pill-negative'}>Real: {fmtMoney(p.real, card.currencyCode)}</div>
-          )}
-          {settings.showPlannedBalance && (
-            <div className={p.planned <= 0 ? 'pill-positive' : 'pill-negative'}>Planned: {fmtMoney(p.planned, card.currencyCode)}</div>
-          )}
-        </div>
-      </div>
-    </CollapsibleCard>
-  );
+  const plannedChange = p.planned - p.real;
+  return <div className="account-summary-grid mb-md">
+    <SummaryGroupCard title="Current balance" hue={p.real > 0 ? 'var(--loss)' : 'var(--profit)'} tooltip="What is owed now, before any future plan is applied.">
+      <SummaryMetric label="Owed now" value={fmtMoney(p.real, card.currencyCode)} tone={p.real > 0 ? 'pill-negative' : 'pill-positive'} large />
+      {card.creditLimit ? <SummaryMetric label="Available credit" value={fmtMoney(Math.max(0, card.creditLimit - p.real), card.currencyCode)} tone="pill-positive" /> : null}
+      <SummaryMetric label="Projection horizon" value={horizonDays === null ? 'All plans' : `${horizonDays} days`} />
+    </SummaryGroupCard>
+    <SummaryGroupCard title="Expected final balance" hue={plannedChange > 0 ? 'var(--loss)' : 'var(--profit)'} tooltip="What would be owed if every visible plan within the selected period happened.">
+      <SummaryMetric label="Expected owed" value={fmtMoney(p.planned, card.currencyCode)} tone={p.planned > 0 ? 'pill-negative' : 'pill-positive'} large />
+      <SummaryMetric label="Planned change" value={fmtMoney(plannedChange, card.currencyCode)} tone={plannedChange > 0 ? 'pill-negative' : 'pill-positive'} />
+      {card.creditLimit ? <SummaryMetric label="Expected available" value={fmtMoney(Math.max(0, card.creditLimit - p.planned), card.currencyCode)} tone="pill-positive" /> : null}
+    </SummaryGroupCard>
+  </div>;
 }
 
 function AddCardPlanForm({ cardId, onSaved, plan }: { cardId: string; onSaved?: () => void; plan?: PlannedCreditCardTransaction }) {

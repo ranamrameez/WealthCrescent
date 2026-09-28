@@ -10123,6 +10123,12 @@ from the lot system."*
   Payment allocation is exclusive across those cycle cards: payments after cut-off through the
   locked bill's final due date belong only to that closed bill; payments after the due date belong
   only to the active cycle, preventing the same payment from reducing both views.
+  Final Credit Card parity pass: Card details moved into a popup opened from the card action menu;
+  every page section now sits in the shared section stack spacing; the bill section explains the
+  locked bill in one concise payment notice; transactions have search/type/date filters and
+  pagination; plans use Account-style Current vs Expected summary cards; monthly history uses
+  grouped month cards; and analytics adds utilization/payment-coverage summaries while retaining
+  the Bank Account balance, flow, category, and expected-balance chart family.
 
 ## Pending
 
