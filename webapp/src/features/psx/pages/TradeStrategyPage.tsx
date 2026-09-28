@@ -1123,7 +1123,7 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
           { key: 'ticker', label: 'Ticker', editable: false, width: 110 },
           { key: 'action', label: 'Action', type: 'select', options: [{ value: 'BUY', label: 'BUY' }, { value: 'SELL', label: 'SELL' }], width: 110 },
           { key: 'shares', label: 'Shares', type: 'number', width: 120 },
-          { key: 'price', label: 'Price', type: 'number', width: 130, formatter: (value) => fmtPSXPrice(Number(value)) },
+          { key: 'price', label: 'Price', type: 'number', width: 130, formatter: (value, _row) => fmtPSXPrice(Number(value)) },
           { key: 'feeOverride', label: 'Fee override', type: 'number', width: 140 },
         ] as BatchColumn<TradePlanLeg>[]}
         getRowId={(row) => `${row.date}:${row.ticker}:${row.action}:${row.shares}:${row.price}:${plan.legs.indexOf(row)}`}
