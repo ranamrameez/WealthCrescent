@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Bar, Line } from 'react-chartjs-2';
-import { CollapsibleCard } from '../../../components/Card';
+import { StandardCard } from '../../../components/StandardCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { Tooltip } from '../../../components/Tooltip';
 import { EditIcon, SaveIcon, TrashIcon, XIcon } from '../../../components/icons';
@@ -229,7 +229,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
       <div className="position-split-left">
 
         {isOpen && (
-          <CollapsibleCard title={<h4 className="m-0">Current position <StatSourceBadge source="official" /></h4>} className="mb-12">
+          <StandardCard title={<span>Current position <StatSourceBadge source="official" /></span>} className="mb-12">
             <div className="grid-auto" style={gridAutoStyle(140, 8)} >
               <div className="stat-card card" style={hueStyle(HUES[2])}>
                 <div className="label">Trend</div>
@@ -282,11 +282,11 @@ export function PositionDetail({ ticker }: { ticker: string }) {
                 <div className="value fs-14">{statusLabel}</div>
               </div>
             </div>
-          </CollapsibleCard>
+          </StandardCard>
         )}
 
         {position && (position.buyCount > 0 || position.sellCount > 0) && (
-          <CollapsibleCard title={<h4 className="m-0">All-time stats <StatSourceBadge source="official" /></h4>} className="mb-12">
+          <StandardCard title={<span>All-time stats <StatSourceBadge source="official" /></span>} className="mb-12">
             <div className="grid-auto" style={gridAutoStyle(100, 8)}>
               <div className="stat-card card" style={hueStyle(HUES[0])}>
                 <div className="label">Bought / Sold</div>
@@ -314,12 +314,12 @@ export function PositionDetail({ ticker }: { ticker: string }) {
               </div>
               {!isOpen && <div className="stat-card card" style={hueStyle(HUES[6])}><div className="label">Held</div><div className="value">{holdingDays}d</div></div>}
             </div>
-          </CollapsibleCard>
+          </StandardCard>
         )}
 
 
         {lotRows.length ? (
-          <CollapsibleCard title={<h4 className="m-0">Open lots <StatSourceBadge source="official" /></h4>} className="mb-12">
+          <StandardCard title={<span>Open lots <StatSourceBadge source="official" /></span>} className="mb-12">
             <div className="table-scroll">
               <table>
                 <thead><tr><LotTh col="buyDate">Buy date</LotTh><LotTh col="buyPrice">Buy price</LotTh><LotTh col="remainingShares">Remaining</LotTh><LotTh col="costPerShare">Cost/share</LotTh></tr></thead>
@@ -338,13 +338,13 @@ export function PositionDetail({ ticker }: { ticker: string }) {
             <p className="text-muted" style={{ marginTop: 4 }}>
               A future sell of {ticker} will consume {workbook.settings.costBasisMethod === 'fifo' ? 'the oldest lot first (FIFO)' : 'the cheapest lot first'}, unless it targets a specific lot via "Sell this lot."
             </p>
-          </CollapsibleCard>
+          </StandardCard>
         ) : null}
 
 
 
         {reportOpenLots.length > 0 && (
-          <CollapsibleCard title={<h4 className="m-0">Open lots <StatSourceBadge source="history" /></h4>} className="mb-12">
+          <StandardCard title={<span>Open lots <StatSourceBadge source="history" /></span>} className="mb-12">
             <div className="table-scroll">
               <table>
                 <thead>
@@ -363,13 +363,13 @@ export function PositionDetail({ ticker }: { ticker: string }) {
                 </tbody>
               </table>
             </div>
-          </CollapsibleCard>
+          </StandardCard>
         )}
 
       </div>
       <div className="position-split-right">
 
-        <CollapsibleCard title={<h4 className="m-0">Daily price</h4>} className="mb-12">
+        <StandardCard title={<span>Daily price</span>} className="mb-12">
         {stats ? (
           <CompactChart height={130}>
             <Line
@@ -416,10 +416,10 @@ export function PositionDetail({ ticker }: { ticker: string }) {
           />
           <button className="btn secondary small" onClick={commitPrice}><SaveIcon size={12} />Save price</button>
         </div>
-        </CollapsibleCard>
+        </StandardCard>
 
         {isOpen && (
-          <CollapsibleCard title={<h4 className="m-0">Buy vs. current vs. break-even</h4>} className="mb-12">
+          <StandardCard title={<span>Buy vs. current vs. break-even</span>} className="mb-12">
             <CompactChart height={lastSellPrice > 0 ? 150 : 115}>
               <Bar
                 data={{
@@ -444,11 +444,11 @@ export function PositionDetail({ ticker }: { ticker: string }) {
                 }}
               />
             </CompactChart>
-          </CollapsibleCard>
+          </StandardCard>
         )}
 
         {stats && (
-          <CollapsibleCard title={<h4 className="m-0">Price range</h4>}>
+          <StandardCard title={<span>Price range</span>}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 8 }}>
               <div className="stat-card card" style={hueStyle(HUES[5])}><div className="label">Lowest</div><div className="value">{fmtPSXPrice(stats.min)}</div><div className="sub">{stats.minDate}</div></div>
               <div className="stat-card card" style={hueStyle(HUES[1])}>
@@ -502,7 +502,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
               </div>
               <button className="btn secondary small mt-sm" onClick={exportPriceHistory}>Export price history CSV</button>
             </details>
-          </CollapsibleCard>
+          </StandardCard>
         )}
 
       </div>
@@ -512,7 +512,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
             amount, Sell price+date, Total sale amount, PL/share, Net profit.
             Naturally absent for a still-fully-open position. */}
         {sortedClosedTrades.length > 0 && (
-          <CollapsibleCard title={<h4 className="m-0">Closed Round-Trips <StatSourceBadge source="history" /></h4>} className="mb-12">
+          <StandardCard title={<span>Closed Round-Trips <StatSourceBadge source="history" /></span>} className="mb-12">
             <div className="table-scroll">
               <table>
                 <thead>
@@ -552,7 +552,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
                 </tbody>
               </table>
             </div>
-          </CollapsibleCard>
+          </StandardCard>
         )}
 
     </>
