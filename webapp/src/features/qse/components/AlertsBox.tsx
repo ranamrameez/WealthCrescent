@@ -1,4 +1,4 @@
-import { fmtPrice } from '../../../lib/format';
+import { fmtQSEPrice } from '../../../lib/format';
 import { useWorkbookStore } from '../../../store/workbookStore';
 import { useQSEDerived } from '../hooks/useQSEDerived';
 
@@ -28,7 +28,7 @@ export function useQSEAlerts(): Alert[] {
     if (w.current && w.current >= w.target) {
       alerts.push({
         ticker: w.ticker,
-        message: `Watchlist target reached (${fmtPrice(w.current)} ≥ ${fmtPrice(w.target)})`,
+        message: `Watchlist target reached (${fmtQSEPrice(w.current)} ≥ ${fmtQSEPrice(w.target)})`,
         cls: 'pos',
       });
     }
