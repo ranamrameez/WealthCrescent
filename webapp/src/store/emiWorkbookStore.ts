@@ -1,5 +1,6 @@
 import { removeEmiPlans } from '../lib/planLifecycle';
 import { create } from 'zustand';
+import { scheduleLocalStorageWrite } from '../lib/localStoragePersistence';
 import { createEmptyEMIWorkbook } from './defaultEmiWorkbook';
 import type { EMILoan, EMIRepayment, EMIWorkbook } from '../types/emiWorkbook';
 
@@ -60,11 +61,9 @@ function loadFromLocalStorage(): EMIWorkbook {
 }
 
 function persist(workbook: EMIWorkbook) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(workbook));
-  } catch (e) {
+  scheduleLocalStorageWrite(STORAGE_KEY, workbook, (e) => {
     console.error('Failed to save workbook to localStorage — your last change may not have persisted.', e);
-  }
+  });
 }
 
 export const useEMIWorkbookStore = create<EMIStoreState>((set, get) => {

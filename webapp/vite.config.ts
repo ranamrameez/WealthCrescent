@@ -13,6 +13,22 @@ export default defineConfig({
   // means routing itself doesn't care about the base path; this only
   // affects built asset URLs.
   base: '/WealthCrescent/',
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          const normalized = id.replaceAll('\\', '/')
+          const feature = normalized.match(/\/src\/features\/([^/]+)\//)?.[1]
+          if (feature) return `feature-${feature}`
+          if (!id.includes('node_modules')) return undefined
+          if (id.includes('firebase')) return 'vendor-firebase'
+          if (id.includes('chart.js') || id.includes('react-chartjs-2') || id.includes('chartjs-plugin-datalabels')) return 'vendor-charts'
+          if (id.includes('react') || id.includes('zustand')) return 'vendor-react'
+          return 'vendor'
+        },
+      },
+    },
+  },
   test: {
     environment: 'jsdom',
     globals: true,
