@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { StandardCard, SummaryChip, type StandardCardAction } from '../../../components/StandardCard';
+import { StandardCard, type StandardCardAction } from '../../../components/StandardCard';
 import { BatchEditGrid, type BatchColumn, type BatchChange } from '../../../components/BatchEditGrid';
 import { TickerLogo } from '../../../components/TickerLogo';
 import { QSE_TICKER_DATALIST_ID } from '../../../components/TickerDatalist';
