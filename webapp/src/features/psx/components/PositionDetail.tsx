@@ -16,7 +16,7 @@ import type { FeeCalculator } from '../../../types/workbook';
 import { getDailyPriceHistory } from '../../../lib/calc/priceHistory';
 import { applyChartTheme } from '../../../lib/chartSetup';
 import { toCSV } from '../../../lib/csv';
-import { fmt, fmtMoney, fmtPrice } from '../../../lib/format';
+import { fmt, fmtMoney, fmtPSXPrice } from '../../../lib/format';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { useSortableRows } from '../../../hooks/useSortableRows';
 import { HUES, hueStyle } from '../../../lib/statCardHues';
@@ -209,7 +209,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
     if (!val || val <= 0) return;
     if (!(await ensureSignedIn('Sign in to save price updates.'))) return;
     setMarketPrice(ticker, val);
-    toast(`${ticker} price saved: ${fmtPrice(val)}`);
+    toast(`${ticker} price saved: ${fmtPSXPrice(val)}`);
     // User-reported bug: this used to reset to '', which blanked the input
     // right after a successful save even though the price WAS saved
     // correctly (every other stat on the page reflected it) — reads as
@@ -233,22 +233,22 @@ export function PositionDetail({ ticker }: { ticker: string }) {
             <div className="grid-auto" style={gridAutoStyle(140, 8)} >
               <div className="stat-card card" style={hueStyle(HUES[2])}>
                 <div className="label">Trend</div>
-                <div className="value"><Sparkline data={sparkData} formatValue={fmtPrice} /></div>
+                <div className="value"><Sparkline data={sparkData} formatValue={fmtPSXPrice} /></div>
               </div>
               <div className="stat-card card" style={hueStyle(HUES[0])}><div className="label">Shares</div><div className="value shares-box">{fmt(shares, 0)}</div></div>
               <div className="stat-card card" style={hueStyle(HUES[1])}>
                 <Tooltip text="Cost: what you paid per share on average. BE (break-even): the price you'd need to sell at to get your money back, including fees.">
                   <div className="label clickable">Cost</div>
                 </Tooltip>
-                <div className="value">{fmtPrice(avg)}</div>
-                <div className="sub" style={{ color: mp > 0 ? (mp >= be ? 'var(--profit)' : 'var(--loss)') : undefined }}>BE {fmtPrice(be)}</div>
+                <div className="value">{fmtPSXPrice(avg)}</div>
+                <div className="sub" style={{ color: mp > 0 ? (mp >= be ? 'var(--profit)' : 'var(--loss)') : undefined }}>BE {fmtPSXPrice(be)}</div>
               </div>
               <div className="stat-card card" style={hueStyle(HUES[1])}>
                 <Tooltip text="PSX nets commission when you buy and sell the same ticker on the same day — the smaller-quantity leg (ties go to the buy) pays no commission or SST, only government levies. 'Same-day' assumes this sell nets against a same-day buy; 'Other day' assumes the full commission applies, same as a regular trade.">
                   <div className="label clickable">BE: same-day vs. other day</div>
                 </Tooltip>
-                <div className="value fs-14">{fmtPrice(beSameDay)}</div>
-                <div className="sub">same-day · other day {fmtPrice(be)}</div>
+                <div className="value fs-14">{fmtPSXPrice(beSameDay)}</div>
+                <div className="sub">same-day · other day {fmtPSXPrice(be)}</div>
               </div>
               <div className="stat-card card" style={hueStyle(HUES[3])}><div className="label">Invested</div><div className="value">{fmtMoney(invested, currency)}</div></div>
               <div className="stat-card card" style={hueStyle(HUES[4])}>
@@ -274,7 +274,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
               <div className="stat-card card" style={hueStyle(HUES[6])}>
                 <div className="label">Exit targets</div>
                 <div className="value" style={{ fontSize: 13 }}>
-                  +1% {fmtPrice(exitTarget(1))}<br />+2% {fmtPrice(exitTarget(2))}<br />+5% {fmtPrice(exitTarget(5))}
+                  +1% {fmtPSXPrice(exitTarget(1))}<br />+2% {fmtPSXPrice(exitTarget(2))}<br />+5% {fmtPSXPrice(exitTarget(5))}
                 </div>
               </div>
               <div className="stat-card card" style={hueStyle(statusHue || HUES[7])}>
@@ -297,9 +297,9 @@ export function PositionDetail({ ticker }: { ticker: string }) {
                 <div className="stat-card card" style={hueStyle(HUES[7])}>
                   <div className="label">Sell price</div>
                   <Tooltip text="Weighted average, and most recent, sell price for this ticker.">
-                    <div className="value">{fmtPrice(avgSellPrice)}</div>
+                    <div className="value">{fmtPSXPrice(avgSellPrice)}</div>
                   </Tooltip>
-                  <div className="sub">avg · last {fmtPrice(lastSellPrice)}</div>
+                  <div className="sub">avg · last {fmtPSXPrice(lastSellPrice)}</div>
                 </div>
               )}
               <div className="stat-card card" style={hueStyle(position.realized >= 0 ? 'var(--profit)' : 'var(--loss)')}>
@@ -327,9 +327,9 @@ export function PositionDetail({ ticker }: { ticker: string }) {
                   {sortedLots.map((lot, i) => (
                     <tr key={i}>
                       <td>{lot.buyDate}</td>
-                      <td>{fmtPrice(lot.buyPrice)}</td>
+                      <td>{fmtPSXPrice(lot.buyPrice)}</td>
                       <td><span className="shares-box">{fmt(lot.remainingShares, 0)}</span></td>
-                      <td>{fmtPrice(lot.buyPrice + lot.buyFeeTotal / lot.originalShares)}</td>
+                      <td>{fmtPSXPrice(lot.buyPrice + lot.buyFeeTotal / lot.originalShares)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -354,7 +354,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
                   {reportOpenLots.map((l, i) => (
                     <tr key={i}>
                       <td>{l.buyDate}</td>
-                      <td>{fmtPrice(l.buyPrice)}</td>
+                      <td>{fmtPSXPrice(l.buyPrice)}</td>
                       <td><span className="shares-box">{fmt(l.remainingShares, 0)}</span></td>
                       <td>{fmtMoney(l.remainingShares * l.buyPrice, currency)}</td>
                       <td>{fmtMoney(l.buyFeeTotal, currency)}</td>
@@ -450,14 +450,14 @@ export function PositionDetail({ ticker }: { ticker: string }) {
         {stats && (
           <CollapsibleCard title={<h4 className="m-0">Price range</h4>}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 8 }}>
-              <div className="stat-card card" style={hueStyle(HUES[5])}><div className="label">Lowest</div><div className="value">{fmtPrice(stats.min)}</div><div className="sub">{stats.minDate}</div></div>
+              <div className="stat-card card" style={hueStyle(HUES[5])}><div className="label">Lowest</div><div className="value">{fmtPSXPrice(stats.min)}</div><div className="sub">{stats.minDate}</div></div>
               <div className="stat-card card" style={hueStyle(HUES[1])}>
                 <div className="label">Median (fair value)</div>
                 <Tooltip text="A simple fair-value estimate: the middle price across every update you've recorded for this ticker.">
-                  <div className="value">{fmtPrice(stats.median)}</div>
+                  <div className="value">{fmtPSXPrice(stats.median)}</div>
                 </Tooltip>
               </div>
-              <div className="stat-card card" style={hueStyle(HUES[2])}><div className="label">Highest</div><div className="value">{fmtPrice(stats.max)}</div><div className="sub">{stats.maxDate}</div></div>
+              <div className="stat-card card" style={hueStyle(HUES[2])}><div className="label">Highest</div><div className="value">{fmtPSXPrice(stats.max)}</div><div className="sub">{stats.maxDate}</div></div>
             </div>
             <details>
               <summary className="text-muted clickable">
@@ -489,7 +489,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
                       ) : (
                         <tr key={rawIndex}>
                           <td>{p.time ? new Date(p.time).toLocaleString() : p.date}</td>
-                          <td>{fmtPrice(p.price)}</td>
+                          <td>{fmtPSXPrice(p.price)}</td>
                           <td>
                             <IconButton label="Edit" icon={<EditIcon size={12} />} onClick={() => startEditPrice(rawIndex, p)} />
                             <IconButton label="Delete" icon={<TrashIcon size={12} />} onClick={() => removePricePoint(rawIndex)} />
@@ -537,10 +537,10 @@ export function PositionDetail({ ticker }: { ticker: string }) {
                     const be = breakEvenPrice(costBasis, t.shares, workbook.settings.feePct, workbook.settings.tick, calcFee);
                     return (
                       <tr key={i}>
-                        <td>{t.buyDate}<br /><span className="text-muted">{fmtPrice(t.buyPrice)} · {fmtMoney(totalBuy, currency)}</span><br /><span className="text-muted">fee {fmtMoney(t.buyFee, currency)}</span></td>
-                        <td>{t.sellDate}<br /><span className="text-muted">{fmtPrice(t.sellPrice)} · {fmtMoney(totalSale, currency)}</span><br /><span className="text-muted">fee {fmtMoney(t.sellFee, currency)}</span></td>
+                        <td>{t.buyDate}<br /><span className="text-muted">{fmtPSXPrice(t.buyPrice)} · {fmtMoney(totalBuy, currency)}</span><br /><span className="text-muted">fee {fmtMoney(t.buyFee, currency)}</span></td>
+                        <td>{t.sellDate}<br /><span className="text-muted">{fmtPSXPrice(t.sellPrice)} · {fmtMoney(totalSale, currency)}</span><br /><span className="text-muted">fee {fmtMoney(t.sellFee, currency)}</span></td>
                         <td><span className="shares-box">{fmt(t.shares, 0)}</span></td>
-                        <td>{fmtPrice(be)}</td>
+                        <td>{fmtPSXPrice(be)}</td>
                         <td className={t.netPL >= 0 ? 'text-profit' : 'text-loss'}>
                           {fmtMoney(t.netPL, currency)}
                           <br /><span className="text-muted">{fmtMoney(t.netPL / t.shares, currency)}/sh</span>
