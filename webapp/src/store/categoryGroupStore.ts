@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { scheduleLocalStorageWrite } from '../lib/localStoragePersistence';
 import { toast } from '../components/Toast';
 import { createEmptyCategoryGroupsWorkbook } from './defaultCategoryGroupsWorkbook';
 import type { CategoryGroup, CategoryGroupsWorkbook } from '../types/finance';
@@ -41,11 +42,9 @@ function loadFromLocalStorage(): CategoryGroupsWorkbook {
 }
 
 function persist(workbook: CategoryGroupsWorkbook) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(workbook));
-  } catch (e) {
+  scheduleLocalStorageWrite(STORAGE_KEY, workbook, (e) => {
     console.error('Failed to save category groups to localStorage — your last change may not have persisted.', e);
-  }
+  });
 }
 
 /** User-configurable named buckets over the Category registry (README

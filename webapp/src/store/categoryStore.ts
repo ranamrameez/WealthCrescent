@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { scheduleLocalStorageWrite } from '../lib/localStoragePersistence';
 import { toast } from '../components/Toast';
 import { createEmptyCategoriesWorkbook } from './defaultCategoriesWorkbook';
 import { DEFAULT_CATEGORIES, DEFAULT_CATEGORY_IDS } from '../lib/categories';
@@ -51,11 +52,9 @@ function loadFromLocalStorage(): CategoriesWorkbook {
 }
 
 function persist(workbook: CategoriesWorkbook) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(workbook));
-  } catch (e) {
+  scheduleLocalStorageWrite(STORAGE_KEY, workbook, (e) => {
     console.error('Failed to save categories to localStorage — your last change may not have persisted.', e);
-  }
+  });
 }
 
 /** The shared Category registry every Finance-based record (Cash/Bank/
