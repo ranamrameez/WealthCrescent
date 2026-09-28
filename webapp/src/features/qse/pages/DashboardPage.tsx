@@ -14,7 +14,7 @@ import { pendingShareDeltaByTicker } from '../../../lib/calc/positions';
 import { perShareCommission } from '../../../lib/calc/partialTradeStrategy';
 import { dimColor, dlBarV, dlDoughnut, dlLine, profitColor } from '../../../lib/chartLabels';
 import { applyChartTheme } from '../../../lib/chartSetup';
-import { fmt, fmtMoney, fmtQSEPrice, qsePriceStep } from '../../../lib/format';
+import { fmt, fmtMoney, fmtQSEPrice } from '../../../lib/format';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { shortenCompanyName } from '../../../lib/shortenName';
 import { useWorkbookStore } from '../../../store/workbookStore';
