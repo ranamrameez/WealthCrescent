@@ -671,7 +671,15 @@ export function NetWorthPage({
           )}
         </CollapsibleCard>
         )}
-      </div> }]} />
+      </div> }, {
+        key: 'plans',
+        label: 'Plans',
+        content: <NetWorthPlanningReality activities={activities} selectedModules={selectedModules} currencies={ownCurrencies} currentRows={rows} emiLoans={emiLoans} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} />,
+      }, {
+        key: 'analytics',
+        label: 'Analytics',
+        content: <NetWorthAnalyticsSection ownCurrencies={ownCurrencies} activities={activities} categories={categories} groups={categoryGroups} emiLoans={emiLoans} currentRows={rows} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} setDrilldown={setDrilldown} splitData={splitData} preferredCurrency={preferredCurrency} rentalsNet={rentalsNet} />,
+      }]} />
 
       {/* User-requested (2026-08-26): subscription renewal/expiry alerts on
           the "homepage" — a compact list, not the full per-subscription
@@ -862,56 +870,8 @@ export function NetWorthPage({
       {/* User-requested (2026-09-04): the Net Worth 2-in-1 interactive
           chart + Budget Planner's Monthly summary widget, moved here in
           full — see `NetWorthMonthlySection` below. */}
-      <NetWorthMonthlySection
-        ownCurrencies={ownCurrencies}
-        activities={activities}
-        emiLoans={emiLoans}
-        currentRows={rows}
-        netWorthAsOfInputs={netWorthAsOfInputs}
-        todayISODate={todayISO}
-        setDrilldown={setDrilldown}
-      />
-
-      <CategoryGroupsSection
-        ownCurrencies={ownCurrencies}
-        activities={activities}
-        categories={categories}
-        groups={categoryGroups}
-        nowMonth={currentMonthOf()}
-        setDrilldown={setDrilldown}
-      />
-
       {/* Item 4: "add charts to view capital split per currency" —
           supplementary content, not part of the requested reordering. */}
-      {splitData.length > 1 && (
-        <ChartCard title={`Capital split by currency (converted to ${preferredCurrency})`} empty={false}>
-          <div style={{ height: 220 }}>
-            <Doughnut
-              data={{
-                labels: splitData.map((d) => d.currency),
-                datasets: [{ data: splitData.map((d) => d.converted), backgroundColor: HUES }],
-              }}
-              options={{ plugins: { datalabels: dlDoughnut((v) => fmtMoney(v, preferredCurrency)) } }}
-            />
-          </div>
-        </ChartCard>
-      )}
-
-      {Object.keys(rentalsNet).length > 0 && (
-        <Card className="mt-12">
-          <div className="label mb-sm">Rental net income (informational — not included above)</div>
-          <div className="text-muted mb-sm">
-            Property values aren't tracked in this app, and rental income already lands in whichever Cash/Bank
-            account it was deposited to — counting it again here would double-count it.
-          </div>
-          <div className="row" style={{ gap: 12 }}>
-            {Object.entries(rentalsNet).map(([code, amount]) => (
-              <div key={code} className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">{code}</div><MoneyValue n={amount} currency={code} /></div>
-            ))}
-          </div>
-        </Card>
-      )}
-
       {firebaseReady && cloudEmpty && (
         <Notice tone="warning" className="mt-12">
           <p className="mt-0">No net worth snapshots found in the cloud for this account. This won't upload automatically.</p>
@@ -937,6 +897,70 @@ export function NetWorthPage({
       {drilldown && <NetWorthDrilldownModal drilldown={drilldown} onClose={() => setDrilldown(null)} />}
     </div>
   );
+}
+
+function NetWorthAnalyticsSection({ ownCurrencies, activities, categories, groups, emiLoans, currentRows, netWorthAsOfInputs, todayISODate, setDrilldown, splitData, preferredCurrency, rentalsNet }: {
+  ownCurrencies: string[]; activities: BudgetActivity[]; categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories'];
+  groups: ReturnType<typeof useCategoryGroupStore.getState>['workbook']['groups']; emiLoans: Parameters<typeof projectedNetWorthTrend>[0]['emiLoans'];
+  currentRows: CurrencyNetWorth[]; netWorthAsOfInputs: NetWorthAsOfInputs; todayISODate: string; setDrilldown: (d: Drilldown) => void;
+  splitData: Array<{ currency: string; converted: number }>; preferredCurrency: string; rentalsNet: Record<string, number>;
+}) {
+  return <div>
+    <NetWorthMonthlySection ownCurrencies={ownCurrencies} activities={activities} emiLoans={emiLoans} currentRows={currentRows} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISODate} setDrilldown={setDrilldown} />
+    <CategoryGroupsSection ownCurrencies={ownCurrencies} activities={activities} categories={categories} groups={groups} nowMonth={currentMonthOf()} setDrilldown={setDrilldown} />
+    {splitData.length > 1 && <ChartCard title={`Capital split by currency (converted to ${preferredCurrency})`} empty={false}><div style={{ height: 220 }}><Doughnut data={{ labels: splitData.map((item) => item.currency), datasets: [{ data: splitData.map((item) => item.converted), backgroundColor: HUES }] }} options={{ plugins: { datalabels: dlDoughnut((value) => fmtMoney(value, preferredCurrency)) } }} /></div></ChartCard>}
+    {Object.keys(rentalsNet).length > 0 && <Card className="mt-12"><div className="label mb-sm">Rental net income (informational — not included above)</div><div className="text-muted mb-sm">Property values aren't tracked, and deposited rental income already lands in Cash/Bank; counting it again would double-count it.</div><div className="row" style={{ gap: 12 }}>{Object.entries(rentalsNet).map(([code, amount]) => <div key={code} className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">{code}</div><MoneyValue n={amount} currency={code} /></div>)}</div></Card>}
+  </div>;
+}
+
+function NetWorthPlanningReality({ activities, selectedModules, currencies, currentRows, emiLoans, netWorthAsOfInputs, todayISODate }: {
+  activities: BudgetActivity[]; selectedModules: string[]; currencies: string[]; currentRows: CurrencyNetWorth[];
+  emiLoans: Parameters<typeof projectedNetWorthTrend>[0]['emiLoans']; netWorthAsOfInputs: NetWorthAsOfInputs; todayISODate: string;
+}) {
+  const [horizonDays, setHorizonDays] = useState<30 | 90 | 365>(90);
+  const endDate = useMemo(() => {
+    const date = new Date(`${todayISODate}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + horizonDays);
+    return date.toISOString().slice(0, 10);
+  }, [todayISODate, horizonDays]);
+  const scopedActivities = useMemo(() => activities.filter((activity) => selectedModules.includes(activity.module)), [activities, selectedModules]);
+  const planned = useMemo(() => scopedActivities.filter((activity) => !activity.executed && activity.date >= todayISODate && activity.date <= endDate), [scopedActivities, todayISODate, endDate]);
+  const projectionMonths = useMemo(() => monthRange(0, Math.max(0, monthsBetween(currentMonthOf(), endDate.slice(0, 7)))), [endDate]);
+  const projection = useMemo(() => projectedNetWorthTrend({
+    months: projectionMonths, currentMonth: currentMonthOf(), todayISODate, currentRows, activities: scopedActivities,
+    emiLoans: selectedModules.includes('emi') ? emiLoans : [], netWorthAsOfInputs,
+  }).at(-1), [projectionMonths, todayISODate, currentRows, scopedActivities, selectedModules, emiLoans, netWorthAsOfInputs]);
+
+  return <div>
+    <div className="filter-preset-row mb-md">
+      {([30, 90, 365] as const).map((days) => <button key={days} type="button" className={`chip${horizonDays === days ? ' active' : ''}`} onClick={() => setHorizonDays(days)}>{days === 365 ? '1 year' : `${days} days`}</button>)}
+      <span className="text-muted">Through {endDate}</span>
+    </div>
+    <div className="grid-auto" style={{ ...gridAutoStyle(360, 12), marginBottom: 16 }}>
+      {currencies.map((currency) => {
+        const current = currentRows.find((row) => row.currency === currency)?.net ?? 0;
+        const currencyPlans = planned.filter((activity) => activity.currencyCode === currency);
+        const inflow = currencyPlans.filter((activity) => activity.amount > 0).reduce((sum, activity) => sum + activity.amount, 0);
+        const outflow = currencyPlans.filter((activity) => activity.amount < 0).reduce((sum, activity) => sum + Math.abs(activity.amount), 0);
+        const projected = projection?.byCurrency[currency] ?? current;
+        const change = projected - current;
+        return <Card key={currency}>
+          <h3 className="mt-0">{currency} planning reality</h3>
+          <div className="grid-auto" style={gridAutoStyle(135, 8)}>
+            <div className="stat-card card"><div className="label">Current net worth</div><MoneyValue n={current} currency={currency} /></div>
+            <div className="stat-card card" style={hueStyle('var(--profit)')}><div className="label">Planned inflow</div><MoneyValue n={inflow} currency={currency} /></div>
+            <div className="stat-card card" style={hueStyle('var(--loss)')}><div className="label">Planned outflow</div><MoneyValue n={outflow} currency={currency} /></div>
+            <div className="stat-card card" style={hueStyle(projected >= 0 ? 'var(--profit)' : 'var(--loss)')}><div className="label">Projected net worth</div><MoneyValue n={projected} currency={currency} /><div className={change >= 0 ? 'pill-positive' : 'pill-negative'}>{change >= 0 ? '+' : ''}{fmtMoney(change, currency)} change</div></div>
+          </div>
+        </Card>;
+      })}
+    </div>
+    <div className="table-scroll"><table><thead><tr><th>Date</th><th>Source</th><th>Description</th><th>Category</th><th>Amount</th></tr></thead><tbody>
+      {planned.slice().sort((a, b) => a.date.localeCompare(b.date)).map((activity) => <tr key={`${activity.module}:${activity.id}`}><td>{activity.date}</td><td>{activity.sourceLabel}</td><td>{activity.description}</td><td>{activity.category || 'Uncategorized'}</td><td className={activity.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(activity.amount, activity.currencyCode)}</td></tr>)}
+      {!planned.length && <tr><td colSpan={5} className="text-muted">No plans fall within this horizon and source scope.</td></tr>}
+    </tbody></table></div>
+    <p className="text-muted mb-0">Projection includes EMI liability reduction without counting a linked bank installment twice.</p>
+  </div>;
 }
 
 /** A single toggleable `.chip` — the exact pattern `ChartFilterBar`'s

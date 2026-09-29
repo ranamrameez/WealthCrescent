@@ -9,6 +9,7 @@
 - Funds analytics now respects the homepage entity scope and renders each selected fund in its own section instead of restoring an unrelated local fund/currency selection.
 - EMI's module homepage now consolidates scoped installment plans, repayment ledgers, and schedule analytics alongside its existing summary/entity views. The shared top-bar entity and transaction filters drive those homepage sections, and each loan remains in its own currency-labelled space.
 - Personal Loans now applies its centralized entity/date/direction/category/source filters to homepage summary, entity cards, plans, payments, and analytics. Analytics renders every selected loan in a separate currency-labelled section rather than replacing homepage scope with a local loan dropdown.
+- Net Worth now exposes standard Summary, Plans, and Analytics sections. Plans shows 30/90-day and one-year currency-separated current net worth, planned inflow/outflow, projected net worth/change, and the contributing plan ledger; projections reuse the shared engine so EMI-linked bank installments are not double-counted.
 
 ## Findings to keep visible
 
