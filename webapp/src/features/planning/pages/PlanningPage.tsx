@@ -92,13 +92,12 @@ export function PlanningPage({
   const links = useInterEntityTransfersStore((s) => s.workbook.entries);
   const categories = useCategoryStore((s) => s.workbook.categories);
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
-  const categoryOptions = useMemo(() => [...new Set(activities.map((a) => a.category || 'Uncategorized'))].sort(), [activities]);
-  usePageTopBarRightSlot(<TopBarControls><TransactionFilterMenu value={filters} categories={categoryOptions} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls>);
-
   const activities = useMemo(
     () => collectBudgetActivities({ cashEntries, plannedCash, bankAccounts, bankTransactions, plannedBank, rentalProperties, rentalEntries, plannedRentals, categories, links }),
     [cashEntries, plannedCash, bankAccounts, bankTransactions, plannedBank, rentalProperties, rentalEntries, plannedRentals, categories, links],
   );
+  const categoryOptions = useMemo(() => [...new Set(activities.map((a) => a.category || 'Uncategorized'))].sort(), [activities]);
+  usePageTopBarRightSlot(<TopBarControls><TransactionFilterMenu value={filters} categories={categoryOptions} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls>);
 
   return (
     <div>
