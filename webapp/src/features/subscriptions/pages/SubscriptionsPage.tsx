@@ -636,7 +636,25 @@ function SubscriptionDetail({ sub, onBack }: { sub: Subscription; onBack: () => 
 
 /* ============================== Analytics ============================== */
 
-function AnalyticsTab({ selectedIds }: { selectedIds?: string[] } = {}) {
+function SubscriptionPlansOverview({ subscriptions }: { subscriptions: Subscription[] }) {
+  const dateFormat = useAppearanceStore((state) => state.appearance.dateFormat);
+  return <div className="stack-lg">{subscriptions.map((subscription) => {
+    const occurrences = generateRenewalOccurrences(subscription);
+    return <Card key={subscription.id}><h3 className="mt-0">{subscription.name} <span className="text-muted">({subscription.currencyCode})</span></h3>
+      <div className="table-scroll"><table><thead><tr><th>Date</th><th>Paying account</th><th>Amount</th></tr></thead><tbody>
+        {occurrences.map((occurrence, index) => <tr key={`${occurrence.date}:${index}`}><td>{formatDate(occurrence.date, dateFormat)}</td><td>{subscription.paidVia?.module === 'creditCard' ? 'Credit card' : subscription.paidVia?.module === 'bank' ? 'Bank' : subscription.paidVia?.module === 'cash' ? 'Cash' : 'Not linked'}</td><td>{fmtMoney(occurrence.amount, subscription.currencyCode)}</td></tr>)}
+        {!occurrences.length && <tr><td colSpan={3} className="text-muted">No upcoming occurrences.</td></tr>}
+      </tbody></table></div>
+    </Card>;
+  })}</div>;
+}
+
+function SubscriptionAlertsOverview({ subscriptions }: { subscriptions: Subscription[] }) {
+  if (!subscriptions.length) return <p className="text-muted">No subscriptions are selected.</p>;
+  return <div className="stack-lg">{subscriptions.map((subscription) => <Card key={subscription.id}><h3 className="mt-0">{subscription.name} <span className="text-muted">({subscription.currencyCode})</span></h3><AlertsSection sub={subscription} /></Card>)}</div>;
+}
+
+function AnalyticsTab({ selectedIds, currencyCode }: { selectedIds?: string[]; currencyCode?: string } = {}) {
   const subs = useSubscriptionsWorkbookStore((s) => s.workbook.entries);
   const scopedSubs = selectedIds ? subs.filter((s) => selectedIds.includes(s.id)) : subs;
   const categoryRegistry = useCategoryStore((s) => s.workbook.categories);
@@ -645,11 +663,11 @@ function AnalyticsTab({ selectedIds }: { selectedIds?: string[] } = {}) {
 
   const currencies = useMemo(() => [...new Set(scopedSubs.map((s) => s.currencyCode))].sort(), [scopedSubs]);
   const [currency, setCurrency] = useState(currencies[0] ?? 'USD');
-  const effectiveCurrency = currencies.includes(currency) ? currency : (currencies[0] ?? currency);
+  const effectiveCurrency = currencyCode ?? (currencies.includes(currency) ? currency : (currencies[0] ?? currency));
 
   const byCategory = useMemo(() => spendByCategory(scopedSubs, effectiveCurrency, categoryRegistry), [scopedSubs, effectiveCurrency, categoryRegistry]);
   const categories = Object.keys(byCategory);
-  const renewals = useMemo(() => upcomingRenewals(scopedSubs, 30), [scopedSubs]);
+  const renewals = useMemo(() => upcomingRenewals(scopedSubs.filter((subscription) => subscription.currencyCode === effectiveCurrency), 30), [scopedSubs, effectiveCurrency]);
 
   const accounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
   const cards = useCreditCardWorkbookStore((s) => s.workbook.cards);
@@ -666,7 +684,7 @@ function AnalyticsTab({ selectedIds }: { selectedIds?: string[] } = {}) {
       out[label] = (out[label] || 0) + monthlyEquivalent(s);
     });
     return out;
-  }, [subs, effectiveCurrency, accounts, cards]);
+  }, [scopedSubs, effectiveCurrency, accounts, cards]);
   const accountLabels = Object.keys(byAccount);
 
   if (!subs.length) {
@@ -675,7 +693,7 @@ function AnalyticsTab({ selectedIds }: { selectedIds?: string[] } = {}) {
 
   return (
     <div>
-      {currencies.length > 1 && (
+      {!currencyCode && currencies.length > 1 && (
         <Field label="Currency" width={120}>
           <Select value={effectiveCurrency} onChange={(e) => setCurrency(e.target.value)}>
             {currencies.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -816,6 +834,8 @@ export function SubscriptionsPage({
   const liveSelected = selected ? subs.find((s) => s.id === selected.id) ?? null : null;
   const [params] = useSearchParams();
   const selectedIds = selectedEntityValues(params, subs.map((s) => s.id));
+  const selectedSubscriptions = useMemo(() => subs.filter((subscription) => selectedIds.includes(subscription.id)), [subs, selectedIds]);
+  const selectedCurrencies = useMemo(() => [...new Set(selectedSubscriptions.map((subscription) => subscription.currencyCode))].sort(), [selectedSubscriptions]);
   usePageTopBarRightSlot(!liveSelected && subs.length ? <TopBarControls><EntityScopeMenu label="Subscriptions" options={subs.map((s) => ({ value: s.id, label: s.name }))} /></TopBarControls> : null);
 
   return (
@@ -841,7 +861,9 @@ export function SubscriptionsPage({
                 </div>
               ),
             },
-            { key: 'analytics', label: 'Analytics', content: <AnalyticsTab selectedIds={selectedIds} /> },
+            { key: 'plans', label: 'Plans', content: <SubscriptionPlansOverview subscriptions={selectedSubscriptions} /> },
+            { key: 'alerts', label: 'Alerts', content: <SubscriptionAlertsOverview subscriptions={selectedSubscriptions} /> },
+            { key: 'analytics', label: 'Analytics', content: <div className="stack-lg">{selectedCurrencies.map((currency) => <Card key={currency}><h3 className="mt-0">{currency}</h3><AnalyticsTab selectedIds={selectedIds} currencyCode={currency} /></Card>)}</div> },
             {
               key: 'settings',
               label: 'Settings',
