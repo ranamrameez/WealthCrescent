@@ -3,8 +3,10 @@ import type { User } from 'firebase/auth';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { EntityScopeMenu, selectedEntityValues } from '../../../components/EntityScopeMenu';
+import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu';
 import { TopBarControls } from '../../../components/TopBarControls';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
+import { useUrlTransactionFilters, type TransactionPageFilters } from '../../../hooks/useUrlTransactionFilters';
 import { Bar, Line } from 'react-chartjs-2';
 import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
 import { ModuleDetailTemplate } from '../../../components/ModuleDetailTemplate';
@@ -1082,6 +1084,63 @@ function RepaymentLog({ loan, repayments }: { loan: EMILoan; repayments: EMIRepa
   );
 }
 
+function HomepagePlans({ loans, filters }: { loans: EMILoan[]; filters: TransactionPageFilters }) {
+  const repayments = useEMIWorkbookStore((state) => state.workbook.repayments);
+  if (filters.direction === 'in' || filters.source === 'statement-import') return <p className="text-muted">No planned installments match the page filters.</p>;
+  return <div className="stack-lg">{loans.map((loan) => {
+    const loanRepayments = repayments.filter((repayment) => repayment.loanId === loan.id);
+    const summary = emiSummary(loan);
+    const rows = summary.rows.slice(summary.elapsed).filter((row) => {
+      const dueDate = resolvedDueDate(loan, row.month, loanRepayments);
+      return (!filters.fromDate || dueDate >= filters.fromDate) && (!filters.toDate || dueDate <= filters.toDate);
+    });
+    return <Card key={loan.id}>
+      <h3 className="mt-0">{loan.name} <span className="text-muted">({loan.currencyCode})</span></h3>
+      <div className="table-scroll"><table><thead><tr><th>Month</th><th>Due date</th><th>Installment</th><th>Balance</th></tr></thead><tbody>
+        {rows.map((row) => <tr key={row.month}><td>#{row.month}</td><td>{resolvedDueDate(loan, row.month, loanRepayments)}</td><td>{fmtMoney(row.emi, loan.currencyCode)}</td><td>{fmtMoney(row.balance, loan.currencyCode)}</td></tr>)}
+        {!rows.length && <tr><td colSpan={4} className="text-muted">No installments match the page filters.</td></tr>}
+      </tbody></table></div>
+    </Card>;
+  })}</div>;
+}
+
+function HomepagePayments({ loans, filters }: { loans: EMILoan[]; filters: TransactionPageFilters }) {
+  const repayments = useEMIWorkbookStore((state) => state.workbook.repayments);
+  if (filters.direction === 'in') return <p className="text-muted">No repayments match the page filters.</p>;
+  return <div className="stack-lg">{loans.map((loan) => {
+    const rows = repayments.filter((repayment) => repayment.loanId === loan.id
+      && (!filters.fromDate || repayment.date >= filters.fromDate)
+      && (!filters.toDate || repayment.date <= filters.toDate)
+      && (filters.source === 'all' || (repayment.source ?? 'manual') === filters.source));
+    return <Card key={loan.id}><h3 className="mt-0">{loan.name} <span className="text-muted">({loan.currencyCode})</span></h3>
+      {rows.length ? <RepaymentLog loan={loan} repayments={rows} /> : <p className="text-muted">No repayments match the page filters.</p>}
+    </Card>;
+  })}</div>;
+}
+
+function HomepageAnalytics({ loans, filters }: { loans: EMILoan[]; filters: TransactionPageFilters }) {
+  useAppearanceStore((state) => state.appearance);
+  const allRepayments = useEMIWorkbookStore((state) => state.workbook.repayments);
+  applyChartTheme();
+  if (filters.direction === 'in' || filters.source === 'statement-import') return <p className="text-muted">No schedule analytics match the page filters.</p>;
+  return <div className="stack-lg">{loans.map((loan) => {
+    const repayments = allRepayments.filter((repayment) => repayment.loanId === loan.id);
+    const rows = emiSchedule(loan).rows.filter((row) => {
+      const dueDate = resolvedDueDate(loan, row.month, repayments);
+      return (!filters.fromDate || dueDate >= filters.fromDate) && (!filters.toDate || dueDate <= filters.toDate);
+    });
+    return <Card key={loan.id}><h3 className="mt-0">{loan.name} <span className="text-muted">({loan.currencyCode})</span></h3>
+      <div className="grid-auto" style={gridAutoStyle(320, 16)}>
+        <div style={{ height: 260 }}><Bar data={{ labels: rows.map((row) => `#${row.month}`), datasets: [
+          { label: 'Principal', data: rows.map((row) => row.principalComp), backgroundColor: withAlpha(cssVar('--profit'), '#3ecf8e'), stack: 'payment' },
+          { label: loan.repaymentMode === 'fixedTotal' ? 'Markup' : 'Interest', data: rows.map((row) => row.interest), backgroundColor: withAlpha(cssVar('--loss'), '#e5484d'), stack: 'payment' },
+        ] }} options={{ maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } }, plugins: { datalabels: dlBarV((value) => fmtMoney(value, loan.currencyCode)) } }} /></div>
+        <div style={{ height: 260 }}><Line data={{ labels: rows.map((row) => resolvedDueDate(loan, row.month, repayments)), datasets: [{ label: 'Balance', data: rows.map((row) => row.balance), borderColor: cssVar('--accent') || '#5aa9c9', backgroundColor: `${cssVar('--accent') || '#5aa9c9'}33`, fill: true, tension: 0.2 }] }} options={{ maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: dlLine((value) => fmtMoney(value, loan.currencyCode)) } }} /></div>
+      </div>
+    </Card>;
+  })}</div>;
+}
+
 /** Overall stats across every loan, shown on the landing view before any
  * loan is opened — user feedback: every module needs an at-a-glance
  * accumulative summary, not just per-loan detail. */
@@ -1248,7 +1307,12 @@ export function EMIPage({
   const liveSelected = selected ? loans.find((l) => l.id === selected.id) ?? null : null;
   const [params] = useSearchParams();
   const selectedIds = selectedEntityValues(params, loans.map((loan) => loan.id));
-  usePageTopBarRightSlot(!liveSelected && loans.length ? <TopBarControls><EntityScopeMenu label="EMI loans" options={loans.map((loan) => ({ value: loan.id, label: loan.name }))} /></TopBarControls> : null);
+  const selectedLoans = useMemo(() => loans.filter((loan) => selectedIds.includes(loan.id)), [loans, selectedIds]);
+  const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
+  usePageTopBarRightSlot(!liveSelected && loans.length ? <TopBarControls>
+    <EntityScopeMenu label="EMI loans" options={loans.map((loan) => ({ value: loan.id, label: loan.name }))} />
+    <TransactionFilterMenu value={filters} categories={[]} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} />
+  </TopBarControls> : null);
 
   const openLoan = (loan: EMILoan) => { setEditOnOpen(false); setSelected(loan); };
   const editLoan = (loan: EMILoan) => { setEditOnOpen(true); setSelected(loan); };
@@ -1273,6 +1337,9 @@ export function EMIPage({
           <StandardPageSections sections={[
             { key: 'summary', label: 'Summary', content: <OverallSummary selectedIds={selectedIds} /> },
             { key: 'loans', label: 'Loans', content: <LoanList onSelect={openLoan} onEdit={editLoan} selectedIds={selectedIds} /> },
+            { key: 'plans', label: 'Plans', content: <HomepagePlans loans={selectedLoans} filters={filters} /> },
+            { key: 'payments', label: 'Payments', content: <HomepagePayments loans={selectedLoans} filters={filters} /> },
+            { key: 'analytics', label: 'Analytics', content: <HomepageAnalytics loans={selectedLoans} filters={filters} /> },
             { key: 'settings', label: 'Settings', content: <AccountSection cloudEmpty={cloudEmpty} uploadLocalToCloud={uploadLocalToCloud} /> },
           ]} />
           <AddLoanFab
