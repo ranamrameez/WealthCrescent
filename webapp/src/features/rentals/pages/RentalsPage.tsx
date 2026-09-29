@@ -4,8 +4,10 @@ import type { PlannedRentalEntry } from '../../../types/plannedRentals';
 import { useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { EntityScopeMenu, selectedEntityValues } from '../../../components/EntityScopeMenu';
+import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu';
 import { TopBarControls } from '../../../components/TopBarControls';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
+import { useUrlTransactionFilters, type TransactionPageFilters } from '../../../hooks/useUrlTransactionFilters';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
 import { Notice } from '../../../components/Notice';
@@ -56,19 +58,32 @@ import { ChartCard } from '../../qse/components/ChartCard';
 import { gridAutoStyle } from '../../../lib/gridStyle';
 const uid = () => crypto.randomUUID();
 
+function filterRentalEntries(entries: RentalEntry[], filters: TransactionPageFilters, categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories']) {
+  return entries.filter((entry) => {
+    if (filters.fromDate && entry.date < filters.fromDate) return false;
+    if (filters.toDate && entry.date > filters.toDate) return false;
+    if (filters.direction === 'in' && !entry.isDeposit) return false;
+    if (filters.direction === 'out' && entry.isDeposit) return false;
+    if (filters.category !== 'all' && categoryName(entry.categoryID, categories) !== filters.category) return false;
+    if (filters.source !== 'all' && (entry.source ?? 'manual') !== filters.source) return false;
+    return true;
+  });
+}
+
 function emptyProperty(defaultCurrency: string): Property {
   return { id: '', name: '', currencyCode: defaultCurrency, purchasePrice: undefined };
 }
 
 /* ============================== Properties ============================== */
 
-function NetIncomeSummary({ selectedIds }: { selectedIds?: string[] } = {}) {
+function NetIncomeSummary({ selectedIds, entries: suppliedEntries }: { selectedIds?: string[]; entries?: RentalEntry[] } = {}) {
   const properties = useRentalsWorkbookStore((s) => s.workbook.settings.properties);
-  const entries = useRentalsWorkbookStore((s) => s.workbook.entries);
+  const storedEntries = useRentalsWorkbookStore((s) => s.workbook.entries);
+  const entries = suppliedEntries ?? storedEntries;
   const scopedProperties = selectedIds ? properties.filter((property) => selectedIds.includes(property.id)) : properties;
   const totals = netIncomeByCurrency(scopedProperties, entries);
   const pending = netIncomePendingByCurrency(scopedProperties, entries);
-  const codes = Object.keys(totals);
+  const codes = [...new Set(scopedProperties.map((property) => property.currencyCode))].sort();
   if (!codes.length) return null;
 
   return (
@@ -634,14 +649,6 @@ function PropertiesTab({ selectedIds }: { selectedIds?: string[] } = {}) {
  * Banking's own `useAccountPicker`: hide from pickers for new activity,
  * never from a total (the property's own already-logged entries keep
  * counting toward Net Worth/summary totals unchanged either way). */
-function usePropertyPicker() {
-  const allProperties = useRentalsWorkbookStore((s) => s.workbook.settings.properties);
-  const properties = useMemo(() => allProperties.filter((p) => p.isActive !== false), [allProperties]);
-  const [propertyId, setPropertyId] = useState<string>(properties[0]?.id ?? '');
-  const property = properties.find((p) => p.id === propertyId) ?? properties[0] ?? null;
-  return { properties, property, propertyId: property?.id ?? '', setPropertyId };
-}
-
 /* ============================== Analytics ============================== */
 
 /** MODULES_PLAN.md §11's Rentals sketch: net income by property (portfolio-
@@ -649,9 +656,10 @@ function usePropertyPicker() {
  * one selected property — the latter two reuse `propertyByCategory`/
  * `propertyMonthlyRollup`, already computed for the plain tables in the
  * Entries tab (README item 23), just charted here instead. */
-function AnalyticsTab({ selectedIds }: { selectedIds?: string[] } = {}) {
+function AnalyticsTab({ selectedIds, entries: suppliedEntries }: { selectedIds?: string[]; entries?: RentalEntry[] } = {}) {
   const properties = useRentalsWorkbookStore((s) => s.workbook.settings.properties).filter((property) => !selectedIds || selectedIds.includes(property.id));
-  const entries = useRentalsWorkbookStore((s) => s.workbook.entries);
+  const storedEntries = useRentalsWorkbookStore((s) => s.workbook.entries);
+  const entries = suppliedEntries ?? storedEntries;
   useAppearanceStore((s) => s.appearance);
   applyChartTheme();
 
@@ -678,18 +686,18 @@ function AnalyticsTab({ selectedIds }: { selectedIds?: string[] } = {}) {
   return (
     <div>
       <div className="row gap-sm">
-        {currencies.length > 1 && (
+        {(!selectedIds || selectedIds.length !== 1) && currencies.length > 1 && (
           <Field label="Currency" width={120}>
             <Select value={effectiveCurrency} onChange={(e) => setCurrency(e.target.value)}>
               {currencies.map((c) => <option key={c} value={c}>{c}</option>)}
             </Select>
           </Field>
         )}
-        <Field label="Property" width={220}>
+        {(!selectedIds || selectedIds.length !== 1) && <Field label="Property" width={220}>
           <Select value={selectedProperty?.id ?? ''} onChange={(e) => setPropertyId(e.target.value)}>
             {properties.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.currencyCode})</option>)}
           </Select>
-        </Field>
+        </Field>}
       </div>
       <div className="grid-auto" style={{ ...gridAutoStyle(320, 16), marginTop: 12 }}>
         <ChartCard title="Net income by property" empty={!netByProperty.length}>
@@ -855,7 +863,7 @@ function EditEntryModal({ entry, onClose }: { entry: RentalEntry; onClose: () =>
 /** User-requested (2026-09-03): "add filters to other tables as well" —
  * extends the Type/Category filter treatment Cash's statement tables got
  * (README Done item 224) here too. */
-function EntriesList({ property, fromDate, toDate }: { property: Property; fromDate: string; toDate: string }) {
+function EntriesList({ property, filters }: { property: Property; filters: TransactionPageFilters }) {
   const [batchOpen, setBatchOpen] = useState(false);
   const dateFormat = useAppearanceStore(s => s.appearance.dateFormat);
   const allEntries = useRentalsWorkbookStore((s) => s.workbook.entries);
@@ -867,24 +875,11 @@ function EntriesList({ property, fromDate, toDate }: { property: Property; fromD
   const sideLabel = useLinkSideLabel();
   const [editingEntry, setEditingEntry] = useState<RentalEntry | null>(null);
   const [detailEntry, setDetailEntry] = useState<RentalEntry | null>(null);
-  const [typeFilter, setTypeFilter] = useState<'all' | 'in' | 'out'>('all');
-  const [categoryFilter, setCategoryFilter] = useState('all');
 
   const allPropertyEntries = useMemo(() => allEntries.filter((e) => e.propertyId === property.id), [allEntries, property.id]);
-  const categoryOptions = useMemo(
-    () => [...new Set(allPropertyEntries.map((e) => categoryName(e.categoryID, categories)))].sort(),
-    [allPropertyEntries, categories],
-  );
   const entries = useMemo(
-    () => allPropertyEntries.filter((e) => {
-      if (fromDate && e.date < fromDate) return false;
-      if (toDate && e.date > toDate) return false;
-      if (typeFilter === 'in' && !e.isDeposit) return false;
-      if (typeFilter === 'out' && e.isDeposit) return false;
-      if (categoryFilter !== 'all' && categoryName(e.categoryID, categories) !== categoryFilter) return false;
-      return true;
-    }),
-    [allPropertyEntries, typeFilter, categoryFilter, categories, fromDate, toDate],
+    () => filterRentalEntries(allPropertyEntries, filters, categories),
+    [allPropertyEntries, filters, categories],
   );
   const linkByRecordId = useMemo(() => {
     const map = new Map<string, (typeof links)[number]>();
@@ -905,25 +900,25 @@ function EntriesList({ property, fromDate, toDate }: { property: Property; fromD
     }
   };
   const { sorted, Th } = useSortableRows(entries, sortValue, 'date', 'desc');
+  const exportStatement = () => {
+    const header = ['Date', 'Type', 'Amount', 'Category', 'Note'];
+    const body = sorted.map((entry) => [entry.date, entry.isDeposit ? 'Rent income' : 'Expense', entry.isDeposit ? entry.amount : -entry.amount, categoryName(entry.categoryID, categories), entry.note ?? '']);
+    const blob = new Blob([toCSV([header, ...body])], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${property.name.replace(/\s+/g, '_')}_statement_${filters.fromDate || 'start'}_to_${filters.toDate || 'now'}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    toast('Filtered statement downloaded.');
+  };
 
   return (
     <div>
       {batchOpen && <RentalTransactionsBatchEditor property={property} rows={sorted} onClose={() => setBatchOpen(false)} />}
-      <button className="btn secondary mb-sm" disabled={!entries.length} onClick={() => setBatchOpen(true)}>Batch edit</button>
-      <div className="row gap-sm mb-sm">
-        <Field label="Type" width={130}>
-          <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}>
-            <option value="all">All</option>
-            <option value="in">Rent income</option>
-            <option value="out">Expense</option>
-          </Select>
-        </Field>
-        <Field label="Category" width={170}>
-          <Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
-            <option value="all">All categories</option>
-            {categoryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
-          </Select>
-        </Field>
+      <div className="row gap-sm mb-sm justify-end">
+        <button className="btn secondary" disabled={!entries.length} onClick={exportStatement}>Export CSV</button>
+        <button className="btn secondary" disabled={!entries.length} onClick={() => setBatchOpen(true)}>Batch edit</button>
       </div>
       <div className="table-scroll">
       <table>
@@ -1179,8 +1174,9 @@ function ImportTab() {
   );
 }
 
-function CategoryAndRollup({ property }: { property: Property }) {
-  const entries = useRentalsWorkbookStore((s) => s.workbook.entries);
+function CategoryAndRollup({ property, entries: suppliedEntries }: { property: Property; entries?: RentalEntry[] }) {
+  const storedEntries = useRentalsWorkbookStore((s) => s.workbook.entries);
+  const entries = suppliedEntries ?? storedEntries;
   const categories = useCategoryStore((s) => s.workbook.categories);
   const byCategory = propertyByCategory(property, entries, categories);
   const rollup = useMemo(() => propertyMonthlyRollup(property, entries), [property, entries]);
@@ -1229,39 +1225,28 @@ function CategoryAndRollup({ property }: { property: Property }) {
 
 function EntriesTab({
   properties,
-  property,
-  propertyId,
-  setPropertyId,
-  fromDate,
-  toDate,
+  selectedIds,
+  filters,
+  entries,
 }: {
   properties: Property[];
-  property: Property | null;
-  propertyId: string;
-  setPropertyId: (id: string) => void;
-  fromDate: string;
-  toDate: string;
+  selectedIds: string[];
+  filters: TransactionPageFilters;
+  entries: RentalEntry[];
 }) {
   if (!properties.length) {
     return <p className="text-muted">Add a property first (Properties tab) before logging income/expenses.</p>;
   }
 
-  return (
-    <div>
-      <Field label="Property" width={220}>
-        <Select value={propertyId} onChange={(e) => setPropertyId(e.target.value)}>
-          {properties.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.currencyCode})</option>)}
-        </Select>
-      </Field>
-      {property && (
-        <div className="mt-12">
-          <CategoryAndRollup property={property} />
-          <EntriesList key={property.id} property={property} fromDate={fromDate} toDate={toDate} />
-          <EntriesFab propertyId={property.id} currencyCode={property.currencyCode} />
-        </div>
-      )}
-    </div>
-  );
+  const scopedProperties = properties.filter((property) => selectedIds.includes(property.id));
+  return <div className="stack-lg">
+    {scopedProperties.map((property) => <Card key={property.id}>
+      <h3 className="mt-0">{property.name} <span className="text-muted">({property.currencyCode})</span></h3>
+      <CategoryAndRollup property={property} entries={entries} />
+      <EntriesList property={property} filters={filters} />
+      <EntriesFab propertyId={property.id} currencyCode={property.currencyCode} />
+    </Card>)}
+  </div>;
 }
 
 /* ============================== Settings ============================== */
@@ -1353,11 +1338,18 @@ export function RentalsPage({
   cloudEmpty: boolean;
   uploadLocalToCloud: () => Promise<void>;
 }) {
-  const { properties, property, propertyId, setPropertyId } = usePropertyPicker();
-  const { fromDate, setFromDate, toDate, setToDate, exportStatement, hasRows } = useEntriesExport(property);
+  const properties = useRentalsWorkbookStore((state) => state.workbook.settings.properties);
+  const entries = useRentalsWorkbookStore((state) => state.workbook.entries);
+  const categories = useCategoryStore((state) => state.workbook.categories);
   const [params] = useSearchParams();
   const selectedIds = selectedEntityValues(params, properties.map((item) => item.id));
-  usePageTopBarRightSlot(properties.length ? <TopBarControls><EntityScopeMenu label="Properties" options={properties.map((item) => ({ value: item.id, label: item.name }))} /></TopBarControls> : null);
+  const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
+  const filteredEntries = useMemo(() => filterRentalEntries(entries, filters, categories).filter((entry) => selectedIds.includes(entry.propertyId)), [entries, filters, categories, selectedIds]);
+  const filterCategories = useMemo(() => [...new Set(entries.filter((entry) => selectedIds.includes(entry.propertyId)).map((entry) => categoryName(entry.categoryID, categories)))].sort(), [entries, selectedIds, categories]);
+  usePageTopBarRightSlot(properties.length ? <TopBarControls>
+    <EntityScopeMenu label="Properties" options={properties.map((item) => ({ value: item.id, label: item.name }))} />
+    <TransactionFilterMenu value={filters} categories={filterCategories} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} />
+  </TopBarControls> : null);
 
   return (
     <div>
@@ -1367,26 +1359,15 @@ export function RentalsPage({
         management fees) against one or more properties, not discrete buy/sell trades.
       </p>
       <StandardPageSections sections={[
-          { key: 'summary', label: 'Summary', content: <NetIncomeSummary selectedIds={selectedIds} /> },
+          { key: 'summary', label: 'Summary', content: <NetIncomeSummary selectedIds={selectedIds} entries={filteredEntries} /> },
           { key: 'properties', label: 'Properties', content: <PropertiesTab selectedIds={selectedIds} /> },
           {
             key: 'entries',
             label: 'Income & expenses',
-            content: <EntriesTab properties={properties} property={property} propertyId={propertyId} setPropertyId={setPropertyId} fromDate={fromDate} toDate={toDate} />,
-            headerEnd: hasRows ? (
-              <div className="row gap-sm">
-                <Field label="From (optional)">
-                  <TextInput type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-                </Field>
-                <Field label="To (optional)">
-                  <TextInput type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-                </Field>
-                <button className="btn secondary" onClick={exportStatement}>Export CSV</button>
-              </div>
-            ) : undefined,
+            content: <EntriesTab properties={properties} selectedIds={selectedIds} filters={filters} entries={filteredEntries} />,
           },
           { key: 'import', label: 'Import', content: <ImportTab /> },
-          { key: 'analytics', label: 'Analytics', content: <AnalyticsTab selectedIds={selectedIds} /> },
+          { key: 'analytics', label: 'Analytics', content: <div className="stack-lg">{selectedIds.map((id) => <Card key={id}><AnalyticsTab selectedIds={[id]} entries={filteredEntries} /></Card>)}</div> },
           {
             key: 'settings',
             label: 'Settings',
