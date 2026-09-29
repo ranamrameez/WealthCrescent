@@ -111,7 +111,7 @@ export function PlanningPage({
       <CollapsibleCard title={<h3 className="m-0">Upcoming (next 30 days)</h3>} className="mb-md">
         <UpcomingList items={upcoming} emptyText="Nothing expected in the next 30 days." />
       </CollapsibleCard>
-      <BudgetOverview activities={activities} categories={categories} filters={filters} />
+      <BudgetOverview activities={activities} filters={filters} />
       <ActivityList activities={activities} filters={filters} />
       <CollapsibleCard title={<h3 className="m-0">Cash</h3>} className="mb-md">
         <CashPlanningTab
@@ -144,7 +144,7 @@ export function PlanningPage({
   );
 }
 
-function BudgetOverview({ activities, categories, filters }: { activities: BudgetActivity[]; categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories']; filters: ReturnType<typeof useUrlTransactionFilters>['filters'] }) {
+function BudgetOverview({ activities, filters }: { activities: BudgetActivity[]; filters: ReturnType<typeof useUrlTransactionFilters>['filters'] }) {
   const month = filters.fromDate.slice(0, 7);
   const [mode, setMode] = useState<'budget' | 'modules'>('budget');
   const monthRows = useMemo(() => activities.filter((a) => !a.executed && a.date.startsWith(month)), [activities, month]);

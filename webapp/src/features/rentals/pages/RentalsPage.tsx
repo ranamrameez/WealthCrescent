@@ -760,40 +760,16 @@ function EntriesFab({ propertyId, currencyCode }: { propertyId: string; currency
 }
 
 
-/** Pending item 58's remainder: this export button used to sit inside
- * `EntriesList`'s own content, one level below where every other module's
- * equivalent export button lives (Done item 121's `headerExtra` rollout)
- * — `Tabs` had no per-tab `headerExtra` slot to hoist it into until now.
- * Lifted out into its own hook (mirrors QSE/PSX's `useTickerExport`) so
- * `RentalsPage` can build the header control at the `Tabs` call site,
- * scoped to whichever property is currently picked. */
-function useEntriesExport(property: Property | null) {
-  const allEntries = useRentalsWorkbookStore((s) => s.workbook.entries);
-  const categories = useCategoryStore((s) => s.workbook.categories);
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
-  const entries = useMemo(() => (property ? allEntries.filter((e) => e.propertyId === property.id) : []), [allEntries, property]);
-
-  const exportStatement = () => {
-    if (!property) return;
-    const rows = entries
-      .filter((e) => (!fromDate || e.date >= fromDate) && (!toDate || e.date <= toDate))
-      .slice()
-      .sort((a, b) => a.date.localeCompare(b.date));
-    const header = ['Date', 'Type', 'Amount', 'Category', 'Note'];
-    const body = rows.map((e) => [e.date, e.isDeposit ? 'Rent income' : 'Expense', e.isDeposit ? e.amount : -e.amount, categoryName(e.categoryID, categories), e.note ?? '']);
-    const blob = new Blob([toCSV([header, ...body])], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    const suffix = fromDate || toDate ? `_${fromDate || 'start'}_to_${toDate || 'now'}` : '';
-    a.download = `${property.name.replace(/\s+/g, '_')}_statement${suffix}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast('Statement downloaded.');
-  };
-
-  return { fromDate, setFromDate, toDate, setToDate, exportStatement, hasRows: entries.length > 0 };
+/** Shared "which property am I adding to" picker for the Import tab.
+ * Only active properties are offered (closed ones are archived, matching
+ * the other "add new" pickers). Falls back to the first active property
+ * until one is chosen, or if the chosen one is closed/deleted. */
+function usePropertyPicker() {
+  const allProperties = useRentalsWorkbookStore((s) => s.workbook.settings.properties);
+  const properties = useMemo(() => allProperties.filter((p) => p.isActive !== false), [allProperties]);
+  const [pickedId, setPickedId] = useState('');
+  const property = properties.find((p) => p.id === pickedId) ?? properties[0] ?? null;
+  return { properties, property, propertyId: property?.id ?? '', setPropertyId: setPickedId };
 }
 
 /** Popup edit form for one Rentals entry — replaces the old inline

@@ -778,7 +778,7 @@ function BalanceProjectionSummary({ horizonDays, selectedCurrencies, filters }: 
     if (filters?.toDate && plan.date > filters.toDate) return false;
     if (filters?.direction === 'in' && plan.type !== 'IN') return false;
     if (filters?.direction === 'out' && plan.type !== 'OUT') return false;
-    if (filters?.category !== 'all' && (plan.category || 'Uncategorized') !== filters.category) return false;
+    if (filters && filters.category !== 'all' && (plan.category || 'Uncategorized') !== filters.category) return false;
     return true;
   }), [allPlannedEntries, selectedCurrencies, filters]);
   const settings = usePlannedCashWorkbookStore((s) => s.workbook.settings);
@@ -1048,7 +1048,7 @@ function PlanList({ horizonDays, selectedCurrencies, filters }: { horizonDays: P
       if (filters?.toDate && p.date > filters.toDate) return false;
       if (filters?.direction === 'in' && p.type !== 'IN') return false;
       if (filters?.direction === 'out' && p.type !== 'OUT') return false;
-      if (filters?.category !== 'all' && (p.category || 'Uncategorized') !== filters.category) return false;
+      if (filters && filters.category !== 'all' && (p.category || 'Uncategorized') !== filters.category) return false;
       if (!planWithinHorizon(p, asOf, horizonDays)) return false;
       return true;
     }),
