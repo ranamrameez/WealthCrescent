@@ -1664,8 +1664,9 @@ function FundsTransfersSection() {
 
 /* ============================== Analytics ============================== */
 
-function AnalyticsTab() {
-  const funds = useFundsWorkbookStore((s) => s.workbook.funds);
+function AnalyticsTab({ selectedIds }: { selectedIds?: string[] } = {}) {
+  const allFunds = useFundsWorkbookStore((s) => s.workbook.funds);
+  const funds = useMemo(() => allFunds.filter((fund) => !selectedIds || selectedIds.includes(fund.id)), [allFunds, selectedIds]);
   const { workbook } = useFundsDerived();
   const categoryRegistry = useCategoryStore((s) => s.workbook.categories);
   // Charts read CSS-var-derived colors — subscribe so this re-renders (and
@@ -1703,18 +1704,18 @@ function AnalyticsTab() {
   return (
     <div>
       <div className="row gap-sm">
-        {currencies.length > 1 && (
+        {(!selectedIds || selectedIds.length !== 1) && currencies.length > 1 && (
           <Field label="Currency" width={120}>
             <Select value={effectiveCurrency} onChange={(e) => setCurrency(e.target.value)}>
               {currencies.map((c) => <option key={c} value={c}>{c}</option>)}
             </Select>
           </Field>
         )}
-        <Field label="Fund" width={220}>
+        {(!selectedIds || selectedIds.length !== 1) && <Field label="Fund" width={220}>
           <Select value={selectedFund?.id ?? ''} onChange={(e) => setFundId(e.target.value)}>
             {funds.map((f) => <option key={f.id} value={f.id}>{f.name} ({f.code})</option>)}
           </Select>
-        </Field>
+        </Field>}
       </div>
       <div className="grid-auto" style={{ ...gridAutoStyle(320, 16), marginTop: 12 }}>
         <ChartCard title="Allocation by category" empty={!categories.length}>
@@ -1887,7 +1888,14 @@ export function FundsPage({
             },
             { key: 'transfers', label: 'Transfers', content: <FundsTransfersSection /> },
             { key: 'import', label: 'Import', content: <SnapshotImportSection /> },
-            { key: 'analytics', label: 'Analytics', content: <AnalyticsTab /> },
+            {
+              key: 'analytics',
+              label: 'Analytics',
+              content: <div className="stack-lg">{selectedIds.map((id) => {
+                const fund = funds.find((item) => item.id === id);
+                return <Card key={id}><h3 className="mt-0">{fund?.name ?? 'Fund'}</h3><AnalyticsTab selectedIds={[id]} /></Card>;
+              })}</div>,
+            },
             {
               key: 'settings',
               label: 'Settings',

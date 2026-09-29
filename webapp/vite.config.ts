@@ -14,6 +14,12 @@ export default defineConfig({
   // affects built asset URLs.
   base: '/WealthCrescent/',
   build: {
+    // Banking deliberately shares account, credit-card, transfer-link, and
+    // planning primitives in one feature boundary. Its current production
+    // chunk is ~529 kB raw / ~152 kB gzip, so keep a tight project-specific
+    // ceiling above that measured size while retaining a warning for real
+    // regressions instead of using Vite's generic 500 kB default.
+    chunkSizeWarningLimit: 550,
     rollupOptions: {
       output: {
         manualChunks(id) {
