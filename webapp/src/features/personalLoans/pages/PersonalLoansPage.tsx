@@ -11,7 +11,9 @@ import { CategorySelect } from '../../../components/CategorySelect';
 import { AnalyticsChartEnhancer } from '../../../components/AnalyticsChartCard';
 import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls';
 import { EntityScopeMenu, selectedEntityValues } from '../../../components/EntityScopeMenu';
+import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
+import { useUrlTransactionFilters, type TransactionPageFilters } from '../../../hooks/useUrlTransactionFilters';
 import { Modal } from '../../../components/Modal';
 import { LoanPaymentsBatchEditor, LoanPlansBatchEditor } from '../../../components/LazyFinanceBatchEditors';
 import { Notice } from '../../../components/Notice';
@@ -164,35 +166,37 @@ function NetPositionSummary({ selectedIds }: { selectedIds?: string[] } = {}) {
  * person, and a repayment timeline; the "payoff planner" from that same
  * sketch lives inside `LoanDetail` below instead, since it needs one
  * specific loan's outstanding balance to project from. */
-function AnalyticsTab({ filter, selectedIds }: { filter: 'all' | 'owed_to_me' | 'i_owe'; selectedIds?: string[] }) {
+function AnalyticsTab({ filter, selectedIds, filters }: { filter: 'all' | 'owed_to_me' | 'i_owe'; selectedIds?: string[]; filters?: TransactionPageFilters }) {
   const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const repayments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
   const plans = usePersonalLoansWorkbookStore((s) => s.workbook.plans ?? []);
+  const categories = useCategoryStore((s) => s.workbook.categories);
   const candidates = useMemo(
     () => loans.filter((loan) => (!selectedIds || selectedIds.includes(loan.id)) && loan.isActive !== false && (filter === 'all' || loan.direction === filter)),
     [loans, selectedIds, filter],
   );
-  const [loanId, setLoanId] = useState('');
-  const selected = candidates.find((loan) => loan.id === loanId) ?? candidates[0];
-
-  if (!selected) return <p className="text-muted">Add a matching loan first to see analytics.</p>;
+  if (!candidates.length) return <p className="text-muted">Add a matching loan first to see analytics.</p>;
 
   return (
-    <div>
-      {candidates.length > 1 && (
-        <Field label="Loan" width={220}>
-          <Select value={selected.id} onChange={(e) => setLoanId(e.target.value)}>
-            {candidates.map((loan) => <option key={loan.id} value={loan.id}>{loan.person} ({loan.currencyCode})</option>)}
-          </Select>
-        </Field>
-      )}
-      <div className="mt-sm">
+    <div className="stack-lg">
+      {candidates.map((selected) => {
+        const scopedPayments = repayments.filter((payment) => payment.loanId === selected.id
+          && (!filters?.fromDate || payment.date >= filters.fromDate)
+          && (!filters?.toDate || payment.date <= filters.toDate)
+          && (!filters || filters.source === 'all' || (payment.source ?? 'manual') === filters.source)
+          && (!filters || filters.category === 'all' || categoryName(payment.categoryID, categories) === filters.category));
+        const scopedPlans = plans.filter((plan) => plan.loanId === selected.id
+          && (!filters?.fromDate || plan.date >= filters.fromDate)
+          && (!filters?.toDate || plan.date <= filters.toDate)
+          && (!filters || filters.category === 'all' || categoryName(plan.categoryID, categories) === filters.category));
+        return <Card key={selected.id}><h3 className="mt-0">{selected.person} <span className="text-muted">({selected.currencyCode})</span></h3>
         <PersonalLoanAnalyticsSection
           loan={selected}
-          payments={repayments.filter((payment) => payment.loanId === selected.id)}
-          plans={plans.filter((plan) => plan.loanId === selected.id)}
+          payments={scopedPayments}
+          plans={scopedPlans}
         />
-      </div>
+        </Card>;
+      })}
     </div>
   );
 }
@@ -1158,17 +1162,25 @@ function LoanList({
 function PersonalLoansModulePlans({
   filter,
   onSelectLoan,
+  selectedIds,
+  filters,
 }: {
   filter: 'all' | 'owed_to_me' | 'i_owe';
   onSelectLoan: (loan: PersonalLoan) => void;
+  selectedIds: string[];
+  filters: TransactionPageFilters;
 }) {
   const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const plans = usePersonalLoansWorkbookStore((s) => s.workbook.plans ?? []);
+  const categories = useCategoryStore((s) => s.workbook.categories);
   const visibleLoans = new Map(
-    loans.filter((loan) => filter === 'all' || loan.direction === filter).map((loan) => [loan.id, loan]),
+    loans.filter((loan) => selectedIds.includes(loan.id) && (filter === 'all' || loan.direction === filter)).map((loan) => [loan.id, loan]),
   );
   const rows = plans
-    .filter((plan) => visibleLoans.has(plan.loanId))
+    .filter((plan) => visibleLoans.has(plan.loanId)
+      && (!filters.fromDate || plan.date >= filters.fromDate)
+      && (!filters.toDate || plan.date <= filters.toDate)
+      && (filters.category === 'all' || categoryName(plan.categoryID, categories) === filters.category))
     .sort((a, b) => a.date.localeCompare(b.date));
 
   return (
@@ -1198,18 +1210,26 @@ function PersonalLoansModulePlans({
 function PersonalLoansModulePayments({
   filter,
   onSelectLoan,
+  selectedIds,
+  filters,
 }: {
   filter: 'all' | 'owed_to_me' | 'i_owe';
   onSelectLoan: (loan: PersonalLoan) => void;
+  selectedIds: string[];
+  filters: TransactionPageFilters;
 }) {
   const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const payments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
   const categories = useCategoryStore((s) => s.workbook.categories);
   const visibleLoans = new Map(
-    loans.filter((loan) => filter === 'all' || loan.direction === filter).map((loan) => [loan.id, loan]),
+    loans.filter((loan) => selectedIds.includes(loan.id) && (filter === 'all' || loan.direction === filter)).map((loan) => [loan.id, loan]),
   );
   const rows = payments
-    .filter((payment) => visibleLoans.has(payment.loanId))
+    .filter((payment) => visibleLoans.has(payment.loanId)
+      && (!filters.fromDate || payment.date >= filters.fromDate)
+      && (!filters.toDate || payment.date <= filters.toDate)
+      && (filters.source === 'all' || (payment.source ?? 'manual') === filters.source)
+      && (filters.category === 'all' || categoryName(payment.categoryID, categories) === filters.category))
     .sort((a, b) => b.date.localeCompare(a.date) || (b.seq ?? 0) - (a.seq ?? 0));
 
   return (
@@ -1302,6 +1322,17 @@ export function PersonalLoansPage({
   const liveSelected = selected ? loans.find((loan) => loan.id === selected.id) ?? null : null;
   const [params] = useSearchParams();
   const selectedIds = selectedEntityValues(params, loans.map((loan) => loan.id));
+  const categories = useCategoryStore((state) => state.workbook.categories);
+  const repayments = usePersonalLoansWorkbookStore((state) => state.workbook.repayments);
+  const { filters: transactionFilters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
+  const scopedIds = useMemo(() => selectedIds.filter((id) => {
+    const loan = loans.find((item) => item.id === id);
+    if (!loan) return false;
+    if (transactionFilters.direction === 'in' && loan.direction !== 'owed_to_me') return false;
+    if (transactionFilters.direction === 'out' && loan.direction !== 'i_owe') return false;
+    return true;
+  }), [selectedIds, loans, transactionFilters.direction]);
+  const filterCategories = useMemo(() => [...new Set(repayments.filter((payment) => selectedIds.includes(payment.loanId)).map((payment) => categoryName(payment.categoryID, categories)))].sort(), [repayments, selectedIds, categories]);
   const archivedCount = useMemo(() => loans.filter((loan) => loan.isActive === false).length, [loans]);
 
   const landingTopBar = useMemo(() => liveSelected ? null : (
@@ -1317,8 +1348,9 @@ export function PersonalLoansPage({
         ]}
       />
       <EntityScopeMenu label="Loans" options={loans.map((loan) => ({ value: loan.id, label: loan.person }))} />
+      <TransactionFilterMenu value={transactionFilters} categories={filterCategories} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} />
     </TopBarControls>
-  ), [liveSelected, filter, loans]);
+  ), [liveSelected, filter, loans, transactionFilters, filterCategories, activeCount, setFilters, resetFilters]);
   usePageTopBarRightSlot(landingTopBar);
 
   if (liveSelected) {
@@ -1338,7 +1370,7 @@ export function PersonalLoansPage({
       label: 'Summary',
       defaultOpen: true,
       summary: <SummaryChip label="Loans" value={loans.length} />,
-      content: <NetPositionSummary selectedIds={selectedIds} />,
+      content: <NetPositionSummary selectedIds={scopedIds} />,
     },
     {
       key: 'loans',
@@ -1346,22 +1378,22 @@ export function PersonalLoansPage({
       defaultOpen: true,
       actions: loanActions,
       summary: <SummaryChip label="Open" value={loans.filter((loan) => loan.isActive !== false).length} />,
-      content: <LoanList onSelect={setSelected} filter={filter} showArchived={showArchived} selectedIds={selectedIds} />,
+      content: <LoanList onSelect={setSelected} filter={filter} showArchived={showArchived} selectedIds={scopedIds} />,
     },
     {
       key: 'plans',
       label: 'Plans',
-      content: <PersonalLoansModulePlans filter={filter} onSelectLoan={setSelected} />,
+      content: <PersonalLoansModulePlans filter={filter} onSelectLoan={setSelected} selectedIds={scopedIds} filters={transactionFilters} />,
     },
     {
       key: 'payments',
       label: 'Payments',
-      content: <PersonalLoansModulePayments filter={filter} onSelectLoan={setSelected} />,
+      content: <PersonalLoansModulePayments filter={filter} onSelectLoan={setSelected} selectedIds={scopedIds} filters={transactionFilters} />,
     },
     {
       key: 'analytics',
       label: 'Analytics',
-      content: <AnalyticsTab filter={filter} selectedIds={selectedIds} />,
+      content: <AnalyticsTab filter={filter} selectedIds={scopedIds} filters={transactionFilters} />,
     },
     {
       key: 'settings',
