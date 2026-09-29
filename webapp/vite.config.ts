@@ -14,18 +14,15 @@ export default defineConfig({
   // affects built asset URLs.
   base: '/WealthCrescent/',
   build: {
-    // Banking deliberately shares account, credit-card, transfer-link, and
-    // planning primitives in one feature boundary. Its current production
-    // chunk is ~529 kB raw / ~152 kB gzip, so keep a tight project-specific
-    // ceiling above that measured size while retaining a warning for real
-    // regressions instead of using Vite's generic 500 kB default.
-    chunkSizeWarningLimit: 550,
+    // Do not force source features into manual chunks: Planning, Cash,
+    // Banking, Transfers, and Account intentionally share components and
+    // stores, and manual feature boundaries can turn those cycles into a
+    // production-only temporal-dead-zone crash. Vendor libraries remain
+    // isolated below; route-level dynamic imports are the safe future path.
+    chunkSizeWarningLimit: 1900,
     rollupOptions: {
       output: {
         manualChunks(id) {
-          const normalized = id.replaceAll('\\', '/')
-          const feature = normalized.match(/\/src\/features\/([^/]+)\//)?.[1]
-          if (feature) return `feature-${feature}`
           if (!id.includes('node_modules')) return undefined
           if (id.includes('firebase')) return 'vendor-firebase'
           if (id.includes('chart.js') || id.includes('react-chartjs-2') || id.includes('chartjs-plugin-datalabels')) return 'vendor-charts'
