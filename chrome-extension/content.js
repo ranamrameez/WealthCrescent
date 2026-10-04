@@ -7,11 +7,11 @@
 
 const STORAGE_KEY = 'scrapeConfig';
 let auditRows = [];
-function captureRaw(row, ticker, price, selected = {}) {
+function captureRaw(row, ticker, price, selected = {}, priceKey = null) {
   const cells = Array.from(row.querySelectorAll('[col-id], td, th, [role="gridcell"]'));
   const source = cells.length ? cells : Array.from(row.children);
   const raw = source.map((cell, index) => ({ key: cell.getAttribute('col-id') || cell.getAttribute('data-field') || 'column_' + (index + 1), value: cell.textContent || '' }));
-  auditRows.push({ ticker, price, accepted: !!ticker && Number.isFinite(price) && price > 0 && TICKER_LIKE.test(ticker), raw, selected });
+  auditRows.push({ ticker, price, priceKey, accepted: !!ticker && Number.isFinite(price) && price > 0 && TICKER_LIKE.test(ticker), raw, selected });
 }
 
 /** A QSE ticker is 2-6 uppercase letters (occasionally digits appear on
@@ -52,11 +52,13 @@ function scrapeWithConfig(cfg) {
     const nameEl = cfg.nameSelector ? row.querySelector(cfg.nameSelector) : null;
     const ticker = cellText(tickerEl).toUpperCase();
     const price = parseNumber(cellText(priceEl));
-    captureRaw(row, ticker, price, { ticker: tickerEl?.textContent || '', price: priceEl?.textContent || '', change: changeEl?.textContent || '', name: nameEl?.textContent || '' });
+    captureRaw(row, ticker, price, { ticker: tickerEl?.textContent || '', price: priceEl?.textContent || '', change: changeEl?.textContent || '', name: nameEl?.textContent || '' }, priceEl?.getAttribute('col-id') || cfg.priceSelector);
     if (!TICKER_LIKE.test(ticker) || price === null || price <= 0) continue;
     out.push({
       ticker,
       price,
+      priceKey: auditRows[auditRows.length - 1]?.priceKey || null,
+      raw: auditRows[auditRows.length - 1]?.raw || [],
       changePct: changeEl ? parseNumber(cellText(changeEl)) : null,
       name: nameEl ? cellText(nameEl) : null,
     });
@@ -110,18 +112,20 @@ function extractRows(rows, cellsOf) {
     }
     if (!ticker || seen.has(ticker)) continue;
     let price = null;
+    let priceKey = null;
     for (let i = tickerIdx + 1; i < cells.length; i++) {
       const n = parseNumber(cellText(cells[i]));
       if (n !== null && n > 0) {
         price = n;
+        priceKey = cells[i].getAttribute('col-id') || cells[i].getAttribute('data-field') || `column_${i + 1}`;
         break;
       }
     }
-    captureRaw(row, ticker, price);
+    captureRaw(row, ticker, price, {}, priceKey);
     if (price === null) continue;
     seen.add(ticker);
     const nextText = cellText(cells[tickerIdx + 1]);
-    out.push({ ticker, price, changePct: null, name: looksLikeName(nextText) ? nextText : null });
+    out.push({ ticker, price, priceKey, raw: auditRows[auditRows.length - 1]?.raw || [], changePct: null, name: looksLikeName(nextText) ? nextText : null });
   }
   return out;
 }
@@ -207,7 +211,7 @@ function scrapeAgGrid() {
     if (!ticker || seen.has(ticker)) continue;
     const priceEl = firstMatchingCell(row, ['lastPrice', 'last', 'price', 'ltp']);
     const price = parseNumber(cellText(priceEl));
-    captureRaw(row, ticker, price, { price: priceEl?.textContent || '' });
+    captureRaw(row, ticker, price, { price: priceEl?.textContent || '' }, priceEl?.getAttribute('col-id') || null);
     if (!TICKER_LIKE.test(ticker) || price === null || price <= 0) continue;
     const nameEl = firstMatchingCell(row, ['name', 'companyName', 'securityName']);
     const changeEl = firstMatchingCell(row, ['changePercent', 'change', 'changePct']);
@@ -215,6 +219,8 @@ function scrapeAgGrid() {
     out.push({
       ticker,
       price,
+      priceKey: auditRows[auditRows.length - 1]?.priceKey || null,
+      raw: auditRows[auditRows.length - 1]?.raw || [],
       changePct: changeEl ? parseNumber(cellText(changeEl)) : null,
       name: nameEl ? cellText(nameEl) : null,
     });
@@ -281,8 +287,6 @@ async function scrapePrices(overrideConfig) {
       // storage unavailable for some reason — fall through to heuristic
     }
   }
-  const configured = scrapeWithConfig(cfg);
-  if (configured) return { rows: configured, strategy: 'configured', auditRows };
   const heuristic = scrapeHeuristic();
   return { rows: heuristic, strategy: 'heuristic', auditRows };
 }

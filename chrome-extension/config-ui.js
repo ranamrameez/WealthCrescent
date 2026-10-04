@@ -8,8 +8,8 @@ export async function mountConfig(container) {
     <p class="muted">Push intervals vary between 1× and 2× this minimum. Collection runs every 45–90 seconds.</p>
     </section><section class="config-section"><h3>Scraping windows (Qatar time)</h3><div class="windows"></div><button type="button" class="add-window secondary">Add time pair</button>
     <p class="muted">Automatic scraping runs within these windows. End times are exclusive; overnight pairs are supported. Manual scrape and push work outside these windows.</p>
-    </section></div><section class="config-section"><h3>Market page and selectors</h3><div class="config-grid">${Object.keys(scrape).map(key => `<label>${({ targetUrl: 'Market-watch URL', rowSelector: 'Row selector', tickerSelector: 'Ticker selector', priceSelector: 'Price selector', changeSelector: 'Change % selector', nameSelector: 'Company name selector' })[key]}<input name="${key}" type="text" ${key === 'targetUrl' ? 'required' : ''}></label>`).join('')}</div>
-    <p class="muted">Leave selectors blank for auto-detection. Selectors are relative to each row.</p>
+    </section></div><section class="config-section"><h3>Market page</h3><div class="config-grid">${Object.keys(scrape).map(key => `<label>${({ targetUrl: 'Market-watch URL', rowSelector: 'Row selector', tickerSelector: 'Ticker selector', priceSelector: 'Price selector', changeSelector: 'Change % selector', nameSelector: 'Company name selector' })[key]}<input name="${key}" type="text" ${key === 'targetUrl' ? 'required' : ''}></label>`).join('')}</div>
+    <p class="muted">Prices are detected automatically using named grid columns.</p>
     </section><button type="submit">Save configurations</button><span class="config-message" role="status"></span></form>`;
   const form = container.querySelector('form');
   for (const [key, value] of Object.entries(scrape)) form.elements[key].value = value;

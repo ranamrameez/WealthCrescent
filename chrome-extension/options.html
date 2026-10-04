@@ -5,7 +5,7 @@
     <title>TheGroup Price Sync — Options</title>
     <style>
       body {
-        max-width: 1200px;
+        max-width: 1500px;
         margin: 30px auto;
         font: 14px/1.5 -apple-system, Segoe UI, Roboto, sans-serif;
         color: #1a1a2e;
@@ -101,10 +101,47 @@
       .window button { margin:0; }
       .config-section input { margin-top:4px; min-width:0; }
       @media(max-width:700px) { .config-sections { grid-template-columns:1fr; } }
+      .top-sections { display:grid; grid-template-columns:220px 190px minmax(0,1fr); gap:12px; align-items:start; }
+      .top-sections > .card, .account-section { padding:12px; margin-bottom:12px; }
+      .account-section { border:1px solid #e5e5f0; border-radius:10px; }
+      .account-section .card { padding:0; border:0; margin-bottom:8px; }
+      .account-section input { width:100%; box-sizing:border-box; }
+      .top-sections h2 { font-size:15px; margin:0 0 10px; }
+      .top-sections p { margin:6px 0; }
+      .top-sections label { font-size:11px; }
+      .top-sections .config-section { padding:8px; margin-bottom:8px; }
+      .top-sections .config-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+      .top-sections .config-sections { grid-template-columns:minmax(150px,1fr) minmax(260px,2fr); gap:8px; }
+      .top-sections .window label { flex-basis:95px; }
+      @media(max-width:1100px) { .top-sections { grid-template-columns:1fr 1fr; } #configCard { grid-column:1/-1; } }
+      @media(max-width:600px) { .top-sections, .top-sections .config-sections, .top-sections .config-grid { grid-template-columns:1fr; } #configCard { grid-column:auto; } }
+      body { background:#dce5ef; color:#17283c; }
+      .card, .account-section { background:#f6f8fc; border-color:#9aadc2; box-shadow:0 2px 5px #17283c12; }
+      .muted, label { color:#43576e; }
+      input:not([type=checkbox]), select { background:#eaf0f7; border:1px solid #879ab0; color:#17283c; min-height:36px; }
+      input[type=checkbox] { width:16px; height:16px; accent-color:#1d4ed8; }
+      .top-sections { grid-template-columns:minmax(240px,1fr) minmax(200px,1fr); }
+      @media(max-width:600px) { .top-sections { grid-template-columns:1fr; } }
+      .view-control { width:240px; max-width:100%; margin-bottom:12px; }
+      .table-header, .pager, .batch-toolbar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+      .table-header { justify-content:space-between; margin-bottom:8px; }
+      .table-header h2 { margin:0; }
+      .table-header button, .batch-toolbar button { margin-top:0; }
+      .batch-toolbar { margin:12px 0; }
+      .batch-toolbar label { margin:0; width:145px; }
+      thead { background:#d6e1ee; }
+      tbody tr:nth-child(even) { background:#e8eef6; }
+      tr.outlier { background:#fff0cd !important; }
+      .flag { color:#8a3300; font-weight:700; }
+      th,td { border-bottom-color:#b0bfd0; }
+      .batch-toolbar .auto-selection { width:auto; display:flex; gap:6px; align-items:center; }
+      #priceChart svg { display:block; min-height:220px; max-height:400px; }
     </style>
-  </head>
+  <link rel="stylesheet" href="actions.css"></head>
   <body>
     <h1>TheGroup Price Sync — Options</h1>
+    <div class="top-sections">
+      <section class="account-section"><h2>Account</h2>
     <div id="signedOutView" class="card" hidden>
       <div class="muted" style="margin-bottom: 8px">
         Sign in with your WealthCrescent account (email/password) — prices you
@@ -153,37 +190,35 @@
 
     </div>
 
+      </section>
     <div class="card" id="scrapingControls"></div>
-    <div class="card" id="configCard"></div>
-    <div class="card">
-      <h2>Test scrape</h2>
-      <p class="muted">
-        Open the market page in a tab first, then click Test — this uses
-        whatever is currently in the fields above (even if unsaved) so you
-        can iterate quickly. No selectors configured yet? It runs the
-        generic auto-detect heuristic instead, so you can see how close that
-        gets on its own.
-      </p>
-      <button id="testBtn">Test scrape</button>
-      <span id="testStrategy"></span>
-      <pre id="testOutput">(no test run yet)</pre>
-    </div>
 
+    </div>
     <div class="card">
-      <h2>Scraped data and raw audit history</h2>
-      <p class="muted">Stored locally in this browser, including manual and test scrapes. Dates and times use Qatar time. Raw values preserve source text before parsing; rejected rows remain available for inspection.</p>
-      <div class="filters">
+      <div class="table-header"><h2>Scraped data and raw audit history</h2><div class="pager"><button id="prevPage">Previous</button> <span id="pageInfo"></span> <button id="nextPage">Next</button></div></div>
+      <p class="muted">Firebase view shows previously pushed prices and history from the shared database. Local audit shows raw source text from this browser. Older Firebase history contains parsed prices only. Dates use Qatar time.</p>
+      <label class="view-control">Data view<select id="dataView"><option value="firebase">Pushed data (Firebase)</option><option value="local">Local raw audit</option></select></label><div class="filters">
         <label>From date<input id="fromDate" type="date"></label><label>To date<input id="toDate" type="date"></label>
-        <label>Ticker<input id="tickerFilter" type="text" placeholder="e.g. QNBK"></label>
+        <label>Ticker<select id="tickerFilter"><option value="">All tickers</option></select></label><label>Price flags<select id="outlierFilter"><option value="">All entries</option><option value="true">Over ?10%</option></select></label>
         <label>Strategy<select id="strategyFilter"><option value="">All</option><option value="configured">Configured</option><option value="heuristic">Heuristic</option></select></label>
         <label>Result<select id="acceptedFilter"><option value="">All</option><option value="true">Accepted</option><option value="false">Rejected</option></select></label>
         <label>Source<select id="sourceFilter"><option value="">All</option><option>automatic</option><option>manual</option><option>test</option></select></label>
         <label>Rows per page<select id="pageSize"><option>25</option><option>50</option><option>100</option></select></label>
       </div>
-      <button id="refreshData">Refresh data</button><p id="dataMessage" role="status"></p>
-      <div style="overflow:auto"><table><thead><tr><th>Captured (Qatar)</th><th>Ticker</th><th>Parsed price</th><th>Result</th><th>Strategy / source</th><th>Raw key/value pairs</th></tr></thead><tbody id="dataRows"></tbody></table></div>
-      <button id="prevPage">Previous</button> <span id="pageInfo"></span> <button id="nextPage">Next</button>
+      <div class="batch-toolbar"><button id="refreshData">Refresh data</button><span id="selectionInfo">0 selected</span><label class="auto-selection"><input id="autoSelectOutliers" type="checkbox" checked> Auto-select outliers (up to 100)</label><label>New price<input id="batchPrice" type="number" min="0.001" step="any" placeholder="Corrected price"></label><button id="editSelected" disabled>Apply price to selected</button><button id="deleteSelected" disabled>Delete selected</button></div><p id="dataMessage" role="status"></p>
+      <div style="overflow:auto"><table><thead><tr><th><input id="selectAll" type="checkbox" aria-label="Select this page"></th><th>Recorded (Qatar)</th><th>Ticker</th><th>Parsed price</th><th>Price grid key</th><th>Change vs previous</th><th>Status</th><th>Strategy / source</th><th>Record / raw values</th></tr></thead><tbody id="dataRows"></tbody></table></div>
+
     </div>
+    <div class="card" id="chartCard"><div class="table-header"><h2>Price history</h2><label class="view-control">Chart ticker<select id="chartTicker"></select></label></div><p class="muted">All prices matching the table filters, across pages. Hover or focus a point for its price and Qatar time. Red points mark outliers.</p><div id="priceChart" aria-live="polite"></div></div>
+    <div class="card"><h2>Test scrape</h2>
+      <p class="muted">
+        Open the market page in a tab first, then click Test. The extension uses automatic grid detection and the market URL configured below.</p>
+      <button id="testBtn">Test scrape</button>
+      <span id="testStrategy"></span>
+      <pre id="testOutput">(no test run yet)</pre>
+    </div>
+
+    <div class="card" id="configCard"></div>
     <script type="module" src="options.js"></script>
   </body>
 </html>

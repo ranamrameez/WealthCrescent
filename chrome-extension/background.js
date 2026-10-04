@@ -1,4 +1,5 @@
 import { saveAudit } from './audit.js';
+import { pushedRecords, paginatePushed, priceDeviation } from './pushed-data.js';
 import { setSyncConfig, withinScrapingWindow } from './common.js';
 // Background service worker: owns the collect → (throttled, randomized)
 // push loop, Firebase Auth (email/password, via plain REST calls — no SDK
@@ -29,6 +30,73 @@ import {
 } from './common.js';
 
 const COLLECT_ALARM = 'collect-tick';
+let pushedSnapshot = null;
+
+async function conditionalRead(path, auth) {
+  const url = `${RTDB_BASE_URL}/${path}.json?auth=${encodeURIComponent(auth.idToken)}`;
+  const response = await fetch(url, { headers: { 'X-Firebase-ETag': 'true' } });
+  if (!response.ok) throw new Error(`Database read failed (${response.status})`);
+  const etag = response.headers.get('ETag');
+  if (!etag) throw new Error('Database did not return a version; refresh and try again.');
+  return { url, etag, value: await response.json() };
+}
+
+async function conditionalWrite(state, value) {
+  const response = await fetch(state.url, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'if-match': state.etag }, body: JSON.stringify(value) });
+  if (!response.ok) throw new Error(response.status === 412 ? 'Record changed since it was read. Refresh and try again.' : `Database update failed (${response.status})`);
+}
+
+async function mutatePushedData(entries, operation, price) {
+  if (!['delete', 'edit'].includes(operation) || !Array.isArray(entries) || !entries.length || entries.length > 100) throw new Error('Select between 1 and 100 records.');
+  if (operation === 'edit' && (!Number.isFinite(price) || price <= 0)) throw new Error('Price must be a positive number.');
+  const auth = await getFreshAuth();
+  if (!auth) throw new Error('Sign in to edit Firebase records.');
+  const results = [];
+  for (const entry of entries) {
+    try {
+      if (!/^[A-Z][A-Z0-9]{1,5}$/.test(entry.ticker) || !['history', 'current'].includes(entry.kind)) throw new Error('Invalid record.');
+      if (entry.kind === 'current') {
+        const state = await conditionalRead(priceCachePath(entry.ticker), auth);
+        if (state.value !== entry.price) throw new Error('Current price changed. Refresh first.');
+        await conditionalWrite(state, operation === 'delete' ? null : price);
+      } else {
+        const state = await conditionalRead(priceHistoryPath(entry.ticker), auth);
+        const points = state.value || {};
+        if (!/^[A-Za-z0-9_-]+$/.test(String(entry.key)) || !Object.hasOwn(points, entry.key)) throw new Error('Invalid history key.');
+        const point = points[entry.key];
+        if (!point || point.price !== entry.price || (entry.time && point.time !== entry.time)) throw new Error('History record changed. Refresh first.');
+        const ordered = () => Object.entries(points).filter(([, p]) => p && Number.isFinite(p.price)).sort((a, b) => String(a[1].time || a[1].date || '').localeCompare(String(b[1].time || b[1].date || '')));
+        const wasLatest = ordered().at(-1)?.[0] === String(entry.key);
+        points[entry.key] = operation === 'delete' ? null : { ...point, price, originalPrice: point.originalPrice ?? point.price, editedAt: new Date().toISOString() };
+        await conditionalWrite(state, points);
+        if (wasLatest) {
+          try {
+            const current = await conditionalRead(priceCachePath(entry.ticker), auth);
+            if (current.value === entry.price) await conditionalWrite(current, ordered().at(-1)?.[1].price ?? null);
+          } catch (error) { results.push({ id: entry.id, ok: true, warning: `History updated; current price needs review: ${error.message}` }); continue; }
+        }
+      }
+      results.push({ id: entry.id, ok: true });
+    } catch (error) { results.push({ id: entry.id, ok: false, error: error.message }); }
+  }
+  pushedSnapshot = null;
+  return results;
+}
+
+async function queryPushedData(filters, refresh = false) {
+  const auth = await getFreshAuth();
+  if (!auth) throw new Error('Sign in on this page to view the data already pushed to Firebase.');
+  if (refresh || !pushedSnapshot || pushedSnapshot.uid !== auth.uid || Date.now() - pushedSnapshot.at > 60000) {
+    const paths = ['priceHistory', 'prices', 'tickerNames', 'pricesUpdatedAt'];
+    const values = await Promise.all(paths.map(async path => {
+      const response = await fetch(`${RTDB_BASE_URL}/stockData/QSE/${path}.json?auth=${encodeURIComponent(auth.idToken)}`);
+      if (!response.ok) throw new Error(`Cannot read Firebase ${path} (${response.status}). Check that this account has database read access.`);
+      return response.json();
+    }));
+    pushedSnapshot = { uid: auth.uid, at: Date.now(), rows: pushedRecords({ history: values[0], prices: values[1], names: values[2], updatedAt: values[3] }) };
+  }
+  return paginatePushed(pushedSnapshot.rows, filters);
+}
 
 // ---------- Auth (Firebase Identity Toolkit REST, no SDK needed) ----------
 
@@ -147,11 +215,14 @@ async function appendHistoryPointSafely(ticker, point, idToken) {
     if (!getRes.ok) throw new Error(`RTDB read failed for ${ticker} history: ${getRes.status}`);
     const etag = getRes.headers.get('ETag');
     const current = (await getRes.json()) || [];
-    const last = current[current.length - 1];
+    const entries = Object.entries(current).filter(([, value]) => value && Number.isFinite(value.price));
+    const last = entries.sort((a, b) => String(a[1].time || a[1].date || '').localeCompare(String(b[1].time || b[1].date || ''))).at(-1)?.[1];
     // Skip appending an identical consecutive price (e.g. no change since
     // the last push) so the array doesn't grow forever on a quiet ticker.
     if (last && last.price === point.price) return { appended: false };
-    const next = [...current, point];
+    const keys = Object.keys(current);
+    const nextKey = keys.every(key => /^\d+$/.test(key)) ? String(Math.max(-1, ...keys.map(Number)) + 1) : String(Date.now());
+    const next = { ...current, [nextKey]: point };
     const putRes = await fetch(url, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'if-match': etag },
@@ -174,8 +245,13 @@ async function pushRows(rows) {
   const errors = [];
   for (const row of rows) {
     try {
+      const previousResponse = await fetch(`${RTDB_BASE_URL}/${priceCachePath(row.ticker)}.json?auth=${encodeURIComponent(auth.idToken)}`);
+      if (!previousResponse.ok) throw new Error(`Cannot read previous price (${previousResponse.status})`);
+      const previousPrice = await previousResponse.json();
+      const point = { date: today, time: nowIso, price: row.price, priceKey: row.priceKey || null, raw: row.raw || [], ...priceDeviation(row.price, previousPrice) };
       await putScalar(priceCachePath(row.ticker), row.price, auth.idToken);
-      await appendHistoryPointSafely(row.ticker, { date: today, time: nowIso, price: row.price }, auth.idToken);
+      await appendHistoryPointSafely(row.ticker, point, auth.idToken);
+      pushedSnapshot = null;
       pushed++;
     } catch (e) {
       errors.push(`${row.ticker}: ${e.message || e}`);
@@ -346,6 +422,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         await setSyncConfig({ scrapingEnabled: false });
         await chrome.alarms.clear(COLLECT_ALARM);
         sendResponse({ ok: true });
+        break;
+      }
+      case 'GET_PUSHED_DATA': {
+        sendResponse({ ok: true, ...await queryPushedData(message.filters || {}, !!message.refresh) });
+        break;
+      }
+      case 'MUTATE_PUSHED_DATA': {
+        sendResponse({ ok: true, results: await mutatePushedData(message.entries, message.operation, message.price) });
         break;
       }
       case 'SIGN_IN': {

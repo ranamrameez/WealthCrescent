@@ -184,3 +184,35 @@ Run extension regression checks with:
 ```sh
 node --test chrome-extension/extension.test.cjs
 ```
+
+The data table defaults to Pushed data (Firebase), reading existing shared price history,
+current prices and ticker names through the authenticated background worker. Date/ticker
+filters and pagination apply to that history without requiring a market tab or a new scrape.
+Use Refresh data to fetch a new snapshot. Local raw audit is a separate view; older
+Firebase points do not contain original DOM key/value pairs. Identical consecutive prices
+were not appended by the existing writer, so Firebase history is not a complete push log.
+
+## Price provenance and corrections
+
+Market selectors are no longer configurable; automatic detection selects the named
+price grid column. New local audit records and Firebase history points retain the
+selected priceKey and raw cell pairs. Existing records without provenance display
+Unavailable rather than inferring a key. Price changes greater than 10% in either
+direction relative to the previous chronological price for that ticker are highlighted,
+with an outlier-only filter. The first record has no comparison baseline.
+
+The ticker dropdown is populated from all records in the selected view. Select rows
+individually or select the current page; selections can span pages up to 100 records.
+Apply price sets the same positive price on all selected rows after a preview
+confirmation; Delete removes selected records from the chosen data source. Firebase
+updates require sign-in and write access, use conditional writes to reject concurrent
+changes, and report per-record failures. Corrections retain originalPrice and raw
+source values. Editing/deleting the latest history point updates the current price
+only when it still matches the original value. Local corrections affect local audit
+history only. No historical raw values can be recovered from old price-only records.
+
+A price-history chart below the table shows all matching records across pagination.
+Choose a chart ticker to inspect its prices, with Qatar timestamps in point tooltips
+and red markers for flagged outliers. Outliers are selected automatically by default
+(up to 100 matching records for batch operations); unchecked rows remain unchecked
+when refreshing. Toggle Auto-select outliers off to manage selection manually.

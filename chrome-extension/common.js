@@ -42,11 +42,6 @@ export const STORAGE_KEYS = {
 
 export const DEFAULT_SCRAPE_CONFIG = {
   targetUrl: DEFAULT_TARGET_URL,
-  rowSelector: '',
-  tickerSelector: '',
-  priceSelector: '',
-  changeSelector: '',
-  nameSelector: '',
 };
 
 export const DEFAULT_SYNC_CONFIG = {
@@ -78,7 +73,7 @@ export async function clearAuth() {
 
 export async function getScrapeConfig() {
   const { [STORAGE_KEYS.SCRAPE_CONFIG]: cfg } = await getStorage(STORAGE_KEYS.SCRAPE_CONFIG);
-  return { ...DEFAULT_SCRAPE_CONFIG, ...(cfg || {}) };
+  return { targetUrl: cfg?.targetUrl || DEFAULT_TARGET_URL };
 }
 
 export async function setScrapeConfig(patch) {

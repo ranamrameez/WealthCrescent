@@ -4,7 +4,7 @@ body { width:300px; margin:0; padding:14px; font:13px/1.4 -apple-system,Segoe UI
 h1 { font-size:15px; margin:0 0 12px; } .actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 button { padding:10px; border:0; border-radius:6px; background:#1a1a4e; color:white; cursor:pointer; } button.secondary { background:#e6e6f0; color:#1a1a4e; } button:disabled { opacity:.5; cursor:default; }
 #scrapingControls { margin-top:8px; } #scrapingControls .run-state { color:#666; font-size:12px; } #actionError, .control-error { color:#b3261e; } a { color:#1a1a4e; }
-</style></head><body><h1>WealthCrescent Price Sync</h1>
+</style><link rel="stylesheet" href="actions.css"></head><body><h1>WealthCrescent Price Sync</h1>
 <div class="actions"><button id="scrapeNowBtn" class="secondary">Scrape now</button><button id="pushNowBtn">Push now</button></div>
 <div id="scrapingControls"></div><p id="actionError" role="alert"></p>
 <a href="options.html" target="_blank">Configurations, account and scraped data</a>
