@@ -1,3 +1,4 @@
+import { StockTradingChart } from '../../../components/StockTradingChart';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
@@ -65,7 +66,7 @@ export function AnalyticsPage() {
   const [filter, setFilter] = useState<ChartFilter>(EMPTY_CHART_FILTER);
   const [hoveredTicker, setHoveredTicker] = useState<string | null>(null);
   const allTickers = useMemo(
-    () => Array.from(new Set(workbook.transactions.map((t) => t.ticker))).sort(),
+    () => Array.from(new Set(workbook.transactions.filter(t => !t.isPending).map((t) => t.ticker))).sort(),
     [workbook.transactions],
   );
 
@@ -101,7 +102,8 @@ export function AnalyticsPage() {
         The full chart library — head back to Dashboard for a quick overview.
       </p>
 
-      <ChartFilterBar tickers={allTickers} filter={filter} onChange={setFilter} />
+      <ChartFilterBar openTickers={allRows.map(row => row.ticker)} tickers={allTickers} filter={filter} onChange={setFilter} />
+      <StockTradingChart transactions={workbook.transactions.filter(tx => (!filter.tickers.length || filter.tickers.includes(tx.ticker)) && (!filter.fromMonth || tx.date.slice(0,7) >= filter.fromMonth) && (!filter.toMonth || tx.date.slice(0,7) <= filter.toMonth))} currency={currency} />
       {isChartFilterActive(filter) && !rows.length && !lifetimeRows.length && (
         <p className="text-muted" style={{ marginTop: -8, marginBottom: 16 }}>
           No data matches the current filter.

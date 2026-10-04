@@ -1,3 +1,4 @@
+import { StockTradingChart } from '../../../components/StockTradingChart';
 import { PriceInput } from "../../../components/ui/PriceInput";
 import { Fragment, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -294,7 +295,11 @@ export function StockPage() {
   usePageTopBarRightSlot(
     <TopBarControls>
       <TopBarSelect label="Stock exchange" value="qse" onChange={(event) => navigate(event.target.value === 'psx' ? `/psx/stock/${ticker}` : `/stock/${ticker}`)} options={[{ value: 'qse', label: 'QSE' }, { value: 'psx', label: 'PSX' }]} />
-      <TopBarSelect label="Stock" value={ticker} onChange={(event) => navigate(`/stock/${event.target.value}`)} options={Object.keys(tickerNames).sort().map((code) => ({ value: code, label: code }))} />
+      <TopBarSelect label="Stock" value={ticker} onChange={(event) => navigate(`/stock/${event.target.value}`)} options={[
+ ...positions.filter(p => p.shares > 0).sort((a,b) => a.ticker.localeCompare(b.ticker)).map(p => ({value:p.ticker,label:p.ticker})),
+ {value:'__closed__',label:'???? Closed positions ????',disabled:true},
+ ...positions.filter(p => p.shares <= 0 && workbook.transactions.some(tx => tx.ticker === p.ticker && !tx.isPending)).sort((a,b) => a.ticker.localeCompare(b.ticker)).map(p => ({value:p.ticker,label:p.ticker})),
+ ]} />
     </TopBarControls>,
   );
 
@@ -308,6 +313,7 @@ export function StockPage() {
         </h1>
       </div>
 
+      <StockTradingChart ticker={ticker} transactions={workbook.transactions} currency={workbook.settings.currency} />
       <StandardPageSections
         sections={[
           { key: 'summary', label: 'Summary', content: <PositionDetail ticker={ticker} />, unframed: true },

@@ -1,3 +1,4 @@
+import { StockTradingChart } from '../../../components/StockTradingChart';
 import { PriceInput } from '../../../components/ui/PriceInput';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -272,6 +273,7 @@ function ClosedPositionsTable({ onSelect }: { onSelect: (ticker: string) => void
 }
 
 export function PortfolioPage() {
+ const { workbook } = useQSEDerived();
   const navigate = useNavigate();
   const goToStock = (ticker: string) => navigate(`/stock/${ticker}`);
 
@@ -279,6 +281,7 @@ export function PortfolioPage() {
     <div>
       <h1 className="pagetitle">Portfolio</h1>
       <p className="pagesub">Open positions and closed trade history.</p>
+      <StockTradingChart transactions={workbook.transactions} currency={workbook.settings.currency} />
       <Tabs
         tabs={[
           { key: 'open', label: 'Holdings', content: <OpenPositionsTable onSelect={goToStock} />, headerExtra: <StatSourceBadge source="official" /> },

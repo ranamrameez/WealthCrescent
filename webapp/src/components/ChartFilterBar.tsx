@@ -8,10 +8,12 @@ import { CheckIcon } from './icons';
  * and per-month chart data rather than re-deriving portfolio state. */
 export function ChartFilterBar({
   tickers,
+  openTickers,
   filter,
   onChange,
 }: {
   tickers: string[];
+  openTickers?: string[];
   filter: ChartFilter;
   onChange: (filter: ChartFilter) => void;
 }) {
@@ -31,7 +33,9 @@ export function ChartFilterBar({
         >
           {filter.tickers.length === 0 && <CheckIcon size={11} />}All
         </button>
-        {tickers.map((t) => (
+        {(openTickers ? [...tickers.filter(t => openTickers.includes(t)), ...tickers.filter(t => !openTickers.includes(t))] : tickers).map((t, index, ordered) => (
+          <span key={t} style={{ display: 'contents' }}>
+          {openTickers && !openTickers.includes(t) && (index === 0 || openTickers.includes(ordered[index - 1])) && <span className="text-muted" style={{ borderLeft: '1px solid var(--border)', paddingLeft: 10, marginLeft: 4 }}>Closed positions</span>}
           <button
             key={t}
             type="button"
@@ -40,6 +44,7 @@ export function ChartFilterBar({
           >
             {filter.tickers.includes(t) && <CheckIcon size={11} />}{t}
           </button>
+          </span>
         ))}
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
