@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { EntityScopeMenu, selectedEntityValues } from '../../../components/EntityScopeMenu';
+import { selectedEntityValues } from '../../../components/EntityScopeMenu';
+import { PageFilterModal } from '../../../components/PageFilterModal';
 import { TopBarControls } from '../../../components/TopBarControls';
 import { Chart, Doughnut } from 'react-chartjs-2';
 import { Card, CollapsibleCard, MoneyValue, StatCard } from '../../../components/Card';
@@ -11,7 +12,7 @@ import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
 import { FabButton } from '../../../components/ui/Fab';
-import { CheckIcon, ChecklistIcon } from '../../../components/icons';
+import { CheckIcon, FilterIcon, CashIcon } from '../../../components/icons';
 import { toast } from '../../../components/Toast';
 import { ChartCard } from '../../qse/components/ChartCard';
 import { netIncomeByCurrency as rentalsNetIncomeByCurrency } from '../../../lib/calc/rentalsModule';
@@ -65,6 +66,8 @@ import type { PersonalLoan } from '../../../types/personalLoansWorkbook';
 import type { EMILoan } from '../../../types/emiWorkbook';
 import type { Fund, FundsWorkbook } from '../../../types/fundsWorkbook';
 import { gridAutoStyle } from '../../../lib/gridStyle';
+
+const DASHBOARD_MODULES = ['cash', 'bank', 'creditCards', 'personalLoans', 'emi', 'funds', 'qse', 'psx', 'rentals'];
 
 const today = () => new Date().toISOString().slice(0, 10);
 const monthLabel = (m: string) => new Date(`${m}-01`).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
@@ -161,22 +164,11 @@ function NetWorthDrilldownModal({ drilldown, onClose }: { drilldown: Drilldown; 
   );
 }
 
-/** Cross-module net worth summary (README item 39 / MODULES_PLAN.md §16),
- * renamed "Dashboard" in the nav/heading (user-requested 2026-09-04) — the
- * route/file names stay `NetWorthPage`/`/net-worth` internally (no user-
- * facing benefit to renaming those, real risk in touching route paths for
- * no functional gain). Currency conversion is best-effort and NEVER blocks
- * the page: rates come from a free, no-key API fetched at most once a day
- * and cached locally, degrading to manual entry if the fetch fails — see
- * this file's own history in CLAUDE.md for the full reasoning.
- *
- * Page order (user-specified 2026-09-04): Net worth summary + Exchange
- * rates side by side, a grid of per-currency account summaries, the new
- * Net Worth 2-in-1 interactive chart + Monthly summary table (moved here
- * from Budget Planner, both windowed and grouped per currency — see
- * `NetWorthMonthlySection` below), then supplementary content (capital
- * split, rentals info, cloud-sync notice) that wasn't part of the
- * requested reordering. */
+/** App home: overall totals in every enabled/held currency, then native-currency
+ * summaries, plans and analytics. Central URL-backed filters control scope and
+ * section visibility; saved inclusion settings retain their sign-in gate.
+ * Exchange rates are a secondary action in a FAB popup. The legacy route is
+ * retained for bookmarks. See docs/PAGE_TEMPLATE_GUIDE.md. */
 export function NetWorthPage({
   cloudEmpty,
   uploadLocalToCloud,
@@ -236,27 +228,36 @@ export function NetWorthPage({
   // currency the user actually has the largest (absolute) net exposure in —
   // a much more likely "the one they care about" than an arbitrary global
   // default — falling back to 'USD' only when there's no data yet to judge by.
-  const [scopeParams] = useSearchParams();
-  const moduleOptions = ['cash', 'bank', 'creditCards', 'personalLoans', 'emi', 'funds', 'qse', 'psx'];
-  const selectedModules = selectedEntityValues(scopeParams, moduleOptions);
+  const [scopeParams, setScopeParams] = useSearchParams();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [ratesOpen, setRatesOpen] = useState(false);
+  const sectionVisible = (key: string) => scopeParams.get(`show-${key}`) !== 'false';
+  const toggleSection = (key: string) => {
+    const next = new URLSearchParams(scopeParams);
+    if (sectionVisible(key)) next.set(`show-${key}`, 'false');
+    else next.delete(`show-${key}`);
+    setScopeParams(next);
+  };
+  const moduleOptions = DASHBOARD_MODULES;
+  const selectedModules = useMemo(() => selectedEntityValues(scopeParams, DASHBOARD_MODULES), [scopeParams]);
   const { rows, biggestExposureCurrency } = useNetWorthSummary(selectedModules);
+  const includedCash = useMemo(() => selectedModules.includes('cash') && cashSettings.includeInNetWorth !== false ? cashEntries : [], [selectedModules, cashSettings.includeInNetWorth, cashEntries]);
+  const includedAccounts = useMemo(() => bank.settings.accounts.filter(account => account.includeInNetWorth !== false && selectedModules.includes(account.isLiability ? 'creditCards' : 'bank')), [bank.settings.accounts, selectedModules]);
   const currencyRank = useCurrencyRankComparator();
   const primaryCurrency = usePrimaryCurrency();
   // Explicit user preference (Primary currency, set on the Account page)
   // beats the inferred biggest-exposure heuristic when both are available.
-  const [preferredCurrency, setPreferredCurrency] = useLastCurrency('net-worth-preferred', primaryCurrency ?? biggestExposureCurrency);
+  const [preferredCurrency] = useLastCurrency('net-worth-preferred', primaryCurrency ?? biggestExposureCurrency);
   // User-reported (2026-09-09): "Dashboard Net Worth Summary still lists
   // global currencies rather than user's." The "Show total in" picker used
   // to map over the whole `CURRENCIES` catalog (~25 currencies) instead of
   // the same enabled/held-currency list every other picker in the app
   // already uses (`AccountFormFields`, etc.) — this is that same list.
-  const preferredCurrencyOptions = useEnabledCurrencies(preferredCurrency);
-  // User-reported (2026-09-11): "its confusing how currency switch works.
-  // move it to top right corner pinned in the topnavbar" — was buried
-  // inside the "Net worth summary" card; now the page's own top-bar
-  // right-slot (see usePageTopBar.ts), pinned regardless of scroll.
+  const enabledCurrencies = useEnabledCurrencies(preferredCurrency);
+  const preferredCurrencyOptions = [...new Set([...enabledCurrencies.map(c => c.code), ...rows.map(r => r.currency)])].sort(currencyRank).map(code => ({ code }));
+  // Page-wide controls share the pinned top bar with section navigation.
   usePageTopBarRightSlot(
-    <TopBarControls><EntityScopeMenu label="Sources" options={moduleOptions.map((module) => ({ value: module, label: module === 'creditCards' ? 'Credit cards' : module === 'personalLoans' ? 'Personal loans' : module.toUpperCase() }))} /><Field label="Show total in" width={150}><Select value={preferredCurrency} onChange={(e) => setPreferredCurrency(e.target.value)} width={150}>{preferredCurrencyOptions.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}</Select></Field></TopBarControls>,
+    <TopBarControls><button type="button" className="btn secondary small topbar-filter-btn" onClick={() => setFiltersOpen(true)}><FilterIcon size={14} /> Filters</button></TopBarControls>,
   );
 
   const categories = useCategoryStore((s) => s.workbook.categories);
@@ -267,26 +268,26 @@ export function NetWorthPage({
   // `budgetPlanner.ts`'s own `linkedRecordKeys` doc comment).
   const activities = useMemo(
     () => collectBudgetActivities({
-      cashEntries, plannedCash,
-      bankAccounts: bank.settings.accounts, bankTransactions: bank.transactions, plannedBank,
-      rentalProperties: rentals.settings.properties, rentalEntries: rentals.entries, plannedRentals,
+      cashEntries: includedCash, plannedCash: selectedModules.includes('cash') && cashSettings.includeInNetWorth !== false ? plannedCash : [],
+      bankAccounts: includedAccounts, bankTransactions: bank.transactions, plannedBank,
+      rentalProperties: selectedModules.includes('rentals') ? rentals.settings.properties : [], rentalEntries: rentals.entries, plannedRentals,
       categories, links,
     }),
-    [cashEntries, plannedCash, bank, plannedBank, rentals, plannedRentals, categories, links],
+    [includedCash, includedAccounts, selectedModules, cashSettings.includeInNetWorth, plannedCash, bank, plannedBank, rentals, plannedRentals, categories, links],
   );
 
   const netWorthAsOfInputs: NetWorthAsOfInputs = useMemo(() => ({
-    cashEntries, cashSettings,
-    bankAccounts: bank.settings.accounts, bankTransactions: bank.transactions,
-    creditCards: creditCardsWb.cards, creditCardTransactions: creditCardsWb.transactions,
-    personalLoans: personalLoans.loans, personalLoanRepayments: personalLoans.repayments,
-    emiLoans,
-    fundsFunds: funds.funds, fundsTransactions: funds.transactions, fundsPriceHistory: funds.priceHistory,
+    cashEntries: includedCash, cashSettings,
+    bankAccounts: includedAccounts, bankTransactions: bank.transactions,
+    creditCards: selectedModules.includes('creditCards') ? creditCardsWb.cards : [], creditCardTransactions: creditCardsWb.transactions,
+    personalLoans: selectedModules.includes('personalLoans') ? personalLoans.loans : [], personalLoanRepayments: personalLoans.repayments,
+    emiLoans: selectedModules.includes('emi') ? emiLoans.filter(loan => loan.includeInNetWorth !== false) : [],
+    fundsFunds: selectedModules.includes('funds') ? funds.funds : [], fundsTransactions: funds.transactions, fundsPriceHistory: funds.priceHistory,
     qseTransactions: qse.transactions, qseTransfers: qse.transfers, qseAdjustments: qse.adjustments,
-    qsePriceHistory: qse.priceHistory, qseSettings: qse.settings,
+    qsePriceHistory: qse.priceHistory, qseSettings: { ...qse.settings, includeInNetWorth: selectedModules.includes('qse') && qse.settings.includeInNetWorth !== false },
     psxTransactions: psx.transactions, psxTransfers: psx.transfers, psxAdjustments: psx.adjustments,
-    psxPriceHistory: psx.priceHistory, psxSettings: psx.settings,
-  }), [cashEntries, cashSettings, bank, creditCardsWb, personalLoans, emiLoans, funds, qse, psx]);
+    psxPriceHistory: psx.priceHistory, psxSettings: { ...psx.settings, includeInNetWorth: selectedModules.includes('psx') && psx.settings.includeInNetWorth !== false },
+  }), [includedCash, includedAccounts, selectedModules, cashSettings, bank, creditCardsWb, personalLoans, emiLoans, funds, qse, psx]);
 
   const [rates, setRates] = useState<FxRates | null>(() => loadCachedFxRates());
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -301,7 +302,7 @@ export function NetWorthPage({
   // own comment for why), but the user can now set a rate between ANY two
   // currencies they actually hold; From/To default to the two currencies
   // most likely relevant (biggest exposure + preferred).
-  const currencyCodes = [...new Set([...rows.map((r) => r.currency), preferredCurrency, 'USD'])];
+  const currencyCodes = [...new Set([...preferredCurrencyOptions.map(c => c.code), 'USD'])];
   const [rateFrom, setRateFrom] = useState(currencyCodes[0] || 'USD');
   const [rateTo, setRateTo] = useState(currencyCodes.find((c) => c !== rateFrom) || 'USD');
   const [crossRateValue, setCrossRateValue] = useState('');
@@ -357,33 +358,10 @@ export function NetWorthPage({
     toast(`Rate saved: 1 ${rateFrom} = ${value} ${rateTo}.`);
   };
 
-  let grandTotal = 0;
-  const unconverted: string[] = [];
-  rows.forEach((r) => {
-    const converted = convertAmount(r.net, r.currency, preferredCurrency, rates);
-    if (converted === null) unconverted.push(r.currency);
-    else grandTotal += converted;
-  });
-
-  // Item 5 of a 2026-08-26 feedback batch: additional summary stats —
-  // total debts across every currency (converted where possible, same
-  // "skip what can't convert" degradation as the grand total above), plus
-  // today's and this month's net cash movement. All three, like the grand
-  // total, are only ever a converted SUM shown alongside the per-currency
-  // real figures — never a silent replacement for them.
-  let totalDebts = 0;
-  const debtsUnconverted: string[] = [];
-  rows.forEach((r) => {
-    if (!r.liabilities) return;
-    const converted = convertAmount(r.liabilities, r.currency, preferredCurrency, rates);
-    if (converted === null) debtsUnconverted.push(r.currency);
-    else totalDebts += converted;
-  });
-
   const todayISO = today();
   const monthStart = `${todayISO.slice(0, 7)}-01`;
-  const todayFlow = flowByCurrency(cashEntries, bank.settings.accounts, bank.transactions, todayISO, todayISO);
-  const monthFlow = flowByCurrency(cashEntries, bank.settings.accounts, bank.transactions, monthStart, todayISO);
+  const todayFlow = flowByCurrency(includedCash, includedAccounts, bank.transactions, todayISO, todayISO);
+  const monthFlow = flowByCurrency(includedCash, includedAccounts, bank.transactions, monthStart, todayISO);
   const plannedMonthByCurrency = useMemo(() => {
     const totals: Record<string, number> = {};
     activities.filter((activity) => !activity.executed && activity.date.startsWith(todayISO.slice(0, 7))).forEach((activity) => {
@@ -391,19 +369,6 @@ export function NetWorthPage({
     });
     return totals;
   }, [activities, todayISO]);
-  const sumFlow = (flow: Record<string, number>) => {
-    let total = 0;
-    let anyUnconverted = false;
-    Object.entries(flow).forEach(([code, amount]) => {
-      const converted = convertAmount(amount, code, preferredCurrency, rates);
-      if (converted === null) anyUnconverted = true;
-      else total += converted;
-    });
-    return { total, anyUnconverted };
-  };
-  const todayFlowTotal = sumFlow(todayFlow);
-  const monthFlowTotal = sumFlow(monthFlow);
-
   // User-requested (2026-09-09): "month Intial minus last balance can tell
   // the Net Worth while current - previous month worth can tell a month's
   // positive/-negative impact + number + percentage." Distinct from
@@ -435,19 +400,12 @@ export function NetWorthPage({
   // — feeds the "This month's change" drill-down popup's Then/Now/Δ table
   // (2026-09-16, see `Drilldown`'s own doc comment).
   const lastMonthBreakdownByCurrency: Record<string, NetWorthBreakdownEntry[]> = {};
-  let lastMonthTotal = 0;
-  let lastMonthUnconverted = false;
   if (hasLastMonthData) {
     netWorthAsOfDate(lastMonthEndDate, netWorthAsOfInputs).forEach((r) => {
       lastMonthByCurrency[r.currency] = r.net;
       lastMonthBreakdownByCurrency[r.currency] = r.breakdown;
-      const converted = convertAmount(r.net, r.currency, preferredCurrency, rates);
-      if (converted === null) lastMonthUnconverted = true;
-      else lastMonthTotal += converted;
     });
   }
-  const netWorthDelta = hasLastMonthData ? grandTotal - lastMonthTotal : null;
-  const netWorthDeltaPct = netWorthDelta !== null && lastMonthTotal !== 0 ? (netWorthDelta / Math.abs(lastMonthTotal)) * 100 : null;
 
   // Item 4: "capital split per currency" — each currency's net worth
   // converted to the preferred currency for a like-for-like comparison
@@ -511,13 +469,29 @@ export function NetWorthPage({
   return (
     <div>
       <h1>Dashboard</h1>
-      {/* Items 2/3/4/5 of a 2026-08-26 follow-up batch: two separate,
-          roughly-equal Cards side by side — "Net worth summary" (the
-          currency picker grouped directly with the big number it controls)
-          and "Exchange rates" (its own Card, with a From/To pair). */}
-      <StandardPageSections sections={[{ key: 'summary', label: 'Summary', defaultOpen: true, content: <div className="grid-auto" style={{ ...gridAutoStyle(320, 16), marginBottom: 16, alignItems: 'start' }}>
-        <Card>
-          <h3 className="mt-0">Net worth summary</h3>
+      <StandardPageSections sections={[{ key: 'summary', label: 'Overall summary', defaultOpen: true, content: <div className="grid-auto" style={{ ...gridAutoStyle(320, 16), marginBottom: 16, alignItems: 'start' }}>
+        {preferredCurrencyOptions.map(({ code: preferredCurrency }) => {
+          const sum = (values: Record<string, number>) => {
+            let total = 0;
+            const missing: string[] = [];
+            Object.entries(values).forEach(([code, amount]) => {
+              const converted = convertAmount(amount, code, preferredCurrency, rates);
+              if (converted === null) missing.push(code); else total += converted;
+            });
+            return { total, missing, anyUnconverted: missing.length > 0 };
+          };
+          const net = sum(Object.fromEntries(rows.map(r => [r.currency, r.net])));
+          const grandTotal = net.total, unconverted = net.missing;
+          const debts = sum(Object.fromEntries(rows.map(r => [r.currency, r.liabilities])));
+          const totalDebts = debts.total, debtsUnconverted = debts.missing;
+          const todayFlowTotal = sum(todayFlow), monthFlowTotal = sum(monthFlow);
+          const previous = sum(lastMonthByCurrency);
+          const lastMonthUnconverted = previous.anyUnconverted;
+          const netWorthDelta = hasLastMonthData ? grandTotal - previous.total : null;
+          const netWorthDeltaPct = netWorthDelta !== null && previous.total !== 0 ? netWorthDelta / Math.abs(previous.total) * 100 : null;
+          const plannedTotal = sum(plannedMonthByCurrency);
+          return <Card key={preferredCurrency}>
+          <h3 className="mt-0">Overall summary — {preferredCurrency}</h3>
           <div className="mt-12">
             <StatCard label={`Estimated net worth (${preferredCurrency})`} value={fmtMoney(grandTotal, preferredCurrency)} hue={grandTotal >= 0 ? 'var(--profit)' : 'var(--loss)'} />
           </div>
@@ -565,9 +539,9 @@ export function NetWorthPage({
             />
             <StatCard
               label="Planned month-end change"
-              value={fmtMoney(plannedMonthByCurrency[preferredCurrency] ?? 0, preferredCurrency)}
-              hue={(plannedMonthByCurrency[preferredCurrency] ?? 0) >= 0 ? 'var(--profit)' : 'var(--loss)'}
-              title="Planned income and expenses across Cash, Banking, and Rentals for the current month. Linked inter-account transfers are excluded from income/expense totals."
+              value={fmtMoney(plannedTotal.total, preferredCurrency)}
+              hue={(plannedTotal.total) >= 0 ? 'var(--profit)' : 'var(--loss)'}
+              title={plannedTotal.anyUnconverted ? `Excludes ${plannedTotal.missing.join(', ')} — no rate available.` : "Planned income and expenses for the current month, converted to this currency. Linked transfers are excluded."}
             />
             {netWorthDelta !== null ? (
               <StatCard
@@ -594,148 +568,9 @@ export function NetWorthPage({
               />
             )}
           </div>
-        </Card>
-
-        {/* User-reported (2026-09-09): "Exchange rates should only be
-           visible if the user chooses multiple currencies" — converting
-           between currencies is meaningless with only one, and the card
-           was permanently visible regardless. Gated on `ownCurrencies`
-           (currencies with real data), the same list already used for the
-           "Rates between your own currencies" table further down. */}
-        {ownCurrencies.length > 1 && (
-        // User-reported (2026-09-11): "Exchange rates is infrequent,
-        // opposite the UI elements preference rule (Frequent, often,
-        // rare)" — a rarely-touched control shouldn't sit in the Main
-        // tier as a permanently-open sibling of the summary card;
-        // collapsed by default now, same tier as every other Often/Rare
-        // section on this page.
-        <CollapsibleCard title={<h3 className="m-0">Exchange rates</h3>} defaultOpen={false}>
-          <div className="text-muted">
-            {rates
-              ? `Rates as of ${new Date(rates.fetchedAt).toLocaleString()} (${rates.source === 'api' ? 'auto-fetched' : 'manually entered'}).`
-              : 'No exchange rates loaded yet.'}
-            {fetchError && ` Auto-fetch failed: ${fetchError} — enter a rate manually below.`}
-          </div>
-          <button type="button" className="btn-link" onClick={refresh} disabled={fetching} style={{ background: 'none', border: 'none', color: 'inherit', textDecoration: 'underline', cursor: 'pointer', padding: 0, marginTop: 2 }}>
-            {fetching ? 'Refreshing…' : 'Refresh rates'}
-          </button>
-
-          <div className="mt-12">
-            <div className="text-muted" style={{ marginBottom: 4 }}>Set a rate between any two currencies</div>
-            <div className="row gap-sm">
-              <Field label="1 unit of">
-                <Select value={rateFrom} onChange={(e) => onRateFromChange(e.target.value)} width={110}>
-                  {currencyCodes.map((c) => <option key={c} value={c}>{c}</option>)}
-                </Select>
-              </Field>
-              <Field label="equals">
-                <TextInput type="number" step="0.0001" placeholder="Rate" value={crossRateValue} onChange={(e) => setCrossRateValue(e.target.value)} className="w-100" />
-              </Field>
-              <Field label="of">
-                <Select value={rateTo} onChange={(e) => onRateToChange(e.target.value)} width={110}>
-                  {currencyCodes.map((c) => <option key={c} value={c}>{c}</option>)}
-                </Select>
-              </Field>
-              <button type="button" className="btn" onClick={applyCrossRate}>Save rate</button>
-            </div>
-          </div>
-
-          {ownCurrencies.length > 1 && (
-            <div style={{ marginTop: 14 }}>
-              <div className="text-muted" style={{ marginBottom: 4 }}>Rates between your own currencies</div>
-              {/* Index-based pairing (not `b > a`) — `ownCurrencies` is now
-                  ordered by the user's own currency ranking, not
-                  alphabetically, so a string comparison would either skip
-                  or duplicate a pair depending on rank vs. alphabetical
-                  order. Pairing by array position still visits each
-                  unordered pair exactly once regardless of sort order. */}
-              {ownCurrencies.flatMap((a, i) =>
-                ownCurrencies.slice(i + 1).map((b) => {
-                  const rAB = effectiveRate(a, b, rates);
-                  const rBA = effectiveRate(b, a, rates);
-                  return (
-                    <div key={`${a}-${b}`} style={{ padding: '3px 0', borderBottom: '1px solid var(--border)' }}>
-                      <div className="row" style={{ justifyContent: 'space-between' }}>
-                        <span className="text-muted">1 {a} =</span>
-                        <span style={{ fontFamily: 'var(--mono)' }}>{rAB !== null ? `${rAB.toFixed(4)} ${b}` : `— ${b} (no rate yet)`}</span>
-                      </div>
-                      <div className="row" style={{ justifyContent: 'space-between' }}>
-                        <span className="text-muted">1 {b} =</span>
-                        <span style={{ fontFamily: 'var(--mono)' }}>{rBA !== null ? `${rBA.toFixed(4)} ${a}` : `— ${a} (no rate yet)`}</span>
-                      </div>
-                    </div>
-                  );
-                }),
-              )}
-            </div>
-          )}
-        </CollapsibleCard>
-        )}
-      </div> }, {
-        key: 'plans',
-        label: 'Plans',
-        content: <NetWorthPlanningReality activities={activities} selectedModules={selectedModules} currencies={ownCurrencies} currentRows={rows} emiLoans={emiLoans} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} />,
-      }, {
-        key: 'analytics',
-        label: 'Analytics',
-        content: <NetWorthAnalyticsSection ownCurrencies={ownCurrencies} activities={activities} categories={categories} groups={categoryGroups} emiLoans={emiLoans} currentRows={rows} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} setDrilldown={setDrilldown} splitData={splitData} preferredCurrency={preferredCurrency} rentalsNet={rentalsNet} />,
-      }]} />
-
-      {/* User-requested (2026-08-26): subscription renewal/expiry alerts on
-          the "homepage" — a compact list, not the full per-subscription
-          detail (which lives on the Subscriptions page itself). */}
-      {renewalsSoon.length > 0 && (
-        <Notice tone="warning" className="mb-md">
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>
-            {renewalsSoon.length} subscription{renewalsSoon.length > 1 ? 's' : ''} renewing in the next 14 days
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-            {renewalsSoon.map((r) => (
-              <span key={r.subscription.id}>
-                {r.subscription.name} — {fmtMoney(r.subscription.amount, r.subscription.currencyCode)} on {r.date}
-              </span>
-            ))}
-          </div>
-          <Link to="/subscriptions" className="text-muted" style={{ display: 'inline-block', marginTop: 6 }}>Manage subscriptions →</Link>
-        </Notice>
-      )}
-
-      <CollapsibleCard title={<h3 className="m-0">Upcoming</h3>} className="mb-md" defaultOpen={upcomingItems.length > 0}>
-        <UpcomingList items={upcomingItems} limit={8} emptyText="Nothing expected in the next 14 days." />
-        <Link to="/planning" className="text-muted" style={{ display: 'block', marginTop: 10 }}>See all →</Link>
-      </CollapsibleCard>
-
-
-      {/* User-reported (2026-09-06), correcting the previous round's own
-         layout: "USE GRID FOR ALL NON_TABLE DATA... YOU DUMPED THE WHOLE
-         CHECKLIST VERTICALLY on the main page instead of inline chips/
-         checkboxes WITH USE A FAB + POPUP TO UPDATE THIS USER PREFERENCE."
-         This is a Rare-tier settings control (per this app's own Main/
-         Often/Rare model) — it belongs behind a FAB + Modal, same as every
-         other rarely-touched per-entity toggle in this app, not a
-         permanently-visible card. Each group of entities is now a wrapping
-         row of `.chip` toggle buttons (the exact pattern `ChartFilterBar`'s
-         ticker filter already established) instead of one checkbox per
-         line. */}
-      <IncludeInNetWorthFab
-        cashSettings={cashSettings} updateCashSettings={updateCashSettings}
-        qseSettings={qse.settings} updateQseSettings={updateQseSettings}
-        psxSettings={psx.settings} updatePsxSettings={updatePsxSettings}
-        bankAccounts={bank.settings.accounts} updateBankAccount={updateBankAccount}
-        personalLoans={personalLoans.loans} updatePersonalLoan={updatePersonalLoan}
-        emiLoans={emiLoans} updateEmiLoan={updateEmiLoan}
-        funds={funds} setFundsWorkbook={setFundsWorkbook}
-        toggleInclude={toggleInclude}
-      />
-
-      {rows.length === 0 && (
-        <Card><div className="text-muted">No balances recorded yet across any account.</div></Card>
-      )}
-
-      {/* Grid of per-currency account summaries (user-specified order,
-          2026-09-04) — a responsive grid lets 2-3 currency sections sit
-          side by side on a wide viewport instead of stacking. */}
-      <div className="grid-auto" style={{ ...gridAutoStyle(360, 12), marginBottom: 16 }}>
+        </Card>;
+        })}
+      </div> }, ...(sectionVisible('currencies') ? [{ key: 'currencies', label: 'Per currency summary', defaultOpen: true, content: (      <div className="grid-auto" style={{ ...gridAutoStyle(360, 12), marginBottom: 16 }}>
         {[...rows].sort((a, b) => currencyRank(a.currency, b.currency)).map((r) => {
           const converted = convertAmount(r.net, r.currency, preferredCurrency, rates);
           const todayFlowC = todayFlow[r.currency] ?? 0;
@@ -804,7 +639,7 @@ export function NetWorthPage({
                       currency: r.currency,
                       from: todayISO,
                       to: todayISO,
-                      items: flowActivity(cashEntries, bank.settings.accounts, bank.transactions, r.currency, todayISO, todayISO),
+                      items: flowActivity(includedCash, includedAccounts, bank.transactions, r.currency, todayISO, todayISO),
                     })}
                   >
                     Today {todayFlowC >= 0 ? '+' : ''}{fmtMoney(todayFlowC, r.currency)}
@@ -820,7 +655,7 @@ export function NetWorthPage({
                       currency: r.currency,
                       from: monthStart,
                       to: todayISO,
-                      items: flowActivity(cashEntries, bank.settings.accounts, bank.transactions, r.currency, monthStart, todayISO),
+                      items: flowActivity(includedCash, includedAccounts, bank.transactions, r.currency, monthStart, todayISO),
                     })}
                   >
                     This month {monthFlowC >= 0 ? '+' : ''}{fmtMoney(monthFlowC, r.currency)}
@@ -865,7 +700,61 @@ export function NetWorthPage({
             </details>
           );
         })}
-      </div>
+      </div>) }] : []), ...(sectionVisible('plans') ? [{
+        key: 'plans',
+        label: 'Plans',
+        content: <NetWorthPlanningReality activities={activities} selectedModules={selectedModules} currencies={ownCurrencies} currentRows={rows} emiLoans={netWorthAsOfInputs.emiLoans} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} />,
+      }] : []), ...(sectionVisible('analytics') ? [{
+        key: 'analytics',
+        label: 'Analytics',
+        content: <NetWorthAnalyticsSection ownCurrencies={ownCurrencies} activities={activities} categories={categories} groups={categoryGroups} emiLoans={netWorthAsOfInputs.emiLoans} currentRows={rows} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} setDrilldown={setDrilldown} splitData={splitData} preferredCurrency={preferredCurrency} rentalsNet={selectedModules.includes('rentals') ? rentalsNet : {}} />,
+      }] : [])]} />
+
+      {/* User-requested (2026-08-26): subscription renewal/expiry alerts on
+          the "homepage" — a compact list, not the full per-subscription
+          detail (which lives on the Subscriptions page itself). */}
+      {renewalsSoon.length > 0 && (
+        <Notice tone="warning" className="mb-md">
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>
+            {renewalsSoon.length} subscription{renewalsSoon.length > 1 ? 's' : ''} renewing in the next 14 days
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+            {renewalsSoon.map((r) => (
+              <span key={r.subscription.id}>
+                {r.subscription.name} — {fmtMoney(r.subscription.amount, r.subscription.currencyCode)} on {r.date}
+              </span>
+            ))}
+          </div>
+          <Link to="/subscriptions" className="text-muted" style={{ display: 'inline-block', marginTop: 6 }}>Manage subscriptions →</Link>
+        </Notice>
+      )}
+
+      <CollapsibleCard title={<h3 className="m-0">Upcoming</h3>} className="mb-md" defaultOpen={upcomingItems.length > 0}>
+        <UpcomingList items={upcomingItems} limit={8} emptyText="Nothing expected in the next 14 days." />
+        <Link to="/planning" className="text-muted" style={{ display: 'block', marginTop: 10 }}>See all →</Link>
+      </CollapsibleCard>
+
+
+      {/* User-reported (2026-09-06), correcting the previous round's own
+         layout: "USE GRID FOR ALL NON_TABLE DATA... YOU DUMPED THE WHOLE
+         CHECKLIST VERTICALLY on the main page instead of inline chips/
+         checkboxes WITH USE A FAB + POPUP TO UPDATE THIS USER PREFERENCE."
+         This is a Rare-tier settings control (per this app's own Main/
+         Often/Rare model) — it belongs behind a FAB + Modal, same as every
+         other rarely-touched per-entity toggle in this app, not a
+         permanently-visible card. Each group of entities is now a wrapping
+         row of `.chip` toggle buttons (the exact pattern `ChartFilterBar`'s
+         ticker filter already established) instead of one checkbox per
+         line. */}
+
+      {rows.length === 0 && (
+        <Card><div className="text-muted">No balances recorded yet across any account.</div></Card>
+      )}
+
+      {/* Grid of per-currency account summaries (user-specified order,
+          2026-09-04) — a responsive grid lets 2-3 currency sections sit
+          side by side on a wide viewport instead of stacking. */}
+
 
       {/* User-requested (2026-09-04): the Net Worth 2-in-1 interactive
           chart + Budget Planner's Monthly summary widget, moved here in
@@ -894,6 +783,96 @@ export function NetWorthPage({
           </button>
         </Notice>
       )}
+
+      <FabButton label="Exchange rates" onClick={() => setRatesOpen(true)}><CashIcon size={18} /></FabButton>
+      {ratesOpen && <Modal title="Exchange rates" onClose={() => setRatesOpen(false)} widthClass="50">          <div className="text-muted">
+            {rates
+              ? `Rates as of ${new Date(rates.fetchedAt).toLocaleString()} (${rates.source === 'api' ? 'auto-fetched' : 'manually entered'}).`
+              : 'No exchange rates loaded yet.'}
+            {fetchError && ` Auto-fetch failed: ${fetchError} — enter a rate manually below.`}
+          </div>
+          <button type="button" className="btn-link" onClick={refresh} disabled={fetching} style={{ background: 'none', border: 'none', color: 'inherit', textDecoration: 'underline', cursor: 'pointer', padding: 0, marginTop: 2 }}>
+            {fetching ? 'Refreshing…' : 'Refresh rates'}
+          </button>
+
+          <div className="mt-12">
+            <div className="text-muted" style={{ marginBottom: 4 }}>Set a rate between any two currencies</div>
+            <div className="row gap-sm">
+              <Field label="1 unit of">
+                <Select value={rateFrom} onChange={(e) => onRateFromChange(e.target.value)} width={110}>
+                  {currencyCodes.map((c) => <option key={c} value={c}>{c}</option>)}
+                </Select>
+              </Field>
+              <Field label="equals">
+                <TextInput type="number" step="0.0001" placeholder="Rate" value={crossRateValue} onChange={(e) => setCrossRateValue(e.target.value)} className="w-100" />
+              </Field>
+              <Field label="of">
+                <Select value={rateTo} onChange={(e) => onRateToChange(e.target.value)} width={110}>
+                  {currencyCodes.map((c) => <option key={c} value={c}>{c}</option>)}
+                </Select>
+              </Field>
+              <button type="button" className="btn" onClick={applyCrossRate}>Save rate</button>
+            </div>
+          </div>
+
+          {ownCurrencies.length > 1 && (
+            <div style={{ marginTop: 14 }}>
+              <div className="text-muted" style={{ marginBottom: 4 }}>Rates between your own currencies</div>
+              {/* Index-based pairing (not `b > a`) — `ownCurrencies` is now
+                  ordered by the user's own currency ranking, not
+                  alphabetically, so a string comparison would either skip
+                  or duplicate a pair depending on rank vs. alphabetical
+                  order. Pairing by array position still visits each
+                  unordered pair exactly once regardless of sort order. */}
+              {ownCurrencies.flatMap((a, i) =>
+                ownCurrencies.slice(i + 1).map((b) => {
+                  const rAB = effectiveRate(a, b, rates);
+                  const rBA = effectiveRate(b, a, rates);
+                  return (
+                    <div key={`${a}-${b}`} style={{ padding: '3px 0', borderBottom: '1px solid var(--border)' }}>
+                      <div className="row" style={{ justifyContent: 'space-between' }}>
+                        <span className="text-muted">1 {a} =</span>
+                        <span style={{ fontFamily: 'var(--mono)' }}>{rAB !== null ? `${rAB.toFixed(4)} ${b}` : `— ${b} (no rate yet)`}</span>
+                      </div>
+                      <div className="row" style={{ justifyContent: 'space-between' }}>
+                        <span className="text-muted">1 {b} =</span>
+                        <span style={{ fontFamily: 'var(--mono)' }}>{rBA !== null ? `${rBA.toFixed(4)} ${a}` : `— ${a} (no rate yet)`}</span>
+                      </div>
+                    </div>
+                  );
+                }),
+              )}
+            </div>
+          )}
+</Modal>}
+      {filtersOpen && <PageFilterModal onClose={() => setFiltersOpen(false)} onReset={() => {
+        const next = new URLSearchParams(scopeParams);
+        ['entities', 'show-currencies', 'show-plans', 'show-analytics'].forEach(key => next.delete(key));
+        setScopeParams(next);
+      }}>
+        <h3 className="mt-0">Sections</h3>
+        <div className="filter-preset-row">{[{ key: 'currencies', label: 'Per currency summary' }, { key: 'plans', label: 'Plans' }, { key: 'analytics', label: 'Analytics' }].map(section => <IncludeChip key={section.key} label={section.label} checked={sectionVisible(section.key)} onToggle={() => toggleSection(section.key)} />)}</div>
+        <h3>Sources</h3>
+        <div className="filter-preset-row">{moduleOptions.map(value => <IncludeChip key={value} label={value === 'creditCards' ? 'Credit cards' : value === 'personalLoans' ? 'Personal loans' : value.toUpperCase()} checked={selectedModules.includes(value)} onToggle={() => {
+          const selected = selectedModules.includes(value) ? selectedModules.filter(module => module !== value) : [...selectedModules, value];
+          if (!selected.length) return;
+          const next = new URLSearchParams(scopeParams);
+          if (selected.length === moduleOptions.length) next.delete('entities'); else next.set('entities', selected.join(','));
+          setScopeParams(next);
+        }} />)}</div>
+        <h3>Include in Net Worth</h3>
+      <IncludeInNetWorthControls
+        cashSettings={cashSettings} updateCashSettings={updateCashSettings}
+        qseSettings={qse.settings} updateQseSettings={updateQseSettings}
+        psxSettings={psx.settings} updatePsxSettings={updatePsxSettings}
+        bankAccounts={bank.settings.accounts} updateBankAccount={updateBankAccount}
+        personalLoans={personalLoans.loans} updatePersonalLoan={updatePersonalLoan}
+        emiLoans={emiLoans} updateEmiLoan={updateEmiLoan}
+        funds={funds} setFundsWorkbook={setFundsWorkbook}
+        toggleInclude={toggleInclude}
+      />
+
+      </PageFilterModal>}
       {drilldown && <NetWorthDrilldownModal drilldown={drilldown} onClose={() => setDrilldown(null)} />}
     </div>
   );
@@ -965,27 +944,18 @@ function NetWorthPlanningReality({ activities, selectedModules, currencies, curr
 
 /** A single toggleable `.chip` — the exact pattern `ChartFilterBar`'s
  * ticker filter already established, reused here instead of a vertical
- * `<label><input type="checkbox">` stack (see `IncludeInNetWorthFab`'s own
+ * `<label><input type="checkbox">` stack (see `IncludeInNetWorthControls`'s own
  * doc comment for why). */
 function IncludeChip({ label, checked, onToggle }: { label: string; checked: boolean; onToggle: () => void }) {
   return (
-    <button type="button" className={`chip${checked ? ' active' : ''}`} onClick={onToggle}>
+    <button type="button" className={`chip${checked ? ' active' : ''}`} aria-pressed={checked} onClick={onToggle}>
       {checked && <CheckIcon size={11} />}{label}
     </button>
   );
 }
 
-/** User-reported (2026-09-06), correcting the previous round's own layout:
- * "USE GRID FOR ALL NON_TABLE DATA... YOU DUMPED THE WHOLE CHECKLIST
- * VERTICALLY on the main page instead of inline chips/checkboxes WITH USE
- * A FAB + POPUP TO UPDATE THIS USER PREFERENCE." Per this app's own Main/
- * Often/Rare content model, "which accounts count toward Net Worth" is a
- * Rare-tier setting (touched occasionally, not glanced at every visit) —
- * it belongs behind a FAB + Modal like every other rarely-used per-entity
- * toggle in this app (Archive/Restore, "Link to bank," etc.), not
- * permanently occupying page space. Each entity group renders as a
- * wrapping row of `IncludeChip`s instead of one checkbox per line. */
-function IncludeInNetWorthFab({
+/** Persistent inclusion controls, hosted in the central page filters popup. */
+function IncludeInNetWorthControls({
   cashSettings, updateCashSettings,
   qseSettings, updateQseSettings,
   psxSettings, updatePsxSettings,
@@ -1004,15 +974,11 @@ function IncludeInNetWorthFab({
   funds: FundsWorkbook; setFundsWorkbook: (wb: FundsWorkbook) => void;
   toggleInclude: (setter: () => void) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const toggleFund = (f: Fund) =>
     toggleInclude(() => setFundsWorkbook({ ...funds, funds: funds.funds.map((x) => (x.id === f.id ? { ...x, includeInNetWorth: x.includeInNetWorth === false } : x)) }));
 
   return (
     <>
-      <FabButton label="Include in Net Worth" onClick={() => setOpen(true)}><ChecklistIcon size={18} /></FabButton>
-      {open && (
-        <Modal title="Include in Net Worth" onClose={() => setOpen(false)}>
           <p className="text-muted mt-0">
             Unchecked items are left out of every total on this page — e.g. an EMI loan you closed
             early that the schedule still thinks is owed.
@@ -1068,8 +1034,6 @@ function IncludeInNetWorthFab({
               </div>
             )}
           </div>
-        </Modal>
-      )}
     </>
   );
 }

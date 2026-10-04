@@ -8,7 +8,7 @@ import { CategoryNav } from './CategoryNav';
 import { LogInIcon, LogoMark, SettingsIcon } from './icons';
 
 const QSE_NAV_ITEMS = [
-  { num: '01', label: 'Dashboard', to: '/' },
+  { num: '01', label: 'Dashboard', to: '/qse' },
   { num: '02', label: 'Portfolio', to: '/portfolio' },
   { num: '03', label: 'Trade Transactions', to: '/transactions' },
   { num: '04', label: 'Watchlist', to: '/watchlist' },
@@ -80,7 +80,7 @@ function ExchangeSwitcher({ exchange }: { exchange: 'qse' | 'psx' }) {
   const navigate = useNavigate();
   return (
     <div className="chip-tabs mb-sm">
-      <button type="button" className={`chip${exchange === 'qse' ? ' active' : ''}`} onClick={() => navigate('/')}>
+      <button type="button" className={`chip${exchange === 'qse' ? ' active' : ''}`} onClick={() => navigate('/qse')}>
         QSE
       </button>
       <button type="button" className={`chip${exchange === 'psx' ? ' active' : ''}`} onClick={() => navigate('/psx')}>

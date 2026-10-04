@@ -43,6 +43,14 @@ app, not developer notes) continuously as features ship.
 
 ## Current status (as of 2026-08-23)
 
+Continuation update (2026-09-29): home now redirects to the cross-module Dashboard;
+QSE's dashboard lives at `/qse`. Dashboard summaries show enabled/held currencies
+together, source and section filters share PageFilterModal with transaction pages,
+and exchange rates open from a floating button. The Planning TDZ fix is already in
+commit 1e5e1fa. Mobile top-bar spacing now takes precedence over desktop defaults.
+Build and dashboard regression tests pass; full-suite and lint follow-ups are
+recorded in webapp/README.md under Pending.
+
 - **QSE module: feature-complete and polished.** Dashboard, Portfolio
   (Holdings/History tabs), per-stock dedicated pages (`/stock/:ticker`),
   Transactions (tabbed sub-sections), Watchlist, Analytics (18 charts in 4

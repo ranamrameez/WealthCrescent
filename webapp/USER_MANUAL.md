@@ -848,11 +848,12 @@ silently doing something wrong.
 
 ---
 
-## 24. Net Worth
+## 24. Dashboard
 
-Pick **Dashboard** from the category list (the top entry — it's the same page this manual
-calls "Net Worth"; not to be confused with each stock exchange's own "Dashboard" page under
-Stock Exchanges) — a single page summarizing everything you've recorded across every module.
+The app opens on **Dashboard**, also the first sidebar entry: a single page summarizing
+everything recorded across modules. Stock Exchanges keeps its own QSE dashboard at `/qse`.
+Overall summaries come first, followed immediately by **Per currency summary**, then
+**Plans** and **Analytics**. Existing `/net-worth` bookmarks continue to work.
 Each currency you use gets its own collapsible section (click
 its header to expand/collapse, or use the responsive grid to see 2-3 side by side on a wide
 screen) showing your real, unconverted **Assets**, **Liabilities**, and **Net** total in that
@@ -864,8 +865,8 @@ separately below, not included in the total** — property values aren't tracked
 and the rent you've collected already landed in whichever Cash/Bank account you deposited it
 to, so adding it again here would count it twice.
 
-- **Net worth summary card**: pick a currency in "Show total in", and every section with a
-  known exchange rate gets converted and added into one grand total, shown alongside **Total
+- **Overall summary**: separate cards show converted totals for your enabled and held
+  currencies. Every section with a known exchange rate contributes to each total, alongside **Total
   debts**, **Today's net flow**, **This month's net flow** (money moved in/out of Cash and
   Banking), and **This month's change** (your real net worth right now vs. the end of last
   month, across every module — a stock's price moving or an EMI loan being paid down counts
@@ -877,7 +878,12 @@ to, so adding it again here would count it twice.
   month chip lists the real Cash entries and Bank transactions that make up that figure; a Δ
   chip shows a module-by-module table of what changed since last month. Each pop-up also
   explains in plain words what the number does and doesn't include.
-- **Exchange rates card**: rates come from a free exchange-rate service, refreshed
+- **Page filters**: use **Filters** in the top bar to show or hide Per currency summary,
+  Plans, and Analytics, and choose which sources contribute to the dashboard. These view
+  choices stay in the page URL. **Reset** restores the default view. The same popup contains
+  **Include in Net Worth** preferences; these saved account choices require sign-in and
+  are not cleared by Reset.
+- **Exchange rates popup**: open the **Exchange rates** floating button. Rates come from a free exchange-rate service, refreshed
   automatically at most once a day (never on every page load) and cached — click **Refresh
   rates** to force an update. If the automatic fetch ever fails (no internet, the service
   being unreachable), or a currency you use simply isn't covered, set a rate yourself between
