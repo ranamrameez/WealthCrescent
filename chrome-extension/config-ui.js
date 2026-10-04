@@ -1,16 +1,16 @@
-import { getScrapeConfig, getSyncConfig, setScrapeConfig, setSyncConfig } from './common.js';
+import { getScrapeConfig, getSyncConfig, setScrapeConfig, setSyncConfig, sendWorkerMessage } from './common.js';
 
 export async function mountConfig(container) {
   const scrape = await getScrapeConfig();
   const sync = await getSyncConfig();
   container.innerHTML = `<h2>Configurations</h2><form>
-    <label>Minimum minutes between Firebase pushes<input name="minPushIntervalMinutes" type="number" min="2" step="1" required></label>
+    <div class="config-sections"><section class="config-section"><h3>Firebase pushes</h3><label>Minimum minutes between Firebase pushes<input name="minPushIntervalMinutes" type="number" min="2" step="1" required></label>
     <p class="muted">Push intervals vary between 1× and 2× this minimum. Collection runs every 45–90 seconds.</p>
-    <h3>Scraping windows (Qatar time)</h3><div class="windows"></div><button type="button" class="add-window secondary">Add time pair</button>
+    </section><section class="config-section"><h3>Scraping windows (Qatar time)</h3><div class="windows"></div><button type="button" class="add-window secondary">Add time pair</button>
     <p class="muted">Automatic scraping runs within these windows. End times are exclusive; overnight pairs are supported. Manual scrape and push work outside these windows.</p>
-    ${Object.keys(scrape).map(key => `<label>${({ targetUrl: 'Market-watch URL', rowSelector: 'Row selector', tickerSelector: 'Ticker selector', priceSelector: 'Price selector', changeSelector: 'Change % selector', nameSelector: 'Company name selector' })[key]}<input name="${key}" type="text" ${key === 'targetUrl' ? 'required' : ''}></label>`).join('')}
+    </section></div><section class="config-section"><h3>Market page and selectors</h3><div class="config-grid">${Object.keys(scrape).map(key => `<label>${({ targetUrl: 'Market-watch URL', rowSelector: 'Row selector', tickerSelector: 'Ticker selector', priceSelector: 'Price selector', changeSelector: 'Change % selector', nameSelector: 'Company name selector' })[key]}<input name="${key}" type="text" ${key === 'targetUrl' ? 'required' : ''}></label>`).join('')}</div>
     <p class="muted">Leave selectors blank for auto-detection. Selectors are relative to each row.</p>
-    <button type="submit">Save configurations</button><span class="config-message" role="status"></span></form>`;
+    </section><button type="submit">Save configurations</button><span class="config-message" role="status"></span></form>`;
   const form = container.querySelector('form');
   for (const [key, value] of Object.entries(scrape)) form.elements[key].value = value;
   form.elements.minPushIntervalMinutes.value = sync.minPushIntervalMinutes;
@@ -47,8 +47,8 @@ export async function mountControls(container) {
   }
   for (const [selector, type] of [['.start-control', 'START_SCRAPING'], ['.stop-control', 'STOP_SCRAPING']]) container.querySelector(selector).onclick = async () => {
     try {
-      const response = await chrome.runtime.sendMessage({ type });
-      if (!response?.ok) throw new Error(response?.error || 'Operation failed');
+      container.querySelector('.control-error').textContent = '';
+      await sendWorkerMessage({ type });
       await refresh();
     } catch (error) { container.querySelector('.control-error').textContent = error.message; }
   };

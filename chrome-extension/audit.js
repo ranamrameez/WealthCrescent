@@ -14,14 +14,15 @@ export async function saveAudit(result, url, source = 'automatic') {
     await new Promise((resolve, reject) => {
       const tx = db.transaction('rows', 'readwrite');
       const store = tx.objectStore('rows');
-      for (const row of result.auditRows || result.rows || []) {
+      for (const row of result.auditRows?.length ? result.auditRows : result.rows || []) {
         const parsed = (result.rows || []).find(value => value.ticker === row.ticker && value.price === row.price);
-        store.add({ ...row, name: parsed?.name ?? null, changePct: parsed?.changePct ?? null, capturedAt, url, source, strategy: result.strategy });
+        store.add({ ...row, accepted: row.accepted ?? (Number.isFinite(row.price) && row.price > 0), name: parsed?.name ?? null, changePct: parsed?.changePct ?? null, capturedAt, url, source, strategy: result.strategy });
       }
       tx.oncomplete = resolve;
       tx.onabort = () => reject(tx.error);
       tx.onerror = () => reject(tx.error);
     });
+    await chrome.storage.local.set({ auditUpdatedAt: capturedAt });
   } finally { db.close(); }
 }
 

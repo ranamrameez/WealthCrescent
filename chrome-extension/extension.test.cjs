@@ -73,3 +73,34 @@ test('Stopped and out-of-window automatic cycles never access the market tab; st
   const response = await new Promise(resolve => handler({ type: 'STOP_SCRAPING' }, {}, resolve));
   assert.equal(response.ok, true); assert.equal(config.scrapingEnabled, false); assert.ok(cleared > 0);
 });
+
+test('Test scrape saves legacy worker results and renders them in the table', async () => {
+  const { JSDOM } = require('../webapp/node_modules/jsdom');
+  const dom = new JSDOM(read('options.html'));
+  const document = dom.window.document;
+  let saved = [], changed;
+  const ctx = vm.createContext({
+    document, console, Date, JSON, Number,
+    mountConfig: async container => { container.innerHTML = '<form>' + ['targetUrl', 'rowSelector', 'tickerSelector', 'priceSelector', 'changeSelector', 'nameSelector'].map(key => `<input name="${key}" value="">`).join('') + '</form>'; },
+    mountControls: async () => {},
+    sendWorkerMessage: async () => ({ ok: true, rows: [{ ticker: 'QNBK', price: 12.34 }], auditRows: [], strategy: 'heuristic' }),
+    saveAudit: async result => { saved = result.rows.map(row => ({ ...row, accepted: true, capturedAt: Date.now(), source: 'test', strategy: result.strategy })); },
+    queryAudit: async () => ({ rows: saved, total: saved.length }),
+    chrome: { storage: { onChanged: { addListener(fn) { changed = fn; } } } },
+  });
+  const code = read('options.js').replace(/^import .*;\r?\n/gm, '');
+  await vm.runInContext('(async () => {' + code + '\n})()', ctx);
+  document.getElementById('tickerFilter').value = 'OTHER';
+  await document.getElementById('testBtn').onclick();
+  assert.equal(saved.length, 1);
+  assert.equal(document.getElementById('dataRows').children.length, 1);
+  assert.match(document.getElementById('dataRows').textContent, /QNBK/);
+  assert.equal(document.getElementById('tickerFilter').value, '');
+  assert.equal(typeof changed, 'function');
+});
+
+test('Old workers receive an actionable reload error', async () => {
+  global.chrome.runtime = { sendMessage: async () => ({ ok: false, error: 'Unknown message type: STOP_SCRAPING' }) };
+  const common = await import('data:text/javascript;base64,' + Buffer.from(read('common.js')).toString('base64'));
+  await assert.rejects(common.sendWorkerMessage({ type: 'STOP_SCRAPING' }), /chrome:\/\/extensions/);
+});

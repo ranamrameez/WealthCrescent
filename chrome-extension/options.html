@@ -90,10 +90,69 @@
       button:disabled { opacity:.5; cursor:default; }
       .secondary { background:#e6e6f0; color:#1a1a4e; }
       h2 { margin-top:0; }
+      .config-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
+      .config-grid label { margin:0; }
+      .config-section { border:1px solid #e5e5f0; border-radius:8px; padding:12px; margin-bottom:12px; min-width:0; }
+      .config-section h3 { margin:0 0 10px; font-size:14px; }
+      .config-sections { display:grid; grid-template-columns:minmax(200px,1fr) minmax(300px,2fr); gap:12px; }
+      .windows { display:flex; flex-wrap:wrap; gap:12px; }
+      .window { align-items:end; flex-wrap:nowrap; }
+      .window label { flex:0 0 110px; margin:0; }
+      .window button { margin:0; }
+      .config-section input { margin-top:4px; min-width:0; }
+      @media(max-width:700px) { .config-sections { grid-template-columns:1fr; } }
     </style>
   </head>
   <body>
     <h1>TheGroup Price Sync — Options</h1>
+    <div id="signedOutView" class="card" hidden>
+      <div class="muted" style="margin-bottom: 8px">
+        Sign in with your WealthCrescent account (email/password) — prices you
+        scrape get pushed to the same shared database every WealthCrescent
+        user reads from.
+      </div>
+      <label>Email</label>
+      <input id="email" type="email" autocomplete="username" />
+      <label>Password</label>
+      <input id="password" type="password" autocomplete="current-password" />
+      <div class="row" style="margin-top: 8px; align-items: center">
+        <label style="display: flex; align-items: center; gap: 6px; margin: 0">
+          <input id="createNew" type="checkbox" style="width: auto" />
+          Create a new account instead
+        </label>
+      </div>
+      <div class="muted" id="createNewHint" hidden style="margin: 4px 0 8px">
+        This doesn't need to match your WealthCrescent login — any signed-in
+        account can push prices, since they land in the shared database, not
+        anyone's personal workbook. A dedicated account keeps your main
+        password out of this extension's local storage.
+      </div>
+      <div class="row">
+        <button id="signInBtn">Sign in</button>
+      </div>
+      <div id="signInError" class="error"></div>
+    </div>
+
+    <div id="signedInView" hidden>
+      <div class="card">
+        <div class="row" style="align-items: center">
+          <div class="muted">Signed in as</div>
+          <button class="secondary" id="signOutBtn" style="flex: 0 0 auto">Sign out</button>
+        </div>
+        <div class="signed-in-email" id="emailLabel"></div>
+      </div>
+
+
+
+      <div class="card" id="statusCard">
+        <div id="statusLines" class="muted"></div>
+        <div id="statusError" class="error"></div>
+      </div>
+
+
+
+    </div>
+
     <div class="card" id="scrapingControls"></div>
     <div class="card" id="configCard"></div>
     <div class="card">

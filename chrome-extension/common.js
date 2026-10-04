@@ -107,6 +107,16 @@ export function withinScrapingWindow(config, now = new Date()) {
   return config.timeWindows.some(({ start, end }) => start < end ? time >= start && time < end : time >= start || time < end);
 }
 
+export async function sendWorkerMessage(message) {
+  const response = await chrome.runtime.sendMessage(message);
+  if (!response?.ok) {
+    const error = response?.error || 'The extension background worker did not respond.';
+    if (/Unknown message type|Receiving end does not exist/i.test(error)) throw new Error('Reload this extension in chrome://extensions, then refresh the market tab and reopen the extension page to load the updated background worker.');
+    throw new Error(error);
+  }
+  return response;
+}
+
 // Prices AND ticker names are written to the SAME shared `stockData/QSE`
 // node the WealthCrescent web app already reads for ticker names/
 // fundamentals (webapp/src/lib/stockData/reader.ts) — not into any one

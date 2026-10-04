@@ -394,7 +394,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         // in-progress edits immediately.
         const result = await scrapeTab(tab, message.config);
         if (result.ok) await saveAudit(result, tab.url, 'test');
-        sendResponse(result);
+        sendResponse({ ...result, auditSaved: !!result.ok });
         break;
       }
       default:

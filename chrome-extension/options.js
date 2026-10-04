@@ -1,4 +1,7 @@
-﻿import { mountConfig, mountControls } from './config-ui.js';
+import './account.js';
+import { saveAudit } from './audit.js';
+import { sendWorkerMessage } from './common.js';
+import { mountConfig, mountControls } from './config-ui.js';
 import { queryAudit } from './audit.js';
 const $ = id => document.getElementById(id);
 await mountConfig($('configCard'));
@@ -10,8 +13,10 @@ $('testBtn').onclick = async () => {
   try {
     const form = $('configCard').querySelector('form');
     const config = Object.fromEntries(['targetUrl', 'rowSelector', 'tickerSelector', 'priceSelector', 'changeSelector', 'nameSelector'].map(key => [key, form.elements[key].value.trim()]));
-    const result = await chrome.runtime.sendMessage({ type: 'TEST_SCRAPE', targetUrl: config.targetUrl, config });
+    const result = await sendWorkerMessage({ type: 'TEST_SCRAPE', targetUrl: config.targetUrl, config });
     if (!result?.ok) throw new Error(result?.error || 'No response');
+    if (!result.auditSaved) await saveAudit(result, config.targetUrl, 'test');
+    for (const id of ['fromDate', 'toDate', 'tickerFilter', 'strategyFilter', 'acceptedFilter', 'sourceFilter']) $(id).value = '';
     $('testStrategy').textContent = `Strategy: ${result.strategy}`;
     $('testOutput').textContent = JSON.stringify(result, null, 2);
     page = 1; await renderData();
@@ -48,3 +53,5 @@ $('refreshData').onclick = () => renderData();
 $('prevPage').onclick = () => { page--; renderData(); };
 $('nextPage').onclick = () => { page++; renderData(); };
 await renderData();
+
+chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && changes.auditUpdatedAt) renderData(); });

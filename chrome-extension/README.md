@@ -162,8 +162,10 @@ Firebase's write limits and the brokerage's own servers.
 
 ## Configurations, controls and audit history
 
-The popup and extension page share a Configurations card containing the market URL,
-all selectors, Firebase push interval and editable start/end time pairs. Defaults are
+The extension page contains a Configurations card with the market URL,
+all selectors, Firebase push interval and editable start/end time pairs in compact inline sections.
+The popup contains Scrape, Push, Start and Stop actions, with a link to the full page
+for account management, configurations and audit history. Defaults are
 09:30?13:00 and 13:10?13:15 in Asia/Qatar. End times are exclusive; overnight
 windows are supported. Start/Stop controls persist across browser restarts. A scrape
 already in progress may finish when stopped. Manual scrape, push and test actions
