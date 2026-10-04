@@ -179,6 +179,14 @@ from the lot system."*
 
 ## Done
 
+- **Dashboard and Planning follow-up (2026-09-29):** the home route opens the cross-module
+  Dashboard; the QSE dashboard is available at `/qse` through Stock Exchanges. Overall
+  summaries show enabled and held currencies together. The shared Page filters popup
+  contains URL-backed source/section choices and saved Net Worth inclusion preferences;
+  exchange-rate controls live behind the floating button. Source choices also apply to
+  flows, plans, and historical comparisons. Confirmed the Planning activity declaration
+  precedes its category-options calculation (the committed TDZ fix).
+
 - **Banking-style Cash and exchange detail completion (2026-09-28):** each Cash
   currency balance is now a clickable account-like entity with its own URL,
   Summary, Transactions, Analytics, and Categories sections plus a top-bar
@@ -10131,6 +10139,16 @@ from the lot system."*
   the Bank Account balance, flow, category, and expected-balance chart family.
 
 ## Pending
+
+- Explicit application type-check (`tsc -p tsconfig.app.json --noEmit`, 2026-10-04)
+  still reports errors in CashPage, PlanningPage, and RentalsPage. The current build
+  command checks the root references file, so a successful production build alone
+  does not establish that every application TypeScript file passes.
+
+- Verification follow-up (2026-09-29): the full suite currently has eight failures across
+  resetLocalData, categoryMerge, planControls, useUrlTransactionFilters, and bankNavigation.
+  Dashboard regression tests pass. Repository lint also reports existing hook-rule errors
+  in TransactionEntryModal; these broader checks need a separate cleanup.
 
 - Batch editing follow-ups: extend the shared grid to other modules; design explicit
   linked-side and recurring/generated-plan editing; add clipboard range paste and

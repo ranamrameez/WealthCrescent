@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Modal } from './Modal';
+import { PageFilterModal } from './PageFilterModal';
 import { Field, Select } from './ui/Field';
 import { currentMonthRange, presetDateRange } from '../lib/dateRange';
 import type { TransactionPageFilters, TransactionPeriod } from '../hooks/useUrlTransactionFilters';
@@ -8,7 +8,7 @@ export function TransactionFilterMenu({value,categories,accountOptions,activeCou
  const [open,setOpen]=useState(false);
  const applyPreset=(period:TransactionPeriod)=>{if(period==='since-month'){const r=currentMonthRange();onChange({period,fromDate:r.startDate,toDate:r.endDate});return;}if(period==='all'){onChange({period,fromDate:'',toDate:''});return;}if(period==='custom'){onChange({period});return;}const r=presetDateRange(period);onChange({period,fromDate:r.startDate,toDate:r.endDate});};
  return <><button type="button" className="btn secondary small topbar-filter-btn" onClick={()=>setOpen(true)}><FilterIcon size={14}/> Filters{activeCount?` (${activeCount})`:''}</button>
- {open&&<Modal title="Page filters" onClose={()=>setOpen(false)} widthClass="50">
+ {open&&<PageFilterModal onClose={()=>setOpen(false)} onReset={onClear}>
   <div className="filter-preset-row">{(['since-month','3','6','12','ytd','all','custom'] as TransactionPeriod[]).map(p=><button key={p} type="button" className={`chip${value.period===p?' active':''}`} onClick={()=>applyPreset(p)}>{p==='since-month'?'This month':p==='ytd'?'YTD':p==='all'?'All time':p==='custom'?'Custom':`${p}M`}</button>)}</div>
   <div className="filter-fields-grid">
    <Field label="From"><input type="date" value={value.fromDate} max={value.toDate||undefined} onChange={e=>onChange({period:'custom',fromDate:e.target.value})}/></Field>
@@ -18,6 +18,5 @@ export function TransactionFilterMenu({value,categories,accountOptions,activeCou
    {accountOptions?.length ? <Field label="Account"><Select value={value.accountId} onChange={e=>onChange({accountId:e.target.value})}><option value="all">All accounts</option>{accountOptions.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</Select></Field> : null}
    <Field label="Source"><Select value={value.source} onChange={e=>onChange({source:e.target.value as TransactionPageFilters['source']})}><option value="all">All</option><option value="manual">Manual</option><option value="statement-import">Imported</option></Select></Field>
   </div>
-  <div className="modal-footer-actions"><button type="button" className="btn secondary small" onClick={onClear}>Reset</button><button type="button" className="btn small" onClick={()=>setOpen(false)}>Done</button></div>
- </Modal>}</>;
+ </PageFilterModal>}</>;
 }

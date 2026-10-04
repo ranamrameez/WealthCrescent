@@ -22,7 +22,7 @@ export type CategoryKey = 'netWorth' | 'stocks' | 'funds' | 'bank' | 'cash' | 'p
 // every module page.
 const CATEGORIES: { key: CategoryKey; label: string; to: string; icon: ReactNode }[] = [
   { key: 'netWorth', label: 'Dashboard', to: '/net-worth', icon: <DashboardIcon /> },
-  { key: 'stocks', label: 'Stock Exchanges', to: '/', icon: <StocksIcon /> },
+  { key: 'stocks', label: 'Stock Exchanges', to: '/qse', icon: <StocksIcon /> },
   { key: 'funds', label: 'Funds', to: '/funds', icon: <FundsIcon /> },
   { key: 'bank', label: 'Banking', to: '/bank', icon: <BankIcon /> },
   { key: 'cash', label: 'Cash', to: '/cash', icon: <CashIcon /> },

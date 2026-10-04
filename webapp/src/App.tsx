@@ -170,7 +170,8 @@ function App() {
         <AppShell user={user}>
           <ErrorBoundary>
             <Routes>
-              <Route path="/" element={<DashboardPage />} />
+              <Route path="/" element={<Navigate to="/net-worth" replace />} />
+              <Route path="/qse" element={<DashboardPage />} />
               <Route path="/portfolio" element={<PortfolioPage />} />
               <Route path="/transactions" element={<TransactionsPage />} />
               <Route path="/watchlist" element={<WatchlistPage />} />
