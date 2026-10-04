@@ -5,7 +5,7 @@
     <title>TheGroup Price Sync — Options</title>
     <style>
       body {
-        max-width: 640px;
+        max-width: 1200px;
         margin: 30px auto;
         font: 14px/1.5 -apple-system, Segoe UI, Roboto, sans-serif;
         color: #1a1a2e;
@@ -31,7 +31,7 @@
         color: #555;
         margin: 10px 0 4px;
       }
-      input[type='text'] {
+      input, select {
         width: 100%;
         box-sizing: border-box;
         padding: 7px 9px;
@@ -82,52 +82,20 @@
         font-size: 12px;
         margin-left: 10px;
       }
+      .row, .filters { display:flex; gap:10px; flex-wrap:wrap; }
+      .row > label { flex:1; }
+      .filters > label { flex:1; min-width:130px; }
+      table { width:100%; border-collapse:collapse; text-align:left; }
+      th, td { padding:10px; border-bottom:1px solid #e5e5f0; vertical-align:top; }
+      button:disabled { opacity:.5; cursor:default; }
+      .secondary { background:#e6e6f0; color:#1a1a4e; }
+      h2 { margin-top:0; }
     </style>
   </head>
   <body>
     <h1>TheGroup Price Sync — Options</h1>
-    <p class="muted">
-      These settings only affect HOW the page is scraped (which URL, which
-      CSS selectors). Sign-in and the Firebase push-throttle settings live in
-      the extension's popup, not here.
-    </p>
-
-    <div class="card">
-      <h2>Target page</h2>
-      <label>Market-watch URL</label>
-      <input id="targetUrl" type="text" />
-      <div class="muted">
-        Must be a page open in one of your browser tabs — the extension
-        reads whatever is already rendered there, it does not fetch or log
-        in on its own.
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>Row/column selectors <span class="muted">(leave blank to auto-detect)</span></h2>
-      <label>Row selector <span class="muted">— one CSS selector matching each stock row</span></label>
-      <input id="rowSelector" type="text" placeholder="e.g. table.market-watch tbody tr" />
-      <label>Ticker selector <span class="muted">— relative to each row</span></label>
-      <input id="tickerSelector" type="text" placeholder="e.g. td:nth-child(1)" />
-      <label>Price selector <span class="muted">— relative to each row</span></label>
-      <input id="priceSelector" type="text" placeholder="e.g. td:nth-child(3)" />
-      <label>Change % selector <span class="muted">(optional)</span></label>
-      <input id="changeSelector" type="text" placeholder="e.g. td:nth-child(4)" />
-      <label>Company name selector <span class="muted">(optional, but needed to fill in missing ticker names)</span></label>
-      <input id="nameSelector" type="text" placeholder="e.g. td:nth-child(2)" />
-      <div class="muted" style="margin-top: 4px">
-        WealthCrescent's bundled ticker list is missing quite a few real QSE
-        symbols — whatever company name is captured here gets pushed into
-        the shared database too, alongside the price, so the app's ticker
-        coverage fills in from real scraped data instead of staying stuck
-        with an old hand-typed list.
-      </div>
-      <div>
-        <button id="saveBtn">Save</button>
-        <span id="savedMsg" class="saved" hidden>Saved.</span>
-      </div>
-    </div>
-
+    <div class="card" id="scrapingControls"></div>
+    <div class="card" id="configCard"></div>
     <div class="card">
       <h2>Test scrape</h2>
       <p class="muted">
@@ -142,6 +110,21 @@
       <pre id="testOutput">(no test run yet)</pre>
     </div>
 
+    <div class="card">
+      <h2>Scraped data and raw audit history</h2>
+      <p class="muted">Stored locally in this browser, including manual and test scrapes. Dates and times use Qatar time. Raw values preserve source text before parsing; rejected rows remain available for inspection.</p>
+      <div class="filters">
+        <label>From date<input id="fromDate" type="date"></label><label>To date<input id="toDate" type="date"></label>
+        <label>Ticker<input id="tickerFilter" type="text" placeholder="e.g. QNBK"></label>
+        <label>Strategy<select id="strategyFilter"><option value="">All</option><option value="configured">Configured</option><option value="heuristic">Heuristic</option></select></label>
+        <label>Result<select id="acceptedFilter"><option value="">All</option><option value="true">Accepted</option><option value="false">Rejected</option></select></label>
+        <label>Source<select id="sourceFilter"><option value="">All</option><option>automatic</option><option>manual</option><option>test</option></select></label>
+        <label>Rows per page<select id="pageSize"><option>25</option><option>50</option><option>100</option></select></label>
+      </div>
+      <button id="refreshData">Refresh data</button><p id="dataMessage" role="status"></p>
+      <div style="overflow:auto"><table><thead><tr><th>Captured (Qatar)</th><th>Ticker</th><th>Parsed price</th><th>Result</th><th>Strategy / source</th><th>Raw key/value pairs</th></tr></thead><tbody id="dataRows"></tbody></table></div>
+      <button id="prevPage">Previous</button> <span id="pageInfo"></span> <button id="nextPage">Next</button>
+    </div>
     <script type="module" src="options.js"></script>
   </body>
 </html>

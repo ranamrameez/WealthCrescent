@@ -1,3 +1,5 @@
+import { saveAudit } from './audit.js';
+import { setSyncConfig, withinScrapingWindow } from './common.js';
 // Background service worker: owns the collect → (throttled, randomized)
 // push loop, Firebase Auth (email/password, via plain REST calls — no SDK
 // bundling needed in an MV3 service worker), and the safe read-modify-write
@@ -246,12 +248,23 @@ async function scrapeTab(tab, overrideConfig) {
 
 // ---------- The collect → throttled/randomized push cycle ----------
 
-async function runCycle({ forcePush = false } = {}) {
+let cycleRunning = false;
+async function runCycle(options = {}) {
+  if (cycleRunning) return;
+  cycleRunning = true;
+  try { await collectCycle(options); } finally { cycleRunning = false; await scheduleNextCollect(); }
+}
+async function collectCycle({ forcePush = false, manual = false } = {}) {
+  const config = await getSyncConfig();
+  if (!manual && (!config.scrapingEnabled || !withinScrapingWindow(config))) {
+    await scheduleNextCollect();
+    return;
+  }
   const scrapeConfig = await getScrapeConfig();
   const tab = await findTargetTab(scrapeConfig.targetUrl);
   if (!tab) {
     await patchStatus({ lastError: 'No matching tab open — open the market page for auto-refresh to work.' });
-    scheduleNextCollect();
+    await scheduleNextCollect();
     return;
   }
 
@@ -262,6 +275,7 @@ async function runCycle({ forcePush = false } = {}) {
     return;
   }
 
+  await saveAudit(result, tab.url, manual ? 'manual' : 'automatic');
   const rows = result.rows || [];
   await patchStatus({
     lastScrapeAt: Date.now(),
@@ -279,7 +293,7 @@ async function runCycle({ forcePush = false } = {}) {
   const syncConfig = await getSyncConfig();
   const due = forcePush || !status.nextPushAt || Date.now() >= status.nextPushAt;
 
-  if (due) {
+  if (due && (manual || (await getSyncConfig()).scrapingEnabled)) {
     try {
       const { pushed, namesPushed, total, errors } = await pushRows(rows);
       const floorMs = syncConfig.minPushIntervalMinutes * 60000;
@@ -300,16 +314,17 @@ async function runCycle({ forcePush = false } = {}) {
     }
   }
 
-  scheduleNextCollect();
+  await scheduleNextCollect();
 }
 
-function scheduleNextCollect() {
+async function scheduleNextCollect() {
+  if (!(await getSyncConfig()).scrapingEnabled) { await chrome.alarms.clear(COLLECT_ALARM); return; }
   const delaySec = randInt(COLLECT_MIN_SECONDS, COLLECT_MAX_SECONDS);
   chrome.alarms.create(COLLECT_ALARM, { when: Date.now() + delaySec * 1000 });
 }
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === COLLECT_ALARM) runCycle();
+  if (alarm.name === COLLECT_ALARM) runCycle().catch(e => patchStatus({ lastError: e.message || String(e) }));
 });
 
 chrome.runtime.onInstalled.addListener(() => scheduleNextCollect());
@@ -320,6 +335,19 @@ chrome.runtime.onStartup.addListener(() => scheduleNextCollect());
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {
     switch (message?.type) {
+      case 'START_SCRAPING': {
+        await setSyncConfig({ scrapingEnabled: true });
+        await runCycle();
+        await scheduleNextCollect();
+        sendResponse({ ok: true });
+        break;
+      }
+      case 'STOP_SCRAPING': {
+        await setSyncConfig({ scrapingEnabled: false });
+        await chrome.alarms.clear(COLLECT_ALARM);
+        sendResponse({ ok: true });
+        break;
+      }
       case 'SIGN_IN': {
         try {
           const auth = await signInWithPassword(message.email, message.password);
@@ -344,12 +372,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         break;
       }
       case 'SCRAPE_NOW_MANUAL': {
-        await runCycle({ forcePush: false });
+        await runCycle({ forcePush: false, manual: true });
         sendResponse({ ok: true });
         break;
       }
       case 'PUSH_NOW': {
-        await runCycle({ forcePush: true });
+        await runCycle({ forcePush: true, manual: true });
         sendResponse({ ok: true });
         break;
       }
@@ -365,12 +393,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         // whatever's currently saved, so Options' "Test scrape" reflects
         // in-progress edits immediately.
         const result = await scrapeTab(tab, message.config);
+        if (result.ok) await saveAudit(result, tab.url, 'test');
         sendResponse(result);
         break;
       }
       default:
         sendResponse({ ok: false, error: `Unknown message type: ${message?.type}` });
     }
-  })();
+  })().catch(e => sendResponse({ ok: false, error: e.message || String(e) }));
   return true; // async response
 });

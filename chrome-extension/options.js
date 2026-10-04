@@ -1,61 +1,50 @@
-import { getScrapeConfig, setScrapeConfig } from './common.js';
+﻿import { mountConfig, mountControls } from './config-ui.js';
+import { queryAudit } from './audit.js';
+const $ = id => document.getElementById(id);
+await mountConfig($('configCard'));
+await mountControls($('scrapingControls'));
 
-const $ = (id) => document.getElementById(id);
-
-function sendMessage(msg) {
-  return new Promise((resolve) => chrome.runtime.sendMessage(msg, resolve));
-}
-
-function readFields() {
-  return {
-    targetUrl: $('targetUrl').value.trim(),
-    rowSelector: $('rowSelector').value.trim(),
-    tickerSelector: $('tickerSelector').value.trim(),
-    priceSelector: $('priceSelector').value.trim(),
-    changeSelector: $('changeSelector').value.trim(),
-    nameSelector: $('nameSelector').value.trim(),
-  };
-}
-
-async function load() {
-  const cfg = await getScrapeConfig();
-  $('targetUrl').value = cfg.targetUrl;
-  $('rowSelector').value = cfg.rowSelector;
-  $('tickerSelector').value = cfg.tickerSelector;
-  $('priceSelector').value = cfg.priceSelector;
-  $('changeSelector').value = cfg.changeSelector;
-  $('nameSelector').value = cfg.nameSelector;
-}
-
-$('saveBtn').addEventListener('click', async () => {
-  await setScrapeConfig(readFields());
-  $('savedMsg').hidden = false;
-  setTimeout(() => ($('savedMsg').hidden = true), 1500);
-});
-
-$('testBtn').addEventListener('click', async () => {
+$('testBtn').onclick = async () => {
   $('testBtn').disabled = true;
   $('testOutput').textContent = 'Scraping…';
-  $('testStrategy').innerHTML = '';
-  const fields = readFields();
-  const res = await sendMessage({
-    type: 'TEST_SCRAPE',
-    targetUrl: fields.targetUrl,
-    config: fields,
-  });
-  $('testBtn').disabled = false;
-  if (!res?.ok) {
-    $('testOutput').textContent = `Error: ${res?.error || 'unknown error'}`;
-    return;
-  }
-  const strategyPill =
-    res.strategy === 'configured'
-      ? '<span class="pill pill-ok">using your selectors</span>'
-      : '<span class="pill pill-warn">auto-detect heuristic (no/empty selectors matched)</span>';
-  $('testStrategy').innerHTML = strategyPill;
-  $('testOutput').textContent = res.rows.length
-    ? JSON.stringify(res.rows.slice(0, 25), null, 2) + (res.rows.length > 25 ? `\n… and ${res.rows.length - 25} more` : '')
-    : 'Scraped 0 rows. Adjust the selectors above and try again, or make sure the market page tab is actually open and finished loading.';
-});
-
-load();
+  try {
+    const form = $('configCard').querySelector('form');
+    const config = Object.fromEntries(['targetUrl', 'rowSelector', 'tickerSelector', 'priceSelector', 'changeSelector', 'nameSelector'].map(key => [key, form.elements[key].value.trim()]));
+    const result = await chrome.runtime.sendMessage({ type: 'TEST_SCRAPE', targetUrl: config.targetUrl, config });
+    if (!result?.ok) throw new Error(result?.error || 'No response');
+    $('testStrategy').textContent = `Strategy: ${result.strategy}`;
+    $('testOutput').textContent = JSON.stringify(result, null, 2);
+    page = 1; await renderData();
+  } catch (error) { $('testOutput').textContent = error.message; }
+  finally { $('testBtn').disabled = false; }
+};
+let page = 1;
+let requestVersion = 0;
+async function renderData() {
+  const version = ++requestVersion;
+  try {
+    if ($('fromDate').value && $('toDate').value && $('fromDate').value > $('toDate').value) throw new Error('From date must be before or equal to To date.');
+    const pageSize = Number($('pageSize').value);
+    const result = await queryAudit({ from: $('fromDate').value, to: $('toDate').value, ticker: $('tickerFilter').value.trim(), strategy: $('strategyFilter').value, accepted: $('acceptedFilter').value, source: $('sourceFilter').value, page, pageSize });
+    if (version !== requestVersion) return;
+    const pages = Math.max(1, Math.ceil(result.total / pageSize));
+    if (page > pages) { page = pages; return renderData(); }
+    $('dataRows').replaceChildren();
+    for (const row of result.rows) {
+      const tr = document.createElement('tr');
+      const values = [new Date(row.capturedAt).toLocaleString('en-GB', { timeZone: 'Asia/Qatar' }), row.ticker || '—', row.price ?? '—', row.accepted ? 'Accepted' : 'Rejected', `${row.strategy} / ${row.source}`];
+      for (const value of values) { const td = document.createElement('td'); td.textContent = value; tr.append(td); }
+      const td = document.createElement('td'); const details = document.createElement('details'); const summary = document.createElement('summary'); summary.textContent = `${row.raw?.length || 0} raw pairs`;
+      const pre = document.createElement('pre'); pre.textContent = JSON.stringify({ raw: row.raw, selected: row.selected, parsed: { ticker: row.ticker, price: row.price, name: row.name, changePct: row.changePct }, url: row.url }, null, 2);
+      details.append(summary, pre); td.append(details); tr.append(td); $('dataRows').append(tr);
+    }
+    $('dataMessage').textContent = result.total ? `${result.total} matching records` : 'No matching data. Open the market tab and run a scrape to collect records.';
+    $('pageInfo').textContent = `Page ${page} of ${pages}`;
+    $('prevPage').disabled = page <= 1; $('nextPage').disabled = page >= pages;
+  } catch (error) { $('dataMessage').textContent = error.message; $('dataRows').replaceChildren(); $('prevPage').disabled = true; $('nextPage').disabled = true; }
+}
+for (const id of ['fromDate', 'toDate', 'tickerFilter', 'strategyFilter', 'acceptedFilter', 'sourceFilter', 'pageSize']) $(id).addEventListener('change', () => { page = 1; renderData(); });
+$('refreshData').onclick = () => renderData();
+$('prevPage').onclick = () => { page--; renderData(); };
+$('nextPage').onclick = () => { page++; renderData(); };
+await renderData();

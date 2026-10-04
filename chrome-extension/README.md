@@ -24,7 +24,7 @@ is what actually fills in the app's ticker coverage, not a one-off manual edit.
   is far more reliable once you've seen the real page's layout.
 - **`background.js`** (the MV3 service worker) does everything else:
   - **Collects** (asks the content script to re-scrape) every ~45–90 seconds (randomized,
-    not a fixed period) whenever the market page is open in some tab. This is free/local —
+    not a fixed period) while scraping is enabled, within the configured Qatar-time windows, and the market page is open in a tab. This is free/local —
     no network request beyond talking to the tab.
   - **Pushes** the latest scrape to Firebase only once at least the configured minimum
     number of minutes has passed since the last push, **plus a random extra delay on top**
@@ -159,3 +159,26 @@ anything other than a slow, occasional refresh. Even so, check The Group's own t
 use for their market-data page before leaving this running long-term, and keep the push
 floor at a sane value (2+ minutes) rather than cranking it down — this protects both
 Firebase's write limits and the brokerage's own servers.
+
+## Configurations, controls and audit history
+
+The popup and extension page share a Configurations card containing the market URL,
+all selectors, Firebase push interval and editable start/end time pairs. Defaults are
+09:30?13:00 and 13:10?13:15 in Asia/Qatar. End times are exclusive; overnight
+windows are supported. Start/Stop controls persist across browser restarts. A scrape
+already in progress may finish when stopped. Manual scrape, push and test actions
+work outside scheduled windows.
+
+Open the extension page from the popup to inspect paginated local audit history.
+Filter by Qatar date range, ticker, strategy, accepted/rejected result and scrape source.
+Expand a record to inspect original column key/value text and selected source fields
+before parsing. Invalid, nonpositive prices and invalid ticker symbols are excluded
+from Firebase writes while remaining in the audit. History starts after this update;
+it is stored in extension-local IndexedDB and is removed when the extension is uninstalled.
+Audit data is not pushed to Firebase. No automatic history pruning is performed.
+
+Run extension regression checks with:
+
+```sh
+node --test chrome-extension/extension.test.cjs
+```

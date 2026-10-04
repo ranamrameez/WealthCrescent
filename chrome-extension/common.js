@@ -51,6 +51,8 @@ export const DEFAULT_SCRAPE_CONFIG = {
 
 export const DEFAULT_SYNC_CONFIG = {
   minPushIntervalMinutes: DEFAULT_MIN_PUSH_INTERVAL_MINUTES,
+  scrapingEnabled: true,
+  timeWindows: [{ start: '09:30', end: '13:00' }, { start: '13:10', end: '13:15' }],
 };
 
 export async function getStorage(keys) {
@@ -94,9 +96,15 @@ export async function getSyncConfig() {
 export async function setSyncConfig(patch) {
   const current = await getSyncConfig();
   const next = { ...current, ...patch };
+  if (!Array.isArray(next.timeWindows) || !next.timeWindows.length || next.timeWindows.some(w => !/^([01]\d|2[0-3]):[0-5]\d$/.test(w.start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(w.end) || w.start === w.end)) throw new Error('Provide at least one valid start/end pair with different times.');
   next.minPushIntervalMinutes = Math.max(MIN_PUSH_INTERVAL_MINUTES_FLOOR, Number(next.minPushIntervalMinutes) || DEFAULT_MIN_PUSH_INTERVAL_MINUTES);
   await setStorage({ [STORAGE_KEYS.SYNC_CONFIG]: next });
   return next;
+}
+
+export function withinScrapingWindow(config, now = new Date()) {
+  const time = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Qatar', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(now);
+  return config.timeWindows.some(({ start, end }) => start < end ? time >= start && time < end : time >= start || time < end);
 }
 
 // Prices AND ticker names are written to the SAME shared `stockData/QSE`

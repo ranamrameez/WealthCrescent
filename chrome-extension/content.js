@@ -6,6 +6,13 @@
 // extension's own background service worker with the parsed rows.
 
 const STORAGE_KEY = 'scrapeConfig';
+let auditRows = [];
+function captureRaw(row, ticker, price, selected = {}) {
+  const cells = Array.from(row.querySelectorAll('[col-id], td, th, [role="gridcell"]'));
+  const source = cells.length ? cells : Array.from(row.children);
+  const raw = source.map((cell, index) => ({ key: cell.getAttribute('col-id') || cell.getAttribute('data-field') || 'column_' + (index + 1), value: cell.textContent || '' }));
+  auditRows.push({ ticker, price, accepted: !!ticker && Number.isFinite(price) && price > 0 && TICKER_LIKE.test(ticker), raw, selected });
+}
 
 /** A QSE ticker is 2-6 uppercase letters (occasionally digits appear on
  * some exchanges, so allow them too) — used by the heuristic fallback to
@@ -45,7 +52,8 @@ function scrapeWithConfig(cfg) {
     const nameEl = cfg.nameSelector ? row.querySelector(cfg.nameSelector) : null;
     const ticker = cellText(tickerEl).toUpperCase();
     const price = parseNumber(cellText(priceEl));
-    if (!ticker || price === null) continue;
+    captureRaw(row, ticker, price, { ticker: tickerEl?.textContent || '', price: priceEl?.textContent || '', change: changeEl?.textContent || '', name: nameEl?.textContent || '' });
+    if (!TICKER_LIKE.test(ticker) || price === null || price <= 0) continue;
     out.push({
       ticker,
       price,
@@ -109,6 +117,7 @@ function extractRows(rows, cellsOf) {
         break;
       }
     }
+    captureRaw(row, ticker, price);
     if (price === null) continue;
     seen.add(ticker);
     const nextText = cellText(cells[tickerIdx + 1]);
@@ -198,7 +207,8 @@ function scrapeAgGrid() {
     if (!ticker || seen.has(ticker)) continue;
     const priceEl = firstMatchingCell(row, ['lastPrice', 'last', 'price', 'ltp']);
     const price = parseNumber(cellText(priceEl));
-    if (price === null) continue;
+    captureRaw(row, ticker, price, { price: priceEl?.textContent || '' });
+    if (!TICKER_LIKE.test(ticker) || price === null || price <= 0) continue;
     const nameEl = firstMatchingCell(row, ['name', 'companyName', 'securityName']);
     const changeEl = firstMatchingCell(row, ['changePercent', 'change', 'changePct']);
     seen.add(ticker);
@@ -261,6 +271,7 @@ function scrapeHeuristic() {
 }
 
 async function scrapePrices(overrideConfig) {
+  auditRows = [];
   let cfg = overrideConfig || {};
   if (!overrideConfig) {
     try {
@@ -271,9 +282,9 @@ async function scrapePrices(overrideConfig) {
     }
   }
   const configured = scrapeWithConfig(cfg);
-  if (configured) return { rows: configured, strategy: 'configured' };
+  if (configured) return { rows: configured, strategy: 'configured', auditRows };
   const heuristic = scrapeHeuristic();
-  return { rows: heuristic, strategy: 'heuristic' };
+  return { rows: heuristic, strategy: 'heuristic', auditRows };
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

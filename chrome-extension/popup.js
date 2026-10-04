@@ -1,4 +1,5 @@
-import { getAuth, getSyncConfig, setSyncConfig, getStatus, getScrapeConfig } from './common.js';
+import { mountConfig, mountControls } from './config-ui.js';
+import { getAuth, getStatus, getScrapeConfig } from './common.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -32,7 +33,7 @@ async function renderStatus() {
     `Last push: ${fmtAgo(status.lastPushAt)}${status.lastPushCount != null ? ` — ${status.lastPushCount}/${status.lastPushTotal} ticker(s), ${status.lastNamesCount || 0} name(s)` : ''}`,
     `Next push due: ${fmtIn(status.nextPushAt)}`,
   ];
-  $('statusLines').innerHTML = lines.map((l) => `<div>${l}</div>`).join('');
+  $('statusLines').replaceChildren(...lines.map(line => { const div = document.createElement('div'); div.textContent = line; return div; }));
   $('statusError').textContent = status.lastError || '';
 }
 
@@ -42,8 +43,7 @@ async function renderAuthState() {
   $('signedInView').hidden = !auth;
   if (auth) {
     $('emailLabel').textContent = auth.email || auth.uid;
-    const sync = await getSyncConfig();
-    $('minPushMinutes').value = sync.minPushIntervalMinutes;
+
     await renderStatus();
   }
 }
@@ -74,11 +74,7 @@ $('signOutBtn').addEventListener('click', async () => {
   await renderAuthState();
 });
 
-$('minPushMinutes').addEventListener('change', async (e) => {
-  const value = Math.max(2, Number(e.target.value) || 2);
-  e.target.value = value;
-  await setSyncConfig({ minPushIntervalMinutes: value });
-});
+
 
 $('scrapeNowBtn').addEventListener('click', async () => {
   $('scrapeNowBtn').disabled = true;
@@ -110,3 +106,6 @@ renderAuthState();
 setInterval(() => {
   if (!$('signedInView').hidden) renderStatus();
 }, 5000);
+
+mountConfig($('configCard'));
+mountControls($('scrapingControls'));
