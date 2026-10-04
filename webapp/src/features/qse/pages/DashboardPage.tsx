@@ -4,7 +4,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { EntityScopeMenu, selectedEntityValues } from '../../../components/EntityScopeMenu';
 import { TopBarControls } from '../../../components/TopBarControls';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
-import { Bar, Doughnut, Line } from 'react-chartjs-2';
+import { StockBar as Bar, StockDoughnut as Doughnut, StockLine as Line } from '../../../components/StockCharts';
+import { stockTickerColor } from '../../../lib/stockChartTheme';
 import { StatCard } from '../../../components/Card';
 import { StandardCard } from '../../../components/StandardCard';
 import { Sparkline } from '../../../components/Sparkline';
@@ -25,7 +26,7 @@ import { useWorkbookStore } from '../../../store/workbookStore';
 import { useAmountFormat } from '../../../hooks/useAmountFormat';
 import { useSortableRows } from '../../../hooks/useSortableRows';
 import { AlertsBox, useQSEAlerts } from '../components/AlertsBox';
-import { ChartCard } from '../components/ChartCard';
+import { StockAnalyticsCard as ChartCard } from '../../../components/StockAnalyticsCard';
 import { useQSEDerived } from '../hooks/useQSEDerived';
 import { useQSEStrategicDerived } from '../hooks/useQSEStrategicDerived';
 import { useQSEStockData } from '../hooks/useQSEStockData';
@@ -266,7 +267,7 @@ function DashboardPositionsView({ workbook, calcFee, positions, rows, summary, r
               labels: rows.map((r) => r.ticker),
               datasets: [{
                 data: rows.map((r) => r.invested),
-                backgroundColor: rows.map((r, i) => dimColor(INVEST_PALETTE[i % INVEST_PALETTE.length], !!hoveredTicker && hoveredTicker !== r.ticker)),
+                backgroundColor: rows.map((r) => dimColor(stockTickerColor(r.ticker), !!hoveredTicker && hoveredTicker !== r.ticker)),
               }],
             }}
             options={{

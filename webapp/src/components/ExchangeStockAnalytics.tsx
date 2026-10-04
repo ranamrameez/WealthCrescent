@@ -1,19 +1,29 @@
+import { StockPLCharts } from './StockPLCharts';
+import type { StockBasisMethod } from '../lib/calc/stockPLHistory';
 import { useMemo } from 'react';
-import { Bar, Doughnut, Line } from 'react-chartjs-2';
+import { StockBar as Bar, StockDoughnut as Doughnut, StockLine as Line } from './StockCharts';
+import { STOCK_BUY_COLOR, STOCK_SELL_COLOR, STOCK_HOLDINGS_COLOR } from '../lib/stockChartTheme';
+import { StockTradingChart } from './StockTradingChart';
 import { AnalyticsChartCard } from './AnalyticsChartCard';
 import { MoneyValue } from './Card';
 import { applyChartTheme } from '../lib/chartSetup';
-import { cssVar } from '../lib/cssVar';
 import { useAppearanceStore } from '../store/appearanceStore';
-import type { Transaction } from '../types/workbook';
+import type { Transaction, FeeCalculator, PricePoint } from '../types/workbook';
 import { gridAutoStyle } from '../lib/gridStyle';
+import { fmtMoney } from '../lib/format';
 
 export function ExchangeStockAnalytics({
   ticker,
   transactions,
   currency,
   formatPrice,
+  priceHistory,
+  calcFee,
+  method,
 }: {
+  priceHistory: Record<string, PricePoint[]>;
+  calcFee: FeeCalculator;
+  method?: StockBasisMethod;
   ticker: string;
   transactions: Transaction[];
   currency: string;
@@ -48,9 +58,9 @@ export function ExchangeStockAnalytics({
   }, [trades]);
 
   if (!trades.length) return <p className="text-muted">Add a completed trade to see stock analytics.</p>;
-  const profit = cssVar('--profit') || '#3ecf8e';
-  const loss = cssVar('--loss') || '#e5484d';
-  const accent = cssVar('--accent') || '#5aa9c9';
+  const buy = STOCK_BUY_COLOR;
+  const sell = STOCK_SELL_COLOR;
+  const holdings = STOCK_HOLDINGS_COLOR;
   return <div>
     <div className="grid-auto mb-md" style={gridAutoStyle(170, 12)}>
       <div className="stat-card card"><div className="label">Bought</div><MoneyValue n={analytics.buyValue} currency={currency} /><div className="sub">{analytics.buyShares.toLocaleString()} shares</div></div>
@@ -58,24 +68,20 @@ export function ExchangeStockAnalytics({
       <div className="stat-card card"><div className="label">Average buy</div><div className="value">{formatPrice(analytics.buyShares ? analytics.buyValue / analytics.buyShares : 0)}</div></div>
       <div className="stat-card card"><div className="label">Average sell</div><div className="value">{formatPrice(analytics.sellShares ? analytics.sellValue / analytics.sellShares : 0)}</div></div>
     </div>
+    <StockTradingChart ticker={ticker} transactions={transactions} currency={currency} />
+    <StockPLCharts transactions={trades} priceHistory={priceHistory} calcFee={calcFee} method={method} currency={currency} />
     <div className="analytics-grid">
       <AnalyticsChartCard title="Monthly trading value" tooltip="The total value bought and sold each month for this stock.">
         <Bar data={{ labels: analytics.months.map(([month]) => month), datasets: [
-          { label: 'Bought', data: analytics.months.map(([, row]) => row.buy), backgroundColor: accent },
-          { label: 'Sold', data: analytics.months.map(([, row]) => row.sell), backgroundColor: profit },
-        ] }} />
+          { label: 'Bought', data: analytics.months.map(([, row]) => row.buy), backgroundColor: buy },
+          { label: 'Sold', data: analytics.months.map(([, row]) => row.sell), backgroundColor: sell },
+        ] }} options={{ scales: { y: { beginAtZero: true, title: { display: true, text: currency } } }, plugins: { tooltip: { callbacks: { label: item => `${item.dataset.label}: ${fmtMoney(Number(item.raw), currency)}` } } } }} />
       </AnalyticsChartCard>
       <AnalyticsChartCard title="Buy and sell mix" tooltip="The share count bought compared with the share count sold.">
-        <Doughnut data={{ labels: ['Bought', 'Sold'], datasets: [{ data: [analytics.buyShares, analytics.sellShares], backgroundColor: [accent, loss] }] }} options={{ cutout: '55%' }} />
+        <Doughnut data={{ labels: ['Bought', 'Sold'], datasets: [{ data: [analytics.buyShares, analytics.sellShares], backgroundColor: [buy, sell] }] }} options={{ cutout: '48%', plugins: { tooltip: { callbacks: { label: item => `${item.label}: ${Number(item.raw).toLocaleString()} shares (${(Number(item.raw) / (analytics.buyShares + analytics.sellShares) * 100).toFixed(1)}%)` } } } }} />
       </AnalyticsChartCard>
       <AnalyticsChartCard title="Shares held over time" tooltip="Cumulative shares after every completed buy or sell.">
-        <Line data={{ labels: analytics.shareHistory.map((row) => row.date), datasets: [{ label: 'Shares', data: analytics.shareHistory.map((row) => row.shares), borderColor: accent, backgroundColor: `${accent}33`, fill: true, tension: 0.2 }] }} options={{ plugins: { legend: { display: false } } }} />
-      </AnalyticsChartCard>
-      <AnalyticsChartCard title="Monthly shares traded" tooltip="The number of shares bought and sold each month.">
-        <Bar data={{ labels: analytics.months.map(([month]) => month), datasets: [
-          { label: 'Bought', data: analytics.months.map(([, row]) => row.buyShares), backgroundColor: accent },
-          { label: 'Sold', data: analytics.months.map(([, row]) => row.sellShares), backgroundColor: loss },
-        ] }} />
+        <Line data={{ labels: analytics.shareHistory.map((row) => row.date), datasets: [{ label: 'Shares', data: analytics.shareHistory.map((row) => row.shares), borderColor: holdings, backgroundColor: `${holdings}33`, fill: true, stepped: true }] }} options={{ scales: { y: { beginAtZero: true, title: { display: true, text: 'Shares held' } } }, plugins: { legend: { display: false } } }} />
       </AnalyticsChartCard>
     </div>
   </div>;

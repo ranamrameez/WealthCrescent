@@ -1,10 +1,12 @@
+import { StockPLCharts } from '../../../components/StockPLCharts';
 import { StockTradingChart } from '../../../components/StockTradingChart';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bar, Doughnut, Line } from 'react-chartjs-2';
+import { StockBar as Bar, StockDoughnut as Doughnut, StockLine as Line } from '../../../components/StockCharts';
+import { stockTickerColor as tickerColor, STOCK_BUY_COLOR, STOCK_SELL_COLOR } from '../../../lib/stockChartTheme';
 import { ChartFilterBar } from '../../../components/ChartFilterBar';
 import { Tabs } from '../../../components/Tabs';
-import { tickerColor } from '../../../lib/cssVar';
+
 import {
   EMPTY_CHART_FILTER,
   filterMonthlyDualSeries,
@@ -18,7 +20,7 @@ import { dimColor, dlBarH, dlBarV, dlDoughnut } from '../../../lib/chartLabels';
 import { profitColor } from '../../../lib/chartLabels';
 import { applyChartTheme } from '../../../lib/chartSetup';
 import { fmt, fmtMoney } from '../../../lib/format';
-import { ChartCard } from '../../qse/components/ChartCard';
+import { StockAnalyticsCard as ChartCard } from '../../../components/StockAnalyticsCard';
 import { useChartData } from '../hooks/useChartData';
 import { usePSXDerived } from '../hooks/usePSXDerived';
 import { useAppearanceStore } from '../../../store/appearanceStore';
@@ -50,7 +52,7 @@ function tickerClickOptions(tickers: string[], navigate: ReturnType<typeof useNa
  * for PSX yet, so there's nothing to show there. */
 export function AnalyticsPage() {
   const navigate = useNavigate();
-  const { workbook, rows: allRows, summary, ledger } = usePSXDerived();
+  const { workbook, rows: allRows, summary, ledger, calcFee } = usePSXDerived();
   useAppearanceStore((s) => s.appearance);
   applyChartTheme();
   const chartData = useChartData();
@@ -94,7 +96,6 @@ export function AnalyticsPage() {
       </p>
 
       <ChartFilterBar openTickers={allRows.map(row => row.ticker)} tickers={allTickers} filter={filter} onChange={setFilter} />
-      <StockTradingChart transactions={workbook.transactions.filter(tx => (!filter.tickers.length || filter.tickers.includes(tx.ticker)) && (!filter.fromMonth || tx.date.slice(0,7) >= filter.fromMonth) && (!filter.toMonth || tx.date.slice(0,7) <= filter.toMonth))} currency={currency} />
       {isChartFilterActive(filter) && !rows.length && !lifetimeRows.length && (
         <p className="text-muted" style={{ marginTop: -8, marginBottom: 16 }}>
           No data matches the current filter.
@@ -103,6 +104,8 @@ export function AnalyticsPage() {
 
       <Tabs
         tabs={[
+          { key: 'trade-pl', label: 'Trading P/L', content: <StockPLCharts transactions={workbook.transactions} priceHistory={workbook.priceHistory} calcFee={calcFee} method={workbook.settings.costBasisMethod} currency={currency} filter={filter} /> },
+          { key: 'trading', label: 'Trading over time', content: (<StockTradingChart transactions={workbook.transactions} filter={filter} currency={currency} />) },
           {
             key: 'performance',
             label: 'Performance',
@@ -196,7 +199,7 @@ export function AnalyticsPage() {
                 </ChartCard>
                 <ChartCard title="Deposits vs invested vs net worth" unfiltered empty={summary.totalInward <= 0}>
                   <Bar
-                    data={{ labels: ['Deposits', 'Invested', 'Net worth'], datasets: [{ data: totalsVals, backgroundColor: ['#8a97a3', '#c9a227', '#3ecf8e'] }] }}
+                    data={{ labels: ['Deposits', 'Invested', 'Net worth'], datasets: [{ data: totalsVals, backgroundColor: ['#8a97a3', '#c9a227', '#a78bfa'] }] }}
                     options={{
                       scales: { y: { suggestedMin: totalsMin - totalsPad, suggestedMax: totalsMax + totalsPad } },
                       plugins: { legend: { display: false }, datalabels: dlBarV((v) => fmtMoney(v, currency)) },
@@ -210,7 +213,7 @@ export function AnalyticsPage() {
                   />
                 </ChartCard>
                 <ChartCard title="Fees paid by month" empty={!feesByMonth.months.length}>
-                  <Bar data={{ labels: feesByMonth.months, datasets: [{ label: `Fees (${currency})`, data: feesByMonth.values, backgroundColor: '#e5484d' }] }} options={{ plugins: { legend: { display: false } } }} />
+                  <Bar data={{ labels: feesByMonth.months, datasets: [{ label: `Fees (${currency})`, data: feesByMonth.values, backgroundColor: '#a78bfa' }] }} options={{ plugins: { legend: { display: false } } }} />
                 </ChartCard>
               </div>
             ),
@@ -225,8 +228,8 @@ export function AnalyticsPage() {
                     data={{
                       labels: activityByMonth.months,
                       datasets: [
-                        { label: 'Buys', data: activityByMonth.buys, backgroundColor: '#3ecf8e' },
-                        { label: 'Sells', data: activityByMonth.sells, backgroundColor: '#e5484d' },
+                        { label: 'Buys', data: activityByMonth.buys, backgroundColor: STOCK_BUY_COLOR },
+                        { label: 'Sells', data: activityByMonth.sells, backgroundColor: STOCK_SELL_COLOR },
                       ],
                     }}
                     options={{ scales: { x: { stacked: true }, y: { stacked: true } }, plugins: { datalabels: { display: (ctx) => (ctx.dataset.data[ctx.dataIndex] as number) > 0, color: '#fff' } } }}

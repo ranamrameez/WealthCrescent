@@ -164,7 +164,7 @@
      highlight. */
   background:transparent;
 }
-.standard-card-header{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(40px,1fr);align-items:center;gap:12px;padding:12px 14px;border-bottom:0px solid var(--border);}
+.standard-card-header{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr) auto;align-items:center;gap:12px;padding:12px 14px;border-bottom:0px solid var(--border);}
 
 /* .standard-card-toggle{display:flex;align-items:center;gap:8px;min-width:0;border:0;background:transparent;color:var(--text);cursor:pointer;text-align:left;padding:0;} */
 .standard-card-toggle {
@@ -2529,3 +2529,8 @@ html[data-density="console"] tbody td {
   .modal-box { max-height:92vh; }
   .modal-box.fullscreen { height:100vh; max-height:100vh; }
 }
+
+/* With no summary pills, the title owns all space up to the actions. */
+.standard-card-header:has(> .standard-card-summary:empty){grid-template-columns:minmax(0,1fr) auto;}
+.standard-card-summary:empty{display:none;}
+.standard-card-title{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}

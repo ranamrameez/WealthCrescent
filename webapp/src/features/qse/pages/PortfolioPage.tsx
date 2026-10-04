@@ -1,3 +1,4 @@
+import { StockPLCharts } from '../../../components/StockPLCharts';
 import { StockTradingChart } from '../../../components/StockTradingChart';
 import { PriceInput } from '../../../components/ui/PriceInput';
 import { useMemo, useState } from 'react';
@@ -273,7 +274,7 @@ function ClosedPositionsTable({ onSelect }: { onSelect: (ticker: string) => void
 }
 
 export function PortfolioPage() {
- const { workbook } = useQSEDerived();
+  const { workbook, calcFee } = useQSEDerived();
   const navigate = useNavigate();
   const goToStock = (ticker: string) => navigate(`/stock/${ticker}`);
 
@@ -281,10 +282,10 @@ export function PortfolioPage() {
     <div>
       <h1 className="pagetitle">Portfolio</h1>
       <p className="pagesub">Open positions and closed trade history.</p>
-      <StockTradingChart transactions={workbook.transactions} currency={workbook.settings.currency} />
       <Tabs
         tabs={[
           { key: 'open', label: 'Holdings', content: <OpenPositionsTable onSelect={goToStock} />, headerExtra: <StatSourceBadge source="official" /> },
+          { key: 'analytics', label: 'Analytics', content: <><StockTradingChart transactions={workbook.transactions} currency={workbook.settings.currency} /><StockPLCharts transactions={workbook.transactions} priceHistory={workbook.priceHistory} calcFee={calcFee} method={workbook.settings.costBasisMethod} currency={workbook.settings.currency} /></> },
           { key: 'closed', label: 'History', content: <ClosedPositionsTable onSelect={goToStock} />, headerExtra: <StatSourceBadge source="official" /> },
         ]}
       />

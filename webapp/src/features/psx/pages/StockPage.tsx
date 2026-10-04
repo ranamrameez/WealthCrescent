@@ -1,4 +1,3 @@
-import { StockTradingChart } from '../../../components/StockTradingChart';
 import { PriceInput } from "../../../components/ui/PriceInput";
 import { Fragment, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -379,7 +378,6 @@ export function StockPage() {
         </h1>
       </div>
 
-      <StockTradingChart ticker={ticker} transactions={workbook.transactions} currency={workbook.settings.currency} />
       <StandardPageSections
         sections={[
           { key: 'summary', label: 'Summary', content: <PositionDetail ticker={ticker} />, unframed: true },
@@ -402,7 +400,7 @@ export function StockPage() {
           {
             key: 'analytics',
             label: 'Analytics',
-            content: <ExchangeStockAnalytics ticker={ticker} transactions={workbook.transactions} currency={workbook.settings.currency} formatPrice={fmtPSXPrice} />,
+            content: <ExchangeStockAnalytics ticker={ticker} transactions={workbook.transactions} priceHistory={workbook.priceHistory} calcFee={calcFee} method={workbook.settings.costBasisMethod} currency={workbook.settings.currency} formatPrice={fmtPSXPrice} />,
           },
           // Pending item 49 ("assess a stock in one go"): see the identical
           // comment in QSE's StockPage.tsx.

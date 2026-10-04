@@ -1,6 +1,8 @@
+import { StockPriceCharts } from '../../../components/StockPriceCharts';
 import { PriceInput } from "../../../components/ui/PriceInput";
 import { useEffect, useMemo, useState } from 'react';
-import { Bar, Line } from 'react-chartjs-2';
+import { StockBar as Bar } from '../../../components/StockCharts';
+import { STOCK_BUY_COLOR, STOCK_SELL_COLOR } from '../../../lib/stockChartTheme';
 import { StandardCard } from '../../../components/StandardCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { EditIcon, SaveIcon, TrashIcon, XIcon } from '../../../components/icons';
@@ -362,40 +364,8 @@ export function PositionDetail({ ticker }: { ticker: string }) {
 
       {/* Daily price — the single most-asked-about number, so it leads
           instead of being buried under other sections. */}
-      <StandardCard title={<span>Daily price</span>} className="mb-12">
-      {stats ? (
-        <CompactChart height={130}>
-          <Line
-            data={{
-              labels: stats.chronological.map((p) => p.date),
-              datasets: [
-                {
-                  label: 'Price',
-                  data: stats.chronological.map((p) => p.price),
-                  borderColor: '#c9a35a',
-                  backgroundColor: 'rgba(201,163,90,0.12)',
-                  fill: true,
-                  tension: 0.25,
-                  // A single day of price history has no line to draw and
-                  // pointRadius:0 hides the dot too — the chart looked
-                  // completely blank (a real user-reported "not working"
-                  // bug) with exactly one data point, which is the common
-                  // case for a ticker whose price was only just set today.
-                  pointRadius: stats.chronological.length > 1 ? 0 : 3,
-                  borderWidth: 1.75,
-                },
-              ],
-            }}
-            options={{
-              maintainAspectRatio: false,
-              plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
-              scales: { x: { display: false }, y: { display: false } },
-            }}
-          />
-        </CompactChart>
-      ) : (
-        <p className="text-muted">No price history recorded for {ticker} yet.</p>
-      )}
+      <StandardCard title={<span>Daily and lifetime market prices</span>} className="mb-12">
+      <StockPriceCharts points={stats?.chronological ?? []} currency={workbook.settings.currency} formatPrice={fmtQSEPrice} />
       <div className="row gap-sm mt-sm">
         <PriceInput exchange="qse"
           type="number"
@@ -421,8 +391,8 @@ export function PositionDetail({ ticker }: { ticker: string }) {
                   {
                     data: lastSellPrice > 0 ? [lastBuyPrice, lastSellPrice, mp, be] : [lastBuyPrice, mp, be],
                     backgroundColor: lastSellPrice > 0
-                      ? ['#8f5ac9', '#3b6bd6', mp >= be ? '#3ecf8e' : '#e5484d', '#c9a35a']
-                      : ['#8f5ac9', mp >= be ? '#3ecf8e' : '#e5484d', '#c9a35a'],
+                      ? [STOCK_BUY_COLOR, STOCK_SELL_COLOR, '#a78bfa', '#c9a35a']
+                      : [STOCK_BUY_COLOR, '#a78bfa', '#c9a35a'],
                     maxBarThickness: 20,
                   },
                 ],
