@@ -1,3 +1,4 @@
+import { PriceInput } from "../../../components/ui/PriceInput";
 import { Fragment, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { confirmDialog } from '../../../components/ConfirmDialog';
@@ -131,7 +132,7 @@ function TickerTransactions({ ticker }: { ticker: string }) {
           <input type="number" placeholder="Shares" value={sharesInput} onChange={(e) => setSharesInput(e.target.value)} className="" />
         </Field>
         <Field label="Price" required>
-          <input type="number" step="0.001" placeholder="Price" value={priceInput} onChange={(e) => setPriceInput(e.target.value)} className="" />
+          <PriceInput exchange="qse" type="number" step="0.001" placeholder="Price" value={priceInput} onChange={(e) => setPriceInput(e.target.value)} className="" />
         </Field>
         <TimeZoneFields
           time={time}
@@ -149,7 +150,7 @@ function TickerTransactions({ ticker }: { ticker: string }) {
         <button className="btn" onClick={submit}>Add {action === 'BUY' ? 'buy' : 'sell'}</button>
       </div>
       {action === 'SELL' && showLotAllocation && (
-        <LotAllocationFields
+        <LotAllocationFields exchange="qse"
           lots={openLots}
           totalShares={Number(sharesInput) || 0}
           value={lotAllocations}
@@ -175,7 +176,7 @@ function TickerTransactions({ ticker }: { ticker: string }) {
                     </select>
                   </td>
                   <td><input type="number" value={editRow.shares} onChange={(e) => setEditRow({ ...editRow, shares: Number(e.target.value) })} className="w-70" /></td>
-                  <td><input type="number" step="0.001" value={editRow.price} onChange={(e) => setEditRow({ ...editRow, price: Number(e.target.value) })} className="w-80" /></td>
+                  <td><PriceInput exchange="qse" type="number" step="0.001" value={editRow.price} onChange={(e) => setEditRow({ ...editRow, price: Number(e.target.value) })} className="w-80" /></td>
                   <td>{fmtMoney(editRow.shares * editRow.price, currency)}</td>
                   <td>
                     <PendingToggle
@@ -190,7 +191,7 @@ function TickerTransactions({ ticker }: { ticker: string }) {
                 {editRow.action === 'SELL' && showLotAllocation && (
                   <tr>
                     <td colSpan={6}>
-                      <LotAllocationFields
+                      <LotAllocationFields exchange="qse"
                         lots={editLots}
                         totalShares={editRow.shares}
                         value={editRow.lotAllocations}

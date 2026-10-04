@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { TextInput } from './Field';
 import type { FIFOLot } from '../../lib/calc/fifoPositions';
-import { fmt, fmtPrice } from '../../lib/format';
+import { fmt, fmtQSEPrice, fmtPSXPrice } from '../../lib/format';
 
 export type LotAllocations = { buyId: string; shares: number }[];
 
@@ -20,6 +20,7 @@ export type LotAllocations = { buyId: string; shares: number }[];
  * left unallocated is explicitly labeled as falling back to the default
  * match order, never silently guessed at. */
 export function LotAllocationFields({
+  exchange,
   lots,
   totalShares,
   value,
@@ -28,11 +29,13 @@ export function LotAllocationFields({
   /** Open lots for this ticker, computed as if THIS sell hadn't happened
    * yet (i.e. from every other transaction) — see the two call sites
    * (`TransactionsPage.tsx`/`StockPage.tsx`) for how each derives this. */
+  exchange: 'qse' | 'psx';
   lots: FIFOLot[];
   totalShares: number;
   value: LotAllocations | undefined;
   onChange: (next: LotAllocations | undefined) => void;
 }) {
+  const fmtPrice = exchange === 'qse' ? fmtQSEPrice : fmtPSXPrice;
   const [expanded, setExpanded] = useState(!!value?.length);
   const usableLots = lots.filter((l) => l.buyId && l.remainingShares > 0);
 

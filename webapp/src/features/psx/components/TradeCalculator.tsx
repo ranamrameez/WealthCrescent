@@ -1,3 +1,4 @@
+import { PriceInput } from "../../../components/ui/PriceInput";
 import { useEffect, useMemo, useState } from 'react';
 import { breakEvenPrice, requiredSellPrice, roundTick } from '../../../lib/calc';
 import { calcCGT, feeScenarios } from '../../../lib/calc/psxFees';
@@ -235,7 +236,7 @@ export function TradeCalculator({ initialTicker }: { initialTicker?: string } = 
             width={140}
             title="Prefilled from the last market price you saved for this ticker. Editing it here only affects this calculator's numbers below — it does NOT save a new market price. Use the Save button to actually update it."
           >
-            <TextInput
+            <PriceInput exchange="psx"
               type="number"
               step="0.01"
               className="price-input"
@@ -284,7 +285,7 @@ export function TradeCalculator({ initialTicker }: { initialTicker?: string } = 
               <TextInput type="number" value={sellShares || ''} onChange={(e) => setSellShares(Number(e.target.value))} />
             </Field>
             <Field label="Sell price" width={90}>
-              <TextInput type="number" step="0.01" value={sellPrice || ''} onChange={(e) => setSellPrice(Number(e.target.value))} />
+              <PriceInput exchange="psx" type="number" step="0.01" value={sellPrice || ''} onChange={(e) => setSellPrice(Number(e.target.value))} />
             </Field>
             <Field label={`Target profit (${currency}, optional)`} width={110}>
               <TextInput type="number" step="0.01" value={targetProfit || ''} onChange={(e) => setTargetProfit(Number(e.target.value))} />
@@ -310,7 +311,7 @@ export function TradeCalculator({ initialTicker }: { initialTicker?: string } = 
         <div>
           <div className="row gap-sm">
             <Field label="Buy price" width={90}>
-              <TextInput
+              <PriceInput exchange="psx"
                 type="number"
                 step="0.01"
                 value={buyPrice || ''}
@@ -344,11 +345,11 @@ export function TradeCalculator({ initialTicker }: { initialTicker?: string } = 
               />
             </Field>
             <Field label="Target avg cost (optional)" width={90}>
-              <TextInput type="number" step="0.01" value={targetAvg || ''} onChange={(e) => setTargetAvg(Number(e.target.value))} />
+              <PriceInput exchange="psx" type="number" step="0.01" value={targetAvg || ''} onChange={(e) => setTargetAvg(Number(e.target.value))} />
             </Field>
             {mode === 'CYCLE' && (
               <Field label="Target sell price" width={90}>
-                <TextInput type="number" step="0.01" value={targetSell || ''} onChange={(e) => { setTargetSell(Number(e.target.value)); setTargetTouched(true); }} />
+                <PriceInput exchange="psx" type="number" step="0.01" value={targetSell || ''} onChange={(e) => { setTargetSell(Number(e.target.value)); setTargetTouched(true); }} />
               </Field>
             )}
           </div>

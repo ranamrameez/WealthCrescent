@@ -1,3 +1,4 @@
+import { PriceInput } from "../../../components/ui/PriceInput";
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { StandardCard, type StandardCardAction } from '../../../components/StandardCard';
@@ -113,13 +114,13 @@ function BuySellAvgDownCalculator() {
           <TextInput value={ticker} onChange={(e) => setTicker(e.target.value.toUpperCase())} list={PSX_TICKER_DATALIST_ID} placeholder="e.g. OGDC" />
         </Field>
         <Field label="Buy price">
-          <TextInput type="number" step="0.01" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)} />
+          <PriceInput exchange="psx" type="number" step="0.01" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)} />
         </Field>
         <Field label="Shares">
           <TextInput type="number" value={shares} onChange={(e) => setShares(e.target.value)} />
         </Field>
         <Field label="Target sell price (optional)">
-          <TextInput type="number" step="0.01" value={targetSell} onChange={(e) => setTargetSell(e.target.value)} />
+          <PriceInput exchange="psx" type="number" step="0.01" value={targetSell} onChange={(e) => setTargetSell(e.target.value)} />
         </Field>
         <Field label=" ">
           <Tooltip text={canAvgDown ? 'Blend this purchase with what you already hold, instead of modeling it alone.' : 'Averaging down needs an existing position in this ticker.'}>
@@ -291,7 +292,7 @@ function WhatIfExitCalculator({
         return (
           <div key={t.ticker} className="row" style={{ gap: 8, alignItems: 'flex-end', marginBottom: 6 }}>
             <Field label={`${t.ticker} exit price`} width={110}>
-              <TextInput
+              <PriceInput exchange="psx"
                 type="number"
                 step="0.01"
                 value={price || ''}
@@ -396,7 +397,7 @@ function NewPlanFab() {
                 <option value="SELL">SELL</option>
               </select>
               <input type="number" placeholder="Shares" value={l.shares || ''} onChange={(e) => update(i, { shares: Number(e.target.value) })} className="w-90" />
-              <input type="number" step="0.01" placeholder="Price" value={l.price || ''} onChange={(e) => update(i, { price: Number(e.target.value) })} className="w-90" />
+              <PriceInput exchange="psx" type="number" step="0.01" placeholder="Price" value={l.price || ''} onChange={(e) => update(i, { price: Number(e.target.value) })} className="w-90" />
               <button className="btn secondary small" onClick={() => setLegs((rs) => rs.filter((_, idx) => idx !== i))}>
                 <TrashIcon size={12} />Remove
               </button>
@@ -922,7 +923,7 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
                     </select>
                   </td>
                   <td><input type="number" value={editLeg.shares} onChange={(e) => setEditLeg({ ...editLeg, shares: Number(e.target.value) })} className="w-70" /></td>
-                  <td><input type="number" step="0.01" value={editLeg.price} onChange={(e) => setEditLeg({ ...editLeg, price: Number(e.target.value) })} className="w-80" /></td>
+                  <td><PriceInput exchange="psx" type="number" step="0.01" value={editLeg.price} onChange={(e) => setEditLeg({ ...editLeg, price: Number(e.target.value) })} className="w-80" /></td>
                   <td>{fmtMoney(editLeg.shares * editLeg.price, currency)}</td>
                   <td>
                     <FeeModeControl
@@ -958,7 +959,7 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
                     </select>
                   </td>
                   <td><input type="number" value={editTxRow.shares} onChange={(e) => setEditTxRow({ ...editTxRow, shares: Number(e.target.value) })} className="w-70" /></td>
-                  <td><input type="number" step="0.01" value={editTxRow.price} onChange={(e) => setEditTxRow({ ...editTxRow, price: Number(e.target.value) })} className="w-80" /></td>
+                  <td><PriceInput exchange="psx" type="number" step="0.01" value={editTxRow.price} onChange={(e) => setEditTxRow({ ...editTxRow, price: Number(e.target.value) })} className="w-80" /></td>
                   <td>{fmtMoney(editTxRow.shares * editTxRow.price, currency)}</td>
                   <td>{fmtMoney(calcFee(editTxRow.shares * editTxRow.price, editTxRow.action === 'BUY', { shares: editTxRow.shares, tx: editTxRow }), currency)}</td>
                   <td><span className="pill-positive">Executed</span></td>
@@ -1064,7 +1065,7 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
                   </select>
                 </td>
                 <td><input type="number" placeholder="Shares" value={addingLeg.shares || ''} onChange={(e) => setAddingLeg({ ...addingLeg, shares: Number(e.target.value) })} className="w-70" /></td>
-                <td><input type="number" step="0.01" placeholder="Price" value={addingLeg.price || ''} onChange={(e) => setAddingLeg({ ...addingLeg, price: Number(e.target.value) })} className="w-80" /></td>
+                <td><PriceInput exchange="psx" type="number" step="0.01" placeholder="Price" value={addingLeg.price || ''} onChange={(e) => setAddingLeg({ ...addingLeg, price: Number(e.target.value) })} className="w-80" /></td>
                 <td>{fmtMoney(addingLeg.shares * addingLeg.price, currency)}</td>
                 <td>
                   <FeeModeControl

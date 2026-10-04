@@ -1,3 +1,4 @@
+import { PriceInput } from '../../../components/ui/PriceInput';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { EntityScopeMenu, selectedEntityValues } from '../../../components/EntityScopeMenu';
@@ -179,12 +180,12 @@ function DashboardPositionsView({ workbook, calcFee, positions, rows, summary, r
                         onClick={(e) => { e.stopPropagation(); setRtTicker(r.ticker); }}
                         title="Total to trade a round trip right now: current price + round-trip commission — click for the full breakdown."
                       >
-                        RT {fmtMoney(r.mp + r.rt.buy + r.rt.sell, currency)}
+                        RT {fmtPSXPrice(r.mp + r.rt.buy + r.rt.sell)}
                       </div>
                     )}
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>
-                    <input
+                    <PriceInput exchange="psx"
                       key={r.mp}
                       type="number"
                       step="0.01"
@@ -238,7 +239,7 @@ function DashboardPositionsView({ workbook, calcFee, positions, rows, summary, r
         <p className="text-muted">No open positions yet.</p>
       )}
       {rtRow && rtRow.rt && (
-        <RoundTripCostModal
+        <RoundTripCostModal exchange="psx"
           ticker={rtRow.ticker}
           currency={currency}
           currentPrice={rtRow.mp}

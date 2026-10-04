@@ -1,3 +1,4 @@
+import { PriceInput } from '../../../components/ui/PriceInput';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkline } from '../../../components/Sparkline';
@@ -130,12 +131,12 @@ function OpenPositionsTable({ onSelect }: { onSelect: (ticker: string) => void }
                     onClick={(e) => { e.stopPropagation(); setRtTicker(r.ticker); }}
                     title="Total to trade a round trip right now: current price + round-trip commission — click for the full breakdown."
                   >
-                    RT {fmtMoney(r.mp + r.rt.buy + r.rt.sell, currency)}
+                    RT {fmtPSXPrice(r.mp + r.rt.buy + r.rt.sell)}
                   </div>
                 )}
               </td>
               <td onClick={(e) => e.stopPropagation()}>
-                <input
+                <PriceInput exchange="psx"
                   key={r.mp}
                   type="number"
                   step="0.01"
@@ -185,7 +186,7 @@ function OpenPositionsTable({ onSelect }: { onSelect: (ticker: string) => void }
         </tbody>
       </table>
       {rtRow && rtRow.rt && (
-        <RoundTripCostModal
+        <RoundTripCostModal exchange="psx"
           ticker={rtRow.ticker}
           currency={currency}
           currentPrice={rtRow.mp}

@@ -1,3 +1,4 @@
+import { PriceInput } from "../../../components/ui/PriceInput";
 import { useEffect, useMemo, useState } from 'react';
 import { Bar, Line } from 'react-chartjs-2';
 import { StandardCard } from '../../../components/StandardCard';
@@ -404,7 +405,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
           <p className="text-muted">No price history recorded for {ticker} yet.</p>
         )}
         <div className="row gap-sm mt-sm">
-          <input
+          <PriceInput exchange="psx"
             type="number"
             step="0.01"
             className="price-input"
@@ -480,7 +481,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
                       return editPriceIndex === rawIndex && editPriceRow ? (
                         <tr key={rawIndex}>
                           <td><input type="date" value={editPriceRow.date} onChange={(e) => setEditPriceRow({ ...editPriceRow, date: e.target.value })} className="w-130" /></td>
-                          <td><input type="number" step="0.01" value={editPriceRow.price} onChange={(e) => setEditPriceRow({ ...editPriceRow, price: Number(e.target.value) })} className="w-90" /></td>
+                          <td><PriceInput exchange="psx" type="number" step="0.01" value={editPriceRow.price} onChange={(e) => setEditPriceRow({ ...editPriceRow, price: Number(e.target.value) })} className="w-90" /></td>
                           <td>
                             <IconButton label="Save" icon={<SaveIcon size={12} />} onClick={saveEditPrice} />
                             <IconButton label="Cancel" icon={<XIcon size={12} />} onClick={cancelEditPrice} />

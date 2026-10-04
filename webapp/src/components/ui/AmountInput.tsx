@@ -1,3 +1,4 @@
+import { fmtQSEPrice, fmtPSXPrice } from '../../lib/format';
 import { useEffect, useState, type InputHTMLAttributes } from 'react';
 import { resolveNumericInput } from '../../lib/mathExpression';
 import { FormulaInput } from './FormulaInput';
@@ -24,27 +25,30 @@ import { FormulaInput } from './FormulaInput';
  * as-is in the field (not silently cleared) so the user can see and fix
  * their typo, and `onChange` simply isn't called until it resolves. */
 export function AmountInput({
+  exchange,
   value,
   onChange,
   ...rest
 }: {
+  exchange?: 'qse' | 'psx';
   value: number;
   onChange: (n: number) => void;
 } & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'>) {
-  const [draft, setDraft] = useState(() => (value || value === 0 ? String(value) : ''));
+  const formatValue = (n: number) => exchange ? (exchange === 'qse' ? fmtQSEPrice(n) : fmtPSXPrice(n)).replaceAll(',', '') : String(n);
+  const [draft, setDraft] = useState(() => (value || value === 0 ? formatValue(value) : ''));
 
   // Resync when the value changes for a reason OTHER than this field's own
   // commit (e.g. the caller reset the whole row/form) — a commit's own
   // onChange leads to the same value coming back here, which is a no-op.
   useEffect(() => {
-    setDraft(value || value === 0 ? String(value) : '');
+    setDraft(value || value === 0 ? formatValue(value) : '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
   const commit = () => {
     const resolved = resolveNumericInput(draft);
     if (resolved !== null) {
-      setDraft(String(resolved));
+      setDraft(formatValue(resolved));
       if (resolved !== value) onChange(resolved);
     }
   };

@@ -1,3 +1,4 @@
+import { PriceInput } from "./ui/PriceInput";
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -8,7 +9,7 @@ import {
   stressTestScenario,
   type RiskMode,
 } from '../lib/calc/riskAnalysis';
-import { fmt, fmtMoney, fmtPrice } from '../lib/format';
+import { fmt, fmtMoney, fmtQSEPrice, fmtPSXPrice } from '../lib/format';
 import type { FeeCalculator } from '../types/workbook';
 import { Card, StatCard } from './Card';
 import { Notice } from './Notice';
@@ -68,6 +69,7 @@ export function RiskCalculator({
    * predates PSX passing it explicitly; both real callers pass their own. */
   exchange?: 'qse' | 'psx';
 }) {
+  const fmtPrice = exchange === 'qse' ? fmtQSEPrice : fmtPSXPrice;
   const held = useMemo(() => [...rows].filter((r) => r.shares > 0).sort((a, b) => a.ticker.localeCompare(b.ticker)), [rows]);
   const [ticker, setTicker] = useState(initialTicker || '');
   const [riskMode, setRiskMode] = useState<RiskMode>('balanced');
@@ -186,16 +188,16 @@ export function RiskCalculator({
         </div>
         <div className="row gap-sm entry-row justify-content-between">
           <Field label="Current price" width={100}>
-            <TextInput type="number" step="0.001" value={currentPriceInput || ''} onChange={(e) => setCurrentPriceInput(Number(e.target.value))} />
+            <PriceInput exchange={exchange} type="number" step="0.001" value={currentPriceInput || ''} onChange={(e) => setCurrentPriceInput(Number(e.target.value))} />
           </Field>
           <Field label="Shares held" width={90}>
             <TextInput type="number" value={sharesInput || ''} onChange={(e) => setSharesInput(Number(e.target.value))} />
           </Field>
           <Field label="Avg buy price" width={100} title="Pre-filled from your real position (invested ÷ shares). Editable so you can test a hypothetical average, but editing it doesn't change your actual holdings.">
-            <TextInput type="number" step="0.001" value={avgInput || ''} onChange={(e) => setAvgInput(Number(e.target.value))} />
+            <PriceInput exchange={exchange} type="number" step="0.001" value={avgInput || ''} onChange={(e) => setAvgInput(Number(e.target.value))} />
           </Field>
           <Field label="Target buy price" width={100} title="The price you're planning to add shares at — can differ from Current price above (e.g. a limit order below today's price).">
-            <TextInput
+            <PriceInput exchange={exchange}
               type="number"
               step="0.001"
               value={targetPrice || ''}
@@ -229,7 +231,7 @@ export function RiskCalculator({
             />
           </Field>
           <Field label="Target sell price" width={100} title="Defaults to your current break-even, but editable — the price you'd actually plan to sell at once you've averaged down.">
-            <TextInput type="number" step="0.001" value={target || ''} onChange={(e) => { setTarget(Number(e.target.value)); setTargetTouched(true); }} />
+            <PriceInput exchange={exchange} type="number" step="0.001" value={target || ''} onChange={(e) => { setTarget(Number(e.target.value)); setTargetTouched(true); }} />
           </Field>
           <Field label={`Min net profit (${currency})`} width={100} title="The smallest profit (after fees) you'd consider worth it at Target sell price — used to flag whether a scenario actually clears your own bar.">
             <TextInput type="number" step="0.01" value={minProfit || ''} onChange={(e) => setMinProfit(Number(e.target.value))} />

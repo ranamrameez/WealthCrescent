@@ -1,6 +1,6 @@
 import { Modal } from './Modal';
 import { StatCard } from './Card';
-import { fmtMoney, fmtPrice } from '../lib/format';
+import { fmtQSEPrice, fmtPSXPrice } from '../lib/format';
 import { gridAutoStyle } from '../lib/gridStyle';
 
 /** User-requested (2026-09-13): "visible on dashboard for opened stocks so
@@ -13,6 +13,7 @@ import { gridAutoStyle } from '../lib/gridStyle';
  * size-independent sanity check the user compares against today's own
  * price swing before deciding whether a small move is worth trading. */
 export function RoundTripCostModal({
+  exchange,
   ticker,
   currency,
   currentPrice,
@@ -20,6 +21,7 @@ export function RoundTripCostModal({
   sellFee,
   onClose,
 }: {
+  exchange: 'qse' | 'psx';
   ticker: string;
   currency: string;
   currentPrice: number;
@@ -27,6 +29,7 @@ export function RoundTripCostModal({
   sellFee: number;
   onClose: () => void;
 }) {
+  const fmtPrice = exchange === 'qse' ? fmtQSEPrice : fmtPSXPrice;
   const total = buyFee + sellFee;
   const pct = currentPrice > 0 ? (total / currentPrice) * 100 : 0;
   return (
@@ -46,7 +49,7 @@ export function RoundTripCostModal({
         <StatCard label="Buy commission (1 share)" value={`${fmtPrice(buyFee)} ${currency}`} />
         <StatCard label="Sell commission (1 share)" value={`${fmtPrice(sellFee)} ${currency}`} />
         <StatCard label="Total round-trip cost" value={`${fmtPrice(total)} ${currency}`} hue="var(--loss)" />
-        <StatCard label="Current price + round-trip cost" value={fmtMoney(currentPrice + total, currency)} />
+        <StatCard label="Current price + round-trip cost" value={`${fmtPrice(currentPrice + total)} ${currency}`} />
         <StatCard label="As % of current price" value={`${pct.toFixed(2)}%`} />
       </div>
     </Modal>

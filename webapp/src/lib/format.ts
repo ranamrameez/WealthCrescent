@@ -38,7 +38,7 @@ export function fmtMoneyCompact(n: number, currency: string): string {
 
 /** Exchange price display rules.
  * QSE quotes use four total price digits: 12.12 / 1.212.
- * PSX quotes display at most two decimal places. */
+ * PSX quotes display exactly two decimal places. */
 /** QSE four-digit quote step: 1.212 uses .001; 12.12 uses .01; 123.5 uses .1. */
 export function qsePriceStep(n: number | undefined | null): number {
   const value = Math.abs(Number(n) || 0);
@@ -51,13 +51,15 @@ export function fmtQSEPrice(n: number | undefined | null): string {
   if (n === undefined || n === null || Number.isNaN(n)) return '—';
   if (n === 0) return '0.000';
   const magnitude = Math.floor(Math.log10(Math.abs(n)));
-  const decimals = Math.max(0, 4 - magnitude - 1);
-  return Number(n).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  const rounded = Number(n.toFixed(Math.max(0, Math.min(3, 3 - magnitude))));
+  const roundedMagnitude = rounded === 0 ? -1 : Math.floor(Math.log10(Math.abs(rounded)));
+  const decimals = Math.max(0, Math.min(3, 3 - roundedMagnitude));
+  return rounded.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
 export function fmtPSXPrice(n: number | undefined | null): string {
   if (n === undefined || n === null || Number.isNaN(n)) return '—';
-  return Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  return Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 /** Generic price formatting used outside a known exchange context.

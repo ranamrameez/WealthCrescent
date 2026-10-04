@@ -1,3 +1,4 @@
+import { PriceInput } from "../../../components/ui/PriceInput";
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PSX_TICKER_DATALIST_ID } from '../../../components/PSXTickerDatalist';
@@ -7,7 +8,7 @@ import { toast } from '../../../components/Toast';
 import { Field } from '../../../components/ui/Field';
 import { IconButton } from '../../../components/ui/IconButton';
 import { TimeZoneFields } from '../../../components/ui/TimeZoneFields';
-import { fmt, fmtMoney } from '../../../lib/format';
+import { fmt, fmtMoney, fmtPSXPrice } from '../../../lib/format';
 import { defaultTimeForDate, defaultTimezoneForCurrency, nowTime } from '../../../lib/datetime';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { useSortableRows } from '../../../hooks/useSortableRows';
@@ -73,7 +74,7 @@ function AddDividendForm() {
         <input placeholder="Ticker" value={ticker} onChange={(e) => onTickerChange(e.target.value)} list={PSX_TICKER_DATALIST_ID} className="w-90" />
       </Field>
       <Field label="Per share">
-        <input type="number" step="0.01" placeholder="Per share" value={perShare || ''} onChange={(e) => setPerShare(Number(e.target.value))} className="w-90" />
+        <PriceInput exchange="psx" type="number" step="0.01" placeholder="Per share" value={perShare || ''} onChange={(e) => setPerShare(Number(e.target.value))} className="w-90" />
       </Field>
       <Field label="Shares">
         <input
@@ -97,7 +98,7 @@ function AddDividendForm() {
         onTimezoneChange={setTimezone}
       />
       <button className="btn" onClick={submit}>Add</button>
-      {preview > 0 && !amount && <span className="text-muted">{fmt(shares, 0)} shares × {perShare} = {preview.toFixed(2)}</span>}
+      {preview > 0 && !amount && <span className="text-muted">{fmt(shares, 0)} shares × {fmtPSXPrice(perShare)} = {preview.toFixed(2)}</span>}
     </div>
   );
 }
@@ -195,7 +196,7 @@ export function DividendsSection() {
                 <tr key={d.i}>
                   <td><input type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} className="w-130" /></td>
                   <td><input value={editRow.ticker} onChange={(e) => setEditRow({ ...editRow, ticker: e.target.value.toUpperCase() })} className="w-80" /></td>
-                  <td><input type="number" step="0.01" value={editRow.perShare} onChange={(e) => setEditRow({ ...editRow, perShare: Number(e.target.value) })} className="w-80" /></td>
+                  <td><PriceInput exchange="psx" type="number" step="0.01" value={editRow.perShare} onChange={(e) => setEditRow({ ...editRow, perShare: Number(e.target.value) })} className="w-80" /></td>
                   <td><input type="number" value={editRow.shares} onChange={(e) => setEditRow({ ...editRow, shares: Number(e.target.value) })} className="w-80" /></td>
                   <td><input type="number" step="0.01" value={editRow.amount} onChange={(e) => setEditRow({ ...editRow, amount: Number(e.target.value) })} className="w-90" /></td>
                   <td>
@@ -207,7 +208,7 @@ export function DividendsSection() {
                 <tr key={d.i}>
                   <td>{d.date}</td>
                   <td><TickerLogo ticker={d.ticker} size="sm" exchange="psx" /><Link to={`/psx/stock/${d.ticker}`}>{d.ticker}</Link></td>
-                  <td>{d.perShare || '—'}</td>
+                  <td>{fmtPSXPrice(d.perShare)}</td>
                   <td>{d.shares || '—'}</td>
                   <td className="pill-positive">{fmtMoney(d.amount, currency)}</td>
                   <td>

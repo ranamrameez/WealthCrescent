@@ -249,7 +249,7 @@ function TxRowFields({
             subscriptionId,
             linked: false,
             direction: 'out',
-            timezone: defaultTimezoneForCurrency(useSideCurrencyStatic(finance)),
+            timezone: defaultTimezoneForCurrency(getSideCurrency(finance)),
             toAmount: undefined,
             toAmountTouched: false,
           });
@@ -269,7 +269,7 @@ function TxRowFields({
               selectedLoan && !row.categoryTouched
                 ? loanCategoryForDirection(selectedLoan.direction)
                 : row.categoryID,
-            timezone: defaultTimezoneForCurrency(useSideCurrencyStatic(finance)),
+            timezone: defaultTimezoneForCurrency(getSideCurrency(finance)),
             toAmount: undefined,
             toAmountTouched: false,
           });
@@ -441,7 +441,7 @@ function TxRowFields({
 // module/currency changes. Deliberately NOT a hook (no store reads): a
 // module change's own `LinkSideConfig.currencyCode` is already resolved by
 // `SideFields` itself before calling back, so this only needs that field.
-function useSideCurrencyStatic(cfg: LinkSideConfig): string | undefined {
+function getSideCurrency(cfg: LinkSideConfig): string | undefined {
   return cfg.currencyCode;
 }
 

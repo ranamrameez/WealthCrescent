@@ -1,3 +1,4 @@
+import { PriceInput } from '../../../components/ui/PriceInput';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { QSE_TICKER_DATALIST_ID } from '../../../components/TickerDatalist';
@@ -36,7 +37,7 @@ export function WatchlistPage() {
           list={QSE_TICKER_DATALIST_ID}
           className="w-90"
         />
-        <input
+        <PriceInput exchange="qse"
           type="number"
           step="0.001"
           className="price-input w-120"
@@ -44,7 +45,7 @@ export function WatchlistPage() {
           value={w.target || ''}
           onChange={(e) => setW({ ...w, target: Number(e.target.value) })}
         />
-        <input
+        <PriceInput exchange="qse"
           type="number"
           step="0.001"
           className="price-input w-120"
@@ -121,7 +122,7 @@ function WatchlistTable({
               <td style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>{tickerNames[item.ticker] ? shortenCompanyName(tickerNames[item.ticker]) : ''}</td>
               <td className="w-82"><Sparkline data={sparkData} formatValue={fmtQSEPrice} /></td>
               <td>
-                <input
+                <PriceInput exchange="qse"
                   type="number"
                   step="0.001"
                   className="price-input w-100"
@@ -131,7 +132,7 @@ function WatchlistTable({
                 />
               </td>
               <td>
-                <input
+                <PriceInput exchange="qse"
                   type="number"
                   step="0.001"
                   className="price-input w-100"

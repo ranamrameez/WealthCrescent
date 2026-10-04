@@ -64,14 +64,18 @@ describe('fmtPrice', () => {
 
 describe('exchange price precision', () => {
   it('formats QSE quotes to four total price digits', () => {
+    expect(fmtQSEPrice(0.1234)).toBe('0.123');
+    expect(fmtQSEPrice(0.001234)).toBe('0.001');
+    expect(fmtQSEPrice(9.9999)).toBe('10.00');
+    expect(fmtQSEPrice(99.999)).toBe('100.0');
     expect(fmtQSEPrice(12.123)).toBe('12.12');
     expect(fmtQSEPrice(1.2124)).toBe('1.212');
     expect(fmtQSEPrice(123.456)).toBe('123.5');
   });
 
-  it('caps PSX quotes at two decimal places', () => {
+  it('formats PSX quotes with exactly two decimal places', () => {
     expect(fmtPSXPrice(12.123)).toBe('12.12');
-    expect(fmtPSXPrice(1.2)).toBe('1.2');
+    expect(fmtPSXPrice(1.2)).toBe('1.20');
     expect(fmtPSXPrice(123.456)).toBe('123.46');
   });
 });

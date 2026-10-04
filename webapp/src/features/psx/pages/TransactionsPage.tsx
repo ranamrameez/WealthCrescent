@@ -1,3 +1,4 @@
+import { PriceInput } from "../../../components/ui/PriceInput";
 import { Fragment, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PSX_TICKER_DATALIST_ID } from '../../../components/PSXTickerDatalist';
@@ -117,7 +118,7 @@ export function TransactionRows({ initial }: { initial?: Partial<Transaction> } 
             <AmountInput placeholder="Shares" value={r.shares} onChange={(shares) => update(i, { shares })} />
           </Field>
           <Field label={i === 0 ? 'Price' : undefined} required={i === 0} title={i === 0 ? 'You can type a math expression here too, e.g. 10.5+5.' : undefined}>
-            <AmountInput placeholder="Price" value={r.price} onChange={(price) => update(i, { price })} />
+            <AmountInput exchange="psx" placeholder="Price" value={r.price} onChange={(price) => update(i, { price })} />
           </Field>
           <FeeModeControl
             mode={feeModeFor(r)}
@@ -156,7 +157,7 @@ export function TransactionRows({ initial }: { initial?: Partial<Transaction> } 
           </button>
         </div>
         {r.action === 'SELL' && showLotAllocation && r.ticker && (
-          <LotAllocationFields
+          <LotAllocationFields exchange="psx"
             lots={lotsByTicker[r.ticker.toUpperCase()] || []}
             totalShares={r.shares}
             value={r.lotAllocations}
@@ -510,7 +511,7 @@ function TransactionList() {
                       </select>
                     </td>
                     <td><input type="number" value={editRow.shares} onChange={(e) => setEditRow({ ...editRow, shares: Number(e.target.value) })} className="w-70" /></td>
-                    <td><input type="number" step="0.01" value={editRow.price} onChange={(e) => setEditRow({ ...editRow, price: Number(e.target.value) })} className="w-80" /></td>
+                    <td><PriceInput exchange="psx" type="number" step="0.01" value={editRow.price} onChange={(e) => setEditRow({ ...editRow, price: Number(e.target.value) })} className="w-80" /></td>
                     <td>{fmtMoney(editRow.shares * editRow.price, currency)}</td>
                     <td>
                       <FeeModeControl
@@ -541,7 +542,7 @@ function TransactionList() {
                   {editRow.action === 'SELL' && showEditLotAllocation && (
                     <tr>
                       <td colSpan={9}>
-                        <LotAllocationFields
+                        <LotAllocationFields exchange="psx"
                           lots={editLots}
                           totalShares={editRow.shares}
                           value={editRow.lotAllocations}
