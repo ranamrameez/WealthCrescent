@@ -1,7 +1,10 @@
+import { BalanceSummaryCards } from '../../../components/BalanceSummaryCards';
+import { planOccurrences, occurrenceCompleted } from '../../../lib/calc/planOccurrences';
+import { BackButton } from '../../../components/BackButton';
 import type { User } from 'firebase/auth';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
 import { SummaryChip, type StandardCardAction } from '../../../components/StandardCard';
@@ -40,14 +43,13 @@ import { allExtraActions, useFabActionsStore } from '../../../store/fabActionsSt
 import { ReorderButtons } from '../../../components/ui/ReorderButtons';
 import { RecurrenceFields } from '../../../components/ui/RecurrenceFields';
 import { PlanningHorizonField } from '../../../components/ui/PlanningHorizonField';
-import { nextRecurrenceOccurrence } from '../../../lib/calc/recurrence';
 import { recurrenceLabel } from '../../../lib/recurrenceLabel';
 import { hueStyle } from '../../../lib/statCardHues';
 import { categoryName, UNCATEGORIZED_ID } from '../../../lib/categories';
 import { useCategoryStore } from '../../../store/categoryStore';
 import { accountBalance, accountPendingBalance, accountRunningLedger, bankAnalyticsFromLedger, bankTotalsByCurrency, budgetVsActual } from '../../../lib/calc/bankModule';
 import { outstandingBalanceByCard } from '../../../lib/calc/creditCardModule';
-import { planWithinHorizon, plannedBankProjection, type PlanningHorizonDays } from '../../../lib/calc/plannedBalance';
+import { plannedBankProjection, type PlanningHorizonDays } from '../../../lib/calc/plannedBalance';
 import { dlBarV, dlDoughnut } from '../../../lib/chartLabels';
 import { applyChartTheme } from '../../../lib/chartSetup';
 import { cssVar, tickerColor } from '../../../lib/cssVar';
@@ -547,6 +549,7 @@ function BanksList({ showArchived = false }: { showArchived?: boolean }) {
 export function BankDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const banks = useBankWorkbookStore((s) => s.workbook.settings.banks ?? []);
   const bank = banks.find((b) => b.id === id);
   const accounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
@@ -588,7 +591,7 @@ export function BankDetailPage() {
       <TopBarSelect
         label="Switch bank"
         value={bank.id}
-        onChange={(event) => navigate(event.target.value ? `/bank/bank/${event.target.value}` : '/bank')}
+        onChange={(event) => navigate({ pathname: event.target.value ? `/bank/bank/${event.target.value}` : '/bank', search: location.search })}
         options={[
           { value: '', label: 'All banks' },
           ...banks
@@ -619,7 +622,7 @@ export function BankDetailPage() {
   if (!bank) {
     return (
       <div className="standard-page">
-        <Link to="/bank">← Back to Banking</Link>
+        <BackButton to="/bank">← Back to Banking</BackButton>
         <p className="text-muted">Bank not found.</p>
       </div>
     );
@@ -739,7 +742,7 @@ export function BankDetailPage() {
 
   return (
     <div className="standard-page">
-      <Link to="/bank">← Back to Banking</Link>
+      <BackButton to="/bank">← Back to Banking</BackButton>
       <StandardPageSections key={bank.id} defaultKey="summary" sections={sections} />
       <FabPanel actions={[
         { label: 'Add an account', icon: <ListIcon />, onClick: () => setAddAccountOpen(true) },
@@ -874,6 +877,7 @@ function CreditUsageBar({ used, limit, currency }: { used: number; limit: number
 export function AccountDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const accounts = useBankWorkbookStore((state) => state.workbook.settings.accounts);
   const banks = useBankWorkbookStore((state) => state.workbook.settings.banks ?? []);
   const account = accounts.find((item) => item.id === id);
@@ -921,13 +925,13 @@ export function AccountDetailPage() {
     const before = allLedger.filter(({ tx }) => !tx.isPending && filters.fromDate && tx.date < filters.fromDate);
     return before.length ? before[before.length - 1].balance : account.openingBalance;
   }, [account, allLedger, filters.fromDate]);
-  const periodCurrentBalance = clearedLedger.length ? clearedLedger[clearedLedger.length - 1].balance : periodStartBalance;
+  const periodCurrentBalance = allLedger.filter(row => !row.tx.isPending && (!filters.toDate || row.tx.date <= filters.toDate)).at(-1)?.balance ?? account?.openingBalance ?? 0;
   const pendingNet = filteredLedger.filter(({ tx }) => tx.isPending).reduce((sum, row) => sum + row.tx.amount, 0);
   const pendingInflow = filteredLedger.filter(({ tx }) => tx.isPending && tx.amount >= 0).reduce((sum, row) => sum + row.tx.amount, 0);
   const pendingOutflow = filteredLedger.filter(({ tx }) => tx.isPending && tx.amount < 0).reduce((sum, row) => sum + row.tx.amount, 0);
-  const plannedNet = plannedEntries.filter((plan) => plan.accountId === account?.id && !plan.executed && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
-  const plannedInflow = plannedEntries.filter((plan) => plan.accountId === account?.id && !plan.executed && plan.amount >= 0 && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
-  const plannedOutflow = plannedEntries.filter((plan) => plan.accountId === account?.id && !plan.executed && plan.amount < 0 && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
+  const plannedNet = planOccurrences(plannedEntries, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters)).filter((plan) => plan.accountId === account?.id && !plan.executed && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
+  const plannedInflow = planOccurrences(plannedEntries, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters)).filter((plan) => plan.accountId === account?.id && !plan.executed && plan.amount >= 0 && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
+  const plannedOutflow = planOccurrences(plannedEntries, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters)).filter((plan) => plan.accountId === account?.id && !plan.executed && plan.amount < 0 && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
   const balanceChange = periodCurrentBalance - periodStartBalance;
   const balanceChangePercent = periodStartBalance === 0 ? null : (balanceChange / Math.abs(periodStartBalance)) * 100;
   const summaryMetric = (label: string, value: string, tone = 'pill-info', large = false, suffix?: ReactNode) => {
@@ -944,13 +948,13 @@ export function AccountDetailPage() {
   const summaryCard = (title: string, metrics: ReactNode, tooltip: string, className = '') => <SummaryGroupCard title={title} tooltip={tooltip} className={className}>{metrics}</SummaryGroupCard>;
   const upcoming = useMemo(
     () => account
-      ? plannedEntries
+      ? planOccurrences(plannedEntries, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters))
           .filter((plan) => plan.accountId === account.id && !plan.executed)
           .filter((plan) => (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate))
           .filter((plan) => filters.direction === 'all' || (filters.direction === 'in' ? plan.amount >= 0 : plan.amount < 0))
           .sort((a, b) => a.date.localeCompare(b.date))
       : [],
-    [plannedEntries, account, filters.fromDate, filters.toDate, filters.direction],
+    [plannedEntries, account, filters],
   );
 
   usePageTopBarRightSlot(account ? (
@@ -959,7 +963,7 @@ export function AccountDetailPage() {
         label="Bank"
         className="account-switch-select"
         value={account.bankId ?? ''}
-        onChange={(event) => navigate(event.target.value ? `/bank/bank/${event.target.value}` : '/bank')}
+        onChange={(event) => navigate({ pathname: event.target.value ? `/bank/bank/${event.target.value}` : '/bank', search: location.search })}
         options={[{ value: '', label: 'All banks' }, ...banks.filter((bank) => bank.isActive !== false).map((bank) => ({ value: bank.id, label: bank.name }))]}
       />
       <TopBarSelect
@@ -968,7 +972,7 @@ export function AccountDetailPage() {
         value={account.id}
         onChange={(event) => {
           setEditAccountOpen(false);
-          navigate(`/bank/account/${event.target.value}`);
+          navigate(`/bank/account/${event.target.value}${location.search}`);
         }}
         options={accounts
           .filter((item) => !item.migratedToCreditCardId && (item.isActive !== false || item.id === account.id))
@@ -985,7 +989,7 @@ export function AccountDetailPage() {
   ) : null);
 
   if (!account) {
-    return <div className="standard-page"><Link to="/bank" className="text-muted">← Back to Banking</Link><p className="text-muted mt-12">Account not found.</p></div>;
+    return <div className="standard-page"><BackButton to="/bank">← Back to Banking</BackButton><p className="text-muted mt-12">Account not found.</p></div>;
   }
 
   const deleteThisAccount = async () => {
@@ -1150,14 +1154,14 @@ export function AccountDetailPage() {
     <div className="standard-page">
       <div className="page-heading">
         <div>
-          <Link to="/bank" className="text-muted">← Back to Banking</Link>
+          <BackButton to="/bank">← Back to Banking</BackButton>
           <div className="page-heading-title-row"><h1 className="pagetitle m-0">{accountDisplayName(account)}</h1>{account.isActive === false && <span className="pill-warn fs-11">Closed</span>}</div>
         </div>
       </div>
       {account.migratedToCreditCardId && <Notice tone="info" className="mb-md">This account was migrated to a real Credit Card record — its transactions and balance now live there.{' '}<Link to={`/bank/card/${account.migratedToCreditCardId}`}>View the Credit Card →</Link></Notice>}
-      <StandardPageSections key={account.id} sections={sections} defaultKey="summary" />
-      {batchEditor === 'transactions' && <BankTransactionsBatchEditor key={account.id} account={account} rows={[...filteredLedger].reverse().map(row => row.tx)} onClose={() => setBatchEditor(null)} />}
-      {batchEditor === 'plans' && <BankPlansBatchEditor key={account.id} account={account} rows={plannedEntries.filter(plan => plan.accountId === account.id && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).sort((a, b) => a.date.localeCompare(b.date))} onClose={() => setBatchEditor(null)} />}
+      <StandardPageSections key={`sections:${account.id}`} sections={sections} defaultKey="summary" />
+      {batchEditor === 'transactions' && <BankTransactionsBatchEditor key={`batch-transactions:${account.id}`} account={account} rows={[...filteredLedger].reverse().map(row => row.tx)} onClose={() => setBatchEditor(null)} />}
+      {batchEditor === 'plans' && <BankPlansBatchEditor key={`batch-plans:${account.id}`} account={account} rows={plannedEntries.filter(plan => plan.accountId === account.id && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).sort((a, b) => a.date.localeCompare(b.date))} onClose={() => setBatchEditor(null)} />}
       {editAccountOpen && (
         <Modal title="Edit account" onClose={() => setEditAccountOpen(false)}>
           <AddAccountForm account={account} onSaved={() => setEditAccountOpen(false)} />
@@ -1471,6 +1475,12 @@ function transactionMatchesFilters(tx: BankTransaction, filters: BankingFilters,
   return true;
 }
 
+function bankPlanMatchesFilters(plan: PlannedBankTransaction, filters: BankingFilters) {
+  return !plan.executed && filters.source !== 'statement-import'
+    && (filters.category === 'all' || (plan.category || 'Uncategorized') === filters.category)
+    && (filters.direction === 'all' || (filters.direction === 'in' ? plan.amount >= 0 : plan.amount < 0));
+}
+
 function BankingScopeSummary({ accounts, filters }: { accounts: BankAccount[]; filters: BankingFilters }) {
   const transactions = useBankWorkbookStore((state) => state.workbook.transactions);
   const creditCards = useCreditCardWorkbookStore((state) => state.workbook.cards);
@@ -1483,35 +1493,28 @@ function BankingScopeSummary({ accounts, filters }: { accounts: BankAccount[]; f
   );
   const accountIds = useMemo(() => new Set(scopedAccounts.map((account) => account.id)), [scopedAccounts]);
   const rows = transactions.filter((tx) => accountIds.has(tx.accountId) && transactionMatchesFilters(tx, filters, categories));
-  const visiblePlans = plans.filter((plan) => accountIds.has(plan.accountId) && !plan.executed && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate));
+  const visiblePlans = planOccurrences(plans, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters)).filter((plan) => accountIds.has(plan.accountId) && !plan.executed && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate));
   const scopedCards = filters.accountId === 'all' ? creditCards.filter((card) => card.isActive !== false) : [];
   const currencies = [...new Set([...scopedAccounts.map((account) => account.currencyCode), ...scopedCards.map((card) => card.currencyCode)])].sort();
   if (!currencies.length) return <p className="text-muted m-0">No accounts or credit cards in this scope yet.</p>;
-  return <div className="account-summary-grid">{currencies.map((currency) => {
+  return <div className="stack-lg">{currencies.map((currency) => {
     const currencyAccounts = scopedAccounts.filter((account) => account.currencyCode === currency);
     const currencyIds = new Set(currencyAccounts.map((account) => account.id));
     const currencyRows = rows.filter((tx) => currencyIds.has(tx.accountId));
-    const pending = currencyRows.filter((tx) => tx.isPending).reduce((sum, tx) => sum + tx.amount, 0);
-    const planned = visiblePlans.filter((plan) => currencyIds.has(plan.accountId)).reduce((sum, plan) => sum + plan.amount, 0);
+    const pendingInflow = currencyRows.filter(tx => tx.isPending && tx.amount >= 0).reduce((sum, tx) => sum + tx.amount, 0);
+    const pendingOutflow = currencyRows.filter(tx => tx.isPending && tx.amount < 0).reduce((sum, tx) => sum + tx.amount, 0);
+    const plannedInflow = visiblePlans.filter(plan => currencyIds.has(plan.accountId) && plan.amount >= 0).reduce((sum, plan) => sum + plan.amount, 0);
+    const plannedOutflow = visiblePlans.filter(plan => currencyIds.has(plan.accountId) && plan.amount < 0).reduce((sum, plan) => sum + plan.amount, 0);
     const inflow = currencyRows.filter((tx) => !tx.isPending && tx.amount >= 0).reduce((sum, tx) => sum + tx.amount, 0);
     const outflow = currencyRows.filter((tx) => !tx.isPending && tx.amount < 0).reduce((sum, tx) => sum + tx.amount, 0);
-    const actual = currencyAccounts.reduce((sum, account) => sum + accountBalance(account, transactions), 0);
+    const actual = currencyAccounts.reduce((sum, account) => sum + accountBalance(account, transactions.filter(tx => !filters.toDate || tx.date <= filters.toDate)), 0);
+    const start = currencyAccounts.reduce((sum, account) => sum + accountBalance(account, transactions.filter(tx => filters.fromDate && tx.date < filters.fromDate)), 0);
     const currencyCards = scopedCards.filter((card) => card.currencyCode === currency);
     const cardOwed = currencyCards.reduce((sum, card) => sum + Math.max(0, outstandingBalanceByCard(card, creditCardTransactions)), 0);
     const cardLimit = currencyCards.reduce((sum, card) => sum + Math.max(0, card.creditLimit ?? 0), 0);
     const available = Math.max(0, cardLimit - cardOwed);
-    return <div key={currency} className="stat-card card account-summary-card" style={hueStyle(actual >= 0 ? 'var(--profit)' : 'var(--loss)')}>
-      <h4>{currency}</h4>
-      <div className="account-summary-card-metrics">
-        <div className="summary-metric summary-metric-large"><span className="summary-metric-label">Actual balance</span><MoneyValue n={actual} currency={currency} /></div>
-        <SummaryChip label="Expected" value={fmtMoney(actual + pending + planned, currency)} />
-        <SummaryChip label="Inflow" value={fmtMoney(inflow, currency)} />
-        <SummaryChip label="Outflow" value={fmtMoney(outflow, currency)} />
-        <SummaryChip label="Pending" value={fmtMoney(pending, currency)} />
-        <SummaryChip label="Planned" value={fmtMoney(planned, currency)} />
-        {!!currencyCards.length && <SummaryChip label="Card owed" value={fmtMoney(cardOwed, currency)} />}
-        {!!cardLimit && <SummaryChip label="Credit available" value={fmtMoney(available, currency)} />}
-      </div>
+    return <div key={currency}><h3>{currency}</h3><BalanceSummaryCards currency={currency} summary={{ start, current: actual, inflow, outflow, pendingInflow, pendingOutflow, plannedInflow, plannedOutflow }} />
+      {!!currencyCards.length && <div className="mt-12"><SummaryChip label="Card owed" value={fmtMoney(cardOwed, currency)} />{!!cardLimit && <SummaryChip label="Credit available" value={fmtMoney(available, currency)} />}</div>}
     </div>;
   })}</div>;
 }
@@ -1975,6 +1978,7 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
   const dateFormat = useAppearanceStore((s) => s.appearance.dateFormat ?? 'DD-MMM-YYYY');
   const allPlans = usePlannedBankWorkbookStore((s) => s.workbook.entries);
   const updatePlan = usePlannedBankWorkbookStore((s) => s.updateEntry);
+  const addCompletedPlan = usePlannedBankWorkbookStore((s) => s.addEntry);
   const deletePlan = usePlannedBankWorkbookStore((s) => s.deleteEntry);
   const addTransaction = useBankWorkbookStore((s) => s.addTransaction);
   const ensureSignedIn = useEnsureSignedIn();
@@ -1982,19 +1986,24 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
   const asOf = useMemo(() => new Date(), []);
 
   const plans = useMemo(
-    () => allPlans.filter((p) => p.accountId === account.id && planWithinHorizon(p, asOf, horizonDays) && (!fromDate || p.date >= fromDate) && (!toDate || p.date <= toDate)),
+    () => planOccurrences(allPlans, fromDate, toDate, asOf, horizonDays).filter((p) => p.accountId === account.id),
     [allPlans, account.id, horizonDays, asOf, fromDate, toDate],
   );
   const sorted = useMemo(() => [...plans].sort((a, b) => a.date.localeCompare(b.date)), [plans]);
 
-  const markDone = async (p: PlannedBankTransaction) => {
-    const occurrenceDate = p.recurrence ? nextRecurrenceOccurrence(p.recurrence)?.toISOString().slice(0, 10) : p.date;
+  const markDone = async (p: PlannedBankTransaction & { planId?: string }) => {
+    const occurrenceDate = p.date;
+    const planId = p.planId ?? p.id;
+    const source = allPlans.find((plan) => plan.id === planId);
+    if (!source || p.executed || (p.recurrence && occurrenceCompleted(source, occurrenceDate))) return toast('This occurrence is already completed.');
     if (!occurrenceDate) return toast('This plan has no more occurrences left (past its end date).');
     if (!(await ensureSignedIn('Sign in to save bank transactions.'))) return;
+    const latestPlan = usePlannedBankWorkbookStore.getState().workbook.entries.find(plan => plan.id === planId);
+    if (!latestPlan || latestPlan.executed || (p.recurrence && occurrenceCompleted(latestPlan, occurrenceDate))) return toast('This occurrence is already completed.');
     addTransaction({
       id: crypto.randomUUID(),
       accountId: p.accountId,
-      date: occurrenceDate,
+      date: p.recurrence ? today() : occurrenceDate,
       description: p.description,
       amount: p.amount,
       isDeposit: p.amount >= 0,
@@ -2002,10 +2011,11 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
       source: 'manual',
     });
     if (p.recurrence) {
-      updatePlan(p.id, { executedThrough: occurrenceDate });
+      updatePlan(planId, { completedDates: [...(latestPlan.completedDates ?? []), occurrenceDate] });
+      addCompletedPlan({ ...source, id: crypto.randomUUID(), seriesId: planId, date: occurrenceDate, fulfilledDate: today(), recurrence: undefined, completedDates: undefined, executedThrough: undefined, executed: true });
       toast(`Marked ${occurrenceDate} as done — added to this account's transactions. This plan keeps recurring.`);
     } else {
-      updatePlan(p.id, { executed: true });
+      updatePlan(planId, { executed: true });
       toast('Marked as done — added to this account\'s transactions.');
     }
   };
@@ -2021,21 +2031,21 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
             {sorted.map((p) => (
               <tr key={p.id}>
                 <td>{formatDate(p.date, dateFormat)}</td>
-                <td><Link to={`/planning?plan=${encodeURIComponent(p.id)}`} className="plan-link">{p.description}</Link></td>
+                <td><Link to={`/planning?plan=${encodeURIComponent(p.planId ?? p.id)}`} className="plan-link">{p.description}</Link></td>
                 <td className={p.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(p.amount, account.currencyCode)}</td>
                 <td>{p.category || '—'}</td>
-                <td className="text-muted">{p.recurrence ? recurrenceLabel(p.recurrence) : p.executed ? 'Done' : 'Planned'}</td>
+                <td className="text-muted">{p.executed ? 'Done' : 'Planned'}{p.recurrence ? ` (${recurrenceLabel(p.recurrence)})` : ''}</td>
                 <td>
-                  {(p.recurrence || !p.executed) && (
+                  {!p.executed && (
                     <button className="btn secondary small" onClick={() => markDone(p)}><CheckIcon size={12} />Mark as done</button>
                   )}{' '}
-                  {showActions && <><IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => setEditingPlan(p)} />{' '}
+                  {showActions && <><IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => setEditingPlan(allPlans.find((plan) => plan.id === (p.planId ?? p.id)) ?? p)} />{' '}
                   <IconButton
                     label="Delete"
                     icon={<TrashIcon size={13} />}
                     align="right"
                     onClick={async () => {
-                      if (await confirmDialog('This cannot be undone.', 'Delete this plan?')) deletePlan(p.id);
+                      if (await confirmDialog('This cannot be undone.', 'Delete this plan?')) deletePlan(p.planId ?? p.id);
                     }}
                   /></>}
                 </td>
@@ -2143,13 +2153,13 @@ function AnalyticsTab({ bankId, filters }: { bankId?: string; filters: BankingFi
   }, [account, allLedger, filters.fromDate]);
   const upcoming = useMemo(
     () => account
-      ? plannedEntries
+      ? planOccurrences(plannedEntries, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters))
           .filter((plan) => plan.accountId === account.id && !plan.executed)
           .filter((plan) => (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate))
           .filter((plan) => filters.direction === 'all' || (filters.direction === 'in' ? plan.amount >= 0 : plan.amount < 0))
           .sort((a, b) => a.date.localeCompare(b.date))
       : [],
-    [plannedEntries, account, filters.fromDate, filters.toDate, filters.direction],
+    [plannedEntries, account, filters],
   );
 
   const thisMonth = today().slice(0, 7);
@@ -2427,6 +2437,7 @@ export function BankPage({
 
   return (
     <div className="standard-page">
+      <BackButton to="/net-worth">← Overview</BackButton>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
         <h1 className="pagetitle m-0">Banking</h1>
         <Tooltip text="Bank account balances and transaction history, entered manually or imported from a CSV statement — no live bank connection (see Disclaimer & Privacy for why)." />

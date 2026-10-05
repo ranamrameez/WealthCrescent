@@ -1,3 +1,6 @@
+import { BackButton } from '../../../components/BackButton';
+import { BalanceSummaryCards } from '../../../components/BalanceSummaryCards';
+import { PageFilters } from '../../../components/PageFilters';
 import { StandardPageSections } from '../../../components/StandardPageSections';
 import type { User } from 'firebase/auth';
 import { useMemo, useState, type ReactNode } from 'react';
@@ -606,7 +609,7 @@ function LoanDetail({ loan, onBack, startInEditMode }: { loan: EMILoan; onBack: 
   };
 
   return (
-    <ModuleDetailTemplate title={loan.name} backLabel="All loans" onBack={onBack} sections={[{ key: 'summary', label: 'Summary', content: <LoanStatZones loan={loan} sum={sum} loanRepayments={loanRepayments} /> }, { key: 'details', label: 'Details', defaultOpen: true, headerEnd: editing ? (
+    <ModuleDetailTemplate title={loan.name} backLabel="All loans" onBack={onBack} sections={[{ key: 'summary', label: 'Account summary', content: <><BalanceSummaryCards currency={loan.currencyCode} summary={{ start: netToReturn, current: Math.max(0, netToReturn - loanRepayments.reduce((total, repayment) => total + repayment.amount, 0)), inflow: 0, outflow: -loanRepayments.reduce((total, repayment) => total + repayment.amount, 0), pendingInflow: 0, pendingOutflow: 0, plannedInflow: 0, plannedOutflow: plannedBankEntries.filter(plan => plan.sourceEmiLoanId === loan.id && !plan.executed).reduce((total, plan) => total + plan.amount, 0) }} /><LoanStatZones loan={loan} sum={sum} loanRepayments={loanRepayments} /></> }, { key: 'details', label: 'Details', defaultOpen: true, headerEnd: editing ? (
             <div className="row gap-sm">
               <IconButton
                 label="Save"
@@ -795,7 +798,7 @@ function LoanDetail({ loan, onBack, startInEditMode }: { loan: EMILoan; onBack: 
         Show the full schedule, start to end (instead of just the next 12 installments)
       </label>
       {/* User-requested (2026-09-03): "add filters to other tables as well." */}
-      <div className="row gap-sm mb-sm">
+      <PageFilters><div className="row gap-sm mb-sm">
         <Field label="Status" width={140}>
           <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}>
             <option value="all">All</option>
@@ -804,7 +807,7 @@ function LoanDetail({ loan, onBack, startInEditMode }: { loan: EMILoan; onBack: 
             <option value="upcoming">Upcoming</option>
           </Select>
         </Field>
-      </div>
+      </div></PageFilters>
 
       <div className="table-scroll">
         <table>
@@ -1319,6 +1322,7 @@ export function EMIPage({
 
   return (
     <div>
+      {!liveSelected && <BackButton to="/net-worth">← Overview</BackButton>}
       <h1 className="pagetitle">EMI / Loans</h1>
       <p className="text-muted mb-12">
         A loan you're repaying on a fixed schedule — a mortgage, car financing, or similar — with an

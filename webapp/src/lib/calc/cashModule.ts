@@ -5,6 +5,16 @@ import { dateOnlyMs } from '../datetime';
 
 export interface CashLedgerRow { entry: CashEntry; balance: number; }
 
+/** Balances use complete cleared history; transaction filters only select flow rows. */
+export function cashPeriodSummary(entries: CashEntry[], visible: CashEntry[], currency: string, fromDate: string, toDate: string) {
+  const ledger = cashRunningLedger(entries).filter((row) => row.entry.currencyCode === currency);
+  const start = fromDate ? ledger.filter((row) => row.entry.date < fromDate).at(-1)?.balance ?? 0 : 0;
+  const current = ledger.filter((row) => !toDate || row.entry.date <= toDate).at(-1)?.balance ?? 0;
+  const scoped = visible.filter((entry) => entry.currencyCode === currency);
+  const total = (pending: boolean, deposit: boolean) => scoped.filter((entry) => !!entry.isPending === pending && entry.isDeposit === deposit).reduce((sum, entry) => sum + (deposit ? entry.amount : -entry.amount), 0);
+  return { start, current, inflow: total(false, true), outflow: total(false, false), pendingInflow: total(true, true), pendingOutflow: total(true, false) };
+}
+
 /** Running cleared balance per currency. Pending entries are excluded from
  * the actual ledger; cashPendingByCurrency exposes their separate impact. */
 export function cashRunningLedger(entries: CashEntry[]): CashLedgerRow[] {

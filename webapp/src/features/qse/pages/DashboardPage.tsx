@@ -1,3 +1,4 @@
+import { BackButton } from '../../../components/BackButton';
 import { PriceInput } from '../../../components/ui/PriceInput';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -359,6 +360,7 @@ export function DashboardPage() {
 
   return (
     <div>
+      <BackButton to="/net-worth">← Overview</BackButton>
       <h1 className="pagetitle">Dashboard</h1>
 
       {/* Only the 9 stat cards genuinely identical regardless of cost-basis

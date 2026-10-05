@@ -1,3 +1,4 @@
+import { BackButton } from '../../../components/BackButton';
 import { PriceInput } from '../../../components/ui/PriceInput';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -26,6 +27,7 @@ export function WatchlistPage() {
 
   return (
     <div>
+      <BackButton to="/qse">← QSE</BackButton>
       <h1 className="pagetitle">Watchlist</h1>
 
       <h3>Add to watchlist</h3>

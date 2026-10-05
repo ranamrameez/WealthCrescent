@@ -1,3 +1,4 @@
+import { BackButton } from '../../../components/BackButton';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AppearanceFields } from '../../../components/AppearancePanel';
@@ -439,6 +440,7 @@ export function AccountPage({ syncStatuses }: { syncStatuses: ModuleSyncStatus[]
 
   return (
     <div>
+      <BackButton to="/net-worth">← Overview</BackButton>
       <h1 className="pagetitle">Account</h1>
 
       {/* User-reported (2026-09): "Everything should be a grid item except

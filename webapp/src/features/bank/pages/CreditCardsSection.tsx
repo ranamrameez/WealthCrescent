@@ -1,6 +1,8 @@
+import { planOccurrences, occurrenceCompleted } from '../../../lib/calc/planOccurrences';
+import { BackButton } from '../../../components/BackButton';
 import { useEffect, useMemo, useState } from 'react';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { CreditCardVisual } from '../../../components/CreditCardVisual';
 import { SummaryGroupCard, SummaryMetric } from '../../../components/SummaryGroupCard';
 import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu';
@@ -38,9 +40,8 @@ import { dlBarV, dlDoughnut } from '../../../lib/chartLabels';
 import { applyChartTheme } from '../../../lib/chartSetup';
 import { cssVar, tickerColor } from '../../../lib/cssVar';
 import { chartAlpha, chartDepthPlugin } from '../../../lib/chartVisuals';
-import { nextRecurrenceOccurrence } from '../../../lib/calc/recurrence';
 import { recurrenceLabel } from '../../../lib/recurrenceLabel';
-import { planWithinHorizon, plannedCreditCardProjection, type PlanningHorizonDays } from '../../../lib/calc/plannedBalance';
+import { plannedCreditCardProjection, type PlanningHorizonDays } from '../../../lib/calc/plannedBalance';
 import { useCategoryStore } from '../../../store/categoryStore';
 import {
   creditCardMonthlyHistory,
@@ -714,7 +715,7 @@ export function CreditCardDetailPage() {
   if (!card) {
     return (
       <div>
-        <Link to="/bank" className="text-muted">← Back to Banking</Link>
+        <BackButton to="/bank">← Back to Banking</BackButton>
         <p className="text-muted mt-12">Card not found.</p>
       </div>
     );
@@ -767,7 +768,7 @@ export function CreditCardDetailPage() {
 
   return (
     <div>
-      <Link to="/bank" className="text-muted">← Back to Banking</Link>
+      <BackButton to="/bank">← Back to Banking</BackButton>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <h1 className="pagetitle" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
           {card.name}
@@ -1031,6 +1032,7 @@ function AddCardPlanForm({ cardId, onSaved, plan }: { cardId: string; onSaved?: 
 function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: PlanningHorizonDays }) {
   const allPlans = usePlannedCreditCardWorkbookStore((s) => s.workbook.entries);
   const updatePlan = usePlannedCreditCardWorkbookStore((s) => s.updateEntry);
+  const addCompletedPlan = usePlannedCreditCardWorkbookStore((s) => s.addEntry);
   const deletePlan = usePlannedCreditCardWorkbookStore((s) => s.deleteEntry);
   const addTransaction = useCreditCardWorkbookStore((s) => s.addTransaction);
   const ensureSignedIn = useEnsureSignedIn();
@@ -1038,24 +1040,30 @@ function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: Pl
   const asOf = useMemo(() => new Date(), []);
 
   const plans = useMemo(
-    () => allPlans.filter((p) => p.cardId === card.id && planWithinHorizon(p, asOf, horizonDays)),
+    () => planOccurrences(allPlans, undefined, undefined, asOf, horizonDays).filter((p) => p.cardId === card.id),
     [allPlans, card.id, horizonDays, asOf],
   );
   const sorted = useMemo(() => [...plans].sort((a, b) => a.date.localeCompare(b.date)), [plans]);
 
-  const markDone = async (p: PlannedCreditCardTransaction) => {
-    const occurrenceDate = p.recurrence ? nextRecurrenceOccurrence(p.recurrence)?.toISOString().slice(0, 10) : p.date;
+  const markDone = async (p: PlannedCreditCardTransaction & { planId?: string }) => {
+    const occurrenceDate = p.date;
+    const planId = p.planId ?? p.id;
+    const source = allPlans.find((plan) => plan.id === planId);
+    if (!source || p.executed || (p.recurrence && occurrenceCompleted(source, occurrenceDate))) return toast('This occurrence is already completed.');
     if (!occurrenceDate) return toast('This plan has no more occurrences left (past its end date).');
     if (!(await ensureSignedIn('Sign in to save credit card transactions.'))) return;
+    const latestPlan = usePlannedCreditCardWorkbookStore.getState().workbook.entries.find(plan => plan.id === planId);
+    if (!latestPlan || latestPlan.executed || (p.recurrence && occurrenceCompleted(latestPlan, occurrenceDate))) return toast('This occurrence is already completed.');
     addTransaction({
-      id: crypto.randomUUID(), cardId: p.cardId, date: occurrenceDate, kind: p.kind,
+      id: crypto.randomUUID(), cardId: p.cardId, date: p.recurrence ? today() : occurrenceDate, kind: p.kind,
       description: p.description, amount: p.amount, source: 'manual',
     });
     if (p.recurrence) {
-      updatePlan(p.id, { executedThrough: occurrenceDate });
+      updatePlan(planId, { completedDates: [...(latestPlan.completedDates ?? []), occurrenceDate] });
+      addCompletedPlan({ ...source, id: crypto.randomUUID(), seriesId: planId, date: occurrenceDate, fulfilledDate: today(), recurrence: undefined, completedDates: undefined, executedThrough: undefined, executed: true });
       toast(`Marked ${occurrenceDate} as done — added to this card's transactions. This plan keeps recurring.`);
     } else {
-      updatePlan(p.id, { executed: true });
+      updatePlan(planId, { executed: true });
       toast('Marked as done — added to this card\'s transactions.');
     }
   };
@@ -1072,18 +1080,18 @@ function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: Pl
                 <td className={p.kind === 'payment' ? 'pill pill-positive' : 'pill pill-negative'} style={{ display: 'inline-block' }}>{KIND_LABELS[p.kind]}</td>
                 <td className="cell-clip" title={p.description}>{p.description}</td>
                 <td>{fmtMoney(p.amount, card.currencyCode)}</td>
-                <td className="text-muted">{p.recurrence ? recurrenceLabel(p.recurrence) : p.executed ? 'Done' : 'Planned'}</td>
+                <td className="text-muted">{p.executed ? 'Done' : 'Planned'}{p.recurrence ? ` (${recurrenceLabel(p.recurrence)})` : ''}</td>
                 <td>
-                  {(p.recurrence || !p.executed) && (
+                  {!p.executed && (
                     <button className="btn secondary small" onClick={() => markDone(p)}>Mark as done</button>
                   )}{' '}
-                  <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => setEditingPlan(p)} />{' '}
+                  <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => setEditingPlan(allPlans.find((plan) => plan.id === (p.planId ?? p.id)) ?? p)} />{' '}
                   <IconButton
                     label="Delete"
                     icon={<TrashIcon size={13} />}
                     align="right"
                     onClick={async () => {
-                      if (await confirmDialog('This cannot be undone.', 'Delete this plan?')) deletePlan(p.id);
+                      if (await confirmDialog('This cannot be undone.', 'Delete this plan?')) deletePlan(p.planId ?? p.id);
                     }}
                   />
                 </td>
@@ -1385,4 +1393,3 @@ function MigrateLegacyCreditCards() {
     </Notice>
   );
 }
-

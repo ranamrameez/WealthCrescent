@@ -1,3 +1,8 @@
+import { BackButton } from '../../../components/BackButton';
+import { PageFilters } from '../../../components/PageFilters';
+import { BalanceSummaryCards } from '../../../components/BalanceSummaryCards';
+import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu';
+import { useUrlTransactionFilters, type TransactionPageFilters } from '../../../hooks/useUrlTransactionFilters';
 import { ModuleDetailTemplate } from '../../../components/ModuleDetailTemplate';
 import type { User } from 'firebase/auth';
 import { useMemo, useState } from 'react';
@@ -229,7 +234,7 @@ function SubscriptionList({ onSelect, selectedIds }: { onSelect: (sub: Subscript
 
   return (
     <div>
-      <div className="row gap-sm mb-sm">
+      <PageFilters><div className="row gap-sm mb-sm">
         <Field label="Status" width={130}>
           <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}>
             <option value="all">All</option>
@@ -243,7 +248,7 @@ function SubscriptionList({ onSelect, selectedIds }: { onSelect: (sub: Subscript
             {knownCategories.map((c) => <option key={c} value={c}>{c}</option>)}
           </Select>
         </Field>
-      </div>
+      </div></PageFilters>
       {!sorted.length ? (
         <p className="text-muted">
           {subs.length ? 'No subscriptions match these filters.' : 'No subscriptions yet — add one above.'}
@@ -373,7 +378,27 @@ function AlertsSection({ sub }: { sub: Subscription }) {
   );
 }
 
+function SubscriptionAccountSummary({ sub, filters }: { sub: Subscription; filters: TransactionPageFilters }) {
+  const bank = usePlannedBankWorkbookStore(state => state.workbook.entries);
+  const cash = usePlannedCashWorkbookStore(state => state.workbook.entries);
+  const cards = usePlannedCreditCardWorkbookStore(state => state.workbook.entries);
+  const categories = useCategoryStore(state => state.workbook.categories);
+  const plans = [...bank, ...cash, ...cards].filter(plan => plan.sourceSubscriptionId === sub.id);
+  const paid = plans.filter(plan => plan.executed).map(plan => ({ ...plan, date: plan.fulfilledDate ?? plan.date }));
+  const amount = (plan: { amount: number }) => Math.abs(plan.amount);
+  const inPeriod = (plan: { date: string }) => (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate);
+  const matches = filters.direction !== 'in' && filters.source !== 'statement-import' && (filters.category === 'all' || filters.category === subCategoryLabel(sub, categories));
+  return <BalanceSummaryCards currency={sub.currencyCode} summary={{
+    start: -paid.filter(plan => filters.fromDate && plan.date < filters.fromDate).reduce((total, plan) => total + amount(plan), 0),
+    current: -paid.filter(plan => !filters.toDate || plan.date <= filters.toDate).reduce((total, plan) => total + amount(plan), 0),
+    inflow: 0, outflow: matches ? -paid.filter(inPeriod).reduce((total, plan) => total + amount(plan), 0) : 0,
+    pendingInflow: 0, pendingOutflow: 0, plannedInflow: 0,
+    plannedOutflow: matches ? -plans.filter(plan => !plan.executed && inPeriod(plan)).reduce((total, plan) => total + amount(plan), 0) : 0,
+  }} />;
+}
+
 function SubscriptionDetail({ sub, onBack }: { sub: Subscription; onBack: () => void }) {
+  const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
   const dateFormat = useAppearanceStore((s) => s.appearance.dateFormat);
   const updateEntry = useSubscriptionsWorkbookStore((s) => s.updateEntry);
   const deleteEntry = useSubscriptionsWorkbookStore((s) => s.deleteEntry);
@@ -485,7 +510,9 @@ function SubscriptionDetail({ sub, onBack }: { sub: Subscription; onBack: () => 
   };
 
   return (
-    <ModuleDetailTemplate title={sub.name} backLabel="All subscriptions" onBack={onBack} sections={[{ key: 'summary', label: 'Summary', defaultOpen: true,  content: <>
+    <ModuleDetailTemplate title={sub.name} backLabel="All subscriptions" onBack={onBack}
+      topBarRight={<TopBarControls><TransactionFilterMenu value={filters} categories={[subCategoryLabel(sub, categoryRegistry)]} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls>}
+      sections={[{ key: 'summary', label: 'Account summary', defaultOpen: true, content: <SubscriptionAccountSummary sub={sub} filters={filters} /> }, { key: 'details', label: 'Subscription details', defaultOpen: true, content: <>
         {editing ? (
           <div>
             <div className="row gap-sm">
@@ -835,11 +862,13 @@ export function SubscriptionsPage({
   const [params] = useSearchParams();
   const selectedIds = selectedEntityValues(params, subs.map((s) => s.id));
   const selectedSubscriptions = useMemo(() => subs.filter((subscription) => selectedIds.includes(subscription.id)), [subs, selectedIds]);
+  const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
   const selectedCurrencies = useMemo(() => [...new Set(selectedSubscriptions.map((subscription) => subscription.currencyCode))].sort(), [selectedSubscriptions]);
-  usePageTopBarRightSlot(!liveSelected && subs.length ? <TopBarControls><EntityScopeMenu label="Subscriptions" options={subs.map((s) => ({ value: s.id, label: s.name }))} /></TopBarControls> : null);
+  usePageTopBarRightSlot(!liveSelected && subs.length ? <TopBarControls><EntityScopeMenu label="Subscriptions" options={subs.map((s) => ({ value: s.id, label: s.name }))} /><TransactionFilterMenu value={filters} categories={[...new Set(subs.map(sub => subCategoryLabel(sub, useCategoryStore.getState().workbook.categories)))]} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls> : null);
 
   return (
     <div>
+      {!liveSelected && <BackButton to="/net-worth">← Overview</BackButton>}
       <h1 className="pagetitle">Subscriptions</h1>
       <p className="text-muted mb-12">
         Recurring payments — streaming, gym, software, memberships — tracked independently and optionally
@@ -849,7 +878,7 @@ export function SubscriptionsPage({
         <SubscriptionDetail sub={liveSelected} onBack={() => setSelected(null)} />
       ) : (
         <StandardPageSections sections={[
-            { key: 'summary', label: 'Summary', content: <OverallSummary selectedIds={selectedIds} /> },
+            { key: 'summary', label: 'Account summary', defaultOpen: true, content: <div className="stack-lg"><OverallSummary selectedIds={selectedIds} />{selectedSubscriptions.map(sub => <div key={sub.id}><h3>{sub.name}</h3><SubscriptionAccountSummary sub={sub} filters={filters} /></div>)}</div> },
             {
               key: 'subscriptions',
               label: 'Subscriptions',

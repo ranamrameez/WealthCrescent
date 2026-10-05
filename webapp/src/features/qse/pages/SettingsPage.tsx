@@ -1,3 +1,4 @@
+import { BackButton } from '../../../components/BackButton';
 import type { User } from 'firebase/auth';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -188,6 +189,7 @@ export function SettingsPage({
 }) {
   return (
     <div>
+      <BackButton to="/qse">← QSE</BackButton>
       <h1 className="pagetitle">Settings</h1>
       <Tabs
         tabs={[

@@ -1,3 +1,4 @@
+import { BackButton } from '../../../components/BackButton';
 import { PriceInput } from '../../../components/ui/PriceInput';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -337,6 +338,7 @@ export function DashboardPage() {
 
   return (
     <div>
+      <BackButton to="/net-worth">← Overview</BackButton>
       <h1 className="pagetitle">PSX Dashboard</h1>
 
       {/* See QSE's DashboardPage.tsx for why only these 9 (of the original

@@ -1,3 +1,4 @@
+import { BackButton } from '../../../components/BackButton';
 import { RiskCalculator } from '../../../components/RiskCalculator';
 import { useQSEDerived } from '../hooks/useQSEDerived';
 import { useQSEStockData } from '../hooks/useQSEStockData';
@@ -11,6 +12,7 @@ export function RiskAnalysisPage() {
 
   return (
     <div>
+      <BackButton to="/qse">← QSE</BackButton>
       <h1 className="pagetitle">Risk Analysis</h1>
       <p className="text-muted" style={{ marginTop: -8, marginBottom: 20 }}>
         Model averaging down into an existing position — new average cost, break-even, and a stress test on the

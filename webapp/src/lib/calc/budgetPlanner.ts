@@ -1,3 +1,4 @@
+import { planOccurrences } from './planOccurrences';
 /** Budget Planner (README item 106 / user-requested 2026-08-26) — a
  * cross-module view over Cash/Bank/Rentals' ALREADY-EXISTING planned
  * entries (their own "Planning" tabs, see `plannedBalance.ts` and
@@ -99,7 +100,7 @@ function normalizeCash(entries: CashEntry[], plans: PlannedCashEntry[], categori
       amount: e.isDeposit ? e.amount : -e.amount, currencyCode: e.currencyCode,
       category: categoryName(e.categoryID, categories), description: e.note || (e.isDeposit ? 'Cash in' : 'Cash out'), executed: true,
     }));
-  const planned: BudgetActivity[] = plans.filter((p) => !p.executed).map((p) => ({
+  const planned: BudgetActivity[] = planOccurrences(plans).filter((p) => !p.executed).map((p) => ({
     id: p.id, module: 'cash', sourceLabel: 'Cash', date: p.date,
     amount: p.type === 'IN' ? p.amount : -p.amount, currencyCode: p.currencyCode,
     category: p.category, description: p.note || (p.type === 'IN' ? 'Planned cash in' : 'Planned cash out'), executed: false,
@@ -119,7 +120,7 @@ function normalizeBank(accounts: BankAccount[], transactions: BankTransaction[],
       category: categoryName(t.categoryID, categories), description: t.description, executed: true,
     }];
   });
-  const planned: BudgetActivity[] = plans.filter((p) => !p.executed).flatMap((p) => {
+  const planned: BudgetActivity[] = planOccurrences(plans).filter((p) => !p.executed).flatMap((p) => {
     const account = accountById.get(p.accountId);
     if (!account) return [];
     return [{
@@ -144,7 +145,7 @@ function normalizeRentals(properties: Property[], entries: RentalEntry[], plans:
       category: categoryName(e.categoryID, categories), description: e.note || (e.isDeposit ? 'Rent income' : 'Expense'), executed: true,
     }];
   });
-  const planned: BudgetActivity[] = plans.filter((p) => !p.executed).flatMap((p) => {
+  const planned: BudgetActivity[] = planOccurrences(plans).filter((p) => !p.executed).flatMap((p) => {
     const property = propertyById.get(p.propertyId);
     if (!property) return [];
     return [{

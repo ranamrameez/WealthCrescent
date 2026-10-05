@@ -48,8 +48,13 @@ export function usePageTopBarChips(chips: TopBarChip[]): void {
 export function usePageTopBarRightSlot(node: ReactNode | null): void {
   const setRightSlot = usePageTopBarStore((s) => s.setRightSlot);
   useEffect(() => {
+    // A landing page rendering a detail child has no slot of its own.
+    // It must not clear the child's newly registered filters.
+    if (node == null) return;
     setRightSlot(node);
-    return () => setRightSlot(null);
+    return () => {
+      if (usePageTopBarStore.getState().rightSlot === node) setRightSlot(null);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node]);
 }

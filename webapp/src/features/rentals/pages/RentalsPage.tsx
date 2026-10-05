@@ -1,4 +1,6 @@
+import { BackButton } from '../../../components/BackButton';
 import type { User } from 'firebase/auth';
+import { BalanceSummaryCards } from '../../../components/BalanceSummaryCards';
 import { RentalPlanEditor } from './RentalPlanEditor';
 import type { PlannedRentalEntry } from '../../../types/plannedRentals';
 import { useMemo, useRef, useState } from 'react';
@@ -57,6 +59,25 @@ import type { Property, RentalEntry } from '../../../types/rentalsWorkbook';
 import { ChartCard } from '../../qse/components/ChartCard';
 import { gridAutoStyle } from '../../../lib/gridStyle';
 const uid = () => crypto.randomUUID();
+
+function RentalAccountSummary({ property, entries, visible, filters }: { property: Property; entries: RentalEntry[]; visible: RentalEntry[]; filters: TransactionPageFilters }) {
+  const plans = usePlannedRentalsWorkbookStore((state) => state.workbook.entries);
+  const signed = (entry: RentalEntry) => entry.isDeposit ? entry.amount : -entry.amount;
+  const history = entries.filter(entry => entry.propertyId === property.id && !entry.isPending);
+  const rows = visible.filter(entry => entry.propertyId === property.id);
+  const total = (pending: boolean, deposit: boolean) => rows.filter(entry => !!entry.isPending === pending && entry.isDeposit === deposit).reduce((sum, entry) => sum + signed(entry), 0);
+  const upcoming = plans.filter(plan => plan.propertyId === property.id && !plan.executed && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate))
+    .filter(plan => filters.category === 'all' || plan.category === filters.category)
+    .filter(plan => filters.direction === 'all' || (filters.direction === 'in' ? plan.type === 'RENT_INCOME' : plan.type === 'EXPENSE'))
+    .filter(() => filters.source !== 'statement-import');
+  return <div><h3>{property.name}</h3><BalanceSummaryCards currency={property.currencyCode} summary={{
+    start: history.filter(entry => filters.fromDate && entry.date < filters.fromDate).reduce((sum, entry) => sum + signed(entry), 0),
+    current: history.filter(entry => !filters.toDate || entry.date <= filters.toDate).reduce((sum, entry) => sum + signed(entry), 0),
+    inflow: total(false, true), outflow: total(false, false), pendingInflow: total(true, true), pendingOutflow: total(true, false),
+    plannedInflow: upcoming.filter(plan => plan.type === 'RENT_INCOME').reduce((sum, plan) => sum + plan.amount, 0),
+    plannedOutflow: -upcoming.filter(plan => plan.type === 'EXPENSE').reduce((sum, plan) => sum + plan.amount, 0),
+  }} /></div>;
+}
 
 function filterRentalEntries(entries: RentalEntry[], filters: TransactionPageFilters, categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories']) {
   return entries.filter((entry) => {
@@ -1329,13 +1350,14 @@ export function RentalsPage({
 
   return (
     <div>
+      <BackButton to="/net-worth">← Overview</BackButton>
       <h1 className="pagetitle">Rentals</h1>
       <p className="text-muted mb-12">
         Rental property income and expenses — recurring rent received and costs (maintenance, property tax,
         management fees) against one or more properties, not discrete buy/sell trades.
       </p>
       <StandardPageSections sections={[
-          { key: 'summary', label: 'Summary', content: <NetIncomeSummary selectedIds={selectedIds} entries={filteredEntries} /> },
+          { key: 'summary', label: 'Account summary', defaultOpen: true, content: <div className="stack-lg"><NetIncomeSummary selectedIds={selectedIds} entries={filteredEntries} />{properties.filter(property => selectedIds.includes(property.id)).map(property => <RentalAccountSummary key={property.id} property={property} entries={entries} visible={filteredEntries} filters={filters} />)}</div> },
           { key: 'properties', label: 'Properties', content: <PropertiesTab selectedIds={selectedIds} /> },
           {
             key: 'entries',

@@ -1,3 +1,5 @@
+import { BackButton } from '../../../components/BackButton';
+import { BalanceSummaryCards } from '../../../components/BalanceSummaryCards';
 import type { User } from 'firebase/auth';
 import { useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -39,7 +41,6 @@ import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
 import {
   loanCategoryForDirection,
   loanOutstanding,
-  loanPendingImpact,
   netPendingByCurrency,
   netPositionByCurrency,
   projectPayoff,
@@ -857,7 +858,6 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
   const updateLoan = usePersonalLoansWorkbookStore((s) => s.updateLoan);
   const ensureSignedIn = useEnsureSignedIn();
   const outstanding = loanOutstanding(loan, repayments);
-  const pendingImpact = loanPendingImpact(loan, repayments);
   const [editLoanOpen, setEditLoanOpen] = useState(false);
   const [batchEditor, setBatchEditor] = useState<'payments' | 'plans' | null>(null);
   const [editPayment, setEditPayment] = useState<PersonalLoanRepayment | null>(null);
@@ -912,14 +912,14 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
   };
 
   const paymentFilterBar = useMemo(() => (
-    <TopBarControls>
+    <>
       <PersonalLoanPaymentFilterMenu
         value={paymentFilters}
         categories={categories}
         onChange={(patch) => setPaymentFilters((current) => ({ ...current, ...patch }))}
         onClear={() => setPaymentFilters({ fromDate: '', toDate: '', source: 'all', categoryID: 'all' })}
       />
-    </TopBarControls>
+    </>
   ), [paymentFilters, categories]);
 
   const exportPayments = () => {
@@ -963,36 +963,16 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
   const sections: StandardPageSection[] = [
     {
       key: 'summary',
-      label: 'Summary',
+      label: 'Account summary',
       hue: loan.color,
       defaultOpen: true,
       actions: summaryActions,
       summary: <SummaryChip label="Outstanding" value={fmtMoney(outstanding, loan.currencyCode)} />,
-      content: (
-        <div className="grid-auto" style={gridAutoStyle(170, 8)}>
-          <div className="stat-card card" style={hueStyle(loan.color ?? 'var(--accent)')}>
-            <div className="label">Amount</div>
-            <MoneyValue n={loan.principal} currency={loan.currencyCode} />
-          </div>
-          <div className="stat-card card" style={hueStyle(loan.color ?? (loan.direction === 'owed_to_me' ? 'var(--profit)' : 'var(--loss)'))}>
-            <div className="label">Outstanding</div>
-            <MoneyValue n={outstanding} currency={loan.currencyCode} />
-          </div>
-          <div className="stat-card card" style={hueStyle(loan.color ?? 'var(--accent)')}>
-            <div className="label">Actual payments</div>
-            <MoneyValue n={actualPaid} currency={loan.currencyCode} />
-          </div>
-          <div className="stat-card card" style={hueStyle(loan.color ?? 'var(--accent)')}>
-            <div className="label">Pending payments</div>
-            <MoneyValue n={pendingPaid} currency={loan.currencyCode} />
-            {pendingImpact !== 0 && <div className="sub">Expected outstanding: {fmtMoney(Math.max(0, outstanding - pendingImpact), loan.currencyCode)}</div>}
-          </div>
-          <div className="stat-card card" style={hueStyle(loan.color ?? 'var(--accent)')}>
-            <div className="label">Planned payments</div>
-            <MoneyValue n={plannedPaid} currency={loan.currencyCode} />
-          </div>
-        </div>
-      ),
+      content: <BalanceSummaryCards currency={loan.currencyCode} summary={{
+        start: Math.max(0, loan.principal - repayments.filter(payment => payment.loanId === loan.id && !payment.isPending && paymentFilters.fromDate && payment.date < paymentFilters.fromDate).reduce((total, payment) => total + payment.amount, 0)),
+        current: Math.max(0, loan.principal - repayments.filter(payment => payment.loanId === loan.id && !payment.isPending && (!paymentFilters.toDate || payment.date <= paymentFilters.toDate)).reduce((total, payment) => total + payment.amount, 0)),
+        inflow: 0, outflow: -actualPaid, pendingInflow: 0, pendingOutflow: -pendingPaid, plannedInflow: 0, plannedOutflow: -plannedPaid,
+      }} />,
     },
     {
       key: 'details',
@@ -1404,6 +1384,7 @@ export function PersonalLoansPage({
 
   return (
     <div className="standard-page">
+      <BackButton to="/net-worth">← Overview</BackButton>
       <h1 className="pagetitle">Personal Loans</h1>
       <p className="text-muted mb-12">
         Informal money borrowed from or lent to another person, with payments, linked transfers, categories, and net position tracking.
@@ -1413,10 +1394,3 @@ export function PersonalLoansPage({
     </div>
   );
 }
-
-
-
-
-
-
-

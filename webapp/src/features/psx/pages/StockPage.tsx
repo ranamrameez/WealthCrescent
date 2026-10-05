@@ -1,6 +1,8 @@
+import { PageFilters } from '../../../components/PageFilters';
+import { BackButton } from '../../../components/BackButton';
 import { PriceInput } from "../../../components/ui/PriceInput";
 import { Fragment, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { CheckIcon, EditIcon, SaveIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { RiskCalculator } from '../../../components/RiskCalculator';
@@ -371,7 +373,7 @@ export function StockPage() {
   return (
     <div className="standard-page">
       <div className="d-flex gap-6 align-items-center">
-        <Link to="/portfolio" className="text-muted">← Back to Portfolio</Link>
+        <BackButton to="/psx/portfolio">← Back to Portfolio</BackButton>
         <h1 className="pagetitle d-flex align-items-center">
           <TickerLogo ticker={ticker} size="lg" exchange="psx" />
           {ticker}&nbsp;&nbsp;{name && <span className="text-muted" style={{ fontSize: 16 }}>{shortenCompanyName(name, 40)}</span>}
@@ -386,7 +388,7 @@ export function StockPage() {
             label: 'Trades',
             content: <TickerTransactions ticker={ticker} />,
             headerEnd: hasRows ? (
-              <div className="row gap-sm">
+              <PageFilters><div className="row gap-sm">
                 <Field label="From (optional)">
                   <TextInput type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
                 </Field>
@@ -394,7 +396,7 @@ export function StockPage() {
                   <TextInput type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
                 </Field>
                 <button className="btn secondary" onClick={exportStatement}>Export CSV</button>
-              </div>
+              </div></PageFilters>
             ) : undefined,
           },
           {

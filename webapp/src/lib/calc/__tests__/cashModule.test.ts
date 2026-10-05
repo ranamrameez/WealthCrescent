@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CashEntry } from '../../../types/cashWorkbook';
 import type { Category } from '../../../types/finance';
-import { cashBalanceByCurrency, cashByCategory, cashMonthlyFlow, cashPendingByCurrency, cashRunningLedger } from '../cashModule';
+import { cashBalanceByCurrency, cashByCategory, cashMonthlyFlow, cashPendingByCurrency, cashRunningLedger, cashPeriodSummary } from '../cashModule';
 
 const TEST_CATEGORIES: Category[] = [
   { id: 'cat_food', serialNumber: 1, name: 'Food' },
@@ -18,6 +18,23 @@ const entry = (over: Partial<CashEntry>): CashEntry => ({
   currencyCode: 'USD',
   source: 'manual',
   ...over,
+});
+
+describe('cashPeriodSummary', () => {
+  it('carries prior cleared balances through empty periods and excludes pending and later money', () => {
+    const entries = [entry({ date: '2026-08-31', amount: 500 }), entry({ date: '2026-08-31', amount: 300, isPending: true }), entry({ date: '2026-10-01', amount: 20 }), entry({ currencyCode: 'PKR', amount: 900 })];
+    const summary = cashPeriodSummary(entries, [], 'USD', '2026-09-01', '2026-09-30');
+    expect(summary.start).toBe(500);
+    expect(summary.current).toBe(500);
+    expect(summary.inflow).toBe(0);
+  });
+  it('keeps the actual balance independent of category/direction row filters', () => {
+    const old = entry({ date: '2026-08-31', amount: 500 });
+    const income = entry({ date: '2026-09-01', amount: 100 });
+    const expense = entry({ date: '2026-09-02', amount: 40, isDeposit: false });
+    const summary = cashPeriodSummary([old, income, expense], [expense], 'USD', '2026-09-01', '2026-09-30');
+    expect(summary).toMatchObject({ start: 500, current: 560, inflow: 0, outflow: -40 });
+  });
 });
 
 describe('cashRunningLedger', () => {

@@ -1,3 +1,5 @@
+import { TopBarControls } from '../../../components/TopBarControls';
+import { BackButton } from '../../../components/BackButton';
 import { PriceInput } from "../../../components/ui/PriceInput";
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -1103,7 +1105,7 @@ export function TradeStrategyPage() {
   const exchange = "QSE";
   const [openPlans, setOpenPlans] = useState<Record<string, boolean>>({});
   usePageTopBarRightSlot(
-    <Select
+    <TopBarControls><Select
       aria-label="Stock exchange"
       value={exchange}
       width={110}
@@ -1111,7 +1113,7 @@ export function TradeStrategyPage() {
     >
       <option value="QSE">QSE</option>
       <option value="PSX">PSX</option>
-    </Select>,
+    </Select></TopBarControls>,
   );
   usePageTopBarChips(useMemo(() => [
     {
@@ -1162,6 +1164,7 @@ export function TradeStrategyPage() {
 
   return (
     <div className="standard-page">
+      <BackButton to="/qse">← QSE</BackButton>
       <h1 className="pagetitle">QSE Trade Strategy</h1>
       <p className="text-muted" style={{ marginBottom: 12 }}>
         Buy/Sell &amp; Avg Down, and Trade Planner &amp; Partial Trade — sketch out trades ahead of time, or get

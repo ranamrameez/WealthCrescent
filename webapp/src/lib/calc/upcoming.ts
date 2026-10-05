@@ -1,3 +1,4 @@
+import { occurrenceCompleted } from './planOccurrences';
 import type { BankAccount } from '../../types/bankWorkbook';
 import type { PlannedBankTransaction } from '../../types/plannedBank';
 import type { PlannedCashEntry } from '../../types/plannedCash';
@@ -58,7 +59,7 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
   inputs.plannedCash.forEach((p) => {
     if (p.recurrence) {
       recurrenceOccurrencesWithin(p.recurrence, todayStr, windowEndStr)
-        .filter((d) => !p.executedThrough || p.executedThrough < d)
+        .filter((d) => !occurrenceCompleted(p, d))
         .forEach((d) => items.push({
           date: d, module: 'cash', label: p.category?.trim() || p.note?.trim() || 'Cash plan',
           amount: p.amount, currencyCode: p.currencyCode, kind: p.type === 'IN' ? 'income' : 'expense', overdue: d < todayStr,
@@ -77,7 +78,7 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
     if (!code) return;
     if (p.recurrence) {
       recurrenceOccurrencesWithin(p.recurrence, todayStr, windowEndStr)
-        .filter((d) => !p.executedThrough || p.executedThrough < d)
+        .filter((d) => !occurrenceCompleted(p, d))
         .forEach((d) => items.push({
           date: d, module: 'bank', label: p.description, amount: Math.abs(p.amount), currencyCode: code,
           kind: p.amount >= 0 ? 'income' : 'expense', overdue: d < todayStr,

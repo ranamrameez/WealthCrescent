@@ -1,3 +1,4 @@
+import { BackButton } from '../../../components/BackButton';
 import { StockPLCharts } from '../../../components/StockPLCharts';
 import { StockTradingChart } from '../../../components/StockTradingChart';
 import { PriceInput } from '../../../components/ui/PriceInput';
@@ -276,6 +277,7 @@ export function PortfolioPage() {
 
   return (
     <div>
+      <BackButton to="/psx">← PSX</BackButton>
       <h1 className="pagetitle">PSX Portfolio</h1>
       <p className="pagesub">Open positions and closed trade history.</p>
       <Tabs

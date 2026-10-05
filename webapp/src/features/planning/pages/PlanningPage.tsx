@@ -1,3 +1,4 @@
+import { BackButton } from '../../../components/BackButton';
 import { useMemo, useState } from 'react';
 import { CollapsibleCard } from '../../../components/Card';
 import { Modal } from '../../../components/Modal';
@@ -101,6 +102,7 @@ export function PlanningPage({
 
   return (
     <div>
+      <BackButton to="/net-worth">← Overview</BackButton>
       <h1 className="pagetitle">Planning</h1>
       <OrphanPlanCleanup />
       <p className="text-muted mb-12">

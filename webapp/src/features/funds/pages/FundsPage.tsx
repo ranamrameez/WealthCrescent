@@ -1,3 +1,8 @@
+import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu';
+import { useUrlTransactionFilters } from '../../../hooks/useUrlTransactionFilters';
+import { BackButton } from '../../../components/BackButton';
+import { BalanceSummaryCards } from '../../../components/BalanceSummaryCards';
+import { PageFilters } from '../../../components/PageFilters';
 import { ModuleDetailTemplate } from '../../../components/ModuleDetailTemplate';
 import type { User } from 'firebase/auth';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -889,9 +894,13 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [editRow, setEditRow] = useState<Transaction | null>(null);
   const [detailTx, setDetailTx] = useState<Transaction | null>(null);
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'BUY' | 'SELL'>('all');
+  const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
+  const fromDate = filters.fromDate;
+  const toDate = filters.toDate;
+  const setFromDate = (value: string) => setFilters({ period: 'custom', fromDate: value });
+  const setToDate = (value: string) => setFilters({ period: 'custom', toDate: value });
+  const typeFilter = filters.direction === 'in' ? 'BUY' : filters.direction === 'out' ? 'SELL' : 'all';
+  const setTypeFilter = (value: 'all' | 'BUY' | 'SELL') => setFilters({ direction: value === 'BUY' ? 'in' : value === 'SELL' ? 'out' : 'all' });
   // User-requested (2026-09-08): "Also show a pending share-count delta" —
   // same reasoning/mechanism as QSE/PSX's Dashboard (Done item 243), reused
   // as-is since Funds shares the exact same Transaction type.
@@ -980,7 +989,7 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
   useAppearanceStore((s) => s.appearance);
   applyChartTheme();
   const contribution = useMemo(
-    () => contributionVsValueSeries(fund.id, workbook.transactions, workbook.priceHistory),
+    () => contributionVsValueSeries(fund.id, workbook.transactions.filter(tx => !tx.isPending), workbook.priceHistory),
     [fund.id, workbook.transactions, workbook.priceHistory],
   );
 
@@ -1006,7 +1015,7 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
   // a Type filter on the transaction table (export below stays unfiltered
   // by type, matching its own existing "whole statement for a date range"
   // behavior).
-  const txs = (typeFilter === 'all' ? allTxs : allTxs.filter((r) => r.t.action === typeFilter))
+  const txs = (typeFilter === 'all' ? allTxs : allTxs.filter((r) => r.t.action === typeFilter)).filter(row => (!fromDate || row.t.date >= fromDate) && (!toDate || row.t.date <= toDate) && filters.source !== 'statement-import')
     .sort((a, b) => b.t.date.localeCompare(a.t.date));
 
   /** README item 40: extends Banking's statement-export pattern (Done
@@ -1116,7 +1125,11 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
   };
 
   return (
-    <ModuleDetailTemplate title={fund.name} backLabel="All funds" onBack={onBack} sections={[{ key: 'summary', label: 'Summary & Details', defaultOpen: true,  content: <>
+    <ModuleDetailTemplate title={fund.name} backLabel="All funds" onBack={onBack} topBarRight={<TopBarControls><TransactionFilterMenu value={filters} categories={[]} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls>} sections={[{ key: 'summary', label: 'Account summary', defaultOpen: true, content: <BalanceSummaryCards currency={fund.currencyCode} summary={{ start: fromDate ? contribution.filter(point => point.date < fromDate).at(-1)?.value ?? 0 : 0, current: toDate ? contribution.filter(point => point.date <= toDate).at(-1)?.value ?? 0 : currentValue,
+      inflow: txs.filter(row => !row.t.isPending && row.t.action === 'BUY').reduce((total, row) => total + row.t.shares * row.t.price, 0),
+      outflow: -txs.filter(row => !row.t.isPending && row.t.action === 'SELL').reduce((total, row) => total + row.t.shares * row.t.price, 0),
+      pendingInflow: allTxs.filter(row => row.t.isPending && row.t.action === 'BUY').reduce((total, row) => total + row.t.shares * currentNav, 0),
+      pendingOutflow: -allTxs.filter(row => row.t.isPending && row.t.action === 'SELL').reduce((total, row) => total + row.t.shares * currentNav, 0), plannedInflow: 0, plannedOutflow: 0 }} /> }, { key: 'details', label: 'Fund details', defaultOpen: true, content: <>
             {editingFund ? (
               <div>
                 <div className="row gap-sm">
@@ -1312,7 +1325,7 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
         </div>
       </> },
 { key: 'transactions', label: 'Transactions', defaultOpen: true, headerEnd: txs.length > 0 ? (
-            <div className="row gap-sm">
+            <PageFilters><div className="row gap-sm">
               <Field label="From (optional)">
                 <TextInput type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
               </Field>
@@ -1320,9 +1333,9 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
                 <TextInput type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
               </Field>
               <button className="btn secondary" onClick={exportStatement}>Export CSV</button>
-            </div>
+            </div></PageFilters>
           ) : undefined, content: <>
-      <div className="row gap-sm mb-sm">
+      <PageFilters><div className="row gap-sm mb-sm">
         <Field label="Type" width={140}>
           <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}>
             <option value="all">All</option>
@@ -1330,7 +1343,7 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
             <option value="SELL">Withdrew</option>
           </Select>
         </Field>
-      </div>
+      </div></PageFilters>
       <div className="table-scroll">
         <table>
           <thead><tr><th>Date</th><th>Type</th><th>Units</th><th>NAV</th><th>Amount</th><th></th></tr></thead>
@@ -1577,7 +1590,7 @@ function FundsTransfersSection() {
         Cash moved into or out of this Funds account, separate from buying/selling fund units —
         e.g. topping up before a purchase, or withdrawing after a redemption.
       </p>
-      <div className="row gap-sm mb-sm">
+      <PageFilters><div className="row gap-sm mb-sm">
         <Field label="Type" width={140}>
           <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}>
             <option value="all">All</option>
@@ -1585,7 +1598,7 @@ function FundsTransfersSection() {
             <option value="WITHDRAWAL">Withdrawal</option>
           </Select>
         </Field>
-      </div>
+      </div></PageFilters>
       <div className="table-scroll mt-sm">
         <table>
           <thead>
@@ -1858,6 +1871,7 @@ export function FundsPage({
 
   return (
     <div>
+      {!liveSelected && !liveSelectedBroker && <BackButton to="/net-worth">← Overview</BackButton>}
       <h1 className="pagetitle">Funds</h1>
       <p className="text-muted mb-12">
         Mutual fund unit holdings and performance — buy/sell units at a NAV per unit, same shape as a stock

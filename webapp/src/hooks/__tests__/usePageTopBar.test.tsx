@@ -1,10 +1,20 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { usePageTopBarChips } from '../usePageTopBar';
+import { usePageTopBarChips, usePageTopBarRightSlot } from '../usePageTopBar';
 import { usePageTopBarStore } from '../../store/pageTopBarStore';
 
 beforeEach(() => {
   usePageTopBarStore.setState({ chips: [], rightSlot: null });
+});
+
+it('does not let an empty landing-page slot clear detail-page filters', () => {
+  const owner = renderHook(() => usePageTopBarRightSlot('Detail filters'));
+  const landing = renderHook(() => usePageTopBarRightSlot(null));
+  expect(usePageTopBarStore.getState().rightSlot).toBe('Detail filters');
+  landing.unmount();
+  expect(usePageTopBarStore.getState().rightSlot).toBe('Detail filters');
+  owner.unmount();
+  expect(usePageTopBarStore.getState().rightSlot).toBeNull();
 });
 
 it('does not rewrite the top-bar store when only chip callback identities change', () => {

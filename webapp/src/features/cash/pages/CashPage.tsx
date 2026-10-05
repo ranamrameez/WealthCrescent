@@ -1,6 +1,10 @@
+import { planOccurrences, occurrenceCompleted } from '../../../lib/calc/planOccurrences';
+import { BackButton } from '../../../components/BackButton';
+import { BalanceSummaryCards } from '../../../components/BalanceSummaryCards';
+import { cashPeriodSummary } from '../../../lib/calc/cashModule';
 import type { User } from 'firebase/auth';
 import { useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
 import { Notice } from '../../../components/Notice';
@@ -32,7 +36,6 @@ import { ReorderButtons } from '../../../components/ui/ReorderButtons';
 import { RecurrenceFields } from '../../../components/ui/RecurrenceFields';
 import { PlanningHorizonField } from '../../../components/ui/PlanningHorizonField';
 import { dateOnlyMs } from '../../../lib/datetime';
-import { nextRecurrenceOccurrence } from '../../../lib/calc/recurrence';
 import { recurrenceLabel } from '../../../lib/recurrenceLabel';
 import { hueStyle } from '../../../lib/statCardHues';
 import { categoryName, UNCATEGORIZED_ID } from '../../../lib/categories';
@@ -71,6 +74,20 @@ function filterCashEntries(entries: CashEntry[], filters: TransactionPageFilters
     if (filters.source !== 'all' && (entry.source ?? 'manual') !== filters.source) return false;
     return true;
   });
+}
+
+function CashAccountSummary({ currency, entries, visible, filters }: { currency: string; entries: CashEntry[]; visible: CashEntry[]; filters: TransactionPageFilters }) {
+  const plans = usePlannedCashWorkbookStore((state) => state.workbook.entries);
+  const summary = cashPeriodSummary(entries, visible, currency, filters.fromDate, filters.toDate);
+  const planned = planOccurrences(plans, filters.fromDate, filters.toDate, new Date(), null)
+    .filter(plan => plan.currencyCode === currency && !plan.executed)
+    .filter(plan => filters.direction === 'all' || (filters.direction === 'in' ? plan.type === 'IN' : plan.type === 'OUT'))
+    .filter(plan => filters.category === 'all' || (plan.category || 'Uncategorized') === filters.category)
+    .filter(() => filters.source !== 'statement-import');
+  return <BalanceSummaryCards currency={currency} summary={{ ...summary,
+    plannedInflow: planned.filter((plan) => plan.type === 'IN').reduce((sum, plan) => sum + plan.amount, 0),
+    plannedOutflow: -planned.filter((plan) => plan.type === 'OUT').reduce((sum, plan) => sum + plan.amount, 0),
+  }} />;
 }
 
 /** User-requested (2026-09-03): "No FAB for logging Cash Transfer!" — the
@@ -150,7 +167,7 @@ function BalancesSummary({ selectedCurrencies, entries: suppliedEntries }: { sel
             title={`${code} cash`}
             subtitle="Open currency details"
             statLabel="Balance"
-            stat={<MoneyValue n={balances[code]} currency={code} />}
+            stat={<MoneyValue n={balances[code] ?? 0} currency={code} />}
             hue={balances[code] >= 0 ? 'var(--profit)' : 'var(--loss)'}
             onClick={() => navigate(`/cash/${encodeURIComponent(code)}`)}
             badge={<>
@@ -159,7 +176,7 @@ function BalancesSummary({ selectedCurrencies, entries: suppliedEntries }: { sel
                actually part of the picture is silently invisible. */}
             {realPending !== 0 && (
               <div className="sub">
-                {realPending > 0 ? '+' : ''}{num(realPending)} {code} pending → {num(balances[code] + realPending)} {code} incl. pending
+                {realPending > 0 ? '+' : ''}{num(realPending)} {code} pending → {num((balances[code] ?? 0) + realPending)} {code} incl. pending
               </div>
             )}
             {pending.length > 0 && (
@@ -520,7 +537,7 @@ function CashStatementTab({ entries, selectedCurrencies, filters, categories }: 
  * per the app's cross-cutting rule), a currency picker selects which
  * currency's charts to show — QSE/PSX don't need this since each exchange
  * has exactly one settings.currency. */
-function AnalyticsTab({ currencyCode, entries: suppliedEntries }: { currencyCode?: string; entries?: CashEntry[] } = {}) {
+function AnalyticsTab({ currencyCode, entries: suppliedEntries, filters }: { currencyCode?: string; entries?: CashEntry[]; filters?: TransactionPageFilters } = {}) {
   const storedEntries = useCashWorkbookStore((s) => s.workbook.entries);
   const entries = suppliedEntries ?? storedEntries;
   // Charts read CSS-var-derived colors — subscribe so this re-renders (and
@@ -538,9 +555,10 @@ function AnalyticsTab({ currencyCode, entries: suppliedEntries }: { currencyCode
   const categories = Object.keys(byCategory);
   const monthlyFlow = useMemo(() => cashMonthlyFlow(entries, effectiveCurrency), [entries, effectiveCurrency]);
   const balanceOverTime = useMemo(
-    () => cashRunningLedger(entries).filter((r) => r.entry.currencyCode === effectiveCurrency),
-    [entries, effectiveCurrency],
+    () => cashRunningLedger(storedEntries).filter((r) => r.entry.currencyCode === effectiveCurrency && entries.some((entry) => entry.id === r.entry.id)),
+    [storedEntries, entries, effectiveCurrency],
   );
+  const periodBalance = cashPeriodSummary(storedEntries, entries, effectiveCurrency, filters?.fromDate ?? '', filters?.toDate ?? '');
 
   if (!currencies.length) {
     return <p className="text-muted">Add a cash entry first (Ledger tab) to see charts here.</p>;
@@ -584,8 +602,8 @@ function AnalyticsTab({ currencyCode, entries: suppliedEntries }: { currencyCode
         <ChartCard title="Balance over time" empty={!balanceOverTime.length}>
           <Line
             data={{
-              labels: balanceOverTime.map((r) => r.entry.date),
-              datasets: [{ label: 'Balance', data: balanceOverTime.map((r) => r.balance), borderColor: '#5aa9c9', backgroundColor: '#5aa9c933', fill: true, tension: 0.2 }],
+              labels: [filters?.fromDate || 'Period start', ...balanceOverTime.map((r) => r.entry.date), filters?.toDate || 'Period end'],
+              datasets: [{ label: 'Balance', data: [periodBalance.start, ...balanceOverTime.map((r) => r.balance), periodBalance.current], borderColor: '#5aa9c9', backgroundColor: '#5aa9c933', fill: true, tension: 0.2 }],
             }}
             options={{ plugins: { legend: { display: false }, datalabels: dlLine((v) => fmtMoney(v, effectiveCurrency)) } }}
           />
@@ -921,10 +939,10 @@ function PlanCurrencyTable({
   markDone,
 }: {
   code: string;
-  plans: PlannedCashEntry[];
+  plans: Array<PlannedCashEntry & { planId?: string }>;
   updatePlan: (id: string, patch: Partial<PlannedCashEntry>) => void;
   deletePlan: (id: string) => void;
-  markDone: (p: PlannedCashEntry) => void;
+  markDone: (p: PlannedCashEntry & { planId?: string }) => void;
 }) {
   const [editId, setEditId] = useState<string | null>(null);
   const [editRow, setEditRow] = useState<PlannedCashEntry | null>(null);
@@ -941,10 +959,14 @@ function PlanCurrencyTable({
   };
   const { sorted, Th } = useSortableRows(plans, sortValue, 'date', 'asc');
 
-  const startEdit = (p: PlannedCashEntry) => { setEditId(p.id); setEditRow({ ...p }); };
+  const startEdit = (p: PlannedCashEntry & { planId?: string }) => {
+    const { planId, ...plan } = p;
+    setEditId(p.id);
+    setEditRow({ ...plan, id: planId ?? plan.id, date: plan.recurrence?.startDate ?? plan.date });
+  };
   const saveEdit = () => {
     if (!editId || !editRow) return;
-    updatePlan(editId, editRow);
+    updatePlan(editRow.id, editRow);
     toast('Plan updated.');
     setEditId(null);
     setEditRow(null);
@@ -1007,9 +1029,9 @@ function PlanCurrencyTable({
                   <td>{fmtMoney(p.amount, p.currencyCode)}</td>
                   <td>{p.category || '—'}</td>
                   <td>{p.note}</td>
-                  <td className="text-muted">{p.recurrence ? recurrenceLabel(p.recurrence) : p.executed ? 'Done' : 'Planned'}</td>
+                  <td className="text-muted">{p.executed ? 'Done' : 'Planned'}{p.recurrence ? ` (${recurrenceLabel(p.recurrence)})` : ''}</td>
                   <td>
-                    {(p.recurrence || !p.executed) && (
+                    {!p.executed && (
                       <button className="btn secondary small" onClick={() => markDone(p)}>Mark as done</button>
                     )}{' '}
                     <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => startEdit(p)} />{' '}
@@ -1018,7 +1040,7 @@ function PlanCurrencyTable({
                       icon={<TrashIcon size={13} />}
                       align="right"
                       onClick={async () => {
-                        if (await confirmDialog('This cannot be undone.', 'Delete this plan?')) deletePlan(p.id);
+                        if (await confirmDialog('This cannot be undone.', 'Delete this plan?')) deletePlan(p.planId ?? p.id);
                       }}
                     />
                   </td>
@@ -1036,13 +1058,14 @@ function PlanCurrencyTable({
 function PlanList({ horizonDays, selectedCurrencies, filters }: { horizonDays: PlanningHorizonDays; selectedCurrencies?: string[]; filters?: TransactionPageFilters }) {
   const allPlans = usePlannedCashWorkbookStore((s) => s.workbook.entries);
   const updatePlan = usePlannedCashWorkbookStore((s) => s.updateEntry);
+  const addCompletedPlan = usePlannedCashWorkbookStore((s) => s.addEntry);
   const deletePlan = usePlannedCashWorkbookStore((s) => s.deleteEntry);
   const addEntry = useCashWorkbookStore((s) => s.addEntry);
   const ensureSignedIn = useEnsureSignedIn();
   const asOf = useMemo(() => new Date(), []);
 
   const plans = useMemo(
-    () => allPlans.filter((p) => {
+    () => planOccurrences(allPlans, filters?.fromDate, filters?.toDate, asOf, horizonDays).filter((p) => {
       if (selectedCurrencies && !selectedCurrencies.includes(p.currencyCode)) return false;
       if (filters?.fromDate && p.date < filters.fromDate) return false;
       if (filters?.toDate && p.date > filters.toDate) return false;
@@ -1056,7 +1079,7 @@ function PlanList({ horizonDays, selectedCurrencies, filters }: { horizonDays: P
   );
 
   const byCurrency = useMemo(() => {
-    const map = new Map<string, PlannedCashEntry[]>();
+    const map = new Map<string, Array<PlannedCashEntry & { planId?: string }>>();
     for (const p of plans) {
       const list = map.get(p.currencyCode) ?? [];
       list.push(p);
@@ -1065,13 +1088,18 @@ function PlanList({ horizonDays, selectedCurrencies, filters }: { horizonDays: P
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [plans]);
 
-  const markDone = async (p: PlannedCashEntry) => {
-    const occurrenceDate = p.recurrence ? nextRecurrenceOccurrence(p.recurrence)?.toISOString().slice(0, 10) : p.date;
+  const markDone = async (p: PlannedCashEntry & { planId?: string }) => {
+    const occurrenceDate = p.date;
+    const planId = p.planId ?? p.id;
+    const source = allPlans.find((plan) => plan.id === planId);
+    if (!source || p.executed || (p.recurrence && occurrenceCompleted(source, occurrenceDate))) return toast('This occurrence is already completed.');
     if (!occurrenceDate) return toast('This plan has no more occurrences left (past its end date).');
     if (!(await ensureSignedIn('Sign in to save cash entries.'))) return;
+    const latestPlan = usePlannedCashWorkbookStore.getState().workbook.entries.find(plan => plan.id === planId);
+    if (!latestPlan || latestPlan.executed || (p.recurrence && occurrenceCompleted(latestPlan, occurrenceDate))) return toast('This occurrence is already completed.');
     addEntry({
       id: crypto.randomUUID(),
-      date: occurrenceDate,
+      date: p.recurrence ? today() : occurrenceDate,
       isDeposit: p.type === 'IN',
       amount: p.amount,
       currencyCode: p.currencyCode,
@@ -1080,10 +1108,11 @@ function PlanList({ horizonDays, selectedCurrencies, filters }: { horizonDays: P
       source: 'manual',
     });
     if (p.recurrence) {
-      updatePlan(p.id, { executedThrough: occurrenceDate });
+      updatePlan(planId, { completedDates: [...(latestPlan.completedDates ?? []), occurrenceDate] });
+      addCompletedPlan({ ...source, id: crypto.randomUUID(), seriesId: planId, date: occurrenceDate, fulfilledDate: today(), recurrence: undefined, completedDates: undefined, executedThrough: undefined, executed: true });
       toast(`Marked ${occurrenceDate} as done — added to your Cash ledger. This plan keeps recurring.`);
     } else {
-      updatePlan(p.id, { executed: true });
+      updatePlan(planId, { executed: true });
       toast('Marked as done — added to your Cash ledger.');
     }
   };
@@ -1304,6 +1333,7 @@ export function CashPage({
   </TopBarControls> : null);
   return (
     <div className="standard-page">
+      <BackButton to="/net-worth">← Overview</BackButton>
       <h1 className="pagetitle">Cash</h1>
       <p className="text-muted mb-12">
         Track physical/informal cash — cash in hand, gifts, small informal amounts. Each entry keeps its own
@@ -1315,7 +1345,7 @@ export function CashPage({
          statement itself; it's now its own tab, moved to the end. Import/
          Settings (not named in the request) stay after, unchanged. */}
       <StandardPageSections sections={[
-          { key: 'summary', label: 'Summary', content: <BalancesSummary selectedCurrencies={selectedCurrencies} entries={filteredEntries} /> },
+          { key: 'summary', label: 'Account summary', defaultOpen: true, content: <div className="stack-lg"><BalancesSummary selectedCurrencies={selectedCurrencies} entries={entries.filter((entry) => !filters.toDate || entry.date <= filters.toDate)} />{selectedCurrencies.map((code) => <div key={code}><h3>{code} cash</h3><CashAccountSummary currency={code} entries={entries} visible={filteredEntries} filters={filters} /></div>)}</div> },
           { key: 'statement', label: 'Transactions', content: <CashStatementTab entries={entries} selectedCurrencies={selectedCurrencies} filters={filters} categories={categories} /> },
           {
             key: 'plans',
@@ -1333,7 +1363,7 @@ export function CashPage({
           {
             key: 'analytics',
             label: 'Analytics',
-            content: <div className="stack-lg">{selectedCurrencies.map((code) => <Card key={code}><h3 className="mt-0">{code}</h3><AnalyticsTab currencyCode={code} entries={filteredEntries} /></Card>)}</div>,
+            content: <div className="stack-lg">{selectedCurrencies.map((code) => <Card key={code}><h3 className="mt-0">{code}</h3><AnalyticsTab currencyCode={code} entries={filteredEntries} filters={filters} /></Card>)}</div>,
           },
           { key: 'categories', label: 'Categories', content: <CategoryBreakdown entries={filteredEntries} /> },
           { key: 'import', label: 'Import', content: <ImportTab /> },
@@ -1361,6 +1391,7 @@ export function CashPage({
 /** Banking-style detail page for one cash currency. Cash has no named
  * accounts, so each currency balance is the stable account-like entity. */
 export function CashCurrencyPage() {
+  const location = useLocation();
   const { currency: rawCurrency } = useParams();
   const navigate = useNavigate();
   const currency = decodeURIComponent(rawCurrency ?? '').toUpperCase();
@@ -1369,44 +1400,35 @@ export function CashCurrencyPage() {
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
   const filteredEntries = useMemo(() => filterCashEntries(entries, filters, categories).filter((entry) => entry.currencyCode === currency), [entries, filters, categories, currency]);
   const filterCategories = useMemo(() => [...new Set(entries.filter((entry) => entry.currencyCode === currency).map((entry) => categoryName(entry.categoryID, categories)))].sort(), [entries, categories, currency]);
-  const allBalances = useMemo(() => cashBalanceByCurrency(entries), [entries]);
-  const currencies = useMemo(() => Object.keys(allBalances).sort(), [allBalances]);
+  const currencies = useMemo(() => [...new Set(entries.map(entry => entry.currencyCode))].sort(), [entries]);
   usePageTopBarRightSlot(currencies.length ? (
     <TopBarControls>
       <TopBarSelect
         label="Currency"
         value={currency}
-        onChange={(event) => navigate(`/cash/${encodeURIComponent(event.target.value)}`)}
+        onChange={(event) => navigate(`/cash/${encodeURIComponent(event.target.value)}${location.search}`)}
         options={currencies.map((code) => ({ value: code, label: code }))}
       />
       <TransactionFilterMenu value={filters} categories={filterCategories} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} />
     </TopBarControls>
   ) : null);
 
-  if (!currency || !(currency in allBalances)) {
-    return <div className="standard-page"><Link to="/cash" className="text-muted">← Back to Cash</Link><p className="text-muted mt-12">Cash currency not found.</p></div>;
+  if (!currency || !currencies.includes(currency)) {
+    return <div className="standard-page"><BackButton to="/cash">← Back to Cash</BackButton><p className="text-muted mt-12">Cash currency not found.</p></div>;
   }
 
-  const filteredBalances = cashBalanceByCurrency(filteredEntries);
-  const filteredPending = cashPendingByCurrency(filteredEntries);
-  const balance = filteredBalances[currency] ?? 0;
-  const pending = filteredPending[currency] ?? 0;
   return <div className="standard-page">
-    <Link to="/cash" className="text-muted">← Back to Cash</Link>
+    <BackButton to="/cash">← Back to Cash</BackButton>
     <div className="module-detail-heading"><h1>{currency} cash</h1><div className="muted">Account-like view for this currency balance</div></div>
     <StandardPageSections sections={[
       {
         key: 'summary',
-        label: 'Summary',
-        content: <div className="grid-auto" style={gridAutoStyle(180, 12)}>
-          <div className="stat-card card" style={hueStyle(balance >= 0 ? 'var(--profit)' : 'var(--loss)')}><div className="label">Cleared balance</div><MoneyValue n={balance} currency={currency} /></div>
-          <div className="stat-card card" style={hueStyle(pending >= 0 ? 'var(--profit)' : 'var(--loss)')}><div className="label">Pending movement</div><MoneyValue n={pending} currency={currency} /></div>
-          <div className="stat-card card"><div className="label">Including pending</div><MoneyValue n={balance + pending} currency={currency} /></div>
-          <div className="stat-card card"><div className="label">Transactions</div><div className="value">{filteredEntries.length}</div></div>
-        </div>,
+        label: 'Account summary',
+        defaultOpen: true,
+        content: <CashAccountSummary currency={currency} entries={entries} visible={filteredEntries} filters={filters} />,
       },
       { key: 'transactions', label: 'Transactions', content: <CashStatementGrid entries={entries} selectedCurrencies={[currency]} filters={filters} categories={categories} /> },
-      { key: 'analytics', label: 'Analytics', content: <AnalyticsTab currencyCode={currency} entries={filteredEntries} /> },
+      { key: 'analytics', label: 'Analytics', content: <AnalyticsTab currencyCode={currency} entries={filteredEntries} filters={filters} /> },
       { key: 'categories', label: 'Categories', content: <CategoryBreakdown currencyCode={currency} entries={filteredEntries} /> },
     ]} />
     <CashPageFab defaultCurrencyOverride={currency} />

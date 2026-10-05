@@ -41,6 +41,8 @@ it('shows future and pending rows from month start, and switches accounts', () =
   expect(screen.queryByText('Future pending payment')).toBeNull();
   expect(screen.queryByText('Prior month')).toBeNull();
   expect(screen.queryByLabelText('Switch bank')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: /Filters/ }));
+  fireEvent.change(screen.getByLabelText('To (blank = no end date)'), { target: { value: '' } });
   fireEvent.change(screen.getByLabelText('Account'), { target: { value: 'a2' } });
   expect(screen.queryByText('Savings deposit')).not.toBeNull();
   expect(screen.queryByText('Future cleared payment')).toBeNull();
@@ -48,14 +50,13 @@ it('shows future and pending rows from month start, and switches accounts', () =
 
 it('provides a bank switcher and bank-scoped analytics on bank details', () => {
   show('/bank/bank/b1?section=analytics');
-  expect(screen.queryByLabelText('Switch bank')).not.toBeNull();
+  expect(screen.queryByLabelText('Switch bank')).toBeNull();
   expect(screen.queryAllByText('Analytics').length).toBeGreaterThan(0);
   expect(screen.queryByText('Line chart')).not.toBeNull();
   fireEvent.click(screen.getByRole('button', { name: /Filters/ }));
   const options = screen.getAllByRole('option').map(option => option.textContent);
   expect(options).toContain('Checking (USD)');
   expect(options).not.toContain('Savings (USD)');
-  fireEvent.click(screen.getByRole('button', { name: 'Done' }));
   fireEvent.change(screen.getByLabelText('Switch bank'), { target: { value: 'b2' } });
   expect(screen.queryByText('Savings')).not.toBeNull();
 });
@@ -72,6 +73,22 @@ it('honors a chosen end date and restores future rows when filters are reset', (
 
 it('offers plan creation on an account even when it has no upcoming plans', () => {
   show('/bank/account/a1?section=plans');
-  fireEvent.click(screen.getByRole('button', { name: 'Add plan' }));
+  const plansSection = [...document.querySelectorAll('section')].find(section => section.querySelector('.standard-card-title')?.textContent === 'Plans')!;
+  const plans = plansSection.querySelector('button[aria-label="Card options"]')!;
+  fireEvent.click(plans);
+  fireEvent.click(screen.getByRole('button', { name: 'Add a plan' }));
   expect(screen.queryByText('Add a plan')).not.toBeNull();
+});
+
+it('keeps one live section stack after repeatedly closing batch edit', async () => {
+  const { container } = show('/bank/account/a1?section=transactions');
+  for (let i = 0; i < 3; i++) {
+    const transactionSection = [...container.querySelectorAll('section')].find(section => section.querySelector('.standard-card-title')?.textContent === 'Transactions')!;
+    fireEvent.click(transactionSection.querySelector('button[aria-label="Card options"]')!);
+    fireEvent.click(screen.getByRole('button', { name: 'Batch edit' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel / Discard' }));
+    expect(container.querySelectorAll('.standard-section-stack')).toHaveLength(1);
+    expect(container.querySelectorAll('.standard-section-anchor')).toHaveLength(5);
+    expect(screen.getAllByText('Future cleared payment')).toHaveLength(1);
+  }
 });

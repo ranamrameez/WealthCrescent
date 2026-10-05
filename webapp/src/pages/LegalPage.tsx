@@ -1,3 +1,4 @@
+import { BackButton } from '../components/BackButton';
 import { Card } from '../components/Card';
 
 /** Standard disclaimer/terms/privacy boilerplate. Not a substitute for a
@@ -8,6 +9,7 @@ import { Card } from '../components/Card';
 export function LegalPage() {
   return (
     <div>
+      <BackButton to="/net-worth">← Overview</BackButton>
       <h1 className="pagetitle">Disclaimer, Terms &amp; Privacy</h1>
 
       <Card className="mb-md">

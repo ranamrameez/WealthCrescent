@@ -1,3 +1,4 @@
+import { PageFilters } from './PageFilters';
 import type { ChartFilter } from '../lib/calc/chartFilters';
 import { CheckIcon } from './icons';
 
@@ -23,7 +24,7 @@ export function ChartFilterBar({
   };
 
   return (
-    <div className="card" style={{ marginBottom: 16, display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+    <PageFilters><div className="card" style={{ marginBottom: 16, display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
         <span className="text-muted">Tickers:</span>
         <button
@@ -73,6 +74,6 @@ export function ChartFilterBar({
         unrealized P/L, cash vs stocks, fees breakdown, deposits vs invested) always reflect your full history —
         they can't be meaningfully filtered to a ticker or date window without changing what "current holdings" means.
       </p>
-    </div>
+    </div></PageFilters>
   );
 }

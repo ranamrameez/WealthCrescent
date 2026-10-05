@@ -1,3 +1,4 @@
+import { BackButton } from '../../../components/BackButton';
 import { StockPLCharts } from '../../../components/StockPLCharts';
 import { StockTradingChart } from '../../../components/StockTradingChart';
 import { useMemo, useState } from 'react';
@@ -90,6 +91,7 @@ export function AnalyticsPage() {
 
   return (
     <div>
+      <BackButton to="/psx">← PSX</BackButton>
       <h1 className="pagetitle">PSX Analytics</h1>
       <p className="text-muted" style={{ marginTop: -8, marginBottom: 20 }}>
         The full chart library — head back to Dashboard for a quick overview.

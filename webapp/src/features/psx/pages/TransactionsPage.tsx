@@ -1,3 +1,5 @@
+import { BackButton } from '../../../components/BackButton';
+import { PageFilters } from '../../../components/PageFilters';
 import { PriceInput } from "../../../components/ui/PriceInput";
 import { Fragment, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -624,7 +626,7 @@ function TransactionList() {
 
   return (
     <div>
-      <div className="row gap-sm mb-sm">
+      <PageFilters><div className="row gap-sm mb-sm">
         <select value={filterTicker} onChange={(e) => setFilterTicker(e.target.value)}>
           <option value="ALL">All tickers</option>
           {tickers.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -642,7 +644,7 @@ function TransactionList() {
         </select>
         <IconButton label="Export JSON" icon={<ExportIcon size={14} />} className="btn secondary" align="right" onClick={exportJSON} />
         <IconButton label="Clear all" icon={<TrashIcon size={14} />} className="btn secondary" align="right" onClick={clearAll} />
-      </div>
+      </div></PageFilters>
 
       <details open className="mb-md">
         <summary className="summary-heading">
@@ -862,7 +864,7 @@ function TransfersSection() {
 
   return (
     <div>
-      <div className="row gap-sm mb-sm">
+      <PageFilters><div className="row gap-sm mb-sm">
         <Field label="Type" width={140}>
           <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}>
             <option value="all">All</option>
@@ -870,7 +872,7 @@ function TransfersSection() {
             <option value="WITHDRAWAL">Withdrawal</option>
           </Select>
         </Field>
-      </div>
+      </div></PageFilters>
       <div className="table-scroll">
         <table>
           <thead>
@@ -1044,7 +1046,7 @@ function CashLedgerSection() {
 
   return (
     <div>
-      <div className="row gap-sm mb-sm">
+      <PageFilters><div className="row gap-sm mb-sm">
         <Field label="Kind" width={140}>
           <Select value={kindFilter} onChange={(e) => setKindFilter(e.target.value as typeof kindFilter)}>
             <option value="all">All</option>
@@ -1053,7 +1055,7 @@ function CashLedgerSection() {
             <option value="adjustment">Adjustment</option>
           </Select>
         </Field>
-      </div>
+      </div></PageFilters>
       <div className="table-scroll">
       <table>
         <thead>
@@ -1086,6 +1088,7 @@ function CashLedgerSection() {
 export function TransactionsPage() {
   return (
     <div>
+      <BackButton to="/psx">← PSX</BackButton>
       <h1 className="pagetitle">PSX Trade Transactions</h1>
       {/* User-reported (2026-08-28, real audit after "you're ignoring what's
          asked for") — same fix as QSE's identical structure: the Transfers

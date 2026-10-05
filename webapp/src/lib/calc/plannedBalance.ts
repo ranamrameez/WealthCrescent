@@ -1,3 +1,4 @@
+import { occurrenceCompleted, planOccurrences } from './planOccurrences';
 import type { BankAccount, BankTransaction } from '../../types/bankWorkbook';
 import type { CashEntry } from '../../types/cashWorkbook';
 import type { CreditCard, CreditCardTransaction } from '../../types/creditCard';
@@ -100,7 +101,7 @@ export function planWithinHorizon(
  * (b) is meaningless for a recurring plan, which never sets `executed` in
  * the first place. */
 export function isPlanDue(
-  p: { executed?: boolean; recurrence?: RecurrenceRule; executedThrough?: string; date: string },
+  p: { executed?: boolean; recurrence?: RecurrenceRule; executedThrough?: string; completedDates?: string[]; date: string },
   asOf: Date,
   horizonDays: PlanningHorizonDays,
 ): boolean {
@@ -111,7 +112,7 @@ export function isPlanDue(
   const next = nextRecurrenceOccurrence(p.recurrence, asOf);
   if (!next) return false;
   const nextStr = next.toISOString().slice(0, 10);
-  if (p.executedThrough && p.executedThrough >= nextStr) return false;
+  if (occurrenceCompleted(p, nextStr)) return false;
   return horizonDays == null || withinHorizon(nextStr, asOf, horizonDays);
 }
 
@@ -130,8 +131,7 @@ export function plannedCashProjection(
   Object.keys(real).forEach((code) => {
     out[code] = { real: real[code], planned: real[code] };
   });
-  planned
-    .filter((p) => isPlanDue(p, asOf, horizonDays))
+  (horizonDays === null ? planned.filter(p => isPlanDue(p, asOf, horizonDays)) : planOccurrences(planned, undefined, undefined, asOf, horizonDays).filter(p => !p.executed))
     .forEach((p) => {
       if (!out[p.currencyCode]) out[p.currencyCode] = { real: real[p.currencyCode] ?? 0, planned: real[p.currencyCode] ?? 0 };
       out[p.currencyCode].planned += p.type === 'IN' ? p.amount : -p.amount;
@@ -155,8 +155,7 @@ export function plannedBankProjection(
     out[code] = { real: real[code], planned: real[code] };
   });
   const currencyByAccount = new Map(accounts.map((a) => [a.id, a.currencyCode]));
-  planned
-    .filter((p) => isPlanDue(p, asOf, horizonDays))
+  (horizonDays === null ? planned.filter(p => isPlanDue(p, asOf, horizonDays)) : planOccurrences(planned, undefined, undefined, asOf, horizonDays).filter(p => !p.executed))
     .forEach((p) => {
       const code = currencyByAccount.get(p.accountId);
       if (!code) return;
@@ -188,8 +187,7 @@ export function plannedCreditCardProjection(
     out[code] = { real: real[code], planned: real[code] };
   });
   const currencyByCard = new Map(cards.map((c) => [c.id, c.currencyCode]));
-  planned
-    .filter((p) => isPlanDue(p, asOf, horizonDays))
+  (horizonDays === null ? planned.filter(p => isPlanDue(p, asOf, horizonDays)) : planOccurrences(planned, undefined, undefined, asOf, horizonDays).filter(p => !p.executed))
     .forEach((p) => {
       const code = currencyByCard.get(p.cardId);
       if (!code) return;
