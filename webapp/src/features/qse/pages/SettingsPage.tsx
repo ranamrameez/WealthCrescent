@@ -1,3 +1,4 @@
+import { PageHeading } from '../../../components/PageHeading';
 import { BackButton } from '../../../components/BackButton';
 import type { User } from 'firebase/auth';
 import { useState } from 'react';
@@ -189,8 +190,7 @@ export function SettingsPage({
 }) {
   return (
     <div>
-      <BackButton to="/qse">← QSE</BackButton>
-      <h1 className="pagetitle">Settings</h1>
+      <PageHeading back={<BackButton to="/qse">← QSE</BackButton>}><h1 className="pagetitle">Settings</h1></PageHeading>
       <Tabs
         tabs={[
           {

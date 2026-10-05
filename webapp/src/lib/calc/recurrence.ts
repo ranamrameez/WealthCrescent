@@ -35,10 +35,11 @@ export function nextRecurrenceOccurrence(rule: RecurrenceRule, asOf: Date = new 
   let d = new Date(rule.startDate);
   const asOfStr = asOf.toISOString().slice(0, 10);
   let i = 0;
-  while (d.toISOString().slice(0, 10) < asOfStr && i < MAX_ITER) {
+  while ((d.toISOString().slice(0, 10) < asOfStr || rule.excludedDates?.includes(d.toISOString().slice(0, 10))) && i < MAX_ITER) {
     d = advanceRecurrence(d, rule);
     i++;
   }
+  if (i >= MAX_ITER) return null;
   if (rule.endDate && d.toISOString().slice(0, 10) > rule.endDate) return null;
   return d;
 }
@@ -52,7 +53,8 @@ export function recurrenceOccurrencesWithin(rule: RecurrenceRule, fromDate: stri
   let d = nextRecurrenceOccurrence(rule, new Date(fromDate));
   let i = 0;
   while (d && d.toISOString().slice(0, 10) <= toDate && i < MAX_ITER) {
-    out.push(d.toISOString().slice(0, 10));
+    const occurrenceDate = d.toISOString().slice(0, 10);
+    if (!rule.excludedDates?.includes(occurrenceDate)) out.push(occurrenceDate);
     const advanced = advanceRecurrence(d, rule);
     d = rule.endDate && advanced.toISOString().slice(0, 10) > rule.endDate ? null : advanced;
     i++;

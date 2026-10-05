@@ -1,3 +1,9 @@
+import { PageHeading } from '../../../components/PageHeading';
+import { InvestmentBalanceSummary } from '../../../components/InvestmentBalanceSummary';
+import { InvestmentPlans } from '../../../components/InvestmentPlans';
+import { InvestmentTransactions } from '../../../components/InvestmentTransactions';
+import { useUrlTransactionFilters } from '../../../hooks/useUrlTransactionFilters';
+import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu';
 import { BackButton } from '../../../components/BackButton';
 import { PriceInput } from '../../../components/ui/PriceInput';
 import { useEffect, useMemo, useState } from 'react';
@@ -322,6 +328,7 @@ export function DashboardPage() {
   const rawWorkbook = useWorkbookStore((s) => s.workbook);
   const tickerOptions = useMemo(() => [...new Set(rawWorkbook.transactions.map((tx) => tx.ticker))].sort(), [rawWorkbook.transactions]);
   const selectedTickers = selectedEntityValues(params, tickerOptions);
+  const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
   const official = useQSEDerived(selectedTickers);
   const strategic = useQSEStrategicDerived();
   const { workbook, rows, summary } = official;
@@ -345,7 +352,7 @@ export function DashboardPage() {
   // shown once here, not duplicated per tab.
   const currentDeposit = summary.totalInward - summary.totalOutward;
   const growthVsDeposit = summary.netWorth - currentDeposit;
-  usePageTopBarRightSlot(<TopBarControls><EntityScopeMenu label="QSE tickers" options={tickerOptions.map((ticker) => ({ value: ticker, label: ticker }))} /></TopBarControls>);
+  usePageTopBarRightSlot(<TopBarControls><EntityScopeMenu label="QSE tickers" options={tickerOptions.map((ticker) => ({ value: ticker, label: ticker }))} /><TransactionFilterMenu value={filters} categories={[]} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls>);
 
   // Auto-hide popup once per browser session on first Dashboard visit,
   // summarizing alerts — the persistent Alerts card further down stays
@@ -360,8 +367,7 @@ export function DashboardPage() {
 
   return (
     <div>
-      <BackButton to="/net-worth">← Overview</BackButton>
-      <h1 className="pagetitle">Dashboard</h1>
+      <PageHeading back={<BackButton to="/net-worth">← Overview</BackButton>}><h1 className="pagetitle">Dashboard</h1></PageHeading>
 
       {/* Only the 9 stat cards genuinely identical regardless of cost-basis
           method live here, unified — Realized/Unrealized/Net P/L and
@@ -440,6 +446,9 @@ export function DashboardPage() {
         ]}
       />
 
+      <StandardCard className="mb-md" title="Account summary"><InvestmentBalanceSummary transactions={workbook.transactions} plans={workbook.tradePlans} marketPrices={workbook.marketPrices} priceHistory={workbook.priceHistory} tickers={selectedTickers} currency={currency} filters={filters} /></StandardCard>
+      <StandardCard className="mt-md" title="Plans" defaultOpen={false}><InvestmentPlans market="qse" items={selectedTickers.map(ticker => ({ id: ticker, name: ticker, currency }))} filters={filters} /></StandardCard>
+      <StandardCard className="mt-md" title="Transactions" defaultOpen={false}><InvestmentTransactions market="qse" transactions={workbook.transactions.filter(tx => selectedTickers.includes(tx.ticker))} currency={currency} filters={filters} /></StandardCard>
       <StandardCard className="mt-md" title="Alerts" defaultOpen={false}>
         <AlertsBox />
       </StandardCard>

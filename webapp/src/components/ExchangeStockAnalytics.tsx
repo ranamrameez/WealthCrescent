@@ -1,3 +1,4 @@
+import type { TransactionPageFilters } from '../hooks/useUrlTransactionFilters';
 import { StockPLCharts } from './StockPLCharts';
 import type { StockBasisMethod } from '../lib/calc/stockPLHistory';
 import { useMemo } from 'react';
@@ -20,7 +21,9 @@ export function ExchangeStockAnalytics({
   priceHistory,
   calcFee,
   method,
+  filters,
 }: {
+  filters?: TransactionPageFilters;
   priceHistory: Record<string, PricePoint[]>;
   calcFee: FeeCalculator;
   method?: StockBasisMethod;
@@ -31,23 +34,27 @@ export function ExchangeStockAnalytics({
 }) {
   useAppearanceStore((state) => state.appearance);
   applyChartTheme();
-  const trades = useMemo(
+  const allTrades = useMemo(
     () => transactions.filter((tx) => tx.ticker === ticker && !tx.isPending).sort((a, b) => a.date.localeCompare(b.date)),
     [transactions, ticker],
   );
+  const inPeriod = (date: string) => (!filters?.fromDate || date >= filters.fromDate) && (!filters?.toDate || date <= filters.toDate);
+  const trades = allTrades.filter(tx => inPeriod(tx.date) && (!filters || filters.direction === 'all' || (filters.direction === 'in' ? tx.action === 'BUY' : tx.action === 'SELL')) && (!filters || filters.source !== 'statement-import'));
+  const chartFilter = { tickers: [ticker], fromDate: filters?.fromDate, toDate: filters?.toDate };
   const analytics = useMemo(() => {
     const months = new Map<string, { buy: number; sell: number; buyShares: number; sellShares: number }>();
-    const shareHistory = trades.reduce<{ date: string; shares: number }[]>((history, tx) => {
+    trades.forEach(tx => {
       const month = tx.date.slice(0, 7);
       const row = months.get(month) ?? { buy: 0, sell: 0, buyShares: 0, sellShares: 0 };
       const value = tx.shares * tx.price;
       if (tx.action === 'BUY') { row.buy += value; row.buyShares += tx.shares; }
       else { row.sell += value; row.sellShares += tx.shares; }
       months.set(month, row);
-      const previousShares = history.at(-1)?.shares ?? 0;
-      history.push({ date: tx.date, shares: previousShares + (tx.action === 'BUY' ? tx.shares : -tx.shares) });
+    });
+    const shareHistory = allTrades.reduce<{ date: string; shares: number }[]>((history, tx) => {
+      history.push({ date: tx.date, shares: (history.at(-1)?.shares ?? 0) + (tx.action === 'BUY' ? tx.shares : -tx.shares) });
       return history;
-    }, []);
+    }, []).filter(point => inPeriod(point.date));
     const buys = trades.filter((tx) => tx.action === 'BUY');
     const sells = trades.filter((tx) => tx.action === 'SELL');
     const buyValue = buys.reduce((sum, tx) => sum + tx.shares * tx.price, 0);
@@ -55,7 +62,7 @@ export function ExchangeStockAnalytics({
     const buyShares = buys.reduce((sum, tx) => sum + tx.shares, 0);
     const sellShares = sells.reduce((sum, tx) => sum + tx.shares, 0);
     return { months: [...months.entries()], shareHistory, buyValue, sellValue, buyShares, sellShares };
-  }, [trades]);
+  }, [trades, allTrades, filters?.fromDate, filters?.toDate]);
 
   if (!trades.length) return <p className="text-muted">Add a completed trade to see stock analytics.</p>;
   const buy = STOCK_BUY_COLOR;
@@ -68,8 +75,8 @@ export function ExchangeStockAnalytics({
       <div className="stat-card card"><div className="label">Average buy</div><div className="value">{formatPrice(analytics.buyShares ? analytics.buyValue / analytics.buyShares : 0)}</div></div>
       <div className="stat-card card"><div className="label">Average sell</div><div className="value">{formatPrice(analytics.sellShares ? analytics.sellValue / analytics.sellShares : 0)}</div></div>
     </div>
-    <StockTradingChart ticker={ticker} transactions={transactions} currency={currency} />
-    <StockPLCharts transactions={trades} priceHistory={priceHistory} calcFee={calcFee} method={method} currency={currency} />
+    <StockTradingChart filter={chartFilter} ticker={ticker} transactions={transactions} currency={currency} />
+    <StockPLCharts filter={chartFilter} transactions={allTrades} priceHistory={priceHistory} calcFee={calcFee} method={method} currency={currency} />
     <div className="analytics-grid">
       <AnalyticsChartCard title="Monthly trading value" tooltip="The total value bought and sold each month for this stock.">
         <Bar data={{ labels: analytics.months.map(([month]) => month), datasets: [

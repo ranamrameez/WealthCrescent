@@ -1,3 +1,4 @@
+import { PageHeading } from '../../../components/PageHeading';
 import { BackButton } from '../../../components/BackButton';
 import type { User } from 'firebase/auth';
 import { useState } from 'react';
@@ -314,8 +315,7 @@ export function SettingsPage({
 }) {
   return (
     <div>
-      <BackButton to="/psx">← PSX</BackButton>
-      <h1 className="pagetitle">PSX Settings</h1>
+      <PageHeading back={<BackButton to="/psx">← PSX</BackButton>}><h1 className="pagetitle">PSX Settings</h1></PageHeading>
       <Tabs
         tabs={[
           {

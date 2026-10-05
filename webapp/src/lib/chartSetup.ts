@@ -15,6 +15,8 @@ import {
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { cssVar } from './cssVar';
 import { chartFillTransparencyPlugin } from './chartLabels';
+import { formatDate } from './format';
+import { useAppearanceStore } from '../store/appearanceStore';
 
 // BarController/LineController (not just their Elements) are needed for a
 // "2-in-1" mixed chart — stacked Assets/Liabilities bars with a Net Worth
@@ -25,6 +27,23 @@ import { chartFillTransparencyPlugin } from './chartLabels';
 ChartJS.register(ArcElement, BarController, BarElement, CategoryScale, LinearScale, LineController, LineElement, PointElement, Legend, Tooltip, Filler, ChartDataLabels, chartFillTransparencyPlugin);
 // Datalabels are opt-in per-chart (legacy behavior: off by default globally).
 ChartJS.defaults.set('plugins.datalabels', { display: false });
+ChartJS.register({
+  id: 'preferredDateFormat',
+  afterUpdate(chart) {
+    const format=useAppearanceStore.getState().appearance.dateFormat;
+    for (const scale of Object.values(chart.scales)) for (const tick of scale.ticks) {
+      if (typeof tick.label==='string' && /^\d{4}-\d{2}-\d{2}$/.test(tick.label)) tick.label=formatDate(tick.label,format);
+    }
+  },
+});
+const defaultTooltipTitle=ChartJS.defaults.plugins.tooltip.callbacks.title;
+ChartJS.defaults.plugins.tooltip.callbacks.title=function(items) {
+  const title=defaultTooltipTitle.call(this,items);
+  return typeof title==='string' && /^\d{4}-\d{2}-\d{2}$/.test(title) ? formatDate(title,useAppearanceStore.getState().appearance.dateFormat) : title;
+};
+useAppearanceStore.subscribe((state,previous)=>{
+  if (state.appearance.dateFormat!==previous.appearance.dateFormat) Object.values(ChartJS.instances).forEach(chart=>chart.update('none'));
+});
 
 // Per-point value labels (dlBarV/dlLine anchor:'end'/align:'top', dlBarH
 // anchor:'end'/align:'right'|'left') sit just outside their bar/point —

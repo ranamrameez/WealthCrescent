@@ -18,7 +18,7 @@ export function StockTradingChart({ transactions, currency, ticker, filter }: { 
   const tickers = [...new Set(scopedTransactions.filter(tx => !tx.isPending).map(tx => tx.ticker))].sort();
   const activeTicker = ticker || (tickers.includes(selectedTicker) ? selectedTicker : undefined);
   const history = useMemo(() => stockTradingHistory(transactions.filter(tx => (!filter?.tickers.length || filter.tickers.includes(tx.ticker)) && (!activeTicker || tx.ticker === activeTicker))), [transactions, activeTicker, filter]);
-  const inWindow = (date: string) => (!filter?.fromMonth || date.slice(0, 7) >= filter.fromMonth) && (!filter?.toMonth || date.slice(0, 7) <= filter.toMonth);
+  const inWindow = (date: string) => (!filter?.fromDate || date >= filter.fromDate) && (!filter?.toDate || date <= filter.toDate) && (!filter?.fromMonth || date.slice(0, 7) >= filter.fromMonth) && (!filter?.toMonth || date.slice(0, 7) <= filter.toMonth);
   const rows = (view === 'entries' ? history.entries : history.daily).filter(row => inWindow(row.date));
   if (!rows.length) return <p className="text-muted">No completed trades match this period.</p>;
   const labels = rows.map(row => row.label);

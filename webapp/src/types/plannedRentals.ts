@@ -5,6 +5,7 @@
  * migration risk to real Rentals data. See README item 38 / MODULES_PLAN.md
  * for the "auto-plan from lease info" feature this backs. */
 export interface PlannedRentalEntry {
+  finance?: { module: 'cash' | 'bank'; ref?: string; currencyCode: string };
   id: string;
   propertyId: string;
   date: string;

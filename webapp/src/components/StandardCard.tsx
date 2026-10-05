@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { Children, isValidElement, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { ArchiveIcon, CheckIcon, CollapseIcon, EditIcon, ExpandIcon, ExportIcon, FlaskIcon, MenuIcon, PlanningIcon, PlusIcon, SaveIcon, TrashIcon, XIcon } from './icons';
 import { StandardIconButton } from './standard';
 
@@ -48,6 +48,9 @@ export function CardActionMenu({ actions, onAction }: { actions: StandardCardAct
 export function StandardCard({ title, summary, actions=[], headerEnd, defaultOpen=true, open:controlledOpen, onToggle, children, className='', hue }: {
   title:ReactNode; summary?:ReactNode; actions?:StandardCardAction[]; headerEnd?:ReactNode; defaultOpen?:boolean; open?:boolean; onToggle?:(open:boolean)=>void; children:ReactNode; className?:string; hue?:string;
 }) {
+  const content = Children.toArray(children);
+  const onlyChild = content.length === 1 && isValidElement(content[0]) ? content[0] : undefined;
+  const redundantWrapper = onlyChild && (onlyChild.type === StandardCard || (typeof onlyChild.type === 'function' && 'cardContainer' in onlyChild.type && onlyChild.type.cardContainer === true));
   const [internalOpen,setInternalOpen]=useState(defaultOpen);
   const [fullScreen, setFullScreen] = useState(false);
   useEffect(() => {
@@ -61,7 +64,7 @@ export function StandardCard({ title, summary, actions=[], headerEnd, defaultOpe
   const enterFullScreen = () => { setFullScreen(true); if (!open) { if (onToggle) onToggle(true); else setInternalOpen(true); } };
   return <>{fullScreen && <div className="standard-card-backdrop" onClick={() => setFullScreen(false)} />}
   <section
-    className={`card standard-card${hue ? ' standard-card-hued' : ''}${fullScreen ? ' standard-card-fullscreen' : ''} ${className}`.trim()}
+    className={`${redundantWrapper && !fullScreen ? 'standard-section' : 'card'} standard-card${hue ? ' standard-card-hued' : ''}${fullScreen ? ' standard-card-fullscreen' : ''} ${className}`.trim()}
     style={hue ? ({ '--card-hue': hue } as CSSProperties) : undefined}
   >
     <header className="standard-card-header">

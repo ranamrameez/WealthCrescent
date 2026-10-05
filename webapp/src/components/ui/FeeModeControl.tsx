@@ -1,3 +1,4 @@
+import { ToggleChip } from './ToggleChip';
 import { useState } from 'react';
 import { Field } from './Field';
 import { Tooltip } from '../Tooltip';
@@ -73,10 +74,7 @@ export function FeeModeControl({
       {mode === 'semi' && (
         <Field label="Netted?" width={190}>
           <Tooltip text="Checked: this leg pays government levies only (netted). Unchecked: this leg pays full commission (charged). Overrides auto-detection either way.">
-            <label style={{ display: 'flex', alignItems: 'center', gap: 4, height: 30, width: 190, whiteSpace: 'nowrap' }}>
-              <input type="checkbox" checked={manualSameDay} onChange={(e) => onManualSameDayChange(e.target.checked)} />
-              {manualSameDay ? 'Netted (levies only)' : 'Charged (full fee)'}
-            </label>
+            <ToggleChip checked={manualSameDay} onChange={next => onManualSameDayChange(next)}  label={<>{manualSameDay ? 'Netted (levies only)' : 'Charged (full fee)'}</>} />
           </Tooltip>
         </Field>
       )}

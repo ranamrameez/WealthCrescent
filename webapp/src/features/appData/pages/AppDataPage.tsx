@@ -1,3 +1,4 @@
+import { PageHeading } from '../../../components/PageHeading';
 import { BackButton } from '../../../components/BackButton';
 import { ref, set } from 'firebase/database';
 import { useRef, useState } from 'react';
@@ -244,8 +245,7 @@ export function AppDataPage() {
 
   return (
     <div>
-      <BackButton to="/net-worth">← Overview</BackButton>
-      <h1 className="pagetitle">App Data</h1>
+      <PageHeading back={<BackButton to="/net-worth">← Overview</BackButton>}><h1 className="pagetitle">App Data</h1></PageHeading>
       <p className="text-muted mb-12">
         Backup or restore your ENTIRE WealthCrescent account in one file — every module at once, instead of each
         module's own Settings tab (still there, unchanged, for a per-module backup).

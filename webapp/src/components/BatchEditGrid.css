@@ -30,3 +30,16 @@
 .batch-edit-error { padding: 4px 8px; color: var(--loss); }
 .batch-edit-warning { padding: 8px; background: var(--panel-2); border: 1px solid var(--loss); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 @media (max-width: 600px) { .batch-edit-dialog { padding: 8px; } .batch-edit-header h2 { font-size: 17px; } }
+
+.batch-edit-dialog { padding: 10px; gap: 6px; }
+.batch-edit-header h2 { font-size: 17px; }
+.batch-edit-header p { max-width: 70ch; }
+.batch-edit-status, .batch-edit-help { font-size: 11px; }
+.batch-edit-table th { padding: 5px 6px; }
+.batch-edit-table input:not([type=checkbox]), .batch-edit-table select { height: 30px; padding: 4px 6px; }
+.batch-edit-table tbody th { position: sticky; left: 0; z-index: 1; }
+.batch-edit-table thead th:first-child { left: 0; z-index: 3; }
+.batch-edit-row-actions { display: flex; gap: 2px; }
+.batch-edit-row-actions button { border: 0; background: transparent; color: var(--text); cursor: pointer; width: 24px; height: 24px; padding: 0; }
+.batch-edit-row-actions button:hover { background: var(--accent-soft); }
+.batch-edit-row-actions button:disabled { opacity: .25; cursor: default; }

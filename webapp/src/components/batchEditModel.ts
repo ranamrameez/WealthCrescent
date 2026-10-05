@@ -3,6 +3,7 @@ import { resolveNumericInput } from '../lib/mathExpression';
 export type CellValue = string | boolean;
 export type RowErrors = Record<string, string | undefined>;
 export interface BatchChange<T> { before: T; after: T }
+export interface BatchMutations<T> { added: T[]; deleted: T[] }
 export interface BatchColumn<T> {
   key: Extract<keyof T, string>;
   label: string;
@@ -54,6 +55,7 @@ export function validBatchDate(date: string): boolean {
 export function prepareBatch<T extends { id: string }>(
   current: T[], changes: BatchChange<T>[], allowed: readonly (keyof T)[],
   validate: (row: T) => RowErrors, locked: (row: T) => string | undefined,
+  mutations: BatchMutations<T> = { added: [], deleted: [] },
 ): T[] {
   const byId = new Map(current.map(row => [row.id, row]));
   const replacements = new Map<string, T>();
@@ -71,5 +73,23 @@ export function prepareBatch<T extends { id: string }>(
     if (error) throw new Error(`Record ${before.id}: ${error}`);
     replacements.set(row.id, next);
   }
-  return current.map(row => replacements.get(row.id) ?? row);
+  const deleted = new Set<string>();
+  for (const before of mutations.deleted) {
+    const row = byId.get(before.id);
+    if (!row || JSON.stringify(row) !== JSON.stringify(before)) throw new Error('A deleted record changed. Discard and reopen the editor.');
+    if (deleted.has(row.id) || replacements.has(row.id)) throw new Error('Duplicate record in batch.');
+    const reason = locked(row);
+    if (reason) throw new Error(reason);
+    deleted.add(row.id);
+  }
+  const addedIds = new Set<string>();
+  for (const row of mutations.added) {
+    if (!row.id || byId.has(row.id) || addedIds.has(row.id)) throw new Error('Duplicate or missing new record ID.');
+    const reason = locked(row);
+    if (reason) throw new Error(reason);
+    const error = Object.values(validate(row)).find(Boolean);
+    if (error) throw new Error(error);
+    addedIds.add(row.id);
+  }
+  return [...current.filter(row => !deleted.has(row.id)).map(row => replacements.get(row.id) ?? row), ...mutations.added];
 }

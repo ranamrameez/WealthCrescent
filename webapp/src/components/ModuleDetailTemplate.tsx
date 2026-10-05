@@ -1,6 +1,8 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { StandardPageSections, type StandardPageSection } from './StandardPageSections';
 import { usePageTopBarRightSlot } from '../hooks/usePageTopBar';
+import { ChevronBack } from './BackButton';
+import { PageHeading } from './PageHeading';
 
 export interface ModuleDetailTemplateProps {
   title?: ReactNode;
@@ -29,8 +31,9 @@ export function ModuleDetailTemplate({
   usePageTopBarRightSlot(topBarRight);
   return (
     <div className="standard-page module-detail-template" style={hue ? { '--module-hue': hue } as CSSProperties : undefined}>
-      <button className="btn secondary small mb-12" onClick={onBack}>← {backLabel}</button>
-      {title && <div className="module-detail-heading"><h1>{title}</h1>{subtitle && <div className="muted">{subtitle}</div>}</div>}
+      <PageHeading back={<ChevronBack onBack={onBack} label={backLabel} />}>
+        {title && <div className="module-detail-heading"><h1>{title}</h1>{subtitle && <div className="muted">{subtitle}</div>}</div>}
+      </PageHeading>
       <StandardPageSections sections={sections} defaultKey={defaultKey} />
       {children}
     </div>

@@ -1,3 +1,7 @@
+import { DateValue } from '../../../components/DateValue';
+import { QuickEntitySwitch } from '../../../components/QuickEntitySwitch';
+import { PageHeading } from '../../../components/PageHeading';
+import { EntityEditorModal, EntityActions } from '../../../components/EntityEditorModal';
 import { BackButton } from '../../../components/BackButton';
 import { PageFilters } from '../../../components/PageFilters';
 import { BalanceSummaryCards } from '../../../components/BalanceSummaryCards';
@@ -10,12 +14,11 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
 import { CategorySelect } from '../../../components/CategorySelect';
-import { Modal } from '../../../components/Modal';
 import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
 import { HUES, hueStyle } from '../../../lib/statCardHues';
 import { confirmDialog } from '../../../components/ConfirmDialog';
-import { EditIcon, PlusIcon, SaveIcon, StarIcon, TrashIcon, XIcon } from '../../../components/icons';
+import { EditIcon, PlusIcon, StarIcon, TrashIcon } from '../../../components/icons';
 import { StandardPageSections } from '../../../components/StandardPageSections';
 import { EntityScopeMenu, selectedEntityValues } from '../../../components/EntityScopeMenu';
 import { TopBarControls } from '../../../components/TopBarControls';
@@ -23,7 +26,6 @@ import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { toast } from '../../../components/Toast';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
 import { IconButton } from '../../../components/ui/IconButton';
-import { FabButton } from '../../../components/ui/Fab';
 import { useEnabledCurrencies } from '../../../hooks/useEnabledCurrencies';
 import { useLastCurrency } from '../../../hooks/useLastCurrency';
 import {
@@ -82,22 +84,22 @@ function AddSubscriptionFab() {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <FabButton label="Add a subscription" onClick={() => setOpen(true)}><PlusIcon /></FabButton>
+      <EntityActions actions={[{ label: "Add a subscription", icon: <PlusIcon />, onClick: () => setOpen(true) }]} />
       {open && (
-        <Modal title="Add a subscription" onClose={() => setOpen(false)}>
+        <EntityEditorModal title="Add a subscription" onClose={() => setOpen(false)}>
           <AddSubscriptionForm onSaved={() => setOpen(false)} />
-        </Modal>
+        </EntityEditorModal>
       )}
     </>
   );
 }
 
-function AddSubscriptionForm({ onSaved }: { onSaved?: () => void } = {}) {
+function AddSubscriptionForm({ onSaved, subscription }: { onSaved?: () => void; subscription?: Subscription } = {}) {
   const addEntry = useSubscriptionsWorkbookStore((s) => s.addEntry);
   const defaultCurrency = useSubscriptionsWorkbookStore((s) => s.workbook.settings.defaultCurrency);
   const [lastCurrency, setLastCurrency] = useLastCurrency('subscriptions', defaultCurrency);
   const ensureSignedIn = useEnsureSignedIn();
-  const [s, setS] = useState<Subscription>(() => emptySubscription(lastCurrency));
+  const [s, setS] = useState<Subscription>(() => subscription ? { ...subscription } : emptySubscription(lastCurrency));
   const currencyOptions = useEnabledCurrencies(s.currencyCode);
 
   const submit = async () => {
@@ -105,7 +107,8 @@ function AddSubscriptionForm({ onSaved }: { onSaved?: () => void } = {}) {
     if (!s.amount || s.amount <= 0) return toast('Enter an amount.');
     if (s.billingCycle === 'custom' && (!s.customDays || s.customDays <= 0)) return toast('Enter the custom cycle length in days.');
     if (!(await ensureSignedIn('Sign in to save subscriptions.'))) return;
-    addEntry({ ...s, id: crypto.randomUUID(), name: s.name.trim() });
+    if (subscription) useSubscriptionsWorkbookStore.getState().updateEntry(subscription.id, { ...s, name: s.name.trim() });
+    else addEntry({ ...s, id: crypto.randomUUID(), name: s.name.trim() });
     toast(`Subscription "${s.name.trim()}" added.`);
     setS(emptySubscription(s.currencyCode));
     onSaved?.();
@@ -146,7 +149,7 @@ function AddSubscriptionForm({ onSaved }: { onSaved?: () => void } = {}) {
         </Field>
       </div>
       <button className="btn mt-12" onClick={submit}>
-        <PlusIcon />Add subscription
+        <PlusIcon />{subscription ? "Save subscription" : "Add subscription"}
       </button>
     </div>
   );
@@ -378,26 +381,31 @@ function AlertsSection({ sub }: { sub: Subscription }) {
   );
 }
 
-function SubscriptionAccountSummary({ sub, filters }: { sub: Subscription; filters: TransactionPageFilters }) {
+function SubscriptionAccountSummary({ sub, subscriptions, filters }: { sub?: Subscription; subscriptions?: Subscription[]; filters: TransactionPageFilters }) {
+  const scoped = subscriptions ?? (sub ? [sub] : []);
+  const currency = scoped[0]?.currencyCode ?? '';
   const bank = usePlannedBankWorkbookStore(state => state.workbook.entries);
   const cash = usePlannedCashWorkbookStore(state => state.workbook.entries);
   const cards = usePlannedCreditCardWorkbookStore(state => state.workbook.entries);
   const categories = useCategoryStore(state => state.workbook.categories);
-  const plans = [...bank, ...cash, ...cards].filter(plan => plan.sourceSubscriptionId === sub.id);
+  const plans = [...bank, ...cash, ...cards].filter(plan => scoped.some(item => item.id === plan.sourceSubscriptionId));
+  const proposals = scoped.flatMap(item => generateRenewalOccurrences(item).filter(occurrence => !plans.some(plan => plan.sourceSubscriptionId === item.id && plan.date === occurrence.date)).map(occurrence => ({ ...occurrence, sourceSubscriptionId: item.id, executed: false })));
   const paid = plans.filter(plan => plan.executed).map(plan => ({ ...plan, date: plan.fulfilledDate ?? plan.date }));
   const amount = (plan: { amount: number }) => Math.abs(plan.amount);
   const inPeriod = (plan: { date: string }) => (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate);
-  const matches = filters.direction !== 'in' && filters.source !== 'statement-import' && (filters.category === 'all' || filters.category === subCategoryLabel(sub, categories));
-  return <BalanceSummaryCards currency={sub.currencyCode} summary={{
+  const matches = filters.direction !== 'in' && filters.source !== 'statement-import';
+  const matchesCategory = (plan: { sourceSubscriptionId?: string }) => filters.category === 'all' || scoped.some(item => item.id === plan.sourceSubscriptionId && subCategoryLabel(item, categories) === filters.category);
+  return <BalanceSummaryCards kind="subscriptions" currency={currency} summary={{
     start: -paid.filter(plan => filters.fromDate && plan.date < filters.fromDate).reduce((total, plan) => total + amount(plan), 0),
     current: -paid.filter(plan => !filters.toDate || plan.date <= filters.toDate).reduce((total, plan) => total + amount(plan), 0),
-    inflow: 0, outflow: matches ? -paid.filter(inPeriod).reduce((total, plan) => total + amount(plan), 0) : 0,
+    inflow: 0, outflow: matches ? -paid.filter(inPeriod).filter(matchesCategory).reduce((total, plan) => total + amount(plan), 0) : 0,
     pendingInflow: 0, pendingOutflow: 0, plannedInflow: 0,
-    plannedOutflow: matches ? -plans.filter(plan => !plan.executed && inPeriod(plan)).reduce((total, plan) => total + amount(plan), 0) : 0,
+    plannedOutflow: matches ? -[...plans, ...proposals].filter(plan => !plan.executed && inPeriod(plan) && matchesCategory(plan)).reduce((total, plan) => total + amount(plan), 0) : 0,
   }} />;
 }
 
-function SubscriptionDetail({ sub, onBack }: { sub: Subscription; onBack: () => void }) {
+function SubscriptionDetail({ sub, onSelect, onBack }: { sub: Subscription; onSelect: (item: Subscription) => void; onBack: () => void }) {
+  const switchEntities = useSubscriptionsWorkbookStore(s=>s.workbook.entries);
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
   const dateFormat = useAppearanceStore((s) => s.appearance.dateFormat);
   const updateEntry = useSubscriptionsWorkbookStore((s) => s.updateEntry);
@@ -405,8 +413,6 @@ function SubscriptionDetail({ sub, onBack }: { sub: Subscription; onBack: () => 
   const categoryRegistry = useCategoryStore((s) => s.workbook.categories);
   const ensureSignedIn = useEnsureSignedIn();
   const [editing, setEditing] = useState(false);
-  const [editRow, setEditRow] = useState<Subscription>(sub);
-  const currencyOptions = useEnabledCurrencies(editRow.currencyCode);
 
   const accounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
   // Archived accounts stay findable (so an already-linked archived account
@@ -442,11 +448,6 @@ function SubscriptionDetail({ sub, onBack }: { sub: Subscription; onBack: () => 
         : accounts.find((a) => a.id === sub.paidVia?.ref)?.name || 'a removed account'
     : null;
 
-  const saveEdit = () => {
-    updateEntry(sub.id, editRow);
-    toast('Subscription updated.');
-    setEditing(false);
-  };
 
   const toggleActive = async () => {
     if (!(await ensureSignedIn('Sign in to update this subscription.'))) return;
@@ -511,48 +512,9 @@ function SubscriptionDetail({ sub, onBack }: { sub: Subscription; onBack: () => 
 
   return (
     <ModuleDetailTemplate title={sub.name} backLabel="All subscriptions" onBack={onBack}
-      topBarRight={<TopBarControls><TransactionFilterMenu value={filters} categories={[subCategoryLabel(sub, categoryRegistry)]} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls>}
-      sections={[{ key: 'summary', label: 'Account summary', defaultOpen: true, content: <SubscriptionAccountSummary sub={sub} filters={filters} /> }, { key: 'details', label: 'Subscription details', defaultOpen: true, content: <>
-        {editing ? (
-          <div>
-            <div className="row gap-sm">
-              <Field label="Name">
-                <TextInput value={editRow.name} onChange={(e) => setEditRow({ ...editRow, name: e.target.value })} />
-              </Field>
-              <Field label="Amount">
-                <TextInput type="number" step="0.01" value={editRow.amount} onChange={(e) => setEditRow({ ...editRow, amount: Number(e.target.value) })} />
-              </Field>
-              <Field label="Currency">
-                <Select value={editRow.currencyCode} onChange={(e) => setEditRow({ ...editRow, currencyCode: e.target.value })}>
-                  {currencyOptions.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
-                </Select>
-              </Field>
-              <Field label="Billing cycle">
-                <Select value={editRow.billingCycle} onChange={(e) => setEditRow({ ...editRow, billingCycle: e.target.value as Subscription['billingCycle'] })}>
-                  <option value="monthly">Monthly</option>
-                  <option value="yearly">Yearly</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="custom">Custom (days)</option>
-                </Select>
-              </Field>
-              {editRow.billingCycle === 'custom' && (
-                <Field label="Every N days">
-                  <TextInput type="number" value={editRow.customDays ?? ''} onChange={(e) => setEditRow({ ...editRow, customDays: Number(e.target.value) })} />
-                </Field>
-              )}
-              <Field label="Start date">
-                <TextInput type="date" value={editRow.startDate} onChange={(e) => setEditRow({ ...editRow, startDate: e.target.value })} />
-              </Field>
-              <Field label="Category">
-                <CategorySelect value={editRow.categoryID ?? UNCATEGORIZED_ID} onChange={(categoryID) => setEditRow({ ...editRow, categoryID })} />
-              </Field>
-            </div>
-            <div className="row gap-sm mt-sm">
-              <IconButton label="Save" icon={<SaveIcon size={13} />} align="right" onClick={saveEdit} />
-              <IconButton label="Cancel" icon={<XIcon size={13} />} align="right" onClick={() => setEditing(false)} />
-            </div>
-          </div>
-        ) : (
+      topBarRight={<TopBarControls><QuickEntitySwitch label="Subscription" value={sub.id} options={[{value:"",label:"All items"},...switchEntities.filter(item=>item.active || item.id===sub.id).map(item=>({value:item.id,label:item.name+' ('+item.currencyCode+')'}))]} onChange={id=>{ const next=switchEntities.find(item=>item.id===id);if(next)onSelect(next);else onBack(); }} /><TransactionFilterMenu value={filters} categories={[subCategoryLabel(sub, categoryRegistry)]} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls>}
+      sections={[{ key: 'summary', label: 'Account summary', defaultOpen: true, content: <SubscriptionAccountSummary sub={sub} filters={filters} /> }, { key: 'details', label: 'Subscription details', defaultOpen: true, actions: [{ label: 'Edit subscription', onClick: () => setEditing(true) }], content: <>
+        {(
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
             <div>
               <div style={{ fontWeight: 700, fontSize: 16 }}>{sub.name}</div>
@@ -562,7 +524,7 @@ function SubscriptionDetail({ sub, onBack }: { sub: Subscription; onBack: () => 
               </div>
             </div>
             <div className="row gap-sm">
-              <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => { setEditRow(sub); setEditing(true); }} />
+              <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => { setEditing(true); }} />
               <button className="btn secondary small" onClick={toggleActive}>{sub.active ? 'Cancel' : 'Reactivate'}</button>
               <IconButton
                 label="Delete"
@@ -592,7 +554,7 @@ function SubscriptionDetail({ sub, onBack }: { sub: Subscription; onBack: () => 
           <div className="stat-card card" style={hueStyle(sub.active ? 'var(--profit)' : 'var(--loss)')}><div className="label">Status</div><div className="value fs-14">{sub.active ? 'Active' : 'Cancelled'}</div></div>
         </div>
       </> },
-{ key: 'details', label: 'Paying account', defaultOpen: true,  content: <>
+{ key: 'paying-account', label: 'Paying account', defaultOpen: true,  content: <>
         <h4 style={{ margin: '0 0 8px' }}>Link to a paying account</h4>
         {linkedLabel ? (
           <p className="text-muted mb-sm">
@@ -644,36 +606,38 @@ function SubscriptionDetail({ sub, onBack }: { sub: Subscription; onBack: () => 
           </button>
         </div>
       </> },
-{ key: 'plans', label: 'Plans', defaultOpen: true,  content: <>
-        <div className="table-scroll">
-          <table>
-            <thead><tr><th>Date</th><th>Amount</th></tr></thead>
-            <tbody>
-              {occurrences.map((o, i) => (
-                <tr key={i}><td>{formatDate(o.date, dateFormat)}</td><td>{fmtMoney(o.amount, sub.currencyCode)}</td></tr>
-              ))}
-              {!occurrences.length && <tr><td colSpan={2} className="text-muted">No upcoming occurrences (subscription is cancelled).</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </> },
-{ key: 'alerts', label: 'Alerts', defaultOpen: true,  content: <><AlertsSection sub={sub} /></> }]}></ModuleDetailTemplate>
+{ key: 'plans', label: 'Plans', defaultOpen: true, content: <SubscriptionPlansOverview subscriptions={[sub]} filters={filters} /> },
+{ key: 'payments', label: 'Payments', content: <SubscriptionPaymentsOverview subscriptions={[sub]} filters={filters} /> },
+{ key: 'analytics', label: 'Analytics', content: <AnalyticsTab selectedIds={[sub.id]} currencyCode={sub.currencyCode} /> },
+{ key: 'alerts', label: 'Alerts', defaultOpen: true,  content: <><AlertsSection sub={sub} /></> }]} >{editing && <EntityEditorModal title="Edit subscription" onClose={() => setEditing(false)}><AddSubscriptionForm subscription={sub} onSaved={() => setEditing(false)} /></EntityEditorModal>}<EntityActions actions={[{label:"Edit subscription",onClick:()=>setEditing(true)}]} /></ModuleDetailTemplate>
   );
 }
 
 /* ============================== Analytics ============================== */
 
-function SubscriptionPlansOverview({ subscriptions }: { subscriptions: Subscription[] }) {
-  const dateFormat = useAppearanceStore((state) => state.appearance.dateFormat);
-  return <div className="stack-lg">{subscriptions.map((subscription) => {
-    const occurrences = generateRenewalOccurrences(subscription);
-    return <Card key={subscription.id}><h3 className="mt-0">{subscription.name} <span className="text-muted">({subscription.currencyCode})</span></h3>
-      <div className="table-scroll"><table><thead><tr><th>Date</th><th>Paying account</th><th>Amount</th></tr></thead><tbody>
-        {occurrences.map((occurrence, index) => <tr key={`${occurrence.date}:${index}`}><td>{formatDate(occurrence.date, dateFormat)}</td><td>{subscription.paidVia?.module === 'creditCard' ? 'Credit card' : subscription.paidVia?.module === 'bank' ? 'Bank' : subscription.paidVia?.module === 'cash' ? 'Cash' : 'Not linked'}</td><td>{fmtMoney(occurrence.amount, subscription.currencyCode)}</td></tr>)}
-        {!occurrences.length && <tr><td colSpan={3} className="text-muted">No upcoming occurrences.</td></tr>}
-      </tbody></table></div>
-    </Card>;
-  })}</div>;
+function useSubscriptionPaymentPlans() {
+  const bank = usePlannedBankWorkbookStore(state => state.workbook.entries);
+  const cash = usePlannedCashWorkbookStore(state => state.workbook.entries);
+  const cards = usePlannedCreditCardWorkbookStore(state => state.workbook.entries);
+  return [...bank, ...cash, ...cards];
+}
+
+function SubscriptionPlansOverview({ subscriptions, filters }: { subscriptions: Subscription[]; filters: TransactionPageFilters }) {
+  const payments = useSubscriptionPaymentPlans();
+  const dateFormat = useAppearanceStore(state => state.appearance.dateFormat);
+  const categories = useCategoryStore(state => state.workbook.categories);
+  const rows = subscriptions.flatMap(subscription => generateRenewalOccurrences(subscription).filter(occurrence => !payments.some(plan => plan.sourceSubscriptionId === subscription.id && plan.executed && plan.date === occurrence.date)).map(occurrence => ({ subscription, ...occurrence })))
+    .filter(row => (!filters.fromDate || row.date >= filters.fromDate) && (!filters.toDate || row.date <= filters.toDate) && filters.direction !== 'in' && filters.source !== 'statement-import' && (filters.category === 'all' || subCategoryLabel(row.subscription, categories) === filters.category)).sort((a, b) => a.date.localeCompare(b.date));
+  return <div className="table-scroll"><table><thead><tr><th>Date</th><th>Subscription</th><th>Paying account</th><th>Amount</th></tr></thead><tbody>{rows.map(row => <tr key={row.subscription.id + ':' + row.date}><td>{formatDate(row.date, dateFormat)}</td><td>{row.subscription.name}</td><td>{row.subscription.paidVia?.module ?? 'Not linked'}</td><td>{fmtMoney(row.amount, row.subscription.currencyCode)}</td></tr>)}</tbody></table>{!rows.length && <p className="text-muted">No unpaid renewals in this period.</p>}</div>;
+}
+
+function SubscriptionPaymentsOverview({ subscriptions, filters }: { subscriptions: Subscription[]; filters: TransactionPageFilters }) {
+  const plans = useSubscriptionPaymentPlans();
+  const categories = useCategoryStore(state => state.workbook.categories);
+  const rows = plans.filter(plan => plan.executed && subscriptions.some(sub => sub.id === plan.sourceSubscriptionId && (filters.category === 'all' || subCategoryLabel(sub, categories) === filters.category)))
+    .map(plan => ({ plan, date: plan.fulfilledDate ?? plan.date, sub: subscriptions.find(sub => sub.id === plan.sourceSubscriptionId)! }))
+    .filter(row => (!filters.fromDate || row.date >= filters.fromDate) && (!filters.toDate || row.date <= filters.toDate) && filters.direction !== 'in' && filters.source !== 'statement-import').sort((a, b) => b.date.localeCompare(a.date));
+  return <div className="table-scroll"><table><thead><tr><th>Paid on</th><th>Subscription</th><th>Scheduled renewal</th><th>Amount</th></tr></thead><tbody>{rows.map(row => <tr key={row.plan.id}><td><DateValue value={row.date} /></td><td>{row.sub.name}</td><td><DateValue value={row.plan.date} /></td><td>{fmtMoney(Math.abs(row.plan.amount), row.sub.currencyCode)}</td></tr>)}</tbody></table>{!rows.length && <p className="text-muted">No fulfilled renewal plans in this period.</p>}</div>;
 }
 
 function SubscriptionAlertsOverview({ subscriptions }: { subscriptions: Subscription[] }) {
@@ -753,7 +717,7 @@ function AnalyticsTab({ selectedIds, currencyCode }: { selectedIds?: string[]; c
               <tbody>
                 {renewals.map((r) => (
                   <tr key={r.subscription.id}>
-                    <td>{r.date}</td>
+                    <td><DateValue value={r.date} /></td>
                     <td>{r.subscription.name}</td>
                     <td>{fmtMoney(r.subscription.amount, r.subscription.currencyCode)}</td>
                   </tr>
@@ -864,21 +828,23 @@ export function SubscriptionsPage({
   const selectedSubscriptions = useMemo(() => subs.filter((subscription) => selectedIds.includes(subscription.id)), [subs, selectedIds]);
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
   const selectedCurrencies = useMemo(() => [...new Set(selectedSubscriptions.map((subscription) => subscription.currencyCode))].sort(), [selectedSubscriptions]);
-  usePageTopBarRightSlot(!liveSelected && subs.length ? <TopBarControls><EntityScopeMenu label="Subscriptions" options={subs.map((s) => ({ value: s.id, label: s.name }))} /><TransactionFilterMenu value={filters} categories={[...new Set(subs.map(sub => subCategoryLabel(sub, useCategoryStore.getState().workbook.categories)))]} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls> : null);
+  usePageTopBarRightSlot(!liveSelected && subs.length ? <TopBarControls><QuickEntitySwitch label="Subscription" value="" options={[{value:"",label:"All subscriptions"},...subs.map(sub=>({value:sub.id,label:sub.name}))]} onChange={id=>{ const next=subs.find(item=>item.id===id);if(next)setSelected(next); }} /><EntityScopeMenu label="Subscriptions" options={subs.map((s) => ({ value: s.id, label: s.name }))} /><TransactionFilterMenu value={filters} categories={[...new Set(subs.map(sub => subCategoryLabel(sub, useCategoryStore.getState().workbook.categories)))]} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls> : null);
 
   return (
     <div>
-      {!liveSelected && <BackButton to="/net-worth">← Overview</BackButton>}
-      <h1 className="pagetitle">Subscriptions</h1>
+      {!liveSelected && <>
+      <PageHeading back={<BackButton to="/net-worth">Overview</BackButton>}><h1 className="pagetitle">Subscriptions</h1></PageHeading>
+      <AddSubscriptionFab />
       <p className="text-muted mb-12">
         Recurring payments — streaming, gym, software, memberships — tracked independently and optionally
         linked to whichever Bank account or Cash actually pays them.
       </p>
+      </>}
       {liveSelected ? (
-        <SubscriptionDetail sub={liveSelected} onBack={() => setSelected(null)} />
+        <SubscriptionDetail key={liveSelected.id} onSelect={setSelected} sub={liveSelected} onBack={() => setSelected(null)} />
       ) : (
         <StandardPageSections sections={[
-            { key: 'summary', label: 'Account summary', defaultOpen: true, content: <div className="stack-lg"><OverallSummary selectedIds={selectedIds} />{selectedSubscriptions.map(sub => <div key={sub.id}><h3>{sub.name}</h3><SubscriptionAccountSummary sub={sub} filters={filters} /></div>)}</div> },
+            { key: 'summary', label: 'Account summary', defaultOpen: true, content: <div className="stack-lg"><OverallSummary selectedIds={selectedIds} />{selectedCurrencies.map(currency => <div key={currency}><h3>{currency}</h3><SubscriptionAccountSummary subscriptions={selectedSubscriptions.filter(sub => sub.currencyCode === currency)} filters={filters} /></div>)}</div> },
             {
               key: 'subscriptions',
               label: 'Subscriptions',
@@ -886,11 +852,12 @@ export function SubscriptionsPage({
                 <div>
 
                   <SubscriptionList onSelect={setSelected} selectedIds={selectedIds} />
-                  <AddSubscriptionFab />
+
                 </div>
               ),
             },
-            { key: 'plans', label: 'Plans', content: <SubscriptionPlansOverview subscriptions={selectedSubscriptions} /> },
+            { key: 'plans', label: 'Plans', content: <SubscriptionPlansOverview subscriptions={selectedSubscriptions} filters={filters} /> },
+            { key: 'payments', label: 'Payments', content: <SubscriptionPaymentsOverview subscriptions={selectedSubscriptions} filters={filters} /> },
             { key: 'alerts', label: 'Alerts', content: <SubscriptionAlertsOverview subscriptions={selectedSubscriptions} /> },
             { key: 'analytics', label: 'Analytics', content: <div className="stack-lg">{selectedCurrencies.map((currency) => <Card key={currency}><h3 className="mt-0">{currency}</h3><AnalyticsTab selectedIds={selectedIds} currencyCode={currency} /></Card>)}</div> },
             {

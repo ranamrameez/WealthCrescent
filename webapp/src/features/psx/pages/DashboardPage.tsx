@@ -1,3 +1,9 @@
+import { PageHeading } from '../../../components/PageHeading';
+import { InvestmentBalanceSummary } from '../../../components/InvestmentBalanceSummary';
+import { InvestmentPlans } from '../../../components/InvestmentPlans';
+import { InvestmentTransactions } from '../../../components/InvestmentTransactions';
+import { useUrlTransactionFilters } from '../../../hooks/useUrlTransactionFilters';
+import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu';
 import { BackButton } from '../../../components/BackButton';
 import { PriceInput } from '../../../components/ui/PriceInput';
 import { useEffect, useMemo, useState } from 'react';
@@ -312,6 +318,7 @@ export function DashboardPage() {
   const rawWorkbook = usePSXWorkbookStore((s) => s.workbook);
   const tickerOptions = useMemo(() => [...new Set(rawWorkbook.transactions.map((tx) => tx.ticker))].sort(), [rawWorkbook.transactions]);
   const selectedTickers = selectedEntityValues(params, tickerOptions);
+  const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
   const official = usePSXDerived(selectedTickers);
   const strategic = usePSXStrategicDerived();
   const { workbook, rows, summary } = official;
@@ -326,7 +333,7 @@ export function DashboardPage() {
   const moneyTitle = (n: number) => (raw ? undefined : fmtMoney(n, currency));
   const currentDeposit = summary.totalInward - summary.totalOutward;
   const growthVsDeposit = summary.netWorth - currentDeposit;
-  usePageTopBarRightSlot(<TopBarControls><EntityScopeMenu label="PSX tickers" options={tickerOptions.map((ticker) => ({ value: ticker, label: ticker }))} /></TopBarControls>);
+  usePageTopBarRightSlot(<TopBarControls><EntityScopeMenu label="PSX tickers" options={tickerOptions.map((ticker) => ({ value: ticker, label: ticker }))} /><TransactionFilterMenu value={filters} categories={[]} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls>);
 
   useEffect(() => {
     if (alerts.length && !sessionStorage.getItem('psx-alerts-shown')) {
@@ -338,8 +345,7 @@ export function DashboardPage() {
 
   return (
     <div>
-      <BackButton to="/net-worth">← Overview</BackButton>
-      <h1 className="pagetitle">PSX Dashboard</h1>
+      <PageHeading back={<BackButton to="/net-worth">← Overview</BackButton>}><h1 className="pagetitle">PSX Dashboard</h1></PageHeading>
 
       {/* See QSE's DashboardPage.tsx for why only these 9 (of the original
           13) stat cards are unified here — the other 4 (Realized/Unrealized/
@@ -416,6 +422,9 @@ export function DashboardPage() {
         ]}
       />
 
+      <StandardCard className="mb-md" title="Account summary"><InvestmentBalanceSummary transactions={workbook.transactions} plans={workbook.tradePlans} marketPrices={workbook.marketPrices} priceHistory={workbook.priceHistory} tickers={selectedTickers} currency={currency} filters={filters} /></StandardCard>
+      <StandardCard className="mt-md" title="Plans" defaultOpen={false}><InvestmentPlans market="psx" items={selectedTickers.map(ticker => ({ id: ticker, name: ticker, currency }))} filters={filters} /></StandardCard>
+      <StandardCard className="mt-md" title="Transactions" defaultOpen={false}><InvestmentTransactions market="psx" transactions={workbook.transactions.filter(tx => selectedTickers.includes(tx.ticker))} currency={currency} filters={filters} /></StandardCard>
       <StandardCard className="mt-md" title="Alerts" defaultOpen={false}>
         <AlertsBox />
       </StandardCard>

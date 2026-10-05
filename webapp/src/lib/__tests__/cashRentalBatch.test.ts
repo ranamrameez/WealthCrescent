@@ -20,7 +20,7 @@ describe('Cash and Rentals batch saves', () => {
     const before = cash.getState().workbook.entries[0];
     const listener = vi.fn();
     const stop = cash.subscribe(listener);
-    saveCashBatch('QAR', [{ before, after: { ...before, amount: 42, currencyCode: 'USD', serialNumber: 900 } }]);
+    saveCashBatch('QAR', [{ before, after: { ...before, amount: 42, currencyCode: 'USD' } }]);
     stop();
     expect(listener).toHaveBeenCalledOnce();
     expect(cash.getState().workbook.entries[0]).toEqual({ ...before, amount: 42 });

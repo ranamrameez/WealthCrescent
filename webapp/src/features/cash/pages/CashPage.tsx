@@ -1,3 +1,7 @@
+import { DateValue } from '../../../components/DateValue';
+import { ToggleChip } from '../../../components/ui/ToggleChip';
+import { FinancePlanEditor } from '../../../components/FinancePlanEditor';
+import { PageHeading } from '../../../components/PageHeading';
 import { planOccurrences, occurrenceCompleted } from '../../../lib/calc/planOccurrences';
 import { BackButton } from '../../../components/BackButton';
 import { BalanceSummaryCards } from '../../../components/BalanceSummaryCards';
@@ -9,8 +13,7 @@ import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
 import { Notice } from '../../../components/Notice';
 import { confirmDialog } from '../../../components/ConfirmDialog';
-import { CheckIcon, EditIcon, PlusIcon, SaveIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
-import { Modal } from '../../../components/Modal';
+import { CheckIcon, EditIcon, PlusIcon, TransferIcon, TrashIcon } from '../../../components/icons';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
 import { StandardPageSections } from '../../../components/StandardPageSections';
 import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls';
@@ -37,11 +40,10 @@ import { RecurrenceFields } from '../../../components/ui/RecurrenceFields';
 import { PlanningHorizonField } from '../../../components/ui/PlanningHorizonField';
 import { dateOnlyMs } from '../../../lib/datetime';
 import { recurrenceLabel } from '../../../lib/recurrenceLabel';
-import { hueStyle } from '../../../lib/statCardHues';
 import { categoryName, UNCATEGORIZED_ID } from '../../../lib/categories';
 import { useCategoryStore } from '../../../store/categoryStore';
 import { cashBalanceByCurrency, cashByCategory, cashMonthlyFlow, cashPendingByCurrency, cashRunningLedger, type CashLedgerRow } from '../../../lib/calc/cashModule';
-import { isPlanDue, planWithinHorizon, plannedCashProjection, type PlanningHorizonDays } from '../../../lib/calc/plannedBalance';
+import { isPlanDue, planWithinHorizon, type PlanningHorizonDays } from '../../../lib/calc/plannedBalance';
 import { dlBarV, dlDoughnut, dlLine } from '../../../lib/chartLabels';
 import { applyChartTheme } from '../../../lib/chartSetup';
 import { cssVar, tickerColor } from '../../../lib/cssVar';
@@ -64,7 +66,7 @@ import { gridAutoStyle } from '../../../lib/gridStyle';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-function filterCashEntries(entries: CashEntry[], filters: TransactionPageFilters, categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories']) {
+export function filterCashEntries(entries: CashEntry[], filters: TransactionPageFilters, categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories']) {
   return entries.filter((entry) => {
     if (filters.fromDate && entry.date < filters.fromDate) return false;
     if (filters.toDate && entry.date > filters.toDate) return false;
@@ -76,10 +78,10 @@ function filterCashEntries(entries: CashEntry[], filters: TransactionPageFilters
   });
 }
 
-function CashAccountSummary({ currency, entries, visible, filters }: { currency: string; entries: CashEntry[]; visible: CashEntry[]; filters: TransactionPageFilters }) {
+export function CashAccountSummary({ currency, entries, visible, filters, plansOverride }: { currency: string; entries: CashEntry[]; visible: CashEntry[]; filters: TransactionPageFilters; plansOverride?: PlannedCashEntry[] }) {
   const plans = usePlannedCashWorkbookStore((state) => state.workbook.entries);
   const summary = cashPeriodSummary(entries, visible, currency, filters.fromDate, filters.toDate);
-  const planned = planOccurrences(plans, filters.fromDate, filters.toDate, new Date(), null)
+  const planned = planOccurrences(plansOverride ?? plans, filters.fromDate, filters.toDate, new Date(), null)
     .filter(plan => plan.currencyCode === currency && !plan.executed)
     .filter(plan => filters.direction === 'all' || (filters.direction === 'in' ? plan.type === 'IN' : plan.type === 'OUT'))
     .filter(plan => filters.category === 'all' || (plan.category || 'Uncategorized') === filters.category)
@@ -125,9 +127,7 @@ function CashPageFab({ defaultCurrencyOverride }: { defaultCurrencyOverride?: st
         />
       )}
       {planOpen && (
-        <Modal title="Add a plan" onClose={() => setPlanOpen(false)}>
-          <AddPlanForm onSaved={() => setPlanOpen(false)} />
-        </Modal>
+        <FinancePlanEditor initialFinance={{ module: "cash", currencyCode: defaultCurrencyOverride }} onClose={() => setPlanOpen(false)} />
       )}
     </>
   );
@@ -745,10 +745,8 @@ function ImportTab() {
                 {headers.map((h) => <option key={h} value={h}>{h}</option>)}
               </Select>
             </Field>
-            <label className="text-muted" style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 20 }} title="Check this if your export uses positive numbers for cash out.">
-              <input type="checkbox" checked={flipSign} onChange={(e) => setFlipSign(e.target.checked)} />
-              Flip sign
-            </label>
+            <ToggleChip checked={flipSign} onChange={next => setFlipSign(next)}  label={<>Flip sign
+            </>} />
           </div>
 
           <h4>Preview (first 5 rows)</h4>
@@ -758,7 +756,7 @@ function ImportTab() {
               <tbody>
                 {mappedPreview.map((r, i) => (
                   <tr key={i}>
-                    <td>{r.date}</td>
+                    <td><DateValue value={r.date} /></td>
                     <td className={r.isDeposit ? 'pill-positive' : 'pill-negative'}>{r.isDeposit ? 'Cash in' : 'Cash out'}</td>
                     <td>{fmtMoney(r.amount, currencyCode)}</td>
                     <td>{r.category || '—'}</td>
@@ -785,67 +783,6 @@ function emptyPlan(defaultCurrency: string): PlannedCashEntry {
   return { id: crypto.randomUUID(), date: today(), type: 'OUT', amount: 0, currencyCode: defaultCurrency, category: '', note: '' };
 }
 
-function BalanceProjectionSummary({ horizonDays, selectedCurrencies, filters }: { horizonDays: PlanningHorizonDays; selectedCurrencies?: string[]; filters?: TransactionPageFilters }) {
-  const allEntries = useCashWorkbookStore((s) => s.workbook.entries);
-  const categories = useCategoryStore((s) => s.workbook.categories);
-  const allPlannedEntries = usePlannedCashWorkbookStore((s) => s.workbook.entries);
-  const entries = useMemo(() => allEntries.filter((entry) => (!selectedCurrencies || selectedCurrencies.includes(entry.currencyCode)) && (!filters || filterCashEntries([entry], filters, categories).length > 0)), [allEntries, selectedCurrencies, filters, categories]);
-  const plannedEntries = useMemo(() => allPlannedEntries.filter((plan) => {
-    if (selectedCurrencies && !selectedCurrencies.includes(plan.currencyCode)) return false;
-    if (filters?.fromDate && plan.date < filters.fromDate) return false;
-    if (filters?.toDate && plan.date > filters.toDate) return false;
-    if (filters?.direction === 'in' && plan.type !== 'IN') return false;
-    if (filters?.direction === 'out' && plan.type !== 'OUT') return false;
-    if (filters && filters.category !== 'all' && (plan.category || 'Uncategorized') !== filters.category) return false;
-    return true;
-  }), [allPlannedEntries, selectedCurrencies, filters]);
-  const settings = usePlannedCashWorkbookStore((s) => s.workbook.settings);
-  const updateSettings = usePlannedCashWorkbookStore((s) => s.updateSettings);
-  const projection = useMemo(
-    () => plannedCashProjection(entries, plannedEntries, new Date(), horizonDays),
-    [entries, plannedEntries, horizonDays],
-  );
-  const codes = Object.keys(projection);
-
-  return (
-    <CollapsibleCard title={<h3 className="m-0">Balance projection</h3>} className="mb-md">
-      <p className="text-muted mt-0">
-        See what your balance would look like if every plan due within the chosen time period actually happened —
-        a reality check before you spend. Choose what you want to see:
-      </p>
-      <div className="row" style={{ gap: 16, marginBottom: 12 }}>
-        <label className="text-muted flex-center-gap4">
-          <input type="checkbox" checked={settings.showRealBalance} onChange={(e) => updateSettings({ showRealBalance: e.target.checked })} />
-          Real balance
-        </label>
-        <label className="text-muted flex-center-gap4">
-          <input type="checkbox" checked={settings.showPlannedBalance} onChange={(e) => updateSettings({ showPlannedBalance: e.target.checked })} />
-          Planned balance
-        </label>
-      </div>
-      {!codes.length ? (
-        <p className="text-muted">No balance yet — add a cash entry or a plan below.</p>
-      ) : (
-        <div className="grid-auto" style={gridAutoStyle(180, 8)}>
-          {codes.map((code) => (
-            <div key={code} className="stat-card card" style={hueStyle('var(--accent)')}>
-              <div className="label">{code}</div>
-              {settings.showRealBalance && (
-                <div className={projection[code].real >= 0 ? 'pill-positive' : 'pill-negative'}>Real: {fmtMoney(projection[code].real, code)}</div>
-              )}
-              {settings.showPlannedBalance && (
-                <div className={projection[code].planned >= 0 ? 'pill-positive' : 'pill-negative'}>
-                  Planned: {fmtMoney(projection[code].planned, code)}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </CollapsibleCard>
-  );
-}
-
 /** README item 86 (2026-08-26 feedback): "Add a plan" shouldn't be
  * permanently visible either — same FAB+popup treatment already used for
  * EMI's "Add a loan" (Done item 166) and Banking's "Add an account". */
@@ -855,22 +792,20 @@ function AddPlanFab() {
     <>
       <FabButton label="Add a plan" onClick={() => setOpen(true)}><PlusIcon /></FabButton>
       {open && (
-        <Modal title="Add a plan" onClose={() => setOpen(false)}>
-          <AddPlanForm onSaved={() => setOpen(false)} />
-        </Modal>
+        <FinancePlanEditor initialFinance={{ module: "cash" }} onClose={() => setOpen(false)} />
       )}
     </>
   );
 }
 
-function AddPlanForm({ onSaved }: { onSaved?: () => void }) {
+export function AddPlanForm({ onSaved, initialCurrency }: { onSaved?: () => void; initialCurrency?: string }) {
   const addPlan = usePlannedCashWorkbookStore((s) => s.addEntry);
   const primaryCurrency = usePrimaryCurrency();
   const workbookDefaultCurrency = useCashWorkbookStore((s) => s.workbook.settings.defaultCurrency);
   const defaultCurrency = primaryCurrency ?? workbookDefaultCurrency;
   const [lastCurrency, setLastCurrency] = useLastCurrency('cash', defaultCurrency);
   const ensureSignedIn = useEnsureSignedIn();
-  const [p, setP] = useState<PlannedCashEntry>(() => emptyPlan(lastCurrency));
+  const [p, setP] = useState<PlannedCashEntry>(() => emptyPlan(initialCurrency ?? lastCurrency));
   const currencyOptions = useEnabledCurrencies(p.currencyCode);
 
   const submit = async () => {
@@ -934,7 +869,6 @@ function AddPlanForm({ onSaved }: { onSaved?: () => void }) {
 function PlanCurrencyTable({
   code,
   plans,
-  updatePlan,
   deletePlan,
   markDone,
 }: {
@@ -946,7 +880,6 @@ function PlanCurrencyTable({
 }) {
   const [editId, setEditId] = useState<string | null>(null);
   const [editRow, setEditRow] = useState<PlannedCashEntry | null>(null);
-  const currencyOptions = useEnabledCurrencies(editRow?.currencyCode);
 
   type Col = 'date' | 'type' | 'amount' | 'status';
   const sortValue = (p: PlannedCashEntry, col: Col): number | string => {
@@ -964,13 +897,6 @@ function PlanCurrencyTable({
     setEditId(p.id);
     setEditRow({ ...plan, id: planId ?? plan.id, date: plan.recurrence?.startDate ?? plan.date });
   };
-  const saveEdit = () => {
-    if (!editId || !editRow) return;
-    updatePlan(editRow.id, editRow);
-    toast('Plan updated.');
-    setEditId(null);
-    setEditRow(null);
-  };
 
   return (
     <CollapsibleCard title={<h3 className="m-0">Plans — {code}</h3>}>
@@ -984,47 +910,9 @@ function PlanCurrencyTable({
           </thead>
           <tbody>
             {sorted.map((p) =>
-              editId === p.id && editRow ? (
+              (
                 <tr key={p.id}>
-                  <td>
-                    <input
-                      type="date"
-                      value={editRow.date}
-                      onChange={(e) => setEditRow({ ...editRow, date: e.target.value, recurrence: editRow.recurrence ? { ...editRow.recurrence, startDate: e.target.value } : undefined })}
-                      className="w-130"
-                    />
-                  </td>
-                  <td>
-                    <select value={editRow.type} onChange={(e) => setEditRow({ ...editRow, type: e.target.value as 'IN' | 'OUT' })}>
-                      <option value="IN">Cash in</option>
-                      <option value="OUT">Cash out</option>
-                    </select>
-                  </td>
-                  <td>
-                    <input type="number" step="0.01" value={editRow.amount} onChange={(e) => setEditRow({ ...editRow, amount: Number(e.target.value) })} className="w-90" />{' '}
-                    <select value={editRow.currencyCode} onChange={(e) => setEditRow({ ...editRow, currencyCode: e.target.value })} className="w-80">
-                      {currencyOptions.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
-                    </select>
-                  </td>
-                  <td><input value={editRow.category ?? ''} onChange={(e) => setEditRow({ ...editRow, category: e.target.value })} className="w-100" /></td>
-                  <td><input value={editRow.note ?? ''} onChange={(e) => setEditRow({ ...editRow, note: e.target.value })} /></td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                      <RecurrenceFields
-                        startDate={editRow.date}
-                        value={editRow.recurrence}
-                        onChange={(recurrence) => setEditRow({ ...editRow, recurrence })}
-                      />
-                    </div>
-                  </td>
-                  <td>
-                    <IconButton label="Save" icon={<SaveIcon size={13} />} align="right" onClick={saveEdit} />{' '}
-                    <IconButton label="Cancel" icon={<XIcon size={13} />} align="right" onClick={() => setEditId(null)} />
-                  </td>
-                </tr>
-              ) : (
-                <tr key={p.id}>
-                  <td>{p.date}</td>
+                  <td><DateValue value={p.date} /></td>
                   <td className={p.type === 'IN' ? 'pill-positive' : 'pill-negative'}>{p.type === 'IN' ? 'Cash in' : 'Cash out'}</td>
                   <td>{fmtMoney(p.amount, p.currencyCode)}</td>
                   <td>{p.category || '—'}</td>
@@ -1051,6 +939,7 @@ function PlanCurrencyTable({
           </tbody>
         </table>
       </div>
+      {editRow && <FinancePlanEditor reference={{ module: "cash", id: editRow.id }} occurrenceDate={plans.find(p => p.id === editId)?.recurrence ? plans.find(p => p.id === editId)?.date : undefined} onClose={() => { setEditId(null); setEditRow(null); }} />}
     </CollapsibleCard>
   );
 }
@@ -1211,7 +1100,6 @@ export function PlanningTab({
   return (
     <div>
       <PlanningHorizonField value={horizonDays} onChange={setHorizonDays} />
-      <BalanceProjectionSummary horizonDays={horizonDays} selectedCurrencies={selectedCurrencies} filters={filters} />
       <PlanList horizonDays={horizonDays} selectedCurrencies={selectedCurrencies} filters={filters} />
       {showFab && <AddPlanFab />}
       <PlanningAccountSection cloudEmpty={plannedCloudEmpty} uploadLocalToCloud={uploadPlannedLocalToCloud} />
@@ -1313,9 +1201,12 @@ export function CashPage({
   plannedCloudEmpty: boolean;
   uploadPlannedLocalToCloud: () => Promise<void>;
 }) {
+  const navigate = useNavigate();
   const entries = useCashWorkbookStore((s) => s.workbook.entries);
   const categories = useCategoryStore((s) => s.workbook.categories);
-  const currencies = useMemo(() => [...new Set(entries.map((entry) => entry.currencyCode))].sort(), [entries]);
+  const currencyPlans=usePlannedCashWorkbookStore(state=>state.workbook.entries);
+  const defaultCurrency=useCashWorkbookStore(state=>state.workbook.settings.defaultCurrency);
+  const currencies = useMemo(() => [...new Set([defaultCurrency,...entries.map(entry=>entry.currencyCode),...currencyPlans.map(plan=>plan.currencyCode)])].sort(), [entries,currencyPlans,defaultCurrency]);
   const [params] = useSearchParams();
   const selectedCurrencies = selectedEntityValues(params, currencies);
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
@@ -1328,13 +1219,12 @@ export function CashPage({
     [entries, filters, categories, selectedCurrencies],
   );
   usePageTopBarRightSlot(currencies.length ? <TopBarControls>
-    <EntityScopeMenu label="Cash currencies" options={currencies.map((code) => ({ value: code, label: code }))} />
+    <TopBarSelect label="Currency" className="account-switch-select" value="" options={[{value:"",label:"All cash"},...currencies.map(code=>({value:code,label:code}))]} onChange={event=>{if(event.target.value)navigate(`/cash/${encodeURIComponent(event.target.value)}`);}} /><EntityScopeMenu label="Cash currencies" options={[{value:"",label:"All cash"},...currencies.map((code) => ({ value: code, label: code }))]} />
     <TransactionFilterMenu value={filters} categories={filterCategories} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} />
   </TopBarControls> : null);
   return (
     <div className="standard-page">
-      <BackButton to="/net-worth">← Overview</BackButton>
-      <h1 className="pagetitle">Cash</h1>
+      <PageHeading back={<BackButton to="/net-worth">← Overview</BackButton>}><h1 className="pagetitle">Cash</h1></PageHeading>
       <p className="text-muted mb-12">
         Track physical/informal cash — cash in hand, gifts, small informal amounts. Each entry keeps its own
         currency; balances and category totals are grouped per currency, never converted.
@@ -1345,7 +1235,8 @@ export function CashPage({
          statement itself; it's now its own tab, moved to the end. Import/
          Settings (not named in the request) stay after, unchanged. */}
       <StandardPageSections sections={[
-          { key: 'summary', label: 'Account summary', defaultOpen: true, content: <div className="stack-lg"><BalancesSummary selectedCurrencies={selectedCurrencies} entries={entries.filter((entry) => !filters.toDate || entry.date <= filters.toDate)} />{selectedCurrencies.map((code) => <div key={code}><h3>{code} cash</h3><CashAccountSummary currency={code} entries={entries} visible={filteredEntries} filters={filters} /></div>)}</div> },
+          { key: 'summary', label: 'Cash summary', defaultOpen: true, content: <div className="stack-lg">{selectedCurrencies.map((code) => <div key={code}><h3>{code} cash</h3><CashAccountSummary currency={code} entries={entries} visible={filteredEntries} filters={filters} /></div>)}</div> },
+          { key: 'currencies', label: 'Cash by currency', content: <BalancesSummary selectedCurrencies={selectedCurrencies} entries={entries.filter(entry => !filters.toDate || entry.date <= filters.toDate)} /> },
           { key: 'statement', label: 'Transactions', content: <CashStatementTab entries={entries} selectedCurrencies={selectedCurrencies} filters={filters} categories={categories} /> },
           {
             key: 'plans',
@@ -1400,13 +1291,15 @@ export function CashCurrencyPage() {
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
   const filteredEntries = useMemo(() => filterCashEntries(entries, filters, categories).filter((entry) => entry.currencyCode === currency), [entries, filters, categories, currency]);
   const filterCategories = useMemo(() => [...new Set(entries.filter((entry) => entry.currencyCode === currency).map((entry) => categoryName(entry.categoryID, categories)))].sort(), [entries, categories, currency]);
-  const currencies = useMemo(() => [...new Set(entries.map(entry => entry.currencyCode))].sort(), [entries]);
+  const currencyPlans=usePlannedCashWorkbookStore(state=>state.workbook.entries);
+  const currencies = useMemo(() => [...new Set([currency,...entries.map(entry=>entry.currencyCode),...currencyPlans.map(plan=>plan.currencyCode)])].sort(), [entries,currencyPlans,currency]);
   usePageTopBarRightSlot(currencies.length ? (
     <TopBarControls>
       <TopBarSelect
         label="Currency"
+        className="account-switch-select"
         value={currency}
-        onChange={(event) => navigate(`/cash/${encodeURIComponent(event.target.value)}${location.search}`)}
+        onChange={(event) => navigate(event.target.value ? `/cash/${encodeURIComponent(event.target.value)}${location.search}` : `/cash${location.search}`)}
         options={currencies.map((code) => ({ value: code, label: code }))}
       />
       <TransactionFilterMenu value={filters} categories={filterCategories} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} />
@@ -1418,8 +1311,7 @@ export function CashCurrencyPage() {
   }
 
   return <div className="standard-page">
-    <BackButton to="/cash">← Back to Cash</BackButton>
-    <div className="module-detail-heading"><h1>{currency} cash</h1><div className="muted">Account-like view for this currency balance</div></div>
+    <PageHeading back={<BackButton to="/cash">← Back to Cash</BackButton>}><div className="module-detail-heading"><h1>{currency} cash</h1><div className="muted">Account-like view for this currency balance</div></div></PageHeading>
     <StandardPageSections sections={[
       {
         key: 'summary',
@@ -1427,6 +1319,7 @@ export function CashCurrencyPage() {
         defaultOpen: true,
         content: <CashAccountSummary currency={currency} entries={entries} visible={filteredEntries} filters={filters} />,
       },
+      { key: 'plans', label: 'Plans', content: <PlanList horizonDays={null} selectedCurrencies={[currency]} filters={filters} /> },
       { key: 'transactions', label: 'Transactions', content: <CashStatementGrid entries={entries} selectedCurrencies={[currency]} filters={filters} categories={categories} /> },
       { key: 'analytics', label: 'Analytics', content: <AnalyticsTab currencyCode={currency} entries={filteredEntries} filters={filters} /> },
       { key: 'categories', label: 'Categories', content: <CategoryBreakdown currencyCode={currency} entries={filteredEntries} /> },

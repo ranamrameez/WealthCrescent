@@ -14,6 +14,8 @@ export interface ChartFilter {
   /** Empty = no ticker filter (show all). */
   tickers: string[];
   /** "YYYY-MM", inclusive. Undefined = no lower/upper bound. */
+  fromDate?: string;
+  toDate?: string;
   fromMonth?: string;
   toMonth?: string;
 }
@@ -21,7 +23,7 @@ export interface ChartFilter {
 export const EMPTY_CHART_FILTER: ChartFilter = { tickers: [] };
 
 export function isChartFilterActive(filter: ChartFilter): boolean {
-  return filter.tickers.length > 0 || !!filter.fromMonth || !!filter.toMonth;
+  return filter.tickers.length > 0 || !!filter.fromMonth || !!filter.toMonth || !!filter.fromDate || !!filter.toDate;
 }
 
 function monthInRange(month: string, filter: ChartFilter): boolean {

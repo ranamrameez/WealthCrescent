@@ -1,6 +1,8 @@
 import type { Finance } from './finance';
 
 export interface Property {
+  /** Default finance used when generating this property's rent plans. */
+  plannedFinance?: { module: 'cash' | 'bank'; ref?: string; currencyCode: string };
   id: string;
   name: string; // "Apartment 4B", "House on Main St"
   /** A property has one currency (real-world rentals do). */

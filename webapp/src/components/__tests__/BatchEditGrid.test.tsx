@@ -12,6 +12,29 @@ function setup(extra = {}) {
   return { ...render(<BatchEditGrid {...props} />), save, close, props };
 }
 describe('BatchEditGrid', () => {
+  it('adds a formula row and deletes an existing row in one staged save', async () => {
+    const { save } = setup({ createRow: () => ({ id: 'new', description: '', amount: 0 }) });
+    fireEvent.click(screen.getByRole('button', { name: 'Add row' }));
+    fireEvent.change(screen.getByLabelText('Row 3, Description'), { target: { value: 'Added' } });
+    fireEvent.change(screen.getByLabelText('Row 3, Amount'), { target: { value: '=4*5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Delete row 1' }));
+    expect(save).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Save all changes'));
+    await waitFor(() => expect(save).toHaveBeenCalledOnce());
+    expect(save.mock.calls[0][1]).toEqual({ added: [{ id: 'new', description: 'Added', amount: 20 }], deleted: [rows[0]] });
+  });
+  it('reorders same-date rows and persists numeric sequence swaps', async () => {
+    type Ordered = Row & { seq?: number };
+    const originals: Ordered[] = [{ ...rows[0], date: '2026-10-01', seq: 1 }, { ...rows[1], date: '2026-10-01', seq: 2 }, { id: 'c', date: '2026-10-02', description: 'Third', amount: 30, seq: 3 }];
+    const save = vi.fn();
+    render(<BatchEditGrid<Ordered> title="Reorder" rows={originals} columns={[...columns as BatchColumn<Ordered>[], { key: 'seq', label: '#', type: 'number', editable: false }]} getRowId={row => row.id} getRowDate={row => row.date!} orderKey="seq" createRow={() => ({ id: 'new', date: '2026-10-01', description: '', amount: 0, seq: 4 })} onSave={save} onClose={() => {}} />);
+    expect((screen.getByRole('button', { name: 'Move row 2 down' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Move row 1 down' }));
+    expect((screen.getByLabelText('Row 1, Description') as HTMLInputElement).value).toBe('Second');
+    fireEvent.click(screen.getByText('Save all changes'));
+    await waitFor(() => expect(save).toHaveBeenCalledOnce());
+    expect(save.mock.calls[0][0].find((change: { after: Ordered }) => change.after.id === 'a').after.seq).toBe(2);
+  });
   it('stages multiple cells, preserves source rows, and commits once', async () => {
     const { save, close } = setup();
     fireEvent.change(screen.getByLabelText('Row 1, Amount'), { target: { value: '15.25' } });
@@ -67,7 +90,7 @@ describe('BatchEditGrid', () => {
   it('does not render editors for locked rows', () => {
     setup({ rowReadOnly: (row: Row) => row.id === 'a' ? 'Linked transfer' : undefined });
     expect(screen.queryByLabelText('Row 1, Amount')).toBeNull();
-    expect(screen.getByText('This Side Only').getAttribute('title')).toBe('Linked transfer');
+    expect(screen.getByText('Read-only').getAttribute('title')).toBe('Linked transfer');
     expect(screen.getByLabelText('Row 2, Amount')).toBeTruthy();
   });
   it('evaluates formulas on Save and highlights edited columns', async () => {

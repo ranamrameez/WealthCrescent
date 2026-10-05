@@ -1,3 +1,6 @@
+import { DateValue } from '../../../components/DateValue';
+import { ToggleChip } from '../../../components/ui/ToggleChip';
+import { PageHeading } from '../../../components/PageHeading';
 import { TopBarControls } from '../../../components/TopBarControls';
 import { BackButton } from '../../../components/BackButton';
 import { PriceInput } from "../../../components/ui/PriceInput";
@@ -126,10 +129,8 @@ function BuySellAvgDownCalculator() {
         </Field>
         <Field label=" ">
           <Tooltip text={canAvgDown ? 'Blend this purchase with what you already hold, instead of modeling it alone.' : 'Averaging down needs an existing position in this ticker.'}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, height: 30 }}>
-              <input type="checkbox" checked={avgDown} disabled={!canAvgDown} onChange={(e) => setAvgDown(e.target.checked)} />
-              Average down
-            </label>
+            <ToggleChip checked={avgDown} onChange={next => setAvgDown(next)} disabled={!canAvgDown} label={<>Average down
+            </>} />
           </Tooltip>
         </Field>
       </div>
@@ -979,7 +980,7 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
               return (
                 <Fragment key={i}>
                   <tr style={leg.executed ? { borderLeft: '3px solid var(--profit)' } : { borderLeft: '3px solid transparent' }}>
-                    <td>{display.date}{stale && (
+                    <td><DateValue value={display.date} />{stale && (
                       <Tooltip text="No linked transaction found — showing the plan's original snapshot from when this was marked done. Use Link below to fix this.">
                         <span style={{ cursor: 'pointer', color: 'var(--warn)' }}> ⚠</span>
                       </Tooltip>
@@ -1241,16 +1242,13 @@ export function TradeStrategyPage() {
 
   return (
     <div className="standard-page">
-      <BackButton to="/psx">← PSX</BackButton>
-      <h1 className="pagetitle">PSX Trade Strategy</h1>
+      <PageHeading back={<BackButton to="/psx">← PSX</BackButton>}><h1 className="pagetitle">PSX Trade Strategy</h1></PageHeading>
       <p className="text-muted mb-12">
         Buy/Sell &amp; Avg Down, and Trade Planner &amp; Partial Trade — sketch out trades ahead of time, or get
         advice on lots you already hold. Every open position gets its own plan automatically.
       </p>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, fontSize: 13 }} title="A popup on app load listing every ticker with a Partial Trade opportunity, across both exchanges — off by default since this is an opt-in, riskier strategy.">
-        <input type="checkbox" checked={alertsEnabled} onChange={(e) => updateSettings({ partialTradeAlertsEnabled: e.target.checked })} />
-        Show Partial Trade Alerts popup on app load
-      </label>
+      <ToggleChip checked={alertsEnabled} onChange={next => updateSettings({ partialTradeAlertsEnabled: next })}  label={<>Show Partial Trade Alerts popup on app load
+      </>} />
 
       <div id="buy-sell-avg-down" className="standard-section-anchor" style={{ scrollMarginTop: 96 }}><BuySellAvgDownCalculator /></div>
 

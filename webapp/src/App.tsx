@@ -289,6 +289,17 @@ function App() {
                 }
               />
               <Route
+                path="/rentals/:propertyId"
+                element={
+                  <RentalsPage
+                    user={user}
+                    syncStatus={rentalsSync.status}
+                    cloudEmpty={rentalsSync.cloudEmpty}
+                    uploadLocalToCloud={rentalsSync.uploadLocalToCloud}
+                  />
+                }
+              />
+              <Route
                 path="/planning"
                 element={
                   <PlanningPage

@@ -27,7 +27,7 @@ describe('StockPLCharts', () => {
     expect(entries[3].datasets[0].data[0]).toBe(125);
     expect(entries[3].datasets[0].data[1]).toBeCloseTo(250 / 3);
     chart.mockClear();
-    fireEvent.click(screen.getByLabelText('Buy/sell days only'));
+    fireEvent.click(screen.getByRole('button', { name: 'Buy/sell days only' }));
     expect(chart).toHaveBeenCalledTimes(5);
   });
 });

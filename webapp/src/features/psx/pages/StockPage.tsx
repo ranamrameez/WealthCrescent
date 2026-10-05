@@ -1,4 +1,9 @@
-import { PageFilters } from '../../../components/PageFilters';
+import { DateValue } from '../../../components/DateValue';
+import { PageHeading } from '../../../components/PageHeading';
+import { InvestmentBalanceSummary } from '../../../components/InvestmentBalanceSummary';
+import { useUrlTransactionFilters, type TransactionPageFilters } from '../../../hooks/useUrlTransactionFilters';
+import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu';
+import { InvestmentPlans } from '../../../components/InvestmentPlans';
 import { BackButton } from '../../../components/BackButton';
 import { PriceInput } from "../../../components/ui/PriceInput";
 import { Fragment, useMemo, useState } from 'react';
@@ -12,7 +17,7 @@ import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls
 import { TickerLogo } from '../../../components/TickerLogo';
 import { toast } from '../../../components/Toast';
 import { Tooltip } from '../../../components/Tooltip';
-import { Field, TextInput } from '../../../components/ui/Field';
+import { Field } from '../../../components/ui/Field';
 import { IconButton } from '../../../components/ui/IconButton';
 import { PendingToggle } from '../../../components/ui/PendingToggle';
 import { TimeZoneFields } from '../../../components/ui/TimeZoneFields';
@@ -35,7 +40,7 @@ import { usePSXStockData } from '../hooks/usePSXStockData';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-function TickerTransactions({ ticker }: { ticker: string }) {
+function TickerTransactions({ ticker, filters }: { ticker: string; filters: TransactionPageFilters }) {
   const { workbook, calcFee } = usePSXDerived();
   const updateTransaction = usePSXWorkbookStore((s) => s.updateTransaction);
   const deleteTransaction = usePSXWorkbookStore((s) => s.deleteTransaction);
@@ -90,7 +95,7 @@ function TickerTransactions({ ticker }: { ticker: string }) {
 
   const filteredRows = workbook.transactions
     .map((tx, i) => ({ tx, i }))
-    .filter((r) => r.tx.ticker === ticker);
+    .filter(r => r.tx.ticker === ticker && (!filters.fromDate || r.tx.date >= filters.fromDate) && (!filters.toDate || r.tx.date <= filters.toDate) && (filters.direction === 'all' || (filters.direction === 'in' ? r.tx.action === 'BUY' : r.tx.action === 'SELL')) && filters.source !== 'statement-import');
 
   type Col = 'date' | 'action' | 'shares' | 'price' | 'cost' | 'fee';
   const sortValue = (r: (typeof filteredRows)[number], col: Col): number | string => {
@@ -255,7 +260,7 @@ function TickerTransactions({ ticker }: { ticker: string }) {
               ) : (
                 <tr key={i}>
                   <td>
-                    {tx.date}
+                    <DateValue value={tx.date} />
                     {tx.isPending && (
                       <Tooltip text="Order placed but not yet filled — excluded from your shares/cash balance until cleared.">
                         <span className="pill-warn ml-6">Pending</span>
@@ -326,8 +331,8 @@ function TickerTransactions({ ticker }: { ticker: string }) {
  * are variable (same-day netting, overrides) unlike QSE's flat rate. */
 function useTickerExport(ticker: string) {
   const { workbook, calcFee } = usePSXDerived();
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  const { filters } = useUrlTransactionFilters();
+  const { fromDate, toDate } = filters;
   const rows = workbook.transactions.filter((tx) => tx.ticker === ticker);
 
   const exportStatement = () => {
@@ -347,7 +352,7 @@ function useTickerExport(ticker: string) {
     toast('Statement downloaded.');
   };
 
-  return { fromDate, setFromDate, toDate, setToDate, exportStatement, hasRows: rows.length > 0 };
+  return { exportStatement, hasRows: rows.length > 0 };
 }
 
 export function StockPage() {
@@ -356,53 +361,45 @@ export function StockPage() {
   const ticker = (rawTicker || '').toUpperCase();
   const { tickerNames } = usePSXStockData();
   const name = tickerNames[ticker];
-  const { fromDate, setFromDate, toDate, setToDate, exportStatement, hasRows } = useTickerExport(ticker);
+  const { exportStatement, hasRows } = useTickerExport(ticker);
+  const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
   const { workbook, rows, calcFee, positions } = usePSXDerived();
   const isOpen = (positions.find((p) => p.ticker === ticker)?.shares || 0) > 0;
   usePageTopBarRightSlot(
     <TopBarControls>
       <TopBarSelect label="Stock exchange" value="psx" onChange={(event) => navigate(event.target.value === 'qse' ? `/stock/${ticker}` : `/psx/stock/${ticker}`)} options={[{ value: 'qse', label: 'QSE' }, { value: 'psx', label: 'PSX' }]} />
-      <TopBarSelect label="Stock" value={ticker} onChange={(event) => navigate(`/psx/stock/${event.target.value}`)} options={[
+      <TopBarSelect label="Stock" value={ticker} onChange={(event) => navigate(event.target.value ? `/psx/stock/${event.target.value}` : '/psx')} options={[{value:'',label:'All PSX stocks'},
  ...positions.filter(p => p.shares > 0).sort((a,b) => a.ticker.localeCompare(b.ticker)).map(p => ({value:p.ticker,label:p.ticker})),
- {value:'__closed__',label:'???? Closed positions ????',disabled:true},
+ {value:'__closed__',label:'Closed positions',disabled:true},
  ...positions.filter(p => p.shares <= 0 && workbook.transactions.some(tx => tx.ticker === p.ticker && !tx.isPending)).sort((a,b) => a.ticker.localeCompare(b.ticker)).map(p => ({value:p.ticker,label:p.ticker})),
  ]} />
+      <TransactionFilterMenu value={filters} categories={[]} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} />
     </TopBarControls>,
   );
 
   return (
     <div className="standard-page">
       <div className="d-flex gap-6 align-items-center">
-        <BackButton to="/psx/portfolio">← Back to Portfolio</BackButton>
-        <h1 className="pagetitle d-flex align-items-center">
+        <PageHeading back={<BackButton to="/psx/portfolio">← Back to Portfolio</BackButton>}><h1 className="pagetitle d-flex align-items-center">
           <TickerLogo ticker={ticker} size="lg" exchange="psx" />
           {ticker}&nbsp;&nbsp;{name && <span className="text-muted" style={{ fontSize: 16 }}>{shortenCompanyName(name, 40)}</span>}
-        </h1>
+        </h1></PageHeading>
       </div>
 
       <StandardPageSections
         sections={[
-          { key: 'summary', label: 'Summary', content: <PositionDetail ticker={ticker} />, unframed: true },
+          { key: 'summary', label: 'Summary', content: <><InvestmentBalanceSummary transactions={workbook.transactions} plans={workbook.tradePlans} marketPrices={workbook.marketPrices} priceHistory={workbook.priceHistory} tickers={[ticker]} currency={workbook.settings.currency} filters={filters} /><PositionDetail ticker={ticker} /></>, unframed: true },
+          { key: 'plans', label: 'Plans', content: <InvestmentPlans market="psx" items={[{ id: ticker, name: ticker, currency: workbook.settings.currency }]} filters={filters} /> },
           {
             key: 'transactions',
             label: 'Trades',
-            content: <TickerTransactions ticker={ticker} />,
-            headerEnd: hasRows ? (
-              <PageFilters><div className="row gap-sm">
-                <Field label="From (optional)">
-                  <TextInput type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-                </Field>
-                <Field label="To (optional)">
-                  <TextInput type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-                </Field>
-                <button className="btn secondary" onClick={exportStatement}>Export CSV</button>
-              </div></PageFilters>
-            ) : undefined,
+            content: <TickerTransactions ticker={ticker} filters={filters} />,
+            headerEnd: hasRows ? <button className="btn secondary small" onClick={exportStatement}>Export CSV</button> : undefined,
           },
           {
             key: 'analytics',
             label: 'Analytics',
-            content: <ExchangeStockAnalytics ticker={ticker} transactions={workbook.transactions} priceHistory={workbook.priceHistory} calcFee={calcFee} method={workbook.settings.costBasisMethod} currency={workbook.settings.currency} formatPrice={fmtPSXPrice} />,
+            content: <ExchangeStockAnalytics filters={filters} ticker={ticker} transactions={workbook.transactions} priceHistory={workbook.priceHistory} calcFee={calcFee} method={workbook.settings.costBasisMethod} currency={workbook.settings.currency} formatPrice={fmtPSXPrice} />,
           },
           // Pending item 49 ("assess a stock in one go"): see the identical
           // comment in QSE's StockPage.tsx.

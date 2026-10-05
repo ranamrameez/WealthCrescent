@@ -1,3 +1,4 @@
+import { DateValue } from '../../../components/DateValue';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { selectedEntityValues } from '../../../components/EntityScopeMenu';
@@ -121,7 +122,7 @@ function NetWorthDrilldownModal({ drilldown, onClose }: { drilldown: Drilldown; 
               <tbody>
                 {drilldown.items.map((it, i) => (
                   <tr key={i}>
-                    <td>{it.date}</td>
+                    <td><DateValue value={it.date} /></td>
                     <td>{it.module}{it.accountName ? ` (${it.accountName})` : ''}</td>
                     <td>{it.description}</td>
                     <td style={{ textAlign: 'right', color: it.amount >= 0 ? 'var(--profit)' : 'var(--loss)' }}>
@@ -935,7 +936,7 @@ function NetWorthPlanningReality({ activities, selectedModules, currencies, curr
       })}
     </div>
     <div className="table-scroll"><table><thead><tr><th>Date</th><th>Source</th><th>Description</th><th>Category</th><th>Amount</th></tr></thead><tbody>
-      {planned.slice().sort((a, b) => a.date.localeCompare(b.date)).map((activity) => <tr key={`${activity.module}:${activity.id}`}><td>{activity.date}</td><td>{activity.sourceLabel}</td><td>{activity.description}</td><td>{activity.category || 'Uncategorized'}</td><td className={activity.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(activity.amount, activity.currencyCode)}</td></tr>)}
+      {planned.slice().sort((a, b) => a.date.localeCompare(b.date)).map((activity) => <tr key={`${activity.module}:${activity.id}`}><td><DateValue value={activity.date} /></td><td>{activity.sourceLabel}</td><td>{activity.description}</td><td>{activity.category || 'Uncategorized'}</td><td className={activity.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(activity.amount, activity.currencyCode)}</td></tr>)}
       {!planned.length && <tr><td colSpan={5} className="text-muted">No plans fall within this horizon and source scope.</td></tr>}
     </tbody></table></div>
     <p className="text-muted mb-0">Projection includes EMI liability reduction without counting a linked bank installment twice.</p>

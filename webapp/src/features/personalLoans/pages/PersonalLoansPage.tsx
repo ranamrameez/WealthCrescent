@@ -1,3 +1,8 @@
+import { PlanEditorModal } from '../../../components/PlanEditorModal';
+import { DateValue } from '../../../components/DateValue';
+import { QuickEntitySwitch } from '../../../components/QuickEntitySwitch';
+import { PageHeading } from '../../../components/PageHeading';
+import { EntityEditorModal, EntityActions } from '../../../components/EntityEditorModal';
 import { BackButton } from '../../../components/BackButton';
 import { BalanceSummaryCards } from '../../../components/BalanceSummaryCards';
 import type { User } from 'firebase/auth';
@@ -20,7 +25,6 @@ import { Modal } from '../../../components/Modal';
 import { LoanPaymentsBatchEditor, LoanPlansBatchEditor } from '../../../components/LazyFinanceBatchEditors';
 import { Notice } from '../../../components/Notice';
 import { confirmDialog } from '../../../components/ConfirmDialog';
-import { hueStyle } from '../../../lib/statCardHues';
 import { ArchiveIcon, CheckIcon, EditIcon, FilterIcon, PersonalLoanIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { toast } from '../../../components/Toast';
 import { Tooltip } from '../../../components/Tooltip';
@@ -41,7 +45,6 @@ import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
 import {
   loanCategoryForDirection,
   loanOutstanding,
-  netPendingByCurrency,
   netPositionByCurrency,
   projectPayoff,
   repaymentRunningOutstanding,
@@ -58,7 +61,6 @@ import { useCategoryStore } from '../../../store/categoryStore';
 import { useInterEntityTransfersStore } from '../../../store/interEntityTransfersStore';
 import { linkTargetPath, useLinkSideLabel } from '../../transfers/pages/TransferLinksPage';
 import type { PersonalLoan, PersonalLoanPlan, PersonalLoanRepayment } from '../../../types/personalLoansWorkbook';
-import { gridAutoStyle } from '../../../lib/gridStyle';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -129,37 +131,26 @@ function PersonalLoanPaymentFilterMenu({
   );
 }
 
-function NetPositionSummary({ selectedIds }: { selectedIds?: string[] } = {}) {
-  const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
-  const repayments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
-  const scopedLoans = selectedIds ? loans.filter((loan) => selectedIds.includes(loan.id)) : loans;
-  const scopedRepayments = selectedIds ? repayments.filter((repayment) => selectedIds.includes(repayment.loanId)) : repayments;
-  const net = netPositionByCurrency(scopedLoans, scopedRepayments);
-  const pending = netPendingByCurrency(scopedLoans, scopedRepayments);
-  const codes = Object.keys(net);
-  if (!codes.length) return null;
-
-  return (
-    <div className="grid-auto" style={{ ...gridAutoStyle(150, 8), marginBottom: 16 }}>
-      {codes.map((code) => {
-        const realPending = pending[code] ?? 0;
-        return (
-          <div key={code} className="stat-card card" style={hueStyle(net[code] >= 0 ? 'var(--profit)' : 'var(--loss)')}>
-            <div className="label">Net position ({code})</div>
-            <MoneyValue n={net[code]} currency={code} />
-            <div className="sub">{net[code] >= 0 ? 'Net owed to you' : 'Net you owe'}</div>
-            {/* User-requested (2026-09-08): don't just exclude pending
-               repayments from the headline figure — show it too. */}
-            {realPending !== 0 && (
-              <div className="sub">
-                {realPending > 0 ? '+' : ''}{fmtMoney(realPending, code)} pending → {fmtMoney(net[code] + realPending, code)} incl. pending
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
+function NetPositionSummary({ selectedIds, filters }: { selectedIds?: string[]; filters: TransactionPageFilters }) {
+  const loans = usePersonalLoansWorkbookStore(state => state.workbook.loans).filter(loan => !selectedIds || selectedIds.includes(loan.id));
+  const payments = usePersonalLoansWorkbookStore(state => state.workbook.repayments);
+  const plans = usePersonalLoansWorkbookStore(state => state.workbook.plans ?? []);
+  const categories = useCategoryStore(state => state.workbook.categories);
+  const inPeriod = (date: string) => (!filters.fromDate || date >= filters.fromDate) && (!filters.toDate || date <= filters.toDate);
+  const matches = (row: { categoryID?: string; source?: string }) => (filters.category === 'all' || categoryName(row.categoryID, categories) === filters.category) && (filters.source === 'all' || (row.source ?? 'manual') === filters.source);
+  return <div className="stack-lg">{[...new Set(loans.map(loan => loan.currencyCode))].sort().map(currency => {
+    const selected = loans.filter(loan => loan.currencyCode === currency);
+    const startingLoans = selected.filter(loan => filters.fromDate && loan.date < filters.fromDate);
+    const currentLoans = selected.filter(loan => !filters.toDate || loan.date <= filters.toDate);
+    const start = netPositionByCurrency(startingLoans, payments.filter(row => filters.fromDate && row.date < filters.fromDate))[currency] ?? 0;
+    const current = netPositionByCurrency(currentLoans, payments.filter(row => !filters.toDate || row.date <= filters.toDate))[currency] ?? 0;
+    const impact = (loanId: string, amount: number) => selected.find(loan => loan.id === loanId)?.direction === 'owed_to_me' ? -amount : amount;
+    const flow = payments.filter(row => selected.some(loan => loan.id === row.loanId) && inPeriod(row.date) && matches(row));
+    const actual = flow.filter(row => !row.isPending).map(row => impact(row.loanId, row.amount));
+    const pending = flow.filter(row => row.isPending).map(row => impact(row.loanId, row.amount));
+    const planned = plans.filter(row => selected.some(loan => loan.id === row.loanId) && !row.executed && inPeriod(row.date) && matches(row)).map(row => impact(row.loanId, row.amount));
+    return <div key={currency}><h3>{currency} net position</h3><BalanceSummaryCards kind="loans" currency={currency} summary={{ start, current, inflow: actual.filter(value => value > 0).reduce((sum, value) => sum + value, 0), outflow: actual.filter(value => value < 0).reduce((sum, value) => sum + value, 0), pendingInflow: pending.filter(value => value > 0).reduce((sum, value) => sum + value, 0), pendingOutflow: pending.filter(value => value < 0).reduce((sum, value) => sum + value, 0), plannedInflow: planned.filter(value => value > 0).reduce((sum, value) => sum + value, 0), plannedOutflow: planned.filter(value => value < 0).reduce((sum, value) => sum + value, 0) }} /></div>;
+  })}</div>;
 }
 
 /** README item 23 / MODULES_PLAN.md §11: per-module Analytics, second
@@ -168,38 +159,17 @@ function NetPositionSummary({ selectedIds }: { selectedIds?: string[] } = {}) {
  * sketch lives inside `LoanDetail` below instead, since it needs one
  * specific loan's outstanding balance to project from. */
 function AnalyticsTab({ filter, selectedIds, filters }: { filter: 'all' | 'owed_to_me' | 'i_owe'; selectedIds?: string[]; filters?: TransactionPageFilters }) {
-  const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
-  const repayments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
-  const plans = usePersonalLoansWorkbookStore((s) => s.workbook.plans ?? []);
-  const categories = useCategoryStore((s) => s.workbook.categories);
-  const candidates = useMemo(
-    () => loans.filter((loan) => (!selectedIds || selectedIds.includes(loan.id)) && loan.isActive !== false && (filter === 'all' || loan.direction === filter)),
-    [loans, selectedIds, filter],
-  );
-  if (!candidates.length) return <p className="text-muted">Add a matching loan first to see analytics.</p>;
-
-  return (
-    <div className="stack-lg">
-      {candidates.map((selected) => {
-        const scopedPayments = repayments.filter((payment) => payment.loanId === selected.id
-          && (!filters?.fromDate || payment.date >= filters.fromDate)
-          && (!filters?.toDate || payment.date <= filters.toDate)
-          && (!filters || filters.source === 'all' || (payment.source ?? 'manual') === filters.source)
-          && (!filters || filters.category === 'all' || categoryName(payment.categoryID, categories) === filters.category));
-        const scopedPlans = plans.filter((plan) => plan.loanId === selected.id
-          && (!filters?.fromDate || plan.date >= filters.fromDate)
-          && (!filters?.toDate || plan.date <= filters.toDate)
-          && (!filters || filters.category === 'all' || categoryName(plan.categoryID, categories) === filters.category));
-        return <Card key={selected.id}><h3 className="mt-0">{selected.person} <span className="text-muted">({selected.currencyCode})</span></h3>
-        <PersonalLoanAnalyticsSection
-          loan={selected}
-          payments={scopedPayments}
-          plans={scopedPlans}
-        />
-        </Card>;
-      })}
-    </div>
-  );
+  const loans = usePersonalLoansWorkbookStore(state => state.workbook.loans).filter(loan => (!selectedIds || selectedIds.includes(loan.id)) && (filter === 'all' || loan.direction === filter));
+  const payments = usePersonalLoansWorkbookStore(state => state.workbook.repayments);
+  const categories = useCategoryStore(state => state.workbook.categories);
+  useAppearanceStore(state => state.appearance); applyChartTheme();
+  return <div className="stack-lg">{[...new Set(loans.map(loan => loan.currencyCode))].sort().map(currency => {
+    const scoped = loans.filter(loan => loan.currencyCode === currency);
+    const history = payments.filter(payment => scoped.some(loan => loan.id === payment.loanId) && !payment.isPending && (!filters?.toDate || payment.date <= filters.toDate));
+    const flow = history.filter(payment => (!filters?.fromDate || payment.date >= filters.fromDate) && (!filters || filters.source === 'all' || (payment.source ?? 'manual') === filters.source) && (!filters || filters.category === 'all' || categoryName(payment.categoryID, categories) === filters.category));
+    const months = [...new Set(flow.map(payment => payment.date.slice(0, 7)))].sort();
+    return <div key={currency}><h3>{currency} loan portfolio</h3><div className="grid-auto"><div style={{ height: 260 }}><Bar data={{ labels: scoped.map(loan => loan.person), datasets: [{ label: 'Outstanding', data: scoped.map(loan => loanOutstanding(loan, history)), backgroundColor: cssVar('--accent') }] }} options={{ maintainAspectRatio: false }} /></div><div style={{ height: 260 }}><Bar data={{ labels: months, datasets: [{ label: 'Payments', data: months.map(month => flow.filter(payment => payment.date.startsWith(month)).reduce((sum, payment) => sum + payment.amount, 0)), backgroundColor: cssVar('--profit') }] }} options={{ maintainAspectRatio: false }} /></div></div></div>;
+  })}</div>;
 }
 
 /** Floating "add a loan" button (user feedback 2026-08-27: adding an entity
@@ -218,16 +188,16 @@ function AddLoanFab() {
   const [open, setOpen] = useState<'loan' | 'transfer' | null>(null);
   return (
     <>
-      <FabPanel
+      <EntityActions
         actions={[
           { label: 'Add a loan', icon: <PersonalLoanIcon />, onClick: () => setOpen('loan') },
           { label: 'Transfers', icon: <TransferIcon />, onClick: () => setOpen('transfer') },
         ]}
       />
       {open === 'loan' && (
-        <Modal title="Add a loan" onClose={() => setOpen(null)}>
+        <EntityEditorModal title="Add a loan" onClose={() => setOpen(null)}>
           <AddLoanForm onSaved={() => setOpen(null)} />
-        </Modal>
+        </EntityEditorModal>
       )}
       {open === 'transfer' && <TransactionEntryModal defaultFinance={{ module: 'personalLoans' }} onClose={() => setOpen(null)} />}
     </>
@@ -409,7 +379,7 @@ function RepaymentsSection({
                 return (
                   <tr key={r.id} onClick={() => setDetailRow(r)} className="clickable">
                     <td>
-                      {r.date}{' '}
+                      <DateValue value={r.date} />{' '}
                       {showActions && <span onClick={(e) => e.stopPropagation()}>
                         <ReorderButtons
                           rows={sorted}
@@ -614,7 +584,7 @@ function ImportRepaymentsSection({ loan, onClose }: { loan: PersonalLoan; onClos
               <tbody>
                 {mappedPreview.map((r, i) => (
                   <tr key={i}>
-                    <td>{r.date}</td>
+                    <td><DateValue value={r.date} /></td>
                     <td>{fmtMoney(r.amount, loan.currencyCode)}</td>
                   </tr>
                 ))}
@@ -742,7 +712,7 @@ function PersonalLoanPlansSection({ loan, showActions }: { loan: PersonalLoan; s
           <tbody>
             {rows.map((plan) => (
               <tr key={plan.id}>
-                <td>{plan.date}</td>
+                <td><DateValue value={plan.date} /></td>
                 <td>{plan.description || '—'}</td>
                 <td>{categoryName(plan.categoryID, categories)}</td>
                 <td>{fmtMoney(plan.amount, loan.currencyCode)}</td>
@@ -851,7 +821,8 @@ function PersonalLoanAnalyticsSection({
   </div>;
 }
 
-function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; startInEditMode?: boolean }) {
+function LoanDetail({ loan, onSelect, onBack }: { loan: PersonalLoan; onSelect: (item: PersonalLoan) => void; onBack: () => void; startInEditMode?: boolean }) {
+  const switchEntities = usePersonalLoansWorkbookStore(s=>s.workbook.loans);
   const repayments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
   const plans = usePersonalLoansWorkbookStore((s) => s.workbook.plans ?? []);
   const deleteLoan = usePersonalLoansWorkbookStore((s) => s.deleteLoan);
@@ -968,7 +939,7 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
       defaultOpen: true,
       actions: summaryActions,
       summary: <SummaryChip label="Outstanding" value={fmtMoney(outstanding, loan.currencyCode)} />,
-      content: <BalanceSummaryCards currency={loan.currencyCode} summary={{
+      content: <BalanceSummaryCards kind="loans" currency={loan.currencyCode} summary={{
         start: Math.max(0, loan.principal - repayments.filter(payment => payment.loanId === loan.id && !payment.isPending && paymentFilters.fromDate && payment.date < paymentFilters.fromDate).reduce((total, payment) => total + payment.amount, 0)),
         current: Math.max(0, loan.principal - repayments.filter(payment => payment.loanId === loan.id && !payment.isPending && (!paymentFilters.toDate || payment.date <= paymentFilters.toDate)).reduce((total, payment) => total + payment.amount, 0)),
         inflow: 0, outflow: -actualPaid, pendingInflow: 0, pendingOutflow: -pendingPaid, plannedInflow: 0, plannedOutflow: -plannedPaid,
@@ -978,13 +949,14 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
       key: 'details',
       label: 'Loan details',
       hue: loan.color,
+      actions: summaryActions,
       content: (
         <AttributeList items={[
           { label: 'Person', value: loan.person },
           { label: 'Loan type', value: loan.direction === 'owed_to_me' ? 'I lent money' : 'I borrowed money' },
           { label: 'Currency', value: loan.currencyCode },
           { label: 'Amount', value: fmtMoney(loan.principal, loan.currencyCode) },
-          { label: 'Date', value: loan.date },
+          { label: 'Date', value: <DateValue value={loan.date} /> },
           { label: 'Note', value: loan.note },
           { label: 'Status', value: loan.isActive === false ? 'Closed' : 'Active' },
           { label: 'Favorite', value: loan.isFavorite ? 'Yes' : 'No' },
@@ -1043,7 +1015,7 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
       onBack={onBack}
       title={loan.person}
       hue={loan.color}
-      topBarRight={paymentFilterBar}
+      topBarRight={<div className="topbar-controls"><QuickEntitySwitch label="Loan" value={loan.id} options={[{value:"",label:"All items"},...switchEntities.filter(item=>item.isActive !== false || item.id===loan.id).map(item=>({value:item.id,label:item.person+' ('+item.currencyCode+')'}))]} onChange={id=>{ const next=switchEntities.find(item=>item.id===id);if(next)onSelect(next);else onBack(); }} />{paymentFilterBar}</div>}
       sections={sections}
       defaultKey="summary"
     >
@@ -1054,9 +1026,9 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
         { label: 'Add a plan', icon: <PlusIcon />, onClick: () => setAddPlanOpen(true) },
       ]} />
       {editLoanOpen && (
-        <Modal title="Edit loan" onClose={() => setEditLoanOpen(false)}>
+        <EntityEditorModal title="Edit loan" onClose={() => setEditLoanOpen(false)}>
           <LoanForm loan={loan} onSaved={() => setEditLoanOpen(false)} />
-        </Modal>
+        </EntityEditorModal>
       )}
       {addPaymentOpen && (
         <TransactionEntryModal
@@ -1064,7 +1036,7 @@ function LoanDetail({ loan, onBack }: { loan: PersonalLoan; onBack: () => void; 
           onClose={() => setAddPaymentOpen(false)}
         />
       )}
-      {addPlanOpen && <Modal title="Add a plan" onClose={() => setAddPlanOpen(false)}><PersonalLoanPlanForm loan={loan} onSaved={() => setAddPlanOpen(false)} /></Modal>}
+      {addPlanOpen && <PlanEditorModal title="Add a plan" onClose={() => setAddPlanOpen(false)}><PersonalLoanPlanForm loan={loan} onSaved={() => setAddPlanOpen(false)} /></PlanEditorModal>}
       {editPayment && (
         <TransactionEntryModal
           defaultFinance={{ module: 'personalLoans', ref: loan.id, currencyCode: loan.currencyCode }}
@@ -1172,7 +1144,7 @@ function PersonalLoansModulePlans({
             const loan = visibleLoans.get(plan.loanId)!;
             return (
               <tr key={plan.id} className="clickable" onClick={() => onSelectLoan(loan)}>
-                <td>{plan.date}</td>
+                <td><DateValue value={plan.date} /></td>
                 <td>{loan.person}</td>
                 <td>{plan.description || '—'}</td>
                 <td>{fmtMoney(plan.amount, loan.currencyCode)}</td>
@@ -1221,7 +1193,7 @@ function PersonalLoansModulePayments({
             const loan = visibleLoans.get(payment.loanId)!;
             return (
               <tr key={payment.id} className="clickable" onClick={() => onSelectLoan(loan)}>
-                <td>{payment.date}</td>
+                <td><DateValue value={payment.date} /></td>
                 <td>{loan.person}</td>
                 <td>{payment.description || '—'}</td>
                 <td>{categoryName(payment.categoryID, categories)}</td>
@@ -1316,7 +1288,7 @@ export function PersonalLoansPage({
   const archivedCount = useMemo(() => loans.filter((loan) => loan.isActive === false).length, [loans]);
 
   const landingTopBar = useMemo(() => liveSelected ? null : (
-    <TopBarControls>
+    <TopBarControls><QuickEntitySwitch label="Loan" value="" options={[{value:"",label:"All loans"},...loans.map(item=>({value:item.id,label:item.person}))]} onChange={id=>{const next=loans.find(item=>item.id===id);if(next)setSelected(next);}} />
       <TopBarSelect
         label="Loan type"
         value={filter}
@@ -1334,7 +1306,7 @@ export function PersonalLoansPage({
   usePageTopBarRightSlot(landingTopBar);
 
   if (liveSelected) {
-    return <LoanDetail loan={liveSelected} onBack={() => setSelected(null)} />;
+    return <LoanDetail key={liveSelected.id} onSelect={setSelected} loan={liveSelected} onBack={() => setSelected(null)} />;
   }
 
   const loanActions: StandardCardAction[] = archivedCount
@@ -1350,7 +1322,7 @@ export function PersonalLoansPage({
       label: 'Summary',
       defaultOpen: true,
       summary: <SummaryChip label="Loans" value={loans.length} />,
-      content: <NetPositionSummary selectedIds={scopedIds} />,
+      content: <NetPositionSummary selectedIds={scopedIds} filters={transactionFilters} />,
     },
     {
       key: 'loans',
@@ -1384,11 +1356,12 @@ export function PersonalLoansPage({
 
   return (
     <div className="standard-page">
-      <BackButton to="/net-worth">← Overview</BackButton>
-      <h1 className="pagetitle">Personal Loans</h1>
+      {!liveSelected && <>
+      <PageHeading back={<BackButton to="/net-worth">Overview</BackButton>}><h1 className="pagetitle">Personal Loans</h1></PageHeading>
       <p className="text-muted mb-12">
         Informal money borrowed from or lent to another person, with payments, linked transfers, categories, and net position tracking.
       </p>
+      </>}
       <StandardPageSections sections={sections} defaultKey="summary" />
       <AddLoanFab />
     </div>

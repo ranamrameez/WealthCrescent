@@ -1,3 +1,7 @@
+import { CreditCardPositionSummary } from '../../../components/CreditCardPositionSummary';
+import { DateValue } from '../../../components/DateValue';
+import { ToggleChip } from '../../../components/ui/ToggleChip';
+import { EntityEditorModal } from '../../../components/EntityEditorModal';
 import { planOccurrences, occurrenceCompleted } from '../../../lib/calc/planOccurrences';
 import { BackButton } from '../../../components/BackButton';
 import { useEffect, useMemo, useState } from 'react';
@@ -41,7 +45,7 @@ import { applyChartTheme } from '../../../lib/chartSetup';
 import { cssVar, tickerColor } from '../../../lib/cssVar';
 import { chartAlpha, chartDepthPlugin } from '../../../lib/chartVisuals';
 import { recurrenceLabel } from '../../../lib/recurrenceLabel';
-import { plannedCreditCardProjection, type PlanningHorizonDays } from '../../../lib/calc/plannedBalance';
+import { type PlanningHorizonDays } from '../../../lib/calc/plannedBalance';
 import { useCategoryStore } from '../../../store/categoryStore';
 import {
   creditCardMonthlyHistory,
@@ -478,7 +482,7 @@ function TransactionsTable({ card, filters, showActions = false }: { card: Credi
         <tbody>
           {pageRows.map((t) => (
             <tr key={t.id} className="clickable" onClick={() => setDetail(t)}>
-              <td>{t.date}</td>
+              <td><DateValue value={t.date} /></td>
               <td className={t.kind === 'payment' ? 'pill pill-positive' : 'pill pill-negative'} style={{ display: 'inline-block' }}>{KIND_LABELS[t.kind]}</td>
               <td className="cell-clip" title={t.description}>{t.description}</td>
               <td>{categoryName(t.categoryID, categories)}</td>
@@ -646,6 +650,7 @@ function CreditCardAnalyticsSection({ card, transactions }: { card: CreditCard; 
 }
 
 export function CreditCardDetailPage() {
+  const banks=useBankWorkbookStore(s=>s.workbook.settings.banks??[]);
   const { id } = useParams();
   const navigate = useNavigate();
   const cards = useCreditCardWorkbookStore((s) => s.workbook.cards);
@@ -698,7 +703,7 @@ export function CreditCardDetailPage() {
 
   usePageTopBarRightSlot(card ? (
     <TopBarControls>
-      <TopBarSelect label="Switch card" value={card.id}
+      <TopBarSelect label="Bank" className="account-switch-select" value={card.bankId??''} options={[{value:'',label:'All banks'},...banks.map(bank=>({value:bank.id,label:bank.name}))]} onChange={event=>navigate(event.target.value ? `/bank/bank/${event.target.value}` : '/bank')} /><TopBarSelect label="Switch card" value={card.id}
         onChange={(event) => navigate(event.target.value ? `/bank/card/${event.target.value}` : '/bank')}
         options={[{ value: '', label: 'All cards' }, ...cards.filter((item) => item.isActive !== false || item.id === card.id).map((item) => ({ value: item.id, label: item.name }))]} />
       <TransactionFilterMenu value={filters} categories={filterCategories} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} />
@@ -768,8 +773,7 @@ export function CreditCardDetailPage() {
 
   return (
     <div>
-      <BackButton to="/bank">← Back to Banking</BackButton>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginTop: 8, marginBottom: 12, flexWrap: 'wrap', gap: 8 }}><BackButton to="/bank">← Back to Banking</BackButton>
         <h1 className="pagetitle" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
           {card.name}
           {card.isActive === false && <span className="pill-warn fs-11">Closed</span>}
@@ -783,7 +787,7 @@ export function CreditCardDetailPage() {
         hue={card.color}
         summary={<SummaryChip label="Outstanding" value={fmtMoney(balance, card.currencyCode)} />}
       >
-        <div className="grid-auto" style={gridAutoStyle(300, 12)}>
+        <CreditCardPositionSummary card={card} filters={filters} /><div className="grid-auto" style={gridAutoStyle(300, 12)}>
           <SummaryGroupCard title="Locked billing cycle" hue="var(--loss)" tooltip="The completed billing cycle. New purchases cannot change these bill figures; eligible payments reduce what remains due.">
             {statement ? <>
               <SummaryMetric label="Remaining total due" value={fmtMoney(statement.remainingStatementBalance, card.currencyCode)} tone={statement.remainingStatementBalance > 0 ? 'pill-negative' : 'pill-positive'} large />
@@ -793,7 +797,7 @@ export function CreditCardDetailPage() {
               <SummaryMetric label="Minimum date" value={statement.minDueDate ?? 'Not set'} />
               <SummaryMetric label="Full-payment date" value={statement.dueDate ?? 'Not set'} />
               {markup > 0 && <SummaryMetric label="Markup if carried" value={fmtMoney(markup, card.currencyCode)} tone="pill-negative" />}
-              <SummaryMetric label="Cycle" value={`${statement.cycleStart} → ${statement.cycleEnd}`} />
+              <SummaryMetric label="Cycle" value={<><DateValue value={statement.cycleStart} /> {'\u2192'} <DateValue value={statement.cycleEnd} /></>} />
             </> : <p className="text-muted m-0">Add the last billing date in Card details.</p>}
           </SummaryGroupCard>
           <SummaryGroupCard title="Open billing cycle" hue="var(--accent)" tooltip="Activity accumulating since the last billing cut-off. It belongs to the next bill and does not alter the locked cycle.">
@@ -804,7 +808,7 @@ export function CreditCardDetailPage() {
               <SummaryMetric label="Current outstanding" value={fmtMoney(balance, card.currencyCode)} tone={balance > 0 ? 'pill-negative' : 'pill-positive'} />
               {card.creditLimit ? <SummaryMetric label="Available credit" value={fmtMoney(Math.max(0, card.creditLimit - Math.max(0, balance)), card.currencyCode)} tone="pill-positive" /> : null}
               <SummaryMetric label="Next billing date" value={openCycle.cycleEnd} />
-              <SummaryMetric label="Cycle" value={`${openCycle.cycleStart} → ${openCycle.cycleEnd}`} />
+              <SummaryMetric label="Cycle" value={<><DateValue value={openCycle.cycleStart} /> {'\u2192'} <DateValue value={openCycle.cycleEnd} /></>} />
             </> : <p className="text-muted m-0">Add the last billing date in Card details.</p>}
           </SummaryGroupCard>
         </div>
@@ -827,10 +831,8 @@ export function CreditCardDetailPage() {
                 <Field label="Amount"><AmountInput value={collectAmount} onChange={setCollectAmount} /></Field>
                 <Field label="Date"><TextInput type="date" value={collectDate} onChange={(e) => setCollectDate(e.target.value)} /></Field>
               </div>
-              <label className="text-muted" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
-                <input type="checkbox" checked={linkMode} onChange={(e) => setLinkMode(e.target.checked)} />
-                Link this to a Bank account or Cash (pays it down for real)
-              </label>
+              <ToggleChip checked={linkMode} onChange={next => setLinkMode(next)}  label={<>Link this to a Bank account or Cash (pays it down for real)
+              </>} />
               {linkMode ? (
                 <div className="mt-sm">
                   <LinkedCardPaymentFields card={card} amount={collectAmount} date={collectDate} onLinked={() => { const pendingMinDue = nextPendingMinDue(proposal.amount, collectAmount); updateCard(card.id, { pendingMinDue }); }} />
@@ -845,7 +847,6 @@ export function CreditCardDetailPage() {
 
       <div id="card-plans"><StandardCard title="Plans" hue={card.color} defaultOpen={false}>
           <PlanningHorizonField value={horizonDays} onChange={setHorizonDays} />
-          <CardBalanceProjection card={card} horizonDays={horizonDays} />
           <CardPlanList card={card} horizonDays={horizonDays} />
       </StandardCard></div>
 
@@ -880,9 +881,9 @@ export function CreditCardDetailPage() {
       </div>
 
       {editCardOpen && (
-        <Modal title="Edit credit card" onClose={() => setEditCardOpen(false)}>
+        <EntityEditorModal title="Edit credit card" onClose={() => setEditCardOpen(false)}>
           <CreditCardForm card={card} onSaved={() => setEditCardOpen(false)} />
-        </Modal>
+        </EntityEditorModal>
       )}
       {cardDetailsOpen && <Modal title="Card details" onClose={() => setCardDetailsOpen(false)}>
         <AttributeList items={[
@@ -944,38 +945,6 @@ function CreditCardDetailFab({ card }: { card: CreditCard }) {
 
 function emptyCardPlan(cardId: string): PlannedCreditCardTransaction {
   return { id: '', cardId, date: today(), description: '', amount: 0, kind: 'charge' };
-}
-
-/** Real vs. planned "what's owed" for this ONE card — same idea as Bank's
- * own `BalanceProjectionSummary`, scoped to a single card instead of the
- * whole module, since `PlannedCreditCardTransaction`s are always logged
- * against one specific card, the same way this page itself is already
- * scoped. A HIGHER number is worse here (money owed), the opposite
- * intuition from Bank's own real/planned figures — see
- * `plannedCreditCardProjection`'s own doc comment. */
-function CardBalanceProjection({ card, horizonDays }: { card: CreditCard; horizonDays: PlanningHorizonDays }) {
-  const cards = useCreditCardWorkbookStore((s) => s.workbook.cards);
-  const transactions = useCreditCardWorkbookStore((s) => s.workbook.transactions);
-  const plannedEntries = usePlannedCreditCardWorkbookStore((s) => s.workbook.entries);
-  const projection = useMemo(
-    () => plannedCreditCardProjection(cards, transactions, plannedEntries, new Date(), horizonDays),
-    [cards, transactions, plannedEntries, horizonDays],
-  );
-  const p = projection[card.currencyCode] ?? { real: 0, planned: 0 };
-
-  const plannedChange = p.planned - p.real;
-  return <div className="account-summary-grid mb-md">
-    <SummaryGroupCard title="Current balance" hue={p.real > 0 ? 'var(--loss)' : 'var(--profit)'} tooltip="What is owed now, before any future plan is applied.">
-      <SummaryMetric label="Owed now" value={fmtMoney(p.real, card.currencyCode)} tone={p.real > 0 ? 'pill-negative' : 'pill-positive'} large />
-      {card.creditLimit ? <SummaryMetric label="Available credit" value={fmtMoney(Math.max(0, card.creditLimit - p.real), card.currencyCode)} tone="pill-positive" /> : null}
-      <SummaryMetric label="Projection horizon" value={horizonDays === null ? 'All plans' : `${horizonDays} days`} />
-    </SummaryGroupCard>
-    <SummaryGroupCard title="Expected final balance" hue={plannedChange > 0 ? 'var(--loss)' : 'var(--profit)'} tooltip="What would be owed if every visible plan within the selected period happened.">
-      <SummaryMetric label="Expected owed" value={fmtMoney(p.planned, card.currencyCode)} tone={p.planned > 0 ? 'pill-negative' : 'pill-positive'} large />
-      <SummaryMetric label="Planned change" value={fmtMoney(plannedChange, card.currencyCode)} tone={plannedChange > 0 ? 'pill-negative' : 'pill-positive'} />
-      {card.creditLimit ? <SummaryMetric label="Expected available" value={fmtMoney(Math.max(0, card.creditLimit - p.planned), card.currencyCode)} tone="pill-positive" /> : null}
-    </SummaryGroupCard>
-  </div>;
 }
 
 function AddCardPlanForm({ cardId, onSaved, plan }: { cardId: string; onSaved?: () => void; plan?: PlannedCreditCardTransaction }) {
@@ -1076,7 +1045,7 @@ function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: Pl
           <tbody>
             {sorted.map((p) => (
               <tr key={p.id}>
-                <td>{p.date}</td>
+                <td><DateValue value={p.date} /></td>
                 <td className={p.kind === 'payment' ? 'pill pill-positive' : 'pill pill-negative'} style={{ display: 'inline-block' }}>{KIND_LABELS[p.kind]}</td>
                 <td className="cell-clip" title={p.description}>{p.description}</td>
                 <td>{fmtMoney(p.amount, card.currencyCode)}</td>
@@ -1130,9 +1099,9 @@ function CreditCardsFab() {
   return (
     <>
       {open === 'card' && (
-        <Modal title="Add a credit card" onClose={() => setOpen(null)}>
+        <EntityEditorModal title="Add a credit card" onClose={() => setOpen(null)}>
           <AddCreditCardForm onSaved={() => setOpen(null)} />
-        </Modal>
+        </EntityEditorModal>
       )}
       {open === 'transfer' && <TransactionEntryModal defaultFinance={{ module: 'creditCard' }} onClose={() => setOpen(null)} />}
     </>

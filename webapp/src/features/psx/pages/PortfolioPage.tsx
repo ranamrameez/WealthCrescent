@@ -1,3 +1,4 @@
+import { PageHeading } from '../../../components/PageHeading';
 import { BackButton } from '../../../components/BackButton';
 import { StockPLCharts } from '../../../components/StockPLCharts';
 import { StockTradingChart } from '../../../components/StockTradingChart';
@@ -277,8 +278,7 @@ export function PortfolioPage() {
 
   return (
     <div>
-      <BackButton to="/psx">← PSX</BackButton>
-      <h1 className="pagetitle">PSX Portfolio</h1>
+      <PageHeading back={<BackButton to="/psx">← PSX</BackButton>}><h1 className="pagetitle">PSX Portfolio</h1></PageHeading>
       <p className="pagesub">Open positions and closed trade history.</p>
       <Tabs
         tabs={[

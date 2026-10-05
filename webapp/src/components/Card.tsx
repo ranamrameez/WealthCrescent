@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { useState } from 'react';
+import { Children, isValidElement, useState } from 'react';
 import { useAmountFormat } from '../hooks/useAmountFormat';
 import { fmtMoney } from '../lib/format';
 import { Tooltip } from './Tooltip';
@@ -13,8 +13,11 @@ export function Card({
   className?: string;
   style?: CSSProperties;
 }) {
+  const content = Children.toArray(children);
+  const onlyChild = content.length === 1 && isValidElement(content[0]) ? content[0] : undefined;
+  const redundantWrapper = onlyChild && (onlyChild.type === Card || (typeof onlyChild.type === 'function' && 'cardContainer' in onlyChild.type && onlyChild.type.cardContainer === true));
   return (
-    <div className={`card ${className}`} style={style}>
+    <div className={`${redundantWrapper ? 'card-group' : 'card'} ${className}`} style={style}>
       {children}
     </div>
   );
@@ -95,6 +98,8 @@ export function CollapsibleCard({
     </Card>
   );
 }
+
+CollapsibleCard.cardContainer = true;
 
 /** Sets --card-hue for card backgrounds and labels. Semantic colors such as
  * var(--profit) override the default, which follows the active theme accent. */

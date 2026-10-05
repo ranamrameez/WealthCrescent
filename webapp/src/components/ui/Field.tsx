@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
 import { Tooltip } from '../Tooltip';
 import { CalendarIcon } from '../icons';
-import { formatDate, parseDateInput } from '../../lib/format';
+import { formatDate, parseDateInput, dateInputFormat } from '../../lib/format';
+import { useAppearanceStore } from '../../store/appearanceStore';
 
 /** Labeled form field wrapper — consistent label+control spacing instead of
  * ad-hoc inline styles scattered per page.
@@ -95,6 +96,10 @@ export function Field({ label, children, width = 180, title, required, as = 'lab
 }
 
 export function TextInput({ width, ...rest }: InputHTMLAttributes<HTMLInputElement> & { width?: number }) {
+  if (rest.type==='date') {
+    const {value,onChange,type: _type,...props}=rest;
+    return <DateInput {...props} width={width} value={String(value ?? '')} onChange={event=>onChange?.(event as ChangeEvent<HTMLInputElement>)} />;
+  }
   return <input {...rest} style={{ width, ...rest.style }} />;
 }
 
@@ -116,7 +121,8 @@ export function DateInput({ value, onChange, width, min, max, disabled, ...rest 
   onChange: (event: { target: { value: string } }) => void;
   width?: number;
 }) {
-  const inputFormat = 'DD-MMM-YYYY' as const;
+  const preferredFormat = useAppearanceStore(s=>s.appearance.dateFormat);
+  const inputFormat = dateInputFormat(preferredFormat ?? 'DD-MMM-YYYY');
   const calendarRef = useRef<HTMLInputElement>(null);
   const displayValue = value ? formatDate(value, inputFormat) : '';
   const [draft, setDraft] = useState(displayValue);
@@ -140,7 +146,7 @@ export function DateInput({ value, onChange, width, min, max, disabled, ...rest 
         autoComplete="off"
         value={draft}
         disabled={disabled}
-        placeholder="01-Aug-2026"
+        placeholder={formatDate('2026-08-01', inputFormat)}
         onChange={(event) => {
           setDraft(event.target.value);
           commit(event.target.value);

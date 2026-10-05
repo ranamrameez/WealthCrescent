@@ -125,6 +125,7 @@ export function generateLeaseRentPlans(property: Property, today: Date = new Dat
         category: 'Rent',
         executed: false,
         sourceLeasePropertyId: property.id,
+        finance: property.plannedFinance,
       });
     }
     cursor.setMonth(cursor.getMonth() + 1);

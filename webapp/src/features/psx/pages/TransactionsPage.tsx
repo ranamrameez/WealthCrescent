@@ -1,3 +1,5 @@
+import { DateValue } from '../../../components/DateValue';
+import { PageHeading } from '../../../components/PageHeading';
 import { BackButton } from '../../../components/BackButton';
 import { PageFilters } from '../../../components/PageFilters';
 import { PriceInput } from "../../../components/ui/PriceInput";
@@ -556,7 +558,7 @@ function TransactionList() {
                   </Fragment>
                 ) : (
                   <tr key={i} onClick={() => setDetailTx(tx)} className="clickable">
-                    <td>{tx.date}</td>
+                    <td><DateValue value={tx.date} /></td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <TickerLogo ticker={tx.ticker} size="sm" exchange="psx" /><Link to={`/psx/stock/${tx.ticker}`}>{tx.ticker}</Link>
                       {tx.isPending && (
@@ -909,7 +911,7 @@ function TransfersSection() {
               ) : (
                 <tr key={t.id}>
                   <td>
-                    {t.date}{' '}
+                    <DateValue value={t.date} />{' '}
                     <ReorderButtons
                       rows={sorted}
                       index={i}
@@ -1004,7 +1006,7 @@ function AdjustmentsSection() {
                 </tr>
               ) : (
                 <tr key={i}>
-                  <td>{a.date}</td>
+                  <td><DateValue value={a.date} /></td>
                   <td>{fmtMoney(a.amount, currency)}</td>
                   <td>{a.note}</td>
                   <td>
@@ -1070,7 +1072,7 @@ function CashLedgerSection() {
         <tbody>
           {sorted.map((e, i) => (
             <tr key={i}>
-              <td>{e.date}</td>
+              <td><DateValue value={e.date} /></td>
               <td>{e.kind}</td>
               <td>{e.label}</td>
               <td className={e.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(e.amount, currency)}</td>
@@ -1088,8 +1090,7 @@ function CashLedgerSection() {
 export function TransactionsPage() {
   return (
     <div>
-      <BackButton to="/psx">← PSX</BackButton>
-      <h1 className="pagetitle">PSX Trade Transactions</h1>
+      <PageHeading back={<BackButton to="/psx">← PSX</BackButton>}><h1 className="pagetitle">PSX Trade Transactions</h1></PageHeading>
       {/* User-reported (2026-08-28, real audit after "you're ignoring what's
          asked for") — same fix as QSE's identical structure: the Transfers
          FAB used to live inside the "Cash transfers" tab's own content,

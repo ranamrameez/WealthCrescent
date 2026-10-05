@@ -1,3 +1,4 @@
+import { ToggleChip } from './ui/ToggleChip';
 import type { ScriptableLineSegmentContext } from 'chart.js';
 import { useMemo, useState } from 'react';
 import type { FeeCalculator, PricePoint, Transaction } from '../types/workbook';
@@ -24,7 +25,7 @@ export function StockPLCharts({ transactions, priceHistory, calcFee, method = 'a
     return stockPLHistory(scoped, Object.fromEntries(Object.entries(priceHistory).filter(([ticker]) => tickers.has(ticker))), calcFee, method);
   }, [transactions, priceHistory, calcFee, method, filter]);
   const points = (view === 'entries' ? history.entries : history.daily).filter(p =>
-    (!filter?.fromMonth || p.date.slice(0, 7) >= filter.fromMonth) && (!filter?.toMonth || p.date.slice(0, 7) <= filter.toMonth) && (!dayTradesOnly || p.dayTrade));
+    (!filter?.fromDate || p.date >= filter.fromDate) && (!filter?.toDate || p.date <= filter.toDate) && (!filter?.fromMonth || p.date.slice(0, 7) >= filter.fromMonth) && (!filter?.toMonth || p.date.slice(0, 7) <= filter.toMonth) && (!dayTradesOnly || p.dayTrade));
   const options = { scales: { y: { title: { display: true, text: currency } } }, plugins: { tooltip: { callbacks: {
     label: (item: { dataset: { label?: string }; raw: unknown }) => `${item.dataset.label}: ${fmtMoney(Number(item.raw), currency)}`,
     afterBody: (items: { dataIndex: number }[]) => { const p = points[items[0]?.dataIndex]; return p ? `${p.dayTrade ? 'Buy and sell activity in the same stock on this date. ' : ''}Quote dates: ${[...new Set(p.quoteDates)].join(', ') || 'No open holdings / no quote'}` : ''; },
@@ -35,7 +36,7 @@ export function StockPLCharts({ transactions, priceHistory, calcFee, method = 'a
   return <div>
     <div className="row gap-sm mb-md">
       <label>Profit/loss detail <select aria-label="Profit/loss detail" value={view} onChange={event => setView(event.target.value)}><option value="daily">By date</option><option value="entries">Individual trades</option></select></label>
-      <label><input type="checkbox" checked={dayTradesOnly} onChange={event => setDayTradesOnly(event.target.checked)} /> Buy/sell days only</label>
+      <ToggleChip checked={dayTradesOnly} onChange={next => setDayTradesOnly(next)}  label={<>Buy/sell days only</>} />
     </div>
     <p className="text-muted">Fees included; cost basis: {method}. Bars show changes, lines show lifetime balances at that date. Buy/sell days have both actions in the same stock and may include sales of older holdings.</p>
     <p className="text-muted">Unrealized P/L uses the latest recorded quote on or before each date, with estimated exit fees. Trade effects hold that quote fixed before and after trading. Missing quotes leave gaps; prior quotes are carried forward and listed on hover.</p>

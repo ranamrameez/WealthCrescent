@@ -1,7 +1,12 @@
+import { DateValue } from '../../../components/DateValue';
+import { ToggleChip } from '../../../components/ui/ToggleChip';
+import { QuickEntitySwitch } from '../../../components/QuickEntitySwitch';
+import { PageHeading } from '../../../components/PageHeading';
+import { EntityEditorModal, EntityActions } from '../../../components/EntityEditorModal';
+import { FundsScopeSummary, FundsScopePlans, FundsScopeTransactions, FundsScopeAnalytics } from '../components/FundsScope';
 import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu';
 import { useUrlTransactionFilters } from '../../../hooks/useUrlTransactionFilters';
 import { BackButton } from '../../../components/BackButton';
-import { BalanceSummaryCards } from '../../../components/BalanceSummaryCards';
 import { PageFilters } from '../../../components/PageFilters';
 import { ModuleDetailTemplate } from '../../../components/ModuleDetailTemplate';
 import type { User } from 'firebase/auth';
@@ -10,7 +15,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { EntityScopeMenu, selectedEntityValues } from '../../../components/EntityScopeMenu';
 import { TopBarControls } from '../../../components/TopBarControls';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
-import { Doughnut, Line } from 'react-chartjs-2';
+import { Line } from 'react-chartjs-2';
 import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
 import { Modal } from '../../../components/Modal';
 import { Notice } from '../../../components/Notice';
@@ -34,7 +39,7 @@ import { useLastCurrency } from '../../../hooks/useLastCurrency';
 import { usePrimaryCurrency } from '../../../hooks/usePrimaryCurrency';
 import { getMarketPrice } from '../../../lib/calc';
 import { pendingShareDeltaByTicker } from '../../../lib/calc/positions';
-import { allocationByCategory, balanceUpdateHistory, brokerTotalsByCurrency, contributionVsValueSeries, expectedPLRate, fundCategoryLabel, fundNetProfit, projectInvestmentReturn } from '../../../lib/calc/fundsModule';
+import { balanceUpdateHistory, brokerTotalsByCurrency, contributionVsValueSeries, expectedPLRate, fundCategoryLabel, fundNetProfit, projectInvestmentReturn } from '../../../lib/calc/fundsModule';
 import { CategorySelect } from '../../../components/CategorySelect';
 import { useCategoryStore } from '../../../store/categoryStore';
 import { UNCATEGORIZED_ID } from '../../../lib/categories';
@@ -47,12 +52,11 @@ import {
   type FundSnapshotRow,
 } from '../../../lib/calc/fundsSnapshotImport';
 import { toCSV } from '../../../lib/csv';
-import { getDailyPriceHistory } from '../../../lib/calc/priceHistory';
 import { transferRunningBalance } from '../../../lib/calc/transferBalance';
 import { fmt, fmtMoney, fmtPrice } from '../../../lib/format';
-import { dlDoughnut, dlLine } from '../../../lib/chartLabels';
+import { dlLine } from '../../../lib/chartLabels';
 import { applyChartTheme } from '../../../lib/chartSetup';
-import { cssVar, tickerColor } from '../../../lib/cssVar';
+import { cssVar } from '../../../lib/cssVar';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { ReorderButtons } from '../../../components/ui/ReorderButtons';
 import { dateOnlyMs } from '../../../lib/datetime';
@@ -95,21 +99,9 @@ function AddFundFab() {
   const primaryCurrency = usePrimaryCurrency();
   const workbookDefaultCurrency = useFundsWorkbookStore((s) => s.workbook.settings.defaultCurrency);
   const defaultCurrency = primaryCurrency ?? workbookDefaultCurrency;
-  const workbook = useFundsWorkbookStore((s) => s.workbook);
-  const setWorkbook = useFundsWorkbookStore((s) => s.setWorkbook);
-  const ensureSignedIn = useEnsureSignedIn();
-  const [brokerName, setBrokerName] = useState('');
-  const submitBroker = async () => {
-    if (!brokerName.trim()) return toast('Enter a broker name.');
-    if (!(await ensureSignedIn('Sign in to save a broker.'))) return;
-    setWorkbook({ ...workbook, brokers: [...workbook.brokers, { id: uid(), name: brokerName.trim() }] });
-    toast('Broker added.');
-    setBrokerName('');
-    setOpen(null);
-  };
   return (
     <>
-      <FabPanel
+      <EntityActions
         actions={[
           { label: 'Add a fund', icon: <PlusIcon />, onClick: () => setOpen('fund') },
           { label: 'Transfers', icon: <TransferIcon />, onClick: () => setOpen('transfer') },
@@ -121,21 +113,16 @@ function AddFundFab() {
         ]}
       />
       {open === 'fund' && (
-        <Modal title="Add a fund" onClose={() => setOpen(null)}>
+        <EntityEditorModal title="Add a fund" onClose={() => setOpen(null)}>
           <AddFundForm onSaved={() => setOpen(null)} />
-        </Modal>
+        </EntityEditorModal>
       )}
       {open === 'transfer' && <TransactionEntryModal defaultFinance={{ module: 'funds', currencyCode: defaultCurrency }} onClose={() => setOpen(null)} />}
       {open === 'helper' && <InvestmentHelperModal onClose={() => setOpen(null)} />}
       {open === 'broker' && (
-        <Modal title="Add a broker" onClose={() => setOpen(null)}>
-          <Field label="Broker name" width={220} required>
-            <TextInput value={brokerName} onChange={(e) => setBrokerName(e.target.value)} placeholder="e.g. Al Rajhi Capital" />
-          </Field>
-          <div className="d-flex justify-center mt-md">
-            <button className="btn" onClick={submitBroker}><SaveIcon />Save</button>
-          </div>
-        </Modal>
+        <EntityEditorModal title="Add a broker" onClose={() => setOpen(null)}>
+          <BrokerForm onSaved={() => setOpen(null)} />
+        </EntityEditorModal>
       )}
     </>
   );
@@ -201,27 +188,18 @@ function BrokersList({ onSelect }: { onSelect: (broker: Broker) => void }) {
  * itself already works on this module (Funds never adopted per-record
  * routes the way Banking did). Lists every fund linked to this Broker
  * (reusing `EntityCard`) with an "Add fund" FAB that pre-fills `brokerId`. */
-function BrokerDetail({ broker, onBack, onSelectFund }: { broker: Broker; onBack: () => void; onSelectFund: (fund: Fund) => void }) {
+function BrokerDetail({ broker, onBack, onSelectFund, onSelect }: { broker: Broker; onBack: () => void; onSelect: (broker: Broker) => void; onSelectFund: (fund: Fund) => void }) {
   const workbook = useFundsWorkbookStore((s) => s.workbook);
   const setWorkbook = useFundsWorkbookStore((s) => s.setWorkbook);
   const { positions } = useFundsDerived();
   const ensureSignedIn = useEnsureSignedIn();
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState({ name: broker.name, notes: broker.notes ?? '' });
   const linkedFunds = useMemo(() => workbook.funds.filter((f) => f.brokerId === broker.id), [workbook.funds, broker.id]);
   const totals = useMemo(() => brokerTotalsByCurrency(broker.id, workbook.funds, workbook.transactions, workbook.marketPrices), [broker.id, workbook.funds, workbook.transactions, workbook.marketPrices]);
   const [addOpen, setAddOpen] = useState(false);
 
   const startEdit = () => {
-    setDraft({ name: broker.name, notes: broker.notes ?? '' });
     setEditing(true);
-  };
-  const save = async () => {
-    if (!draft.name.trim()) return toast('Enter a broker name.');
-    if (!(await ensureSignedIn('Sign in to save broker details.'))) return;
-    setWorkbook({ ...workbook, brokers: workbook.brokers.map((b) => (b.id === broker.id ? { ...b, name: draft.name.trim(), notes: draft.notes.trim() || undefined } : b)) });
-    toast('Broker updated.');
-    setEditing(false);
   };
   const remove = async () => {
     if (!(await confirmDialog(`Delete "${broker.name}"? Its funds stay, just no longer grouped under this broker.`))) return;
@@ -235,27 +213,16 @@ function BrokerDetail({ broker, onBack, onSelectFund }: { broker: Broker; onBack
     onBack();
   };
 
+  const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
+  const linkedIds = linkedFunds.map(fund => fund.id);
   return (
-    <ModuleDetailTemplate title={broker.name} backLabel="All funds" onBack={onBack} sections={[{ key: 'summary', label: 'Summary & Details', defaultOpen: true, headerEnd: !editing && (
+    <ModuleDetailTemplate title={broker.name} backLabel="All funds" onBack={onBack} topBarRight={<TopBarControls><QuickEntitySwitch label="Broker" value={broker.id} options={[{value:"",label:"All funds"},...workbook.brokers.map(item=>({value:item.id,label:item.name}))]} onChange={id=>{const next=workbook.brokers.find(item=>item.id===id);next?onSelect(next):onBack();}} /><TransactionFilterMenu value={filters} categories={[]} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls>} sections={[{ key: 'balances', label: 'Account summary', defaultOpen: true, content: <FundsScopeSummary ids={linkedIds} filters={filters} /> }, { key: 'plans', label: 'Plans', content: <FundsScopePlans ids={linkedIds} filters={filters} /> }, { key: 'transactions', label: 'Transactions', content: <FundsScopeTransactions ids={linkedIds} filters={filters} onSelect={id => { const fund = linkedFunds.find(item => item.id === id); if (fund) onSelectFund(fund); }} /> }, { key: 'analytics', label: 'Analytics', content: <FundsScopeAnalytics ids={linkedIds} filters={filters} /> },{ key: 'summary', label: 'Broker details', defaultOpen: true, headerEnd: !editing && (
             <>
               <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={startEdit} />
               <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={remove} />
             </>
           ), content: <>
-        {editing ? (
-          <div>
-            <Field label="Broker name" width={220} required>
-              <TextInput value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-            </Field>
-            <Field label="Notes (optional)" width={220}>
-              <TextInput value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
-            </Field>
-            <div className="row gap-sm mt-sm">
-              <button className="btn" onClick={save}><SaveIcon />Save</button>
-              <button className="btn secondary" onClick={() => setEditing(false)}><XIcon />Cancel</button>
-            </div>
-          </div>
-        ) : (
+        {(
           <div>
             {broker.notes && <p className="text-muted mt-0">{broker.notes}</p>}
             <div className="row" style={{ gap: 16 }}>
@@ -292,7 +259,7 @@ function BrokerDetail({ broker, onBack, onSelectFund }: { broker: Broker; onBack
           })}
         </div>
         {!linkedFunds.length && <p className="text-muted">No funds linked to this broker yet.</p>}
-      </div></> }]}><FabButtonAddFund brokerId={broker.id} open={addOpen} setOpen={setAddOpen} /></ModuleDetailTemplate>
+      </div></> }]} >{editing && <EntityEditorModal title="Edit broker" onClose={() => setEditing(false)}><BrokerForm broker={broker} onSaved={() => setEditing(false)} /></EntityEditorModal>}<FabButtonAddFund brokerId={broker.id} open={addOpen} setOpen={setAddOpen} /></ModuleDetailTemplate>
   );
 }
 
@@ -411,14 +378,14 @@ function InvestmentHelperModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-function AddFundForm({ onSaved, initialBrokerId }: { onSaved?: () => void; initialBrokerId?: string } = {}) {
+function AddFundForm({ onSaved, initialBrokerId, fund }: { onSaved?: () => void; initialBrokerId?: string; fund?: Fund } = {}) {
   const workbook = useFundsWorkbookStore((s) => s.workbook);
   const setWorkbook = useFundsWorkbookStore((s) => s.setWorkbook);
   const addTransaction = useFundsWorkbookStore((s) => s.addTransaction);
   const primaryCurrency = usePrimaryCurrency();
   const [lastCurrency, setLastCurrency] = useLastCurrency('funds', primaryCurrency ?? 'USD');
   const ensureSignedIn = useEnsureSignedIn();
-  const [f, setF] = useState<Fund>(() => emptyFund(lastCurrency, initialBrokerId));
+  const [f, setF] = useState<Fund>(() => fund ? { ...fund } : emptyFund(lastCurrency, initialBrokerId));
   const currencyOptions = useEnabledCurrencies(f.currencyCode);
   const brokers = useFundsWorkbookStore((s) => s.workbook.brokers);
   const visibleBrokers = useMemo(() => brokers.filter((b) => b.isActive !== false), [brokers]);
@@ -430,7 +397,13 @@ function AddFundForm({ onSaved, initialBrokerId }: { onSaved?: () => void; initi
     if (!f.name.trim()) return toast('Enter a fund name.');
     if (!f.code.trim()) return toast('Enter a fund code.');
     if (!(await ensureSignedIn('Sign in to save funds.'))) return;
-    const id = uid();
+    const id = fund?.id ?? uid();
+    if (fund) {
+      const latest = useFundsWorkbookStore.getState().workbook;
+      setWorkbook({ ...latest, funds: latest.funds.map(item => item.id === fund.id ? { ...f, name: f.name.trim(), code: f.code.trim().toUpperCase(), platform: f.platform.trim() } : item) });
+      onSaved?.();
+      return;
+    }
     setWorkbook({ ...workbook, funds: [...workbook.funds, { ...f, id, name: f.name.trim(), code: f.code.trim().toUpperCase(), platform: f.platform.trim() }] });
     if (initialAmount > 0 && initialNav > 0) {
       addTransaction({ date: initialDate, ticker: id, action: 'BUY', shares: initialAmount / initialNav, price: initialNav });
@@ -473,6 +446,7 @@ function AddFundForm({ onSaved, initialBrokerId }: { onSaved?: () => void; initi
           </Field>
         )}
       </div>
+      {!fund && <>
       <p className="text-muted mt-sm">Optional initial investment (leave amount blank to just add the fund with no transactions yet):</p>
       <div className="row gap-sm">
         <Field label="Date">
@@ -485,8 +459,9 @@ function AddFundForm({ onSaved, initialBrokerId }: { onSaved?: () => void; initi
           <TextInput type="number" step="0.0001" value={initialNav || ''} onChange={(e) => setInitialNav(Number(e.target.value))} />
         </Field>
       </div>
+      </>}
       <button className="btn mt-12" onClick={submit}>
-        <PlusIcon />Add fund
+        <PlusIcon />{fund ? "Save fund" : "Add fund"}
       </button>
     </div>
   );
@@ -855,7 +830,8 @@ function SnapshotImportSection() {
 
 /* ============================== Fund detail ============================== */
 
-function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
+function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; onSelect: (item: Fund) => void; onBack: () => void; onSelectBroker: (broker: Broker) => void }) {
+  const switchEntities = useFundsWorkbookStore(s=>s.workbook.funds);
   const { positions, fundXIRR, workbook } = useFundsDerived();
   const setWorkbook = useFundsWorkbookStore((s) => s.setWorkbook);
   const addTransaction = useFundsWorkbookStore((s) => s.addTransaction);
@@ -868,10 +844,7 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
   const categoryRegistry = useCategoryStore((s) => s.workbook.categories);
 
   const [editingFund, setEditingFund] = useState(false);
-  const [editFund, setEditFund] = useState<Fund>(fund);
-  const editFundCurrencyOptions = useEnabledCurrencies(editFund.currencyCode);
-  const brokers = useFundsWorkbookStore((s) => s.workbook.brokers);
-  const visibleEditBrokers = useMemo(() => brokers.filter((b) => b.isActive !== false), [brokers]);
+  const [entryOpen,setEntryOpen]=useState(false);
   const [navInput, setNavInput] = useState('');
   const [balanceInput, setBalanceInput] = useState('');
   const [txAction, setTxAction] = useState<'BUY' | 'SELL'>('BUY');
@@ -1040,11 +1013,6 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
     toast('Statement downloaded.');
   };
 
-  const saveFund = () => {
-    setWorkbook({ ...workbook, funds: workbook.funds.map((f) => (f.id === fund.id ? editFund : f)) });
-    toast('Fund updated.');
-    setEditingFund(false);
-  };
 
   const deleteFund = async () => {
     if (!(await confirmDialog('This deletes the fund and all its transactions.', `Delete fund "${fund.name}"?`))) return;
@@ -1125,34 +1093,8 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
   };
 
   return (
-    <ModuleDetailTemplate title={fund.name} backLabel="All funds" onBack={onBack} topBarRight={<TopBarControls><TransactionFilterMenu value={filters} categories={[]} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls>} sections={[{ key: 'summary', label: 'Account summary', defaultOpen: true, content: <BalanceSummaryCards currency={fund.currencyCode} summary={{ start: fromDate ? contribution.filter(point => point.date < fromDate).at(-1)?.value ?? 0 : 0, current: toDate ? contribution.filter(point => point.date <= toDate).at(-1)?.value ?? 0 : currentValue,
-      inflow: txs.filter(row => !row.t.isPending && row.t.action === 'BUY').reduce((total, row) => total + row.t.shares * row.t.price, 0),
-      outflow: -txs.filter(row => !row.t.isPending && row.t.action === 'SELL').reduce((total, row) => total + row.t.shares * row.t.price, 0),
-      pendingInflow: allTxs.filter(row => row.t.isPending && row.t.action === 'BUY').reduce((total, row) => total + row.t.shares * currentNav, 0),
-      pendingOutflow: -allTxs.filter(row => row.t.isPending && row.t.action === 'SELL').reduce((total, row) => total + row.t.shares * currentNav, 0), plannedInflow: 0, plannedOutflow: 0 }} /> }, { key: 'details', label: 'Fund details', defaultOpen: true, content: <>
-            {editingFund ? (
-              <div>
-                <div className="row gap-sm">
-                  <TextInput value={editFund.name} onChange={(e) => setEditFund({ ...editFund, name: e.target.value })} />
-                  <TextInput value={editFund.code} onChange={(e) => setEditFund({ ...editFund, code: e.target.value.toUpperCase() })} />
-                  <TextInput value={editFund.platform} onChange={(e) => setEditFund({ ...editFund, platform: e.target.value })} />
-                  <CategorySelect value={editFund.categoryID ?? UNCATEGORIZED_ID} onChange={(categoryID) => setEditFund({ ...editFund, categoryID })} />
-                  <Select value={editFund.currencyCode} onChange={(e) => setEditFund({ ...editFund, currencyCode: e.target.value })}>
-                    {editFundCurrencyOptions.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
-                  </Select>
-                  {visibleEditBrokers.length > 0 && (
-                    <Select value={editFund.brokerId ?? ''} onChange={(e) => setEditFund({ ...editFund, brokerId: e.target.value || undefined })}>
-                      <option value="">No broker</option>
-                      {visibleEditBrokers.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                    </Select>
-                  )}
-                </div>
-                <div className="row gap-sm mt-sm">
-                  <IconButton label="Save" icon={<SaveIcon size={13} />} align="right" onClick={saveFund} />
-                  <IconButton label="Cancel" icon={<XIcon size={13} />} align="right" onClick={() => setEditingFund(false)} />
-                </div>
-              </div>
-            ) : (
+    <ModuleDetailTemplate title={fund.name} backLabel="All funds" onBack={onBack} topBarRight={<TopBarControls><QuickEntitySwitch label="Broker" value={fund.brokerId??''} options={[{value:'',label:'All funds'},...workbook.brokers.map(broker=>({value:broker.id,label:broker.name}))]} onChange={id=>{const next=workbook.brokers.find(broker=>broker.id===id);next?onSelectBroker(next):onBack();}} /><QuickEntitySwitch label="Fund" value={fund.id} options={[{value:"",label:"All items"},...switchEntities.filter(item=>item.isActive !== false || item.id===fund.id).map(item=>({value:item.id,label:item.name+' ('+item.currencyCode+')'}))]} onChange={id=>{ const next=switchEntities.find(item=>item.id===id);if(next)onSelect(next);else onBack(); }} /><TransactionFilterMenu value={filters} categories={[]} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls>} sections={[{ key: 'summary', label: 'Account summary', defaultOpen: true, content: <FundsScopeSummary ids={[fund.id]} filters={filters} /> }, { key: 'details', label: 'Fund details', defaultOpen: true, actions: [{ label: 'Edit fund', onClick: () => setEditingFund(true) }], content: <>
+            {(
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1163,7 +1105,7 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
                   <div className="text-muted">{fund.code} · {fund.platform} · {fundCategoryLabel(fund, categoryRegistry)} · {fund.currencyCode}</div>
                 </div>
                 <div className="row gap-sm">
-                  <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => { setEditFund(fund); setEditingFund(true); }} />
+                  <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => { setEditingFund(true); }} />
                   <IconButton
                     label={fund.isActive === false ? 'Reopen' : 'Close'}
                     icon={fund.isActive === false ? <RestoreIcon size={13} /> : <ArchiveIcon size={13} />}
@@ -1219,7 +1161,8 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
                 <div className="value">{plRate ? <>{fmtMoney(plRate.monthlyAmount, fund.currencyCode)} <span style={{ fontSize: 12 }}>({plRate.monthlyPct.toFixed(2)}%)</span></> : '—'}</div>
               </div>
             </div>
-            {/* User-requested (2026-09-03): "add a chart to view periodic
+      </> },
+{ key: 'analytics', label: 'Analytics', content: <>            {/* User-requested (2026-09-03): "add a chart to view periodic
                 growth with balance & PL indications over time." */}
             <div className="mt-12">
               <ChartCard title="Growth over time" empty={!contribution.length}>
@@ -1234,8 +1177,8 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
                   options={{ plugins: { datalabels: dlLine((v) => fmtMoney(v, fund.currencyCode)) } }}
                 />
               </ChartCard>
-            </div>
-      </> },
+            </div></> },
+{ key: 'plans', label: 'Plans', content: <FundsScopePlans ids={[fund.id]} filters={filters} /> },
 { key: 'entry', label: 'Add transaction', defaultOpen: true,  content: <><h3>Add transaction</h3>
 <div className="row" style={{ gap: 8, marginBottom: 16 }}>
         <Field label="Action">
@@ -1298,10 +1241,8 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
           onTimezoneChange={setTxTimezone}
         />
         <Field label="Order">
-          <label className="text-muted" style={{ display: 'flex', alignItems: 'center', gap: 6 }} title="Placed but not yet settled — excluded from your units/value until it clears.">
-            <input type="checkbox" checked={txPending} onChange={(e) => setTxPending(e.target.checked)} />
-            Pending
-          </label>
+          <ToggleChip checked={txPending} onChange={next => setTxPending(next)}  label={<>Pending
+          </>} />
         </Field>
         <button className="btn" onClick={submitTx}><PlusIcon />Add</button>
       </div></> },
@@ -1374,7 +1315,7 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
               ) : (
                 <tr key={i} onClick={() => setDetailTx(t)} className="clickable">
                   <td>
-                    {t.date}
+                    <DateValue value={t.date} />
                     {t.isPending && (
                       <Tooltip text="Order placed but not yet settled — excluded from units/value until cleared.">
                         <span className="pill-warn ml-6">Pending</span>
@@ -1478,7 +1419,7 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
             </div>
           </>
         )}
-      </> }]}>{detailTx && (
+      </> }]} >{editingFund && <EntityEditorModal title="Edit fund" onClose={() => setEditingFund(false)}><AddFundForm fund={fund} onSaved={() => setEditingFund(false)} /></EntityEditorModal>}{detailTx && (
         <RecordDetailModal
           title={detailTx.action === 'BUY' ? 'Invested' : 'Withdrew'}
           onClose={() => setDetailTx(null)}
@@ -1493,7 +1434,7 @@ function FundDetail({ fund, onBack }: { fund: Fund; onBack: () => void }) {
             { label: 'Status', value: detailTx.isPending ? 'Pending (not yet settled)' : 'Cleared' },
           ]}
         />
-      )}</ModuleDetailTemplate>
+      )}<EntityActions actions={[{label:"Add transaction",onClick:()=>setEntryOpen(true)},{label:"Edit fund",onClick:()=>setEditingFund(true)}]} />{entryOpen && <TransactionEntryModal defaultFinance={{module:"funds",ref:fund.id,currencyCode:fund.currencyCode}} onClose={()=>setEntryOpen(false)} />}</ModuleDetailTemplate>
   );
 }
 
@@ -1635,7 +1576,7 @@ function FundsTransfersSection() {
               ) : (
                 <tr key={t.id}>
                   <td>
-                    {t.date}{' '}
+                    <DateValue value={t.date} />{' '}
                     <ReorderButtons
                       rows={sorted}
                       index={i}
@@ -1677,105 +1618,14 @@ function FundsTransfersSection() {
 
 /* ============================== Analytics ============================== */
 
-function AnalyticsTab({ selectedIds }: { selectedIds?: string[] } = {}) {
-  const allFunds = useFundsWorkbookStore((s) => s.workbook.funds);
-  const funds = useMemo(() => allFunds.filter((fund) => !selectedIds || selectedIds.includes(fund.id)), [allFunds, selectedIds]);
-  const { workbook } = useFundsDerived();
-  const categoryRegistry = useCategoryStore((s) => s.workbook.categories);
-  // Charts read CSS-var-derived colors — subscribe so this re-renders (and
-  // recomputes those colors) on a live theme switch, same pattern as every
-  // other chart-bearing page in this app.
-  useAppearanceStore((s) => s.appearance);
-  applyChartTheme();
 
-  const currencies = useMemo(() => [...new Set(funds.map((f) => f.currencyCode))].sort(), [funds]);
-  const [currency, setCurrency] = useState(currencies[0] ?? 'USD');
-  const effectiveCurrency = currencies.includes(currency) ? currency : (currencies[0] ?? currency);
-
-  const [fundId, setFundId] = useState(funds[0]?.id ?? '');
-  const selectedFund = funds.find((f) => f.id === fundId) ?? funds[0] ?? null;
-
-  const allocation = useMemo(
-    () => allocationByCategory(funds, workbook.transactions, workbook.marketPrices, effectiveCurrency, categoryRegistry),
-    [funds, workbook.transactions, workbook.marketPrices, effectiveCurrency, categoryRegistry],
-  );
-  const categories = Object.keys(allocation);
-
-  const navHistory = useMemo(
-    () => (selectedFund ? getDailyPriceHistory(selectedFund.id, workbook.priceHistory) : []),
-    [selectedFund, workbook.priceHistory],
-  );
-  const contribution = useMemo(
-    () => (selectedFund ? contributionVsValueSeries(selectedFund.id, workbook.transactions, workbook.priceHistory) : []),
-    [selectedFund, workbook.transactions, workbook.priceHistory],
-  );
-
-  if (!funds.length) {
-    return <p className="text-muted">Add a fund first (Funds tab) to see charts here.</p>;
-  }
-
-  return (
-    <div>
-      <div className="row gap-sm">
-        {(!selectedIds || selectedIds.length !== 1) && currencies.length > 1 && (
-          <Field label="Currency" width={120}>
-            <Select value={effectiveCurrency} onChange={(e) => setCurrency(e.target.value)}>
-              {currencies.map((c) => <option key={c} value={c}>{c}</option>)}
-            </Select>
-          </Field>
-        )}
-        {(!selectedIds || selectedIds.length !== 1) && <Field label="Fund" width={220}>
-          <Select value={selectedFund?.id ?? ''} onChange={(e) => setFundId(e.target.value)}>
-            {funds.map((f) => <option key={f.id} value={f.id}>{f.name} ({f.code})</option>)}
-          </Select>
-        </Field>}
-      </div>
-      <div className="grid-auto" style={{ ...gridAutoStyle(320, 16), marginTop: 12 }}>
-        <ChartCard title="Allocation by category" empty={!categories.length}>
-          <Doughnut
-            data={{
-              labels: categories,
-              datasets: [{ data: categories.map((c) => allocation[c]), backgroundColor: categories.map((c) => tickerColor(c)) }],
-            }}
-            options={{ cutout: '55%', plugins: { datalabels: dlDoughnut((v) => fmtMoney(v, effectiveCurrency)) } }}
-          />
-        </ChartCard>
-        {selectedFund && (
-          <>
-            <ChartCard title={`NAV over time — ${selectedFund.code}`} empty={!navHistory.length}>
-              <Line
-                data={{
-                  labels: navHistory.map((p) => p.date),
-                  datasets: [{ label: 'NAV', data: navHistory.map((p) => p.price), borderColor: '#5aa9c9', backgroundColor: '#5aa9c933', fill: true, tension: 0.2 }],
-                }}
-                options={{ plugins: { legend: { display: false }, datalabels: dlLine((v) => fmtPrice(v)) } }}
-              />
-            </ChartCard>
-            <ChartCard title={`Contribution vs. value — ${selectedFund.code}`} empty={!contribution.length}>
-              <Line
-                data={{
-                  labels: contribution.map((c) => c.date),
-                  datasets: [
-                    { label: 'Invested', data: contribution.map((c) => c.invested), borderColor: cssVar('--warn') || '#e8a23d', backgroundColor: 'transparent', tension: 0.2 },
-                    { label: 'Value', data: contribution.map((c) => c.value), borderColor: cssVar('--profit') || '#3ecf8e', backgroundColor: 'transparent', tension: 0.2 },
-                  ],
-                }}
-                options={{ plugins: { datalabels: dlLine((v) => fmtMoney(v, selectedFund.currencyCode)) } }}
-              />
-            </ChartCard>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ============================== Settings ============================== */
-
-// User-reported (2026-08-27, then again 2026-08-28): duplicated the global
-// /account hub's own Sync status section — dropped the status text/heading
-// here, same fix already applied app-wide (see BankPage.tsx for the
-// fullest write-up).
+// User-requested (2026-09-16): "No need of settings in individual modules!"
+// — Default currency and JSON export/import were per-module settings
+// duplicating two already-unified hubs: currency is now driven app-wide by
+// the Account page's Primary/Secondary/Other ranking (`usePrimaryCurrency`),
+// and export/import lives at `/app-data` (Done item 177). Only "Clear all
+// data" stays here — a real, destructive, module-scoped action `/app-data`
+// has no equivalent for.
 function AccountSection({
   cloudEmpty,
   uploadLocalToCloud,
@@ -1819,13 +1669,7 @@ function AccountSection({
   );
 }
 
-// User-requested (2026-09-16): "No need of settings in individual modules!"
-// — Default currency and JSON export/import were per-module settings
-// duplicating two already-unified hubs: currency is now driven app-wide by
-// the Account page's Primary/Secondary/Other ranking (`usePrimaryCurrency`),
-// and export/import lives at `/app-data` (Done item 177). Only "Clear all
-// data" stays here — a real, destructive, module-scoped action `/app-data`
-// has no equivalent for.
+
 function DataManagement() {
   const setWorkbook = useFundsWorkbookStore((s) => s.setWorkbook);
 
@@ -1867,27 +1711,32 @@ export function FundsPage({
   const liveSelectedBroker = selectedBroker ? brokers.find((b) => b.id === selectedBroker.id) ?? null : null;
   const [params] = useSearchParams();
   const selectedIds = selectedEntityValues(params, funds.map((fund) => fund.id));
-  usePageTopBarRightSlot(!liveSelected && !liveSelectedBroker && funds.length ? <TopBarControls><EntityScopeMenu label="Funds" options={funds.map((fund) => ({ value: fund.id, label: fund.name }))} /></TopBarControls> : null);
+  const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
+  usePageTopBarRightSlot(!liveSelected && !liveSelectedBroker && (funds.length || brokers.length) ? <TopBarControls><QuickEntitySwitch label="Broker" value="" options={[{value:"",label:"All brokers"},...brokers.map(broker=>({value:broker.id,label:broker.name}))]} onChange={id=>{const next=brokers.find(broker=>broker.id===id);if(next)setSelectedBroker(next);}} /><QuickEntitySwitch label="Fund" value="" options={[{value:"",label:"All funds"},...funds.map(fund=>({value:fund.id,label:fund.name}))]} onChange={id=>{ const next=funds.find(item=>item.id===id);if(next)setSelected(next); }} /><EntityScopeMenu label="Funds" options={funds.map((fund) => ({ value: fund.id, label: fund.name }))} /><TransactionFilterMenu value={filters} categories={[]} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls> : null);
 
   return (
     <div>
-      {!liveSelected && !liveSelectedBroker && <BackButton to="/net-worth">← Overview</BackButton>}
-      <h1 className="pagetitle">Funds</h1>
+      {!liveSelected && !liveSelectedBroker && <>
+      <PageHeading back={<BackButton to="/net-worth">Overview</BackButton>}><h1 className="pagetitle">Funds</h1></PageHeading>
+      <AddFundFab />
       <p className="text-muted mb-12">
         Mutual fund unit holdings and performance — buy/sell units at a NAV per unit, same shape as a stock
         trade. Returns are shown as XIRR, which accounts for when each investment happened, not just totals.
       </p>
+      </>}
       {liveSelected ? (
-        <FundDetail fund={liveSelected} onBack={() => setSelected(null)} />
+        <FundDetail onSelectBroker={broker=>{setSelected(null);setSelectedBroker(broker);}} key={liveSelected.id} onSelect={setSelected} fund={liveSelected} onBack={() => setSelected(null)} />
       ) : liveSelectedBroker ? (
-        <BrokerDetail
+        <BrokerDetail key={liveSelectedBroker.id} onSelect={setSelectedBroker}
           broker={liveSelectedBroker}
           onBack={() => setSelectedBroker(null)}
           onSelectFund={(f) => { setSelectedBroker(null); setSelected(f); }}
         />
       ) : (
         <StandardPageSections sections={[
-            { key: 'summary', label: 'Summary', content: <OverallSummary selectedIds={selectedIds} /> },
+            { key: 'summary', label: 'Summary', content: <div className="stack-lg"><FundsScopeSummary ids={selectedIds} filters={filters} /><OverallSummary selectedIds={selectedIds} /></div> },
+            { key: 'plans', label: 'Plans', content: <FundsScopePlans ids={selectedIds} filters={filters} /> },
+            { key: 'transactions', label: 'Transactions', content: <FundsScopeTransactions ids={selectedIds} filters={filters} onSelect={id => setSelected(funds.find(fund => fund.id === id) ?? null)} /> },
             {
               key: 'funds',
               label: 'Funds',
@@ -1896,7 +1745,7 @@ export function FundsPage({
 
                   <BrokersList onSelect={setSelectedBroker} />
                   <FundList onSelect={setSelected} selectedIds={selectedIds} />
-                  <AddFundFab />
+
                 </div>
               ),
             },
@@ -1905,10 +1754,7 @@ export function FundsPage({
             {
               key: 'analytics',
               label: 'Analytics',
-              content: <div className="stack-lg">{selectedIds.map((id) => {
-                const fund = funds.find((item) => item.id === id);
-                return <Card key={id}><h3 className="mt-0">{fund?.name ?? 'Fund'}</h3><AnalyticsTab selectedIds={[id]} /></Card>;
-              })}</div>,
+              content: <FundsScopeAnalytics ids={selectedIds} filters={filters} />,
             },
             {
               key: 'settings',
@@ -1929,4 +1775,18 @@ export function FundsPage({
       )}
     </div>
   );
+}
+
+function BrokerForm({ broker, onSaved }: { broker?: Broker; onSaved: () => void }) {
+  const [draft,setDraft] = useState({name:broker?.name ?? '',notes:broker?.notes ?? ''});
+  const ensureSignedIn = useEnsureSignedIn();
+  const save = async () => {
+    if (!draft.name.trim()) return toast('Enter a broker name.');
+    if (!(await ensureSignedIn('Sign in to save broker details.'))) return;
+    const store=useFundsWorkbookStore.getState();
+    const normalized={...broker,id:broker?.id ?? uid(),name:draft.name.trim(),notes:draft.notes.trim() || undefined};
+    store.setWorkbook({...store.workbook,brokers:broker ? store.workbook.brokers.map(item=>item.id===broker.id ? normalized : item) : [...store.workbook.brokers,normalized]});
+    onSaved();
+  };
+  return <><Field label="Broker name" required><TextInput value={draft.name} onChange={event=>setDraft({...draft,name:event.target.value})} /></Field><Field label="Notes (optional)"><TextInput value={draft.notes} onChange={event=>setDraft({...draft,notes:event.target.value})} /></Field><button className="btn" onClick={()=>void save()}>Save broker</button></>;
 }

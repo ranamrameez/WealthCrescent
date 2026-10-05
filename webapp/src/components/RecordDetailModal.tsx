@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Fragment } from 'react';
 import { Modal } from './Modal';
+import { DateValue } from './DateValue';
 
 export interface DetailField {
   label: string;
@@ -25,7 +26,7 @@ export function RecordDetailModal({ title, fields, onClose }: { title: string; f
         {fields.map((f, i) => (
           <Fragment key={i}>
             <div className="text-muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{f.label}</div>
-            <div style={{ wordBreak: 'break-word' }}>{f.value}</div>
+            <div style={{ wordBreak: 'break-word' }}>{typeof f.value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(f.value) ? <DateValue value={f.value} /> : f.value}</div>
           </Fragment>
         ))}
       </div>

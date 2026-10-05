@@ -1,4 +1,4 @@
-import { prepareBatch, validBatchDate, type BatchChange, type RowErrors } from '../components/batchEditModel';
+import { prepareBatch, validBatchDate, type BatchMutations, type BatchChange, type RowErrors } from '../components/batchEditModel';
 import { useBankWorkbookStore } from '../store/bankWorkbookStore';
 import { useCashWorkbookStore } from '../store/cashWorkbookStore';
 import type { CashEntry } from '../types/cashWorkbook';
@@ -35,26 +35,26 @@ export function validateFinanceBatch(row: { date: string; amount: number; time?:
   if (row.categoryID && !useCategoryStore.getState().workbook.categories.some(category => category.id === row.categoryID)) errors.categoryID = 'Choose an existing category.';
   return errors;
 }
-const transactionFields = ['date', 'time', 'timezone', 'description', 'amount', 'categoryID', 'isPending'] as const;
+const transactionFields = ['date', 'time', 'timezone', 'description', 'amount', 'categoryID', 'isPending', 'serialNumber'] as const;
 const planFields = ['date', 'description', 'amount', 'categoryID'] as const;
 
-export function saveCashBatch(currencyCode: string, changes: BatchChange<CashEntry>[]) {
+export function saveCashBatch(currencyCode: string, changes: BatchChange<CashEntry>[], mutations?: BatchMutations<CashEntry>) {
   const state = useCashWorkbookStore.getState();
   const entries = prepareBatch(state.workbook.entries, changes,
-    ['date', 'time', 'timezone', 'note', 'amount', 'isDeposit', 'categoryID', 'isPending'],
+    ['date', 'time', 'timezone', 'note', 'amount', 'isDeposit', 'categoryID', 'isPending', 'serialNumber'],
     row => validateFinanceBatch(row, false),
-    row => row.currencyCode !== currencyCode ? 'Currency cannot be changed.' : linkedBatchReason('cash', row.id));
+    row => row.currencyCode !== currencyCode ? 'Currency cannot be changed.' : linkedBatchReason('cash', row.id), mutations);
   state.setWorkbook({ ...state.workbook, entries });
 }
 
-export function saveRentalBatch(property: Property, changes: BatchChange<RentalEntry>[]) {
+export function saveRentalBatch(property: Property, changes: BatchChange<RentalEntry>[], mutations?: BatchMutations<RentalEntry>) {
   const state = useRentalsWorkbookStore.getState();
   const current = state.workbook.settings.properties.find(row => row.id === property.id);
   if (!current || current.currencyCode !== property.currencyCode) throw new Error('Property changed or was removed. Discard and reopen the editor.');
   const entries = prepareBatch(state.workbook.entries, changes,
     ['date', 'time', 'timezone', 'note', 'amount', 'isDeposit', 'categoryID', 'isPending'],
     row => validateFinanceBatch(row, false),
-    row => row.propertyId !== property.id ? 'Property cannot be changed.' : linkedBatchReason('rentals', row.id));
+    row => row.propertyId !== property.id ? 'Property cannot be changed.' : linkedBatchReason('rentals', row.id), mutations);
   state.setWorkbook({ ...state.workbook, entries });
 }
 
@@ -67,31 +67,31 @@ function assertLoan(expected: PersonalLoan) {
   if (!current || current.currencyCode !== expected.currencyCode || current.direction !== expected.direction) throw new Error('Loan changed or was removed. Discard and reopen the editor.');
 }
 
-export function saveBankBatch(account: BankAccount, changes: BatchChange<BankTransaction>[]) {
+export function saveBankBatch(account: BankAccount, changes: BatchChange<BankTransaction>[], mutations?: BatchMutations<BankTransaction>) {
   assertAccount(account);
   const state = useBankWorkbookStore.getState();
   const transactions = prepareBatch(state.workbook.transactions, changes, transactionFields,
-    row => validateFinanceBatch(row, true), row => row.accountId !== account.id ? 'Account cannot be changed.' : linkedBatchReason('bank', row.id));
+    row => validateFinanceBatch(row, true), row => row.accountId !== account.id ? 'Account cannot be changed.' : linkedBatchReason('bank', row.id), mutations);
   state.setWorkbook({ ...state.workbook, transactions });
 }
-export function saveBankPlanBatch(account: BankAccount, changes: BatchChange<PlannedBankTransaction>[]) {
+export function saveBankPlanBatch(account: BankAccount, changes: BatchChange<PlannedBankTransaction>[], mutations?: BatchMutations<PlannedBankTransaction>) {
   assertAccount(account);
   const state = usePlannedBankWorkbookStore.getState();
   const entries = prepareBatch(state.workbook.entries, changes, ['date', 'description', 'amount', 'category'],
-    row => validateFinanceBatch(row, true), row => row.accountId !== account.id ? 'Account cannot be changed.' : bankPlanBatchReason(row));
+    row => validateFinanceBatch(row, true), row => row.accountId !== account.id ? 'Account cannot be changed.' : bankPlanBatchReason(row), mutations);
   state.setWorkbook({ ...state.workbook, entries });
 }
-export function saveLoanPaymentBatch(loan: PersonalLoan, changes: BatchChange<PersonalLoanRepayment>[]) {
+export function saveLoanPaymentBatch(loan: PersonalLoan, changes: BatchChange<PersonalLoanRepayment>[], mutations?: BatchMutations<PersonalLoanRepayment>) {
   assertLoan(loan);
   const state = usePersonalLoansWorkbookStore.getState();
-  const repayments = prepareBatch(state.workbook.repayments, changes, transactionFields,
-    row => validateFinanceBatch(row, false), row => row.loanId !== loan.id ? 'Loan cannot be changed.' : linkedBatchReason('personalLoans', row.id));
+  const repayments = prepareBatch(state.workbook.repayments, changes, ['date', 'time', 'timezone', 'description', 'amount', 'categoryID', 'isPending', 'seq'],
+    row => validateFinanceBatch(row, false), row => row.loanId !== loan.id ? 'Loan cannot be changed.' : linkedBatchReason('personalLoans', row.id), mutations);
   state.setWorkbook({ ...state.workbook, repayments });
 }
-export function saveLoanPlanBatch(loan: PersonalLoan, changes: BatchChange<PersonalLoanPlan>[]) {
+export function saveLoanPlanBatch(loan: PersonalLoan, changes: BatchChange<PersonalLoanPlan>[], mutations?: BatchMutations<PersonalLoanPlan>) {
   assertLoan(loan);
   const state = usePersonalLoansWorkbookStore.getState();
   const plans = prepareBatch(state.workbook.plans ?? [], changes, planFields,
-    row => validateFinanceBatch(row, false), row => row.loanId !== loan.id ? 'Loan cannot be changed.' : row.executed ? 'Executed plan: read-only.' : undefined);
+    row => validateFinanceBatch(row, false), row => row.loanId !== loan.id ? 'Loan cannot be changed.' : row.executed ? 'Executed plan: read-only.' : undefined, mutations);
   state.setWorkbook({ ...state.workbook, plans });
 }

@@ -1,3 +1,7 @@
+import { ToggleChip } from '../../../components/ui/ToggleChip';
+import { FinancePlanEditor } from '../../../components/FinancePlanEditor';
+import { EntityEditorModal } from '../../../components/EntityEditorModal';
+import { PageHeading } from '../../../components/PageHeading';
 import { BalanceSummaryCards } from '../../../components/BalanceSummaryCards';
 import { planOccurrences, occurrenceCompleted } from '../../../lib/calc/planOccurrences';
 import { BackButton } from '../../../components/BackButton';
@@ -49,7 +53,7 @@ import { categoryName, UNCATEGORIZED_ID } from '../../../lib/categories';
 import { useCategoryStore } from '../../../store/categoryStore';
 import { accountBalance, accountPendingBalance, accountRunningLedger, bankAnalyticsFromLedger, bankTotalsByCurrency, budgetVsActual } from '../../../lib/calc/bankModule';
 import { outstandingBalanceByCard } from '../../../lib/calc/creditCardModule';
-import { plannedBankProjection, type PlanningHorizonDays } from '../../../lib/calc/plannedBalance';
+import { type PlanningHorizonDays } from '../../../lib/calc/plannedBalance';
 import { dlBarV, dlDoughnut } from '../../../lib/chartLabels';
 import { applyChartTheme } from '../../../lib/chartSetup';
 import { cssVar, tickerColor } from '../../../lib/cssVar';
@@ -262,15 +266,15 @@ function AccountsFab() {
   return (
     <>
       {open === 'account' && (
-        <Modal title="Add an account" onClose={() => setOpen(null)}>
+        <EntityEditorModal title="Add an account" onClose={() => setOpen(null)}>
           <AddAccountForm onSaved={() => setOpen(null)} />
-        </Modal>
+        </EntityEditorModal>
       )}
       {open === 'transfer' && <TransactionEntryModal onClose={() => setOpen(null)} />}
       {open === 'bank' && (
-        <Modal title="Add a bank" onClose={() => setOpen(null)}>
+        <EntityEditorModal title="Add a bank" onClose={() => setOpen(null)}>
           <BankForm onSaved={() => setOpen(null)} />
-        </Modal>
+        </EntityEditorModal>
       )}
     </>
   );
@@ -599,6 +603,7 @@ export function BankDetailPage() {
             .map((item) => ({ value: item.id, label: item.name })),
         ]}
       />
+      <TopBarSelect label="Account" className="account-switch-select" value="" options={[{value:"",label:"All accounts"},...accountOptions]} onChange={event=>{if(event.target.value)navigate(`/bank/account/${event.target.value}${location.search}`);}} />
       <TransactionFilterMenu
         value={filters}
         categories={categoryOptions}
@@ -742,21 +747,21 @@ export function BankDetailPage() {
 
   return (
     <div className="standard-page">
-      <BackButton to="/bank">← Back to Banking</BackButton>
+      <PageHeading back={<BackButton to="/bank">← Back to Banking</BackButton>}><h1 className="pagetitle">{bank.name}</h1></PageHeading>
       <StandardPageSections key={bank.id} defaultKey="summary" sections={sections} />
       <FabPanel actions={[
         { label: 'Add an account', icon: <ListIcon />, onClick: () => setAddAccountOpen(true) },
         { label: 'Transfers', icon: <TransferIcon />, onClick: () => setTransferOpen(true) },
       ]} />
       {bankModalOpen && (
-        <Modal title="Edit bank" onClose={() => setBankModalOpen(false)}>
+        <EntityEditorModal title="Edit bank" onClose={() => setBankModalOpen(false)}>
           <BankForm bank={bank} onSaved={() => setBankModalOpen(false)} />
-        </Modal>
+        </EntityEditorModal>
       )}
       {addAccountOpen && (
-        <Modal title="Add an account" onClose={() => setAddAccountOpen(false)}>
+        <EntityEditorModal title="Add an account" onClose={() => setAddAccountOpen(false)}>
           <AddAccountForm initialBankId={bank.id} onSaved={() => setAddAccountOpen(false)} />
-        </Modal>
+        </EntityEditorModal>
       )}
       {transferOpen && (
         <TransactionEntryModal defaultFinance={transferDefault} onClose={() => setTransferOpen(false)} />
@@ -972,11 +977,11 @@ export function AccountDetailPage() {
         value={account.id}
         onChange={(event) => {
           setEditAccountOpen(false);
-          navigate(`/bank/account/${event.target.value}${location.search}`);
+          navigate(event.target.value ? `/bank/account/${event.target.value}${location.search}` : `/bank${location.search}`);
         }}
-        options={accounts
+        options={[{value:"",label:"All accounts"},...accounts
           .filter((item) => !item.migratedToCreditCardId && (item.isActive !== false || item.id === account.id))
-          .map((item) => ({ value: item.id, label: `${accountDisplayName(item)} (${item.currencyCode})` }))}
+          .map((item) => ({ value: item.id, label: `${accountDisplayName(item)} (${item.currencyCode})` }))]}
       />
       <TransactionFilterMenu
         value={filters}
@@ -1131,7 +1136,7 @@ export function AccountDetailPage() {
         { label: 'Import transactions', onClick: () => window.dispatchEvent(new Event('bank:open-import')) },
         { label: 'Export filtered', onClick: exportTransactions, disabled: !filteredLedger.length },
         { label: 'Export all', onClick: exportAllTransactions, disabled: !allLedger.length },
-        { label: 'Batch edit', disabled: !filteredLedger.length || !!account.migratedToCreditCardId, onClick: () => setBatchEditor('transactions') },
+        { label: 'Batch edit', disabled: !!account.migratedToCreditCardId, onClick: () => setBatchEditor('transactions') },
         { label: showTransactionActions ? 'Done modifying' : 'Modify', icon: <EditIcon size={14} />, onClick: () => setShowTransactionActions((value) => !value) },
       ],
       headerEnd: showTransactionActions ? <IconButton label="Hide modification options" icon={<XIcon size={13} />} align="right" onClick={() => setShowTransactionActions(false)} /> : undefined,
@@ -1152,24 +1157,17 @@ export function AccountDetailPage() {
 
   return (
     <div className="standard-page">
-      <div className="page-heading">
-        <div>
-          <BackButton to="/bank">← Back to Banking</BackButton>
-          <div className="page-heading-title-row"><h1 className="pagetitle m-0">{accountDisplayName(account)}</h1>{account.isActive === false && <span className="pill-warn fs-11">Closed</span>}</div>
-        </div>
-      </div>
+      <PageHeading back={<BackButton to="/bank">All banks</BackButton>}><h1 className="pagetitle m-0">{accountDisplayName(account)}{account.isActive === false && <span className="pill-warn fs-11">Closed</span>}</h1></PageHeading>
       {account.migratedToCreditCardId && <Notice tone="info" className="mb-md">This account was migrated to a real Credit Card record — its transactions and balance now live there.{' '}<Link to={`/bank/card/${account.migratedToCreditCardId}`}>View the Credit Card →</Link></Notice>}
       <StandardPageSections key={`sections:${account.id}`} sections={sections} defaultKey="summary" />
       {batchEditor === 'transactions' && <BankTransactionsBatchEditor key={`batch-transactions:${account.id}`} account={account} rows={[...filteredLedger].reverse().map(row => row.tx)} onClose={() => setBatchEditor(null)} />}
       {batchEditor === 'plans' && <BankPlansBatchEditor key={`batch-plans:${account.id}`} account={account} rows={plannedEntries.filter(plan => plan.accountId === account.id && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).sort((a, b) => a.date.localeCompare(b.date))} onClose={() => setBatchEditor(null)} />}
       {editAccountOpen && (
-        <Modal title="Edit account" onClose={() => setEditAccountOpen(false)}>
+        <EntityEditorModal title="Edit account" onClose={() => setEditAccountOpen(false)}>
           <AddAccountForm account={account} onSaved={() => setEditAccountOpen(false)} />
-        </Modal>
+        </EntityEditorModal>
       )}
-      {addingPlan && <Modal title="Add a plan" onClose={() => setAddingPlan(false)}>
-        <AddBankPlanForm accountId={account.id} onSaved={() => setAddingPlan(false)} />
-      </Modal>}
+      {addingPlan && <FinancePlanEditor initialFinance={{ module: "bank", ref: account.id, currencyCode: account.currencyCode }} onClose={() => setAddingPlan(false)} />}
       <AccountTransfersFab accountId={account.id} currencyCode={account.currencyCode} />
       {showScrollTop && <button type="button" className="scroll-top-button" aria-label="Scroll to top" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}><ArrowUpIcon size={16} /></button>}
     </div>
@@ -1481,7 +1479,7 @@ function bankPlanMatchesFilters(plan: PlannedBankTransaction, filters: BankingFi
     && (filters.direction === 'all' || (filters.direction === 'in' ? plan.amount >= 0 : plan.amount < 0));
 }
 
-function BankingScopeSummary({ accounts, filters }: { accounts: BankAccount[]; filters: BankingFilters }) {
+export function BankingScopeSummary({ accounts, filters, plansOverride, includeCards = true }: { accounts: BankAccount[]; filters: BankingFilters; plansOverride?: PlannedBankTransaction[]; includeCards?: boolean }) {
   const transactions = useBankWorkbookStore((state) => state.workbook.transactions);
   const creditCards = useCreditCardWorkbookStore((state) => state.workbook.cards);
   const creditCardTransactions = useCreditCardWorkbookStore((state) => state.workbook.transactions);
@@ -1493,8 +1491,8 @@ function BankingScopeSummary({ accounts, filters }: { accounts: BankAccount[]; f
   );
   const accountIds = useMemo(() => new Set(scopedAccounts.map((account) => account.id)), [scopedAccounts]);
   const rows = transactions.filter((tx) => accountIds.has(tx.accountId) && transactionMatchesFilters(tx, filters, categories));
-  const visiblePlans = planOccurrences(plans, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters)).filter((plan) => accountIds.has(plan.accountId) && !plan.executed && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate));
-  const scopedCards = filters.accountId === 'all' ? creditCards.filter((card) => card.isActive !== false) : [];
+  const visiblePlans = planOccurrences(plansOverride ?? plans, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters)).filter((plan) => accountIds.has(plan.accountId) && !plan.executed && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate));
+  const scopedCards = includeCards && filters.accountId === 'all' ? creditCards.filter((card) => card.isActive !== false) : [];
   const currencies = [...new Set([...scopedAccounts.map((account) => account.currencyCode), ...scopedCards.map((card) => card.currencyCode)])].sort();
   if (!currencies.length) return <p className="text-muted m-0">No accounts or credit cards in this scope yet.</p>;
   return <div className="stack-lg">{currencies.map((currency) => {
@@ -1714,7 +1712,7 @@ function ImportStatementSection({ account, compact = false }: { account: BankAcc
             <Field label="Date column" width={180}><Select value={dateCol} onChange={(e) => setDateCol(e.target.value)}>{headers.map((h) => <option key={h} value={h}>{h}</option>)}</Select></Field>
             <Field label="Description column" width={220}><Select value={descCol} onChange={(e) => setDescCol(e.target.value)}>{headers.map((h) => <option key={h} value={h}>{h}</option>)}</Select></Field>
             <Field label="Amount column" width={180}><Select value={amountCol} onChange={(e) => setAmountCol(e.target.value)}>{headers.map((h) => <option key={h} value={h}>{h}</option>)}</Select></Field>
-            <label className="text-muted" style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 20 }}><input type="checkbox" checked={flipSign} onChange={(e) => setFlipSign(e.target.checked)} />Flip sign</label>
+            <ToggleChip checked={flipSign} onChange={next => setFlipSign(next)}  label={<>Flip sign</>} />
           </div>
           <div className="grid-auto mt-md" style={gridAutoStyle(150, 8)}>
             <div className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">CSV rows</div><strong>{rows.length}</strong></div>
@@ -1824,56 +1822,6 @@ function emptyBankPlan(accountId: string): PlannedBankTransaction {
   return { id: crypto.randomUUID(), accountId, date: today(), description: '', amount: 0, category: '' };
 }
 
-function BalanceProjectionSummary({ horizonDays }: { horizonDays: PlanningHorizonDays }) {
-  const accounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
-  const transactions = useBankWorkbookStore((s) => s.workbook.transactions);
-  const plannedEntries = usePlannedBankWorkbookStore((s) => s.workbook.entries);
-  const settings = usePlannedBankWorkbookStore((s) => s.workbook.settings);
-  const updateSettings = usePlannedBankWorkbookStore((s) => s.updateSettings);
-  const projections = useMemo(() => accounts.map((account) => ({ account, projection: plannedBankProjection([account], transactions.filter((tx) => tx.accountId === account.id), plannedEntries.filter((plan) => plan.accountId === account.id), new Date(), horizonDays) })), [accounts, transactions, plannedEntries, horizonDays]);
-
-  return (
-    <CollapsibleCard
-      title={
-        <Tooltip text="See what your total balance would look like if every plan due within the chosen time period actually happened — a reality check before you spend.">
-          <h3 style={{ margin: 0, cursor: 'pointer' }}>Balance projection</h3>
-        </Tooltip>
-      }
-      className="mb-md"
-    >
-      <div className="row" style={{ gap: 16, marginBottom: 12 }}>
-        <label className="text-muted flex-center-gap4">
-          <input type="checkbox" checked={settings.showRealBalance} onChange={(e) => updateSettings({ showRealBalance: e.target.checked })} />
-          Real balance
-        </label>
-        <label className="text-muted flex-center-gap4">
-          <input type="checkbox" checked={settings.showPlannedBalance} onChange={(e) => updateSettings({ showPlannedBalance: e.target.checked })} />
-          Planned balance
-        </label>
-      </div>
-      {!projections.length ? (
-        <p className="text-muted">No balance yet — add an account or a plan below.</p>
-      ) : (
-        <div className="grid-auto" style={gridAutoStyle(180, 8)}>
-          {projections.flatMap(({ account, projection }) => Object.keys(projection).map((code) => (
-            <div key={`${account.id}:${code}`} className="stat-card card" style={{ borderTop: `3px solid ${account.color ?? 'var(--accent)'}` }}>
-              <div className="label">{accountDisplayName(account)} · {code}</div>
-              {settings.showRealBalance && (
-                <div className={projection[code].real >= 0 ? 'pill-positive' : 'pill-negative'}>Real: {fmtMoney(projection[code].real, code)}</div>
-              )}
-              {settings.showPlannedBalance && (
-                <div className={projection[code].planned >= 0 ? 'pill-positive' : 'pill-negative'}>
-                  Planned: {fmtMoney(projection[code].planned, code)}
-                </div>
-              )}
-            </div>
-          )))}
-        </div>
-      )}
-    </CollapsibleCard>
-  );
-}
-
 /** README item 86 (2026-08-26 feedback): "Add a plan" shouldn't be
  * permanently visible either — same FAB+popup treatment as "Add a loan"
  * (Done item 166) and "Add an account" above.
@@ -1890,9 +1838,7 @@ function AddBankPlanFab({ accountId }: { accountId: string }) {
   return (
     <>
       {open && (
-        <Modal title="Add a plan" onClose={() => setOpen(false)}>
-          <AddBankPlanForm accountId={accountId} onSaved={() => setOpen(false)} />
-        </Modal>
+        <FinancePlanEditor initialFinance={{ module: "bank", ref: accountId }} onClose={() => setOpen(false)} />
       )}
     </>
   );
@@ -2056,9 +2002,7 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
         </table>
       </div>
       {editingPlan && (
-        <Modal title="Edit plan" onClose={() => setEditingPlan(null)}>
-          <AddBankPlanForm accountId={account.id} plan={editingPlan} onSaved={() => setEditingPlan(null)} />
-        </Modal>
+        <FinancePlanEditor reference={{ module: "bank", id: editingPlan.id }} onClose={() => setEditingPlan(null)} />
       )}
     </div>
   );
@@ -2230,8 +2174,10 @@ function AnalyticsTab({ bankId, filters }: { bankId?: string; filters: BankingFi
 
 export function PlanningTab({
   plannedCloudEmpty,
+  showFab = true,
   uploadPlannedLocalToCloud,
 }: {
+  showFab?: boolean;
   plannedSyncStatus?: string;
   plannedCloudEmpty: boolean;
   uploadPlannedLocalToCloud: () => Promise<void>;
@@ -2250,8 +2196,7 @@ export function PlanningTab({
   return (
     <div>
       <PlanningHorizonField value={horizonDays} onChange={setHorizonDays} />
-      <BalanceProjectionSummary horizonDays={horizonDays} />
-      <div className="standard-section-stack">{accounts.map((account) => <div key={account.id} className="mt-12"><h3>{accountDisplayName(account)} <span className="text-muted">({account.currencyCode})</span></h3><BankPlanList account={account} horizonDays={horizonDays} /><AddBankPlanFab accountId={account.id} /></div>)}</div>
+      <div className="standard-section-stack">{accounts.map((account) => <div key={account.id} className="mt-12"><h3>{accountDisplayName(account)} <span className="text-muted">({account.currencyCode})</span></h3><BankPlanList account={account} horizonDays={horizonDays} />{showFab && <AddBankPlanFab accountId={account.id} />}</div>)}</div>
       <PlanningAccountSection cloudEmpty={plannedCloudEmpty} uploadLocalToCloud={uploadPlannedLocalToCloud} />
     </div>
   );
@@ -2296,6 +2241,7 @@ export function BankPage({
   plannedCreditCardCloudEmpty: boolean;
   uploadPlannedCreditCardLocalToCloud: () => Promise<void>;
 }) {
+  const navigate = useNavigate();
   const actionsByKey = useFabActionsStore((s) => s.actionsByKey);
   const fabActions = useMemo(() => {
     const seen = new Set<string>();
@@ -2341,6 +2287,8 @@ export function BankPage({
 
   const topBarFilters = useMemo(() => (
     <TopBarControls>
+      <TopBarSelect label="Bank" className="account-switch-select" value="" options={[{value:"",label:"All banks"},...banks.map(bank=>({value:bank.id,label:bank.name}))]} onChange={event=>{if(event.target.value)navigate(`/bank/bank/${event.target.value}`);}} />
+      <TopBarSelect label="Account" className="account-switch-select" value="" options={[{value:"",label:"All accounts"},...accountOptions]} onChange={event=>{if(event.target.value)navigate(`/bank/account/${event.target.value}`);}} />
       <TransactionFilterMenu
         value={filters}
         categories={categoryOptions}
@@ -2350,7 +2298,7 @@ export function BankPage({
         onClear={resetFilters}
       />
     </TopBarControls>
-  ), [filters, categoryOptions, accountOptions, activeCount, setFilters, resetFilters]);
+  ), [filters, categoryOptions, accountOptions, activeCount, setFilters, resetFilters, banks, navigate]);
   usePageTopBarRightSlot(topBarFilters);
 
   const bankActions: StandardCardAction[] = archivedBankCount
@@ -2437,8 +2385,7 @@ export function BankPage({
 
   return (
     <div className="standard-page">
-      <BackButton to="/net-worth">← Overview</BackButton>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}><BackButton to="/net-worth">← Overview</BackButton>
         <h1 className="pagetitle m-0">Banking</h1>
         <Tooltip text="Bank account balances and transaction history, entered manually or imported from a CSV statement — no live bank connection (see Disclaimer & Privacy for why)." />
       </div>

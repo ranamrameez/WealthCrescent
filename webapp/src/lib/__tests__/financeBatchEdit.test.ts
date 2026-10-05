@@ -17,11 +17,31 @@ beforeEach(() => {
   links.getState().setWorkbook({ settings: {}, entries: [] });
 });
 describe('finance batch commits', () => {
+  it('atomically creates, deletes and reorders records within an account', () => {
+    const [first, second] = structuredClone(bank.getState().workbook.transactions);
+    const added = { ...tx, id: 'new', source: 'manual' as const, serialNumber: 6 };
+    const listener = vi.fn(); const stop = bank.subscribe(listener);
+    saveBankBatch(account, [{ before: second, after: { ...second, serialNumber: 4 } }], { added: [added], deleted: [first] });
+    stop();
+    expect(listener).toHaveBeenCalledOnce();
+    expect(bank.getState().workbook.transactions.map(row => row.id)).toEqual(['tx2', 'new']);
+    expect(bank.getState().workbook.transactions[0].serialNumber).toBe(4);
+  });
+  it('rejects deletion conflicts, linked deletions and out-of-scope creation', () => {
+    const before = structuredClone(bank.getState().workbook.transactions[0]);
+    expect(() => saveBankBatch(account, [], { added: [{ ...tx, id: 'new', accountId: 'other' }], deleted: [] })).toThrow('Account cannot');
+    bank.getState().updateTransaction(before.id, { amount: -90 });
+    expect(() => saveBankBatch(account, [], { added: [], deleted: [before] })).toThrow('deleted record changed');
+    const current = bank.getState().workbook.transactions[0];
+    links.getState().addEntry({ id: 'link', from: { module: 'bank', ref: account.id }, to: { module: 'personalLoans', ref: loan.id }, fromRecordId: current.id, toRecordId: 'payment', fromAmount: 90, toAmount: 90, date: current.date });
+    expect(() => saveBankBatch(account, [], { added: [], deleted: [current] })).toThrow('Linked transfer');
+    expect(bank.getState().workbook.transactions).toHaveLength(2);
+  });
   it('commits bank changes once, derives direction, and preserves identity, provenance and entity preferences', () => {
     const before = structuredClone(bank.getState().workbook.transactions[0]);
     const listener = vi.fn();
     const stop = bank.subscribe(listener);
-    saveBankBatch(account, [{ before, after: { ...before, amount: 50, isPending: true, accountId: 'wrong', source: 'manual', serialNumber: 999 } }]);
+    saveBankBatch(account, [{ before, after: { ...before, amount: 50, isPending: true, accountId: 'wrong', source: 'manual' } }]);
     stop();
     expect(listener).toHaveBeenCalledOnce();
     expect(bank.getState().workbook.transactions[0]).toEqual({ ...before, amount: 50, isDeposit: true, isPending: true });

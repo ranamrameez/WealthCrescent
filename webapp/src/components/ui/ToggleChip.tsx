@@ -1,4 +1,5 @@
 import { CheckIcon } from '../icons';
+import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
 /** A small chip-style toggle for any boolean choice — user-requested
  * (2026-09-14): "Use chips/switch for radio & checkboxes." Generalizes
@@ -12,15 +13,17 @@ export function ToggleChip({
   onChange,
   label,
   title,
+  ...props
 }: {
   checked: boolean;
   onChange: (next: boolean) => void;
-  label: string;
+  label: ReactNode;
   title?: string;
-}) {
+} & Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onChange'>) {
   return (
     <div className="chip-tabs" style={{ alignSelf: 'flex-start' }}>
       <button
+        {...props}
         type="button"
         className={`chip${checked ? ' active' : ''}`}
         onClick={() => onChange(!checked)}

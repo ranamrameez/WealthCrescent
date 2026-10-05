@@ -20,7 +20,7 @@ export type CategoryKey = 'netWorth' | 'stocks' | 'funds' | 'bank' | 'cash' | 'p
 // Transfers page/route/nav entry is gone, replaced by an app-wide
 // "Transfers" FAB (`components/ui/Fab.tsx`'s `FabPanel`) reachable from
 // every module page.
-const CATEGORIES: { key: CategoryKey; label: string; to: string; icon: ReactNode }[] = [
+export const CATEGORIES: { key: CategoryKey; label: string; to: string; icon: ReactNode }[] = [
   { key: 'netWorth', label: 'Dashboard', to: '/net-worth', icon: <DashboardIcon /> },
   { key: 'stocks', label: 'Stock Exchanges', to: '/qse', icon: <StocksIcon /> },
   { key: 'funds', label: 'Funds', to: '/funds', icon: <FundsIcon /> },

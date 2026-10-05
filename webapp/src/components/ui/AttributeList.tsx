@@ -1,3 +1,4 @@
+import { DateValue } from '../DateValue';
 import type { ReactNode } from 'react';
 import { gridAutoStyle } from '../../lib/gridStyle';
 
@@ -20,7 +21,7 @@ export function AttributeList({ items }: { items: { label: string; value: ReactN
           <div className="text-muted" style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 2 }}>
             {i.label}
           </div>
-          <div>{i.value}</div>
+          <div>{typeof i.value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(i.value) ? <DateValue value={i.value} /> : i.value}</div>
         </div>
       ))}
     </div>

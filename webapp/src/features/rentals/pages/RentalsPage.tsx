@@ -1,10 +1,19 @@
+import { DateValue } from '../../../components/DateValue';
+import { ToggleChip } from '../../../components/ui/ToggleChip';
+import { QuickEntitySwitch } from '../../../components/QuickEntitySwitch';
+import { fulfillRentalPlan } from '../../../lib/rentalPlanFulfillment';
+import { FinancePlanEditor } from '../../../components/FinancePlanEditor';
+import { PlanEditorModal } from '../../../components/PlanEditorModal';
+import { EntityEditorModal, EntityActions } from '../../../components/EntityEditorModal';
+import { PageHeading } from '../../../components/PageHeading';
+import { PageFilters } from '../../../components/PageFilters';
 import { BackButton } from '../../../components/BackButton';
 import type { User } from 'firebase/auth';
 import { BalanceSummaryCards } from '../../../components/BalanceSummaryCards';
 import { RentalPlanEditor } from './RentalPlanEditor';
 import type { PlannedRentalEntry } from '../../../types/plannedRentals';
 import { useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { EntityScopeMenu, selectedEntityValues } from '../../../components/EntityScopeMenu';
 import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu';
 import { TopBarControls } from '../../../components/TopBarControls';
@@ -13,10 +22,8 @@ import { useUrlTransactionFilters, type TransactionPageFilters } from '../../../
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
 import { Notice } from '../../../components/Notice';
-import { hueStyle } from '../../../lib/statCardHues';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { ArchiveIcon, CheckIcon, EditIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon } from '../../../components/icons';
-import { Modal } from '../../../components/Modal';
 import { StandardPageSections } from '../../../components/StandardPageSections';
 import { toast } from '../../../components/Toast';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
@@ -34,7 +41,7 @@ import { usePrimaryCurrency } from '../../../hooks/usePrimaryCurrency';
 import { useSortableRows } from '../../../hooks/useSortableRows';
 import { categoryName, RENT_CATEGORY_ID, UNCATEGORIZED_ID } from '../../../lib/categories';
 import { useCategoryStore } from '../../../store/categoryStore';
-import { netIncomeByCurrency, netIncomeByProperty, netIncomePendingByCurrency, propertyByCategory, propertyMonthlyRollup, propertyNetIncome } from '../../../lib/calc/rentalsModule';
+import { netIncomeByProperty, propertyByCategory, propertyMonthlyRollup, propertyNetIncome } from '../../../lib/calc/rentalsModule';
 import { generateLeaseRentPlans, nextPendingBalance, proposeRentCollection } from '../../../lib/calc/rentalPlanning';
 import { parseCSV, toCSV } from '../../../lib/csv';
 import { fmtMoney, formatDate } from '../../../lib/format';
@@ -60,26 +67,29 @@ import { ChartCard } from '../../qse/components/ChartCard';
 import { gridAutoStyle } from '../../../lib/gridStyle';
 const uid = () => crypto.randomUUID();
 
-function RentalAccountSummary({ property, entries, visible, filters }: { property: Property; entries: RentalEntry[]; visible: RentalEntry[]; filters: TransactionPageFilters }) {
-  const plans = usePlannedRentalsWorkbookStore((state) => state.workbook.entries);
-  const signed = (entry: RentalEntry) => entry.isDeposit ? entry.amount : -entry.amount;
-  const history = entries.filter(entry => entry.propertyId === property.id && !entry.isPending);
-  const rows = visible.filter(entry => entry.propertyId === property.id);
-  const total = (pending: boolean, deposit: boolean) => rows.filter(entry => !!entry.isPending === pending && entry.isDeposit === deposit).reduce((sum, entry) => sum + signed(entry), 0);
-  const upcoming = plans.filter(plan => plan.propertyId === property.id && !plan.executed && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate))
-    .filter(plan => filters.category === 'all' || plan.category === filters.category)
-    .filter(plan => filters.direction === 'all' || (filters.direction === 'in' ? plan.type === 'RENT_INCOME' : plan.type === 'EXPENSE'))
-    .filter(() => filters.source !== 'statement-import');
-  return <div><h3>{property.name}</h3><BalanceSummaryCards currency={property.currencyCode} summary={{
-    start: history.filter(entry => filters.fromDate && entry.date < filters.fromDate).reduce((sum, entry) => sum + signed(entry), 0),
-    current: history.filter(entry => !filters.toDate || entry.date <= filters.toDate).reduce((sum, entry) => sum + signed(entry), 0),
-    inflow: total(false, true), outflow: total(false, false), pendingInflow: total(true, true), pendingOutflow: total(true, false),
-    plannedInflow: upcoming.filter(plan => plan.type === 'RENT_INCOME').reduce((sum, plan) => sum + plan.amount, 0),
-    plannedOutflow: -upcoming.filter(plan => plan.type === 'EXPENSE').reduce((sum, plan) => sum + plan.amount, 0),
-  }} /></div>;
+export function RentalAccountSummary({ properties, entries, visible, filters, plansOverride }: { properties: Property[]; entries: RentalEntry[]; visible: RentalEntry[]; filters: TransactionPageFilters; plansOverride?: PlannedRentalEntry[] }) {
+  const plans = usePlannedRentalsWorkbookStore(state => state.workbook.entries);
+  return <div className="stack-lg">{[...new Set(properties.map(p => p.currencyCode))].sort().map(currency => {
+    const ids = new Set(properties.filter(p => p.currencyCode === currency).map(p => p.id));
+    const signed = (entry: RentalEntry) => entry.isDeposit ? entry.amount : -entry.amount;
+    const history = entries.filter(entry => ids.has(entry.propertyId) && !entry.isPending);
+    const rows = visible.filter(entry => ids.has(entry.propertyId));
+    const total = (pending: boolean, deposit: boolean) => rows.filter(entry => !!entry.isPending === pending && entry.isDeposit === deposit).reduce((sum, entry) => sum + signed(entry), 0);
+    const upcoming = (plansOverride ?? plans).filter(plan => ids.has(plan.propertyId) && !plan.executed && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate))
+      .filter(plan => filters.category === 'all' || plan.category === filters.category)
+      .filter(plan => filters.direction === 'all' || (filters.direction === 'in' ? plan.type === 'RENT_INCOME' : plan.type === 'EXPENSE'))
+      .filter(() => filters.source !== 'statement-import');
+    return <div key={currency}><h3>{currency}</h3><BalanceSummaryCards kind="rentals" currency={currency} summary={{
+      start: history.filter(entry => filters.fromDate && entry.date < filters.fromDate).reduce((sum, entry) => sum + signed(entry), 0),
+      current: history.filter(entry => !filters.toDate || entry.date <= filters.toDate).reduce((sum, entry) => sum + signed(entry), 0),
+      inflow: total(false, true), outflow: total(false, false), pendingInflow: total(true, true), pendingOutflow: total(true, false),
+      plannedInflow: upcoming.filter(plan => plan.type === 'RENT_INCOME').reduce((sum, plan) => sum + plan.amount, 0),
+      plannedOutflow: -upcoming.filter(plan => plan.type === 'EXPENSE').reduce((sum, plan) => sum + plan.amount, 0),
+    }} /></div>;
+  })}</div>;
 }
 
-function filterRentalEntries(entries: RentalEntry[], filters: TransactionPageFilters, categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories']) {
+export function filterRentalEntries(entries: RentalEntry[], filters: TransactionPageFilters, categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories']) {
   return entries.filter((entry) => {
     if (filters.fromDate && entry.date < filters.fromDate) return false;
     if (filters.toDate && entry.date > filters.toDate) return false;
@@ -96,38 +106,6 @@ function emptyProperty(defaultCurrency: string): Property {
 }
 
 /* ============================== Properties ============================== */
-
-function NetIncomeSummary({ selectedIds, entries: suppliedEntries }: { selectedIds?: string[]; entries?: RentalEntry[] } = {}) {
-  const properties = useRentalsWorkbookStore((s) => s.workbook.settings.properties);
-  const storedEntries = useRentalsWorkbookStore((s) => s.workbook.entries);
-  const entries = suppliedEntries ?? storedEntries;
-  const scopedProperties = selectedIds ? properties.filter((property) => selectedIds.includes(property.id)) : properties;
-  const totals = netIncomeByCurrency(scopedProperties, entries);
-  const pending = netIncomePendingByCurrency(scopedProperties, entries);
-  const codes = [...new Set(scopedProperties.map((property) => property.currencyCode))].sort();
-  if (!codes.length) return null;
-
-  return (
-    <div className="grid-auto" style={{ ...gridAutoStyle(150, 8), marginBottom: 16 }}>
-      {codes.map((code) => {
-        const realPending = pending[code] ?? 0;
-        return (
-          <div key={code} className="stat-card card" style={hueStyle(totals[code] >= 0 ? 'var(--profit)' : 'var(--loss)')}>
-            <div className="label">Net income ({code})</div>
-            <MoneyValue n={totals[code]} currency={code} />
-            {/* User-requested (2026-09-08): don't just exclude pending money
-               from the headline figure — show it too. */}
-            {realPending !== 0 && (
-              <div className="sub">
-                {realPending > 0 ? '+' : ''}{fmtMoney(realPending, code)} pending → {fmtMoney(totals[code] + realPending, code)} incl. pending
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 /** Floating "add a property" button (user feedback 2026-08-27: adding an
  * entity isn't a routine task, use FABs — same pattern already established
@@ -147,16 +125,16 @@ function AddPropertyFab() {
   const [open, setOpen] = useState<'property' | 'transfer' | null>(null);
   return (
     <>
-      <FabPanel
+      <EntityActions
         actions={[
           { label: 'Add a property', icon: <PlusIcon />, onClick: () => setOpen('property') },
           { label: 'Transfers', icon: <TransferIcon />, onClick: () => setOpen('transfer') },
         ]}
       />
       {open === 'property' && (
-        <Modal title="Add a property" onClose={() => setOpen(null)}>
+        <EntityEditorModal title="Add a property" onClose={() => setOpen(null)}>
           <AddPropertyForm onSaved={() => setOpen(null)} />
-        </Modal>
+        </EntityEditorModal>
       )}
       {open === 'transfer' && <TransactionEntryModal defaultFinance={{ module: 'rentals' }} onClose={() => setOpen(null)} />}
     </>
@@ -172,7 +150,6 @@ export function AddPropertyForm({ onSaved, initialCurrency }: { onSaved?: (id: s
   const [lastCurrency, setLastCurrency] = useLastCurrency('rentals', primaryCurrency ?? 'USD');
   const ensureSignedIn = useEnsureSignedIn();
   const [p, setP] = useState(() => emptyProperty(initialCurrency ?? lastCurrency));
-  const currencyOptions = useEnabledCurrencies(p.currencyCode);
 
   const submit = async () => {
     if (!p.name.trim()) return toast('Enter a property name.');
@@ -186,19 +163,7 @@ export function AddPropertyForm({ onSaved, initialCurrency }: { onSaved?: (id: s
 
   return (
     <div>
-      <div className="row gap-sm">
-        <Field label="Property name" width={180} required>
-          <TextInput value={p.name} onChange={(e) => setP({ ...p, name: e.target.value })} placeholder="e.g. Apartment 4B" />
-        </Field>
-        <Field label="Currency" width={100} required>
-          <Select value={p.currencyCode} onChange={(e) => { setP({ ...p, currencyCode: e.target.value }); setLastCurrency(e.target.value); }}>
-            {currencyOptions.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
-          </Select>
-        </Field>
-        <Field label="Purchase price (optional)" width={160}>
-          <TextInput type="number" step="0.01" value={p.purchasePrice ?? ''} onChange={(e) => setP({ ...p, purchasePrice: e.target.value === '' ? undefined : Number(e.target.value) })} />
-        </Field>
-      </div>
+      <PropertyFormFields property={p} onChange={next => { setP(next); setLastCurrency(next.currencyCode); }} />
       <button className="btn mt-12" onClick={submit}>
         <PlusIcon />Add property
       </button>
@@ -233,6 +198,7 @@ function PropertiesList({ selectedIds }: { selectedIds?: string[] } = {}) {
   // Pending item 115(c): Sr# = the property's own stable position in the
   // underlying (unfiltered) array, creation order — same convention as
   // Bank/Personal Loans/EMI/Funds.
+  const navigate = useNavigate();
   const srNumOf = useMemo(() => new Map(allProperties.map((p, i) => [p.id, i + 1])), [allProperties]);
 
   // User-requested (2026-09-03): "add isActive flag to all modules where
@@ -277,7 +243,7 @@ function PropertiesList({ selectedIds }: { selectedIds?: string[] } = {}) {
                 statLabel="Net income (all time)"
                 stat={<MoneyValue n={netIncome} currency={p.currencyCode} />}
                 hue={netIncome >= 0 ? 'var(--profit)' : 'var(--loss)'}
-                onClick={() => setDetailProperty(p)}
+                onClick={() => navigate(`/rentals/${encodeURIComponent(p.id)}`)}
                 actions={
                   <>
                     <IconButton
@@ -394,7 +360,6 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
   const plannedEntries = usePlannedRentalsWorkbookStore((s) => s.workbook.entries);
   const addPlannedEntries = usePlannedRentalsWorkbookStore((s) => s.addEntries);
   const deletePlannedEntry = usePlannedRentalsWorkbookStore((s) => s.deleteEntry);
-  const updatePlannedEntry = usePlannedRentalsWorkbookStore((s) => s.updateEntry);
   const propertyPlans = plannedEntries
     .filter((p) => p.propertyId === property.id)
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -444,7 +409,6 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
     toast(pendingRentBalance ? `Logged — ${fmtMoney(pendingRentBalance, property.currencyCode)} still pending, carried to next cycle.` : 'Logged to the ledger.');
   };
 
-  const currencyOptions = useEnabledCurrencies(lease.currencyCode);
 
   const saveLease = async () => {
     if (!(await ensureSignedIn('Sign in to save property details.'))) return;
@@ -476,13 +440,13 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
     const ok = await confirmDialog(`Add this ${fmtMoney(plan.amount, property.currencyCode)} ${plan.type === 'RENT_INCOME' ? 'rent income' : 'expense'} to the ledger?`, 'Mark as done?');
     if (!ok) return;
     if (!(await ensureSignedIn('Sign in to record this transaction.'))) return;
-    addRentalEntry({ id: crypto.randomUUID(), propertyId: plan.propertyId, date: plan.date, isDeposit: plan.type === 'RENT_INCOME', amount: plan.amount, category: plan.category });
-    updatePlannedEntry(planId, { executed: true });
+    const error=fulfillRentalPlan(planId);
+    if (error) return toast(error);
     toast('Logged to the ledger.');
   };
 
   return (
-    <Modal title={property.name} onClose={onClose}>
+    <EntityEditorModal title={`Edit property: ${property.name}`} onClose={onClose}>
       {/* Pending item 114/README item 271-272's own precedent: an entity's
          "Often" tier detail view must show/edit EVERY attribute, not just
          the module-specific ones — Name/Currency/Purchase price used to be
@@ -491,88 +455,7 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
          EntityCard grid (2026-09-09). Reuses the SAME `lease` state (already
          the full Property object) and `saveLease` handler, since these
          fields save identically to every lease/tenant field below. */}
-      <h4 style={{ margin: '0 0 8px' }}>Property details</h4>
-      <div className="row gap-sm mb-sm">
-        <Field label="Name">
-          <TextInput value={lease.name} onChange={(e) => setLease({ ...lease, name: e.target.value })} />
-        </Field>
-        <Field label="Currency">
-          <Select value={lease.currencyCode} onChange={(e) => setLease({ ...lease, currencyCode: e.target.value })}>
-            {currencyOptions.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
-          </Select>
-        </Field>
-        <Field label="Purchase price (optional)">
-          <TextInput type="number" step="0.01" value={lease.purchasePrice ?? ''} onChange={(e) => setLease({ ...lease, purchasePrice: e.target.value === '' ? undefined : Number(e.target.value) })} />
-        </Field>
-      </div>
-      <h4 style={{ margin: '0 0 8px' }}>Lease &amp; tenant details</h4>
-      <div className="row gap-sm mb-sm">
-        <Field label="Monthly rent">
-          <TextInput type="number" step="0.01" value={lease.monthlyRent ?? ''} onChange={(e) => setLease({ ...lease, monthlyRent: e.target.value === '' ? undefined : Number(e.target.value) })} />
-        </Field>
-        <Field label="Cycle start day (1-31)">
-          <TextInput type="number" min={1} max={31} value={lease.cycleStartDay ?? ''} onChange={(e) => setLease({ ...lease, cycleStartDay: e.target.value === '' ? undefined : Number(e.target.value) })} />
-        </Field>
-        <Field label="Lease start">
-          <TextInput type="date" value={lease.leaseStartDate ?? ''} onChange={(e) => setLease({ ...lease, leaseStartDate: e.target.value || undefined })} />
-        </Field>
-        <Field label="Lease end (optional)">
-          <TextInput type="date" value={lease.leaseEndDate ?? ''} onChange={(e) => setLease({ ...lease, leaseEndDate: e.target.value || undefined })} />
-        </Field>
-      </div>
-      <div className="row gap-sm mb-sm">
-        <Field
-          label="Collection cycle (optional)"
-          title="Opts this property into the separate rent-collection proposal below — pick how often rent is actually collected."
-        >
-          <Select value={lease.collectionCycle ?? ''} onChange={(e) => setLease({ ...lease, collectionCycle: (e.target.value || undefined) as Property['collectionCycle'] })}>
-            <option value="">— Not set —</option>
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-            <option value="annual">Annual</option>
-          </Select>
-        </Field>
-        <Field
-          label="Last collection date"
-          title="When rent was last actually collected — the next proposal below is computed one cycle forward from this date (falls back to Lease start if left blank)."
-        >
-          <TextInput type="date" value={lease.lastCollectionDate ?? ''} onChange={(e) => setLease({ ...lease, lastCollectionDate: e.target.value || undefined })} />
-        </Field>
-      </div>
-      <div className="row gap-sm mb-sm">
-        <Field label="Tenant name">
-          <TextInput value={lease.tenantName ?? ''} onChange={(e) => setLease({ ...lease, tenantName: e.target.value })} />
-        </Field>
-        <Field label="Tenant contact">
-          <TextInput value={lease.tenantContact ?? ''} onChange={(e) => setLease({ ...lease, tenantContact: e.target.value })} />
-        </Field>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--muted)' }}>
-          <input type="checkbox" checked={!!lease.utilitiesIncluded} onChange={(e) => setLease({ ...lease, utilitiesIncluded: e.target.checked })} />
-          Utilities included in rent
-        </label>
-      </div>
-      <div className="row" style={{ gap: 8, marginBottom: 12 }}>
-        <Field label="Security deposit">
-          <TextInput type="number" step="0.01" value={lease.securityDeposit ?? ''} onChange={(e) => setLease({ ...lease, securityDeposit: e.target.value === '' ? undefined : Number(e.target.value) })} />
-        </Field>
-        <Field label="Deposit type">
-          <Select value={lease.securityDepositType ?? ''} onChange={(e) => setLease({ ...lease, securityDepositType: (e.target.value || undefined) as Property['securityDepositType'] })}>
-            <option value="">—</option>
-            <option value="cash">Cash</option>
-            <option value="cheque">Cheque</option>
-            <option value="bank_transfer">Bank transfer</option>
-            <option value="other">Other</option>
-          </Select>
-        </Field>
-        <Field label="Deposit date">
-          <TextInput type="date" value={lease.securityDepositDate ?? ''} onChange={(e) => setLease({ ...lease, securityDepositDate: e.target.value || undefined })} />
-        </Field>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--muted)' }}>
-          <input type="checkbox" checked={!!lease.securityDepositReturned} onChange={(e) => setLease({ ...lease, securityDepositReturned: e.target.checked })} />
-          Deposit returned
-        </label>
-      </div>
+      <PropertyFormFields property={lease} onChange={setLease} />
       <div className="row" style={{ gap: 8, marginBottom: 16 }}>
         <button className="btn secondary" onClick={saveLease}><SaveIcon size={12} />Save details</button>
         <button className="btn" onClick={generatePlans}>Generate projected rent</button>
@@ -609,10 +492,8 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
                   <button className="btn" onClick={logCollection}>Approve &amp; log</button>
                 )}
               </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
-                <input type="checkbox" checked={collectLinkMode} onChange={(e) => setCollectLinkMode(e.target.checked)} />
-                Link this to a Bank account or Cash (creates a matching entry there too, instead of just here)
-              </label>
+              <ToggleChip checked={collectLinkMode} onChange={next => setCollectLinkMode(next)}  label={<>Link this to a Bank account or Cash (creates a matching entry there too, instead of just here)
+              </>} />
             </>
           ) : (
             <p className="text-muted">Set a Last collection date (or a Lease start) above so the next due date can be computed.</p>
@@ -629,7 +510,7 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
           <tbody>
             {propertyPlans.map((p) => (
               <tr key={p.id}>
-                <td>{p.date}</td>
+                <td><DateValue value={p.date} /></td>
                 <td>{p.type === 'RENT_INCOME' ? 'Rent income' : 'Expense'}</td>
                 <td>{p.note || p.category || '—'}</td>
                 <td>{fmtMoney(p.amount, property.currencyCode)}</td>
@@ -649,7 +530,7 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
           </tbody>
         </table>
       </div>
-    </Modal>
+    </EntityEditorModal>
   );
 }
 
@@ -658,7 +539,7 @@ function PropertiesTab({ selectedIds }: { selectedIds?: string[] } = {}) {
     <div>
 
       <PropertiesList selectedIds={selectedIds} />
-      <AddPropertyFab />
+
     </div>
   );
 }
@@ -706,7 +587,7 @@ function AnalyticsTab({ selectedIds, entries: suppliedEntries }: { selectedIds?:
 
   return (
     <div>
-      <div className="row gap-sm">
+      {selectedIds?.length !== 1 && <PageFilters><div className="row gap-sm">
         {(!selectedIds || selectedIds.length !== 1) && currencies.length > 1 && (
           <Field label="Currency" width={120}>
             <Select value={effectiveCurrency} onChange={(e) => setCurrency(e.target.value)}>
@@ -719,7 +600,7 @@ function AnalyticsTab({ selectedIds, entries: suppliedEntries }: { selectedIds?:
             {properties.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.currencyCode})</option>)}
           </Select>
         </Field>}
-      </div>
+      </div></PageFilters>}
       <div className="grid-auto" style={{ ...gridAutoStyle(320, 16), marginTop: 12 }}>
         <ChartCard title="Net income by property" empty={!netByProperty.length}>
           <Bar
@@ -915,7 +796,7 @@ function EntriesList({ property, filters }: { property: Property; filters: Trans
       {batchOpen && <RentalTransactionsBatchEditor property={property} rows={sorted} onClose={() => setBatchOpen(false)} />}
       <div className="row gap-sm mb-sm justify-end">
         <button className="btn secondary" disabled={!entries.length} onClick={exportStatement}>Export CSV</button>
-        <button className="btn secondary" disabled={!entries.length} onClick={() => setBatchOpen(true)}>Batch edit</button>
+        <button className="btn secondary" onClick={() => setBatchOpen(true)}>Batch edit</button>
       </div>
       <div className="table-scroll">
       <table>
@@ -1140,10 +1021,8 @@ function ImportTab() {
                 {headers.map((h) => <option key={h} value={h}>{h}</option>)}
               </Select>
             </Field>
-            <label className="text-muted" style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 20 }} title="Check this if your export uses positive numbers for expenses.">
-              <input type="checkbox" checked={flipSign} onChange={(e) => setFlipSign(e.target.checked)} />
-              Flip sign
-            </label>
+            <ToggleChip checked={flipSign} onChange={next => setFlipSign(next)}  label={<>Flip sign
+            </>} />
           </div>
 
           <h4>Preview (first 5 rows)</h4>
@@ -1153,7 +1032,7 @@ function ImportTab() {
               <tbody>
                 {mappedPreview.map((r, i) => (
                   <tr key={i}>
-                    <td>{r.date}</td>
+                    <td><DateValue value={r.date} /></td>
                     <td className={r.isDeposit ? 'pill-positive' : 'pill-negative'}>{r.isDeposit ? 'Rent income' : 'Expense'}</td>
                     <td>{property ? fmtMoney(r.amount, property.currencyCode) : r.amount}</td>
                     <td>{r.category || '—'}</td>
@@ -1241,7 +1120,7 @@ function EntriesTab({
       <h3 className="mt-0">{property.name} <span className="text-muted">({property.currencyCode})</span></h3>
       <CategoryAndRollup property={property} entries={entries} />
       <EntriesList property={property} filters={filters} />
-      <EntriesFab propertyId={property.id} currencyCode={property.currencyCode} />
+
     </Card>)}
   </div>;
 }
@@ -1326,6 +1205,25 @@ function DataManagement() {
   );
 }
 
+function RentalPlansOverview({ propertyIds, filters }: { propertyIds: string[]; filters: TransactionPageFilters }) {
+  const plans = usePlannedRentalsWorkbookStore(state => state.workbook.entries);
+  const properties = useRentalsWorkbookStore(state => state.workbook.settings.properties).filter(property => propertyIds.includes(property.id));
+  const [editing, setEditing] = useState<PlannedRentalEntry | 'new' | null>(null);
+  const [financePlanId,setFinancePlanId] = useState<string | null>(null);
+  const [newPropertyId, setNewPropertyId] = useState(propertyIds[0] ?? '');
+  const effectiveId = propertyIds.includes(newPropertyId) ? newPropertyId : propertyIds[0] ?? '';
+  const ensureSignedIn = useEnsureSignedIn();
+  const rows = plans.filter(plan => propertyIds.includes(plan.propertyId) && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate) && (filters.category === 'all' || plan.category === filters.category) && (filters.direction === 'all' || (filters.direction === 'in' ? plan.type === 'RENT_INCOME' : plan.type === 'EXPENSE')) && filters.source !== 'statement-import');
+  const fulfill = async (id: string) => {
+    if (!(await ensureSignedIn('Sign in to fulfill this plan.'))) return;
+    const plan = usePlannedRentalsWorkbookStore.getState().workbook.entries.find(item => item.id === id);
+    if (!plan || plan.executed) return;
+    const error=fulfillRentalPlan(id);
+    if (error) toast(error);
+  };
+  return <><button className="btn secondary small" disabled={!properties.length} onClick={() => setEditing('new')}>+ Add plan</button><div className="table-scroll mt-12"><table><thead><tr><th>Date</th><th>Property</th><th>Plan</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead><tbody>{rows.map(plan => <tr key={plan.id}><td><DateValue value={plan.date} /></td><td>{properties.find(p => p.id === plan.propertyId)?.name}</td><td>{plan.note || plan.category || plan.type}</td><td>{fmtMoney(plan.amount, properties.find(p => p.id === plan.propertyId)?.currencyCode ?? '')}</td><td>{plan.executed ? 'Done' : 'Planned'}</td><td>{!plan.executed && <><button className="btn secondary small" onClick={() => setEditing(plan)}>Edit</button>{' '}<button className="btn secondary small" onClick={() => setFinancePlanId(plan.id)}>Link finance</button>{' '}<button className="btn secondary small" onClick={() => void fulfill(plan.id)}>Mark done</button>{' '}<button className="btn secondary small" onClick={async () => { if (await ensureSignedIn('Sign in to remove this plan.')) usePlannedRentalsWorkbookStore.getState().deleteEntry(plan.id); }}>Remove</button></>}</td></tr>)}</tbody></table>{!rows.length && <p className="text-muted">No plans in this period.</p>}</div>{financePlanId && <FinancePlanEditor reference={{ module:"rentals",id:financePlanId }} onClose={() => setFinancePlanId(null)} />}{editing && <PlanEditorModal title={editing === 'new' ? 'Add rental plan' : 'Edit rental plan'} onClose={() => setEditing(null)}>{editing === 'new' && properties.length > 1 && <Field label="Property"><Select value={effectiveId} onChange={event => setNewPropertyId(event.target.value)}>{properties.map(property => <option key={property.id} value={property.id}>{property.name}</option>)}</Select></Field>}<RentalPlanEditor key={editing === 'new' ? effectiveId : editing.id} propertyId={editing === 'new' ? effectiveId : editing.propertyId} plan={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} /></PlanEditorModal>}</>;
+}
+
 export function RentalsPage({
   cloudEmpty,
   uploadLocalToCloud,
@@ -1339,34 +1237,41 @@ export function RentalsPage({
   const entries = useRentalsWorkbookStore((state) => state.workbook.entries);
   const categories = useCategoryStore((state) => state.workbook.categories);
   const [params] = useSearchParams();
-  const selectedIds = selectedEntityValues(params, properties.map((item) => item.id));
+  const { propertyId } = useParams();
+  const navigate=useNavigate();
+  const selectedProperty = properties.find(p => p.id === propertyId);
+  const [editDetails, setEditDetails] = useState(false);
+  const selectedIds = propertyId ? (selectedProperty ? [propertyId] : []) : selectedEntityValues(params, properties.map((item) => item.id));
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
   const filteredEntries = useMemo(() => filterRentalEntries(entries, filters, categories).filter((entry) => selectedIds.includes(entry.propertyId)), [entries, filters, categories, selectedIds]);
   const filterCategories = useMemo(() => [...new Set(entries.filter((entry) => selectedIds.includes(entry.propertyId)).map((entry) => categoryName(entry.categoryID, categories)))].sort(), [entries, selectedIds, categories]);
-  usePageTopBarRightSlot(properties.length ? <TopBarControls>
-    <EntityScopeMenu label="Properties" options={properties.map((item) => ({ value: item.id, label: item.name }))} />
+  usePageTopBarRightSlot(properties.length ? <TopBarControls><QuickEntitySwitch label="Property" value={propertyId ?? ""} options={[{value:"",label:"All properties"},...properties.filter(p=>p.isActive!==false || p.id===propertyId).map(p=>({value:p.id,label:p.name+" ("+p.currencyCode+")"}))]} onChange={id=>navigate({pathname:id ? `/rentals/${id}` : "/rentals",search:params.toString()})} />
+    {!propertyId && <EntityScopeMenu label="Properties" options={properties.map((item) => ({ value: item.id, label: item.name }))} />}
     <TransactionFilterMenu value={filters} categories={filterCategories} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} />
   </TopBarControls> : null);
 
   return (
     <div>
-      <BackButton to="/net-worth">← Overview</BackButton>
-      <h1 className="pagetitle">Rentals</h1>
+      <PageHeading back={<BackButton to={propertyId ? "/rentals" : "/net-worth"}>{propertyId ? "All properties" : "Overview"}</BackButton>}><h1 className="pagetitle">{selectedProperty?.name ?? "Rentals"}</h1></PageHeading>
       <p className="text-muted mb-12">
         Rental property income and expenses — recurring rent received and costs (maintenance, property tax,
         management fees) against one or more properties, not discrete buy/sell trades.
       </p>
+      {!propertyId && <AddPropertyFab />}
+      {selectedProperty && <EntriesFab propertyId={selectedProperty.id} currencyCode={selectedProperty.currencyCode} />}
+      {selectedProperty && editDetails && <PropertyDetailModal property={selectedProperty} onClose={() => setEditDetails(false)} />}
       <StandardPageSections sections={[
-          { key: 'summary', label: 'Account summary', defaultOpen: true, content: <div className="stack-lg"><NetIncomeSummary selectedIds={selectedIds} entries={filteredEntries} />{properties.filter(property => selectedIds.includes(property.id)).map(property => <RentalAccountSummary key={property.id} property={property} entries={entries} visible={filteredEntries} filters={filters} />)}</div> },
-          { key: 'properties', label: 'Properties', content: <PropertiesTab selectedIds={selectedIds} /> },
+          { key: 'summary', label: 'Account summary', defaultOpen: true, content: <RentalAccountSummary properties={properties.filter(p => selectedIds.includes(p.id))} entries={entries} visible={filteredEntries} filters={filters} /> },
+          ...(propertyId ? [{ key: 'details', label: 'Property details', actions: [{ label: 'Edit property', onClick: () => setEditDetails(true) }], content: <dl><dt>Name</dt><dd>{selectedProperty?.name}</dd><dt>Currency</dt><dd>{selectedProperty?.currencyCode}</dd><dt>Monthly rent</dt><dd>{fmtMoney(selectedProperty?.monthlyRent ?? 0, selectedProperty?.currencyCode ?? '')}</dd><dt>Tenant</dt><dd>{selectedProperty?.tenantName || 'Unspecified'}</dd><dt>Lease</dt><dd>{selectedProperty?.leaseStartDate || 'Unspecified'} to {selectedProperty?.leaseEndDate || 'Open ended'}</dd></dl> }] : [{ key: 'properties', label: 'Properties', content: <PropertiesTab selectedIds={selectedIds} /> }]),
+          { key: 'plans', label: 'Plans', content: <RentalPlansOverview propertyIds={selectedIds} filters={filters} /> },
           {
             key: 'entries',
             label: 'Income & expenses',
             content: <EntriesTab properties={properties} selectedIds={selectedIds} filters={filters} entries={filteredEntries} />,
           },
-          { key: 'import', label: 'Import', content: <ImportTab /> },
-          { key: 'analytics', label: 'Analytics', content: <div className="stack-lg">{selectedIds.map((id) => <Card key={id}><AnalyticsTab selectedIds={[id]} entries={filteredEntries} /></Card>)}</div> },
-          {
+          ...(propertyId ? [] : [{ key: 'import', label: 'Import', content: <ImportTab /> }]),
+          { key: 'analytics', label: 'Analytics', content: <AnalyticsTab selectedIds={selectedIds} entries={filteredEntries} /> },
+          ...(propertyId ? [] : [{
             key: 'settings',
             label: 'Settings',
             content: (
@@ -1379,9 +1284,92 @@ export function RentalsPage({
                 <DataManagement />
               </div>
             ),
-          },
+          }]),
         ]}
       />
     </div>
   );
+}
+
+function PropertyFormFields({ property: lease, onChange: setLease }: { property: Property; onChange: (property: Property) => void }) {
+  const currencyOptions = useEnabledCurrencies(lease.currencyCode);
+  return <>      <h4 style={{ margin: '0 0 8px' }}>Property details</h4>
+      <div className="row gap-sm mb-sm">
+        <Field label="Name">
+          <TextInput value={lease.name} onChange={(e) => setLease({ ...lease, name: e.target.value })} />
+        </Field>
+        <Field label="Currency">
+          <Select value={lease.currencyCode} onChange={(e) => setLease({ ...lease, currencyCode: e.target.value })}>
+            {currencyOptions.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
+          </Select>
+        </Field>
+        <Field label="Purchase price (optional)">
+          <TextInput type="number" step="0.01" value={lease.purchasePrice ?? ''} onChange={(e) => setLease({ ...lease, purchasePrice: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        </Field>
+      </div>
+      <h4 style={{ margin: '0 0 8px' }}>Lease &amp; tenant details</h4>
+      <div className="row gap-sm mb-sm">
+        <Field label="Monthly rent">
+          <TextInput type="number" step="0.01" value={lease.monthlyRent ?? ''} onChange={(e) => setLease({ ...lease, monthlyRent: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        </Field>
+        <Field label="Cycle start day (1-31)">
+          <TextInput type="number" min={1} max={31} value={lease.cycleStartDay ?? ''} onChange={(e) => setLease({ ...lease, cycleStartDay: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        </Field>
+        <Field label="Lease start">
+          <TextInput type="date" value={lease.leaseStartDate ?? ''} onChange={(e) => setLease({ ...lease, leaseStartDate: e.target.value || undefined })} />
+        </Field>
+        <Field label="Lease end (optional)">
+          <TextInput type="date" value={lease.leaseEndDate ?? ''} onChange={(e) => setLease({ ...lease, leaseEndDate: e.target.value || undefined })} />
+        </Field>
+      </div>
+      <div className="row gap-sm mb-sm">
+        <Field
+          label="Collection cycle (optional)"
+          title="Opts this property into the separate rent-collection proposal below — pick how often rent is actually collected."
+        >
+          <Select value={lease.collectionCycle ?? ''} onChange={(e) => setLease({ ...lease, collectionCycle: (e.target.value || undefined) as Property['collectionCycle'] })}>
+            <option value="">— Not set —</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="annual">Annual</option>
+          </Select>
+        </Field>
+        <Field
+          label="Last collection date"
+          title="When rent was last actually collected — the next proposal below is computed one cycle forward from this date (falls back to Lease start if left blank)."
+        >
+          <TextInput type="date" value={lease.lastCollectionDate ?? ''} onChange={(e) => setLease({ ...lease, lastCollectionDate: e.target.value || undefined })} />
+        </Field>
+      </div>
+      <div className="row gap-sm mb-sm">
+        <Field label="Tenant name">
+          <TextInput value={lease.tenantName ?? ''} onChange={(e) => setLease({ ...lease, tenantName: e.target.value })} />
+        </Field>
+        <Field label="Tenant contact">
+          <TextInput value={lease.tenantContact ?? ''} onChange={(e) => setLease({ ...lease, tenantContact: e.target.value })} />
+        </Field>
+        <ToggleChip checked={!!lease.utilitiesIncluded} onChange={next => setLease({ ...lease, utilitiesIncluded: next })}  label={<>Utilities included in rent
+        </>} />
+      </div>
+      <div className="row" style={{ gap: 8, marginBottom: 12 }}>
+        <Field label="Security deposit">
+          <TextInput type="number" step="0.01" value={lease.securityDeposit ?? ''} onChange={(e) => setLease({ ...lease, securityDeposit: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        </Field>
+        <Field label="Deposit type">
+          <Select value={lease.securityDepositType ?? ''} onChange={(e) => setLease({ ...lease, securityDepositType: (e.target.value || undefined) as Property['securityDepositType'] })}>
+            <option value="">—</option>
+            <option value="cash">Cash</option>
+            <option value="cheque">Cheque</option>
+            <option value="bank_transfer">Bank transfer</option>
+            <option value="other">Other</option>
+          </Select>
+        </Field>
+        <Field label="Deposit date">
+          <TextInput type="date" value={lease.securityDepositDate ?? ''} onChange={(e) => setLease({ ...lease, securityDepositDate: e.target.value || undefined })} />
+        </Field>
+        <ToggleChip checked={!!lease.securityDepositReturned} onChange={next => setLease({ ...lease, securityDepositReturned: next })}  label={<>Deposit returned
+        </>} />
+      </div>
+</>;
 }

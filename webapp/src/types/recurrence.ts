@@ -13,6 +13,8 @@
 export type RecurrenceCycle = 'monthly' | 'yearly' | 'weekly' | 'custom';
 
 export interface RecurrenceRule {
+  /** Individually edited items are stored separately, including finance overrides. */
+  excludedDates?: string[];
   cycle: RecurrenceCycle;
   /** Used when `cycle === 'custom'` — e.g. a 28-day pay cycle. */
   customDays?: number;

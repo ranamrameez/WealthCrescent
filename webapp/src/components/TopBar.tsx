@@ -1,3 +1,8 @@
+import { useWorkbookStore } from '../store/workbookStore';
+import { usePSXWorkbookStore } from '../store/psxWorkbookStore';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { CATEGORIES, categoryForPath } from './CategoryNav';
+import { TopBarSelect } from './TopBarControls';
 import { usePageTopBarStore } from '../store/pageTopBarStore';
 
 /** App-wide fixed top bar — user-requested (2026-09-11, design reference:
@@ -20,16 +25,19 @@ import { usePageTopBarStore } from '../store/pageTopBarStore';
  *
  * Reads from `pageTopBarStore` — the exact same "page registers, one
  * globally-mounted component renders" shape `FabPanel`/`fabActionsStore`
- * already established for the floating action button. Renders nothing
- * (not even an empty bar) when the current page hasn't registered any
- * chips or a right-slot — most pages don't use `Tabs` at all (Dashboards,
- * per-stock pages, ...), and a permanent empty strip on those would just
- * be dead chrome. */
+ * already established for the floating action button. Always includes module navigation; pages register their own sibling switchers and filters. */
 export function TopBar() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const category = categoryForPath(location.pathname);
+  const qse=useWorkbookStore(s=>s.workbook);
+  const psx=usePSXWorkbookStore(s=>s.workbook);
+  const exchange=location.pathname.startsWith('/psx')?'psx':'qse';
+  const stockWorkbook=exchange==='psx'?psx:qse;
+  const stockOptions=[...new Set([...stockWorkbook.transactions.map(tx=>tx.ticker),...Object.keys(stockWorkbook.marketPrices)])].sort();
+  const stockDetail=/\/stock\//.test(location.pathname);
   const chips = usePageTopBarStore((s) => s.chips);
   const rightSlot = usePageTopBarStore((s) => s.rightSlot);
-
-  if (!chips.length && !rightSlot) return null;
 
   return (
     <div className="page-topbar">
@@ -40,7 +48,7 @@ export function TopBar() {
           </button>
         ))}
       </div>
-      {rightSlot && <div className="page-topbar-right">{rightSlot}</div>}
+      <div className="page-topbar-right"><TopBarSelect label="Module" className="account-switch-select" value={category ?? ''} options={[{value:'',label:'Select module'},...CATEGORIES.map(item=>({value:item.key,label:item.label}))]} onChange={event=>{const next=CATEGORIES.find(item=>item.key===event.target.value);if(next)navigate(next.to);}} />{category==='stocks' && !stockDetail && <TopBarSelect label="Stock" className="account-switch-select" value="" options={[{value:'',label:'All stocks'},...stockOptions.map(ticker=>({value:ticker,label:ticker}))]} onChange={event=>{if(event.target.value)navigate(`${exchange==='psx'?'/psx':''}/stock/${event.target.value}`);}} />}{rightSlot}</div>
     </div>
   );
 }

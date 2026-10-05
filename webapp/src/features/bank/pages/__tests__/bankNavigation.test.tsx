@@ -50,7 +50,8 @@ it('shows future and pending rows from month start, and switches accounts', () =
 
 it('provides a bank switcher and bank-scoped analytics on bank details', () => {
   show('/bank/bank/b1?section=analytics');
-  expect(screen.queryByLabelText('Switch bank')).toBeNull();
+  expect(screen.queryByLabelText('Switch bank')).not.toBeNull();
+  expect(screen.getByLabelText('Switch bank').closest('.modal-overlay')).toBeNull();
   expect(screen.queryAllByText('Analytics').length).toBeGreaterThan(0);
   expect(screen.queryByText('Line chart')).not.toBeNull();
   fireEvent.click(screen.getByRole('button', { name: /Filters/ }));
@@ -77,7 +78,8 @@ it('offers plan creation on an account even when it has no upcoming plans', () =
   const plans = plansSection.querySelector('button[aria-label="Card options"]')!;
   fireEvent.click(plans);
   fireEvent.click(screen.getByRole('button', { name: 'Add a plan' }));
-  expect(screen.queryByText('Add a plan')).not.toBeNull();
+  expect(screen.queryByText('Add plan')).not.toBeNull();
+  expect(screen.getByLabelText('Finance')).toHaveProperty('value', 'a1');
 });
 
 it('keeps one live section stack after repeatedly closing batch edit', async () => {

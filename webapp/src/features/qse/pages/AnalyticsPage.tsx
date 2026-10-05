@@ -1,3 +1,4 @@
+import { PageHeading } from '../../../components/PageHeading';
 import { BackButton } from '../../../components/BackButton';
 import { StockPLCharts } from '../../../components/StockPLCharts';
 import { StockTradingChart } from '../../../components/StockTradingChart';
@@ -100,8 +101,7 @@ export function AnalyticsPage() {
 
   return (
     <div>
-      <BackButton to="/qse">← QSE</BackButton>
-      <h1 className="pagetitle">Analytics</h1>
+      <PageHeading back={<BackButton to="/qse">← QSE</BackButton>}><h1 className="pagetitle">Analytics</h1></PageHeading>
       <p className="text-muted" style={{ marginTop: -8, marginBottom: 20 }}>
         The full chart library — head back to Dashboard for a quick overview.
       </p>

@@ -74,3 +74,5 @@ export function ChartCard({
 
   return <CollapsibleCard title={heading}>{body}</CollapsibleCard>;
 }
+
+ChartCard.cardContainer = true;

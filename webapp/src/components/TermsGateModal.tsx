@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTermsStore } from "../store/termsStore";
+import { ToggleChip } from './ui/ToggleChip';
 
 /** Blocks the app behind a one-time Disclaimer/Terms acceptance for first-
  * time visitors — legal risk (calculations are estimates, not advice, no
@@ -43,10 +44,7 @@ export function TermsGateModal() {
 					<p className="text-muted">
 						Full details any time via <strong>Disclaimer &amp; Privacy</strong> in the sidebar.
 					</p>
-					<label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 12, cursor: "pointer" }}>
-						<input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} style={{ marginTop: 3 }} />
-						<span>I have read and accept the Disclaimer, Terms &amp; Privacy.</span>
-					</label>
+					<ToggleChip checked={checked} onChange={setChecked} label="I have read and accept the Disclaimer, Terms & Privacy." />
 					<button className="btn mt-12" disabled={!checked} onClick={accept}>
 						Accept &amp; continue
 					</button>

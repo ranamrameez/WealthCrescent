@@ -1,3 +1,4 @@
+import { DateValue } from '../../../components/DateValue';
 import { PageFilters } from '../../../components/PageFilters';
 import { PriceInput } from "../../../components/ui/PriceInput";
 import { useMemo, useState } from 'react';
@@ -207,7 +208,7 @@ export function DividendsSection() {
                 </tr>
               ) : (
                 <tr key={d.i}>
-                  <td>{d.date}</td>
+                  <td><DateValue value={d.date} /></td>
                   <td><TickerLogo ticker={d.ticker} size="sm" exchange="psx" /><Link to={`/psx/stock/${d.ticker}`}>{d.ticker}</Link></td>
                   <td>{fmtPSXPrice(d.perShare)}</td>
                   <td>{d.shares || '—'}</td>

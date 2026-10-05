@@ -1,25 +1,23 @@
+import { DateValue } from '../../../components/DateValue';
+import { PlanningTab as CashPlanningTab } from '../../cash/pages/CashPage';
+import { PlanningTab as BankPlanningTab } from '../../bank/pages/BankPage';
+import { useSortableRows } from '../../../hooks/useSortableRows';
+import { FinancePlansHierarchy } from '../../../components/FinancePlansHierarchy';
+import { useSearchParams } from 'react-router-dom';
+import { PageHeading } from '../../../components/PageHeading';
 import { BackButton } from '../../../components/BackButton';
 import { useMemo, useState } from 'react';
 import { CollapsibleCard } from '../../../components/Card';
-import { Modal } from '../../../components/Modal';
 import { OrphanPlanCleanup } from '../../../components/OrphanPlanCleanup';
-import { toast } from '../../../components/Toast';
-import { Field, Select, TextInput } from '../../../components/ui/Field';
-import { FabButton } from '../../../components/ui/Fab';
-import { PlusIcon } from '../../../components/icons';
+import { Field, Select } from '../../../components/ui/Field';
 import { UpcomingList } from '../../../components/UpcomingList';
 import { useUpcomingItems } from '../../../hooks/useUpcomingItems';
-import { useSortableRows } from '../../../hooks/useSortableRows';
-import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { useUrlTransactionFilters } from '../../../hooks/useUrlTransactionFilters';
 import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu';
 import { TopBarControls } from '../../../components/TopBarControls';
-import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { fmtMoney } from '../../../lib/format';
 import {
   collectBudgetActivities,
-  PREDEFINED_EXPENSE_CATEGORIES,
-  PREDEFINED_INCOME_CATEGORIES,
   type BudgetActivity,
   type BudgetModule,
 } from '../../../lib/calc/budgetPlanner';
@@ -31,44 +29,10 @@ import { usePlannedBankWorkbookStore } from '../../../store/plannedBankWorkbookS
 import { useRentalsWorkbookStore } from '../../../store/rentalsWorkbookStore';
 import { usePlannedRentalsWorkbookStore } from '../../../store/plannedRentalsWorkbookStore';
 import { useInterEntityTransfersStore } from '../../../store/interEntityTransfersStore';
-import type { PlannedRentalEntry } from '../../../types/plannedRentals';
-import type { Property } from '../../../types/rentalsWorkbook';
-import { PlanningTab as CashPlanningTab } from '../../cash/pages/CashPage';
-import { PlanningTab as BankPlanningTab } from '../../bank/pages/BankPage';
 
-const today = () => new Date().toISOString().slice(0, 10);
 
-/** Unifies what used to be two separate, overlapping pages — this file
- * (Cash/Banking's own "Planning" tabs, promoted here) and the standalone
- * Budget Planner page — into one. User-reported (2026-09-08): "Planning &
- * Budget Planner are two faces of a single feature, confusing, complex and
- * still incomplete." That was accurate: both pages let you add a Cash/Bank
- * plan, both showed planned Cash/Bank data, and neither was a strict
- * superset of the other (only THIS page's Cash/Bank "Add a plan" forms
- * support recurrence; only the old Budget Planner's combined table let you
- * see Cash+Bank+Rentals activity side by side, filterable). Merged rather
- * than picking one, per the user's own explicit choice.
- *
- * Layout, top to bottom: (1) Upcoming (next 30 days) — unchanged, every
- * module. (2) All planned financial activity — the old Budget Planner's
- * combined, filterable Cash/Bank/Rentals table, now the one place to
- * BROWSE everything at once. (3) Cash's own Planning tools (balance
- * projection + an editable, recurrence-capable plan list) — unchanged,
- * reused as-is. (4) Banking's own Planning tools — same. (5) Rentals — a
- * NEW lightweight "add a one-off plan" section: Rentals never had its own
- * per-page Planning tools (only per-property auto-generation, buried in
- * `PropertyDetailModal`), so the old Budget Planner's generic add-plan
- * form is kept, narrowed to Rentals only — its Cash/Bank options are
- * dropped since Cash's/Bank's own sections above are strictly more
- * capable (recurrence, edit, delete, mark-done) for those two modules. */
-export function PlanningPage({
-  cashPlannedSyncStatus,
-  cashPlannedCloudEmpty,
-  uploadCashPlannedLocalToCloud,
-  bankPlannedSyncStatus,
-  bankPlannedCloudEmpty,
-  uploadBankPlannedLocalToCloud,
-}: {
+/** Shared plan hierarchy, combined activity and the existing module planning tools. */
+export function PlanningPage({cashPlannedSyncStatus,cashPlannedCloudEmpty,uploadCashPlannedLocalToCloud,bankPlannedSyncStatus,bankPlannedCloudEmpty,uploadBankPlannedLocalToCloud}: {
   cashPlannedSyncStatus: string;
   cashPlannedCloudEmpty: boolean;
   uploadCashPlannedLocalToCloud: () => Promise<void>;
@@ -88,7 +52,6 @@ export function PlanningPage({
   const rentalProperties = useRentalsWorkbookStore((s) => s.workbook.settings.properties);
   const rentalEntries = useRentalsWorkbookStore((s) => s.workbook.entries);
   const plannedRentals = usePlannedRentalsWorkbookStore((s) => s.workbook.entries);
-  const addPlannedRentals = usePlannedRentalsWorkbookStore((s) => s.addEntry);
 
   const links = useInterEntityTransfersStore((s) => s.workbook.entries);
   const categories = useCategoryStore((s) => s.workbook.categories);
@@ -98,52 +61,22 @@ export function PlanningPage({
     [cashEntries, plannedCash, bankAccounts, bankTransactions, plannedBank, rentalProperties, rentalEntries, plannedRentals, categories, links],
   );
   const categoryOptions = useMemo(() => [...new Set(activities.map((a) => a.category || 'Uncategorized'))].sort(), [activities]);
-  usePageTopBarRightSlot(<TopBarControls><TransactionFilterMenu value={filters} categories={categoryOptions} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls>);
 
-  return (
-    <div>
-      <BackButton to="/net-worth">← Overview</BackButton>
-      <h1 className="pagetitle">Planning</h1>
+  const [params] = useSearchParams();
+  const controls = <TopBarControls><TransactionFilterMenu value={filters} categories={categoryOptions} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls>;
+  return <div>
+    {!params.get('plan') && <PageHeading back={<BackButton to="/net-worth">Overview</BackButton>}><h1 className="pagetitle">Planning</h1></PageHeading>}
+    <FinancePlansHierarchy filters={filters} controls={controls} overview={<>
       <OrphanPlanCleanup />
-      <p className="text-muted mb-12">
-        Everything expected to happen soon, across every module — a plan can repeat (e.g. a monthly salary or a
-        recurring bill), so you only set it up once. Browse every planned Cash/Banking/Rentals activity below, or
-        manage a specific module's own plans (add, edit, delete, mark done) further down.
-      </p>
-      <CollapsibleCard title={<h3 className="m-0">Upcoming (next 30 days)</h3>} className="mb-md">
-        <UpcomingList items={upcoming} emptyText="Nothing expected in the next 30 days." />
-      </CollapsibleCard>
+      <CollapsibleCard title="Upcoming (next 30 days)" className="mt-md" defaultOpen={false}><UpcomingList items={upcoming} emptyText="Nothing expected in the next 30 days." /></CollapsibleCard>
       <BudgetOverview activities={activities} filters={filters} />
       <ActivityList activities={activities} filters={filters} />
-      <CollapsibleCard title={<h3 className="m-0">Cash</h3>} className="mb-md">
-        <CashPlanningTab
-          plannedSyncStatus={cashPlannedSyncStatus}
-          plannedCloudEmpty={cashPlannedCloudEmpty}
-          uploadPlannedLocalToCloud={uploadCashPlannedLocalToCloud}
-        />
+      <CollapsibleCard title="Module planning tools" defaultOpen={false}>
+        <CashPlanningTab showFab={false} plannedSyncStatus={cashPlannedSyncStatus} plannedCloudEmpty={cashPlannedCloudEmpty} uploadPlannedLocalToCloud={uploadCashPlannedLocalToCloud} />
+        <BankPlanningTab showFab={false} plannedSyncStatus={bankPlannedSyncStatus} plannedCloudEmpty={bankPlannedCloudEmpty} uploadPlannedLocalToCloud={uploadBankPlannedLocalToCloud} />
       </CollapsibleCard>
-      <CollapsibleCard title={<h3 className="m-0">Banking</h3>} className="mb-md">
-        <BankPlanningTab
-          plannedSyncStatus={bankPlannedSyncStatus}
-          plannedCloudEmpty={bankPlannedCloudEmpty}
-          uploadPlannedLocalToCloud={uploadBankPlannedLocalToCloud}
-        />
-      </CollapsibleCard>
-      <CollapsibleCard title={<h3 className="m-0">Rentals</h3>}>
-        <p className="text-muted mt-0">
-          Rentals plans its own recurring rent per property (see a property's own "Details" view for lease-based
-          projection and rent collection) — use this for a one-off plan that doesn't fit either of those, like a
-          planned repair expense.
-        </p>
-        {/* Archived properties excluded from this "pick where a NEW plan
-           goes" picker (2026-09-03) — same rule as everywhere else;
-           `activities`/`ActivityList` above still read the FULL
-           unfiltered list, so an archived property's own past activity
-           still shows. */}
-        <AddRentalPlanFab rentalProperties={rentalProperties.filter((p) => p.isActive !== false)} addPlannedRentals={addPlannedRentals} />
-      </CollapsibleCard>
-    </div>
-  );
+    </>} />
+  </div>;
 }
 
 function BudgetOverview({ activities, filters }: { activities: BudgetActivity[]; filters: ReturnType<typeof useUrlTransactionFilters>['filters'] }) {
@@ -187,7 +120,7 @@ function BudgetOverview({ activities, filters }: { activities: BudgetActivity[];
   </CollapsibleCard>;
 }
 
-/** User-requested (2026-09-03): "add filters to other tables as well." */
+
 function ActivityList({ activities, filters }: { activities: BudgetActivity[]; filters: ReturnType<typeof useUrlTransactionFilters>['filters'] }) {
   const moduleLabel: Record<BudgetModule, string> = { cash: 'Cash', bank: 'Banking', rentals: 'Rentals' };
   const filtered = useMemo(
@@ -229,7 +162,7 @@ function ActivityList({ activities, filters }: { activities: BudgetActivity[]; f
           <tbody>
             {sorted.map((a) => (
               <tr key={`${a.module}:${a.id}`}>
-                <td>{a.date}</td>
+                <td><DateValue value={a.date} /></td>
                 <td>{moduleLabel[a.module]}</td>
                 <td>{a.sourceLabel}</td>
                 <td>{a.description}</td>
@@ -249,87 +182,5 @@ function ActivityList({ activities, filters }: { activities: BudgetActivity[]; f
         </table>
       </div>
     </CollapsibleCard>
-  );
-}
-
-/** Narrowed from the old Budget Planner's generic Cash/Bank/Rentals add-plan
- * form to Rentals only — Cash and Bank each have their own, strictly more
- * capable "Add a plan" (recurrence, in their own sections above), so
- * offering a second, less capable way to add a Cash/Bank plan on the same
- * page would recreate exactly the "two faces of one feature" confusion
- * this merge exists to fix. */
-function AddRentalPlanFab({ rentalProperties, addPlannedRentals }: { rentalProperties: Property[]; addPlannedRentals: (e: PlannedRentalEntry) => void }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <FabButton label="Add a rental plan" onClick={() => setOpen(true)}><PlusIcon /></FabButton>
-      {open && (
-        <Modal title="Add a rental plan" onClose={() => setOpen(false)}>
-          <AddRentalPlanForm rentalProperties={rentalProperties} addPlannedRentals={addPlannedRentals} onSaved={() => setOpen(false)} />
-        </Modal>
-      )}
-    </>
-  );
-}
-
-function AddRentalPlanForm({ rentalProperties, addPlannedRentals, onSaved }: { rentalProperties: Property[]; addPlannedRentals: (e: PlannedRentalEntry) => void; onSaved: () => void }) {
-  const ensureSignedIn = useEnsureSignedIn();
-  const [propertyId, setPropertyId] = useState(rentalProperties[0]?.id ?? '');
-  const [type, setType] = useState<'income' | 'expense'>('expense');
-  const [date, setDate] = useState(today());
-  const [amount, setAmount] = useState(0);
-  const [category, setCategory] = useState('');
-  const [note, setNote] = useState('');
-
-  const categoryOptions = type === 'income' ? PREDEFINED_INCOME_CATEGORIES : PREDEFINED_EXPENSE_CATEGORIES;
-
-  const submit = async () => {
-    if (!amount || amount <= 0) return toast('Enter an amount.');
-    if (!propertyId) return toast('Add a property first (Rentals page).');
-    if (!(await ensureSignedIn('Sign in to save plans.'))) return;
-    addPlannedRentals({ id: crypto.randomUUID(), propertyId, date, type: type === 'income' ? 'RENT_INCOME' : 'EXPENSE', amount, category: category.trim() || undefined, note: note.trim() || undefined });
-    toast('Plan added.');
-    onSaved();
-  };
-
-  if (!rentalProperties.length) {
-    return <p className="text-muted">No properties yet — add one on the Rentals page first.</p>;
-  }
-
-  return (
-    <div>
-      <div className="row gap-sm">
-        <Field label="Property" width={180} required>
-          <Select value={propertyId} onChange={(e) => setPropertyId(e.target.value)}>
-            {rentalProperties.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.currencyCode})</option>)}
-          </Select>
-        </Field>
-        <Field label="Type" width={120} required>
-          <Select value={type} onChange={(e) => { setType(e.target.value as 'income' | 'expense'); setCategory(''); }}>
-            <option value="income">Income</option>
-            <option value="expense">Expense</option>
-          </Select>
-        </Field>
-        <Field label="Date" required>
-          <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </Field>
-        <Field label="Amount" width={120} required>
-          <TextInput type="number" step="0.01" value={amount || ''} onChange={(e) => setAmount(Number(e.target.value))} />
-        </Field>
-        <Field label="Category (optional)" width={160}>
-          <TextInput list="rental-plan-category-datalist" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Repairs" />
-        </Field>
-        <Field label="Note (optional)" width={180}>
-          <TextInput value={note} onChange={(e) => setNote(e.target.value)} />
-        </Field>
-      </div>
-      <datalist id="rental-plan-category-datalist">
-        {categoryOptions.map((c) => <option key={c} value={c} />)}
-      </datalist>
-      <button className="btn mt-12" onClick={submit}>
-        <PlusIcon />Add plan
-      </button>
-      <p className="text-muted mt-sm"><span className="text-loss">*</span> Required. Everything else on this form is optional.</p>
-    </div>
   );
 }

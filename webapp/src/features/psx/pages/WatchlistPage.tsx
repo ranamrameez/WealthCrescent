@@ -1,3 +1,4 @@
+import { PageHeading } from '../../../components/PageHeading';
 import { BackButton } from '../../../components/BackButton';
 import { PriceInput } from '../../../components/ui/PriceInput';
 import { useState } from 'react';
@@ -28,8 +29,7 @@ export function WatchlistPage() {
 
   return (
     <div>
-      <BackButton to="/psx">← PSX</BackButton>
-      <h1 className="pagetitle">PSX Watchlist</h1>
+      <PageHeading back={<BackButton to="/psx">← PSX</BackButton>}><h1 className="pagetitle">PSX Watchlist</h1></PageHeading>
 
       <h3>Add to watchlist</h3>
       <div className="row gap-sm">
