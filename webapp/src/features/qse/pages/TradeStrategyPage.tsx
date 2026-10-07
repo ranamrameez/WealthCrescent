@@ -1,3 +1,7 @@
+import { SummaryChip } from '../../../components/StandardCard';
+import { useActivePageSection } from '../../../hooks/useActivePageSection';
+import { ProfitableStockAlert } from '../../../components/ProfitableStockAlert';
+import { StarIcon, CalendarIcon, ChecklistIcon, ArchiveIcon, RestoreIcon } from '../../../components/icons';
 import { ProfitableLotAlerts } from '../../../components/ProfitableLotAlerts';
 import { PlanExecutionSummary } from '../../../components/PlanExecutionSummary';
 import { DateValue } from '../../../components/DateValue';
@@ -6,7 +10,7 @@ import { PageHeading } from '../../../components/PageHeading';
 import { TopBarControls } from '../../../components/TopBarControls';
 import { BackButton } from '../../../components/BackButton';
 import { PriceInput } from "../../../components/ui/PriceInput";
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { StandardCard, type StandardCardAction } from '../../../components/StandardCard';
 import { BatchEditGrid, type BatchColumn, type BatchChange } from '../../../components/BatchEditGrid';
@@ -27,7 +31,7 @@ import { hueStyle } from '../../../lib/statCardHues';
 import { analyzeTradePlanByTicker, whatIfExit, type TradePlanTickerSummary } from '../../../lib/calc/tradePlanAnalysis';
 import { breakEvenPrice } from '../../../lib/calc/fees';
 import { getMarketPrice } from '../../../lib/calc/priceHistory';
-import { computeFIFOPositions } from '../../../lib/calc/fifoPositions';
+import { strategyPositions } from '../../../lib/calc/strategyPositions';
 import { computeAveragingScenario } from '../../../lib/calc/riskAnalysis';
 import {
   computeLotAdvice,
@@ -126,8 +130,7 @@ function BuySellAvgDownCalculator() {
           <PriceInput exchange="qse" type="number" step="0.001" value={targetSell} onChange={(e) => setTargetSell(e.target.value)} />
         </Field>
         <Field label=" ">
-          <ToggleChip checked={avgDown} onChange={next => setAvgDown(next)} disabled={!canAvgDown} label={<>Average down
-          </>} />
+          <ToggleChip checked={avgDown} onChange={setAvgDown} label={`Average down: ${avgDown ? 'On' : 'Off'}`} />
         </Field>
       </div>
 
@@ -137,7 +140,8 @@ function BuySellAvgDownCalculator() {
         </p>
       )}
 
-      {avgDown && (
+      {avgDown && !canAvgDown && <p className="text-muted mb-sm">Select a ticker with existing holdings to calculate averaging down.</p>}
+      {avgDown && canAvgDown && (
         <Notice tone="warning" className="mb-sm">
           Averaging down increases your exposure to a losing position — it lowers your break-even, but only by
           committing more capital to a stock that's currently down. <Link to="/legal">Read more</Link>
@@ -173,7 +177,7 @@ function BuySellAvgDownCalculator() {
   );
 }
 
-function PartialTradeAdvisor({ ticker, onSellLot }: { ticker: string; onSellLot: (lot: LotAdvice) => void }) {
+function PartialTradeAdvisor({ ticker, onSellLot, onSellLots }: { ticker: string; onSellLot: (lot: LotAdvice) => void; onSellLots: (lots: LotAdvice[]) => void }) {
   const { workbook, calcFee, rows } = useQSEDerived();
   const currency = workbook.settings.currency;
   const feePct = workbook.settings.feePct;
@@ -183,7 +187,7 @@ function PartialTradeAdvisor({ ticker, onSellLot }: { ticker: string; onSellLot:
   // concentrate the remaining position in the worst-performing lots —
   // oldest-first FIFO only does that by coincidence, and got it backwards
   // for a real reported case (see `LotMatchOrder`'s own doc comment).
-  const { lotsByTicker } = useMemo(() => computeFIFOPositions(workbook.transactions, calcFee, 'lowestCostFirst'), [workbook.transactions, calcFee]);
+  const { lotsByTicker } = useMemo(() => strategyPositions(workbook.transactions, calcFee), [workbook.transactions, calcFee]);
   const lots = lotsByTicker[ticker.toUpperCase()] || [];
   const row = rows.find((r) => r.ticker === ticker.toUpperCase());
   const currentPrice = row?.marketPrice || 0;
@@ -223,19 +227,8 @@ function PartialTradeAdvisor({ ticker, onSellLot }: { ticker: string; onSellLot:
 
   return (
     <div style={{ marginBottom: 16 }}>
-      {lots.length > 1 && (
-        <Notice tone="warning" className="mb-sm">
-          Partial Trade Strategy concentrates your remaining position in your worst-performing lots — you keep
-          holding whatever doesn't sell. <Link to="/legal">Read more</Link>
-        </Notice>
-      )}
       {sellable > 0 ? (
-        <p className="mb-sm">
-          <span className="pill-positive">{fmt(sellable, 0)} of {fmt(total, 0)} shares</span> of {ticker.toUpperCase()} are already profitable at the current price ({fmtQSEPrice(currentPrice)}).
-          {' \u00b7 '}Estimated profit {fmtMoney(profitableTotals.profit, currency)}
-          {' \u00b7 '}Sale value {fmtMoney(profitableTotals.grossProceeds, currency)}
-          {' \u00b7 '}Net proceeds {fmtMoney(profitableTotals.netProceeds, currency)}
-        </p>
+        <ProfitableStockAlert sellable={sellable} total={total} price={currentPrice} {...profitableTotals} currency={currency} exchange="qse" onSell={() => onSellLots(advice.filter(lot => lot.suggestion === 'sell'))} />
       ) : (
         <p className="text-muted mb-sm">No lot of {ticker.toUpperCase()} is profitable at the current price ({fmtQSEPrice(currentPrice)}) yet.</p>
       )}
@@ -434,61 +427,13 @@ function NewPlanFab() {
   );
 }
 
-/** "Broker Style" view (2026-09-16 trust-restoration): the user's own
- * original ask, restored — a real, always-in-sync-with-Dashboard snapshot
- * of this ticker's OFFICIAL position (whatever `QSESettings.costBasisMethod`
- * is set to — weighted-average by default, or the same lot-based numbers
- * `useQSEDerived()` feeds Dashboard/Portfolio once switched, see that
- * field's own doc comment), rendered right next to Strategic Trades'
- * advisory numbers so a user can directly compare "what my broker/
- * statement would show" against "what a hypothetical Strategic Trades plan
- * projects" without leaving this page or guessing which of the two is
- * which. Never reads anything from `plan`/`tickerAnalysis` — completely
- * independent of the Strategic side. */
-function BrokerStyleView({ ticker }: { ticker: string }) {
-  const { workbook, calcFee, positions } = useQSEDerived();
-  const currency = workbook.settings.currency;
-  const position = positions.find((p) => p.ticker === ticker);
-  const shares = position?.shares || 0;
-
-  if (!position || shares <= 0) {
-    return (
-      <p className="text-muted mb-sm">
-        No open shares of {ticker} right now — there's nothing for a broker statement to show until you hold some.
-      </p>
-    );
-  }
-
-  const avgCost = position.invested / shares;
-  const be = breakEvenPrice(position.invested, shares, workbook.settings.feePct, workbook.settings.tick, calcFee);
-  const mp = getMarketPrice(ticker, workbook.marketPrices, workbook.transactions);
-  const value = shares * mp;
-  const sellFee = mp > 0 ? calcFee(value, false) : 0;
-  const profit = mp > 0 ? value - sellFee - position.invested : NaN;
-
-  return (
-    <div className="grid-auto" style={gridAutoStyle(150, 8)}>
-      <div className="card stat-card" style={hueStyle('var(--info)')}><div className="label">Shares held</div><div className="value">{fmt(shares, 0)}</div></div>
-      <div className="card stat-card" style={hueStyle('var(--accent)')}><div className="label">Avg cost</div><div className="value">{fmtQSEPrice(avgCost)}</div></div>
-      <div className="card stat-card" style={hueStyle('var(--gold)')}><div className="label">Break-even</div><div className="value">{fmtQSEPrice(be)}</div></div>
-      <div className="card stat-card" style={hueStyle('var(--accent)')}><div className="label">Current price</div><div className="value">{mp > 0 ? fmtQSEPrice(mp) : '—'}</div></div>
-      {Number.isFinite(profit) && (
-        <div className="card stat-card" style={hueStyle('var(--accent)')}>
-          <div className="label">Unrealized P/L</div>
-          <div className={`value ${profit >= 0 ? 'pill-positive' : 'pill-negative'}`}>{fmtMoney(profit, currency)}</div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; onToggle?: (open: boolean) => void }) {
   const updateTradePlan = useWorkbookStore((s) => s.updateTradePlan);
   const deleteTradePlan = useWorkbookStore((s) => s.deleteTradePlan);
   const executeTradePlanLeg = useWorkbookStore((s) => s.executeTradePlanLeg);
   const setMarketPrice = useWorkbookStore((s) => s.setMarketPrice);
   const ensureSignedIn = useEnsureSignedIn();
-  const { workbook, calcFee, rows } = useQSEDerived();
+  const { workbook, calcFee, rows, positions } = useQSEDerived();
   const { tickerNames } = useQSEStockData();
   const currency = workbook.settings.currency;
 
@@ -510,16 +455,16 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
   }, [currentPlanDate, plan.id, plan.legs, updateTradePlan]);
 
   const planLots = useMemo(
-    () => computeFIFOPositions(workbook.transactions, calcFee, 'lowestCostFirst').lotsByTicker[guardTicker.toUpperCase()] || [],
+    () => strategyPositions(workbook.transactions, calcFee).lotsByTicker[guardTicker.toUpperCase()] || [],
     [workbook.transactions, calcFee, guardTicker],
   );
-  const missedOpportunity = guardTicker
+  const missedOpportunity = useMemo(() => guardTicker
     ? findMissedOpportunity(workbook.priceHistory[guardTicker.toUpperCase()] || [], planLots, calcFee)
-    : null;
+    : null, [guardTicker, workbook.priceHistory, planLots, calcFee]);
   const [showMissedOpportunities, setShowMissedOpportunities] = useState(false);
 
-  const calcLegFee = (leg: TradePlanLeg) =>
-    leg.feeOverride !== undefined ? leg.feeOverride : calcFee(leg.shares * leg.price, leg.action === 'BUY', { shares: leg.shares });
+  const calcLegFee = useCallback((leg: TradePlanLeg) =>
+    leg.feeOverride !== undefined ? leg.feeOverride : calcFee(leg.shares * leg.price, leg.action === 'BUY', { shares: leg.shares }), [calcFee]);
   const resolveExecutedTx = (leg: TradePlanLeg): Transaction | null =>
     leg.executedTransactionId ? (workbook.transactions.find((t) => t.id === leg.executedTransactionId) ?? null) : null;
   const legFee = (leg: TradePlanLeg): number => {
@@ -561,7 +506,7 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
     setEditTxRow(null);
   };
 
-  const tickerAnalysis = analyzeTradePlanByTicker(plan.legs, rows, calcFee, workbook.settings.feePct, workbook.settings.tick, calcLegFee, guardTicker || undefined);
+  const tickerAnalysis = useMemo(() => analyzeTradePlanByTicker(plan.legs, rows, calcFee, workbook.settings.feePct, workbook.settings.tick, calcLegFee, guardTicker || undefined), [plan.legs, rows, calcFee, workbook.settings.feePct, workbook.settings.tick, calcLegFee, guardTicker]);
 
   const [editingMeta, setEditingMeta] = useState(false);
   const [name, setName] = useState(plan.name);
@@ -576,7 +521,6 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
   // statement would show) and the ADVISORY Strategic Trades view, so both
   // are directly comparable without leaving this card. Defaults to Broker
   // Style — the real, trustworthy figure first.
-  const [statsView, setStatsView] = useState<'broker' | 'strategic'>('strategic');
 
   const addLeg = () => {
     if (!addingLeg || !addingLeg.shares || !addingLeg.price) return toast('Fill in shares and price first.');
@@ -635,6 +579,7 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
   const totalBuy = plan.legs.filter(l => !l.ignored).reduce((s, l) => { const v = resolvedLegValues(l); return s + (v.action === 'BUY' ? v.shares * v.price : 0); }, 0);
   const totalSell = plan.legs.filter(l => !l.ignored).reduce((s, l) => { const v = resolvedLegValues(l); return s + (v.action === 'SELL' ? v.shares * v.price : 0); }, 0);
   const brokerRow = rows.find((row) => row.ticker === guardTicker);
+  const realizedPL = positions.find(position => position.ticker === guardTicker)?.realized ?? 0;
   const holdingsPrice = brokerRow?.marketPrice || getMarketPrice(guardTicker, workbook.marketPrices, workbook.transactions);
   const roundTrip = holdingsPrice > 0 ? perShareCommission(holdingsPrice, calcFee) : null;
   const brokerAvg = brokerRow && brokerRow.shares > 0 ? brokerRow.invested / brokerRow.shares : 0;
@@ -659,21 +604,10 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
   };
   const { sorted: sortedLegRows, Th: LegTh } = useSortableRows(legRows, legSortValue, 'price', 'desc');
 
-  const cardSummary: ReactNode = (
-    <>
-      {guardTicker && (
-        <span className="pill pill-info" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <TickerLogo ticker={guardTicker} exchange="qse" size="sm" />
-          {guardTicker}
-        </span>
-      )}{' '}
-      <span className="text-muted">{plan.createdAt} · {doneCount}/{plan.legs.length} executed</span>
-    </>
-  );
-
   const cardActions: StandardCardAction[] = [
     {
       label: 'Edit plan',
+      icon: <EditIcon size={14} />,
       onClick: () => {
         setName(plan.name);
         setNotes(plan.notes || '');
@@ -683,6 +617,7 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
     },
     ...(!plan.isDefault && guardTicker ? [{
       label: 'Make default',
+      icon: <StarIcon size={14} />,
       onClick: () => {
         const state = useWorkbookStore.getState();
         for (const other of state.workbook.tradePlans) {
@@ -695,10 +630,12 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
     }] : []),
     ...(missedOpportunity ? [{
       label: 'Recent missed opportunities',
+      icon: <CalendarIcon size={14} />,
       onClick: () => setShowMissedOpportunities(true),
     }] : []),
     ...(doneCount > 0 ? [{
       label: 'Clear executed trades',
+      icon: <ArchiveIcon size={14} />,
       onClick: () => {
         void (async () => {
           const ok = await confirmDialog(
@@ -711,10 +648,12 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
     }] : []),
     ...(plan.legs.length > 0 ? [{
       label: 'Batch edit planned legs',
+      icon: <ChecklistIcon size={14} />,
       onClick: () => setBatchEditingLegs(true),
     }] : []),
     ...(plan.legs.length > 0 ? [{
       label: 'Clear plan',
+      icon: <RestoreIcon size={14} />,
       onClick: () => {
         void (async () => {
           const ok = await confirmDialog(
@@ -727,6 +666,7 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
     }] : []),
     {
       label: 'Delete plan',
+      icon: <TrashIcon size={14} />,
       disabled: hasOpenShares && !!plan.isDefault,
       tone: 'danger',
       onClick: () => {
@@ -749,7 +689,21 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
     toast(`Added SELL ${fmt(lot.remainingShares, 0)} ${guardTicker} @ ${fmtQSEPrice(price)} to this plan.`);
   };
 
-  const bodyContent = (
+  const addProfitableLotsToPlan = async (lots: LotAdvice[]) => {
+    if (!(await ensureSignedIn('Sign in to update trade plans.'))) return;
+    const current = useWorkbookStore.getState().workbook.tradePlans.find(item => item.id === plan.id);
+    if (!current) return;
+    const legs = lots.flatMap(lot => {
+      const alreadyPlanned = current.legs.filter(leg => !leg.executed && !leg.ignored && leg.action === 'SELL' && leg.ticker === guardTicker && leg.targetLotBuyId === lot.buyId).reduce((sum, leg) => sum + leg.shares, 0);
+      const shares = Math.max(0, lot.remainingShares - alreadyPlanned);
+      return shares > 0 ? [{ date: today(), action: 'SELL' as const, ticker: guardTicker, shares, price: holdingsPrice, targetLotBuyId: lot.buyId }] : [];
+    });
+    if (!legs.length) { toast('Profitable shares are already planned.'); return; }
+    updateTradePlan(plan.id, { legs: [...current.legs, ...legs] });
+    toast('Added profitable shares to planned trades.');
+  };
+
+  const bodyContent = open ? (
     <>
       {editingMeta && (
         <div className="row mb-sm" style={{ gap: 8 }}>
@@ -761,41 +715,41 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
         </div>
       )}
       <div className="grid-auto mb-sm" style={gridAutoStyle(260, 8)}>
-        <div role="button" tabIndex={0} className={`card stat-card${statsView === 'broker' ? ' active' : ''}`} onClick={() => setStatsView('broker')} onKeyDown={event=>{if(event.target===event.currentTarget && (event.key==='Enter'||event.key===' ')){event.preventDefault();setStatsView('broker');}}}>
+        <div className="card stat-card">
           <div className="label">Current Holdings <StatSourceBadge source="official" /></div>
           <div className="value">Avg {brokerAvg > 0 ? fmtQSEPrice(brokerAvg) : '—'} · BE {brokerBE > 0 ? fmtQSEPrice(brokerBE) : '—'} <span className="shares-box">{fmt(brokerRow?.shares || 0, 0)}</span></div>
-          <div className="sub">Value {brokerRow ? fmtMoney(brokerRow.value, currency) : '—'} · <span className={(brokerRow?.profit ?? 0) >= 0 ? 'pill-positive' : 'pill-negative'}>P/L {brokerRow ? fmtMoney(brokerRow.profit, currency) : '—'}</span></div>
-          {guardTicker && <div className="sub holdings-price-row" onClick={event=>event.stopPropagation()} onKeyDown={event=>event.stopPropagation()}>
-            <label className="holdings-price-label">Price <PriceInput exchange="qse" aria-label={`Current price for ${guardTicker}`} key={holdingsPrice} type="number" step="0.001" className="price-input w-96" defaultValue={holdingsPrice || ''} placeholder="—" onKeyDown={async event=>{if(event.key==='Enter'){const target=event.currentTarget;const value=parseFloat(target.value)||0;if(value>0 && await ensureSignedIn('Sign in to save price updates.')){setMarketPrice(guardTicker,value);toast(`${guardTicker} price saved: ${fmtQSEPrice(value)}`);}target.blur();}}} /></label>
+          <div className="sub">Value {brokerRow ? fmtMoney(brokerRow.value, currency) : '\u2014'} {'\u00b7'} <span className={`pill ${realizedPL >= 0 ? 'pill-positive' : 'pill-negative'}`}>Realized P/L {fmtMoney(realizedPL, currency)}</span></div>
+          {guardTicker && <div className="holdings-price-section plan-execution-split" onClick={event=>event.stopPropagation()} onKeyDown={event=>event.stopPropagation()}>
+            <div className="label">Current Price</div>
+            <div className="holdings-price-row"><PriceInput exchange="qse" aria-label={`Current price for ${guardTicker}`} key={holdingsPrice} type="number" step="0.001" className="price-input w-96" defaultValue={holdingsPrice || ''} placeholder="—" onKeyDown={async event=>{if(event.key==='Enter'){const target=event.currentTarget;const value=parseFloat(target.value)||0;if(value>0 && await ensureSignedIn('Sign in to save price updates.')){setMarketPrice(guardTicker,value);toast(`${guardTicker} price saved: ${fmtQSEPrice(value)}`);}target.blur();}}} />
+            <div className="holdings-roundtrip">
+            <span className="holdings-rtc" title="Buy and sell commission per share">RTC {roundTrip ? '+'+fmtQSEPrice(roundTrip.buy+roundTrip.sell) : '—'}</span>
             <span title="Current price plus buy and sell commission per share">RT {roundTrip ? fmtQSEPrice(holdingsPrice+roundTrip.buy+roundTrip.sell) : '—'}</span>
-            <span title="Buy and sell commission per share">RTC {roundTrip ? '+'+fmtQSEPrice(roundTrip.buy+roundTrip.sell) : '—'}</span>
+            </div>
+            <span className={`pill ${(brokerRow?.profit ?? 0) >= 0 ? 'pill-positive' : 'pill-negative'}`}>Unrealized P/L {brokerRow ? fmtMoney(brokerRow.profit, currency) : '\u2014'}</span>
+            </div>
           </div>}
         </div>
-        <button type="button" className={`card stat-card${statsView === 'strategic' ? ' active' : ''}`} onClick={() => setStatsView('strategic')}>
+        <div className="card stat-card">
           <div className="label">Planned Strategic Trades <StatSourceBadge source="advisory" /></div>
           <div className="value">Avg {strategicRow?.avgCost ? fmtQSEPrice(strategicRow.avgCost) : '—'} · BE {strategicRow?.breakEven ? fmtQSEPrice(strategicRow.breakEven) : '—'} <span className="shares-box">{fmt(strategicRow?.effectiveShares ?? 0, 0)}</span></div>
-          {strategicRow && <PlanExecutionSummary analysis={[strategicRow]} exchange="qse" currency={currency} compact />}
-        </button>
+          {strategicRow && <PlanExecutionSummary analysis={[strategicRow]} exchange="qse" currency={currency} compact calcFee={calcFee} marketPrices={{ ...workbook.marketPrices, ...Object.fromEntries(rows.map(row => [row.ticker, row.marketPrice])) }} realizedByTicker={Object.fromEntries(positions.map(position => [position.ticker, position.realized]))} />}
+        </div>
       </div>
 
-      {statsView === 'broker' && guardTicker && (
-        <div style={{ marginBottom: 16 }}>
-          <div className="text-muted" style={{ marginBottom: 4 }}>
-            Exactly what your broker/statement would show for {guardTicker} right now — unaffected by anything
-            in this plan or Strategic Trades below.
-          </div>
-          <BrokerStyleView ticker={guardTicker} />
-        </div>
-      )}
 
-      {statsView === 'strategic' && (
-        <>
 
-      {tickerAnalysis.some(row => row.ticker !== strategicRow?.ticker) && <PlanExecutionSummary analysis={tickerAnalysis.filter(row => row.ticker !== strategicRow?.ticker)} exchange="qse" currency={currency} />}
-        </>
-      )}
+      {tickerAnalysis.some(row => row.ticker !== strategicRow?.ticker) && <PlanExecutionSummary analysis={tickerAnalysis.filter(row => row.ticker !== strategicRow?.ticker)} exchange="qse" currency={currency} calcFee={calcFee} marketPrices={{ ...workbook.marketPrices, ...Object.fromEntries(rows.map(row => [row.ticker, row.marketPrice])) }} realizedByTicker={Object.fromEntries(positions.map(position => [position.ticker, position.realized]))} />}
+
 
       <h3 className="mb-sm">Planned Trades</h3>
+      {planLots.length > 1 && (
+        <Notice tone="warning" className="mb-sm">
+          Partial Trade Strategy concentrates your remaining position in your worst-performing lots — you keep
+          holding whatever doesn't sell. <Link to="/legal">Read more</Link>
+        </Notice>
+      )}
+
       <div className="table-scroll">
         <table>
           <thead>
@@ -952,31 +906,29 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
         </table>
       </div>
 
-      {statsView === 'strategic' && guardTicker && (
-        <div className="mt-sm">
+      <div className="row gap-sm mt-sm mb-sm" style={{ alignItems: 'center' }}>
+        {!addingLeg && <button type="button" className="btn secondary small" onClick={() => setAddingLeg({ date: today(), action: 'BUY', shares: 0, price: 0 })}><PlusIcon size={12} />Add leg</button>}
+        <SummaryChip label="Planned buys" value={fmtMoney(totalBuy, currency)} />
+        <SummaryChip label="Planned sells" value={fmtMoney(totalSell, currency)} />
+        {tickerAnalysis.some(summary => summary.plannedSold > 0) && <SummaryChip label="Pending sell P/L" value={fmtMoney(tickerAnalysis.reduce((sum, summary) => sum + summary.realizedPL, 0), currency)} />}
+      </div>
+
+      {guardTicker && (
+        <div className="mt-sm strategy-view-panel">
           <h3 className="mb-sm">Open Lots</h3>
-          <PartialTradeAdvisor ticker={guardTicker} onSellLot={addLotToPlan} />
+          <PartialTradeAdvisor ticker={guardTicker} onSellLot={addLotToPlan} onSellLots={addProfitableLotsToPlan} />
         </div>
       )}
 
-      {!addingLeg && (
-        <button className="btn secondary small mt-sm" onClick={() => setAddingLeg({ date: today(), action: 'BUY', shares: 0, price: 0 })}>
-          <PlusIcon size={12} />Add leg
-        </button>
-      )}
 
-      <p className="text-muted mt-sm">
-        Planned buys {fmtMoney(totalBuy, currency)} · Planned sells {fmtMoney(totalSell, currency)}
-        {tickerAnalysis.some((t) => t.plannedSold > 0) && (<> · Total planned P/L {fmtMoney(tickerAnalysis.reduce((s, t) => s + t.realizedPL, 0), currency)}</>)}
-      </p>
     </>
-  );
+  ) : null;
 
   return (
     <>
       <StandardCard
-        title={<span>{plan.name}{plan.isDefault && <span className="pill pill-info ml-6">Default</span>}</span>}
-        summary={cardSummary}
+        title={<span className="trade-plan-title">{guardTicker && <><TickerLogo ticker={guardTicker} exchange="qse" size="sm" /><span className="trade-plan-stock">{tickerNames[guardTicker] || guardTicker}{tickerNames[guardTicker] && <> ({guardTicker})</>}</span></>}<span className="trade-plan-name">{plan.name}</span></span>}
+        headerEnd={<>{plan.isDefault && <span className="pill pill-info">Default</span>}<span className="text-muted trade-plan-execution-count">{doneCount}/{plan.legs.length} executed</span></>}
         actions={cardActions}
         defaultOpen={false}
         open={open}
@@ -1036,6 +988,8 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
   );
 }
 
+const MemoPlanCard = memo(PlanCard);
+
 export function TradeStrategyPage() {
   const tradePlans = useWorkbookStore((s) => s.workbook.tradePlans);
   const addTradePlan = useWorkbookStore((s) => s.addTradePlan);
@@ -1043,6 +997,12 @@ export function TradeStrategyPage() {
   const navigate = useNavigate();
   const exchange = "QSE";
   const [openPlans, setOpenPlans] = useState<Record<string, boolean>>({});
+  const planToggleHandlers = useMemo(() => Object.fromEntries(tradePlans.map(plan => [plan.id, (open: boolean) => setOpenPlans(current => ({ ...current, [plan.id]: open }))])), [tradePlans]);
+  const { activeSection, setActiveSection } = useActivePageSection([
+    { key: 'profitable-share-alerts', id: 'profitable-share-alerts' },
+    ...sorted.map(plan => ({ key: plan.id, id: `trade-plan-${plan.id}` })),
+    { key: 'buy-sell-avg-down', id: 'buy-sell-avg-down' },
+  ]);
   usePageTopBarRightSlot(
     <TopBarControls><Select
       aria-label="Stock exchange"
@@ -1055,26 +1015,47 @@ export function TradeStrategyPage() {
     </Select></TopBarControls>,
   );
   usePageTopBarChips(useMemo(() => [
-    {
-      key: 'buy-sell-avg-down',
-      label: 'Buy/Sell & Avg Down',
-      active: false,
-      onClick: () => {
-        document.getElementById('buy-sell-avg-down')?.querySelector<HTMLButtonElement>('.standard-card-toggle[aria-expanded="false"]')?.click();
-        requestAnimationFrame(() => document.getElementById('buy-sell-avg-down')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-      },
-    },
+    { key: 'profitable-share-alerts', label: 'Alerts', active: activeSection === 'profitable-share-alerts', onClick: () => { setActiveSection('profitable-share-alerts'); document.getElementById('profitable-share-alerts')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } },
     ...sorted.map((plan) => ({
       key: plan.id,
       label: plan.name,
-      active: false,
+      active: activeSection === plan.id,
       onClick: () => {
+        setActiveSection(plan.id);
         setOpenPlans((current) => ({ ...current, [plan.id]: true }));
         requestAnimationFrame(() => document.getElementById(`trade-plan-${plan.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
       },
     })),
-  ], [tradePlans]));
+    {
+      key: 'buy-sell-avg-down',
+      label: 'Calculator',
+      active: activeSection === 'buy-sell-avg-down',
+      onClick: () => {
+        setActiveSection('buy-sell-avg-down');
+        document.getElementById('buy-sell-avg-down')?.querySelector<HTMLButtonElement>('.standard-card-toggle[aria-expanded="false"]')?.click();
+        requestAnimationFrame(() => document.getElementById('buy-sell-avg-down')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      },
+    },
+  ], [tradePlans, activeSection, setActiveSection]));
   const { rows, workbook, calcFee } = useQSEDerived();
+  const ensureSignedIn = useEnsureSignedIn();
+  const planProfitableShares = async (ticker: string, lots: LotAdvice[], price: number) => {
+    if (!(await ensureSignedIn('Sign in to update trade plans.'))) return;
+    const state = useWorkbookStore.getState();
+    const existing = state.workbook.tradePlans.find(plan => (plan.defaultTicker || plan.legs[0]?.ticker) === ticker && plan.isDefault)
+      || state.workbook.tradePlans.find(plan => (plan.defaultTicker || plan.legs[0]?.ticker) === ticker);
+    const legs = lots.flatMap(lot => {
+      const planned = (existing?.legs || []).filter(leg => !leg.executed && !leg.ignored && leg.action === 'SELL' && leg.ticker === ticker && leg.targetLotBuyId === lot.buyId).reduce((sum, leg) => sum + leg.shares, 0);
+      const shares = Math.max(0, lot.remainingShares - planned);
+      return shares > 0 ? [{ date: today(), action: 'SELL' as const, ticker, shares, price, targetLotBuyId: lot.buyId }] : [];
+    });
+    if (!legs.length) { toast('Profitable shares are already planned.'); return; }
+    const id = existing?.id || crypto.randomUUID();
+    if (existing) state.updateTradePlan(id, { legs: [...existing.legs, ...legs] });
+    else state.addTradePlan({ id, name: ticker + ' Plan', createdAt: today(), defaultTicker: ticker, isDefault: true, legs });
+    setOpenPlans(current => ({ ...current, [id]: true }));
+    toast('Added profitable shares to planned trades.');
+  };
   const { user } = useAuthState();
 
   // Phase 3: every open position always has its own plan to host that
@@ -1100,16 +1081,21 @@ export function TradeStrategyPage() {
   }, [user, rows, tradePlans, addTradePlan]);
 
   return (
-    <div className="standard-page">
+    <div className="standard-page trade-strategy-page">
       <PageHeading back={<BackButton to="/qse">← QSE</BackButton>}><h1 className="pagetitle">QSE Trade Strategy</h1></PageHeading>
-     <ProfitableLotAlerts transactions={workbook.transactions} marketPrices={workbook.marketPrices} calcFee={calcFee} feePct={workbook.settings.feePct} tick={workbook.settings.tick} currency={workbook.settings.currency} exchange="qse" />
+     <ProfitableLotAlerts transactions={workbook.transactions} marketPrices={workbook.marketPrices} calcFee={calcFee} feePct={workbook.settings.feePct} tick={workbook.settings.tick} currency={workbook.settings.currency} exchange="qse" onSell={planProfitableShares} />
 
-      <h2 style={{ marginTop: 20, marginBottom: 8, fontSize: 16 }}>Trade Planner</h2>
+      <section>
+      <h2 className="trade-strategy-heading">Trade Planner</h2>
       <NewPlanFab />
-      {sorted.length ? <div className="standard-section-stack">{sorted.map((p) => <div key={p.id} id={`trade-plan-${p.id}`} className="standard-section-anchor" style={{ scrollMarginTop: 96 }}><PlanCard plan={p} open={!!openPlans[p.id]} onToggle={(open) => setOpenPlans((current) => ({ ...current, [p.id]: open }))} /></div>)}</div> : <p className="text-muted">No trade plans yet.</p>}
+      {sorted.length ? <div className="standard-section-stack">{sorted.map((p) => <div key={p.id} id={`trade-plan-${p.id}`} className="standard-section-anchor" style={{ scrollMarginTop: 96 }}><MemoPlanCard plan={p} open={!!openPlans[p.id]} onToggle={planToggleHandlers[p.id]} /></div>)}</div> : <p className="text-muted">No trade plans yet.</p>}
 
 
-      <div id="buy-sell-avg-down" className="standard-section-anchor" style={{ scrollMarginTop: 96 }}><BuySellAvgDownCalculator /></div>
+      </section>
+      <section id="buy-sell-avg-down" className="standard-section-anchor" style={{ scrollMarginTop: 96 }}>
+        <h2 className="trade-strategy-heading">Trade Calculator</h2>
+        <BuySellAvgDownCalculator />
+      </section>
     </div>
   );
 }

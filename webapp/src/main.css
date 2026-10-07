@@ -149,6 +149,24 @@
 
 /* ================= Standard page template ================= */
 .standard-page{display:flex;flex-direction:column;gap:16px;}
+.trade-strategy-page { gap: 10px; }
+.trade-strategy-page > .page-heading { margin-bottom: 0; }
+.trade-strategy-heading { font-size: 16px; line-height: 1.3; margin: 10px 0 6px; }
+.trade-plan-card > .standard-card-header .standard-card-title { min-width: 0; width: 100%; }
+.trade-plan-title { display: flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; }
+.trade-plan-stock { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.trade-plan-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 11px; font-weight: 400; color: var(--muted); text-transform: none; letter-spacing: normal; }
+.trade-plan-execution-count { font-size: 11px; white-space: nowrap; }
+.trade-plan-card .standard-card-menu-item { font-size: 12px; gap: 6px; padding: 6px 8px; }
+.holdings-roundtrip { display: flex; flex-direction: column; gap: 2px; }
+.holdings-rtc { font-size: 10px; color: var(--muted); }
+.strategy-view-toggle { cursor: pointer; transition: background-color 160ms ease, box-shadow 160ms ease; }
+.strategy-view-toggle:hover, .strategy-view-toggle:focus-visible { box-shadow: 0 0 0 1px var(--accent); }
+.strategy-view-panel { animation: strategy-panel-enter 180ms ease-out; }
+@keyframes strategy-panel-enter { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .strategy-view-panel { animation: none; } .strategy-view-toggle { transition: none; } }
+.profitable-share-alerts > :last-child { margin-bottom: 0; }
+.profitable-share-alerts > p { margin-top: 0; }
 .page-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
 .page-heading-title-row{display:flex;align-items:center;gap:8px;margin-top:6px;}
 .standard-section-stack{display:flex;flex-direction:column;gap:16px;}

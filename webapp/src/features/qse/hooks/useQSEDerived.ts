@@ -1,3 +1,4 @@
+import type { Workbook } from '../../../types/workbook';
 import { useMemo } from 'react';
 import { buildCashLedger, cashSummary, computePositions, computeRealizedPLTimeSeries, getMarketPrice, makeQSEFeeCalculator } from '../../../lib/calc';
 import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
@@ -20,10 +21,7 @@ export interface QSERow {
  * all) needed the same opt-in lot-based methods PSX already had — this
  * mirrors `usePSXDerived`'s own branch exactly. Default ('average' /
  * undefined) is byte-for-byte unchanged from before this existed. */
-export function useQSEDerived(selectedTickers?: string[]) {
-  const workbook = useWorkbookStore((s) => s.workbook);
-
-  return useMemo(() => {
+function calculateDerived(workbook: Workbook, selectedTickers?: string[]) {
     const scoped = selectedTickers?.length ? workbook.transactions.filter((tx) => selectedTickers.includes(tx.ticker)) : workbook.transactions;
     const calcFee = makeQSEFeeCalculator(workbook.settings);
     const method = workbook.settings.costBasisMethod ?? 'average';
@@ -65,5 +63,22 @@ export function useQSEDerived(selectedTickers?: string[]) {
       });
 
     return { workbook, calcFee, positions, summary, realizedSeries, ledger, rows, lots };
-  }, [workbook, selectedTickers?.join('|')]);
+
+}
+
+const sharedDerived = new WeakMap<Workbook, ReturnType<typeof calculateDerived>>();
+
+export function useQSEDerived(selectedTickers?: string[]) {
+  const workbook = useWorkbookStore((state) => state.workbook);
+  const tickerKey = selectedTickers?.join('|') ?? '';
+  return useMemo(() => {
+    if (!tickerKey) {
+      const cached = sharedDerived.get(workbook);
+      if (cached) return cached;
+      const result = calculateDerived(workbook);
+      sharedDerived.set(workbook, result);
+      return result;
+    }
+    return calculateDerived(workbook, tickerKey.split('|'));
+  }, [workbook, tickerKey]);
 }

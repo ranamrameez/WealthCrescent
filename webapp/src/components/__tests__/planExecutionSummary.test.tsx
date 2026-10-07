@@ -25,10 +25,10 @@ describe.each(['psx', 'qse'] as const)('%s execution summary', exchange => {
     const { container } = render(<PlanExecutionSummary analysis={analysis} exchange={exchange} currency={currency} compact />);
     const columns = container.querySelector('.plan-execution-columns')!;
     expect(columns.children[0]).toHaveTextContent('Still planned');
-    expect(columns.children[0]).toHaveTextContent('-20 sell');
+    expect(columns.children[0]).toHaveTextContent('Sell 20');
     expect(columns.children[0]).toHaveTextContent(fmtMoney(160, currency));
     expect(columns.children[1]).toHaveTextContent('Already executed');
-    expect(columns.children[1]).toHaveTextContent('+100 buy');
+    expect(columns.children[1]).toHaveTextContent('Buy 100');
     expect(container.querySelector('.card')).toBeNull();
     expect(screen.queryByText('Avg cost')).toBeNull();
   });
@@ -39,9 +39,9 @@ describe.each(['psx', 'qse'] as const)('%s execution summary', exchange => {
     const snapshot = JSON.stringify({ legs, analysis });
     render(<PlanExecutionSummary analysis={analysis} exchange={exchange} currency={currency} />);
     expect(screen.getAllByText(/Plan execution summary/)).toHaveLength(1);
-    expect(metric('Already executed')).toHaveTextContent('+100 buy');
-    expect(metric('Still planned')).toHaveTextContent('+50 buy');
-    expect(metric('Still planned')).toHaveTextContent('-20 sell');
+    expect(metric('Already executed')).toHaveTextContent('Buy 100');
+    expect(metric('Still planned')).toHaveTextContent('Buy 50');
+    expect(metric('Still planned')).toHaveTextContent('Sell 20');
     expect(metric('Shares after plan')).toHaveTextContent('130');
     expect(metric('Avg cost')).toHaveTextContent(price(2000 / 150));
     expect(metric('Break-even')).toHaveTextContent(price(analysis[0].breakEven));
@@ -52,14 +52,14 @@ describe.each(['psx', 'qse'] as const)('%s execution summary', exchange => {
   it('updates after execution while keeping the projected holding unchanged', () => {
     const pending = leg({ shares: 50, price: 20 });
     const { rerender } = render(<PlanExecutionSummary analysis={analyze([pending])} exchange={exchange} currency={currency} />);
-    expect(metric('Still planned')).toHaveTextContent('+50 buy');
+    expect(metric('Still planned')).toHaveTextContent('Buy 50');
     expect(metric('Shares after plan')).toHaveTextContent('150');
     rerender(<PlanExecutionSummary analysis={analyze([{ ...pending, executed: true }], 150, 2000)} exchange={exchange} currency={currency} />);
-    expect(metric('Already executed')).toHaveTextContent('+50 buy');
-    expect(metric('Still planned').textContent).toBe('\u2014');
+    expect(metric('Already executed')).toHaveTextContent('Buy 50');
+    expect(metric('Still planned').textContent).toBe('0');
     expect(metric('Shares after plan')).toHaveTextContent('150');
     expect(metric('Avg cost')).toHaveTextContent(price(2000 / 150));
-    expect(metric('Planned P/L (from pending sells)').textContent).toBe('\u2014');
+    expect(metric('Planned P/L (from pending sells)').textContent).toBe(fmtMoney(0, currency));
   });
 
   it('preserves visibility of every ticker in legacy multi-stock plans', () => {

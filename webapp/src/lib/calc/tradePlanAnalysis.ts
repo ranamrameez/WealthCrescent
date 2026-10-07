@@ -50,6 +50,12 @@ export interface TradePlanTickerSummary {
  * cost-basis math — they're already inside `realHoldings` via the real
  * Transaction "Mark done" created, so folding them in again would double
  * their effect. */
+export function projectedPlanPL(summary: TradePlanTickerSummary, currentPrice: number, actualRealizedPL: number, calcFee: FeeCalculator) {
+  const remainingPL = currentPrice > 0 && summary.effectiveShares > 0
+    ? whatIfExit(summary.effectiveShares, summary.avgCost, currentPrice, calcFee).pl : 0;
+  return actualRealizedPL + summary.realizedPL + remainingPL;
+}
+
 export function analyzeTradePlanByTicker(
   legs: TradePlanLeg[],
   realHoldings: RealHolding[],

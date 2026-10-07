@@ -1,3 +1,4 @@
+import type { PSXWorkbook } from '../../../types/psxWorkbook';
 import { useMemo } from 'react';
 import { buildCashLedger, cashSummary, computePositions, computeRealizedPLTimeSeries, getMarketPrice } from '../../../lib/calc';
 import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
@@ -30,10 +31,7 @@ export interface PSXRow {
  * numbers. `lots` exposes each open ticker's remaining lots for display;
  * it's empty under the weighted-average method, which has no discrete lots
  * to show. */
-export function usePSXDerived(selectedTickers?: string[]) {
-  const workbook = usePSXWorkbookStore((s) => s.workbook);
-
-  return useMemo(() => {
+function calculateDerived(workbook: PSXWorkbook, selectedTickers?: string[]) {
     const scoped = selectedTickers?.length ? workbook.transactions.filter((tx) => selectedTickers.includes(tx.ticker)) : workbook.transactions;
     const calcFee = makePSXFeeCalculator(workbook.settings, scoped);
     const method = workbook.settings.costBasisMethod;
@@ -73,5 +71,22 @@ export function usePSXDerived(selectedTickers?: string[]) {
       });
 
     return { workbook, calcFee, positions, summary, realizedSeries, ledger, rows, lots };
-  }, [workbook, selectedTickers?.join('|')]);
+
+}
+
+const sharedDerived = new WeakMap<PSXWorkbook, ReturnType<typeof calculateDerived>>();
+
+export function usePSXDerived(selectedTickers?: string[]) {
+  const workbook = usePSXWorkbookStore((state) => state.workbook);
+  const tickerKey = selectedTickers?.join('|') ?? '';
+  return useMemo(() => {
+    if (!tickerKey) {
+      const cached = sharedDerived.get(workbook);
+      if (cached) return cached;
+      const result = calculateDerived(workbook);
+      sharedDerived.set(workbook, result);
+      return result;
+    }
+    return calculateDerived(workbook, tickerKey.split('|'));
+  }, [workbook, tickerKey]);
 }

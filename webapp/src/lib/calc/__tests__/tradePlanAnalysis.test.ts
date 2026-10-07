@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FeeCalculator, TradePlanLeg } from '../../../types/workbook';
-import { analyzeTradePlanByTicker, whatIfExit } from '../tradePlanAnalysis';
+import { analyzeTradePlanByTicker, projectedPlanPL, whatIfExit } from '../tradePlanAnalysis';
 
 const leg = (over: Partial<TradePlanLeg>): TradePlanLeg => ({
   date: '2026-01-01',
@@ -15,6 +15,14 @@ const noFee: FeeCalculator = () => 0;
 const flatFee: FeeCalculator = (amount) => amount * 0.01;
 
 describe('analyzeTradePlanByTicker', () => {
+  it('projects existing holdings even without pending sells and includes actual realized P/L', () => {
+    const [summary] = analyzeTradePlanByTicker([], [{ ticker: 'QGTS', shares: 100, invested: 1000 }], noFee, 0, 0.01, undefined, 'QGTS');
+    expect(projectedPlanPL(summary, 12, -50, noFee)).toBe(150);
+  });
+  it('combines blended remaining holdings and pending sells without counting executed legs twice', () => {
+    const [summary] = analyzeTradePlanByTicker([leg({ shares: 100, price: 10, executed: true }), leg({ shares: 50, price: 20 }), leg({ action: 'SELL', shares: 20, price: 18 })], [{ ticker: 'QGTS', shares: 100, invested: 1000 }], noFee, 0, 0.01);
+    expect(projectedPlanPL(summary, 15, 40, noFee)).toBeCloseTo(40 + 20 * (18 - 2000 / 150) + 130 * (15 - 2000 / 150));
+  });
   it('excludes ignored trades from projections and includes them again when restored', () => {
     const legs = [leg({ shares: 50, price: 20, ignored: true }), leg({ action: 'SELL', shares: 20, price: 18, ignored: true })];
     const real = [{ ticker: 'QGTS', shares: 100, invested: 1000 }];

@@ -1,3 +1,7 @@
+import { useEnsureSignedIn } from '../lib/firebase/useEnsureSignedIn';
+import { computeFIFOPositions } from '../lib/calc/fifoPositions';
+import { computeLotAdvice } from '../lib/calc/partialTradeStrategy';
+import { getMarketPrice } from '../lib/calc/priceHistory';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { makeQSEFeeCalculator } from '../lib/calc/fees';
@@ -30,6 +34,26 @@ interface AlertRow extends PartialTradeOpportunity {
  * pattern) — link-only (confirmed via Q&A): clicking a row navigates to
  * that ticker's own page to act, no duplicate write path here. */
 export function PartialTradeAlertsPopup() {
+  const ensureSignedIn = useEnsureSignedIn();
+  const planSell = async (row: AlertRow) => {
+    if (!(await ensureSignedIn('Sign in to update trade plans.'))) return;
+    const state = row.exchange === 'psx' ? usePSXWorkbookStore.getState() : useWorkbookStore.getState();
+    const wb = state.workbook;
+    const fee = row.exchange === 'psx' ? makePSXFeeCalculator(usePSXWorkbookStore.getState().workbook.settings, wb.transactions) : makeQSEFeeCalculator(useWorkbookStore.getState().workbook.settings);
+    const price = getMarketPrice(row.ticker, wb.marketPrices, wb.transactions);
+    const lots = computeFIFOPositions(wb.transactions, fee, 'lowestCostFirst').lotsByTicker[row.ticker] || [];
+    const advice = computeLotAdvice(lots, fee, price, wb.settings.feePct, wb.settings.tick).filter(lot => lot.suggestion === 'sell');
+    const plan = wb.tradePlans.find(item => (item.defaultTicker || item.legs[0]?.ticker) === row.ticker && item.isDefault) || wb.tradePlans.find(item => (item.defaultTicker || item.legs[0]?.ticker) === row.ticker);
+    const legs = advice.flatMap(lot => {
+      const pending = (plan?.legs || []).filter(leg => !leg.executed && !leg.ignored && leg.action === 'SELL' && leg.ticker === row.ticker && leg.targetLotBuyId === lot.buyId).reduce((sum, leg) => sum + leg.shares, 0);
+      const shares = Math.max(0, lot.remainingShares - pending);
+      return shares > 0 ? [{ date: today(), ticker: row.ticker, action: 'SELL' as const, shares, price, targetLotBuyId: lot.buyId }] : [];
+    });
+    if (!legs.length) return;
+    if (plan) state.updateTradePlan(plan.id, { legs: [...plan.legs, ...legs] });
+    else state.addTradePlan({ id: crypto.randomUUID(), name: row.ticker + ' Plan', createdAt: today(), defaultTicker: row.ticker, isDefault: true, legs });
+    setHidden(true);
+  };
   const qseSettings = useWorkbookStore((s) => s.workbook.settings);
   const qseTx = useWorkbookStore((s) => s.workbook.transactions);
   const qseMarketPrices = useWorkbookStore((s) => s.workbook.marketPrices);
@@ -109,7 +133,7 @@ export function PartialTradeAlertsPopup() {
                 {d.sellableShares}/{d.totalShares} sh sellable · {fmtMoney(d.bestUnrealizedPL, d.currency)}
               </div>
             </div>
-            <button className="btn secondary small" onClick={() => dismissOne(d.key)}>Dismiss</button>
+            <div className="row gap-sm"><button className="btn secondary small" onClick={() => planSell(d)}>Sell</button><button className="btn secondary small" onClick={() => dismissOne(d.key)}>Dismiss</button></div>
           </div>
         ))}
       </div>

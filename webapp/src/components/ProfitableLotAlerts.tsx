@@ -1,30 +1,26 @@
-import { computeFIFOPositions } from '../lib/calc/fifoPositions';
-import { computeLotAdvice, profitableLotTotals, sellableShareSummary } from '../lib/calc/partialTradeStrategy';
+import { strategyPositions } from '../lib/calc/strategyPositions';
+import { computeLotAdvice, profitableLotTotals, sellableShareSummary, type LotAdvice } from '../lib/calc/partialTradeStrategy';
 import { getMarketPrice } from '../lib/calc/priceHistory';
-import { fmt, fmtMoney, fmtPSXPrice, fmtQSEPrice } from '../lib/format';
 import type { FeeCalculator, Transaction } from '../types/workbook';
-import { Notice } from './Notice';
+import { memo } from 'react';
+import { ProfitableStockAlert } from './ProfitableStockAlert';
 
-export function ProfitableLotAlerts({ transactions, marketPrices, calcFee, feePct, tick, currency, exchange }: {
+function ProfitableLotAlertsView({ transactions, marketPrices, calcFee, feePct, tick, currency, exchange, onSell }: {
   transactions: Transaction[]; marketPrices: Record<string, number>; calcFee: FeeCalculator;
-  feePct: number; tick: number; currency: string; exchange: 'psx' | 'qse';
+  feePct: number; tick: number; currency: string; exchange: 'psx' | 'qse'; onSell?: (ticker: string, lots: LotAdvice[], price: number) => void;
 }) {
-  const { lotsByTicker } = computeFIFOPositions(transactions, calcFee, 'lowestCostFirst');
+  const { lotsByTicker } = strategyPositions(transactions, calcFee);
   const alerts = Object.entries(lotsByTicker).flatMap(([ticker, lots]) => {
     const price = getMarketPrice(ticker, marketPrices, transactions);
     if (price <= 0) return [];
     const advice = computeLotAdvice(lots, calcFee, price, feePct, tick);
     const shares = sellableShareSummary(advice);
-    return shares.sellable > 0 ? [{ ticker, price, ...shares, ...profitableLotTotals(advice, price) }] : [];
+    return shares.sellable > 0 ? [{ ticker, price, advice, ...shares, ...profitableLotTotals(advice, price) }] : [];
   }).sort((a, b) => b.profit - a.profit);
-  const priceFormat = exchange === 'psx' ? fmtPSXPrice : fmtQSEPrice;
-  return <section className="mb-sm" aria-label="Profitable share alerts" aria-live="polite">
-    <h2 className="mb-sm">Profitable Share Alerts</h2>
-    {alerts.length ? alerts.map(alert => <Notice key={alert.ticker} tone="success" className="mb-sm">
-      <strong>{alert.ticker}</strong>: {fmt(alert.sellable, 0)} of {fmt(alert.total, 0)} shares profitable at {priceFormat(alert.price)}
-      {' · '}Estimated profit {fmtMoney(alert.profit, currency)}
-      {' · '}Sale value {fmtMoney(alert.grossProceeds, currency)}
-      {' · '}Net proceeds {fmtMoney(alert.netProceeds, currency)}
-    </Notice>) : <p className="text-muted">No open lots are profitable at current prices.</p>}
+  return <section id="profitable-share-alerts" className="profitable-share-alerts" aria-label="Profitable share alerts" aria-live="polite" style={{ scrollMarginTop: 96 }}>
+    <h2 className="trade-strategy-heading">Profitable Share Alerts</h2>
+    {alerts.length ? alerts.map(alert => <ProfitableStockAlert key={alert.ticker} {...alert} currency={currency} exchange={exchange} onSell={onSell ? () => onSell(alert.ticker, alert.advice.filter(lot => lot.suggestion === 'sell'), alert.price) : undefined} />) : <p className="text-muted">No open lots are profitable at current prices.</p>}
   </section>;
 }
+
+export const ProfitableLotAlerts = memo(ProfitableLotAlertsView);
