@@ -193,7 +193,7 @@ function PartialTradeAdvisor({ ticker, onSellLot, onSellLots }: { ticker: string
   const currentPrice = row?.marketPrice || 0;
   const advice = computeLotAdvice(lots, calcFee, currentPrice, feePct, tick);
   type LotCol = 'buyDate' | 'buyPrice' | 'remainingShares' | 'costPerShare' | 'breakEven' | 'unrealizedPL' | 'suggestion';
-  const { sorted: sortedAdvice, Th: LotTh } = useSortableRows(advice, (lot: LotAdvice, col: LotCol) => lot[col], 'buyDate', 'asc');
+  const { sorted: sortedAdvice, Th: LotTh } = useSortableRows(advice, (lot: LotAdvice, col: LotCol) => lot[col], 'buyDate', 'desc');
 
 
   // User-reported (2026-09-16): a plan's ticker with zero matching
