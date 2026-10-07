@@ -1,3 +1,4 @@
+import { ToggleChip } from '../../../components/ui/ToggleChip';
 import { PageHeading } from '../../../components/PageHeading';
 import { BackButton } from '../../../components/BackButton';
 import type { User } from 'firebase/auth';
@@ -239,6 +240,7 @@ function CostBasisSettings() {
 
   return (
     <Card>
+      <ToggleChip checked={!!settings.partialTradeAlertsEnabled} onChange={next => updateSettings({ partialTradeAlertsEnabled: next })} label="Show realtime Partial Trade Alerts popup" />
       <h3 className="mt-0">Cost basis method</h3>
       <p className="text-muted" style={{ marginTop: -4 }}>
         Average cost blends every buy into one running average, so a sell can't be tied to a

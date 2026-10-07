@@ -78,8 +78,8 @@ export function analyzeTradePlanByTicker(
   return tickers.map((ticker) => {
     const real = realHoldings.find((r) => r.ticker === ticker);
     const tickerLegs = legs.filter((l) => l.ticker === ticker);
-    const pendingBuys = tickerLegs.filter((l) => l.action === 'BUY' && !l.executed);
-    const pendingSells = tickerLegs.filter((l) => l.action === 'SELL' && !l.executed);
+    const pendingBuys = tickerLegs.filter((l) => l.action === 'BUY' && !l.executed && !l.ignored);
+    const pendingSells = tickerLegs.filter((l) => l.action === 'SELL' && !l.executed && !l.ignored);
     const executedBought = tickerLegs.filter((l) => l.action === 'BUY' && l.executed).reduce((s, l) => s + l.shares, 0);
     const executedSold = tickerLegs.filter((l) => l.action === 'SELL' && l.executed).reduce((s, l) => s + l.shares, 0);
 

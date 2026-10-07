@@ -188,6 +188,8 @@ export interface Adjustment {
 }
 
 export interface TradePlanLeg {
+  /** Retained in the plan, excluded from pending projections until restored. */
+  ignored?: boolean;
   action: 'BUY' | 'SELL';
   ticker: string;
   shares: number;

@@ -15,6 +15,20 @@ const noFee: FeeCalculator = () => 0;
 const flatFee: FeeCalculator = (amount) => amount * 0.01;
 
 describe('analyzeTradePlanByTicker', () => {
+  it('excludes ignored trades from projections and includes them again when restored', () => {
+    const legs = [leg({ shares: 50, price: 20, ignored: true }), leg({ action: 'SELL', shares: 20, price: 18, ignored: true })];
+    const real = [{ ticker: 'QGTS', shares: 100, invested: 1000 }];
+    const [ignored] = analyzeTradePlanByTicker(legs, real, noFee, 0, 0.01);
+    expect(ignored.effectiveShares).toBe(100);
+    expect(ignored.avgCost).toBe(10);
+    expect(ignored.plannedBought).toBe(0);
+    expect(ignored.plannedSold).toBe(0);
+    expect(ignored.realizedPL).toBe(0);
+    const [restored] = analyzeTradePlanByTicker(legs.map(l => ({ ...l, ignored: false })), real, noFee, 0, 0.01);
+    expect(restored.effectiveShares).toBe(130);
+    expect(restored.plannedBought).toBe(50);
+    expect(restored.plannedSold).toBe(20);
+  });
   it('computes average cost and break-even from a plan\'s own pending buy legs, no fees', () => {
     const legs = [leg({ action: 'BUY', shares: 100, price: 10 })];
     const [summary] = analyzeTradePlanByTicker(legs, [], noFee, 0, 0.01);

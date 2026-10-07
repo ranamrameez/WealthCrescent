@@ -48,7 +48,7 @@ export function PartialTradeAlertsPopup() {
     if (qseSettings.partialTradeAlertsEnabled) {
       const calcFee = makeQSEFeeCalculator(qseSettings);
       scanPortfolioForOpportunities(qseTx, calcFee, qseMarketPrices, qseSettings.feePct, qseSettings.tick).forEach((o) => {
-        const key = `qse:${o.ticker}:${date}`;
+        const key = `qse:${o.ticker}:${date}:${o.sellableShares}:${o.bestUnrealizedPL}`;
         if (!isDismissed(key)) rows.push({ ...o, exchange: 'qse', currency: qseSettings.currency, key });
       });
     }
@@ -61,16 +61,18 @@ export function PartialTradeAlertsPopup() {
     }
     return rows;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [qseSettings, qseTx, qseMarketPrices, psxSettings, psxTx, psxMarketPrices, isDismissed]);
 
   const [visibleKeys, setVisibleKeys] = useState<string[]>(() => initial.map((d) => d.key));
   const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
+    setVisibleKeys(initial.map(row => row.key));
+    setHidden(false);
     if (!initial.length) return;
     const t = setTimeout(() => setHidden(true), AUTO_HIDE_MS);
     return () => clearTimeout(t);
-  }, [initial.length]);
+  }, [initial]);
 
   const visible = initial.filter((d) => visibleKeys.includes(d.key));
   if (hidden || !visible.length) return null;

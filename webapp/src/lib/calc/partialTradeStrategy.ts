@@ -87,6 +87,15 @@ export function sellableShareSummary(advice: LotAdvice[]): { sellable: number; t
   return { sellable, total };
 }
 
+/** Totals for the profitable lots only, using the same per-lot fee estimates as the table. */
+export function profitableLotTotals(advice: LotAdvice[], currentPrice: number) {
+  return advice.filter(lot => lot.suggestion === 'sell').reduce((sum, lot) => ({
+    profit: sum.profit + lot.unrealizedPL,
+    grossProceeds: sum.grossProceeds + lot.remainingShares * currentPrice,
+    netProceeds: sum.netProceeds + lot.remainingShares * lot.costPerShare + lot.unrealizedPL,
+  }), { profit: 0, grossProceeds: 0, netProceeds: 0 });
+}
+
 export interface MissedOpportunity {
   /** The recent peak is evaluated separately for each lot, and only using
    * prices on/after that lot's buy date. A later purchase can never claim a

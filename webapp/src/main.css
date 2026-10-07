@@ -729,6 +729,39 @@ hr {
 	flex-direction: column;
 }
 
+.holdings-price-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.holdings-price-row .holdings-price-label {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  width: auto;
+  gap: 4px;
+  margin: 0;
+}
+.plan-execution-split {
+  width: 100%;
+  margin-top: 6px;
+  padding-top: 6px;
+  /* border-top: 1px solid var(--border); */
+  text-align: left;
+}
+.plan-execution-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.plan-execution-columns > div + div {
+  border-left: 1px solid var(--border);
+  padding-left: 8px;
+}
+.stat-card .plan-execution-columns .label {
+  margin-bottom: 0;
+}
 .stat-card .label {
 	color: var(--muted);
 	font-size: 10.5px;

@@ -175,7 +175,7 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
       executeTradePlanLeg: (planId, legIndex) => mutate((wb) => {
         const plan = wb.tradePlans.find((p) => p.id === planId);
         const leg = plan?.legs[legIndex];
-        if (!plan || !leg || leg.executed) return wb;
+        if (!plan || !leg || leg.executed || leg.ignored) return wb;
         const tx: Transaction = { id: crypto.randomUUID(), seq: nextSeqForEntity(wb.transactions, (t) => t.ticker, leg.ticker), timestamp: new Date().toISOString(), date: leg.date || new Date().toISOString().slice(0, 10), ticker: leg.ticker, action: leg.action, shares: leg.shares, price: leg.price, targetLotBuyId: leg.targetLotBuyId };
         return { ...wb, transactions: [...wb.transactions, tx], tradePlans: wb.tradePlans.map((p) => p.id === planId ? { ...p, legs: p.legs.map((l, i) => i === legIndex ? { ...l, executed: true, executedTransactionId: tx.id } : l) } : p) };
       }),

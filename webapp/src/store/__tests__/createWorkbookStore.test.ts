@@ -25,6 +25,18 @@ function createEmptyTestWorkbook(): TestWorkbook {
 const STORAGE_KEY = 'test_workbook_normalize_v1';
 
 describe('createWorkbookStore normalize', () => {
+  it('retains ignored legs and prevents execution until they are restored', () => {
+    const useStore = createWorkbookStore('test_ignored_plan', createEmptyTestWorkbook);
+    const leg = { date: '2026-08-01', ticker: 'QGTS', action: 'BUY' as const, shares: 100, price: 10, ignored: true };
+    useStore.getState().addTradePlan({ id: 'ignored', name: 'Plan', createdAt: '2026-08-01', legs: [leg] });
+    useStore.getState().executeTradePlanLeg('ignored', 0);
+    expect(useStore.getState().workbook.transactions).toHaveLength(0);
+    expect(useStore.getState().workbook.tradePlans[0].legs[0]).toMatchObject(leg);
+    useStore.getState().updateTradePlan('ignored', { legs: [{ ...leg, ignored: false }] });
+    useStore.getState().executeTradePlanLeg('ignored', 0);
+    expect(useStore.getState().workbook.transactions).toHaveLength(1);
+    localStorage.removeItem('test_ignored_plan');
+  });
   beforeEach(() => {
     localStorage.removeItem(STORAGE_KEY);
   });
