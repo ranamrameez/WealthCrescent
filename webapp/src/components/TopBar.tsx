@@ -1,9 +1,11 @@
 import { useWorkbookStore } from '../store/workbookStore';
 import { usePSXWorkbookStore } from '../store/psxWorkbookStore';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { CATEGORIES, categoryForPath } from './CategoryNav';
+import { categoryForPath } from './CategoryNav';
 import { TopBarSelect } from './TopBarControls';
 import { usePageTopBarStore } from '../store/pageTopBarStore';
+import { useRef } from 'react';
+import { useTopBarPageSections } from '../hooks/useTopBarPageSections';
 
 /** App-wide fixed top bar — user-requested (2026-09-11, design reference:
  * `wealth_tracker_template/` in this repo): the page's own sections
@@ -25,7 +27,7 @@ import { usePageTopBarStore } from '../store/pageTopBarStore';
  *
  * Reads from `pageTopBarStore` — the exact same "page registers, one
  * globally-mounted component renders" shape `FabPanel`/`fabActionsStore`
- * already established for the floating action button. Always includes module navigation; pages register their own sibling switchers and filters. */
+ * already established for the floating action button. The sidebar owns module navigation; this bar keeps page sections, sibling switchers and filters. */
 export function TopBar() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -36,19 +38,21 @@ export function TopBar() {
   const stockWorkbook=exchange==='psx'?psx:qse;
   const stockOptions=[...new Set([...stockWorkbook.transactions.map(tx=>tx.ticker),...Object.keys(stockWorkbook.marketPrices)])].sort();
   const stockDetail=/\/stock\//.test(location.pathname);
-  const chips = usePageTopBarStore((s) => s.chips);
+  const registered = usePageTopBarStore((s) => s.chips);
+  const bar = useRef<HTMLDivElement>(null);
+  const chips = useTopBarPageSections(bar, registered, location.pathname + location.search);
   const rightSlot = usePageTopBarStore((s) => s.rightSlot);
 
   return (
-    <div className="page-topbar">
+    <div ref={bar} className="page-topbar">
       <div className="chip-tabs page-topbar-sections">
         {chips.map((c) => (
-          <button key={c.key} type="button" className={`chip${c.active ? ' active' : ''}`} onClick={c.onClick}>
+          <button key={c.key} type="button" className={`chip${c.active ? ' active' : ''}`} aria-current={c.active ? 'location' : undefined} onClick={c.onClick}>
             {c.label}
           </button>
         ))}
       </div>
-      <div className="page-topbar-right"><TopBarSelect label="Module" className="account-switch-select" value={category ?? ''} options={[{value:'',label:'Select module'},...CATEGORIES.map(item=>({value:item.key,label:item.label}))]} onChange={event=>{const next=CATEGORIES.find(item=>item.key===event.target.value);if(next)navigate(next.to);}} />{category==='stocks' && !stockDetail && <TopBarSelect label="Stock" className="account-switch-select" value="" options={[{value:'',label:'All stocks'},...stockOptions.map(ticker=>({value:ticker,label:ticker}))]} onChange={event=>{if(event.target.value)navigate(`${exchange==='psx'?'/psx':''}/stock/${event.target.value}`);}} />}{rightSlot}</div>
+      <div className="page-topbar-right">{category==='stocks' && !stockDetail && <TopBarSelect label="Stock" className="account-switch-select" value="" options={[{value:'',label:'All stocks'},...stockOptions.map(ticker=>({value:ticker,label:ticker}))]} onChange={event=>{if(event.target.value)navigate(`${exchange==='psx'?'/psx':''}/stock/${event.target.value}`);}} />}{rightSlot}</div>
     </div>
   );
 }

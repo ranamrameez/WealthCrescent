@@ -148,7 +148,12 @@
 
 
 /* ================= Standard page template ================= */
-.standard-page{display:flex;flex-direction:column;gap:16px;}
+.standard-page{display:flex;flex-direction:column;gap:var(--page-card-gap, 16px);}
+.page-card:not(.stat-card) { padding: var(--page-card-padding-y) var(--page-card-padding-x); }
+.standard-page > .page-card, .standard-page > .page-section-card { margin-top: 0; margin-bottom: 0; }
+.standard-section-anchor { scroll-margin-top: 96px; }
+.page-topbar .topbar-select-wrap > span { display: none; }
+.page-topbar .modal-overlay .topbar-select-wrap > span { display: inline; }
 .trade-strategy-page { gap: 10px; }
 .trade-strategy-page > .page-heading { margin-bottom: 0; }
 .trade-strategy-heading { font-size: 16px; line-height: 1.3; margin: 10px 0 6px; }

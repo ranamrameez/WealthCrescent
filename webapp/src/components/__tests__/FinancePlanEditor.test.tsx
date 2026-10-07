@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { FinancePlanEditor } from '../FinancePlanEditor';
 import { PlanFinanceEditor } from '../PlanFinanceEditor';
 import { FinancePlansHierarchy } from '../FinancePlansHierarchy';
+import { PageFabGroup } from '../PageFabGroup';
 import { MemoryRouter } from 'react-router-dom';
 import { usePlannedCashWorkbookStore } from '../../store/plannedCashWorkbookStore';
 import { usePlannedBankWorkbookStore } from '../../store/plannedBankWorkbookStore';
@@ -49,7 +50,7 @@ describe('Shared plan editors',()=>{
     expect(usePlannedCashWorkbookStore.getState().workbook.entries[0]).not.toHaveProperty('accountId');
   });
   it('keeps the Add plan FAB on the empty overview and opens parent detail with dated items',()=>{
-    const rendered=render(<MemoryRouter><FinancePlansHierarchy filters={filters} controls={null} /></MemoryRouter>);
+    const rendered=render(<MemoryRouter initialEntries={['/planning']}><FinancePlansHierarchy filters={filters} controls={null} /><PageFabGroup /></MemoryRouter>);
     expect(screen.getByRole('button',{name:'Add plan'})).toBeTruthy();
     rendered.unmount();
     usePlannedCashWorkbookStore.getState().addEntry({id:'salary',date:'2026-10-01',type:'IN',currencyCode:'QAR',amount:100,note:'Salary',recurrence:{cycle:'monthly',startDate:'2026-10-01'}});

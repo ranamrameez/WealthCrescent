@@ -29,7 +29,6 @@ import { Tooltip } from '../../../components/Tooltip';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
 import { PendingToggle } from '../../../components/ui/PendingToggle';
 import { IconButton } from '../../../components/ui/IconButton';
-import { FabPanel } from '../../../components/ui/Fab';
 import { TransactionEntryModal } from '../../../components/TransactionEntryModal';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
 import { TimeZoneFields } from '../../../components/ui/TimeZoneFields';
@@ -269,7 +268,7 @@ function BrokerDetail({ broker, onBack, onSelectFund, onSelect }: { broker: Brok
 function FabButtonAddFund({ brokerId, open, setOpen }: { brokerId: string; open: boolean; setOpen: (v: boolean) => void }) {
   return (
     <>
-      <FabPanel actions={[{ label: 'Add fund', icon: <PlusIcon />, onClick: () => setOpen(true) }]} />
+      <EntityActions actions={[{ label: 'Add fund', icon: <PlusIcon />, onClick: () => setOpen(true) }]} />
       {open && (
         <Modal title="Add a fund" onClose={() => setOpen(false)}>
           <AddFundForm initialBrokerId={brokerId} onSaved={() => setOpen(false)} />
@@ -1715,7 +1714,7 @@ export function FundsPage({
   usePageTopBarRightSlot(!liveSelected && !liveSelectedBroker && (funds.length || brokers.length) ? <TopBarControls><QuickEntitySwitch label="Broker" value="" options={[{value:"",label:"All brokers"},...brokers.map(broker=>({value:broker.id,label:broker.name}))]} onChange={id=>{const next=brokers.find(broker=>broker.id===id);if(next)setSelectedBroker(next);}} /><QuickEntitySwitch label="Fund" value="" options={[{value:"",label:"All funds"},...funds.map(fund=>({value:fund.id,label:fund.name}))]} onChange={id=>{ const next=funds.find(item=>item.id===id);if(next)setSelected(next); }} /><EntityScopeMenu label="Funds" options={funds.map((fund) => ({ value: fund.id, label: fund.name }))} /><TransactionFilterMenu value={filters} categories={[]} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls> : null);
 
   return (
-    <div>
+    <div className="standard-page">
       {!liveSelected && !liveSelectedBroker && <>
       <PageHeading back={<BackButton to="/net-worth">Overview</BackButton>}><h1 className="pagetitle">Funds</h1></PageHeading>
       <AddFundFab />

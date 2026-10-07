@@ -1,3 +1,4 @@
+import { StandardCard } from '../../../components/StandardCard';
 import { PageHeading } from '../../../components/PageHeading';
 import { BackButton } from '../../../components/BackButton';
 import { PriceInput } from '../../../components/ui/PriceInput';
@@ -27,10 +28,10 @@ export function WatchlistPage() {
   const [w, setW] = useState<WatchlistItem>({ ticker: '', target: 0, current: 0 });
 
   return (
-    <div>
+    <div className="standard-page">
       <PageHeading back={<BackButton to="/qse">← QSE</BackButton>}><h1 className="pagetitle">Watchlist</h1></PageHeading>
 
-      <h3>Add to watchlist</h3>
+      <StandardCard title="Add to watchlist">
       <div className="row gap-sm">
         <input
           placeholder="Ticker"
@@ -69,7 +70,10 @@ export function WatchlistPage() {
         </button>
       </div>
 
+      </StandardCard>
+      <StandardCard title="Watchlist">
       <WatchlistTable workbook={workbook} tickerNames={tickerNames} updateWatchlistItem={updateWatchlistItem} removeWatchlistItem={removeWatchlistItem} />
+      </StandardCard>
     </div>
   );
 }

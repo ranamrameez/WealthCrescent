@@ -100,7 +100,7 @@ export function AnalyticsPage() {
   const fundamentalsRows = rows.map((r) => r.ticker).filter((t) => fundamentals[t]);
 
   return (
-    <div>
+    <div className="standard-page">
       <PageHeading back={<BackButton to="/qse">← QSE</BackButton>}><h1 className="pagetitle">Analytics</h1></PageHeading>
       <p className="text-muted" style={{ marginTop: -8, marginBottom: 20 }}>
         The full chart library — head back to Dashboard for a quick overview.

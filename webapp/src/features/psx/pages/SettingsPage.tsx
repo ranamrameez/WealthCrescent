@@ -316,7 +316,7 @@ export function SettingsPage({
   uploadLocalToCloud: () => Promise<void>;
 }) {
   return (
-    <div>
+    <div className="standard-page">
       <PageHeading back={<BackButton to="/psx">← PSX</BackButton>}><h1 className="pagetitle">PSX Settings</h1></PageHeading>
       <Tabs
         tabs={[

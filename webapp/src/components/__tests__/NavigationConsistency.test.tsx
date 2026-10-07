@@ -7,9 +7,24 @@ import { DateInput } from '../ui/Field';
 import { useAppearanceStore } from '../../store/appearanceStore';
 import { StandardCard } from '../StandardCard';
 import { SummaryGroupCard } from '../SummaryGroupCard';
+import { MemoryRouter } from 'react-router-dom';
+import { TopBar } from '../TopBar';
+import { usePageTopBarStore } from '../../store/pageTopBarStore';
 
 afterEach(cleanup);
 describe('Consistent navigation and presentation',()=>{
+  it('omits the main-module switcher while preserving banking child dropdowns and accessible names',()=>{
+    usePageTopBarStore.getState().setRightSlot(<TopBarControls><TopBarSelect label="Bank" className="account-switch-select" value="" options={[{value:'',label:'All banks'}]} /><QuickEntitySwitch label="Account" value="" options={[{value:'',label:'All accounts'}]} onChange={()=>{}} /></TopBarControls>);
+    try {
+      render(<MemoryRouter initialEntries={['/bank']}><TopBar /></MemoryRouter>);
+      expect(screen.queryByRole('combobox',{name:'Module'})).toBeNull();
+      expect(screen.getByRole('combobox',{name:'Bank'})).toBeVisible();
+      expect(screen.getByRole('combobox',{name:'Account'})).toBeVisible();
+      expect(screen.getAllByRole('combobox')).toHaveLength(2);
+    } finally {
+      act(()=>usePageTopBarStore.getState().setRightSlot(null));
+    }
+  });
   it('keeps parent and sibling navigation visible while filters open separately',()=>{
     const change=vi.fn();
     render(<TopBarControls><QuickEntitySwitch label="Fund" value="a" options={[{value:'',label:'All funds'},{value:'a',label:'Fund A'},{value:'b',label:'Fund B'}]} onChange={change} /><TopBarSelect label="Category" value="all" onChange={()=>{}} options={[{value:'all',label:'All categories'}]} /></TopBarControls>);

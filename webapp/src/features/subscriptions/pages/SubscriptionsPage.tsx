@@ -831,7 +831,7 @@ export function SubscriptionsPage({
   usePageTopBarRightSlot(!liveSelected && subs.length ? <TopBarControls><QuickEntitySwitch label="Subscription" value="" options={[{value:"",label:"All subscriptions"},...subs.map(sub=>({value:sub.id,label:sub.name}))]} onChange={id=>{ const next=subs.find(item=>item.id===id);if(next)setSelected(next); }} /><EntityScopeMenu label="Subscriptions" options={subs.map((s) => ({ value: s.id, label: s.name }))} /><TransactionFilterMenu value={filters} categories={[...new Set(subs.map(sub => subCategoryLabel(sub, useCategoryStore.getState().workbook.categories)))]} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls> : null);
 
   return (
-    <div>
+    <div className="standard-page">
       {!liveSelected && <>
       <PageHeading back={<BackButton to="/net-worth">Overview</BackButton>}><h1 className="pagetitle">Subscriptions</h1></PageHeading>
       <AddSubscriptionFab />

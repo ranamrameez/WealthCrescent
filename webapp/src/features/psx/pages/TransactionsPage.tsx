@@ -1089,7 +1089,7 @@ function CashLedgerSection() {
 
 export function TransactionsPage() {
   return (
-    <div>
+    <div className="standard-page">
       <PageHeading back={<BackButton to="/psx">← PSX</BackButton>}><h1 className="pagetitle">PSX Trade Transactions</h1></PageHeading>
       {/* User-reported (2026-08-28, real audit after "you're ignoring what's
          asked for") — same fix as QSE's identical structure: the Transfers

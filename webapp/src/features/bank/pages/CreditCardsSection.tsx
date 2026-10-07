@@ -772,7 +772,7 @@ export function CreditCardDetailPage() {
   const openCycleNet = openCycle ? openCycle.chargesThisCycle - openCycle.paymentsThisCycle : 0;
 
   return (
-    <div>
+    <div className="standard-page">
       <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginTop: 8, marginBottom: 12, flexWrap: 'wrap', gap: 8 }}><BackButton to="/bank">← Back to Banking</BackButton>
         <h1 className="pagetitle" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
           {card.name}

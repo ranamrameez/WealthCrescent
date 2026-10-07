@@ -6,6 +6,7 @@ export interface TabDef {
   label: string;
   content: ReactNode;
   headerExtra?: ReactNode;
+  defaultOpen?: boolean;
 }
 
 /** Compatibility adapter onto the standard URL-aware page section stack.
@@ -20,6 +21,7 @@ export function Tabs({ tabs, defaultKey }: { tabs: TabDef[]; defaultKey?: string
         label: tab.label,
         content: tab.content,
         headerEnd: tab.headerExtra,
+        defaultOpen: tab.defaultOpen,
       }))}
     />
   );

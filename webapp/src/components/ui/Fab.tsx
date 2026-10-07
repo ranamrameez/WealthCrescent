@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Tooltip } from '../Tooltip';
 import { MenuIcon, XIcon } from '../icons';
 import { useAppearanceStore } from '../../store/appearanceStore';
+import { orderedFabActions } from '../../lib/fabActionOrder';
 
 /** The floating "+" action button every module uses for its "Often" tier
  * add-entity flow (Done items 82/166/170/202) — was 9 byte-identical
@@ -39,7 +40,8 @@ export interface FabAction {
  * "add a new account" action of its own — only "Transfers" makes sense
  * there) renders exactly like the plain `FabButton` always did, with no
  * pointless expand step for a single choice. */
-export function FabPanel({ actions }: { actions: FabAction[] }) {
+export function FabPanel({ actions: suppliedActions }: { actions: FabAction[] }) {
+  const actions = orderedFabActions(suppliedActions);
   const fabAlwaysOpen = useAppearanceStore((s) => !!s.appearance.fabAlwaysOpen);
   const [open, setOpen] = useState(fabAlwaysOpen);
   if (!actions.length) return null;

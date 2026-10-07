@@ -91,7 +91,7 @@ export function AnalyticsPage() {
   };
 
   return (
-    <div>
+    <div className="standard-page">
       <PageHeading back={<BackButton to="/psx">← PSX</BackButton>}><h1 className="pagetitle">PSX Analytics</h1></PageHeading>
       <p className="text-muted" style={{ marginTop: -8, marginBottom: 20 }}>
         The full chart library — head back to Dashboard for a quick overview.

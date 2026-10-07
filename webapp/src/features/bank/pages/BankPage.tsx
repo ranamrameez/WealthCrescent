@@ -253,9 +253,10 @@ function BankForm({ bank, onSaved }: { bank?: Bank; onSaved?: () => void }) {
 }
 
 function AccountsFab() {
-  const [open, setOpen] = useState<'account' | 'transfer' | 'bank' | null>(null);
+  const [open, setOpen] = useState<'account' | 'transfer' | 'bank' | 'plan' | null>(null);
   const actions = useMemo(
     () => [
+      { label: 'Add a plan', icon: <PlusIcon />, onClick: () => setOpen('plan') },
       { label: 'Add an account', icon: <ListIcon />, onClick: () => setOpen('account') },
       { label: 'Transfers', icon: <TransferIcon />, onClick: () => setOpen('transfer') },
       { label: 'Add a bank', icon: <BankIcon />, onClick: () => setOpen('bank') },
@@ -265,6 +266,7 @@ function AccountsFab() {
   usePageFabActions('bank-accounts', actions);
   return (
     <>
+      {open === 'plan' && <FinancePlanEditor initialFinance={{ module: 'bank' }} onClose={() => setOpen(null)} />}
       {open === 'account' && (
         <EntityEditorModal title="Add an account" onClose={() => setOpen(null)}>
           <AddAccountForm onSaved={() => setOpen(null)} />
@@ -589,6 +591,7 @@ export function BankDetailPage() {
   const [bankModalOpen, setBankModalOpen] = useState(false);
   const [addAccountOpen, setAddAccountOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [addPlanOpen, setAddPlanOpen] = useState(false);
 
   usePageTopBarRightSlot(bank ? (
     <TopBarControls>
@@ -750,9 +753,11 @@ export function BankDetailPage() {
       <PageHeading back={<BackButton to="/bank">← Back to Banking</BackButton>}><h1 className="pagetitle">{bank.name}</h1></PageHeading>
       <StandardPageSections key={bank.id} defaultKey="summary" sections={sections} />
       <FabPanel actions={[
+        ...(linkedAccounts.length ? [{ label: 'Add a plan', icon: <PlusIcon />, onClick: () => setAddPlanOpen(true) }] : []),
         { label: 'Add an account', icon: <ListIcon />, onClick: () => setAddAccountOpen(true) },
         { label: 'Transfers', icon: <TransferIcon />, onClick: () => setTransferOpen(true) },
       ]} />
+      {addPlanOpen && <FinancePlanEditor initialFinance={transferDefault} onClose={() => setAddPlanOpen(false)} />}
       {bankModalOpen && (
         <EntityEditorModal title="Edit bank" onClose={() => setBankModalOpen(false)}>
           <BankForm bank={bank} onSaved={() => setBankModalOpen(false)} />
@@ -1195,16 +1200,18 @@ function useAccountPicker() {
  * other module's own Transfers FAB opens. */
 function AccountTransfersFab({ accountId, currencyCode }: { accountId: string; currencyCode: string }) {
   const [open, setOpen] = useState(false);
+  const [planOpen, setPlanOpen] = useState(false);
   const actionsByKey = useFabActionsStore((s) => s.actionsByKey);
   const fabActions = allExtraActions(actionsByKey);
   const actions = useMemo(
-    () => [{ label: 'Transfers', icon: <TransferIcon />, onClick: () => setOpen(true) }],
+    () => [{ label: 'Add a plan', icon: <PlusIcon />, onClick: () => setPlanOpen(true) }, { label: 'Transfers', icon: <TransferIcon />, onClick: () => setOpen(true) }],
     [],
   );
   usePageFabActions('bank-account-detail', actions);
   return (
     <>
       <FabPanel actions={fabActions} />
+      {planOpen && <FinancePlanEditor initialFinance={{ module: 'bank', ref: accountId, currencyCode }} onClose={() => setPlanOpen(false)} />}
       {open && <TransactionEntryModal defaultFinance={{ module: 'bank', ref: accountId, currencyCode }} onClose={() => setOpen(false)} />}
     </>
   );

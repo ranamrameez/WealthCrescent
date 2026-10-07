@@ -30,7 +30,6 @@ import { toast } from '../../../components/Toast';
 import { Tooltip } from '../../../components/Tooltip';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
 import { IconButton } from '../../../components/ui/IconButton';
-import { FabPanel } from '../../../components/ui/Fab';
 import { TransactionEntryModal } from '../../../components/TransactionEntryModal';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
 import { useEnabledCurrencies } from '../../../hooks/useEnabledCurrencies';
@@ -1021,7 +1020,7 @@ function LoanDetail({ loan, onSelect, onBack }: { loan: PersonalLoan; onSelect: 
     >
       {batchEditor === 'payments' && <LoanPaymentsBatchEditor key={loan.id} loan={loan} rows={[...filteredPayments].sort((a, b) => b.date.localeCompare(a.date) || (b.seq ?? 0) - (a.seq ?? 0))} onClose={() => setBatchEditor(null)} />}
       {batchEditor === 'plans' && <LoanPlansBatchEditor key={loan.id} loan={loan} rows={plans.filter(plan => plan.loanId === loan.id).sort((a, b) => a.date.localeCompare(b.date))} onClose={() => setBatchEditor(null)} />}
-      <FabPanel actions={[
+      <EntityActions actions={[
         { label: 'Add payment', icon: <TransferIcon />, onClick: () => setAddPaymentOpen(true) },
         { label: 'Add a plan', icon: <PlusIcon />, onClick: () => setAddPlanOpen(true) },
       ]} />

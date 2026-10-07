@@ -281,7 +281,7 @@ export function PortfolioPage() {
   const goToStock = (ticker: string) => navigate(`/stock/${ticker}`);
 
   return (
-    <div>
+    <div className="standard-page">
       <PageHeading back={<BackButton to="/qse">← QSE</BackButton>}><h1 className="pagetitle">Portfolio</h1></PageHeading>
       <p className="pagesub">Open positions and closed trade history.</p>
       <Tabs

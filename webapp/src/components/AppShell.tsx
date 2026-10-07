@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
+import { PageFabGroup } from './PageFabGroup';
 
 const COLLAPSE_KEY = 'WealthCrescent_sidebar_collapsed_v1';
 
@@ -66,6 +67,7 @@ export function AppShell({ user, children }: { user: User | null; children: Reac
         </button>
         <TopBar />
         {children}
+        <PageFabGroup />
       </div>
     </div>
   );

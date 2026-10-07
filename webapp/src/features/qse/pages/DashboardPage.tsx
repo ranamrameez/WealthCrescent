@@ -14,7 +14,6 @@ import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { StockBar as Bar, StockDoughnut as Doughnut, StockLine as Line } from '../../../components/StockCharts';
 import { stockTickerColor } from '../../../lib/stockChartTheme';
 import { StatCard } from '../../../components/Card';
-import { StandardCard } from '../../../components/StandardCard';
 import { Sparkline } from '../../../components/Sparkline';
 import { TickerLogo } from '../../../components/TickerLogo';
 import { RoundTripCostModal } from '../../../components/RoundTripCostModal';
@@ -366,7 +365,7 @@ export function DashboardPage() {
   }, []);
 
   return (
-    <div>
+    <div className="standard-page">
       <PageHeading back={<BackButton to="/net-worth">← Overview</BackButton>}><h1 className="pagetitle">Dashboard</h1></PageHeading>
 
       {/* Only the 9 stat cards genuinely identical regardless of cost-basis
@@ -411,7 +410,7 @@ export function DashboardPage() {
       </div>
 
       <Tabs
-        defaultKey="broker"
+        defaultKey="summary"
         tabs={[
           {
             key: 'broker',
@@ -443,15 +442,12 @@ export function DashboardPage() {
               />
             ),
           },
+          { key: 'summary', label: 'Account summary', defaultOpen: true, content: <><InvestmentBalanceSummary transactions={workbook.transactions} plans={workbook.tradePlans} marketPrices={workbook.marketPrices} priceHistory={workbook.priceHistory} tickers={selectedTickers} currency={currency} filters={filters} /></> },
+          { key: 'plans', label: 'Plans', defaultOpen: false, content: <><InvestmentPlans market="qse" items={selectedTickers.map(ticker => ({ id: ticker, name: ticker, currency }))} filters={filters} /></> },
+          { key: 'transactions', label: 'Transactions', defaultOpen: false, content: <><InvestmentTransactions market="qse" transactions={workbook.transactions.filter(tx => selectedTickers.includes(tx.ticker))} currency={currency} filters={filters} /></> },
+          { key: 'alerts', label: 'Alerts', defaultOpen: false, content: <AlertsBox /> },
         ]}
       />
-
-      <StandardCard className="mb-md" title="Account summary"><InvestmentBalanceSummary transactions={workbook.transactions} plans={workbook.tradePlans} marketPrices={workbook.marketPrices} priceHistory={workbook.priceHistory} tickers={selectedTickers} currency={currency} filters={filters} /></StandardCard>
-      <StandardCard className="mt-md" title="Plans" defaultOpen={false}><InvestmentPlans market="qse" items={selectedTickers.map(ticker => ({ id: ticker, name: ticker, currency }))} filters={filters} /></StandardCard>
-      <StandardCard className="mt-md" title="Transactions" defaultOpen={false}><InvestmentTransactions market="qse" transactions={workbook.transactions.filter(tx => selectedTickers.includes(tx.ticker))} currency={currency} filters={filters} /></StandardCard>
-      <StandardCard className="mt-md" title="Alerts" defaultOpen={false}>
-        <AlertsBox />
-      </StandardCard>
 
       <div style={{ marginTop: 16, textAlign: 'center' }}>
         <Link to="/analytics" className="btn secondary">

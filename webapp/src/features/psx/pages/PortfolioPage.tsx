@@ -277,7 +277,7 @@ export function PortfolioPage() {
   const goToStock = (ticker: string) => navigate(`/psx/stock/${ticker}`);
 
   return (
-    <div>
+    <div className="standard-page">
       <PageHeading back={<BackButton to="/psx">← PSX</BackButton>}><h1 className="pagetitle">PSX Portfolio</h1></PageHeading>
       <p className="pagesub">Open positions and closed trade history.</p>
       <Tabs

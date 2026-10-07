@@ -244,7 +244,7 @@ export function AppDataPage() {
   };
 
   return (
-    <div>
+    <div className="standard-page">
       <PageHeading back={<BackButton to="/net-worth">← Overview</BackButton>}><h1 className="pagetitle">App Data</h1></PageHeading>
       <p className="text-muted mb-12">
         Backup or restore your ENTIRE WealthCrescent account in one file — every module at once, instead of each

@@ -1038,7 +1038,7 @@ function CashLedgerSection() {
 
 export function TransactionsPage() {
   return (
-    <div>
+    <div className="standard-page">
       <PageHeading back={<BackButton to="/qse">← QSE</BackButton>}><h1 className="pagetitle">Trade Transactions</h1></PageHeading>
       {/* User-reported (2026-08-28, real audit after "you're ignoring what's
          asked for"): the Transfers FAB used to live inside `TransfersSection`

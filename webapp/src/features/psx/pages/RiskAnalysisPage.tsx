@@ -12,7 +12,7 @@ export function RiskAnalysisPage() {
   const { feePct, tick, currency } = workbook.settings;
 
   return (
-    <div>
+    <div className="standard-page">
       <PageHeading back={<BackButton to="/psx">← PSX</BackButton>}><h1 className="pagetitle">PSX Risk Analysis</h1></PageHeading>
       <p className="text-muted" style={{ marginTop: -8, marginBottom: 20 }}>
         Model averaging down into an existing position — new average cost, break-even, and a stress test on the

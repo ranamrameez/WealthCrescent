@@ -468,7 +468,7 @@ export function NetWorthPage({
   };
 
   return (
-    <div>
+    <div className="standard-page">
       <h1>Dashboard</h1>
       <StandardPageSections sections={[{ key: 'summary', label: 'Overall summary', defaultOpen: true, content: <div className="grid-auto" style={{ ...gridAutoStyle(320, 16), marginBottom: 16, alignItems: 'start' }}>
         {preferredCurrencyOptions.map(({ code: preferredCurrency }) => {

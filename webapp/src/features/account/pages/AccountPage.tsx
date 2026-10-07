@@ -440,7 +440,7 @@ export function AccountPage({ syncStatuses }: { syncStatuses: ModuleSyncStatus[]
   };
 
   return (
-    <div>
+    <div className="standard-page">
       <PageHeading back={<BackButton to="/net-worth">← Overview</BackButton>}><h1 className="pagetitle">Account</h1></PageHeading>
 
       {/* User-reported (2026-09): "Everything should be a grid item except

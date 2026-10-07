@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { orderedPageSections } from '../lib/pageSectionOrder';
 import { useSearchParams } from 'react-router-dom';
 import { usePageTopBarChips } from '../hooks/usePageTopBar';
 import type { TopBarChip } from '../store/pageTopBarStore';
@@ -6,7 +7,9 @@ import { StandardCard, type StandardCardAction } from './StandardCard';
 
 export interface StandardPageSection { key:string; label:string; content:ReactNode; summary?:ReactNode; actions?:StandardCardAction[]; headerEnd?:ReactNode; defaultOpen?:boolean; hue?:string; unframed?:boolean; }
 
-export function StandardPageSections({sections,defaultKey}:{sections:StandardPageSection[];defaultKey?:string}) {
+export function StandardPageSections({sections: suppliedSections,defaultKey}:{sections:StandardPageSection[];defaultKey?:string}) {
+  const sections = orderedPageSections(suppliedSections);
+  const sectionId = useId();
   const [params,setParams]=useSearchParams();
   const firstKey=defaultKey||sections[0]?.key||'';
   const requested=params.get('section');
@@ -22,7 +25,7 @@ export function StandardPageSections({sections,defaultKey}:{sections:StandardPag
     ...sections.map(s=>({key:s.key,label:s.label,active:!allOpen&&activeKey===s.key,onClick:()=>jump(s.key)}))
   ],[sections,openKeys,activeKey,requested]);
   usePageTopBarChips(chips);
-  return <div className="standard-section-stack">{sections.map(s=><div key={s.key} className="standard-section-anchor" ref={el=>{refs.current[s.key]=el;}}>
+  return <div className="standard-section-stack">{sections.map(s=><div key={s.key} id={`${sectionId}-${s.key}`} data-page-section={s.key} data-section-label={s.label} className="standard-section-anchor" ref={el=>{refs.current[s.key]=el;}}>
     {s.unframed
       ? (!!openKeys[s.key] && s.content)
       : <StandardCard title={s.label} summary={s.summary} actions={s.actions} headerEnd={s.headerEnd} hue={s.hue} open={!!openKeys[s.key]} onToggle={open=>{setOpenKeys(p=>({...p,[s.key]:open})); if(open)setSection(s.key); else if(requested==='all'||activeKey===s.key)setSection(null);}}>{s.content}</StandardCard>}

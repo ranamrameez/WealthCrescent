@@ -17,7 +17,7 @@ export function Card({
   const onlyChild = content.length === 1 && isValidElement(content[0]) ? content[0] : undefined;
   const redundantWrapper = onlyChild && (onlyChild.type === Card || (typeof onlyChild.type === 'function' && 'cardContainer' in onlyChild.type && onlyChild.type.cardContainer === true));
   return (
-    <div className={`${redundantWrapper ? 'card-group' : 'card'} ${className}`} style={style}>
+    <div className={`${redundantWrapper ? 'card-group' : 'card page-card'} ${className}`} style={style}>
       {children}
     </div>
   );

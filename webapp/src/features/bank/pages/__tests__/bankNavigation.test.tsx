@@ -82,6 +82,14 @@ it('offers plan creation on an account even when it has no upcoming plans', () =
   expect(screen.getByLabelText('Finance')).toHaveProperty('value', 'a1');
 });
 
+it.each(['/bank/account/a1', '/bank/bank/b1'])('keeps plan creation in the FAB while sections are collapsed on %s', url => {
+  show(url);
+  fireEvent.click(screen.getByRole('button', { name: 'Open actions' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Add a plan' }));
+  expect(screen.getByLabelText('Finance')).toHaveProperty('value', 'a1');
+  expect(screen.getByRole('button', { name: 'Save plan' })).toBeTruthy();
+});
+
 it('keeps one live section stack after repeatedly closing batch edit', async () => {
   const { container } = show('/bank/account/a1?section=transactions');
   for (let i = 0; i < 3; i++) {

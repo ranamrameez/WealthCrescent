@@ -64,7 +64,7 @@ export function PlanningPage({cashPlannedSyncStatus,cashPlannedCloudEmpty,upload
 
   const [params] = useSearchParams();
   const controls = <TopBarControls><TransactionFilterMenu value={filters} categories={categoryOptions} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls>;
-  return <div>
+  return <div className="standard-page">
     {!params.get('plan') && <PageHeading back={<BackButton to="/net-worth">Overview</BackButton>}><h1 className="pagetitle">Planning</h1></PageHeading>}
     <FinancePlansHierarchy filters={filters} controls={controls} overview={<>
       <OrphanPlanCleanup />

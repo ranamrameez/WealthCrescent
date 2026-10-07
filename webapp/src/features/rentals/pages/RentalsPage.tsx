@@ -29,7 +29,6 @@ import { toast } from '../../../components/Toast';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
 import { PendingToggle } from '../../../components/ui/PendingToggle';
 import { IconButton } from '../../../components/ui/IconButton';
-import { FabPanel } from '../../../components/ui/Fab';
 import { TransactionEntryModal } from '../../../components/TransactionEntryModal';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
 import { CategorySelect } from '../../../components/CategorySelect';
@@ -655,7 +654,7 @@ function EntriesFab({ propertyId, currencyCode }: { propertyId: string; currency
   const [open, setOpen] = useState(false);
   return (
     <>
-      <FabPanel actions={[{ label: 'Transfers', icon: <TransferIcon />, onClick: () => setOpen(true) }]} />
+      <EntityActions actions={[{ label: 'Transfers', icon: <TransferIcon />, onClick: () => setOpen(true) }]} />
       {open && <TransactionEntryModal defaultFinance={{ module: 'rentals', ref: propertyId, currencyCode }} onClose={() => setOpen(false)} />}
     </>
   );
@@ -1251,7 +1250,7 @@ export function RentalsPage({
   </TopBarControls> : null);
 
   return (
-    <div>
+    <div className="standard-page">
       <PageHeading back={<BackButton to={propertyId ? "/rentals" : "/net-worth"}>{propertyId ? "All properties" : "Overview"}</BackButton>}><h1 className="pagetitle">{selectedProperty?.name ?? "Rentals"}</h1></PageHeading>
       <p className="text-muted mb-12">
         Rental property income and expenses — recurring rent received and costs (maintenance, property tax,

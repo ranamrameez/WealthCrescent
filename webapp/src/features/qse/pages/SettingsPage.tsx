@@ -191,7 +191,7 @@ export function SettingsPage({
   uploadLocalToCloud: () => Promise<void>;
 }) {
   return (
-    <div>
+    <div className="standard-page">
       <PageHeading back={<BackButton to="/qse">← QSE</BackButton>}><h1 className="pagetitle">Settings</h1></PageHeading>
       <Tabs
         tabs={[

@@ -1,3 +1,4 @@
+import { EntityActions } from '../../../components/EntityEditorModal';
 import { DateValue } from '../../../components/DateValue';
 import { ToggleChip } from '../../../components/ui/ToggleChip';
 import { FinancePlanEditor } from '../../../components/FinancePlanEditor';
@@ -23,7 +24,7 @@ import { toast } from '../../../components/Toast';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
 import { PendingToggle } from '../../../components/ui/PendingToggle';
 import { IconButton } from '../../../components/ui/IconButton';
-import { FabButton, FabPanel } from '../../../components/ui/Fab';
+import { FabButton } from '../../../components/ui/Fab';
 import { TransactionEntryModal } from '../../../components/TransactionEntryModal';
 import { CategorySelect } from '../../../components/CategorySelect';
 import { FinanceEditModal } from '../../../components/FinanceEditModal';
@@ -114,7 +115,7 @@ function CashPageFab({ defaultCurrencyOverride }: { defaultCurrencyOverride?: st
   const defaultCurrency = defaultCurrencyOverride ?? primaryCurrency ?? workbookDefaultCurrency;
   return (
     <>
-      <FabPanel
+      <EntityActions
         actions={[
           { label: 'Transfers', icon: <TransferIcon />, onClick: () => setTransferOpen(true) },
           { label: 'Add a plan', icon: <PlusIcon />, onClick: () => setPlanOpen(true) },

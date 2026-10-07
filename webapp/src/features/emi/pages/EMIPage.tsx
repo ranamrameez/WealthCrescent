@@ -1258,7 +1258,7 @@ export function EMIPage({
   const editLoan = (loan: EMILoan) => { setEditOnOpen(true); setSelected(loan); };
 
   return (
-    <div>
+    <div className="standard-page">
       {!liveSelected && <>
       <PageHeading back={<BackButton to="/net-worth">Overview</BackButton>}><h1 className="pagetitle">EMI / Loans</h1></PageHeading>
 
