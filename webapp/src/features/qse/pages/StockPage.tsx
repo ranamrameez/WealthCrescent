@@ -1,3 +1,4 @@
+import { MarketPriceHistory } from '../components/MarketPriceHistory';
 import { DateValue } from '../../../components/DateValue';
 import { PageHeading } from '../../../components/PageHeading';
 import { InvestmentBalanceSummary } from '../../../components/InvestmentBalanceSummary';
@@ -323,6 +324,7 @@ export function StockPage() {
       <StandardPageSections
         sections={[
           { key: 'summary', label: 'Summary', content: <><InvestmentBalanceSummary transactions={workbook.transactions} plans={workbook.tradePlans} marketPrices={workbook.marketPrices} priceHistory={workbook.priceHistory} tickers={[ticker]} currency={workbook.settings.currency} filters={filters} /><PositionDetail ticker={ticker} /></>, unframed: true },
+          { key: 'market-prices', label: 'Market prices', content: <MarketPriceHistory ticker={ticker} /> },
           { key: 'plans', label: 'Plans', content: <InvestmentPlans market="qse" items={[{ id: ticker, name: ticker, currency: workbook.settings.currency }]} filters={filters} /> },
           {
             key: 'transactions',

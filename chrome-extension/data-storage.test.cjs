@@ -9,8 +9,8 @@ function databaseContext(seed = {}) {
   const get = path => path.split('/').reduce((value,key) => value?.[key],db) ?? null;
   function put(path,value) { const parts=path.split('/'),key=parts.pop(); let parent=db; for(const p of parts) parent=parent[p] ||= {}; parent[key]=value; version++; }
   const ctx = vm.createContext({ console, Date, Intl, encodeURIComponent,
-    RTDB_BASE_URL:'https://db.example', SHARED_LAST_UPDATED_PATH:'stockData/QSE/pricesUpdatedAt',
-    priceCachePath:t=>'stockData/QSE/prices/'+t,priceHistoryPath:t=>'stockData/QSE/priceHistory/'+t,tickerNamePath:t=>'stockData/QSE/tickerNames/'+t,
+    RTDB_BASE_URL:'https://db.example', SHARED_LAST_UPDATED_PATH:'QSE/pricesUpdatedAt',
+    priceCachePath:t=>'QSE/prices/'+t,priceHistoryPath:t=>'QSE/priceHistory/'+t,tickerNamePath:t=>'QSE/tickerNames/'+t,
     getAuth:async()=>({uid:'user',idToken:'token',expiresAt:Date.now()+60000}),
     qatarDate: date => new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Qatar',year:'numeric',month:'2-digit',day:'2-digit'}).format(date),
     priceDeviation:()=>({}), saveExtensionConfigs:async()=>{}, patchStatus:async()=>{},
@@ -28,10 +28,10 @@ function databaseContext(seed = {}) {
 }
 test('Ticker migration retains all old prices and extrema; incremental sync never downloads history',async()=>{
   const old={price:10,dayHigh:15,dayLow:8,date:'2026-10-01',time:'2026-10-01T12:00:00Z'};
-  const {ctx,get,calls}=databaseContext({stockData:{QSE:{priceHistory:{QFLS:{0:old}},prices:{QFLS:10}}}});
+  const {ctx,get,calls}=databaseContext({QSE:{priceHistory:{QFLS:{0:old}},prices:{QFLS:10}}});
   ctx.point={price:11,dayHigh:12,dayLow:9,date:'2026-10-02',time:'2026-10-02T12:00:00Z',highLowKey:'highLow',highLowRaw:['12','9']};
   await vm.runInContext('syncTickerPoint("QFLS",point,{idToken:"token"})',ctx);
-  const root='stockData/QSE/tickers/QFLS';
+  const root='QSE/tickers/QFLS';
   assert.equal(get(root+'/allTimeBounds/high'),15);assert.equal(get(root+'/allTimeBounds/low'),8);
   assert.equal(get(root+'/dayToDayBounds/2026-10-01/high'),15);
   assert.equal(get(root+'/dayToDayBounds/2026-10-02/low'),9);
@@ -42,27 +42,27 @@ test('Ticker migration retains all old prices and extrema; incremental sync neve
   assert.equal(Object.keys(get(root+'/allPrices')).length,3);
   assert.equal(get(root+'/dayToDayBounds/2026-10-02/high'),13);
   assert.deepEqual([...new Set(calls.filter(c=>c.method==='GET').map(c=>c.path))].sort(),[root+'/latest',root+'/dayToDayBounds/2026-10-02',root+'/allTimeBounds'].sort());
-  assert.deepEqual(get(root+'/latest'),get('stockData/QSE/priceHistory/QFLS/'+Date.parse(ctx.point.time)));
+  assert.deepEqual(get(root+'/latest'),get('QSE/priceHistory/QFLS/'+Date.parse(ctx.point.time)));
   await vm.runInContext('syncTickerPoint("QFLS",point,{idToken:"token"})',ctx);
   assert.equal(Object.keys(get(root+'/allPrices')).length,3);
 });
 test('Deleting an outlier rebuilds ticker summaries and preserves remaining daily bounds',async()=>{
   const history={0:{price:10,dayHigh:12,dayLow:9,time:'2026-10-01T12:00:00Z',date:'2026-10-01'},1:{price:100,time:'2026-10-02T12:00:00Z',date:'2026-10-02'}};
-  const {ctx,get}=databaseContext({stockData:{QSE:{priceHistory:{QFLS:history},prices:{QFLS:100}}}});
+  const {ctx,get}=databaseContext({QSE:{priceHistory:{QFLS:history},prices:{QFLS:100}}});
   const result=await vm.runInContext('mutatePushedData([{id:"h1",ticker:"QFLS",kind:"history",key:"1",price:100}],"delete")',ctx);
   assert.equal(result[0].ok,true);
-  assert.equal(get('stockData/QSE/tickers/QFLS/allTimeBounds/high'),12);
-  assert.equal(get('stockData/QSE/tickers/QFLS/latest/price'),10);
-  assert.equal(get('stockData/QSE/tickers/QFLS/dayToDayBounds/2026-10-02'),null);
+  assert.equal(get('QSE/tickers/QFLS/allTimeBounds/high'),12);
+  assert.equal(get('QSE/tickers/QFLS/latest/price'),10);
+  assert.equal(get('QSE/tickers/QFLS/dayToDayBounds/2026-10-02'),null);
 });
 test('pushRows writes the same daily bounds alongside canonical and compatible history prices',async()=>{
-  const {ctx,get}=databaseContext({stockData:{QSE:{prices:{QFLS:10}}}});
+  const {ctx,get}=databaseContext({QSE:{prices:{QFLS:10}}});
   const result=await vm.runInContext('pushRows([{ticker:"QFLS",price:11,dayHigh:13,dayLow:9,highLowKey:"highLow",highLowRaw:["13","9"]}])',ctx);
   assert.equal(result.pushed,1);assert.equal(result.errors.length,0);
-  const latest=get('stockData/QSE/tickers/QFLS/latest');
+  const latest=get('QSE/tickers/QFLS/latest');
   assert.equal(latest.dayHigh,13);assert.equal(latest.dayLow,9);assert.equal(latest.highLowKey,'highLow');
-  assert.equal(get('stockData/QSE/tickers/QFLS/dayToDayBounds/'+latest.date+'/high'),13);
-  assert.deepEqual(get('stockData/QSE/tickers/QFLS/allPrices/'+Date.parse(latest.time)),latest);
+  assert.equal(get('QSE/tickers/QFLS/dayToDayBounds/'+latest.date+'/high'),13);
+  assert.deepEqual(get('QSE/tickers/QFLS/allPrices/'+Date.parse(latest.time)),latest);
 });
 function configContext() {
   const local={chartFavourites:['QFLS'],syncConfig:{minPushIntervalMinutes:0}},cloud={},calls=[];let fail=false;
@@ -116,14 +116,14 @@ test('Favourite timeframe filters independently of table dates and persists its 
 });
 
 test('Current-price corrections also update allPrices and bounds; deleting current clears latest',async()=>{
-  const {ctx,get}=databaseContext({stockData:{QSE:{prices:{QFLS:10}}}});
+  const {ctx,get}=databaseContext({QSE:{prices:{QFLS:10}}});
   const result=await vm.runInContext('mutatePushedData([{id:"current",ticker:"QFLS",kind:"current",price:10}],"edit",11)',ctx);
   assert.equal(result[0].ok,true);
-  assert.equal(get('stockData/QSE/tickers/QFLS/latest/price'),11);
-  assert.equal(get('stockData/QSE/tickers/QFLS/allTimeBounds/high'),11);
-  assert.equal(Object.keys(get('stockData/QSE/tickers/QFLS/allPrices')).length,1);
+  assert.equal(get('QSE/tickers/QFLS/latest/price'),11);
+  assert.equal(get('QSE/tickers/QFLS/allTimeBounds/high'),11);
+  assert.equal(Object.keys(get('QSE/tickers/QFLS/allPrices')).length,1);
   const deleted=await vm.runInContext('mutatePushedData([{id:"current",ticker:"QFLS",kind:"current",price:11}],"delete")',ctx);
-  assert.equal(deleted[0].ok,true);assert.equal(get('stockData/QSE/tickers/QFLS/latest'),null);
+  assert.equal(deleted[0].ok,true);assert.equal(get('QSE/tickers/QFLS/latest'),null);
 });
 test('Worker restart restores remote configs before a normal price sync can overwrite them',async()=>{
   const {ctx,local,cloud,calls}=configContext();local.extensionConfigOwner='alice';
@@ -140,4 +140,16 @@ test('Offline account switching clears another account settings and reports the 
   await assert.rejects(vm.runInContext('restoreExtensionConfigs({uid:"bob",idToken:"token"})',ctx),/Cannot load/);
   assert.deepEqual(local.chartFavourites,[]);assert.equal(local.syncConfig.minPushIntervalMinutes,2);
   assert.equal(local.extensionConfigOwner,'bob');assert.match(local.configSyncStatus.error,/Cannot load/);
+});
+
+test('Root QSE migration preserves old history and existing root values without user-scoped market data',async()=>{
+  const point={price:10,time:'2026-10-01T12:00:00Z',date:'2026-10-01'};
+  const {ctx,get,calls}=databaseContext({stockData:{QSE:{prices:{QFLS:10,QNBK:12},priceHistory:{QFLS:{0:point}},tickerNames:{QFLS:'Legacy'}}},QSE:{prices:{QFLS:11}}});
+  await vm.runInContext('ensureQseRoot({idToken:"token"})',ctx);
+  assert.equal(get('QSE/prices/QFLS'),11);assert.equal(get('QSE/prices/QNBK'),12);
+  assert.deepEqual(get('QSE/priceHistory/QFLS/0'),point);assert.equal(get('QSE/migrationVersion'),2);
+  assert.equal(get('stockData/QSE/prices/QFLS'),10);
+  assert.ok(calls.filter(c=>c.method!=='GET').every(c=>c.path==='QSE'));
+  calls.length=0;await vm.runInContext('ensureQseRoot({idToken:"other-user"})',ctx);
+  assert.equal(calls.length,0);
 });

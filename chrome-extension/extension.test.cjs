@@ -127,15 +127,15 @@ test('Pushed-data handler reads Firebase and returns previous history without sc
     paginatePushed: rows => ({ rows, total: rows.length }),
     getAuth: async () => ({ uid: 'user', idToken: 'token', expiresAt: Date.now() + 60000 }),
     RTDB_BASE_URL: 'https://database.example',
-    fetch: async url => { urls.push(url); return { ok: true, json: async () => url.includes('/priceHistory.') ? { QNBK: [{ price: 12.34, date: '2026-10-01' }] } : null }; },
+    fetch: async url => { urls.push(url); return { ok: true, headers:{get:()=> 'v1'}, json: async () => url.includes('/migrationVersion.') ? 2 : url.includes('/priceHistory.') ? { QNBK: [{ price: 12.34, date: '2026-10-01' }] } : null }; },
     chrome: { alarms: { onAlarm: { addListener() {} } }, runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener(fn) { handler = fn; } } } },
   });
   vm.runInContext(read('background.js').replace(/import\s+[\s\S]*?from\s+'[^']+';/g, ''), ctx);
   const response = await new Promise(resolve => handler({ type: 'GET_PUSHED_DATA', filters: {} }, {}, resolve));
   assert.equal(response.ok, true); assert.equal(response.rows[0].price, 12.34);
-  assert.equal(urls.length, 4);
+  assert.equal(urls.length, 5);
   await new Promise(resolve => handler({ type: 'GET_PUSHED_DATA' }, {}, resolve));
-  assert.equal(urls.length, 4, 'Pagination reuses the snapshot');
+  assert.equal(urls.length, 5, 'Pagination reuses the snapshot');
 });
 
 test('Page defaults to combined data and today, with working chart date presets', async () => {
@@ -184,8 +184,8 @@ function mutationContext(initial, conflict = false) {
   const state = structuredClone(initial);
   const writes = [];
   const ctx = vm.createContext({ console, Date, encodeURIComponent,
-    priceCachePath: ticker => `stockData/QSE/prices/${ticker}`,
-    priceHistoryPath: ticker => `stockData/QSE/priceHistory/${ticker}`,
+    priceCachePath: ticker => `QSE/prices/${ticker}`,
+    priceHistoryPath: ticker => `QSE/priceHistory/${ticker}`,
     getAuth: async () => ({ uid: 'user', idToken: 'token', expiresAt: Date.now() + 60000 }),
     RTDB_BASE_URL: 'https://database.example',
     fetch: async (url, options = {}) => {
@@ -201,6 +201,7 @@ function mutationContext(initial, conflict = false) {
     chrome: { alarms: { onAlarm: { addListener() {} } }, runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener() {} } } },
   });
   vm.runInContext(read('background.js').replace(/import\s+[\s\S]*?from\s+'[^']+';/g, ''), ctx);
+  vm.runInContext('ensureQseRoot = async () => {}', ctx);
   vm.runInContext(read('ticker-data.js').replace(/export /g, ''), ctx);
   return { ctx, state, writes };
 }
@@ -499,6 +500,7 @@ test('A successful price write is counted even when its history write fails', as
     chrome: { alarms: { onAlarm: { addListener() {} } }, runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener() {} } } },
   });
   vm.runInContext(read('background.js').replace(/import\s+[\s\S]*?from\s+'[^']+';/g, ''), ctx);
+  vm.runInContext('ensureQseRoot = async () => {}', ctx);
   const result = await vm.runInContext('pushRows([{ticker:"QFLS", price:11}])', ctx);
   assert.equal(result.pushed, 1);
   assert.equal(result.syncedTickers[0], 'QFLS');

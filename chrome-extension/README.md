@@ -1,8 +1,10 @@
+> Current schema: shared market data is at database root `QSE`, independent of the signed-in user. Only personal extension configs belong under `users/{uid}`. Version 0.1.13 copies the previous `stockData/QSE` tree on the first shared-data read/sync, preserving existing root values. The old tree is retained as a migration backup and receives no new writes.
+
 # TheGroup → WealthCrescent Price Sync (Chrome extension)
 
 Scrapes live QSE prices — and company names — off [The Group](https://webd.thegroup.com.qa/en/markets/qatar)'s
 market-watch page (while it's open in one of your own logged-in tabs) and pushes them into
-the **shared** `stockData/QSE` node in WealthCrescent's Firebase Realtime Database — the
+the **shared** `QSE` node in WealthCrescent's Firebase Realtime Database — the
 same node the web app already reads ticker names/fundamentals from — so the data is useful
 to every WealthCrescent user, not just whoever runs this extension.
 
@@ -10,7 +12,7 @@ WealthCrescent's bundled ticker list (`webapp/src/lib/stockData/qseSeed.ts`) onl
 hard-coded a partial set of QSE's real listed companies and was never meant to be kept
 up to date by hand. Since this extension already scrapes every row of the market-watch
 table for a price, it captures that same row's company-name cell too and pushes it to
-`stockData/QSE/tickerNames/{ticker}` — so running this for a while against the real page
+`QSE/tickerNames/{ticker}` — so running this for a while against the real page
 is what actually fills in the app's ticker coverage, not a one-off manual edit.
 
 ## How it works
@@ -46,7 +48,7 @@ is what actually fills in the app's ticker coverage, not a one-off manual edit.
 
 ## ⚠️ Required one-time setup: a Firebase Realtime Database rule change
 
-This extension writes to `stockData/QSE/...`. That path's current security rules (set up
+This extension writes to `QSE/...`. That path's current security rules (set up
 for WealthCrescent itself) most likely don't allow writes from just any authenticated
 user — only the project owner can check/change this, since it needs Firebase console
 access this repo's own AI sessions don't have. Open **Firebase Console → Realtime
@@ -56,11 +58,9 @@ any signed-in user, e.g.:
 ```json
 {
   "rules": {
-    "stockData": {
-      "QSE": {
-        ".read": "auth != null",
-        ".write": "auth != null"
-      }
+    "QSE": {
+      ".read": "auth != null",
+      ".write": "auth != null"
     },
     "...": { "...": "leave every other existing rule (users/**, etc.) exactly as it is" }
   }
@@ -72,7 +72,7 @@ already exist for `users/{uid}/...` etc. If you're not sure how those are curren
 structured, export the current rules first (Rules tab → the JSON is right there) before
 editing.
 
-**Note:** the web app itself does not yet read `stockData/QSE/prices` or
+**Note:** the web app itself does not yet read `QSE/prices` or
 `.../priceHistory` to resolve a stock's "current price" — today it only reads
 `tickerNames`/`fundamentals` from this node. Wiring the app's own price resolution to
 prefer this shared feed is a separate, follow-up change to the live app (real blast
@@ -94,7 +94,7 @@ overriding on overlap) the bundled seed, with no extra wiring needed.
 ## Signing in
 
 Firebase RTDB rules need *some* authenticated user, but — since prices land in the shared
-`stockData/QSE` node, not any one person's own workbook — it does **not** need to be your
+`QSE` node, not any one person's own workbook — it does **not** need to be your
 main WealthCrescent login. The popup's sign-in form has a **"Create a new account
 instead"** checkbox that registers a brand-new, dedicated email/password account for this
 purpose alone via Firebase's `accounts:signUp` endpoint, so your main password never has to
@@ -280,7 +280,7 @@ the updated content script.
 
 ## Ticker storage and account configurations (v0.1.12)
 
-Fast app reads use `stockData/QSE/tickers/{ticker}`:
+Fast app reads use `QSE/tickers/{ticker}`:
 
 - `allPrices/{pointKey}`: full price points, including `dayHigh`, `dayLow`, raw
   provenance, date and timestamp. Unchanged consecutive values are deduplicated;
@@ -317,7 +317,7 @@ already covered by parent rules (do not replace the existing rules tree):
 ```json
 {
   "users": { "$uid": { "extensionConfigs": { ".read": "auth != null && auth.uid === $uid", ".write": "auth != null && auth.uid === $uid" } } },
-  "stockData": { "QSE": { "tickers": { "$ticker": { "allPrices": { ".indexOn": ["time", "date"] } } } } }
+  "QSE": { ".read": "auth != null", ".write": "auth != null", "tickers": { "$ticker": { "allPrices": { ".indexOn": ["time", "date"] } } } }
 }
 ```
 

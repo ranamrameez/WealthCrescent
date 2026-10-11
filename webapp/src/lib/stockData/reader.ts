@@ -1,8 +1,8 @@
-import { get, ref, set } from 'firebase/database';
+import { get, ref, update } from 'firebase/database';
 import { db } from '../firebase/client';
 import { QSE_FUNDAMENTALS, QSE_TICKER_NAMES, type FundamentalsEntry } from './qseSeed';
 
-const STOCK_DATA_PATH = 'stockData/QSE';
+const STOCK_DATA_PATH = 'QSE';
 
 export interface QSEStockData {
   tickerNames: Record<string, string>;
@@ -30,8 +30,13 @@ export interface QSEStockData {
 export async function fetchQSEStockData(): Promise<QSEStockData> {
   if (!db) return { tickerNames: QSE_TICKER_NAMES, fundamentals: QSE_FUNDAMENTALS };
   try {
-    const snap = await get(ref(db, STOCK_DATA_PATH));
-    const val = snap.val();
+    const readLeaf = async (key: string) => {
+      const shared = await get(ref(db!, STOCK_DATA_PATH + '/' + key));
+      if (shared.exists()) return shared.val();
+      return (await get(ref(db!, 'stockData/QSE/' + key))).val();
+    };
+    const [tickerNames, fundamentals] = await Promise.all([readLeaf('tickerNames'), readLeaf('fundamentals')]);
+    const val = { tickerNames, fundamentals };
     return {
       tickerNames: { ...QSE_TICKER_NAMES, ...(val?.tickerNames || {}) },
       fundamentals: { ...QSE_FUNDAMENTALS, ...(val?.fundamentals || {}) },
@@ -44,10 +49,10 @@ export async function fetchQSEStockData(): Promise<QSEStockData> {
 
 /** Writes the bundled seed values into the shared node. Run this once
  * (e.g. from the browser console via a debug hook) to populate
- * `stockData/QSE` in Firebase; not called automatically by the app. */
+ * root `QSE` in Firebase; not called automatically by the app. */
 export async function seedQSEStockData(): Promise<void> {
   if (!db) throw new Error('Firebase is not initialized');
-  await set(ref(db, STOCK_DATA_PATH), {
+  await update(ref(db, STOCK_DATA_PATH), {
     tickerNames: QSE_TICKER_NAMES,
     fundamentals: QSE_FUNDAMENTALS,
   });

@@ -8,7 +8,7 @@ import { setSyncConfig, withinScrapingWindow, pushDelayMs } from './common.js';
 // Background service worker: owns the collect → (throttled, randomized)
 // push loop, Firebase Auth (email/password, via plain REST calls — no SDK
 // bundling needed in an MV3 service worker), and the safe read-modify-write
-// against the shared `stockData/QSE` RTDB node. The popup and options pages
+// against the shared `QSE` RTDB node. The popup and options pages
 // talk to this file only via chrome.runtime messages; they never touch
 // Firebase or chrome.alarms directly.
 
@@ -35,6 +35,31 @@ import {
 
 const COLLECT_ALARM = 'collect-tick';
 let pushedSnapshot = null;
+let rootReady = false;
+async function ensureQseRoot(auth) {
+  if (rootReady) return;
+  const marker = await conditionalRead('QSE/migrationVersion', auth);
+  if (marker.value === 2) { rootReady = true; return; }
+  const state = await conditionalRead('QSE', auth);
+  const response = await fetch(RTDB_BASE_URL + '/stockData/QSE.json?auth=' + encodeURIComponent(auth.idToken));
+  if (!response.ok) throw new Error('Cannot migrate legacy QSE data (' + response.status + ')');
+  const legacy = await response.json() || {};
+  const current = state.value || {};
+  const merged = { ...legacy, ...current, migrationVersion:2 };
+  for (const key of ['tickers','prices','priceHistory','tickerNames','fundamentals']) merged[key] = { ...(legacy[key] || {}), ...(current[key] || {}) };
+  for (const ticker of Object.keys(merged.priceHistory)) merged.priceHistory[ticker] = { ...(legacy.priceHistory?.[ticker] || {}), ...(current.priceHistory?.[ticker] || {}) };
+  for (const ticker of Object.keys(merged.tickers)) {
+    const archived = { ...(legacy.tickers?.[ticker]?.allPrices || {}), ...(current.tickers?.[ticker]?.allPrices || {}) };
+    const projection = tickerProjection(archived);
+    merged.tickers[ticker] = { ...(legacy.tickers?.[ticker] || {}), ...(current.tickers?.[ticker] || {}), ...projection, latest: Object.hasOwn(current.tickers?.[ticker] || {}, 'latest') ? current.tickers[ticker].latest : projection.latest };
+  }
+  try { await conditionalWrite(state, merged); }
+  catch (error) {
+    if (!/Record changed/.test(error.message) || (await conditionalRead('QSE/migrationVersion', auth)).value !== 2) throw error;
+  }
+  rootReady = true;
+}
+
 
 async function conditionalRead(path, auth) {
   const url = `${RTDB_BASE_URL}/${path}.json?auth=${encodeURIComponent(auth.idToken)}`;
@@ -55,6 +80,7 @@ async function mutatePushedData(entries, operation, price) {
   if (operation === 'edit' && (!Number.isFinite(price) || price <= 0)) throw new Error('Price must be a positive number.');
   const auth = await getFreshAuth();
   if (!auth) throw new Error('Sign in to edit Firebase records.');
+  await ensureQseRoot(auth);
   const results = [];
   for (const entry of entries) {
     try {
@@ -96,10 +122,11 @@ async function mutatePushedData(entries, operation, price) {
 async function queryPushedData(filters, refresh = false) {
   const auth = await getFreshAuth();
   if (!auth) throw new Error('Sign in on this page to view the data already pushed to Firebase.');
+  await ensureQseRoot(auth);
   if (refresh || !pushedSnapshot || pushedSnapshot.uid !== auth.uid || Date.now() - pushedSnapshot.at > 60000) {
     const paths = ['priceHistory', 'prices', 'tickerNames', 'pricesUpdatedAt'];
     const values = await Promise.all(paths.map(async path => {
-      const response = await fetch(`${RTDB_BASE_URL}/stockData/QSE/${path}.json?auth=${encodeURIComponent(auth.idToken)}`);
+      const response = await fetch(`${RTDB_BASE_URL}/QSE/${path}.json?auth=${encodeURIComponent(auth.idToken)}`);
       if (!response.ok) throw new Error(`Cannot read Firebase ${path} (${response.status}). Check that this account has database read access.`);
       return response.json();
     }));
@@ -254,7 +281,7 @@ async function updateTickerBounds(path, point, auth) {
 }
 
 async function syncTickerPoint(ticker, point, auth) {
-  const root = 'stockData/QSE/tickers/' + encodeURIComponent(ticker);
+  const root = 'QSE/tickers/' + encodeURIComponent(ticker);
   const latest = await conditionalRead(root + '/latest', auth);
   // One-time migration: bootstrap historical extrema before incremental updates.
   if (!latest.value) {
@@ -270,7 +297,7 @@ async function syncTickerPoint(ticker, point, auth) {
   const last = latest.value;
   if (last && last.price === point.price && last.date === point.date && (last.dayHigh ?? null) === point.dayHigh && (last.dayLow ?? null) === point.dayLow) return;
   const key = String(Date.parse(point.time));
-  const response = await fetch(RTDB_BASE_URL + '/stockData/QSE.json?auth=' + encodeURIComponent(auth.idToken), {
+  const response = await fetch(RTDB_BASE_URL + '/QSE.json?auth=' + encodeURIComponent(auth.idToken), {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ['tickers/' + ticker + '/allPrices/' + key]: point, ['tickers/' + ticker + '/latest']: point, ['priceHistory/' + ticker + '/' + key]: point }),
   });
@@ -278,7 +305,7 @@ async function syncTickerPoint(ticker, point, auth) {
 }
 
 async function rebuildTickerProjection(ticker, auth, clearLatest = false) {
-  const state = await conditionalRead('stockData/QSE/tickers/' + encodeURIComponent(ticker), auth);
+  const state = await conditionalRead('QSE/tickers/' + encodeURIComponent(ticker), auth);
   const legacy = await conditionalRead(priceHistoryPath(ticker), auth);
   const projection = tickerProjection(legacy.value);
   if (clearLatest) projection.latest = null;
@@ -288,6 +315,7 @@ async function rebuildTickerProjection(ticker, auth, clearLatest = false) {
 async function pushRows(rows) {
   const auth = await getFreshAuth();
   if (!auth) throw new Error('Sign in on the extension page to sync prices.');
+  await ensureQseRoot(auth);
   await saveExtensionConfigs(getFreshAuth).then(() => patchStatus({ configSyncError:'' })).catch(error => patchStatus({ configSyncError:error.message }));
   const nowIso = new Date().toISOString();
   const today = qatarDate(new Date(nowIso));
