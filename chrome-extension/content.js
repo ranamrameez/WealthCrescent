@@ -180,6 +180,20 @@ function firstMatchingCell(row, colIds) {
   return null;
 }
 
+function readHighLow(row) {
+  const cell = firstMatchingCell(row, ['highLow']);
+  const result = { dayHigh: null, dayLow: null, highLowKey: cell ? 'highLow' : null, highLowRaw: [], rangeError: '' };
+  if (!cell) return result;
+  // The cell's textContent can concatenate the two prices without a separator.
+  const spans = Array.from(cell.querySelectorAll('span')).filter(span => !span.querySelector('span'));
+  result.highLowRaw = spans.map(span => span.textContent || '');
+  if (result.highLowRaw.length !== 2) { result.rangeError = 'Expected two highLow price spans (High, Low).'; return result; }
+  const [high, low] = result.highLowRaw.map(parseNumber);
+  if (high === null || low === null || high <= 0 || low <= 0 || high < low) { result.rangeError = 'Invalid daily high/low pair.'; return result; }
+  result.dayHigh = high; result.dayLow = low;
+  return result;
+}
+
 /** AG Grid tier: a widely-used JS data-grid library that renders each row as
  * `<div role="row" row-id="TICKER">` with per-column
  * `<div role="gridcell" col-id="...">` children — real, stable structural
@@ -211,7 +225,9 @@ function scrapeAgGrid() {
     if (!ticker || seen.has(ticker)) continue;
     const priceEl = firstMatchingCell(row, ['lastPrice', 'last', 'price', 'ltp']);
     const price = parseNumber(cellText(priceEl));
+    const range = readHighLow(row);
     captureRaw(row, ticker, price, { price: priceEl?.textContent || '' }, priceEl?.getAttribute('col-id') || null);
+    Object.assign(auditRows[auditRows.length - 1], range);
     if (!TICKER_LIKE.test(ticker) || price === null || price <= 0) continue;
     const nameEl = firstMatchingCell(row, ['name', 'companyName', 'securityName']);
     const changeEl = firstMatchingCell(row, ['changePercent', 'change', 'changePct']);
@@ -219,6 +235,7 @@ function scrapeAgGrid() {
     out.push({
       ticker,
       price,
+      ...range,
       priceKey: auditRows[auditRows.length - 1]?.priceKey || null,
       raw: auditRows[auditRows.length - 1]?.raw || [],
       changePct: changeEl ? parseNumber(cellText(changeEl)) : null,

@@ -268,3 +268,12 @@ Favourite and Full screen controls. Favourites persist in browser storage and
 appear above the table, using the current date range and data view even when
 the table is filtered to another ticker. Fullscreen charts stay open during
 background refreshes; exit fullscreen to refresh the view.
+
+Daily price ranges: the AG Grid highLow cell is read as High then Low from its
+two spans. dayHigh/dayLow and highLowKey/highLowRaw are retained in local audit
+and Firebase history. Invalid pairs retain raw values and rangeError. History
+adds points for changed bounds or a new Qatar day even at an unchanged price.
+The table shows both bounds; green chart ranges show reported daily extrema at
+scrape time, without assigning an occurrence time to the extrema. Older records
+without these fields show no range. Reload the extension and market tab to use
+the updated content script.

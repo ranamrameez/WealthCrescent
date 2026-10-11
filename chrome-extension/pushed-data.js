@@ -7,7 +7,7 @@ export function pushedRecords({ history = {}, prices = {}, names = {}, updatedAt
       if (!point || !Number.isFinite(point.price)) continue;
       const capturedAt = Date.parse(point.time || (point.date ? `${point.date}T00:00:00+03:00` : ''));
       const comparison = priceDeviation(point.price, previousPrice);
-      rows.push({ id: `history:${ticker}:${key}`, key, kind: 'history', ticker, price: point.price, priceKey: point.priceKey || null, ...comparison, name: names?.[ticker] || null, capturedAt: Number.isFinite(capturedAt) ? capturedAt : null, date: point.date || '', source: 'Firebase history', raw: point.raw || null, stored: point });
+      rows.push({ id: `history:${ticker}:${key}`, key, kind: 'history', ticker, price: point.price, priceKey: point.priceKey || null, dayHigh: point.dayHigh ?? null, dayLow: point.dayLow ?? null, highLowKey: point.highLowKey || null, highLowRaw: point.highLowRaw || [], rangeError: point.rangeError || '', ...comparison, name: names?.[ticker] || null, capturedAt: Number.isFinite(capturedAt) ? capturedAt : null, date: point.date || '', source: 'Firebase history', raw: point.raw || null, stored: point });
       previousPrice = point.price;
     }
   }
@@ -36,5 +36,5 @@ export function paginatePushed(rows, { from = '', to = '', ticker = '', outliers
     const date = parts.length ? `${part('year')}-${part('month')}-${part('day')}` : row.date || '';
     return (!from || date >= from) && (!to || (!!date && date <= to)) && (!ticker || row.ticker.toUpperCase().includes(ticker.toUpperCase())) && (!outliers || row.outlier);
   });
-  return { rows: filtered.slice((page - 1) * pageSize, page * pageSize), total: filtered.length, tickers: [...new Set(rows.map(row => row.ticker))].sort(), chartRows: filtered.map(({ ticker, price, capturedAt, outlier, deltaPct }) => ({ ticker, price, capturedAt, outlier, deltaPct })), outlierRows: filtered.filter(row => row.outlier).slice(0, 100).map(({ id, ticker, price, key, kind, stored, origin, auditId }) => ({ id, ticker, price, key, kind, origin, auditId, stored: { time: stored?.time } })) };
+  return { rows: filtered.slice((page - 1) * pageSize, page * pageSize), total: filtered.length, tickers: [...new Set(rows.map(row => row.ticker))].sort(), chartRows: filtered.map(({ ticker, price, capturedAt, outlier, deltaPct, dayHigh, dayLow }) => ({ ticker, price, capturedAt, outlier, deltaPct, dayHigh, dayLow })), outlierRows: filtered.filter(row => row.outlier).slice(0, 100).map(({ id, ticker, price, key, kind, stored, origin, auditId }) => ({ id, ticker, price, key, kind, origin, auditId, stored: { time: stored?.time } })) };
 }

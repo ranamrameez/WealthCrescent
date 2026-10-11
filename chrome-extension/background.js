@@ -219,9 +219,9 @@ async function appendHistoryPointSafely(ticker, point, idToken) {
     const current = (await getRes.json()) || [];
     const entries = Object.entries(current).filter(([, value]) => value && Number.isFinite(value.price));
     const last = entries.sort((a, b) => String(a[1].time || a[1].date || '').localeCompare(String(b[1].time || b[1].date || ''))).at(-1)?.[1];
-    // Skip appending an identical consecutive price (e.g. no change since
-    // the last push) so the array doesn't grow forever on a quiet ticker.
-    if (last && last.price === point.price) return { appended: false };
+    // Skip only unchanged price and bounds within the same Qatar day.
+    // New extrema must be retained even when the sampled last price is unchanged.
+    if (last && last.price === point.price && last.date === point.date && (last.dayHigh ?? null) === (point.dayHigh ?? null) && (last.dayLow ?? null) === (point.dayLow ?? null)) return { appended: false };
     const keys = Object.keys(current);
     const nextKey = keys.every(key => /^\d+$/.test(key)) ? String(Math.max(-1, ...keys.map(Number)) + 1) : String(Date.now());
     const next = { ...current, [nextKey]: point };
@@ -241,7 +241,7 @@ async function pushRows(rows) {
   const auth = await getFreshAuth();
   if (!auth) throw new Error('Sign in on the extension page to sync prices.');
   const nowIso = new Date().toISOString();
-  const today = nowIso.slice(0, 10);
+  const today = qatarDate(new Date(nowIso));
   let pushed = 0;
   const syncedTickers = [];
   let namesPushed = 0;
@@ -251,7 +251,7 @@ async function pushRows(rows) {
       const previousResponse = await fetch(`${RTDB_BASE_URL}/${priceCachePath(row.ticker)}.json?auth=${encodeURIComponent(auth.idToken)}`);
       if (!previousResponse.ok) throw new Error(`Cannot read previous price (${previousResponse.status})`);
       const previousPrice = await previousResponse.json();
-      const point = { date: today, time: nowIso, price: row.price, priceKey: row.priceKey || null, raw: row.raw || [], ...priceDeviation(row.price, previousPrice) };
+      const point = { date: today, time: nowIso, price: row.price, priceKey: row.priceKey || null, dayHigh: row.dayHigh ?? null, dayLow: row.dayLow ?? null, highLowKey: row.highLowKey || null, highLowRaw: row.highLowRaw || [], rangeError: row.rangeError || '', raw: row.raw || [], ...priceDeviation(row.price, previousPrice) };
       await putScalar(priceCachePath(row.ticker), row.price, auth.idToken);
       pushedSnapshot = null;
       pushed++;

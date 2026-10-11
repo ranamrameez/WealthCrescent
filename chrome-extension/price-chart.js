@@ -57,7 +57,7 @@ export function renderPriceChart(container, rows, ticker, options = {}) {
   };
   const svg = node('svg', { viewBox: '0 0 1000 320', role: 'img', 'aria-label': `${ticker} price history in Qatar time`, width: '100%' });
   svg.append(node('title', {}, `${ticker}: ${points.length} prices; red markers indicate changes beyond ±10%.`));
-  const prices = points.map(point => point.price);
+  const prices = points.flatMap(point => [point.price, point.dayHigh, point.dayLow].filter(Number.isFinite));
   const min = Math.min(...prices), max = Math.max(...prices);
   const padding = (max - min) * .1 || Math.max(max * .02, .01);
   const low = min - padding, high = max + padding;
@@ -73,6 +73,13 @@ export function renderPriceChart(container, rows, ticker, options = {}) {
   svg.append(node('polyline', { points: points.map(point => `${x(point)},${y(point)}`).join(' '), fill: 'none', stroke: '#1d4ed8', 'stroke-width': 2.5 }));
   const date = value => new Date(value).toLocaleString('en-GB', { timeZone: 'Asia/Qatar' });
   for (const point of points) {
+    if (Number.isFinite(point.dayHigh) && Number.isFinite(point.dayLow)) {
+      const range = node('g', { 'data-role': 'daily-range', tabindex: 0 });
+      range.append(node('title', {}, `Reported day high: ${point.dayHigh}; day low: ${point.dayLow}; captured ${date(point.capturedAt)}. Extrema time unknown.`));
+      range.append(node('line', { x1: x(point), x2: x(point), y1: y({ price: point.dayHigh }), y2: y({ price: point.dayLow }), stroke: '#047857', 'stroke-width': 2, opacity: .65 }));
+      for (const value of [point.dayHigh, point.dayLow]) range.append(node('line', { x1: x(point) - 5, x2: x(point) + 5, y1: y({ price: value }), y2: y({ price: value }), stroke: '#047857', 'stroke-width': 2 }));
+      svg.append(range);
+    }
     const circle = node('circle', { cx: x(point), cy: y(point), r: point.outlier ? 5 : 3, fill: point.outlier ? '#b91c1c' : '#1d4ed8', tabindex: 0 });
     circle.append(node('title', {}, `${ticker} · ${date(point.capturedAt)} · ${point.price}${point.outlier ? ` · Flag: ${point.deltaPct?.toFixed(2)}%` : ''}`));
     svg.append(circle);
@@ -80,4 +87,9 @@ export function renderPriceChart(container, rows, ticker, options = {}) {
   svg.append(node('text', { x: 80, y: 290, fill: '#17283c', 'font-size': 13 }, date(start)));
   if (end !== start) svg.append(node('text', { x: 980, y: 290, 'text-anchor': 'end', fill: '#17283c', 'font-size': 13 }, date(end)));
   container.append(svg);
+  if (points.some(point => Number.isFinite(point.dayHigh) && Number.isFinite(point.dayLow))) {
+    const legend = document.createElement('p');
+    legend.textContent = 'Blue: sampled price. Green: reported daily high/low at scrape time; the time of each extremum is unknown.';
+    container.append(legend);
+  }
 }

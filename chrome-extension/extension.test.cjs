@@ -475,7 +475,8 @@ test('Successful push marks only accepted records from its own scrape batch as s
 });
 
 test('A successful price write is counted even when its history write fails', async () => {
-  const ctx = vm.createContext({ console, Date, encodeURIComponent,
+  const qatarDate = () => '2026-10-11';
+  const ctx = vm.createContext({ console, Date, encodeURIComponent, qatarDate,
     getAuth: async () => ({ uid: 'user', idToken: 'token', expiresAt: Date.now() + 60000 }),
     RTDB_BASE_URL: 'https://database.example',
     priceCachePath: ticker => `prices/${ticker}`,
@@ -631,4 +632,43 @@ test('Extension modules resolve every local import', () => {
       assert.ok(fs.existsSync(path.resolve(__dirname, match[1])), `${file}: missing ${match[1]}`);
     }
   }
+});
+
+ test('Combined High/Low spans preserve daily extrema and raw provenance', () => {
+  const { JSDOM } = require('../webapp/node_modules/jsdom');
+  for (const [high, low, valid] of [['0.971','0.941',true],['0.9','1.0',false],['bad','0.941',false]]) {
+    const dom = new JSDOM('<div role="row" class="ag-row" row-id="QFLS"><div col-id="lastPrice">0.956</div><div col-id="highLow"><div><span>'+high+'</span><span>'+low+'</span></div></div></div>');
+    const ctx = context(dom.window.document); vm.runInContext(read('content.js'), ctx);
+    const result = JSON.parse(vm.runInContext('JSON.stringify({ rows: scrapeAgGrid(), audit: auditRows })', ctx));
+    assert.equal(result.rows[0].price, .956);
+    assert.equal(result.rows[0].dayHigh, valid ? .971 : null);
+    assert.equal(result.rows[0].dayLow, valid ? .941 : null);
+    assert.deepEqual(result.audit[0].highLowRaw, [high,low]);
+    assert.equal(result.audit[0].highLowKey, 'highLow');
+    assert.equal(!!result.audit[0].rangeError, !valid);
+  }
+});
+ test('History saves changing daily bounds and new dates despite an unchanged last price', async () => {
+  const point = { price: .956, dayHigh: .971, dayLow: .941, date: '2026-10-11', time:'2026-10-11T09:00:00Z' };
+  for (const [patch, appended] of [[{},false],[{dayHigh:.98},true],[{dayLow:.93},true],[{date:'2026-10-12'},true]]) {
+    const { ctx, state } = mutationContext({history:[point],price:.956});
+    ctx.point = {...point,...patch};
+    const result = await vm.runInContext('appendHistoryPointSafely("QFLS",point,"token")',ctx);
+    assert.equal(result.appended, appended);
+    if(appended) assert.deepEqual(state.history[1], {...point,...patch});
+  }
+});
+ test('Daily bounds survive Firebase filtering and appear in chart ranges', async () => {
+  const { JSDOM } = require('../webapp/node_modules/jsdom');
+  const data = await import('data:text/javascript;base64,' + Buffer.from(read('pushed-data.js')).toString('base64'));
+  const rows = data.pushedRecords({history:{QFLS:[{price:.956,dayHigh:.971,dayLow:.941,time:'2026-10-11T09:00:00Z',highLowKey:'highLow',highLowRaw:['0.971','0.941']}]}});
+  const chartRows = data.paginatePushed(rows).chartRows;
+  assert.equal(chartRows[0].dayHigh,.971); assert.equal(chartRows[0].dayLow,.941);
+  assert.deepEqual(rows[0].highLowRaw,['0.971','0.941']);
+  const chart = await import('data:text/javascript;base64,' + Buffer.from(read('price-chart.js')).toString('base64'));
+  const dom = new JSDOM('<div id="chart"></div>');const container=dom.window.document.getElementById('chart');
+  chart.renderPriceChart(container,chartRows,'QFLS');
+  assert.equal(container.querySelectorAll('[data-role="daily-range"]').length,1);
+  assert.match(container.textContent,/day high: 0.971; day low: 0.941/);
+  assert.match(container.textContent,/Extrema time unknown/);
 });

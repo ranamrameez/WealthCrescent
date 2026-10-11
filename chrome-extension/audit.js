@@ -132,7 +132,7 @@ export async function queryAudit({ from = '', to = '', ticker = '', strategy = '
         }
         cursor.continue();
       };
-      tx.oncomplete = () => resolve({ rows: rows.reverse().slice((page - 1) * pageSize, page * pageSize), ...(includeRecords ? { records: rows } : {}), total: rows.length, tickers: [...tickers].filter(Boolean).sort(), chartRows: rows.map(({ ticker, price, capturedAt, outlier, deltaPct }) => ({ ticker, price, capturedAt, outlier, deltaPct })), outlierRows: rows.filter(row => row.outlier).slice(0, 100).map(({ id, ticker, price }) => ({ id, ticker, price })) });
+      tx.oncomplete = () => resolve({ rows: rows.reverse().slice((page - 1) * pageSize, page * pageSize), ...(includeRecords ? { records: rows } : {}), total: rows.length, tickers: [...tickers].filter(Boolean).sort(), chartRows: rows.map(({ ticker, price, capturedAt, outlier, deltaPct, dayHigh, dayLow }) => ({ ticker, price, capturedAt, outlier, deltaPct, dayHigh, dayLow })), outlierRows: rows.filter(row => row.outlier).slice(0, 100).map(({ id, ticker, price }) => ({ id, ticker, price })) });
       tx.onerror = () => reject(tx.error);
       tx.onabort = () => reject(tx.error || new Error('Audit query was interrupted.'));
     });
