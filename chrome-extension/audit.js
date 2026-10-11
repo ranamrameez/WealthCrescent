@@ -49,7 +49,7 @@ export async function mutateAudit(entries, operation, price) {
           const row = request.result;
           if (!row || row.price !== entry.price) { tx.abort(); return; }
           if (operation === 'delete') store.delete(entry.id);
-          else store.put({ ...row, originalPrice: row.originalPrice ?? row.price, price, accepted: true, editedAt: Date.now() });
+          else store.put({ ...row, originalPrice: row.originalPrice ?? row.price, price, accepted: true, previousSyncedAt: row.syncedAt || row.previousSyncedAt || null, syncedAt: null, editedAt: Date.now() });
         };
       }
       tx.oncomplete = resolve;
@@ -77,10 +77,34 @@ export async function saveAudit(result, url, source = 'automatic') {
       tx.onerror = () => reject(tx.error);
     });
     await chrome.storage.local.set({ auditUpdatedAt: capturedAt });
+    return capturedAt;
   } finally { db.close(); }
 }
 
-export async function queryAudit({ from = '', to = '', ticker = '', strategy = '', accepted = '', source = '', outliers = '', page = 1, pageSize = 25 } = {}) {
+export async function markAuditSynced(capturedAt, tickers) {
+  if (!tickers.length) return;
+  const db = await openDB();
+  const syncedAt = Date.now();
+  try {
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction('rows', 'readwrite');
+      const request = tx.objectStore('rows').openCursor();
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) return;
+        const row = cursor.value;
+        if (row.capturedAt === capturedAt && row.accepted !== false && tickers.includes(row.ticker)) cursor.update({ ...row, syncedAt });
+        cursor.continue();
+      };
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error('Sync audit update interrupted.'));
+    });
+    await chrome.storage.local.set({ auditUpdatedAt: syncedAt });
+  } finally { db.close(); }
+}
+
+export async function queryAudit({ from = '', to = '', ticker = '', strategy = '', accepted = '', source = '', outliers = '', page = 1, pageSize = 25, includeRecords = false } = {}) {
   const db = await openDB();
   try {
     return await new Promise((resolve, reject) => {
@@ -104,7 +128,7 @@ export async function queryAudit({ from = '', to = '', ticker = '', strategy = '
         }
         cursor.continue();
       };
-      tx.oncomplete = () => resolve({ rows: rows.reverse().slice((page - 1) * pageSize, page * pageSize), total: rows.length, tickers: [...tickers].filter(Boolean).sort(), chartRows: rows.map(({ ticker, price, capturedAt, outlier, deltaPct }) => ({ ticker, price, capturedAt, outlier, deltaPct })), outlierRows: rows.filter(row => row.outlier).slice(0, 100).map(({ id, ticker, price }) => ({ id, ticker, price })) });
+      tx.oncomplete = () => resolve({ rows: rows.reverse().slice((page - 1) * pageSize, page * pageSize), ...(includeRecords ? { records: rows } : {}), total: rows.length, tickers: [...tickers].filter(Boolean).sort(), chartRows: rows.map(({ ticker, price, capturedAt, outlier, deltaPct }) => ({ ticker, price, capturedAt, outlier, deltaPct })), outlierRows: rows.filter(row => row.outlier).slice(0, 100).map(({ id, ticker, price }) => ({ id, ticker, price })) });
       tx.onerror = () => reject(tx.error);
       tx.onabort = () => reject(tx.error || new Error('Audit query was interrupted.'));
     });

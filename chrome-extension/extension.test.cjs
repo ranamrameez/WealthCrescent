@@ -90,7 +90,7 @@ test('Test scrape saves legacy worker results and renders them in the table', as
     chrome: { storage: { onChanged: { addListener(fn) { changed = fn; } } } },
   });
   const code = read('options.js').replace(/^import .*;\r?\n/gm, '');
-  await vm.runInContext('(async () => { const renderPriceChart = () => {}; const mountStats = async () => {}; ' + code + '\n})()', ctx);
+  await vm.runInContext('(async () => { const renderPriceChart = () => {}; const mountStats = async () => {}; const qatarDate = () => "2026-10-11"; const dateRange = period => period === "all" ? { from: "", to: "" } : { from: "2026-10-05", to: "2026-10-11" }; ' + code + '\n})()', ctx);
   document.getElementById('tickerFilter').value = 'OTHER';
   await document.getElementById('testBtn').onclick();
   assert.equal(saved.length, 1);
@@ -138,20 +138,28 @@ test('Pushed-data handler reads Firebase and returns previous history without sc
   assert.equal(urls.length, 4, 'Pagination reuses the snapshot');
 });
 
-test('Page defaults to Firebase data and places the table before Test scrape', async () => {
+test('Page defaults to combined data and today, with working chart date presets', async () => {
   const { JSDOM } = require('../webapp/node_modules/jsdom');
   const document = new JSDOM(read('options.html')).window.document;
   let requested;
   const ctx = vm.createContext({ document, console, Date, JSON, Number,
     mountConfig: async () => {}, mountControls: async () => {},
-    sendWorkerMessage: async message => { requested = message; return { ok: true, total: 1, rows: [{ ticker: 'QIBK', price: 21, capturedAt: Date.now(), source: 'Firebase history', stored: { price: 21 } }] }; },
-    queryAudit: async () => { throw new Error('Must query Firebase by default'); },
+    sendWorkerMessage: async message => { requested = message; return { ok: true, total: 1, rows: [{ ticker: 'QIBK', price: 21, capturedAt: Date.now(), origin: 'firebase', syncStatus: 'Synced', source: 'Firebase history', stored: { price: 21 } }] }; },
+    queryAudit: async () => { throw new Error('Must query combined data by default'); },
     chrome: { storage: { onChanged: { addListener() {} } } },
   });
-  await vm.runInContext('(async () => { const renderPriceChart = () => {}; const mountStats = async () => {}; ' + read('options.js').replace(/^import .*;\r?\n/gm, '') + '\n})()', ctx);
-  assert.equal(requested.type, 'GET_PUSHED_DATA');
+  await vm.runInContext('(async () => { const renderPriceChart = () => {}; const mountStats = async () => {}; const qatarDate = () => "2026-10-11"; const dateRange = period => period === "all" ? { from: "", to: "" } : { from: "2026-10-05", to: "2026-10-11" }; ' + read('options.js').replace(/^import .*;\r?\n/gm, '') + '\n})()', ctx);
+  assert.equal(requested.type, 'GET_ALL_DATA');
+  assert.equal(requested.filters.from, '2026-10-11');
+  assert.equal(requested.filters.to, '2026-10-11');
+  assert.equal(document.getElementById('chartTicker').value, '');
+  await document.querySelector('[data-period="7d"]').onclick();
+  assert.equal(requested.filters.from, '2026-10-05');
+  await document.querySelector('[data-period="all"]').onclick();
+  assert.equal(requested.filters.from, '');
+  assert.equal(requested.filters.to, '');
   assert.match(document.getElementById('dataRows').textContent, /QIBK/);
-  assert.match(document.getElementById('dataRows').textContent, /Stored in Firebase/);
+  assert.match(document.getElementById('dataRows').textContent, /Synced/);
   assert.equal(document.getElementById('strategyFilter').disabled, true);
   assert.ok(document.getElementById('dataRows').compareDocumentPosition(document.getElementById('testBtn')) & 4);
   assert.equal(document.querySelector('.top-sections').children.length, 3);
@@ -223,7 +231,7 @@ test('Table populates ticker dropdown and selected-row edit sends the expected c
   const { JSDOM } = require('../webapp/node_modules/jsdom');
   const document = new JSDOM(read('options.html')).window.document;
   let mutation, preview;
-  const row = { id: 'history:QNBK:2', kind: 'history', key: '2', ticker: 'QNBK', price: 25, priceKey: 'lastPrice', capturedAt: Date.now(), deltaPct: 25, previousPrice: 20, outlier: true, source: 'Firebase history', stored: { time: '2026-10-04' } };
+  const row = { id: 'history:QNBK:2', kind: 'history', key: '2', ticker: 'QNBK', price: 25, priceKey: 'lastPrice', capturedAt: Date.now(), deltaPct: 25, previousPrice: 20, outlier: true, origin: 'firebase', syncStatus: 'Synced', source: 'Firebase history', stored: { time: '2026-10-04' } };
   const ctx = vm.createContext({ document, window: { confirm: text => { preview = text; return true; } }, console, Date, JSON, Number,
     mountConfig: async () => {}, mountControls: async () => {},
     sendWorkerMessage: async message => {
@@ -232,7 +240,7 @@ test('Table populates ticker dropdown and selected-row edit sends the expected c
     },
     chrome: { storage: { onChanged: { addListener() {} } } },
   });
-  await vm.runInContext('(async () => { const renderPriceChart = () => {}; const mountStats = async () => {}; ' + read('options.js').replace(/^import .*;\r?\n/gm, '') + '\n})()', ctx);
+  await vm.runInContext('(async () => { const renderPriceChart = () => {}; const mountStats = async () => {}; const qatarDate = () => "2026-10-11"; const dateRange = period => period === "all" ? { from: "", to: "" } : { from: "2026-10-05", to: "2026-10-11" }; ' + read('options.js').replace(/^import .*;\r?\n/gm, '') + '\n})()', ctx);
   assert.equal(document.getElementById('tickerFilter').options.length, 3);
   assert.match(document.getElementById('dataRows').textContent, /lastPrice/);
   assert.match(document.getElementById('dataRows').textContent, /FLAG 25.00%/);
@@ -404,4 +412,64 @@ test('Stored audit summary counts scrape batches rather than individual ticker r
   const result = await vm.runInContext(`summarizeAuditToday(${Date.parse('2026-10-11T10:00:00Z')})`, ctx);
   assert.equal(result.scrapeCount, 2);
   assert.equal(result.rowCount, 3);
+});
+
+test('Date presets use Qatar today and clamp calendar month/year boundaries', async () => {
+  const activity = await import('data:text/javascript;base64,' + Buffer.from(read('activity.js').replace(/^import .*;\r?\n/gm, '')).toString('base64'));
+  const source = read('date-ranges.js').replace(/^import .*;\r?\n/gm, `const qatarDate = ${activity.qatarDate.toString()};\n`);
+  const module = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+  const now = Date.parse('2026-10-10T22:00:00Z');
+  assert.deepEqual(module.dateRange('1d', now), { from: '2026-10-11', to: '2026-10-11' });
+  assert.deepEqual(module.dateRange('7d', now), { from: '2026-10-05', to: '2026-10-11' });
+  for (const [period, from] of [['1M', '2026-09-11'], ['3M', '2026-07-11'], ['6M', '2026-04-11'], ['1Y', '2025-10-11']]) assert.equal(module.dateRange(period, now).from, from);
+  assert.equal(module.dateRange('1M', Date.parse('2026-03-31T09:00:00Z')).from, '2026-02-28');
+  assert.equal(module.dateRange('1Y', Date.parse('2024-02-29T09:00:00Z')).from, '2023-02-28');
+  assert.deepEqual(module.dateRange('all', now), { from: '', to: '' });
+});
+
+test('Combined data includes synced and pending rows without ID collisions or invented sync proof', async () => {
+  const module = await import('data:text/javascript;base64,' + Buffer.from(read('combined-data.js')).toString('base64'));
+  const records = module.combineRecords([{ id: 'history:QFLS:0', ticker: 'QFLS', price: 10, capturedAt: 200 }], [
+    { id: 1, ticker: 'QFLS', price: 10, capturedAt: 100, accepted: true },
+    { id: 2, ticker: 'QFLS', price: 11, capturedAt: 300, accepted: true },
+    { id: 3, ticker: 'QFLS', price: 10, capturedAt: 400, accepted: true },
+    { id: 4, ticker: 'QFLS', price: 15, capturedAt: 500, accepted: true, syncedAt: 600 },
+  ]);
+  assert.equal(records.length, 5);
+  assert.equal(records.find(row => row.id === 'local:1').syncStatus, 'Synced (stored price match)');
+  assert.equal(records.find(row => row.id === 'local:2').syncStatus, 'Pending / unverified');
+  assert.equal(records.find(row => row.id === 'local:3').syncStatus, 'Pending / unverified');
+  assert.equal(records.find(row => row.id === 'local:4').syncStatus, 'Synced');
+  assert.equal(records.find(row => row.id === 'local:1').auditId, 1);
+  assert.equal(records.find(row => row.id === 'history:QFLS:0').origin, 'firebase');
+});
+
+test('All-ticker price history renders a separate chart for every matching ticker', async () => {
+  const { JSDOM } = require('../webapp/node_modules/jsdom');
+  const module = await import('data:text/javascript;base64,' + Buffer.from(read('price-chart.js')).toString('base64'));
+  const document = new JSDOM('<div id="chart"></div>').window.document;
+  const chart = document.getElementById('chart');
+  module.renderPriceChart(chart, [{ ticker: 'QFLS', price: 10, capturedAt: 100 }, { ticker: 'QNBK', price: 15, capturedAt: 200 }], '');
+  assert.equal(chart.querySelectorAll('svg').length, 2);
+  assert.match(chart.textContent, /QFLS/);
+  assert.match(chart.textContent, /QNBK/);
+});
+
+test('Successful push marks only accepted records from its own scrape batch as synced', async () => {
+  const sample = [{ ticker: 'QFLS', capturedAt: 100, accepted: true }, { ticker: 'QFLS', capturedAt: 99, accepted: true }, { ticker: 'QNBK', capturedAt: 100, accepted: true }, { ticker: 'QFLS', capturedAt: 100, accepted: false }];
+  const db = { close() {}, transaction() {
+    const tx = { objectStore() { return { openCursor() {
+      const request = {}; let index = 0;
+      const next = () => queueMicrotask(() => {
+        if (index < sample.length) { const position = index++; request.result = { value: sample[position], update: value => { sample[position] = value; }, continue: next }; }
+        else request.result = null;
+        request.onsuccess(); if (!request.result) tx.oncomplete();
+      }); next(); return request;
+    } }; } }; return tx;
+  } };
+  const ctx = vm.createContext({ chrome: { storage: { local: { set: async () => {} } } }, indexedDB: { open() { const request = {}; queueMicrotask(() => { request.result = db; request.onsuccess(); }); return request; } } });
+  vm.runInContext(read('audit.js').replace(/^import .*;\r?\n/gm, '').replace(/export /g, ''), ctx);
+  await vm.runInContext('markAuditSynced(100, ["QFLS"])', ctx);
+  assert.ok(sample[0].syncedAt);
+  assert.equal(sample.filter(row => row.syncedAt).length, 1);
 });

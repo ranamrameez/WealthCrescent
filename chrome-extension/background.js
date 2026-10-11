@@ -1,5 +1,6 @@
 import { recordActivity, qatarDate } from './activity.js';
-import { saveAudit } from './audit.js';
+import { saveAudit, queryAudit, markAuditSynced } from './audit.js';
+import { combineRecords } from './combined-data.js';
 import { pushedRecords, paginatePushed, priceDeviation } from './pushed-data.js';
 import { setSyncConfig, withinScrapingWindow } from './common.js';
 // Background service worker: owns the collect → (throttled, randomized)
@@ -242,6 +243,7 @@ async function pushRows(rows) {
   const nowIso = new Date().toISOString();
   const today = nowIso.slice(0, 10);
   let pushed = 0;
+  const syncedTickers = [];
   let namesPushed = 0;
   const errors = [];
   for (const row of rows) {
@@ -254,6 +256,7 @@ async function pushRows(rows) {
       await appendHistoryPointSafely(row.ticker, point, auth.idToken);
       pushedSnapshot = null;
       pushed++;
+      syncedTickers.push(row.ticker);
     } catch (e) {
       errors.push(`${row.ticker}: ${e.message || e}`);
     }
@@ -275,7 +278,7 @@ async function pushRows(rows) {
   } catch (e) {
     // Non-critical — the per-ticker writes already landed.
   }
-  return { pushed, namesPushed, total: rows.length, errors };
+  return { pushed, namesPushed, total: rows.length, errors, syncedTickers };
 }
 
 // ---------- Scraping (delegates to the content script) ----------
@@ -354,7 +357,7 @@ async function collectCycle({ forcePush = false, manual = false } = {}) {
   }
 
   await recordActivity({ type: 'scrape', success: true, count: result.rows?.length || 0 });
-  await saveAudit(result, tab.url, manual ? 'manual' : 'automatic');
+  const auditBatchAt = await saveAudit(result, tab.url, manual ? 'manual' : 'automatic');
   const rows = result.rows || [];
   await patchStatus({
     lastScrapeAt: Date.now(),
@@ -374,7 +377,8 @@ async function collectCycle({ forcePush = false, manual = false } = {}) {
 
   if (due && (manual || (await getSyncConfig()).scrapingEnabled)) {
     try {
-      const { pushed, namesPushed, total, errors } = await pushRows(rows);
+      const { pushed, namesPushed, total, errors, syncedTickers } = await pushRows(rows);
+      await markAuditSynced(auditBatchAt, syncedTickers);
       await recordActivity({ type: 'sync', count: pushed, success: pushed === total });
       const floorMs = syncConfig.minPushIntervalMinutes * 60000;
       // Randomized gap: between 1x and 2x the configured floor, re-rolled
@@ -431,6 +435,18 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       }
       case 'GET_PUSHED_DATA': {
         sendResponse({ ok: true, ...await queryPushedData(message.filters || {}, !!message.refresh) });
+        break;
+      }
+      case 'GET_ALL_DATA': {
+        const local = await queryAudit({ includeRecords: true });
+        let firebase = [];
+        let warning = '';
+        try {
+          await queryPushedData({}, !!message.refresh);
+          firebase = pushedSnapshot.rows;
+        } catch (error) { warning = `Firebase unavailable: ${error.message} Showing local records; their sync state may be unverified.`; }
+        const rows = combineRecords(firebase, local.records);
+        sendResponse({ ok: true, ...paginatePushed(rows, message.filters || {}), warning });
         break;
       }
       case 'GET_ACTIVITY_SUMMARY': {

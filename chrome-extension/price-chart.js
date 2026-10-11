@@ -1,6 +1,18 @@
 export function renderPriceChart(container, rows, ticker) {
   const document = container.ownerDocument;
   container.replaceChildren();
+  if (!ticker) {
+    const tickers = [...new Set(rows.filter(row => Number.isFinite(row.price) && row.capturedAt != null).map(row => row.ticker))].sort();
+    if (!tickers.length) { container.textContent = 'No dated prices in the current filters.'; return; }
+    const grid = document.createElement('div'); grid.className = 'chart-grid';
+    for (const symbol of tickers) {
+      const card = document.createElement('section'); const heading = document.createElement('h3'); heading.textContent = symbol;
+      const chart = document.createElement('div'); card.append(heading, chart); grid.append(card);
+      renderPriceChart(chart, rows, symbol);
+    }
+    container.append(grid);
+    return;
+  }
   const points = rows.filter(row => row.ticker === ticker && Number.isFinite(row.price) && row.capturedAt != null).sort((a, b) => a.capturedAt - b.capturedAt);
   if (!points.length) { container.textContent = 'No dated prices for this ticker in the current filters.'; return; }
   const ns = 'http://www.w3.org/2000/svg';

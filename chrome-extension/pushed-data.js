@@ -36,5 +36,5 @@ export function paginatePushed(rows, { from = '', to = '', ticker = '', outliers
     const date = parts.length ? `${part('year')}-${part('month')}-${part('day')}` : row.date || '';
     return (!from || date >= from) && (!to || (!!date && date <= to)) && (!ticker || row.ticker.toUpperCase().includes(ticker.toUpperCase())) && (!outliers || row.outlier);
   });
-  return { rows: filtered.slice((page - 1) * pageSize, page * pageSize), total: filtered.length, tickers: [...new Set(rows.map(row => row.ticker))].sort(), chartRows: filtered.map(({ ticker, price, capturedAt, outlier, deltaPct }) => ({ ticker, price, capturedAt, outlier, deltaPct })), outlierRows: filtered.filter(row => row.outlier).slice(0, 100).map(({ id, ticker, price, key, kind, stored }) => ({ id, ticker, price, key, kind, stored: { time: stored?.time } })) };
+  return { rows: filtered.slice((page - 1) * pageSize, page * pageSize), total: filtered.length, tickers: [...new Set(rows.map(row => row.ticker))].sort(), chartRows: filtered.map(({ ticker, price, capturedAt, outlier, deltaPct }) => ({ ticker, price, capturedAt, outlier, deltaPct })), outlierRows: filtered.filter(row => row.outlier).slice(0, 100).map(({ id, ticker, price, key, kind, stored, origin, auditId }) => ({ id, ticker, price, key, kind, origin, auditId, stored: { time: stored?.time } })) };
 }

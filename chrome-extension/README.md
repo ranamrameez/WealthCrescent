@@ -233,3 +233,15 @@ started. Missing counters show Unavailable rather than zero, and a newer legacy
 status timestamp prompts reloading the background worker. Statistics cover all
 tickers regardless of the table filter. Stored history points are not sync counts:
 unchanged prices are deduplicated, and shared points can come from other browsers.
+
+The table and chart open on today in Qatar time, with All (synced and pending) as
+the default data view. All view combines shared Firebase records with local audit
+records and distinguishes confirmed syncs, older stored-price matches and pending
+or unverified records. Firebase history and local audit remain separate options.
+New successful pushes mark their local audit records as synced; local price edits
+clear that confirmation. Combined-view batch operations target each record's source.
+
+The chart defaults to All tickers, displaying one chart per matching ticker, with
+1d, 7d, 1M, 3M, 6M, 1Y and All time buttons. These presets update the shared table
+and chart date filters. Month/year presets use calendar boundaries; manual dates
+remain available. All matching records are charted across pagination.
