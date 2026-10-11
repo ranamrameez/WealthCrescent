@@ -1,3 +1,4 @@
+import { recordActivity } from './activity.js';
 import { saveAudit } from './audit.js';
 import { pushedRecords, paginatePushed, priceDeviation } from './pushed-data.js';
 import { setSyncConfig, withinScrapingWindow } from './common.js';
@@ -346,11 +347,13 @@ async function collectCycle({ forcePush = false, manual = false } = {}) {
 
   const result = await scrapeTab(tab);
   if (!result.ok) {
+    await recordActivity({ type: 'scrape', success: false });
     await patchStatus({ lastError: `Scrape failed: ${result.error}` });
     scheduleNextCollect();
     return;
   }
 
+  await recordActivity({ type: 'scrape', success: true, count: result.rows?.length || 0 });
   await saveAudit(result, tab.url, manual ? 'manual' : 'automatic');
   const rows = result.rows || [];
   await patchStatus({
@@ -372,6 +375,7 @@ async function collectCycle({ forcePush = false, manual = false } = {}) {
   if (due && (manual || (await getSyncConfig()).scrapingEnabled)) {
     try {
       const { pushed, namesPushed, total, errors } = await pushRows(rows);
+      await recordActivity({ type: 'sync', count: pushed, success: pushed === total });
       const floorMs = syncConfig.minPushIntervalMinutes * 60000;
       // Randomized gap: between 1x and 2x the configured floor, re-rolled
       // fresh after every push — never a perfectly predictable period.
@@ -386,6 +390,7 @@ async function collectCycle({ forcePush = false, manual = false } = {}) {
       });
       if (errors.length) console.warn('[thegroup-price-sync] push errors:', errors);
     } catch (e) {
+      await recordActivity({ type: 'sync', count: 0, success: false });
       await patchStatus({ lastError: e.message || String(e) });
     }
   }
@@ -477,6 +482,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         // whatever's currently saved, so Options' "Test scrape" reflects
         // in-progress edits immediately.
         const result = await scrapeTab(tab, message.config);
+        await recordActivity({ type: 'scrape', success: !!result.ok, count: result.rows?.length || 0, source: 'test' });
         if (result.ok) await saveAudit(result, tab.url, 'test');
         sendResponse({ ...result, auditSaved: !!result.ok });
         break;

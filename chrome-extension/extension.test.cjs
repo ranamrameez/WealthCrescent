@@ -90,7 +90,7 @@ test('Test scrape saves legacy worker results and renders them in the table', as
     chrome: { storage: { onChanged: { addListener(fn) { changed = fn; } } } },
   });
   const code = read('options.js').replace(/^import .*;\r?\n/gm, '');
-  await vm.runInContext('(async () => { const renderPriceChart = () => {}; ' + code + '\n})()', ctx);
+  await vm.runInContext('(async () => { const renderPriceChart = () => {}; const mountStats = async () => {}; ' + code + '\n})()', ctx);
   document.getElementById('tickerFilter').value = 'OTHER';
   await document.getElementById('testBtn').onclick();
   assert.equal(saved.length, 1);
@@ -148,13 +148,13 @@ test('Page defaults to Firebase data and places the table before Test scrape', a
     queryAudit: async () => { throw new Error('Must query Firebase by default'); },
     chrome: { storage: { onChanged: { addListener() {} } } },
   });
-  await vm.runInContext('(async () => { const renderPriceChart = () => {}; ' + read('options.js').replace(/^import .*;\r?\n/gm, '') + '\n})()', ctx);
+  await vm.runInContext('(async () => { const renderPriceChart = () => {}; const mountStats = async () => {}; ' + read('options.js').replace(/^import .*;\r?\n/gm, '') + '\n})()', ctx);
   assert.equal(requested.type, 'GET_PUSHED_DATA');
   assert.match(document.getElementById('dataRows').textContent, /QIBK/);
   assert.match(document.getElementById('dataRows').textContent, /Stored in Firebase/);
   assert.equal(document.getElementById('strategyFilter').disabled, true);
   assert.ok(document.getElementById('dataRows').compareDocumentPosition(document.getElementById('testBtn')) & 4);
-  assert.equal(document.querySelector('.top-sections').children.length, 2);
+  assert.equal(document.querySelector('.top-sections').children.length, 3);
 });
 
 test('Outliers flag changes beyond 10 percent in either direction, with source keys retained', async () => {
@@ -232,7 +232,7 @@ test('Table populates ticker dropdown and selected-row edit sends the expected c
     },
     chrome: { storage: { onChanged: { addListener() {} } } },
   });
-  await vm.runInContext('(async () => { const renderPriceChart = () => {}; ' + read('options.js').replace(/^import .*;\r?\n/gm, '') + '\n})()', ctx);
+  await vm.runInContext('(async () => { const renderPriceChart = () => {}; const mountStats = async () => {}; ' + read('options.js').replace(/^import .*;\r?\n/gm, '') + '\n})()', ctx);
   assert.equal(document.getElementById('tickerFilter').options.length, 3);
   assert.match(document.getElementById('dataRows').textContent, /lastPrice/);
   assert.match(document.getElementById('dataRows').textContent, /FLAG 25.00%/);
@@ -278,4 +278,78 @@ test('Chart includes all filtered pages and automatic outlier selection is cappe
   assert.equal(result.rows.length, 25);
   assert.equal(result.chartRows.length, 125);
   assert.equal(result.outlierRows.length, 100);
+});
+
+test('Audit cursor returns complete totals, charts and second-page results without a total variable', async () => {
+  const sample = [10, 11, 13].map((price, index) => ({ id: index + 1, ticker: 'QNBK', price, accepted: true, source: 'automatic', capturedAt: Date.parse('2026-10-11T09:00:00Z') + index * 60000 }));
+  const db = { close() {}, transaction() {
+    const tx = { objectStore() { return { openCursor() {
+      const request = {}; let index = 0;
+      const next = () => queueMicrotask(() => {
+        if (index >= sample.length) { request.result = null; request.onsuccess(); tx.oncomplete(); return; }
+        request.result = { value: structuredClone(sample[index++]), continue: next };
+        try { request.onsuccess(); } catch (error) { tx.error = error; tx.onabort(); }
+      });
+      next(); return request;
+    } }; } };
+    return tx;
+  } };
+  const ctx = vm.createContext({
+    indexedDB: { open() { const request = {}; queueMicrotask(() => { request.result = db; request.onsuccess(); }); return request; } },
+    priceDeviation: (price, previousPrice) => ({ previousPrice, deltaPct: previousPrice ? (price - previousPrice) / previousPrice * 100 : null, outlier: previousPrice ? Math.abs(price / previousPrice - 1) > .1 + 1e-9 : false }),
+  });
+  vm.runInContext(read('audit.js').replace(/^import .*;\r?\n/gm, '').replace(/export /g, ''), ctx);
+  const result = await vm.runInContext('queryAudit({ page: 2, pageSize: 1 })', ctx);
+  assert.equal(result.total, 3);
+  assert.equal(result.rows[0].price, 11);
+  assert.equal(result.chartRows.length, 3);
+  assert.equal(result.outlierRows.length, 1);
+});
+
+test('Activity counts scrapes and syncs, persists last-sync time and resets at Qatar midnight', async () => {
+  const source = read('activity.js').replace(/^import .*;\r?\n/gm, '');
+  const module = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+  const now = Date.parse('2026-10-11T20:59:00Z');
+  let activity = module.updateActivity({}, { type: 'scrape', success: true, count: 50 }, now);
+  activity = module.updateActivity(activity, { type: 'scrape', success: true, count: 2, source: 'test' }, now);
+  activity = module.updateActivity(activity, { type: 'scrape', success: false }, now);
+  activity = module.updateActivity(activity, { type: 'sync', success: true, count: 50 }, now);
+  activity = module.updateActivity(activity, { type: 'sync', success: false, count: 10 }, now);
+  activity = module.updateActivity(activity, { type: 'sync', success: false, count: 0 }, now + 1000);
+  assert.equal(activity.daily.scrapeCount, 2);
+  assert.equal(activity.daily.scrapedRows, 52);
+  assert.equal(activity.daily.testCount, 1);
+  assert.equal(activity.daily.scrapeFailures, 1);
+  assert.equal(activity.daily.syncCount, 2);
+  assert.equal(activity.daily.syncAttempts, 3);
+  assert.equal(activity.daily.syncFailures, 2);
+  assert.equal(activity.daily.syncedRows, 60);
+  assert.equal(activity.lastSyncAt, now, 'A wholly failed sync does not reset elapsed time');
+  const tomorrow = module.dailyActivity(activity, Date.parse('2026-10-11T21:00:00Z'));
+  assert.equal(tomorrow.daily.date, '2026-10-12');
+  assert.equal(tomorrow.daily.scrapeCount, 0);
+  assert.equal(tomorrow.daily.syncCount, 0);
+  assert.equal(tomorrow.lastSyncAt, now);
+});
+
+test('Shared statistics show elapsed sync time and today counts even when signed out', async () => {
+  const { JSDOM } = require('../webapp/node_modules/jsdom');
+  const dom = new JSDOM('<div id="stats"></div>');
+  const ctx = vm.createContext({
+    Date, window: dom.window, setInterval: () => 1, clearInterval() {},
+    getActivity: async () => ({ daily: { scrapeCount: 4, scrapedRows: 200, syncCount: 2, syncedRows: 100, syncAttempts: 3, syncFailures: 1, scrapeFailures: 0, testCount: 1 }, lastSyncAt: Date.now() - 120000 }),
+    getStatus: async () => ({}), getSyncConfig: async () => ({ scrapingEnabled: false }),
+    chrome: { storage: { onChanged: { addListener() {}, removeListener() {} } } },
+    container: dom.window.document.getElementById('stats'),
+  });
+  vm.runInContext(read('stats-ui.js').replace(/^import .*;\r?\n/gm, '').replace(/export /g, ''), ctx);
+  await vm.runInContext('mountStats(container)', ctx);
+  const text = ctx.container.textContent;
+  assert.match(text, /Since last sync2m/);
+  assert.match(text, /Scrapes today4/);
+  assert.match(text, /Syncs today2/);
+  assert.match(text, /Next sync dueStopped/);
+  assert.ok(read('popup.html').includes('id="activityStats"'));
+  const page = new JSDOM(read('options.html')).window.document;
+  assert.equal(page.getElementById('signedInView').contains(page.getElementById('activityStats')), false);
 });

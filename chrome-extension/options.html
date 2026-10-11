@@ -120,7 +120,8 @@
       .muted, label { color:#43576e; }
       input:not([type=checkbox]), select { background:#eaf0f7; border:1px solid #879ab0; color:#17283c; min-height:36px; }
       input[type=checkbox] { width:16px; height:16px; accent-color:#1d4ed8; }
-      .top-sections { grid-template-columns:minmax(240px,1fr) minmax(200px,1fr); }
+      .top-sections { grid-template-columns:minmax(240px,1fr) minmax(190px,.7fr) minmax(340px,1.5fr); }
+      @media(max-width:1000px) { .top-sections { grid-template-columns:1fr 1fr; } #activityStats { grid-column:1/-1; } }
       @media(max-width:600px) { .top-sections { grid-template-columns:1fr; } }
       .view-control { width:240px; max-width:100%; margin-bottom:12px; }
       .table-header, .pager, .batch-toolbar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
@@ -181,10 +182,7 @@
 
 
 
-      <div class="card" id="statusCard">
-        <div id="statusLines" class="muted"></div>
-        <div id="statusError" class="error"></div>
-      </div>
+
 
 
 
@@ -192,6 +190,7 @@
 
       </section>
     <div class="card" id="scrapingControls"></div>
+    <div class="card" id="activityStats"></div>
 
     </div>
     <div class="card">

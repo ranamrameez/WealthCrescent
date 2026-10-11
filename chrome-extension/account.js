@@ -1,39 +1,9 @@
-import { getAuth, getStatus } from './common.js';
+import { getAuth } from './common.js';
 
 const $ = (id) => document.getElementById(id);
 
 function sendMessage(msg) {
   return new Promise((resolve) => chrome.runtime.sendMessage(msg, resolve));
-}
-
-function fmtAgo(ts) {
-  if (!ts) return 'never';
-  const sec = Math.max(0, Math.round((Date.now() - ts) / 1000));
-  if (sec < 60) return `${sec}s ago`;
-  const min = Math.round(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.round(min / 60);
-  return `${hr}h ago`;
-}
-
-function fmtIn(ts) {
-  if (!ts) return '—';
-  const sec = Math.round((ts - Date.now()) / 1000);
-  if (sec <= 0) return 'due now';
-  const min = Math.round(sec / 60);
-  if (min < 1) return `${sec}s`;
-  return `${min}m`;
-}
-
-async function renderStatus() {
-  const status = await getStatus();
-  const lines = [
-    `Last scrape: ${fmtAgo(status.lastScrapeAt)}${status.lastScrapeCount != null ? ` — ${status.lastScrapeCount} ticker(s)` : ''}${status.lastStrategy ? ` (${status.lastStrategy})` : ''}`,
-    `Last push: ${fmtAgo(status.lastPushAt)}${status.lastPushCount != null ? ` — ${status.lastPushCount}/${status.lastPushTotal} ticker(s), ${status.lastNamesCount || 0} name(s)` : ''}`,
-    `Next push due: ${fmtIn(status.nextPushAt)}`,
-  ];
-  $('statusLines').replaceChildren(...lines.map(line => { const div = document.createElement('div'); div.textContent = line; return div; }));
-  $('statusError').textContent = status.lastError || '';
 }
 
 async function renderAuthState() {
@@ -42,8 +12,6 @@ async function renderAuthState() {
   $('signedInView').hidden = !auth;
   if (auth) {
     $('emailLabel').textContent = auth.email || auth.uid;
-
-    await renderStatus();
   }
 }
 
@@ -76,4 +44,3 @@ $('signOutBtn').addEventListener('click', async () => {
 
 
 renderAuthState();
-setInterval(() => { if (!$('signedInView').hidden) renderStatus(); }, 5000);

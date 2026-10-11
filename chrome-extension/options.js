@@ -1,3 +1,4 @@
+import { mountStats } from './stats-ui.js';
 import { renderPriceChart } from './price-chart.js';
 import './account.js';
 import { saveAudit } from './audit.js';
@@ -7,6 +8,7 @@ import { queryAudit, mutateAudit } from './audit.js';
 const $ = id => document.getElementById(id);
 await mountConfig($('configCard'));
 await mountControls($('scrapingControls'));
+await mountStats($('activityStats'));
 
 $('testBtn').onclick = async () => {
   $('testBtn').disabled = true;

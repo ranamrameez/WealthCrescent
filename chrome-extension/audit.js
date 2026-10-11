@@ -73,13 +73,13 @@ export async function queryAudit({ from = '', to = '', ticker = '', strategy = '
         const part = type => parts.find(value => value.type === type).value;
         const date = part('year') + '-' + part('month') + '-' + part('day');
         if ((!from || date >= from) && (!to || date <= to) && (!ticker || (row.ticker || '').toUpperCase().includes(ticker.toUpperCase())) && (!strategy || row.strategy === strategy) && (!source || row.source === source) && (!accepted || String(row.accepted) === accepted) && (!outliers || row.outlier)) {
-          if (total >= (page - 1) * pageSize && rows.length < pageSize) rows.push(row);
-          total++;
+          rows.push(row);
         }
         cursor.continue();
       };
       tx.oncomplete = () => resolve({ rows: rows.reverse().slice((page - 1) * pageSize, page * pageSize), total: rows.length, tickers: [...tickers].filter(Boolean).sort(), chartRows: rows.map(({ ticker, price, capturedAt, outlier, deltaPct }) => ({ ticker, price, capturedAt, outlier, deltaPct })), outlierRows: rows.filter(row => row.outlier).slice(0, 100).map(({ id, ticker, price }) => ({ id, ticker, price })) });
       tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error('Audit query was interrupted.'));
     });
   } finally { db.close(); }
 }

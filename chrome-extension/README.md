@@ -216,3 +216,13 @@ Choose a chart ticker to inspect its prices, with Qatar timestamps in point tool
 and red markers for flagged outliers. Outliers are selected automatically by default
 (up to 100 matching records for batch operations); unchecked rows remain unchecked
 when refreshing. Toggle Auto-select outliers off to manage selection manually.
+
+## Activity statistics
+
+The popup and extension page both show live time since the last successful sync and
+last scrape, next sync due, and daily scrape/sync counts with ticker-row totals.
+Counters are persisted locally and reset at midnight in Asia/Qatar. Test scrapes
+are included in scrape totals and also listed separately. A sync counts when at
+least one price write succeeds; unsuccessful or partial attempts are listed too.
+Wholly failed syncs do not change the last-successful-sync timestamp. Counters begin
+with this update; historical activity is not retroactively counted.

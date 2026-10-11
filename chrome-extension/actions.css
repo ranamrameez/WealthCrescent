@@ -25,3 +25,10 @@ button:disabled { opacity: .45; cursor: default; }
 #deleteSelected { background:#b91c1c; color:#fff; }
 #editSelected { background:#1d4ed8; color:#fff; }
 .outlier td:nth-child(6) { color:#8a3300; font-weight:700; }
+
+.stats-card { border:1px solid #9aadc2; background:#edf2f8; border-radius:8px; padding:10px; margin:10px 0; }
+.stats-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.15fr); gap:6px 12px; font-size:12px; margin:8px 0; }
+.stats-grid dt { color:#43576e; }
+.stats-grid dd { margin:0; font-weight:600; }
+#activityStats h2 { font-size:15px; margin:0 0 8px; }
+#activityStats .muted { font-size:11px; color:#43576e; }

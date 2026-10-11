@@ -1,3 +1,4 @@
+import { mountStats } from './stats-ui.js';
 import { mountControls } from './config-ui.js';
 import { sendWorkerMessage } from './common.js';
 const error = document.getElementById('actionError');
@@ -11,3 +12,5 @@ for (const [id, type] of [['scrapeNowBtn', 'SCRAPE_NOW_MANUAL'], ['pushNowBtn', 
   };
 }
 mountControls(document.getElementById('scrapingControls')).catch(cause => { error.textContent = cause.message; });
+
+mountStats(document.getElementById('activityStats'));
