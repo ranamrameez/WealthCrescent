@@ -2,7 +2,7 @@ import { recordActivity, qatarDate } from './activity.js';
 import { saveAudit, queryAudit, markAuditSynced } from './audit.js';
 import { combineRecords } from './combined-data.js';
 import { pushedRecords, paginatePushed, priceDeviation } from './pushed-data.js';
-import { setSyncConfig, withinScrapingWindow } from './common.js';
+import { setSyncConfig, withinScrapingWindow, pushDelayMs } from './common.js';
 // Background service worker: owns the collect → (throttled, randomized)
 // push loop, Firebase Auth (email/password, via plain REST calls — no SDK
 // bundling needed in an MV3 service worker), and the safe read-modify-write
@@ -337,7 +337,7 @@ async function runCycle(options = {}) {
   cycleRunning = true;
   try { await collectCycle(options); } finally { cycleRunning = false; await scheduleNextCollect(); }
 }
-async function collectCycle({ forcePush = false, manual = false } = {}) {
+async function collectCycle({ forcePush = false, manual = false, scrapeOnly = false } = {}) {
   const config = await getSyncConfig();
   if (!manual && (!config.scrapingEnabled || !withinScrapingWindow(config))) {
     await scheduleNextCollect();
@@ -376,18 +376,15 @@ async function collectCycle({ forcePush = false, manual = false } = {}) {
 
   const status = await getStatus();
   const syncConfig = await getSyncConfig();
-  const due = forcePush || !status.nextPushAt || Date.now() >= status.nextPushAt;
+  const due = forcePush || syncConfig.minPushIntervalMinutes === 0 || !status.nextPushAt || Date.now() >= status.nextPushAt;
 
-  if (due && (manual || (await getSyncConfig()).scrapingEnabled)) {
+  if (!scrapeOnly && due && (manual || (await getSyncConfig()).scrapingEnabled)) {
     try {
       const { pushed, namesPushed, total, errors, syncedTickers } = await pushRows(rows);
       await recordActivity({ type: 'sync', count: pushed, success: pushed === total && !errors.length, error: errors.slice(0, 3).join(' ') });
       try { await markAuditSynced(auditBatchAt, syncedTickers); }
       catch (error) { errors.push(`Prices synced; local audit update failed: ${error.message}`); }
-      const floorMs = syncConfig.minPushIntervalMinutes * 60000;
-      // Randomized gap: between 1x and 2x the configured floor, re-rolled
-      // fresh after every push — never a perfectly predictable period.
-      const nextPushAt = Date.now() + floorMs + randInt(0, floorMs);
+      const nextPushAt = Date.now() + pushDelayMs(syncConfig);
       await patchStatus({
         lastPushAt: Date.now(),
         lastPushCount: pushed,
@@ -410,7 +407,11 @@ async function collectCycle({ forcePush = false, manual = false } = {}) {
 async function scheduleNextCollect() {
   if (!(await getSyncConfig()).scrapingEnabled) { await chrome.alarms.clear(COLLECT_ALARM); return; }
   const delaySec = randInt(COLLECT_MIN_SECONDS, COLLECT_MAX_SECONDS);
-  chrome.alarms.create(COLLECT_ALARM, { when: Date.now() + delaySec * 1000 });
+  const config = await getSyncConfig();
+  const status = config.pushTimingMode === 'constant' ? await getStatus() : {};
+  const now = Date.now();
+  const when = status.nextPushAt > now ? Math.min(now + delaySec * 1000, status.nextPushAt) : now + delaySec * 1000;
+  chrome.alarms.create(COLLECT_ALARM, { when });
 }
 
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -489,7 +490,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         break;
       }
       case 'SCRAPE_NOW_MANUAL': {
-        await runCycle({ forcePush: false, manual: true });
+        await runCycle({ forcePush: false, manual: true, scrapeOnly: true });
         sendResponse({ ok: true });
         break;
       }
@@ -520,4 +521,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
   })().catch(e => sendResponse({ ok: false, error: e.message || String(e) }));
   return true; // async response
+});
+
+chrome.storage?.onChanged?.addListener((changes, area) => {
+  if (area !== 'local' || !changes.syncConfig) return;
+  const before = changes.syncConfig.oldValue || {};
+  const after = changes.syncConfig.newValue || {};
+  if (before.pushTimingMode === after.pushTimingMode && before.minPushIntervalMinutes === after.minPushIntervalMinutes) return;
+  (async () => {
+    const [config, status] = await Promise.all([getSyncConfig(), getStatus()]);
+    if (status.lastPushAt) await patchStatus({ nextPushAt: status.lastPushAt + pushDelayMs(config) });
+    await scheduleNextCollect();
+  })().catch(error => patchStatus({ lastError: error.message }));
 });

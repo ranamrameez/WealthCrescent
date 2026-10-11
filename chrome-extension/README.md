@@ -252,3 +252,19 @@ history counter. Sync errors persist independently of scrape errors and remain
 visible until a successful sync. Failed attempts observe the configured retry
 minimum. Successful current-price writes count as synced even if a subsequent
 history write fails, with the history failure shown as a partial-sync warning.
+
+## Push timing and favourite charts
+
+Configurations offer Random (1?2 times the interval) and Constant push timing.
+Intervals may be zero: every successful automatic scrape then syncs immediately,
+without an additional Firebase push delay. Collection remains every 45?90 seconds
+and follows the Qatar-time scraping windows. Constant timing aligns the next
+collection alarm with the push due time where possible; browser alarm delays and
+time windows still apply. Configuration changes recalculate the next push time.
+
+The extension page includes Scrape now (local collection only) and Push now
+(scrape then force a push), alongside Start and Stop. Every ticker chart has
+Favourite and Full screen controls. Favourites persist in browser storage and
+appear above the table, using the current date range and data view even when
+the table is filtered to another ticker. Fullscreen charts stay open during
+background refreshes; exit fullscreen to refresh the view.

@@ -1,3 +1,4 @@
+import { getChartFavourites, setChartFavourites } from './chart-favourites.js';
 import { dateRange } from './date-ranges.js';
 import { qatarDate } from './activity.js';
 import { mountStats } from './stats-ui.js';
@@ -8,9 +9,10 @@ import { sendWorkerMessage } from './common.js';
 import { mountConfig, mountControls } from './config-ui.js';
 import { queryAudit, mutateAudit } from './audit.js';
 const $ = id => document.getElementById(id);
+const favourites = new Set(await getChartFavourites());
 $('fromDate').value = $('toDate').value = qatarDate();
 await mountConfig($('configCard'));
-await mountControls($('scrapingControls'));
+await mountControls($('scrapingControls'), { manualActions: true });
 await mountStats($('activityStats'));
 
 $('testBtn').onclick = async () => {
@@ -34,6 +36,7 @@ let page = 1;
 const selected = new Map();
 const deselectedOutliers = new Set();
 let chartRows = [];
+let favouriteRows = [];
 let visibleRows = [];
 function updateSelection() {
   $('selectionInfo').textContent = `${selected.size} selected`;
@@ -43,6 +46,7 @@ function updateSelection() {
 }
 let requestVersion = 0;
 async function renderData(refresh = false) {
+  if (document.fullscreenElement) return;
   const version = ++requestVersion;
   try {
     if ($('fromDate').value && $('toDate').value && $('fromDate').value > $('toDate').value) throw new Error('From date must be before or equal to To date.');
@@ -53,7 +57,7 @@ async function renderData(refresh = false) {
     $('dataMessage').textContent = firebase ? 'Loading pushed data from Firebase...' : 'Loading local audit...';
     const filters = { from: $('fromDate').value, to: $('toDate').value, ticker: $('tickerFilter').value.trim(), strategy: $('strategyFilter').value, accepted: $('acceptedFilter').value, source: $('sourceFilter').value, outliers: $('outlierFilter').value, page, pageSize };
     const result = combined ? await sendWorkerMessage({ type: 'GET_ALL_DATA', filters, refresh }) : firebase ? await sendWorkerMessage({ type: 'GET_PUSHED_DATA', filters, refresh }) : await queryAudit(filters);
-    if (version !== requestVersion) return;
+    if (version !== requestVersion || document.fullscreenElement) return;
     const pages = Math.max(1, Math.ceil(result.total / pageSize));
     if (page > pages) { page = pages; return renderData(); }
     const tickerValue = $('tickerFilter').value;
@@ -70,7 +74,14 @@ async function renderData(refresh = false) {
     const chartTickers = [...new Set(chartRows.map(row => row.ticker))].sort();
     $('chartTicker').replaceChildren(...['', ...chartTickers].map(ticker => { const option = document.createElement('option'); option.value = ticker; option.textContent = ticker || 'All tickers'; return option; }));
     $('chartTicker').value = chartTickers.includes(tickerValue) ? tickerValue : chartTickers.includes(previousChartTicker) ? previousChartTicker : '';
-    renderPriceChart($('priceChart'), chartRows, $('chartTicker').value);
+    favouriteRows = chartRows;
+    if (favourites.size && filters.ticker) {
+      const chartFilters = { ...filters, ticker: '' };
+      const all = combined ? await sendWorkerMessage({ type: 'GET_ALL_DATA', filters: chartFilters }) : firebase ? await sendWorkerMessage({ type: 'GET_PUSHED_DATA', filters: chartFilters }) : await queryAudit(chartFilters);
+      if (version !== requestVersion) return;
+      favouriteRows = all.chartRows || all.rows;
+    }
+    renderCharts();
     $('dataRows').replaceChildren();
     for (const row of result.rows) {
       const tr = document.createElement('tr');
@@ -87,7 +98,7 @@ async function renderData(refresh = false) {
     $('pageInfo').textContent = `Page ${page} of ${pages}`;
     updateSelection();
     $('prevPage').disabled = page <= 1; $('nextPage').disabled = page >= pages;
-  } catch (error) { if (version !== requestVersion) return; $('dataMessage').textContent = error.message; $('dataRows').replaceChildren(); $('priceChart').replaceChildren(); $('prevPage').disabled = true; $('nextPage').disabled = true; }
+  } catch (error) { if (version !== requestVersion) return; $('dataMessage').textContent = error.message; $('dataRows').replaceChildren(); $('priceChart').replaceChildren(); $('favouriteChartList').replaceChildren(); $('prevPage').disabled = true; $('nextPage').disabled = true; }
 }
 for (const id of ['dataView', 'fromDate', 'toDate', 'tickerFilter', 'strategyFilter', 'acceptedFilter', 'sourceFilter', 'outlierFilter', 'pageSize']) $(id).addEventListener('change', () => { page = 1; selected.clear(); deselectedOutliers.clear(); updateSelection(); renderData(); });
 $('refreshData').onclick = () => renderData(true);
@@ -130,10 +141,31 @@ for (const button of document.querySelectorAll('[data-period]')) button.onclick 
   page = 1; selected.clear(); deselectedOutliers.clear(); await renderData();
 };
 for (const id of ['fromDate', 'toDate']) $(id).addEventListener('change', () => { for (const toggle of document.querySelectorAll('[data-period]')) toggle.setAttribute('aria-pressed', 'false'); });
-$('chartTicker').onchange = () => renderPriceChart($('priceChart'), chartRows, $('chartTicker').value);
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) renderData(); });
+$('chartTicker').onchange = () => renderCharts();
 $('autoSelectOutliers').onchange = () => { selected.clear(); deselectedOutliers.clear(); renderData(); };
+function renderCharts() {
+  const options = { favourites, onFavourite: async ticker => {
+    const next = new Set(favourites);
+    if (next.has(ticker)) next.delete(ticker); else next.add(ticker);
+    await setChartFavourites([...next]);
+    favourites.clear(); next.forEach(symbol => favourites.add(symbol));
+    await renderData();
+  } };
+  renderPriceChart($('priceChart'), chartRows, $('chartTicker').value, options);
+  const list = $('favouriteChartList'); list.replaceChildren();
+  if (!favourites.size) { list.textContent = 'Choose Favourite on a chart to pin it here.'; return; }
+  const grid = document.createElement('div'); grid.className = 'chart-grid';
+  for (const ticker of [...favourites].sort()) {
+    const card = document.createElement('section'); const title = document.createElement('h3'); title.textContent = ticker;
+    const chart = document.createElement('div'); card.append(title, chart); grid.append(card);
+    renderPriceChart(chart, favouriteRows, ticker, options);
+  }
+  list.append(grid);
+}
 $('editSelected').onclick = () => applyBatch('edit');
 $('deleteSelected').onclick = () => applyBatch('delete');
 await renderData();
 
-chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && (changes.auditUpdatedAt || changes.auth || changes.status)) renderData(!!changes.status); });
+chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && changes.chartFavourites) { favourites.clear(); (changes.chartFavourites.newValue || []).forEach(ticker => favourites.add(ticker)); renderData(); }
+  if (area === 'local' && (changes.auditUpdatedAt || changes.auth || changes.status)) renderData(!!changes.status); });

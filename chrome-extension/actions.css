@@ -32,3 +32,13 @@ button:disabled { opacity: .45; cursor: default; }
 .stats-grid dd { margin:0; font-weight:600; }
 #activityStats h2 { font-size:15px; margin:0 0 8px; }
 #activityStats .muted { font-size:11px; color:#43576e; }
+
+.manual-actions, .chart-toolbar { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
+.manual-actions button, .chart-toolbar button { margin:0; }
+.scrape-control, .chart-fullscreen, .chart-favourite { background:#e2e8f0; color:#17283c; border-color:#879ab0; }
+.push-control { background:#1d4ed8; color:white; }
+.chart-favourite[aria-pressed=true] { background:#fcd34d; color:#422006; border-color:#b45309; }
+:fullscreen { background:#edf2f8; padding:24px; box-sizing:border-box; overflow:auto; }
+:fullscreen svg { width:100%; min-height:65vh !important; max-height:85vh !important; }
+.chart-dialog { width:92vw; max-width:1500px; background:#edf2f8; border:1px solid #879ab0; border-radius:10px; }
+.chart-dialog::backdrop { background:#17283c99; }

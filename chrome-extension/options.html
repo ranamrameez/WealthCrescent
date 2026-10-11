@@ -199,8 +199,8 @@
     <div class="card" id="activityStats"></div>
 
     </div>
-    <div class="card">
-      <div class="table-header"><h2>Scraped data and raw audit history</h2><div class="pager"><button id="prevPage">Previous</button> <span id="pageInfo"></span> <button id="nextPage">Next</button></div></div>
+    <div class="card" id="favouriteCharts"><h2>Favourite price charts</h2><p class="muted">Pinned tickers use the current date range and data view.</p><div id="favouriteChartList"></div></div>
+    <div class="card"><div class="table-header"><h2>Scraped data and raw audit history</h2><div class="pager"><button id="prevPage">Previous</button> <span id="pageInfo"></span> <button id="nextPage">Next</button></div></div>
       <p class="muted">All view combines Firebase prices with local synced and pending/unverified scrapes. A stored-price match is shown separately from a confirmed sync. Local audit shows raw source text from this browser. Older Firebase history contains parsed prices only. Dates use Qatar time.</p>
       <label class="view-control">Data view<select id="dataView"><option value="all">All (synced and pending)</option><option value="firebase">Pushed data (Firebase)</option><option value="local">Local raw audit</option></select></label><div class="filters">
         <label>From date<input id="fromDate" type="date"></label><label>To date<input id="toDate" type="date"></label>

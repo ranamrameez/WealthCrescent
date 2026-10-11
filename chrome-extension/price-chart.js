@@ -1,4 +1,4 @@
-export function renderPriceChart(container, rows, ticker) {
+export function renderPriceChart(container, rows, ticker, options = {}) {
   const document = container.ownerDocument;
   container.replaceChildren();
   if (!ticker) {
@@ -8,13 +8,46 @@ export function renderPriceChart(container, rows, ticker) {
     for (const symbol of tickers) {
       const card = document.createElement('section'); const heading = document.createElement('h3'); heading.textContent = symbol;
       const chart = document.createElement('div'); card.append(heading, chart); grid.append(card);
-      renderPriceChart(chart, rows, symbol);
+      renderPriceChart(chart, rows, symbol, options);
     }
     container.append(grid);
     return;
   }
+  const toolbar = document.createElement('div'); toolbar.className = 'chart-toolbar';
+  if (options.onFavourite) {
+    const favourite = document.createElement('button');
+    const active = options.favourites?.has(ticker) || false;
+    favourite.className = 'chart-favourite'; favourite.textContent = active ? '★ Favourited' : '☆ Favourite';
+    favourite.setAttribute('aria-pressed', String(active)); favourite.setAttribute('aria-label', `${active ? 'Unfavourite' : 'Favourite'} ${ticker}`);
+    favourite.onclick = async () => {
+      favourite.disabled = true;
+      try { await options.onFavourite(ticker); favourite.setAttribute('aria-pressed', String(options.favourites?.has(ticker) || false)); favourite.textContent = options.favourites?.has(ticker) ? '? Favourited' : '? Favourite'; }
+      catch (error) { favourite.textContent = error.message; }
+      finally { favourite.disabled = false; }
+    };
+    toolbar.append(favourite);
+  }
+  const fullscreen = document.createElement('button'); fullscreen.className = 'chart-fullscreen'; fullscreen.textContent = 'Full screen';
+  fullscreen.setAttribute('aria-label', `View ${ticker} full screen`);
+  fullscreen.onclick = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else if (container.requestFullscreen) await container.requestFullscreen();
+      else throw new Error('Use expanded chart');
+      fullscreen.textContent = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
+    } catch {
+      const dialog = document.createElement('dialog'); dialog.className = 'chart-dialog';
+      const close = document.createElement('button'); close.textContent = 'Close'; close.onclick = () => dialog.close();
+      const heading = document.createElement('h2'); heading.textContent = ticker;
+      const chart = document.createElement('div'); dialog.append(close, heading, chart); document.body.append(dialog);
+      renderPriceChart(chart, rows, ticker);
+      dialog.addEventListener('close', () => dialog.remove(), { once: true });
+      dialog.showModal();
+    }
+  };
+  toolbar.append(fullscreen); container.append(toolbar);
   const points = rows.filter(row => row.ticker === ticker && Number.isFinite(row.price) && row.capturedAt != null).sort((a, b) => a.capturedAt - b.capturedAt);
-  if (!points.length) { container.textContent = 'No dated prices for this ticker in the current filters.'; return; }
+  if (!points.length) { const message = document.createElement('p'); message.textContent = 'No dated prices for this ticker in the current filters.'; container.append(message); return; }
   const ns = 'http://www.w3.org/2000/svg';
   const node = (name, attrs, text) => {
     const el = document.createElementNS(ns, name);

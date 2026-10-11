@@ -22,7 +22,7 @@ export const DEFAULT_TARGET_URL = 'https://webd.thegroup.com.qa/en/markets/qatar
 // floor, never a perfectly predictable period) — this is both kinder to
 // Firebase RTDB's write-rate limits and less bot-like as a request pattern
 // against the brokerage's own page.
-export const MIN_PUSH_INTERVAL_MINUTES_FLOOR = 2;
+export const MIN_PUSH_INTERVAL_MINUTES_FLOOR = 0;
 export const DEFAULT_MIN_PUSH_INTERVAL_MINUTES = 2;
 
 // Collection (local scrape, no network write) cadence — randomized between
@@ -46,6 +46,7 @@ export const DEFAULT_SCRAPE_CONFIG = {
 
 export const DEFAULT_SYNC_CONFIG = {
   minPushIntervalMinutes: DEFAULT_MIN_PUSH_INTERVAL_MINUTES,
+  pushTimingMode: 'random',
   scrapingEnabled: true,
   timeWindows: [{ start: '09:30', end: '13:00' }, { start: '13:10', end: '13:15' }],
 };
@@ -84,17 +85,25 @@ export async function setScrapeConfig(patch) {
 export async function getSyncConfig() {
   const { [STORAGE_KEYS.SYNC_CONFIG]: cfg } = await getStorage(STORAGE_KEYS.SYNC_CONFIG);
   const merged = { ...DEFAULT_SYNC_CONFIG, ...(cfg || {}) };
-  merged.minPushIntervalMinutes = Math.max(MIN_PUSH_INTERVAL_MINUTES_FLOOR, Number(merged.minPushIntervalMinutes) || DEFAULT_MIN_PUSH_INTERVAL_MINUTES);
+  merged.pushTimingMode = merged.pushTimingMode === 'constant' ? 'constant' : 'random';
+  merged.minPushIntervalMinutes = Math.max(MIN_PUSH_INTERVAL_MINUTES_FLOOR, Number.isFinite(Number(merged.minPushIntervalMinutes)) ? Number(merged.minPushIntervalMinutes) : DEFAULT_MIN_PUSH_INTERVAL_MINUTES);
   return merged;
 }
 
 export async function setSyncConfig(patch) {
   const current = await getSyncConfig();
   const next = { ...current, ...patch };
+  if (!['random', 'constant'].includes(next.pushTimingMode)) throw new Error('Choose random or constant push timing.');
   if (!Array.isArray(next.timeWindows) || !next.timeWindows.length || next.timeWindows.some(w => !/^([01]\d|2[0-3]):[0-5]\d$/.test(w.start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(w.end) || w.start === w.end)) throw new Error('Provide at least one valid start/end pair with different times.');
-  next.minPushIntervalMinutes = Math.max(MIN_PUSH_INTERVAL_MINUTES_FLOOR, Number(next.minPushIntervalMinutes) || DEFAULT_MIN_PUSH_INTERVAL_MINUTES);
+  next.minPushIntervalMinutes = Math.max(MIN_PUSH_INTERVAL_MINUTES_FLOOR, Number.isFinite(Number(next.minPushIntervalMinutes)) ? Number(next.minPushIntervalMinutes) : DEFAULT_MIN_PUSH_INTERVAL_MINUTES);
   await setStorage({ [STORAGE_KEYS.SYNC_CONFIG]: next });
   return next;
+}
+
+export function pushDelayMs(config, random = Math.random) {
+  const value = Number(config.minPushIntervalMinutes);
+  const floor = Math.max(0, Number.isFinite(value) ? value : DEFAULT_MIN_PUSH_INTERVAL_MINUTES) * 60000;
+  return config.pushTimingMode === 'constant' ? floor : floor + Math.min(floor, Math.floor(Math.max(0, random()) * (floor + 1)));
 }
 
 export function withinScrapingWindow(config, now = new Date()) {

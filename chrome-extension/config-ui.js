@@ -4,8 +4,9 @@ export async function mountConfig(container) {
   const scrape = await getScrapeConfig();
   const sync = await getSyncConfig();
   container.innerHTML = `<h2>Configurations</h2><form>
-    <div class="config-sections"><section class="config-section"><h3>Firebase pushes</h3><label>Minimum minutes between Firebase pushes<input name="minPushIntervalMinutes" type="number" min="2" step="1" required></label>
-    <p class="muted">Push intervals vary between 1× and 2× this minimum. Collection runs every 45–90 seconds.</p>
+    <div class="config-sections"><section class="config-section"><h3>Firebase pushes</h3><label>Minutes between Firebase pushes<input name="minPushIntervalMinutes" type="number" min="0" step="1" required></label>
+    <label>Push timing<select name="pushTimingMode"><option value="random">Random (1?2? interval)</option><option value="constant">Constant interval</option></select></label>
+    <p class="muted">Random push intervals vary between 1× and 2× this minimum. Constant timing uses the configured interval. Set 0 to sync after every automatic scrape. Collection runs every 45–90 seconds.</p>
     </section><section class="config-section"><h3>Scraping windows (Qatar time)</h3><div class="windows"></div><button type="button" class="add-window secondary">Add time pair</button>
     <p class="muted">Automatic scraping runs within these windows. End times are exclusive; overnight pairs are supported. Manual scrape and push work outside these windows.</p>
     </section></div><section class="config-section"><h3>Market page</h3><div class="config-grid">${Object.keys(scrape).map(key => `<label>${({ targetUrl: 'Market-watch URL', rowSelector: 'Row selector', tickerSelector: 'Ticker selector', priceSelector: 'Price selector', changeSelector: 'Change % selector', nameSelector: 'Company name selector' })[key]}<input name="${key}" type="text" ${key === 'targetUrl' ? 'required' : ''}></label>`).join('')}</div>
@@ -14,6 +15,7 @@ export async function mountConfig(container) {
   const form = container.querySelector('form');
   for (const [key, value] of Object.entries(scrape)) form.elements[key].value = value;
   form.elements.minPushIntervalMinutes.value = sync.minPushIntervalMinutes;
+  form.elements.pushTimingMode.value = sync.pushTimingMode;
   const windows = container.querySelector('.windows');
   function addWindow(pair = { start: '09:30', end: '13:00' }) {
     const row = document.createElement('div'); row.className = 'row window';
@@ -31,14 +33,28 @@ export async function mountConfig(container) {
       if (targetUrl.origin !== 'https://webd.thegroup.com.qa') throw new Error('Use a market URL on https://webd.thegroup.com.qa.');
       const fields = Object.fromEntries(Object.keys(scrape).map(key => [key, form.elements[key].value.trim()]));
       for (const [key, value] of Object.entries(fields)) if (key.endsWith('Selector') && value) document.querySelector(value);
-      await setSyncConfig({ minPushIntervalMinutes: Number(form.elements.minPushIntervalMinutes.value), timeWindows: Array.from(windows.children).map(row => ({ start: row.querySelector('.start').value, end: row.querySelector('.end').value })) });
+      await setSyncConfig({ pushTimingMode: form.elements.pushTimingMode.value, minPushIntervalMinutes: Number(form.elements.minPushIntervalMinutes.value), timeWindows: Array.from(windows.children).map(row => ({ start: row.querySelector('.start').value, end: row.querySelector('.end').value })) });
       await setScrapeConfig(fields); message.textContent = ' Saved.';
     } catch (error) { message.textContent = ` ${error.message}`; }
   };
 }
 
-export async function mountControls(container) {
+export async function mountControls(container, { manualActions = false } = {}) {
   container.innerHTML = '<p class="run-state" role="status"></p><button class="start-control">Start scraping</button> <button class="stop-control secondary">Stop scraping</button><p class="control-error" role="alert"></p>';
+  if (manualActions) {
+    const actions = document.createElement('div'); actions.className = 'manual-actions';
+    for (const [label, type, className] of [['Scrape now', 'SCRAPE_NOW_MANUAL', 'scrape-control'], ['Push now', 'PUSH_NOW', 'push-control']]) {
+      const button = document.createElement('button'); button.textContent = label; button.className = className;
+      button.onclick = async () => {
+        button.disabled = true; container.querySelector('.control-error').textContent = '';
+        try { await sendWorkerMessage({ type }); }
+        catch (error) { container.querySelector('.control-error').textContent = error.message; }
+        finally { button.disabled = false; }
+      };
+      actions.append(button);
+    }
+    container.querySelector('.run-state').after(actions);
+  }
   async function refresh() {
     const config = await getSyncConfig();
     container.querySelector('.run-state').textContent = config.scrapingEnabled ? 'Scraping enabled (follows Qatar time windows)' : 'Scraping stopped';

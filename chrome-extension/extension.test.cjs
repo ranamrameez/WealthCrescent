@@ -90,7 +90,7 @@ test('Test scrape saves legacy worker results and renders them in the table', as
     chrome: { storage: { onChanged: { addListener(fn) { changed = fn; } } } },
   });
   const code = read('options.js').replace(/^import .*;\r?\n/gm, '');
-  await vm.runInContext('(async () => { const renderPriceChart = () => {}; const mountStats = async () => {}; const qatarDate = () => "2026-10-11"; const dateRange = period => period === "all" ? { from: "", to: "" } : { from: "2026-10-05", to: "2026-10-11" }; ' + code + '\n})()', ctx);
+  await vm.runInContext('(async () => { const renderPriceChart = () => {}; const mountStats = async () => {}; const getChartFavourites = async () => []; const setChartFavourites = async () => {}; const qatarDate = () => "2026-10-11"; const dateRange = period => period === "all" ? { from: "", to: "" } : { from: "2026-10-05", to: "2026-10-11" }; ' + code + '\n})()', ctx);
   document.getElementById('tickerFilter').value = 'OTHER';
   await document.getElementById('testBtn').onclick();
   assert.equal(saved.length, 1);
@@ -148,7 +148,7 @@ test('Page defaults to combined data and today, with working chart date presets'
     queryAudit: async () => { throw new Error('Must query combined data by default'); },
     chrome: { storage: { onChanged: { addListener() {} } } },
   });
-  await vm.runInContext('(async () => { const renderPriceChart = () => {}; const mountStats = async () => {}; const qatarDate = () => "2026-10-11"; const dateRange = period => period === "all" ? { from: "", to: "" } : { from: "2026-10-05", to: "2026-10-11" }; ' + read('options.js').replace(/^import .*;\r?\n/gm, '') + '\n})()', ctx);
+  await vm.runInContext('(async () => { const renderPriceChart = () => {}; const mountStats = async () => {}; const getChartFavourites = async () => []; const setChartFavourites = async () => {}; const qatarDate = () => "2026-10-11"; const dateRange = period => period === "all" ? { from: "", to: "" } : { from: "2026-10-05", to: "2026-10-11" }; ' + read('options.js').replace(/^import .*;\r?\n/gm, '') + '\n})()', ctx);
   assert.equal(requested.type, 'GET_ALL_DATA');
   assert.equal(requested.filters.from, '2026-10-11');
   assert.equal(requested.filters.to, '2026-10-11');
@@ -240,7 +240,7 @@ test('Table populates ticker dropdown and selected-row edit sends the expected c
     },
     chrome: { storage: { onChanged: { addListener() {} } } },
   });
-  await vm.runInContext('(async () => { const renderPriceChart = () => {}; const mountStats = async () => {}; const qatarDate = () => "2026-10-11"; const dateRange = period => period === "all" ? { from: "", to: "" } : { from: "2026-10-05", to: "2026-10-11" }; ' + read('options.js').replace(/^import .*;\r?\n/gm, '') + '\n})()', ctx);
+  await vm.runInContext('(async () => { const renderPriceChart = () => {}; const mountStats = async () => {}; const getChartFavourites = async () => []; const setChartFavourites = async () => {}; const qatarDate = () => "2026-10-11"; const dateRange = period => period === "all" ? { from: "", to: "" } : { from: "2026-10-05", to: "2026-10-11" }; ' + read('options.js').replace(/^import .*;\r?\n/gm, '') + '\n})()', ctx);
   assert.equal(document.getElementById('tickerFilter').options.length, 3);
   assert.match(document.getElementById('dataRows').textContent, /lastPrice/);
   assert.match(document.getElementById('dataRows').textContent, /FLAG 25.00%/);
@@ -529,4 +529,106 @@ test('Failed sync keeps its error and schedules a retry rather than retrying eve
   await vm.runInContext('runCycle({ manual: true })', ctx);
   assert.equal(events.filter(event => event.type === 'sync').length, 1);
   assert.match(status.lastSyncError, /Sign in/);
+});
+
+test('Push timing supports random, constant and zero intervals without clamping zero', async () => {
+  const common = await import('data:text/javascript;base64,' + Buffer.from(read('common.js')).toString('base64'));
+  assert.equal(common.pushDelayMs({ minPushIntervalMinutes: 3, pushTimingMode: 'constant' }, () => .9), 180000);
+  assert.equal(common.pushDelayMs({ minPushIntervalMinutes: 3, pushTimingMode: 'random' }, () => 0), 180000);
+  assert.equal(common.pushDelayMs({ minPushIntervalMinutes: 3, pushTimingMode: 'random' }, () => 1), 360000);
+  for (const pushTimingMode of ['random', 'constant']) {
+    await common.setSyncConfig({ minPushIntervalMinutes: 0, pushTimingMode });
+    assert.equal((await common.getSyncConfig()).minPushIntervalMinutes, 0);
+    assert.equal(common.pushDelayMs(await common.getSyncConfig()), 0);
+  }
+  await assert.rejects(common.setSyncConfig({ pushTimingMode: 'invalid' }));
+});
+
+test('Extension page controls offer separate Scrape and Push actions and timing selection', async () => {
+  const { JSDOM } = require('../webapp/node_modules/jsdom');
+  const document = new JSDOM('<div id="config"></div><div id="controls"></div>').window.document;
+  const messages = []; let saved;
+  const ctx = vm.createContext({ document,
+    getScrapeConfig: async () => ({ targetUrl: 'https://webd.thegroup.com.qa/en/markets/qatar' }),
+    getSyncConfig: async () => ({ minPushIntervalMinutes: 0, pushTimingMode: 'constant', scrapingEnabled: true, timeWindows: [{ start: '09:30', end: '13:00' }] }),
+    setSyncConfig: async config => { saved = config; }, setScrapeConfig: async () => {},
+    sendWorkerMessage: async message => messages.push(message.type),
+    chrome: { storage: { onChanged: { addListener() {} } } }, URL,
+  });
+  vm.runInContext(read('config-ui.js').replace(/^import .*;\r?\n/gm, '').replace(/export /g, ''), ctx);
+  await vm.runInContext('mountConfig(document.getElementById("config"))', ctx);
+  await vm.runInContext('mountControls(document.getElementById("controls"), { manualActions: true })', ctx);
+  assert.equal(document.querySelector('[name=minPushIntervalMinutes]').min, '0');
+  assert.equal(document.querySelector('[name=pushTimingMode]').value, 'constant');
+  await document.querySelector('form').onsubmit({ preventDefault() {} });
+  assert.equal(saved.minPushIntervalMinutes, 0);
+  assert.equal(saved.pushTimingMode, 'constant');
+  await document.querySelector('.scrape-control').onclick();
+  await document.querySelector('.push-control').onclick();
+  assert.deepEqual(messages, ['SCRAPE_NOW_MANUAL', 'PUSH_NOW']);
+});
+
+test('Chart favourite and fullscreen controls invoke their actions', async () => {
+  const { JSDOM } = require('../webapp/node_modules/jsdom');
+  const module = await import('data:text/javascript;base64,' + Buffer.from(read('price-chart.js')).toString('base64'));
+  const document = new JSDOM('<div id="chart"></div>').window.document;
+  const chart = document.getElementById('chart'); let favourite, fullscreen = 0;
+  chart.requestFullscreen = async () => fullscreen++;
+  module.renderPriceChart(chart, [{ ticker: 'QFLS', price: 10, capturedAt: 100 }], 'QFLS', { favourites: new Set(['QFLS']), onFavourite: async ticker => { favourite = ticker; } });
+  assert.equal(chart.querySelector('.chart-favourite').getAttribute('aria-pressed'), 'true');
+  await chart.querySelector('.chart-favourite').onclick();
+  assert.equal(favourite, 'QFLS');
+  await chart.querySelector('.chart-fullscreen').onclick();
+  assert.equal(fullscreen, 1);
+});
+
+test('Favourites persist and pinned charts appear before the table', async () => {
+  const { JSDOM } = require('../webapp/node_modules/jsdom');
+  const charts = await import('data:text/javascript;base64,' + Buffer.from(read('price-chart.js')).toString('base64'));
+  const document = new JSDOM(read('options.html')).window.document;
+  let saved = ['QFLS'];
+  const rows = ['QFLS', 'QNBK'].map((ticker, index) => ({ id: ticker, ticker, price: 10 + index, capturedAt: 100 + index, origin: 'firebase', syncStatus: 'Synced' }));
+  const ctx = vm.createContext({ document, Date, Number, JSON,
+    renderPriceChart: charts.renderPriceChart,
+    qatarDate: () => '2026-10-11', mountConfig: async () => {}, mountControls: async () => {}, mountStats: async () => {},
+    getChartFavourites: async () => saved, setChartFavourites: async tickers => { saved = tickers; },
+    sendWorkerMessage: async () => ({ rows, chartRows: rows, total: rows.length, tickers: rows.map(row => row.ticker) }),
+    chrome: { storage: { onChanged: { addListener() {} } } },
+  });
+  await vm.runInContext('(async () => {' + read('options.js').replace(/^import .*;\r?\n/gm, '') + '\n})()', ctx);
+  assert.equal(document.querySelectorAll('#favouriteChartList svg').length, 1);
+  assert.ok(document.getElementById('favouriteCharts').compareDocumentPosition(document.getElementById('dataRows')) & 4);
+  await document.querySelector('#priceChart button[aria-label="Favourite QNBK"]').onclick();
+  assert.deepEqual([...saved].sort(), ['QFLS', 'QNBK']);
+  assert.equal(document.querySelectorAll('#favouriteChartList svg').length, 2);
+  await document.querySelector('#favouriteChartList button[aria-label="Unfavourite QFLS"]').onclick();
+  assert.deepEqual([...saved], ['QNBK']);
+});
+
+test('Zero interval syncs every automatic scrape and manual scrape-only does not push', async () => {
+  const status = { nextPushAt: Date.now() + 3600000 }; let pushes = 0;
+  const ctx = vm.createContext({ console, Date, URL,
+    getScrapeConfig: async () => ({ targetUrl: 'https://market.example/' }),
+    getSyncConfig: async () => ({ scrapingEnabled: true, minPushIntervalMinutes: 0, pushTimingMode: 'constant' }),
+    getStatus: async () => status, patchStatus: async patch => Object.assign(status, patch),
+    recordActivity: async () => {}, saveAudit: async () => 1, markAuditSynced: async () => {},
+    withinScrapingWindow: () => true, randInt: () => 60, pushDelayMs: () => 0, COLLECT_MIN_SECONDS: 45, COLLECT_MAX_SECONDS: 90,
+    chrome: { tabs: { query: async () => [{ id: 1, url: 'https://market.example/' }], sendMessage: (id, message, respond) => respond({ ok: true, rows: [{ ticker: 'QFLS', price: 10 }] }) },
+      alarms: { create() {}, onAlarm: { addListener() {} } }, runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener() {} } } },
+    fakePush: async () => { pushes++; return { pushed: 1, namesPushed: 0, total: 1, errors: [], syncedTickers: ['QFLS'] }; },
+  });
+  vm.runInContext(read('background.js').replace(/import\s+[\s\S]*?from\s+'[^']+';/g, ''), ctx);
+  vm.runInContext('pushRows = fakePush', ctx);
+  await vm.runInContext('runCycle()', ctx); await vm.runInContext('runCycle()', ctx);
+  assert.equal(pushes, 2);
+  await vm.runInContext('runCycle({ manual: true, scrapeOnly: true })', ctx);
+  assert.equal(pushes, 2);
+});
+
+test('Extension modules resolve every local import', () => {
+  for (const file of fs.readdirSync(__dirname).filter(name => name.endsWith('.js'))) {
+    for (const match of read(file).matchAll(/(?:from\s+|import\s*)['"](\.\/[^'"]+)['"]/g)) {
+      assert.ok(fs.existsSync(path.resolve(__dirname, match[1])), `${file}: missing ${match[1]}`);
+    }
+  }
 });
