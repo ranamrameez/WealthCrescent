@@ -245,3 +245,10 @@ The chart defaults to All tickers, displaying one chart per matching ticker, wit
 1d, 7d, 1M, 3M, 6M, 1Y and All time buttons. These presets update the shared table
 and chart date filters. Month/year presets use calendar boundaries; manual dates
 remain available. All matching records are charted across pagination.
+
+Activity cards now use local activity and audit records only; they do not fetch
+Firebase history to display stats. Confirmed synced audit rows replace the cloud
+history counter. Sync errors persist independently of scrape errors and remain
+visible until a successful sync. Failed attempts observe the configured retry
+minimum. Successful current-price writes count as synced even if a subsequent
+history write fails, with the history failure shown as a partial-sync warning.

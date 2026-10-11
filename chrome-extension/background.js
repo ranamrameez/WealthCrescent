@@ -239,7 +239,7 @@ async function appendHistoryPointSafely(ticker, point, idToken) {
 
 async function pushRows(rows) {
   const auth = await getFreshAuth();
-  if (!auth) throw new Error('Not signed in — open the popup and sign in to push scraped prices.');
+  if (!auth) throw new Error('Sign in on the extension page to sync prices.');
   const nowIso = new Date().toISOString();
   const today = nowIso.slice(0, 10);
   let pushed = 0;
@@ -253,10 +253,13 @@ async function pushRows(rows) {
       const previousPrice = await previousResponse.json();
       const point = { date: today, time: nowIso, price: row.price, priceKey: row.priceKey || null, raw: row.raw || [], ...priceDeviation(row.price, previousPrice) };
       await putScalar(priceCachePath(row.ticker), row.price, auth.idToken);
-      await appendHistoryPointSafely(row.ticker, point, auth.idToken);
       pushedSnapshot = null;
       pushed++;
       syncedTickers.push(row.ticker);
+      try {
+        const history = await appendHistoryPointSafely(row.ticker, point, auth.idToken);
+        if (history.conflicted) errors.push(`${row.ticker}: current price synced; history update conflicted, retry later.`);
+      } catch (error) { errors.push(`${row.ticker}: current price synced; history failed: ${error.message}`); }
     } catch (e) {
       errors.push(`${row.ticker}: ${e.message || e}`);
     }
@@ -274,7 +277,7 @@ async function pushRows(rows) {
     }
   }
   try {
-    await putScalar(SHARED_LAST_UPDATED_PATH, nowIso, auth.idToken);
+    if (pushed > 0) await putScalar(SHARED_LAST_UPDATED_PATH, nowIso, auth.idToken);
   } catch (e) {
     // Non-critical — the per-ticker writes already landed.
   }
@@ -378,8 +381,9 @@ async function collectCycle({ forcePush = false, manual = false } = {}) {
   if (due && (manual || (await getSyncConfig()).scrapingEnabled)) {
     try {
       const { pushed, namesPushed, total, errors, syncedTickers } = await pushRows(rows);
-      await markAuditSynced(auditBatchAt, syncedTickers);
-      await recordActivity({ type: 'sync', count: pushed, success: pushed === total });
+      await recordActivity({ type: 'sync', count: pushed, success: pushed === total && !errors.length, error: errors.slice(0, 3).join(' ') });
+      try { await markAuditSynced(auditBatchAt, syncedTickers); }
+      catch (error) { errors.push(`Prices synced; local audit update failed: ${error.message}`); }
       const floorMs = syncConfig.minPushIntervalMinutes * 60000;
       // Randomized gap: between 1x and 2x the configured floor, re-rolled
       // fresh after every push — never a perfectly predictable period.
@@ -390,12 +394,13 @@ async function collectCycle({ forcePush = false, manual = false } = {}) {
         lastPushTotal: total,
         lastNamesCount: namesPushed,
         nextPushAt,
-        lastError: errors.length ? `${errors.length} ticker(s) failed to push (see console).` : '',
+        lastError: errors.slice(0, 3).join(' '),
+        lastSyncError: errors.slice(0, 3).join(' '),
       });
       if (errors.length) console.warn('[thegroup-price-sync] push errors:', errors);
     } catch (e) {
-      await recordActivity({ type: 'sync', count: 0, success: false });
-      await patchStatus({ lastError: e.message || String(e) });
+      await recordActivity({ type: 'sync', count: 0, success: false, error: e.message || String(e) });
+      await patchStatus({ lastError: e.message || String(e), lastSyncError: e.message || String(e), nextPushAt: Date.now() + syncConfig.minPushIntervalMinutes * 60000 });
     }
   }
 

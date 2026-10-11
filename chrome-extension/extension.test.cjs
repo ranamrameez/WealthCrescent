@@ -365,14 +365,14 @@ test('Shared statistics show elapsed sync time and today counts even when signed
   assert.equal(page.getElementById('signedInView').contains(page.getElementById('activityStats')), false);
 });
 
-test('Missing activity counters show recorded evidence and unavailable totals, never misleading zeros', async () => {
+test('Statistics remain local and show recorded evidence without unavailable placeholders', async () => {
   const { JSDOM } = require('../webapp/node_modules/jsdom');
   const dom = new JSDOM('<div id="stats"></div>');
   const ctx = vm.createContext({ Date, window: dom.window, setInterval: () => 1, clearInterval() {},
     qatarDate: () => '2026-10-11',
     summarizeAuditToday: async () => ({ scrapeCount: 13, rowCount: 13 }),
     sendWorkerMessage: async () => ({ historyPointsToday: 2 }),
-    getActivity: async () => ({ daily: {} }),
+    getActivity: async () => ({ daily: { scrapeCount: 0, scrapedRows: 0, syncCount: 0, syncedRows: 0, syncAttempts: 0, syncFailures: 0, scrapeFailures: 0, testCount: 0 } }),
     getStatus: async () => ({ lastPushCount: 1, lastPushAt: Date.now() - 20000, lastScrapeAt: Date.now() - 46000 }),
     getSyncConfig: async () => ({ scrapingEnabled: true }),
     chrome: { storage: { onChanged: { addListener() {}, removeListener() {} } } },
@@ -382,10 +382,10 @@ test('Missing activity counters show recorded evidence and unavailable totals, n
   await vm.runInContext('mountStats(container)', ctx);
   const text = ctx.container.textContent;
   assert.match(text, /Local scrapes recorded today13 \(13 raw rows\)/);
-  assert.match(text, /Firebase history points today2/);
-  assert.match(text, /Syncs counted todayUnavailable \(not tracked\)/);
+  assert.match(text, /Confirmed synced audit rows today0/);
+  assert.match(text, /Syncs counted today0/);
   assert.match(text, /reload the extension/i);
-  assert.doesNotMatch(text, /0 ticker writes/);
+  assert.doesNotMatch(text, /Unavailable/);
 });
 
 test('Stored audit summary counts scrape batches rather than individual ticker rows', async () => {
@@ -472,4 +472,61 @@ test('Successful push marks only accepted records from its own scrape batch as s
   await vm.runInContext('markAuditSynced(100, ["QFLS"])', ctx);
   assert.ok(sample[0].syncedAt);
   assert.equal(sample.filter(row => row.syncedAt).length, 1);
+});
+
+test('A successful price write is counted even when its history write fails', async () => {
+  const ctx = vm.createContext({ console, Date, encodeURIComponent,
+    getAuth: async () => ({ uid: 'user', idToken: 'token', expiresAt: Date.now() + 60000 }),
+    RTDB_BASE_URL: 'https://database.example',
+    priceCachePath: ticker => `prices/${ticker}`,
+    priceHistoryPath: ticker => `history/${ticker}`,
+    tickerNamePath: ticker => `names/${ticker}`,
+    SHARED_LAST_UPDATED_PATH: 'updatedAt',
+    priceDeviation: () => ({}),
+    fetch: async (url, options = {}) => {
+      if (url.includes('/history/')) return { ok: false, status: 403 };
+      return { ok: true, json: async () => 10 };
+    },
+    chrome: { alarms: { onAlarm: { addListener() {} } }, runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener() {} } } },
+  });
+  vm.runInContext(read('background.js').replace(/import\s+[\s\S]*?from\s+'[^']+';/g, ''), ctx);
+  const result = await vm.runInContext('pushRows([{ticker:"QFLS", price:11}])', ctx);
+  assert.equal(result.pushed, 1);
+  assert.equal(result.syncedTickers[0], 'QFLS');
+  assert.match(result.errors[0], /current price synced; history failed/);
+});
+
+test('Activity preserves sync failure reason across subsequent scrapes', async () => {
+  const module = await import('data:text/javascript;base64,' + Buffer.from(read('activity.js').replace(/^import .*;\r?\n/gm, '')).toString('base64'));
+  const failed = module.updateActivity({}, { type: 'sync', success: false, count: 0, error: 'Sign in on the extension page to sync prices.' });
+  const afterScrape = module.updateActivity(failed, { type: 'scrape', success: true, count: 57 });
+  assert.match(afterScrape.lastSyncError, /Sign in/);
+  const success = module.updateActivity(afterScrape, { type: 'sync', success: true, count: 57 });
+  assert.equal(success.lastSyncError, '');
+});
+
+test('Failed sync keeps its error and schedules a retry rather than retrying every scrape', async () => {
+  const status = {}; const events = [];
+  const ctx = vm.createContext({ console, Date,
+    getAuth: async () => null,
+    getScrapeConfig: async () => ({ targetUrl: 'https://market.example/' }),
+    getSyncConfig: async () => ({ scrapingEnabled: true, minPushIntervalMinutes: 2 }),
+    getStatus: async () => status,
+    patchStatus: async patch => Object.assign(status, patch),
+    recordActivity: async event => events.push(event), saveAudit: async () => 1,
+    withinScrapingWindow: () => true, randInt: () => 60, COLLECT_MIN_SECONDS: 45, COLLECT_MAX_SECONDS: 90,
+    chrome: {
+      tabs: { query: async () => [{ id: 1, url: 'https://market.example/' }], sendMessage: (id, message, respond) => respond({ ok: true, rows: [{ ticker: 'QFLS', price: 10 }] }) },
+      alarms: { create() {}, onAlarm: { addListener() {} } },
+      runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener() {} } },
+    }, URL,
+  });
+  vm.runInContext(read('background.js').replace(/import\s+[\s\S]*?from\s+'[^']+';/g, ''), ctx);
+  await vm.runInContext('runCycle({ manual: true })', ctx);
+  assert.match(status.lastSyncError, /Sign in/);
+  assert.ok(status.nextPushAt > Date.now() + 110000);
+  assert.equal(events.filter(event => event.type === 'sync').length, 1);
+  await vm.runInContext('runCycle({ manual: true })', ctx);
+  assert.equal(events.filter(event => event.type === 'sync').length, 1);
+  assert.match(status.lastSyncError, /Sign in/);
 });

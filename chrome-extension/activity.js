@@ -27,6 +27,8 @@ export function updateActivity(activity, event, now = Date.now()) {
     } else daily.scrapeFailures++;
   } else if (event.type === 'sync') {
     daily.syncAttempts++;
+    next.lastSyncAttemptAt = now;
+    next.lastSyncError = event.success ? '' : event.error || 'Sync did not complete. Review the sync error and retry.';
     if (count > 0) {
       daily.syncCount++;
       daily.syncedRows += count;

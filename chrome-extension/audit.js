@@ -18,6 +18,8 @@ export async function summarizeAuditToday(now = Date.now()) {
       const request = tx.objectStore('rows').openCursor();
       const batches = new Set();
       let rowCount = 0;
+      let syncedRows = 0;
+      let lastSyncAt = null;
       request.onsuccess = () => {
         const cursor = request.result;
         if (!cursor) return;
@@ -25,10 +27,12 @@ export async function summarizeAuditToday(now = Date.now()) {
         if (qatarDate(row.capturedAt) === date) {
           batches.add(`${row.capturedAt}:${row.source || ''}:${row.url || ''}`);
           rowCount++;
+          if (row.syncedAt) syncedRows++;
         }
+        if (row.syncedAt && (!lastSyncAt || row.syncedAt > lastSyncAt)) lastSyncAt = row.syncedAt;
         cursor.continue();
       };
-      tx.oncomplete = () => resolve({ date, scrapeCount: batches.size, rowCount });
+      tx.oncomplete = () => resolve({ date, scrapeCount: batches.size, rowCount, syncedRows, lastSyncAt });
       tx.onerror = () => reject(tx.error);
       tx.onabort = () => reject(tx.error || new Error('Audit summary interrupted.'));
     });
