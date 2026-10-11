@@ -226,3 +226,10 @@ are included in scrape totals and also listed separately. A sync counts when at
 least one price write succeeds; unsuccessful or partial attempts are listed too.
 Wholly failed syncs do not change the last-successful-sync timestamp. Counters begin
 with this update; historical activity is not retroactively counted.
+
+Activity statistics also summarize retained local scrape batches and today's shared
+Firebase history points. These include records saved before activity-counter tracking
+started. Missing counters show Unavailable rather than zero, and a newer legacy
+status timestamp prompts reloading the background worker. Statistics cover all
+tickers regardless of the table filter. Stored history points are not sync counts:
+unchanged prices are deduplicated, and shared points can come from other browsers.

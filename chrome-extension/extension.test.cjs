@@ -337,7 +337,10 @@ test('Shared statistics show elapsed sync time and today counts even when signed
   const dom = new JSDOM('<div id="stats"></div>');
   const ctx = vm.createContext({
     Date, window: dom.window, setInterval: () => 1, clearInterval() {},
-    getActivity: async () => ({ daily: { scrapeCount: 4, scrapedRows: 200, syncCount: 2, syncedRows: 100, syncAttempts: 3, syncFailures: 1, scrapeFailures: 0, testCount: 1 }, lastSyncAt: Date.now() - 120000 }),
+    qatarDate: () => '2026-10-11',
+    summarizeAuditToday: async () => ({ scrapeCount: 4, rowCount: 200 }),
+    sendWorkerMessage: async () => ({ historyPointsToday: 8 }),
+    getActivity: async () => ({ trackingStartedAt: Date.now(), daily: { scrapeCount: 4, scrapedRows: 200, syncCount: 2, syncedRows: 100, syncAttempts: 3, syncFailures: 1, scrapeFailures: 0, testCount: 1 }, lastSyncAt: Date.now() - 120000 }),
     getStatus: async () => ({}), getSyncConfig: async () => ({ scrapingEnabled: false }),
     chrome: { storage: { onChanged: { addListener() {}, removeListener() {} } } },
     container: dom.window.document.getElementById('stats'),
@@ -346,10 +349,59 @@ test('Shared statistics show elapsed sync time and today counts even when signed
   await vm.runInContext('mountStats(container)', ctx);
   const text = ctx.container.textContent;
   assert.match(text, /Since last sync2m/);
-  assert.match(text, /Scrapes today4/);
-  assert.match(text, /Syncs today2/);
+  assert.match(text, /Scrapes counted today4/);
+  assert.match(text, /Syncs counted today2/);
   assert.match(text, /Next sync dueStopped/);
   assert.ok(read('popup.html').includes('id="activityStats"'));
   const page = new JSDOM(read('options.html')).window.document;
   assert.equal(page.getElementById('signedInView').contains(page.getElementById('activityStats')), false);
+});
+
+test('Missing activity counters show recorded evidence and unavailable totals, never misleading zeros', async () => {
+  const { JSDOM } = require('../webapp/node_modules/jsdom');
+  const dom = new JSDOM('<div id="stats"></div>');
+  const ctx = vm.createContext({ Date, window: dom.window, setInterval: () => 1, clearInterval() {},
+    qatarDate: () => '2026-10-11',
+    summarizeAuditToday: async () => ({ scrapeCount: 13, rowCount: 13 }),
+    sendWorkerMessage: async () => ({ historyPointsToday: 2 }),
+    getActivity: async () => ({ daily: {} }),
+    getStatus: async () => ({ lastPushCount: 1, lastPushAt: Date.now() - 20000, lastScrapeAt: Date.now() - 46000 }),
+    getSyncConfig: async () => ({ scrapingEnabled: true }),
+    chrome: { storage: { onChanged: { addListener() {}, removeListener() {} } } },
+    container: dom.window.document.getElementById('stats'),
+  });
+  vm.runInContext(read('stats-ui.js').replace(/^import .*;\r?\n/gm, '').replace(/export /g, ''), ctx);
+  await vm.runInContext('mountStats(container)', ctx);
+  const text = ctx.container.textContent;
+  assert.match(text, /Local scrapes recorded today13 \(13 raw rows\)/);
+  assert.match(text, /Firebase history points today2/);
+  assert.match(text, /Syncs counted todayUnavailable \(not tracked\)/);
+  assert.match(text, /reload the extension/i);
+  assert.doesNotMatch(text, /0 ticker writes/);
+});
+
+test('Stored audit summary counts scrape batches rather than individual ticker rows', async () => {
+  const activity = await import('data:text/javascript;base64,' + Buffer.from(read('activity.js').replace(/^import .*;\r?\n/gm, '')).toString('base64'));
+  const sample = [
+    { ticker: 'QFLS', capturedAt: Date.parse('2026-10-10T21:01:00Z'), source: 'automatic', url: 'market' },
+    { ticker: 'QNBK', capturedAt: Date.parse('2026-10-10T21:01:00Z'), source: 'automatic', url: 'market' },
+    { ticker: 'QFLS', capturedAt: Date.parse('2026-10-11T09:00:00Z'), source: 'test', url: 'market' },
+    { ticker: 'QFLS', capturedAt: Date.parse('2026-10-10T20:59:00Z'), source: 'automatic', url: 'market' },
+  ];
+  const db = { close() {}, transaction() {
+    const tx = { objectStore() { return { openCursor() {
+      const request = {}; let index = 0;
+      const next = () => queueMicrotask(() => {
+        request.result = index < sample.length ? { value: sample[index++], continue: next } : null;
+        request.onsuccess(); if (!request.result) tx.oncomplete();
+      }); next(); return request;
+    } }; } }; return tx;
+  } };
+  const ctx = vm.createContext({ qatarDate: activity.qatarDate,
+    indexedDB: { open() { const request = {}; queueMicrotask(() => { request.result = db; request.onsuccess(); }); return request; } },
+  });
+  vm.runInContext(read('audit.js').replace(/^import .*;\r?\n/gm, '').replace(/export /g, ''), ctx);
+  const result = await vm.runInContext(`summarizeAuditToday(${Date.parse('2026-10-11T10:00:00Z')})`, ctx);
+  assert.equal(result.scrapeCount, 2);
+  assert.equal(result.rowCount, 3);
 });

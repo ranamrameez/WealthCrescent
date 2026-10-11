@@ -1,4 +1,4 @@
-import { recordActivity } from './activity.js';
+import { recordActivity, qatarDate } from './activity.js';
 import { saveAudit } from './audit.js';
 import { pushedRecords, paginatePushed, priceDeviation } from './pushed-data.js';
 import { setSyncConfig, withinScrapingWindow } from './common.js';
@@ -431,6 +431,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       }
       case 'GET_PUSHED_DATA': {
         sendResponse({ ok: true, ...await queryPushedData(message.filters || {}, !!message.refresh) });
+        break;
+      }
+      case 'GET_ACTIVITY_SUMMARY': {
+        await queryPushedData({});
+        const today = qatarDate();
+        const points = pushedSnapshot.rows.filter(row => row.kind === 'history' && row.capturedAt != null && qatarDate(row.capturedAt) === today);
+        sendResponse({ ok: true, historyPointsToday: points.length });
         break;
       }
       case 'MUTATE_PUSHED_DATA': {

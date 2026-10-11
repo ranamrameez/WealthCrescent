@@ -1,4 +1,5 @@
 import { priceDeviation } from './pushed-data.js';
+import { qatarDate } from './activity.js';
 function openDB() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open('scrape-audit', 1);
@@ -6,6 +7,32 @@ function openDB() {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
+}
+
+export async function summarizeAuditToday(now = Date.now()) {
+  const db = await openDB();
+  const date = qatarDate(now);
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction('rows');
+      const request = tx.objectStore('rows').openCursor();
+      const batches = new Set();
+      let rowCount = 0;
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) return;
+        const row = cursor.value;
+        if (qatarDate(row.capturedAt) === date) {
+          batches.add(`${row.capturedAt}:${row.source || ''}:${row.url || ''}`);
+          rowCount++;
+        }
+        cursor.continue();
+      };
+      tx.oncomplete = () => resolve({ date, scrapeCount: batches.size, rowCount });
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error('Audit summary interrupted.'));
+    });
+  } finally { db.close(); }
 }
 
 export async function mutateAudit(entries, operation, price) {
