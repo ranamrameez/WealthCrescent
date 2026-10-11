@@ -47,19 +47,26 @@ export async function mountStats(container) {
       ['Next sync due', !config.scrapingEnabled ? 'Stopped' : status.nextPushAt ? status.nextPushAt <= Date.now() ? 'On next eligible scrape' : `In ${elapsed(Date.now(), status.nextPushAt)}` : 'On next eligible scrape'],
     ];
     const heading = document.createElement('h2'); heading.textContent = 'Activity';
-    const list = document.createElement('dl'); list.className = 'stats-grid';
-    for (const [label, value] of lines) {
-      const term = document.createElement('dt'); term.textContent = label;
-      const detail = document.createElement('dd'); detail.textContent = value;
-      list.append(term, detail);
+    const list = document.createElement('div'); list.className = 'activity-sections';
+    const localLabels = new Set(['Since last scrape','Local scrapes recorded today','Scrapes counted today','Scrape failures / tests today']);
+    for (const [title, isLocal] of [['Local scrape',true],['DB sync',false]]) {
+      const section = document.createElement('section'); const heading = document.createElement('h3'); heading.textContent = title;
+      const details = document.createElement('dl'); details.className = 'stats-grid';
+      for (const [label,value] of lines.filter(([label]) => localLabels.has(label) === isLocal)) {
+        const term = document.createElement('dt'); term.textContent = label;
+        const detail = document.createElement('dd'); detail.textContent = value; details.append(term,detail);
+      }
+      section.append(heading,details); list.append(section);
     }
     const note = document.createElement('p'); note.className = 'muted';
     note.textContent = `Today uses Qatar time. Statistics cover all tickers; table filters do not affect them. Local records count retained scrape batches. Stats come from this extension; no Firebase read is needed. Confirmed synced rows are retained audit records marked after a successful price write. ${tracked ? `Activity counters started ${new Date(activity.trackingStartedAt).toLocaleString('en-GB', { timeZone: 'Asia/Qatar' })}; tests are included.` : 'Activity counters have not started; reload the extension in chrome://extensions to load the updated worker.'}${stale ? ' Saved status is newer than the activity counters; reload the extension to resume tracking.' : ''}`;
-    const error = document.createElement('p'); error.className = 'error'; error.textContent = [...new Set([syncError, status.lastError, recorded.error].filter(Boolean))].join(' ');
+    const error = document.createElement('p'); error.className = 'error'; error.textContent = [...new Set([syncError, status.lastError, status.configSyncError, recorded.error].filter(Boolean))].join(' ');
+    const { configSyncStatus } = await chrome.storage.local?.get('configSyncStatus') || {};
+    if (configSyncStatus?.error) error.textContent += ' ' + configSyncStatus.error;
     container.replaceChildren(heading, list, note, error);
   }
   const refresh = () => render().catch(error => { if (!disposed) container.textContent = `Cannot load statistics: ${error.message}`; });
-  const listener = (changes, area) => { if (area === 'local' && (changes.activity || changes.status || changes.syncConfig || changes.auditUpdatedAt || changes.auth)) { evidenceCache = null; refresh(); } };
+  const listener = (changes, area) => { if (area === 'local' && (changes.activity || changes.status || changes.syncConfig || changes.auditUpdatedAt || changes.auth || changes.configSyncStatus)) { evidenceCache = null; refresh(); } };
   chrome.storage.onChanged.addListener(listener);
   const timer = setInterval(refresh, 5000);
   window.addEventListener('pagehide', () => { disposed = true; clearInterval(timer); chrome.storage.onChanged.removeListener(listener); }, { once: true });

@@ -1,3 +1,5 @@
+import { mergeBounds, tickerProjection } from './ticker-data.js';
+import { restoreExtensionConfigs, saveExtensionConfigs, CONFIG_KEYS } from './cloud-config.js';
 import { recordActivity, qatarDate } from './activity.js';
 import { saveAudit, queryAudit, markAuditSynced } from './audit.js';
 import { combineRecords } from './combined-data.js';
@@ -61,6 +63,11 @@ async function mutatePushedData(entries, operation, price) {
         const state = await conditionalRead(priceCachePath(entry.ticker), auth);
         if (state.value !== entry.price) throw new Error('Current price changed. Refresh first.');
         await conditionalWrite(state, operation === 'delete' ? null : price);
+        if (operation === 'edit') {
+          const time = new Date().toISOString();
+          // Record manual current-price corrections so allPrices and summaries agree.
+          await putScalar(priceHistoryPath(entry.ticker) + '/' + Date.parse(time), { price, originalPrice:entry.price, time, date:qatarDate(new Date(time)), editedAt:time, priceKey:'manualCorrection', dayHigh:null, dayLow:null, raw:[] }, auth.idToken);
+        }
       } else {
         const state = await conditionalRead(priceHistoryPath(entry.ticker), auth);
         const points = state.value || {};
@@ -78,6 +85,7 @@ async function mutatePushedData(entries, operation, price) {
           } catch (error) { results.push({ id: entry.id, ok: true, warning: `History updated; current price needs review: ${error.message}` }); continue; }
         }
       }
+      await rebuildTickerProjection(entry.ticker, auth, entry.kind === 'current' && operation === 'delete');
       results.push({ id: entry.id, ok: true });
     } catch (error) { results.push({ id: entry.id, ok: false, error: error.message }); }
   }
@@ -237,9 +245,50 @@ async function appendHistoryPointSafely(ticker, point, idToken) {
   return { appended: false, conflicted: true };
 }
 
+async function updateTickerBounds(path, point, auth) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const state = await conditionalRead(path, auth);
+    try { await conditionalWrite(state, mergeBounds(state.value, point)); return; }
+    catch (error) { if (!/Record changed/.test(error.message) || attempt === 2) throw error; }
+  }
+}
+
+async function syncTickerPoint(ticker, point, auth) {
+  const root = 'stockData/QSE/tickers/' + encodeURIComponent(ticker);
+  const latest = await conditionalRead(root + '/latest', auth);
+  // One-time migration: bootstrap historical extrema before incremental updates.
+  if (!latest.value) {
+    const legacy = await conditionalRead(priceHistoryPath(ticker), auth);
+    const seed = tickerProjection(legacy.value);
+    const state = await conditionalRead(root, auth);
+    if (!state.value) await conditionalWrite(state, seed);
+  }
+  await Promise.all([
+    updateTickerBounds(root + '/dayToDayBounds/' + point.date, point, auth),
+    updateTickerBounds(root + '/allTimeBounds', point, auth),
+  ]);
+  const last = latest.value;
+  if (last && last.price === point.price && last.date === point.date && (last.dayHigh ?? null) === point.dayHigh && (last.dayLow ?? null) === point.dayLow) return;
+  const key = String(Date.parse(point.time));
+  const response = await fetch(RTDB_BASE_URL + '/stockData/QSE.json?auth=' + encodeURIComponent(auth.idToken), {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ['tickers/' + ticker + '/allPrices/' + key]: point, ['tickers/' + ticker + '/latest']: point, ['priceHistory/' + ticker + '/' + key]: point }),
+  });
+  if (!response.ok) throw new Error('Ticker price/history sync failed (' + response.status + ')');
+}
+
+async function rebuildTickerProjection(ticker, auth, clearLatest = false) {
+  const state = await conditionalRead('stockData/QSE/tickers/' + encodeURIComponent(ticker), auth);
+  const legacy = await conditionalRead(priceHistoryPath(ticker), auth);
+  const projection = tickerProjection(legacy.value);
+  if (clearLatest) projection.latest = null;
+  await conditionalWrite(state, projection);
+}
+
 async function pushRows(rows) {
   const auth = await getFreshAuth();
   if (!auth) throw new Error('Sign in on the extension page to sync prices.');
+  await saveExtensionConfigs(getFreshAuth).then(() => patchStatus({ configSyncError:'' })).catch(error => patchStatus({ configSyncError:error.message }));
   const nowIso = new Date().toISOString();
   const today = qatarDate(new Date(nowIso));
   let pushed = 0;
@@ -257,8 +306,7 @@ async function pushRows(rows) {
       pushed++;
       syncedTickers.push(row.ticker);
       try {
-        const history = await appendHistoryPointSafely(row.ticker, point, auth.idToken);
-        if (history.conflicted) errors.push(`${row.ticker}: current price synced; history update conflicted, retry later.`);
+        await syncTickerPoint(row.ticker, point, auth);
       } catch (error) { errors.push(`${row.ticker}: current price synced; history failed: ${error.message}`); }
     } catch (e) {
       errors.push(`${row.ticker}: ${e.message || e}`);
@@ -466,9 +514,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({ ok: true, results: await mutatePushedData(message.entries, message.operation, message.price) });
         break;
       }
+      case 'LOAD_EXTENSION_CONFIGS': {
+        await restoreExtensionConfigs(await getFreshAuth());
+        await patchStatus({ configSyncError:'' });
+        sendResponse({ ok: true }); break;
+      }
       case 'SIGN_IN': {
         try {
           const auth = await signInWithPassword(message.email, message.password);
+          await restoreExtensionConfigs(auth).catch(error => patchStatus({ configSyncError: error.message }));
           sendResponse({ ok: true, email: auth.email, uid: auth.uid });
         } catch (e) {
           sendResponse({ ok: false, error: e.message || String(e) });
@@ -524,7 +578,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 });
 
 chrome.storage?.onChanged?.addListener((changes, area) => {
-  if (area !== 'local' || !changes.syncConfig) return;
+  if (area !== 'local') return;
+  if (CONFIG_KEYS.some(key => changes[key])) saveExtensionConfigs(getFreshAuth, true).then(() => patchStatus({ configSyncError:'' })).catch(error => patchStatus({ configSyncError: error.message }));
+  if (!changes.syncConfig) return;
   const before = changes.syncConfig.oldValue || {};
   const after = changes.syncConfig.newValue || {};
   if (before.pushTimingMode === after.pushTimingMode && before.minPushIntervalMinutes === after.minPushIntervalMinutes) return;

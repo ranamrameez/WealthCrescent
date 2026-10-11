@@ -277,3 +277,49 @@ The table shows both bounds; green chart ranges show reported daily extrema at
 scrape time, without assigning an occurrence time to the extrema. Older records
 without these fields show no range. Reload the extension and market tab to use
 the updated content script.
+
+## Ticker storage and account configurations (v0.1.12)
+
+Fast app reads use `stockData/QSE/tickers/{ticker}`:
+
+- `allPrices/{pointKey}`: full price points, including `dayHigh`, `dayLow`, raw
+  provenance, date and timestamp. Unchanged consecutive values are deduplicated;
+  a new day or changed daily bound retains a new point.
+- `dayToDayBounds/{YYYY-MM-DD}`: `{ low, high, updatedAt }`, keyed by Qatar day.
+- `allTimeBounds`: `{ low, high, updatedAt }` across retained price history.
+- `latest`: the most recently synced complete price point.
+
+Bounds include observed prices and valid reported daily High/Low pairs, so an
+intraday extremum survives even if no scrape sampled that price. Occurrence times
+for reported extrema remain unknown. The first sync for each ticker copies existing
+legacy history and computes historical bounds. Following syncs read only small
+latest/day/all-time nodes, use conditional writes to merge extrema, and atomically
+append full points to canonical and compatible legacy history paths. Summary write
+conflicts retry; partial failures remain visible in activity. History edits/deletes
+rebuild summaries from retained history. Existing `prices`, `priceHistory` and
+`tickerNames` readers remain compatible. Migration occurs on the next sync for
+each scraped ticker, rather than at extension installation.
+
+`users/{uid}/extensionConfigs` stores scrape and sync settings, favourites, each
+favourite timeframe, and data-view/page-size/outlier-selection preferences. These
+are restored on sign-in or opening the extension, with a local working copy for
+offline operation. Failed writes retain a per-account pending snapshot and retry
+on later changes or syncs. Authentication tokens and audit/activity records are
+excluded. Another account does not inherit a previous account's settings.
+
+Activity is the first page card with Local scrape and DB sync panels. Pinned charts
+have independent 1d, 7d, 1M, 3M, 6M, 1Y and All time selections; these do not
+change table dates.
+
+Merge the following permissions/indexes into your existing Firebase rules if not
+already covered by parent rules (do not replace the existing rules tree):
+
+```json
+{
+  "users": { "$uid": { "extensionConfigs": { ".read": "auth != null && auth.uid === $uid", ".write": "auth != null && auth.uid === $uid" } } },
+  "stockData": { "QSE": { "tickers": { "$ticker": { "allPrices": { ".indexOn": ["time", "date"] } } } } }
+}
+```
+
+The existing authenticated QSE write permission must also cover `tickers`. Rules
+are documented here, not deployed by the extension.

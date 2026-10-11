@@ -9,7 +9,18 @@ import { sendWorkerMessage } from './common.js';
 import { mountConfig, mountControls } from './config-ui.js';
 import { queryAudit, mutateAudit } from './audit.js';
 const $ = id => document.getElementById(id);
+await sendWorkerMessage({ type:'LOAD_EXTENSION_CONFIGS' }).catch(error => { $('dataMessage').textContent = error.message; });
 const favourites = new Set(await getChartFavourites());
+const savedConfig = await chrome.storage.local?.get(['favouriteTimeframes','viewPreferences']) || {};
+let favouriteTimeframes = savedConfig.favouriteTimeframes || {};
+function applyViewPreferences(preferences) {
+for (const [id,value] of Object.entries(preferences || {})) {
+  if (['dataView','pageSize','outlierFilter','autoSelectOutliers'].includes(id) && $(id)) {
+    if (id === 'autoSelectOutliers') $(id).checked = !!value; else $(id).value = value;
+  }
+}
+}
+applyViewPreferences(savedConfig.viewPreferences);
 $('fromDate').value = $('toDate').value = qatarDate();
 await mountConfig($('configCard'));
 await mountControls($('scrapingControls'), { manualActions: true });
@@ -37,6 +48,7 @@ const selected = new Map();
 const deselectedOutliers = new Set();
 let chartRows = [];
 let favouriteRows = [];
+const favouriteChartRows = new Map();
 let visibleRows = [];
 function updateSelection() {
   $('selectionInfo').textContent = `${selected.size} selected`;
@@ -75,12 +87,15 @@ async function renderData(refresh = false) {
     $('chartTicker').replaceChildren(...['', ...chartTickers].map(ticker => { const option = document.createElement('option'); option.value = ticker; option.textContent = ticker || 'All tickers'; return option; }));
     $('chartTicker').value = chartTickers.includes(tickerValue) ? tickerValue : chartTickers.includes(previousChartTicker) ? previousChartTicker : '';
     favouriteRows = chartRows;
-    if (favourites.size && filters.ticker) {
-      const chartFilters = { ...filters, ticker: '' };
-      const all = combined ? await sendWorkerMessage({ type: 'GET_ALL_DATA', filters: chartFilters }) : firebase ? await sendWorkerMessage({ type: 'GET_PUSHED_DATA', filters: chartFilters }) : await queryAudit(chartFilters);
-      if (version !== requestVersion) return;
-      favouriteRows = all.chartRows || all.rows;
-    }
+    const pinned = await Promise.all([...favourites].map(async ticker => {
+      const period = favouriteTimeframes[ticker] || '1d';
+      const range = dateRange(period);
+      const chartFilters = { ...filters, ...range, ticker, outliers:'' };
+      const data = combined ? await sendWorkerMessage({ type:'GET_ALL_DATA', filters:chartFilters }) : firebase ? await sendWorkerMessage({ type:'GET_PUSHED_DATA',filters:chartFilters }) : await queryAudit(chartFilters);
+      return [ticker, data.chartRows || data.rows];
+    }));
+    if (version !== requestVersion) return;
+    favouriteChartRows.clear(); pinned.forEach(([ticker,rows]) => favouriteChartRows.set(ticker,rows));
     renderCharts();
     $('dataRows').replaceChildren();
     for (const row of result.rows) {
@@ -158,14 +173,29 @@ function renderCharts() {
   const grid = document.createElement('div'); grid.className = 'chart-grid';
   for (const ticker of [...favourites].sort()) {
     const card = document.createElement('section'); const title = document.createElement('h3'); title.textContent = ticker;
-    const chart = document.createElement('div'); card.append(title, chart); grid.append(card);
-    renderPriceChart(chart, favouriteRows, ticker, options);
+    const periods = document.createElement('div'); periods.className = 'chart-ranges'; periods.setAttribute('role','group'); periods.setAttribute('aria-label', ticker + ' timeframe');
+    for (const period of ['1d','7d','1M','3M','6M','1Y','all']) {
+      const button = document.createElement('button'); button.textContent = period === 'all' ? 'All time' : period;
+      button.dataset.favouritePeriod = period; button.setAttribute('aria-pressed', String((favouriteTimeframes[ticker] || '1d') === period));
+      button.onclick = async () => {
+        favouriteTimeframes = { ...favouriteTimeframes, [ticker]:period };
+        await chrome.storage.local?.set({ favouriteTimeframes }); await renderData();
+      }; periods.append(button);
+    }
+    const chart = document.createElement('div'); card.append(title, periods, chart); grid.append(card);
+    renderPriceChart(chart, favouriteChartRows.get(ticker) || favouriteRows, ticker, options);
   }
   list.append(grid);
 }
 $('editSelected').onclick = () => applyBatch('edit');
 $('deleteSelected').onclick = () => applyBatch('delete');
 await renderData();
+for (const id of ['dataView','pageSize','outlierFilter','autoSelectOutliers']) $(id).addEventListener('change', async () => {
+  const viewPreferences = Object.fromEntries(['dataView','pageSize','outlierFilter','autoSelectOutliers'].map(key => [key, key === 'autoSelectOutliers' ? $(key).checked : $(key).value]));
+  await chrome.storage.local?.set({ viewPreferences });
+});
 
 chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && changes.chartFavourites) { favourites.clear(); (changes.chartFavourites.newValue || []).forEach(ticker => favourites.add(ticker)); renderData(); }
+  if (area === 'local' && changes.viewPreferences) { applyViewPreferences(changes.viewPreferences.newValue); page = 1; renderData(); }
+  if (area === 'local' && changes.favouriteTimeframes) { favouriteTimeframes = changes.favouriteTimeframes.newValue || {}; renderData(); }
   if (area === 'local' && (changes.auditUpdatedAt || changes.auth || changes.status)) renderData(!!changes.status); });

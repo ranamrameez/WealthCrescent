@@ -2,6 +2,7 @@ import { mountStats } from './stats-ui.js';
 import { mountControls } from './config-ui.js';
 import { sendWorkerMessage } from './common.js';
 const error = document.getElementById('actionError');
+await sendWorkerMessage({ type:'LOAD_EXTENSION_CONFIGS' }).catch(cause => { error.textContent = cause.message; });
 for (const [id, type] of [['scrapeNowBtn', 'SCRAPE_NOW_MANUAL'], ['pushNowBtn', 'PUSH_NOW']]) {
   const button = document.getElementById(id);
   button.onclick = async () => {

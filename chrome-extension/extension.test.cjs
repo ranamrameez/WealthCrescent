@@ -162,7 +162,8 @@ test('Page defaults to combined data and today, with working chart date presets'
   assert.match(document.getElementById('dataRows').textContent, /Synced/);
   assert.equal(document.getElementById('strategyFilter').disabled, true);
   assert.ok(document.getElementById('dataRows').compareDocumentPosition(document.getElementById('testBtn')) & 4);
-  assert.equal(document.querySelector('.top-sections').children.length, 3);
+  assert.equal(document.querySelector('.top-sections').children.length, 2);
+  assert.ok(document.getElementById('activityStats').compareDocumentPosition(document.querySelector('.top-sections')) & 4);
 });
 
 test('Outliers flag changes beyond 10 percent in either direction, with source keys retained', async () => {
@@ -188,7 +189,7 @@ function mutationContext(initial, conflict = false) {
     getAuth: async () => ({ uid: 'user', idToken: 'token', expiresAt: Date.now() + 60000 }),
     RTDB_BASE_URL: 'https://database.example',
     fetch: async (url, options = {}) => {
-      const key = url.includes('/priceHistory/') ? 'history' : 'price';
+      const key = url.includes('/tickers/') ? 'projection' : url.includes('/priceHistory/') ? 'history' : 'price';
       if (options.method === 'PUT') {
         assert.equal(options.headers['if-match'], 'v1');
         writes.push({ key, value: JSON.parse(options.body) });
@@ -200,6 +201,7 @@ function mutationContext(initial, conflict = false) {
     chrome: { alarms: { onAlarm: { addListener() {} } }, runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener() {} } } },
   });
   vm.runInContext(read('background.js').replace(/import\s+[\s\S]*?from\s+'[^']+';/g, ''), ctx);
+  vm.runInContext(read('ticker-data.js').replace(/export /g, ''), ctx);
   return { ctx, state, writes };
 }
 
@@ -356,6 +358,12 @@ test('Shared statistics show elapsed sync time and today counts even when signed
   vm.runInContext(read('stats-ui.js').replace(/^import .*;\r?\n/gm, '').replace(/export /g, ''), ctx);
   await vm.runInContext('mountStats(container)', ctx);
   const text = ctx.container.textContent;
+  const panels = ctx.container.querySelectorAll('.activity-sections section');
+  assert.equal(panels.length,2);
+  assert.match(panels[0].textContent,/Local scrape/);
+  assert.match(panels[0].textContent,/Scrapes counted today4/);
+  assert.match(panels[1].textContent,/DB sync/);
+  assert.match(panels[1].textContent,/Syncs counted today2/);
   assert.match(text, /Since last sync2m/);
   assert.match(text, /Scrapes counted today4/);
   assert.match(text, /Syncs counted today2/);
@@ -476,7 +484,7 @@ test('Successful push marks only accepted records from its own scrape batch as s
 
 test('A successful price write is counted even when its history write fails', async () => {
   const qatarDate = () => '2026-10-11';
-  const ctx = vm.createContext({ console, Date, encodeURIComponent, qatarDate,
+  const ctx = vm.createContext({ console, Date, encodeURIComponent, qatarDate, saveExtensionConfigs: async () => {}, patchStatus: async () => {},
     getAuth: async () => ({ uid: 'user', idToken: 'token', expiresAt: Date.now() + 60000 }),
     RTDB_BASE_URL: 'https://database.example',
     priceCachePath: ticker => `prices/${ticker}`,
@@ -591,7 +599,7 @@ test('Favourites persist and pinned charts appear before the table', async () =>
   const rows = ['QFLS', 'QNBK'].map((ticker, index) => ({ id: ticker, ticker, price: 10 + index, capturedAt: 100 + index, origin: 'firebase', syncStatus: 'Synced' }));
   const ctx = vm.createContext({ document, Date, Number, JSON,
     renderPriceChart: charts.renderPriceChart,
-    qatarDate: () => '2026-10-11', mountConfig: async () => {}, mountControls: async () => {}, mountStats: async () => {},
+    dateRange: period => ({ from: period === 'all' ? '' : '2026-10-11', to: period === 'all' ? '' : '2026-10-11' }), qatarDate: () => '2026-10-11', mountConfig: async () => {}, mountControls: async () => {}, mountStats: async () => {},
     getChartFavourites: async () => saved, setChartFavourites: async tickers => { saved = tickers; },
     sendWorkerMessage: async () => ({ rows, chartRows: rows, total: rows.length, tickers: rows.map(row => row.ticker) }),
     chrome: { storage: { onChanged: { addListener() {} } } },

@@ -24,6 +24,14 @@ export async function mountConfig(container) {
     row.querySelector('button').onclick = () => row.remove(); windows.append(row);
   }
   sync.timeWindows.forEach(addWindow);
+  chrome.storage.onChanged.addListener(async (changes,area) => {
+    if (area !== 'local' || !(changes.extensionConfigOwner || changes.scrapeConfig || changes.syncConfig)) return;
+    const [scrape,sync] = await Promise.all([getScrapeConfig(),getSyncConfig()]);
+    form.elements.targetUrl.value = scrape.targetUrl;
+    form.elements.minPushIntervalMinutes.value = sync.minPushIntervalMinutes;
+    form.elements.pushTimingMode.value = sync.pushTimingMode;
+    windows.replaceChildren(); sync.timeWindows.forEach(addWindow);
+  });
   container.querySelector('.add-window').onclick = () => addWindow();
   form.onsubmit = async event => {
     event.preventDefault();
