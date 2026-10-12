@@ -388,7 +388,7 @@ export function StockPage() {
 
       <StandardPageSections preserveOrder defaultKey="prices"
         sections={[
-          { key: 'prices', label: 'Lifetime Chart', defaultOpen: true, content: <PositionDetail ticker={ticker} section="prices" /> },
+          { key: 'prices', label: 'Market Price', defaultOpen: true, content: <PositionDetail ticker={ticker} section="prices" /> },
           { key: 'summary', label: 'Summary', defaultOpen: true, content: <StockPortfolioSummary ticker={ticker} /> },
           { key: 'lots', label: 'Open Lots', defaultOpen: true, content: <PositionDetail ticker={ticker} section="lots" /> },
           {

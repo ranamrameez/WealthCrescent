@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MarketPriceChart } from './MarketPriceChart';
+import { MarketPriceChart } from '../../../components/MarketPriceChart';
 import { useMarketPageData } from '../hooks/useMarketPageData';
 import { filterMarketRows, lifetimeBounds, marketDateRange, MARKET_PERIODS, previousSessionClose, type MarketSource } from '../../../lib/stockData/marketPageModel';
 import '../pages/MarketPricesPage.css';

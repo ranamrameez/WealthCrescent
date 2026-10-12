@@ -30,7 +30,7 @@ import { gridAutoStyle } from '../../../lib/gridStyle';
 
 function DetailCard({section,title,children,...props}: ComponentProps<typeof StandardCard> & {section:string}) {
   return section === 'all' ? <StandardCard title={title} {...props}>{children}</StandardCard>
-    : <div className={props.className}>{section !== 'lots' && section !== 'closed' && <h3>{title}</h3>}{children}</div>;
+    : <div className={props.className}>{section !== 'lots' && section !== 'closed' && section !== 'prices' && <h3>{title}</h3>}{children}</div>;
 }
 
 /** Small, fixed-height chart wrapper — Chart.js defaults to filling
@@ -374,7 +374,7 @@ export function PositionDetail({ ticker, section = 'all' }: { ticker: string; se
 
       {/* Daily price — the single most-asked-about number, so it leads
           instead of being buried under other sections. */}
-      {(section === 'all' || section === 'prices') && <DetailCard section={section} title={<span>Market price chart</span>} className="mb-12">
+      {(section === 'all' || section === 'prices') && <DetailCard section={section} title={<span>Market Price</span>} className="mb-12">
       <MarketPriceHistory ticker={ticker} />
       <div className="row gap-sm mt-sm">
         <PriceInput exchange="qse"

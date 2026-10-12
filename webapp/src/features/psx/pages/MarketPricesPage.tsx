@@ -12,7 +12,7 @@ import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { filterMarketRows, lifetimeBounds, marketDateRange, marketRows, MARKET_PERIODS, previousSessionClose, type MarketRow } from '../../../lib/stockData/marketPageModel';
 import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
 import { toast } from '../../../components/Toast';
-import { MarketPriceChart } from '../../qse/components/MarketPriceChart';
+import { MarketPriceChart } from '../../../components/MarketPriceChart';
 import { MarketTickerCards } from '../../qse/components/MarketTickerCards';
 import { usePSXStockData } from '../hooks/usePSXStockData';
 import '../../qse/pages/MarketPricesPage.css';

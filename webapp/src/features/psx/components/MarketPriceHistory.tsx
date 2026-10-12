@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { fmtPSXPrice } from '../../../lib/format';
 import { filterMarketRows, lifetimeBounds, marketDateRange, marketRows, MARKET_PERIODS, previousSessionClose } from '../../../lib/stockData/marketPageModel';
 import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
-import { MarketPriceChart } from '../../qse/components/MarketPriceChart';
+import { MarketPriceChart } from '../../../components/MarketPriceChart';
 import '../../qse/pages/MarketPricesPage.css';
 
 export function MarketPriceHistory({ticker}:{ticker:string}) {

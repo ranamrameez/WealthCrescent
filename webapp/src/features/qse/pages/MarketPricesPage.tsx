@@ -16,7 +16,7 @@ import { useQSEDerived } from '../hooks/useQSEDerived';
 import { useMarketFavourites } from '../hooks/useMarketFavourites';
 import { useMarketCardPrices,useMarketPageData } from '../hooks/useMarketPageData';
 import { MarketTickerCards } from '../components/MarketTickerCards';
-import { MarketPriceChart } from '../components/MarketPriceChart';
+import { MarketPriceChart } from '../../../components/MarketPriceChart';
 import './MarketPricesPage.css';
 const symbolPattern=/^[A-Z][A-Z0-9]{1,5}$/;
 export function MarketPricesPage() {

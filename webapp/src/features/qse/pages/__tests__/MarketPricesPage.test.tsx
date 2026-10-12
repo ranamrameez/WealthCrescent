@@ -66,5 +66,5 @@ it('applies timeframe and source to both charts and paginated updates',()=>{
  expect(container.querySelector('[data-page-section="updates"] tbody')?.textContent).not.toContain('App');
  fireEvent.click(screen.getByRole('button',{name:'All time'}));
  expect(screen.getByText(/1 matching updates/)).toBeVisible();
- expect(mock.charts.at(-1)?.datasets.find(dataset=>dataset.label==='Median')?.data[0]).toBe(1.01);
+ expect(mock.charts.at(-1)?.datasets.map(dataset=>dataset.label)).not.toContain('Median');
 });

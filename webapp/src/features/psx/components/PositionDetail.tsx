@@ -31,7 +31,7 @@ import { gridAutoStyle } from '../../../lib/gridStyle';
 
 function DetailCard({section,title,children,...props}: ComponentProps<typeof StandardCard> & {section:string}) {
   return section === 'all' ? <StandardCard title={title} {...props}>{children}</StandardCard>
-    : <div className={props.className}>{section !== 'lots' && section !== 'closed' && <h3>{title}</h3>}{children}</div>;
+    : <div className={props.className}>{section !== 'lots' && section !== 'closed' && section !== 'prices' && <h3>{title}</h3>}{children}</div>;
 }
 
 function CompactChart({ height, children }: { height: number; children: React.ReactNode }) {
@@ -377,7 +377,7 @@ export function PositionDetail({ ticker, section = 'all' }: { ticker: string; se
       </div>
       <div>
 
-        {(section === 'all' || section === 'prices') && <DetailCard section={section} title={<span>Market price chart</span>} className="mb-12">
+        {(section === 'all' || section === 'prices') && <DetailCard section={section} title={<span>Market Price</span>} className="mb-12">
         <MarketPriceHistory ticker={ticker} />
       <div className="row gap-sm mt-sm">
           <PriceInput exchange="psx"

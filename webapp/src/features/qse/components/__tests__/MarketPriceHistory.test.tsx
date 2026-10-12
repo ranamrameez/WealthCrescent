@@ -4,7 +4,7 @@ import { qatarDay } from '../../../../lib/stockData/qsePrices';
 const state=vi.hoisted(()=>({denied:false,paths:[] as string[]}));
 vi.mock('../../../../lib/firebase/client',()=>({db:{}}));
 vi.mock('../../../../lib/firebase/useAuthState',()=>({useAuthState:()=>({user:{uid:'alice'},authResolved:true})}));
-vi.mock('../MarketPriceChart',()=>({MarketPriceChart:({rows,bounds}:{rows:{source:string}[];bounds:{low:number;high:number}|null})=><div><span>{rows.filter(row=>row.source==='shared').length} shared points; {rows.filter(row=>row.source==='manual').length} manual points</span><span>Bounds {bounds?.low} to {bounds?.high}</span></div>}));
+vi.mock('../../../../components/MarketPriceChart',()=>({MarketPriceChart:({rows,bounds}:{rows:{source:string}[];bounds:{low:number;high:number}|null})=><div><span>{rows.filter(row=>row.source==='shared').length} shared points; {rows.filter(row=>row.source==='manual').length} manual points</span><span>Bounds {bounds?.low} to {bounds?.high}</span></div>}));
 vi.mock('../../../../store/workbookStore',()=>({useWorkbookStore:(selector:(s:unknown)=>unknown)=>selector({workbook:{priceHistory:{QFLS:[{date:qatarDay(),price:10}]},settings:{currency:'QAR'}}})}));
 vi.mock('firebase/database',()=>({
   ref:(_db:unknown,path:string)=>path,orderByChild:(key:string)=>key,startAt:(value:string)=>value,endAt:(value:string)=>value,query:(path:string)=>path,
