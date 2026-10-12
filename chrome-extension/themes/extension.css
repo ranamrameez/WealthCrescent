@@ -1,0 +1,45 @@
+/* Extension components adapted to the webapp's Material Teal tokens. */
+html[data-color="material-teal"] { color-scheme:light; --body:"Inter",-apple-system,"Segoe UI",Roboto,sans-serif; --disp:"Space Grotesk",var(--body); --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,monospace; }
+html[data-color="material-teal"] body { font-family:var(--body); font-size:14px; line-height:1.5; }
+html[data-color="material-teal"] h1, html[data-color="material-teal"] h2, html[data-color="material-teal"] h3 { font-family:var(--disp); color:var(--text); }
+html[data-color="material-teal"] h1 { font-size:24px; letter-spacing:-.5px; }
+html[data-color="material-teal"] .card, html[data-color="material-teal"] .stats-card { background:var(--panel); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow-card); }
+html[data-color="material-teal"] button { background:var(--accent); color:var(--on-accent); border:1px solid transparent; border-radius:999px; padding:10px 16px; font:600 13px/1.3 var(--body); cursor:pointer; transition:box-shadow .12s ease,filter .12s ease; }
+html[data-color="material-teal"] button:hover:not(:disabled) { filter:none; box-shadow:0 2px 6px rgb(0 0 0 / 14%); }
+html[data-color="material-teal"] button:focus-visible, html[data-color="material-teal"] summary:focus-visible, html[data-color="material-teal"] a:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
+html[data-color="material-teal"] button.secondary, html[data-color="material-teal"] #scrapeNowBtn, html[data-color="material-teal"] #testBtn, html[data-color="material-teal"] #refreshData, html[data-color="material-teal"] #prevPage, html[data-color="material-teal"] #nextPage, html[data-color="material-teal"] .scrape-control, html[data-color="material-teal"] .chart-fullscreen, html[data-color="material-teal"] .chart-favourite { background:var(--accent-soft); color:var(--accent); border-color:transparent; }
+html[data-color="material-teal"] #pushNowBtn, html[data-color="material-teal"] #editSelected, html[data-color="material-teal"] #signInBtn, html[data-color="material-teal"] .push-control, html[data-color="material-teal"] .start-control { background:var(--accent); color:var(--on-accent); }
+html[data-color="material-teal"] #deleteSelected, html[data-color="material-teal"] #deleteOutliers, html[data-color="material-teal"] .stop-control { background:var(--loss); color:#fff; }
+html[data-color="material-teal"] button:disabled { opacity:.45; cursor:default; box-shadow:none; }
+html[data-color="material-teal"] input:not([type="checkbox"]), html[data-color="material-teal"] select, html[data-color="material-teal"] textarea { color:var(--text); background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:9px 12px; font-family:var(--body); }
+html[data-color="material-teal"] input[type="checkbox"] { width:auto; accent-color:var(--accent); }
+html[data-color="material-teal"] input:focus, html[data-color="material-teal"] select:focus { outline:3px solid var(--accent-soft); border-color:var(--accent); }
+html[data-color="material-teal"] label, html[data-color="material-teal"] .muted, html[data-color="material-teal"] .stats-grid dt, html[data-color="material-teal"] #activityStats .muted, html[data-color="material-teal"] #scrapingControls .run-state { color:var(--muted); }
+html[data-color="material-teal"] a { color:var(--accent); }
+html[data-color="material-teal"] .extension-nav { background:var(--panel); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow-card); }
+html[data-color="material-teal"] .extension-nav a { color:var(--accent); border-radius:999px; font-weight:600; }
+html[data-color="material-teal"] .extension-nav a:hover, html[data-color="material-teal"] .extension-nav a:focus-visible { background:var(--accent-soft); }
+html[data-color="material-teal"] .collapsible-section { background:var(--panel); border-color:var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow-card); overflow:clip; }
+html[data-color="material-teal"] .collapsible-section > summary { color:var(--accent); background:var(--panel); border-radius:var(--radius-lg); }
+html[data-color="material-teal"] .collapsible-section[open] > summary { background:var(--accent-soft); border-radius:var(--radius-lg) var(--radius-lg) 0 0; }
+html[data-color="material-teal"] .collapsible-section > .card { box-shadow:none; border:0; border-radius:0; }
+html[data-color="material-teal"] .activity-sections section, html[data-color="material-teal"] .config-section, html[data-color="material-teal"] .advanced-controls, html[data-color="material-teal"] .chart-grid section { background:var(--panel-2); border:1px solid var(--border); border-radius:var(--radius-md); }
+html[data-color="material-teal"] .action-status { background:var(--accent-soft); color:var(--accent); border-color:transparent; border-radius:var(--radius-md); }
+html[data-color="material-teal"] th, html[data-color="material-teal"] .preview-scroll thead { background:var(--accent-soft); color:var(--accent); border-color:var(--border); }
+html[data-color="material-teal"] td { color:var(--text); border-color:var(--border); }
+html[data-color="material-teal"] .preview-scroll { border-color:var(--border); border-radius:var(--radius-md); }
+html[data-color="material-teal"] .chart-ranges button[aria-pressed="true"], html[data-color="material-teal"] .chart-favourite[aria-pressed="true"] { background:var(--accent); color:var(--on-accent); border-color:transparent; }
+html[data-color="material-teal"] pre { background:var(--panel-2); color:var(--text); border-color:var(--border); border-radius:12px; font-family:var(--mono); }
+html[data-color="material-teal"] .error, html[data-color="material-teal"] #actionError, html[data-color="material-teal"] .control-error { color:var(--loss); }
+html[data-color="material-teal"] :fullscreen, html[data-color="material-teal"] .chart-dialog { background:var(--panel); color:var(--text); border-color:var(--border); }
+html[data-color="material-teal"] .chart-dialog::backdrop { background:rgb(23 37 38 / 60%); }
+@media(prefers-reduced-motion:reduce) { html[data-color="material-teal"] button { transition:none; } }
+
+html[data-color="material-teal"] body:not(:has(.extension-nav)) h1 { font-size:17px; letter-spacing:0; }
+html[data-color="material-teal"] svg polyline { stroke:var(--accent); }
+html[data-color="material-teal"] svg circle[fill="#1d4ed8"] { fill:var(--accent); }
+html[data-color="material-teal"] svg circle[fill="#b91c1c"] { fill:var(--loss); }
+html[data-color="material-teal"] svg line[stroke="#b0bfd0"] { stroke:var(--border); }
+html[data-color="material-teal"] svg text { fill:var(--muted); }
+html[data-color="material-teal"] svg [data-role="daily-range"] line { stroke:var(--profit); }
+html[data-color="material-teal"] tr.outlier { background:color-mix(in srgb,var(--warn) 12%,var(--panel)) !important; }

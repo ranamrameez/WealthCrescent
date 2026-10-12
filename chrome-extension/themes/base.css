@@ -1,0 +1,88 @@
+/* Shared tokens and default light/dark surfaces. */
+:root {
+	/* User-reported ("menu bg and text contrast is still not visual at
+       many places"): every native browser control — a <select>'s own
+       opened dropdown list, number/date input spinners, scrollbars — was
+       rendering in the browser's default LIGHT appearance regardless of
+       this app's own dark theme, since nothing ever told the browser a
+       dark palette was in use. `color-scheme` is exactly that hint; this
+       app's own CSS custom properties already carry the real palette, so
+       this doesn't change any app-drawn color — it only tells the browser
+       which built-in palette to use for the handful of controls it draws
+       itself that this app's CSS can't reach into (a select's own popup
+       list chief among them). Default here is dark since :root's own
+       un-overridden palette above is the dark one; the light override
+       right below flips it back. */
+	color-scheme: dark;
+	/* User-reported: dark mode's page background and its panels sat too
+       close in lightness to read as separate surfaces ("hard to distinct
+       UI components"). Lifted all three a step while keeping the same
+       bg < panel < panel-2 ordering, so panels visibly "pop" off the page
+       instead of blending into a single near-black field. */
+	--bg: #15181d;
+	--bg-gradient-0:linear-gradient(168deg, color-mix(in srgb, var(--accent) 30%, var(--panel)) 14%, var(--accent) 95%);
+	--bg-gradient-1:linear-gradient(153deg, color-mix(in srgb, var(--accent) 53%, var(--panel)) 88%, var(--accent) 96%);
+	--bg-gradient-2:linear-gradient(168deg, color-mix(in srgb, var(--accent) 40%, var(--panel)) 24%, var(--accent) 95%);
+	--bg-gradient-3:linear-gradient(168deg, color-mix(in srgb, var(--accent) 50%, var(--panel)) 34%, var(--accent) 95%);
+	--bg-gradient-4:linear-gradient(168deg, color-mix(in srgb, var(--accent) 60%, var(--panel)) 44%, var(--accent) 95%);
+
+	--bg-design-1: radial-gradient(circle at 47% -49%, color-mix(in srgb, white 69%, var(--card-hue)) 74%, transparent 55%),  color-mix(in srgb, var(--card-hue, var(--accent)) 22%, var(--card-hue));
+	--bg-design-2: radial-gradient(circle at 47% -49%, color-mix(in srgb, white 69%, var(--card-hue)) 74%, transparent 55%),  color-mix(in srgb, var(--card-hue, var(--accent)) 22%, var(--card-hue));
+	--bg-design-3: radial-gradient(circle at 47% -49%, color-mix(in srgb, white 69%, var(--card-hue)) 74%, transparent 55%),  color-mix(in srgb, var(--card-hue, var(--accent)) 22%, var(--card-hue));
+	--bg-design-4: radial-gradient(circle at 47% -49%, color-mix(in srgb, white 69%, var(--card-hue)) 74%, transparent 55%),  color-mix(in srgb, var(--card-hue, var(--accent)) 22%, var(--card-hue));
+	--bg-design-5: radial-gradient(circle at 47% -49%, color-mix(in srgb, white 69%, var(--card-hue)) 74%, transparent 55%),  color-mix(in srgb, var(--card-hue, var(--accent)) 22%, var(--card-hue));
+	--bg-design-6: radial-gradient(circle at 47% -49%, color-mix(in srgb, white 69%, var(--card-hue)) 74%, transparent 55%),  color-mix(in srgb, var(--card-hue, var(--accent)) 22%, var(--card-hue));
+
+	--panel: #1c2129;
+	--panel-2: #232a33;
+	--border: #2d3640;
+	--text: #e8ecef;
+	--muted: #8a97a3;
+	--accent: #3d4b58;
+	--accent-soft: #1c242c;
+	--gold: #c9a227;
+	--gold-rgb: 201, 162, 39;
+	--info: #3d8bd6;
+	--info-rgb: 61, 139, 214;
+	--profit: #34c77b;
+	--loss: #e5484d;
+	--warn: #e5a93f;
+	--radius: 10px;
+	--radius-md: 16px;
+	--radius-lg: 20px;
+	--radius-x-lg: 24px;
+	--radius-full-round: 999px;
+	/* Lightened 2026-08-27 (redesign rule 4, "lighter shadows to make UI
+       less dense") — roughly half the previous opacity/spread on both
+       layers, still enough separation to read as "elevated" without the
+       heavier look every card on every page previously had. */
+	--shadow-card: 0 1px 1px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.09);
+	--shadow-lg: 0 6px 16px rgba(0, 0, 0, 0.24);
+	--on-accent-soft: #fff;
+	--mono: "JetBrains Mono", monospace;
+	--disp: "Space Grotesk", sans-serif;
+	--body: "Inter", sans-serif;
+}:root[data-theme="light"] {
+	color-scheme: light;
+	/* Same reasoning as the dark palette above — a touch greyer than the
+       previous near-white page background, so white panels stand out
+       more clearly as distinct surfaces. */
+	--bg: #ecece7;
+	--panel: #ffffff;
+	--panel-2: #f4f5f7;
+	--border: #d3d8de;
+	--text: #1b2027;
+	--muted: #667085;
+	--accent: #33414d;
+	--accent-soft: #e7ebee;
+	--gold: #a9790a;
+	--gold-rgb: 169, 121, 10;
+	--info: #1c64c9;
+	--info-rgb: 28, 100, 201;
+	--profit: #18874a;
+	--loss: #c8302f;
+	--warn: #a9790a;
+	--on-accent-soft: var(--accent);
+	--shadow-card: 0 1px 1px rgba(20, 20, 30, 0.04), 0 2px 8px rgba(20, 20, 30, 0.04);
+	--shadow-lg: 0 8px 20px rgba(20, 20, 30, 0.1);
+}

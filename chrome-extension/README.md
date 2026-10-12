@@ -358,3 +358,7 @@ Detected outliers has its own preview table with reference prices, deviation, so
 Local audit reads/classification share a versioned short-lived snapshot, combined data reuses classification across requests, matching local/Firebase prices uses an index, and date filtering caches computed Qatar dates. Pinned Table dates charts reuse the main query. Closed chart sections skip rendering. Large plots render at most 500 representative points (including bucket extrema and available flagged points), with a visible sample count; underlying records remain complete. All-ticker plots initially render six charts and offer Show more ticker charts. Raw record JSON and outlier evidence are built when opened. Auto-refresh is coalesced over 750 ms; activity evidence refreshes on completion or after its five-second cache expires.
 
 Regression checks include performance.test.cjs. UI interaction checks run in jsdom; actual Chrome visual layout and production timing are not verified in this session.
+
+## Material Teal appearance (v0.1.21)
+
+Options and popup use the webapp Material Teal light palette. themes/base.css and themes/material-teal.css are local copies of the webapp theme sources, keeping the unpacked extension self-contained. themes/extension.css maps extension controls, sections, navigation, tables, preview and charts to those tokens, using the webapp typography stacks, rounded controls and surface styles. Destructive actions and outliers retain semantic warning/error colors. Refresh the copied source files when updating the shared webapp palette.
