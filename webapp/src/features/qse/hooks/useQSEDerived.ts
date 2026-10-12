@@ -2,7 +2,7 @@ import type { Workbook } from '../../../types/workbook';
 import { useMemo } from 'react';
 import { buildCashLedger, cashSummary, computePositions, computeRealizedPLTimeSeries, getMarketPrice, makeQSEFeeCalculator } from '../../../lib/calc';
 import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
-import { useWorkbookStore } from '../../../store/workbookStore';
+import { useLiveQseWorkbook } from './useLiveQseWorkbook';
 
 export interface QSERow {
   ticker: string;
@@ -69,7 +69,7 @@ function calculateDerived(workbook: Workbook, selectedTickers?: string[]) {
 const sharedDerived = new WeakMap<Workbook, ReturnType<typeof calculateDerived>>();
 
 export function useQSEDerived(selectedTickers?: string[]) {
-  const workbook = useWorkbookStore((state) => state.workbook);
+  const workbook = useLiveQseWorkbook();
   const tickerKey = selectedTickers?.join('|') ?? '';
   return useMemo(() => {
     if (!tickerKey) {

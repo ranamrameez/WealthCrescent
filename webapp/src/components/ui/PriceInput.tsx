@@ -1,4 +1,4 @@
-import { useState, type InputHTMLAttributes } from 'react';
+import { useEffect, useState, type InputHTMLAttributes } from 'react';
 import { fmtQSEPrice, fmtPSXPrice, qsePriceStep } from '../../lib/format';
 
 /** Keep the user's draft intact while editing; format exchange prices at rest. */
@@ -6,6 +6,7 @@ export function PriceInput({ exchange, value, defaultValue, onChange, onFocus, o
   InputHTMLAttributes<HTMLInputElement> & { exchange: 'qse' | 'psx'; width?: number }) {
   const [focused, setFocused] = useState(false);
   const [draft, setDraft] = useState(defaultValue);
+  useEffect(() => { if (!focused && value === undefined) setDraft(defaultValue); }, [defaultValue, focused, value]);
   const current = value === undefined ? draft : value;
   const empty = current === '' || current === undefined || current === null;
   const numeric = Number(current);
