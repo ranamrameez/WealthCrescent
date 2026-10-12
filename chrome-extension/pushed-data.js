@@ -27,14 +27,14 @@ export function priceDeviation(price, previousPrice) {
   return { previousPrice: previousPrice ?? null, deltaPct, outlier: deltaPct !== null && Math.abs(deltaPct) > 10 + 1e-9 };
 }
 
-export function paginatePushed(rows, { from = '', to = '', ticker = '', outliers = '', page = 1, pageSize = 25 } = {}) {
+export function paginatePushed(rows, { from = '', to = '', ticker = '', outliers = '', strategy = '', accepted = '', source = '', page = 1, pageSize = 25 } = {}) {
   page = Math.max(1, Math.floor(Number(page) || 1));
   pageSize = Math.min(100, Math.max(1, Math.floor(Number(pageSize) || 25)));
   const filtered = rows.filter(row => {
     const parts = row.capturedAt == null ? [] : new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Qatar', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(row.capturedAt);
     const part = type => parts.find(value => value.type === type)?.value || '';
     const date = parts.length ? `${part('year')}-${part('month')}-${part('day')}` : row.date || '';
-    return (!from || date >= from) && (!to || (!!date && date <= to)) && (!ticker || row.ticker.toUpperCase().includes(ticker.toUpperCase())) && (!outliers || row.outlier);
+    return (!from || date >= from) && (!to || (!!date && date <= to)) && (!ticker || row.ticker.toUpperCase().includes(ticker.toUpperCase())) && (!outliers || row.outlier) && (!strategy || row.strategy === strategy) && (!source || row.source === source) && (!accepted || String(row.accepted ?? (row.origin === 'firebase' || row.kind === 'history' || row.kind === 'current')) === accepted);
   });
   return { rows: filtered.slice((page - 1) * pageSize, page * pageSize), total: filtered.length, tickers: [...new Set(rows.map(row => row.ticker))].sort(), chartRows: filtered.map(({ ticker, price, capturedAt, outlier, deltaPct, dayHigh, dayLow }) => ({ ticker, price, capturedAt, outlier, deltaPct, dayHigh, dayLow })), outlierRows: filtered.filter(row => row.outlier).slice(0, 100).map(({ id, ticker, price, key, kind, stored, origin, auditId }) => ({ id, ticker, price, key, kind, origin, auditId, stored: { time: stored?.time } })) };
 }

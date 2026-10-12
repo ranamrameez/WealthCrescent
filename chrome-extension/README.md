@@ -25,7 +25,7 @@ is what actually fills in the app's ticker coverage, not a one-off manual edit.
   real `nameSelector` set in Options (same "Test scrape" workflow as the other selectors)
   is far more reliable once you've seen the real page's layout.
 - **`background.js`** (the MV3 service worker) does everything else:
-  - **Collects** on the configured scrape interval (default 5 seconds) and on rendered price changes while enabled, within the configured Qatar-time windows, and with the market page open. This is free/local ?—
+  - **Collects** on the configured scrape interval (default zero, price-change only) and on rendered price changes while enabled, within the configured Qatar-time windows when enabled, and with the market page open. This is free/local ?—
     no network request beyond talking to the tab.
   - **Pushes** the latest scrape to Firebase only once at least the configured minimum
     number of minutes has passed since the last push, **plus a random extra delay on top**
@@ -325,4 +325,10 @@ are documented here, not deployed by the extension.
 
 ### Live collection controls
 
-Configure **Scrape interval (seconds)** independently of Firebase push timing. Zero disables periodic collection. Enable **Scrape on every price change** to observe rendered ticker prices (updates are grouped for 250 ms); set the Firebase push interval to zero to sync each collected update. **Follow Qatar time windows** can be disabled for collection throughout the day. Start/Stop applies to both triggers. Short intervals use the open market tab timer; Chrome can throttle background tabs, so timing is best effort. Longer intervals use Chrome alarms. Reload the extension and refresh the market tab after installing this update.
+Configure **Scrape interval (seconds)** independently of Firebase push timing. Zero disables periodic collection. Enable **Scrape on every price change** to observe rendered ticker prices (updates are coalesced within the current event loop); set the Firebase push interval to zero to sync each collected update. **Follow Qatar time windows** can be disabled for collection throughout the day. Start/Stop applies to both triggers. Short intervals use the open market tab timer; Chrome can throttle background tabs, so timing is best effort. Longer intervals use Chrome alarms. Reload the extension and refresh the market tab after installing this update.
+
+Sign-in and account creation clear stale authentication errors and immediately request a sync cycle. Signed-out scraping records local audit data without attempting authenticated Firebase writes. Defaults enable price-change collection with zero collection and push delays, throughout the day; existing saved timing and Start/Stop preferences are retained. Retry alarms allow failed syncs to retry even without a new price change (Chrome may delay alarms). Activity displays live scrape and sync phases. The top navigation opens collapsible sections; collapsed state is retained locally.
+
+## Action completion and filter audit (v0.1.17)
+
+Options and popup show a shared live action banner. Conflicting actions are disabled and rejected by the worker; manual scrape/push replies arrive after completion and surface failures. Stop waits for ongoing work before reporting Stopped. Pinned charts default to Table dates and inherit all table filters; explicit per-ticker timeframes override dates only. Combined view supports local source, strategy and accepted/rejected filtering. Source-level findings, automated evidence and remaining live checks are in [AUDIT.md](AUDIT.md).

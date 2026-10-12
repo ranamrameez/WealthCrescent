@@ -17,7 +17,9 @@ export function updateActivity(activity, event, now = Date.now()) {
   next.trackingStartedAt ||= now;
   const daily = next.daily;
   const count = Math.max(0, Number(event.count) || 0);
-  if (event.type === 'scrape') {
+  if (event.type === 'auth') {
+    next.lastSyncError = '';
+  } else if (event.type === 'scrape') {
     if (event.success) {
       daily.scrapeCount++;
       daily.scrapedRows += count;

@@ -42,3 +42,12 @@ button:disabled { opacity: .45; cursor: default; }
 :fullscreen svg { width:100%; min-height:65vh !important; max-height:85vh !important; }
 .chart-dialog { width:92vw; max-width:1500px; background:#edf2f8; border:1px solid #879ab0; border-radius:10px; }
 .chart-dialog::backdrop { background:#17283c99; }
+
+.extension-nav { position:sticky; top:0; z-index:10; display:flex; flex-wrap:wrap; gap:8px; padding:12px; background:#17283c; border-radius:8px; }
+.extension-nav a { color:#fff; padding:6px 10px; border-radius:4px; text-decoration:none; }
+.extension-nav a:hover, .extension-nav a:focus-visible { background:#36516f; }
+.collapsible-section { margin:12px 0; border:1px solid #9aadc2; border-radius:8px; scroll-margin-top:100px; }
+.collapsible-section > summary { cursor:pointer; padding:12px; font-weight:600; background:#e8eef6; border-radius:8px; }
+.collapsible-section > .card { margin:0; border:0; }
+
+.action-status { position:sticky; top:70px; z-index:9; padding:10px; background:#eef4fb; border:1px solid #9aadc2; border-radius:6px; color:#17283c; }

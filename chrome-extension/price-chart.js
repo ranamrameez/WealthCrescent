@@ -2,7 +2,7 @@ export function renderPriceChart(container, rows, ticker, options = {}) {
   const document = container.ownerDocument;
   container.replaceChildren();
   if (!ticker) {
-    const tickers = [...new Set(rows.filter(row => Number.isFinite(row.price) && row.capturedAt != null).map(row => row.ticker))].sort();
+    const tickers = [...new Set(rows.filter(row => Number.isFinite(row.price) && Number.isFinite(row.capturedAt)).map(row => row.ticker))].sort();
     if (!tickers.length) { container.textContent = 'No dated prices in the current filters.'; return; }
     const grid = document.createElement('div'); grid.className = 'chart-grid';
     for (const symbol of tickers) {
@@ -46,7 +46,7 @@ export function renderPriceChart(container, rows, ticker, options = {}) {
     }
   };
   toolbar.append(fullscreen); container.append(toolbar);
-  const points = rows.filter(row => row.ticker === ticker && Number.isFinite(row.price) && row.capturedAt != null).sort((a, b) => a.capturedAt - b.capturedAt);
+  const points = rows.filter(row => row.ticker === ticker && Number.isFinite(row.price) && Number.isFinite(row.capturedAt)).sort((a, b) => a.capturedAt - b.capturedAt);
   if (!points.length) { const message = document.createElement('p'); message.textContent = 'No dated prices for this ticker in the current filters.'; container.append(message); return; }
   const ns = 'http://www.w3.org/2000/svg';
   const node = (name, attrs, text) => {
@@ -58,7 +58,7 @@ export function renderPriceChart(container, rows, ticker, options = {}) {
   const svg = node('svg', { viewBox: '0 0 1000 320', role: 'img', 'aria-label': `${ticker} price history in Qatar time`, width: '100%' });
   svg.append(node('title', {}, `${ticker}: ${points.length} prices; red markers indicate changes beyond ±10%.`));
   const prices = points.flatMap(point => [point.price, point.dayHigh, point.dayLow].filter(Number.isFinite));
-  const min = Math.min(...prices), max = Math.max(...prices);
+  const min = prices.reduce((value, price) => Math.min(value, price), Infinity), max = prices.reduce((value, price) => Math.max(value, price), -Infinity);
   const padding = (max - min) * .1 || Math.max(max * .02, .01);
   const low = min - padding, high = max + padding;
   const start = points[0].capturedAt, end = points.at(-1).capturedAt;

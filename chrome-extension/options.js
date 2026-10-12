@@ -50,28 +50,38 @@ let chartRows = [];
 let favouriteRows = [];
 const favouriteChartRows = new Map();
 let visibleRows = [];
+let batchBusy = false;
 function updateSelection() {
   $('selectionInfo').textContent = `${selected.size} selected`;
-  $('editSelected').disabled = $('deleteSelected').disabled = !selected.size;
+  $('editSelected').disabled = $('deleteSelected').disabled = batchBusy || !selected.size;
   $('selectAll').checked = visibleRows.length > 0 && visibleRows.every(row => selected.has(row.id));
   $('selectAll').indeterminate = visibleRows.some(row => selected.has(row.id)) && !$('selectAll').checked;
 }
 let requestVersion = 0;
 async function renderData(refresh = false) {
-  if (document.fullscreenElement) return;
+  if (document.fullscreenElement || batchBusy) return;
   const version = ++requestVersion;
   try {
     if ($('fromDate').value && $('toDate').value && $('fromDate').value > $('toDate').value) throw new Error('From date must be before or equal to To date.');
     const pageSize = Number($('pageSize').value);
     const firebase = $('dataView').value === 'firebase';
     const combined = $('dataView').value === 'all';
-    for (const id of ['strategyFilter', 'acceptedFilter', 'sourceFilter']) $(id).disabled = firebase || combined;
-    $('dataMessage').textContent = firebase ? 'Loading pushed data from Firebase...' : 'Loading local audit...';
-    const filters = { from: $('fromDate').value, to: $('toDate').value, ticker: $('tickerFilter').value.trim(), strategy: $('strategyFilter').value, accepted: $('acceptedFilter').value, source: $('sourceFilter').value, outliers: $('outlierFilter').value, page, pageSize };
+    for (const id of ['strategyFilter', 'acceptedFilter', 'sourceFilter']) $(id).disabled = firebase;
+    $('dataMessage').textContent = firebase ? 'Loading pushed data from Firebase...' : combined ? 'Loading synced and local audit data...' : 'Loading local audit...';
+    const filters = { from: $('fromDate').value, to: $('toDate').value, ticker: $('tickerFilter').value.trim(), strategy: firebase ? '' : $('strategyFilter').value, accepted: firebase ? '' : $('acceptedFilter').value, source: firebase ? '' : $('sourceFilter').value, outliers: $('outlierFilter').value, page, pageSize };
     const result = combined ? await sendWorkerMessage({ type: 'GET_ALL_DATA', filters, refresh }) : firebase ? await sendWorkerMessage({ type: 'GET_PUSHED_DATA', filters, refresh }) : await queryAudit(filters);
     if (version !== requestVersion || document.fullscreenElement) return;
     const pages = Math.max(1, Math.ceil(result.total / pageSize));
     if (page > pages) { page = pages; return renderData(); }
+    const pinned = await Promise.all([...favourites].map(async ticker => {
+      const period = favouriteTimeframes[ticker] || 'filters';
+      const range = period === 'filters' ? {} : dateRange(period);
+      if (filters.ticker && !ticker.toUpperCase().includes(filters.ticker.toUpperCase())) return [ticker, []];
+      const chartFilters = { ...filters, ...range, ticker };
+      const data = combined ? await sendWorkerMessage({ type:'GET_ALL_DATA', filters:chartFilters }) : firebase ? await sendWorkerMessage({ type:'GET_PUSHED_DATA',filters:chartFilters }) : await queryAudit(chartFilters);
+      return [ticker, data.chartRows || data.rows];
+    }));
+    if (version !== requestVersion || document.fullscreenElement || batchBusy) return;
     const tickerValue = $('tickerFilter').value;
     $('tickerFilter').replaceChildren(...['', ...(result.tickers || [])].map(ticker => { const option = document.createElement('option'); option.value = ticker; option.textContent = ticker || 'All tickers'; return option; }));
     $('tickerFilter').value = tickerValue;
@@ -87,14 +97,6 @@ async function renderData(refresh = false) {
     $('chartTicker').replaceChildren(...['', ...chartTickers].map(ticker => { const option = document.createElement('option'); option.value = ticker; option.textContent = ticker || 'All tickers'; return option; }));
     $('chartTicker').value = chartTickers.includes(tickerValue) ? tickerValue : chartTickers.includes(previousChartTicker) ? previousChartTicker : '';
     favouriteRows = chartRows;
-    const pinned = await Promise.all([...favourites].map(async ticker => {
-      const period = favouriteTimeframes[ticker] || '1d';
-      const range = dateRange(period);
-      const chartFilters = { ...filters, ...range, ticker, outliers:'' };
-      const data = combined ? await sendWorkerMessage({ type:'GET_ALL_DATA', filters:chartFilters }) : firebase ? await sendWorkerMessage({ type:'GET_PUSHED_DATA',filters:chartFilters }) : await queryAudit(chartFilters);
-      return [ticker, data.chartRows || data.rows];
-    }));
-    if (version !== requestVersion) return;
     favouriteChartRows.clear(); pinned.forEach(([ticker,rows]) => favouriteChartRows.set(ticker,rows));
     renderCharts();
     $('dataRows').replaceChildren();
@@ -124,6 +126,7 @@ $('selectAll').onchange = () => {
   renderData();
 };
 async function applyBatch(operation) {
+  if (batchBusy) return;
   const entries = [...selected.values()].map(row => ({ id: row.id, kind: row.kind, origin: row.origin || ( $('dataView').value === 'firebase' ? 'firebase' : 'local'), auditId: row.auditId, ticker: row.ticker, key: row.key, price: row.price, time: row.stored?.time }));
   const price = Number($('batchPrice').value);
   if (!entries.length) return;
@@ -131,6 +134,8 @@ async function applyBatch(operation) {
   if (operation === 'edit' && (!Number.isFinite(price) || price <= 0)) { $('dataMessage').textContent = 'Enter a positive corrected price.'; return; }
   const location = $('dataView').value === 'all' ? 'their respective Firebase or local records' : $('dataView').value === 'firebase' ? 'the shared Firebase database' : 'local audit history';
   if (!window.confirm(operation === 'delete' ? 'Delete ' + entries.length + ' selected record(s) from ' + location + '?' : 'Set all ' + entries.length + ' selected record(s) to price ' + price + ' in ' + location + '?')) return;
+  batchBusy = true;
+  document.dispatchEvent(new document.defaultView.CustomEvent('extension-action', { detail: { key: 'batch', busy: true } }));
   $('editSelected').disabled = $('deleteSelected').disabled = true;
   try {
     const firebaseEntries = entries.filter(entry => entry.origin === 'firebase');
@@ -144,10 +149,10 @@ async function applyBatch(operation) {
       try { results.push(...await mutateAudit(localEntries, operation, price)); }
       catch (error) { results.push(...localEntries.map(entry => ({ id: entry.id, ok: false, error: error.message }))); }
     }
-    selected.clear(); await renderData(true);
+    selected.clear(); batchBusy = false; await renderData(true);
     $('dataMessage').textContent = results.filter(result => result.ok).length + ' record(s) updated. ' + results.filter(result => result.error || result.warning).map(result => result.error || result.warning).join(' ');
   } catch (error) { $('dataMessage').textContent = error.message; }
-  finally { updateSelection(); }
+  finally { batchBusy = false; document.dispatchEvent(new document.defaultView.CustomEvent('extension-action', { detail: { key: 'batch', busy: false } })); updateSelection(); }
 }
 for (const button of document.querySelectorAll('[data-period]')) button.onclick = async () => {
   const range = dateRange(button.dataset.period);
@@ -171,15 +176,19 @@ function renderCharts() {
   const list = $('favouriteChartList'); list.replaceChildren();
   if (!favourites.size) { list.textContent = 'Choose Favourite on a chart to pin it here.'; return; }
   const grid = document.createElement('div'); grid.className = 'chart-grid';
-  for (const ticker of [...favourites].sort()) {
+  for (const ticker of [...favourites].sort().filter(ticker => !$('tickerFilter').value || ticker.includes($('tickerFilter').value))) {
     const card = document.createElement('section'); const title = document.createElement('h3'); title.textContent = ticker;
     const periods = document.createElement('div'); periods.className = 'chart-ranges'; periods.setAttribute('role','group'); periods.setAttribute('aria-label', ticker + ' timeframe');
-    for (const period of ['1d','7d','1M','3M','6M','1Y','all']) {
-      const button = document.createElement('button'); button.textContent = period === 'all' ? 'All time' : period;
-      button.dataset.favouritePeriod = period; button.setAttribute('aria-pressed', String((favouriteTimeframes[ticker] || '1d') === period));
+    for (const period of ['filters','1d','7d','1M','3M','6M','1Y','all']) {
+      const button = document.createElement('button'); button.textContent = period === 'filters' ? 'Table dates' : period === 'all' ? 'All time' : period;
+      button.dataset.favouritePeriod = period; button.setAttribute('aria-pressed', String((favouriteTimeframes[ticker] || 'filters') === period));
       button.onclick = async () => {
+        button.disabled = true;
+        try {
         favouriteTimeframes = { ...favouriteTimeframes, [ticker]:period };
         await chrome.storage.local?.set({ favouriteTimeframes }); await renderData();
+        } catch (error) { $('dataMessage').textContent = error.message; }
+        finally { button.disabled = false; }
       }; periods.append(button);
     }
     const chart = document.createElement('div'); card.append(title, periods, chart); grid.append(card);
@@ -190,6 +199,11 @@ function renderCharts() {
 $('editSelected').onclick = () => applyBatch('edit');
 $('deleteSelected').onclick = () => applyBatch('delete');
 await renderData();
+let refreshTimer;
+function scheduleDataRefresh(force = false) {
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(() => { if (batchBusy) { scheduleDataRefresh(force); return; } renderData(force); }, 150);
+}
 for (const id of ['dataView','pageSize','outlierFilter','autoSelectOutliers']) $(id).addEventListener('change', async () => {
   const viewPreferences = Object.fromEntries(['dataView','pageSize','outlierFilter','autoSelectOutliers'].map(key => [key, key === 'autoSelectOutliers' ? $(key).checked : $(key).value]));
   await chrome.storage.local?.set({ viewPreferences });
@@ -198,4 +212,4 @@ for (const id of ['dataView','pageSize','outlierFilter','autoSelectOutliers']) $
 chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && changes.chartFavourites) { favourites.clear(); (changes.chartFavourites.newValue || []).forEach(ticker => favourites.add(ticker)); renderData(); }
   if (area === 'local' && changes.viewPreferences) { applyViewPreferences(changes.viewPreferences.newValue); page = 1; renderData(); }
   if (area === 'local' && changes.favouriteTimeframes) { favouriteTimeframes = changes.favouriteTimeframes.newValue || {}; renderData(); }
-  if (area === 'local' && (changes.auditUpdatedAt || changes.auth || changes.status)) renderData(!!changes.status); });
+  if (area === 'local' && (changes.auditUpdatedAt || changes.auth || changes.status?.newValue?.lastPushAt !== changes.status?.oldValue?.lastPushAt)) scheduleDataRefresh(!!changes.auth || !!changes.status); });

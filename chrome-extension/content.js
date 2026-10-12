@@ -339,7 +339,7 @@ if (typeof MutationObserver !== 'undefined') {
   }
   async function configureLiveScraping() {
     const stored = await chrome.storage.local.get('syncConfig');
-    liveConfig = { scrapingEnabled: true, scrapeIntervalSeconds: 5, scrapeOnPriceChange: true, ...stored.syncConfig };
+    liveConfig = { scrapingEnabled: true, scrapeIntervalSeconds: 0, scrapeOnPriceChange: true, ...stored.syncConfig };
     clearInterval(timer);
     clearTimeout(pending); pending = undefined;
     lastPrices = priceSignature();
@@ -353,7 +353,7 @@ if (typeof MutationObserver !== 'undefined') {
       pending = undefined;
       const prices = priceSignature();
       if (prices !== lastPrices) { lastPrices = prices; notify('price'); }
-    }, 250);
+    }, 0);
   }).observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['value', 'data-value'] });
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && changes.syncConfig) configureLiveScraping().catch(() => {});

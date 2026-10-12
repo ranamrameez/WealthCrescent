@@ -1,4 +1,4 @@
-import { getAuth } from './common.js';
+import { getAuth, sendWorkerMessage } from './common.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -43,4 +43,5 @@ $('signOutBtn').addEventListener('click', async () => {
 
 
 
+chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && changes.auth) renderAuthState(); });
 renderAuthState();

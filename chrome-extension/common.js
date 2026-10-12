@@ -15,7 +15,7 @@ export const DEFAULT_TARGET_URL = 'https://webd.thegroup.com.qa/en/markets/qatar
 
 // Scrape cadence and Firebase push cadence are configured independently.
 export const MIN_PUSH_INTERVAL_MINUTES_FLOOR = 0;
-export const DEFAULT_MIN_PUSH_INTERVAL_MINUTES = 2;
+export const DEFAULT_MIN_PUSH_INTERVAL_MINUTES = 0;
 
 // Legacy bounds retained for older scheduler callers.
 export const COLLECT_MIN_SECONDS = 45;
@@ -34,11 +34,11 @@ export const DEFAULT_SCRAPE_CONFIG = {
 
 export const DEFAULT_SYNC_CONFIG = {
   minPushIntervalMinutes: DEFAULT_MIN_PUSH_INTERVAL_MINUTES,
-  pushTimingMode: 'random',
+  pushTimingMode: 'constant',
   scrapingEnabled: true,
-  scrapeIntervalSeconds: 5,
+  scrapeIntervalSeconds: 0,
   scrapeOnPriceChange: true,
-  respectTimeWindows: true,
+  respectTimeWindows: false,
   timeWindows: [{ start: '09:30', end: '13:00' }, { start: '13:10', end: '13:15' }],
 };
 
@@ -78,6 +78,8 @@ export async function getSyncConfig() {
   const merged = { ...DEFAULT_SYNC_CONFIG, ...(cfg || {}) };
   merged.pushTimingMode = merged.pushTimingMode === 'constant' ? 'constant' : 'random';
   merged.minPushIntervalMinutes = Math.max(MIN_PUSH_INTERVAL_MINUTES_FLOOR, Number.isFinite(Number(merged.minPushIntervalMinutes)) ? Number(merged.minPushIntervalMinutes) : DEFAULT_MIN_PUSH_INTERVAL_MINUTES);
+  merged.scrapeIntervalSeconds = Number.isFinite(Number(merged.scrapeIntervalSeconds)) && Number(merged.scrapeIntervalSeconds) >= 0 ? Number(merged.scrapeIntervalSeconds) : DEFAULT_SYNC_CONFIG.scrapeIntervalSeconds;
+  if (!Array.isArray(merged.timeWindows) || merged.timeWindows.some(w => !w || !/^([01]\d|2[0-3]):[0-5]\d$/.test(w.start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(w.end))) merged.timeWindows = DEFAULT_SYNC_CONFIG.timeWindows;
   return merged;
 }
 
@@ -89,7 +91,8 @@ export async function setSyncConfig(patch) {
   if (!Number.isFinite(Number(next.scrapeIntervalSeconds)) || Number(next.scrapeIntervalSeconds) < 0) throw new Error('Scrape interval must be zero or a positive number of seconds.');
   next.scrapeIntervalSeconds = Number(next.scrapeIntervalSeconds);
   if (!next.scrapeIntervalSeconds && !next.scrapeOnPriceChange) throw new Error('Enable price-change scraping or set a positive scrape interval.');
-  next.minPushIntervalMinutes = Math.max(MIN_PUSH_INTERVAL_MINUTES_FLOOR, Number.isFinite(Number(next.minPushIntervalMinutes)) ? Number(next.minPushIntervalMinutes) : DEFAULT_MIN_PUSH_INTERVAL_MINUTES);
+  if (!Number.isFinite(Number(next.minPushIntervalMinutes)) || Number(next.minPushIntervalMinutes) < 0) throw new Error('Push interval must be zero or a positive number of minutes.');
+  next.minPushIntervalMinutes = Number(next.minPushIntervalMinutes);
   await setStorage({ [STORAGE_KEYS.SYNC_CONFIG]: next });
   return next;
 }

@@ -9,7 +9,7 @@ test('Qatar schedule boundaries, overnight windows and configuration validation'
   const storage = {};
   global.chrome = { storage: { local: { get: async key => ({ [key]: storage[key] }), set: async patch => Object.assign(storage, patch) } } };
   const common = await import('data:text/javascript;base64,' + Buffer.from(read('common.js')).toString('base64'));
-  const config = await common.getSyncConfig();
+  const config = { ...await common.getSyncConfig(), respectTimeWindows: true };
   for (const [time, expected] of [['06:29', false], ['06:30', true], ['09:59', true], ['10:00', false], ['10:10', true], ['10:15', false]]) {
     assert.equal(common.withinScrapingWindow(config, new Date(`2026-10-04T${time}:00Z`)), expected, time);
   }
@@ -52,7 +52,7 @@ test('Stopped and out-of-window automatic cycles never access the market tab; st
   let config = { scrapingEnabled: false };
   let queried = 0, cleared = 0, scheduled = 0, handler;
   const ctx = vm.createContext({
-    console,
+    console, patchStatus: async () => {}, getStatus: async () => ({}),
     getSyncConfig: async () => config,
     setSyncConfig: async patch => { config = { ...config, ...patch }; },
     withinScrapingWindow: () => false,
@@ -160,7 +160,7 @@ test('Page defaults to combined data and today, with working chart date presets'
   assert.equal(requested.filters.to, '');
   assert.match(document.getElementById('dataRows').textContent, /QIBK/);
   assert.match(document.getElementById('dataRows').textContent, /Synced/);
-  assert.equal(document.getElementById('strategyFilter').disabled, true);
+  assert.equal(document.getElementById('strategyFilter').disabled, false);
   assert.ok(document.getElementById('dataRows').compareDocumentPosition(document.getElementById('testBtn')) & 4);
   assert.equal(document.querySelector('.top-sections').children.length, 2);
   assert.ok(document.getElementById('activityStats').compareDocumentPosition(document.querySelector('.top-sections')) & 4);
@@ -516,7 +516,7 @@ test('Activity preserves sync failure reason across subsequent scrapes', async (
   assert.equal(success.lastSyncError, '');
 });
 
-test('Failed sync keeps its error and schedules a retry rather than retrying every scrape', async () => {
+test('Signed-out scraping continues without failed sync attempts', async () => {
   const status = {}; const events = [];
   const ctx = vm.createContext({ console, Date,
     getAuth: async () => null,
@@ -534,12 +534,12 @@ test('Failed sync keeps its error and schedules a retry rather than retrying eve
   });
   vm.runInContext(read('background.js').replace(/import\s+[\s\S]*?from\s+'[^']+';/g, ''), ctx);
   await vm.runInContext('runCycle({ manual: true })', ctx);
-  assert.match(status.lastSyncError, /Sign in/);
-  assert.ok(status.nextPushAt > Date.now() + 110000);
-  assert.equal(events.filter(event => event.type === 'sync').length, 1);
+  assert.equal(status.syncState, 'Waiting for sign-in');
+  assert.equal(status.lastSyncError, '');
+  assert.equal(events.filter(event => event.type === 'sync').length, 0);
   await vm.runInContext('runCycle({ manual: true })', ctx);
-  assert.equal(events.filter(event => event.type === 'sync').length, 1);
-  assert.match(status.lastSyncError, /Sign in/);
+  assert.equal(events.filter(event => event.type === 'sync').length, 0);
+  assert.equal(events.filter(event => event.type === 'scrape').length, 2);
 });
 
 test('Push timing supports random, constant and zero intervals without clamping zero', async () => {
@@ -563,7 +563,7 @@ test('Extension page controls offer separate Scrape and Push actions and timing 
     getScrapeConfig: async () => ({ targetUrl: 'https://webd.thegroup.com.qa/en/markets/qatar' }),
     getSyncConfig: async () => ({ minPushIntervalMinutes: 0, pushTimingMode: 'constant', scrapingEnabled: true, timeWindows: [{ start: '09:30', end: '13:00' }] }),
     setSyncConfig: async config => { saved = config; }, setScrapeConfig: async () => {},
-    sendWorkerMessage: async message => messages.push(message.type),
+    sendWorkerMessage: async message => { messages.push(message.type); if (message.type === 'SAVE_CONFIGS') saved = message.sync; },
     chrome: { storage: { onChanged: { addListener() {} } } }, URL,
   });
   vm.runInContext(read('config-ui.js').replace(/^import .*;\r?\n/gm, '').replace(/export /g, ''), ctx);
@@ -576,7 +576,7 @@ test('Extension page controls offer separate Scrape and Push actions and timing 
   assert.equal(saved.pushTimingMode, 'constant');
   await document.querySelector('.scrape-control').onclick();
   await document.querySelector('.push-control').onclick();
-  assert.deepEqual(messages, ['SCRAPE_NOW_MANUAL', 'PUSH_NOW']);
+  assert.deepEqual(messages, ['SAVE_CONFIGS', 'SCRAPE_NOW_MANUAL', 'PUSH_NOW']);
 });
 
 test('Chart favourite and fullscreen controls invoke their actions', async () => {
@@ -720,4 +720,71 @@ test('Scrape interval validation and all-day window override', async () => {
   await assert.rejects(common.setSyncConfig({ scrapeIntervalSeconds: -1 }));
   await assert.rejects(common.setSyncConfig({ scrapeIntervalSeconds: 0, scrapeOnPriceChange: false }));
   assert.equal(common.withinScrapingWindow({ respectTimeWindows: false, timeWindows: [] }), true);
+});
+
+
+test('Sign-in clears stale errors and automatically syncs without another price change', async () => {
+  let handler, auth = null, pushes = 0;
+  const status = { lastSyncError: 'Sign in on the extension page to sync prices.', nextPushAt: Date.now() + 600000 };
+  const events = [];
+  const ctx = vm.createContext({ console, Date, URL,
+    getAuth: async () => auth, setAuth: async value => { auth = value; },
+    getScrapeConfig: async () => ({ targetUrl: 'https://market.example/' }),
+    getSyncConfig: async () => ({ scrapingEnabled: true, scrapeIntervalSeconds: 0, respectTimeWindows: false, minPushIntervalMinutes: 0 }),
+    getStatus: async () => status, patchStatus: async patch => Object.assign(status, patch),
+    restoreExtensionConfigs: async () => {}, recordActivity: async event => events.push(event),
+    saveAudit: async () => 1, markAuditSynced: async () => {}, withinScrapingWindow: () => true, pushDelayMs: () => 0,
+    fetch: async () => ({ ok: true, json: async () => ({ idToken: 'token', refreshToken: 'refresh', localId: 'user', expiresIn: '3600' }) }),
+    IDENTITY_TOOLKIT_BASE: 'https://auth.example', FIREBASE_API_KEY: 'test',
+    chrome: { tabs: { query: async () => [{ id: 1, url: 'https://market.example/' }], sendMessage: (id, message, cb) => cb({ ok: true, rows: [{ ticker: 'QFLS', price: 10 }] }) },
+      alarms: { create() {}, clear: async () => {}, onAlarm: { addListener() {} } },
+      runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener(fn) { handler = fn; } } } },
+    fakePush: async () => { pushes++; return { pushed: 1, namesPushed: 0, total: 1, errors: [], syncedTickers: ['QFLS'] }; },
+  });
+  vm.runInContext(read('background.js').replace(/import\s+[\s\S]*?from\s+'[^']+';/g, ''), ctx);
+  vm.runInContext('pushRows = fakePush', ctx);
+  const response = await new Promise(resolve => handler({ type: 'SIGN_IN', email: 'user@example.com', password: 'test' }, {}, resolve));
+  assert.equal(response.ok, true);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(pushes, 1);
+  assert.equal(status.syncState, 'Synced');
+  assert.equal(status.lastSyncError, '');
+  assert.equal(events[0].type, 'auth');
+});
+
+test('Navigation opens collapsed sections and preserves card contents', async () => {
+  const { JSDOM } = require('../webapp/node_modules/jsdom');
+  const document = new JSDOM(read('options.html')).window.document;
+  const ctx = vm.createContext({ document, chrome: { storage: { local: { get: async () => ({ collapsedSections: { configCard: true } }), set: async () => {} } } } });
+  await vm.runInContext('(async () => {' + read('page-ui.js') + '})()', ctx);
+  const settings = document.getElementById('section-configCard');
+  assert.equal(settings.open, false);
+  document.querySelector('a[href="#section-configCard"]').click();
+  assert.equal(settings.open, true);
+  assert.ok(settings.contains(document.getElementById('configCard')));
+  assert.equal(document.querySelectorAll('details').length, 8);
+});
+
+
+test('Zero-delay failed sync schedules a retry and avoids retrying on each price change', async () => {
+  let pushes = 0;
+  const status = {}, alarms = [];
+  const ctx = vm.createContext({ console, Date, URL,
+    getScrapeConfig: async () => ({ targetUrl: 'https://market.example/' }),
+    getSyncConfig: async () => ({ scrapingEnabled: true, scrapeIntervalSeconds: 0, respectTimeWindows: false, minPushIntervalMinutes: 0 }),
+    getStatus: async () => status, patchStatus: async patch => Object.assign(status, patch),
+    recordActivity: async () => {}, saveAudit: async () => 1, withinScrapingWindow: () => true,
+    chrome: { tabs: { query: async () => [{ id: 1, url: 'https://market.example/' }], sendMessage: (id, message, cb) => cb({ ok: true, rows: [{ ticker: 'QFLS', price: 10 }] }) },
+      alarms: { create: (name, options) => alarms.push({ name, ...options }), clear: async () => {}, onAlarm: { addListener() {} } },
+      runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener() {} } } },
+    fakePush: async () => { pushes++; throw new Error('Network unavailable'); },
+  });
+  vm.runInContext(read('background.js').replace(/import\s+[\s\S]*?from\s+'[^']+';/g, ''), ctx);
+  vm.runInContext('pushRows = fakePush', ctx);
+  await vm.runInContext('runCycle()', ctx);
+  assert.equal(status.syncState, 'Retrying');
+  assert.ok(alarms.some(alarm => alarm.name === 'sync-retry' && alarm.when > Date.now()));
+  await vm.runInContext('runCycle()', ctx);
+  assert.equal(pushes, 1);
+  assert.equal(status.scrapeState, 'Watching prices');
 });

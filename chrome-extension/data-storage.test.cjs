@@ -112,7 +112,7 @@ test('Favourite timeframe filters independently of table dates and persists its 
   assert.equal(storage.favouriteTimeframes.QFLS,'all');
   assert.equal(requests.filter(r=>r.filters?.ticker==='QFLS').at(-1).filters.from,'');
   assert.equal(document.getElementById('fromDate').value,'2026-10-11');
-  assert.equal(document.querySelectorAll('#favouriteChartList [data-favourite-period]').length,7);
+  assert.equal(document.querySelectorAll('#favouriteChartList [data-favourite-period]').length,8);
 });
 
 test('Current-price corrections also update allPrices and bounds; deleting current clears latest',async()=>{

@@ -1,12 +1,13 @@
 import { RTDB_BASE_URL, DEFAULT_SCRAPE_CONFIG, DEFAULT_SYNC_CONFIG } from './common.js';
 export const CONFIG_KEYS = ['scrapeConfig', 'syncConfig', 'chartFavourites', 'favouriteTimeframes', 'viewPreferences'];
+function networkRequest(url, options = {}) { return fetch(url, { ...options, ...(typeof AbortSignal !== 'undefined' ? { signal: AbortSignal.timeout(20000) } : {}) }); }
 const defaults = () => ({ scrapeConfig: { ...DEFAULT_SCRAPE_CONFIG }, syncConfig: { ...DEFAULT_SYNC_CONFIG }, chartFavourites: [], favouriteTimeframes: {}, viewPreferences: {} });
 let queue = Promise.resolve(), restoring = false, lastSaved = '', activeUid = null;
 function enqueue(work) { const task = queue.catch(() => {}).then(work); queue = task; return task; }
 function pick(value) { return Object.fromEntries(CONFIG_KEYS.filter(key => value?.[key] !== undefined).map(key => [key, value[key]])); }
 function url(auth) { return RTDB_BASE_URL + '/users/' + encodeURIComponent(auth.uid) + '/extensionConfigs.json?auth=' + encodeURIComponent(auth.idToken); }
 async function upload(auth, snapshot, profiles, keys = CONFIG_KEYS) {
-  const response = await fetch(url(auth), { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ ...Object.fromEntries(keys.map(key => [key, snapshot[key]])), schemaVersion:1, updatedAt:new Date().toISOString() }) });
+  const response = await networkRequest(url(auth), { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ ...Object.fromEntries(keys.map(key => [key, snapshot[key]])), schemaVersion:1, updatedAt:new Date().toISOString() }) });
   if (!response.ok) throw new Error('Configuration sync failed (' + response.status + '); settings retained locally for retry.');
   lastSaved = JSON.stringify(snapshot);
   profiles[auth.uid] = { values:snapshot, pending:false };
@@ -22,7 +23,7 @@ async function restore(auth) {
       try { await chrome.storage.local.set({ ...cached, extensionConfigOwner:auth.uid }); }
       finally { restoring = false; }
     }
-    const response = await fetch(url(auth));
+    const response = await networkRequest(url(auth));
     if (!response.ok) throw new Error('Cannot load account configurations (' + response.status + ').');
     const cloud = await response.json();
     const own = profiles[auth.uid];

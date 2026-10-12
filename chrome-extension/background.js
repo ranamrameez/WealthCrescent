@@ -27,6 +27,7 @@ import {
   setAuth,
   clearAuth,
   getScrapeConfig,
+  setScrapeConfig,
   getSyncConfig,
   patchStatus,
   getStatus,
@@ -34,14 +35,18 @@ import {
 } from './common.js';
 
 const COLLECT_ALARM = 'collect-tick';
+function networkRequest(url, options = {}) {
+  return fetch(url, { ...options, ...(typeof AbortSignal !== 'undefined' ? { signal: AbortSignal.timeout(20000) } : {}) });
+}
 let pushedSnapshot = null;
+let pushedRead = null;
 let rootReady = false;
 async function ensureQseRoot(auth) {
   if (rootReady) return;
   const marker = await conditionalRead('QSE/migrationVersion', auth);
   if (marker.value === 2) { rootReady = true; return; }
   const state = await conditionalRead('QSE', auth);
-  const response = await fetch(RTDB_BASE_URL + '/stockData/QSE.json?auth=' + encodeURIComponent(auth.idToken));
+  const response = await networkRequest(RTDB_BASE_URL + '/stockData/QSE.json?auth=' + encodeURIComponent(auth.idToken));
   if (!response.ok) throw new Error('Cannot migrate legacy QSE data (' + response.status + ')');
   const legacy = await response.json() || {};
   const current = state.value || {};
@@ -63,7 +68,7 @@ async function ensureQseRoot(auth) {
 
 async function conditionalRead(path, auth) {
   const url = `${RTDB_BASE_URL}/${path}.json?auth=${encodeURIComponent(auth.idToken)}`;
-  const response = await fetch(url, { headers: { 'X-Firebase-ETag': 'true' } });
+  const response = await networkRequest(url, { headers: { 'X-Firebase-ETag': 'true' } });
   if (!response.ok) throw new Error(`Database read failed (${response.status})`);
   const etag = response.headers.get('ETag');
   if (!etag) throw new Error('Database did not return a version; refresh and try again.');
@@ -71,7 +76,7 @@ async function conditionalRead(path, auth) {
 }
 
 async function conditionalWrite(state, value) {
-  const response = await fetch(state.url, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'if-match': state.etag }, body: JSON.stringify(value) });
+  const response = await networkRequest(state.url, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'if-match': state.etag }, body: JSON.stringify(value) });
   if (!response.ok) throw new Error(response.status === 412 ? 'Record changed since it was read. Refresh and try again.' : `Database update failed (${response.status})`);
 }
 
@@ -124,13 +129,20 @@ async function queryPushedData(filters, refresh = false) {
   if (!auth) throw new Error('Sign in on this page to view the data already pushed to Firebase.');
   await ensureQseRoot(auth);
   if (refresh || !pushedSnapshot || pushedSnapshot.uid !== auth.uid || Date.now() - pushedSnapshot.at > 60000) {
+    if (!pushedRead || pushedRead.uid !== auth.uid) {
+      const pending = { uid: auth.uid };
+      pending.promise = (async () => {
     const paths = ['priceHistory', 'prices', 'tickerNames', 'pricesUpdatedAt'];
     const values = await Promise.all(paths.map(async path => {
-      const response = await fetch(`${RTDB_BASE_URL}/QSE/${path}.json?auth=${encodeURIComponent(auth.idToken)}`);
+      const response = await networkRequest(`${RTDB_BASE_URL}/QSE/${path}.json?auth=${encodeURIComponent(auth.idToken)}`);
       if (!response.ok) throw new Error(`Cannot read Firebase ${path} (${response.status}). Check that this account has database read access.`);
       return response.json();
     }));
     pushedSnapshot = { uid: auth.uid, at: Date.now(), rows: pushedRecords({ history: values[0], prices: values[1], names: values[2], updatedAt: values[3] }) };
+      })().finally(() => { if (pushedRead === pending) pushedRead = null; });
+      pushedRead = pending;
+    }
+    await pushedRead.promise;
   }
   return paginatePushed(pushedSnapshot.rows, filters);
 }
@@ -153,7 +165,7 @@ function normalizeAuthResponse(json, fallbackEmail) {
 }
 
 async function signInWithPassword(email, password) {
-  const res = await fetch(`${IDENTITY_TOOLKIT_BASE}/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`, {
+  const res = await networkRequest(`${IDENTITY_TOOLKIT_BASE}/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password, returnSecureToken: true }),
@@ -169,7 +181,7 @@ async function signInWithPassword(email, password) {
 }
 
 async function signUpWithPassword(email, password) {
-  const res = await fetch(`${IDENTITY_TOOLKIT_BASE}/accounts:signUp?key=${FIREBASE_API_KEY}`, {
+  const res = await networkRequest(`${IDENTITY_TOOLKIT_BASE}/accounts:signUp?key=${FIREBASE_API_KEY}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password, returnSecureToken: true }),
@@ -201,7 +213,7 @@ function friendlyAuthError(code) {
 
 async function refreshAuth(auth) {
   const body = new URLSearchParams({ grant_type: 'refresh_token', refresh_token: auth.refreshToken });
-  const res = await fetch(`${SECURE_TOKEN_BASE}/token?key=${FIREBASE_API_KEY}`, {
+  const res = await networkRequest(`${SECURE_TOKEN_BASE}/token?key=${FIREBASE_API_KEY}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
@@ -209,10 +221,14 @@ async function refreshAuth(auth) {
   const json = await res.json();
   if (!res.ok) {
     // Refresh token itself is no longer valid — the user needs to sign in again.
-    await clearAuth();
-    throw new Error('Signed out (token expired) — sign in again from the popup.');
+    if (res.status >= 500 || res.status === 429) throw new Error('Authentication service unavailable. Retrying will keep your sign-in.');
+    const current = await getAuth();
+    if (current?.refreshToken === auth.refreshToken) await clearAuth();
+    throw new Error('Signed out (token expired) — sign in again from the extension page.');
   }
   const next = normalizeAuthResponse(json, auth.email);
+  const current = await getAuth();
+  if (current?.refreshToken !== auth.refreshToken) return current;
   await setAuth(next);
   return next;
 }
@@ -220,17 +236,19 @@ async function refreshAuth(auth) {
 /** Returns a currently-valid idToken, refreshing first if it's near expiry.
  * Returns null if never signed in; throws if refresh itself fails (caller
  * should surface that as a "please sign in again" state). */
+let refreshingAuth = null;
 async function getFreshAuth() {
   const auth = await getAuth();
   if (!auth) return null;
   if (Date.now() < auth.expiresAt) return auth;
-  return refreshAuth(auth);
+  if (!refreshingAuth) refreshingAuth = refreshAuth(auth).finally(() => { refreshingAuth = null; });
+  return refreshingAuth;
 }
 
 // ---------- RTDB REST helpers ----------
 
 async function putScalar(path, value, idToken) {
-  const res = await fetch(`${RTDB_BASE_URL}/${path}.json?auth=${idToken}`, {
+  const res = await networkRequest(`${RTDB_BASE_URL}/${path}.json?auth=${idToken}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(value),
@@ -248,7 +266,7 @@ async function putScalar(path, value, idToken) {
 async function appendHistoryPointSafely(ticker, point, idToken) {
   const url = `${RTDB_BASE_URL}/${priceHistoryPath(ticker)}.json?auth=${idToken}`;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const getRes = await fetch(url, { headers: { 'X-Firebase-ETag': 'true' } });
+    const getRes = await networkRequest(url, { headers: { 'X-Firebase-ETag': 'true' } });
     if (!getRes.ok) throw new Error(`RTDB read failed for ${ticker} history: ${getRes.status}`);
     const etag = getRes.headers.get('ETag');
     const current = (await getRes.json()) || [];
@@ -260,7 +278,7 @@ async function appendHistoryPointSafely(ticker, point, idToken) {
     const keys = Object.keys(current);
     const nextKey = keys.every(key => /^\d+$/.test(key)) ? String(Math.max(-1, ...keys.map(Number)) + 1) : String(Date.now());
     const next = { ...current, [nextKey]: point };
-    const putRes = await fetch(url, {
+    const putRes = await networkRequest(url, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'if-match': etag },
       body: JSON.stringify(next),
@@ -297,7 +315,7 @@ async function syncTickerPoint(ticker, point, auth) {
   const last = latest.value;
   if (last && last.price === point.price && last.date === point.date && (last.dayHigh ?? null) === point.dayHigh && (last.dayLow ?? null) === point.dayLow) return;
   const key = String(Date.parse(point.time));
-  const response = await fetch(RTDB_BASE_URL + '/QSE.json?auth=' + encodeURIComponent(auth.idToken), {
+  const response = await networkRequest(RTDB_BASE_URL + '/QSE.json?auth=' + encodeURIComponent(auth.idToken), {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ['tickers/' + ticker + '/allPrices/' + key]: point, ['tickers/' + ticker + '/latest']: point, ['priceHistory/' + ticker + '/' + key]: point }),
   });
@@ -325,7 +343,7 @@ async function pushRows(rows) {
   const errors = [];
   for (const row of rows) {
     try {
-      const previousResponse = await fetch(`${RTDB_BASE_URL}/${priceCachePath(row.ticker)}.json?auth=${encodeURIComponent(auth.idToken)}`);
+      const previousResponse = await networkRequest(`${RTDB_BASE_URL}/${priceCachePath(row.ticker)}.json?auth=${encodeURIComponent(auth.idToken)}`);
       if (!previousResponse.ok) throw new Error(`Cannot read previous price (${previousResponse.status})`);
       const previousPrice = await previousResponse.json();
       const point = { date: today, time: nowIso, price: row.price, priceKey: row.priceKey || null, dayHigh: row.dayHigh ?? null, dayLow: row.dayLow ?? null, highLowKey: row.highLowKey || null, highLowRaw: row.highLowRaw || [], rangeError: row.rangeError || '', raw: row.raw || [], ...priceDeviation(row.price, previousPrice) };
@@ -362,6 +380,10 @@ async function pushRows(rows) {
 
 // ---------- Scraping (delegates to the content script) ----------
 
+function matchesMarketUrl(candidate, target) {
+  try { const a = new URL(candidate), b = new URL(target); return a.origin === b.origin && a.pathname.replace(/\/$/, '') === b.pathname.replace(/\/$/, ''); }
+  catch { return false; }
+}
 async function findTargetTab(targetUrl) {
   let originPattern = 'https://webd.thegroup.com.qa/*';
   try {
@@ -371,8 +393,7 @@ async function findTargetTab(targetUrl) {
   }
   const tabs = await chrome.tabs.query({ url: originPattern });
   if (!tabs.length) return null;
-  const exact = tabs.find((t) => t.url && t.url.startsWith(targetUrl));
-  return exact || tabs[0];
+  return tabs.find(tab => matchesMarketUrl(tab.url, targetUrl)) || null;
 }
 
 /** Chrome's own `chrome.runtime.lastError.message` for a tab whose content
@@ -395,7 +416,9 @@ function friendlyScrapeError(rawError) {
 
 async function scrapeTab(tab, overrideConfig) {
   return new Promise((resolve) => {
+    const timeout = typeof setTimeout === 'function' ? setTimeout(() => resolve({ ok: false, error: 'Market page did not respond within 15 seconds. Refresh that tab and retry.' }), 15000) : null;
     chrome.tabs.sendMessage(tab.id, { type: 'SCRAPE_NOW', config: overrideConfig }, (response) => {
+      if (timeout !== null) clearTimeout(timeout);
       if (chrome.runtime.lastError) {
         resolve({ ok: false, error: friendlyScrapeError(chrome.runtime.lastError.message) });
         return;
@@ -408,31 +431,60 @@ async function scrapeTab(tab, overrideConfig) {
 // ---------- The collect → throttled/randomized push cycle ----------
 
 let cycleRunning = false;
-let cyclePending = false;
+let cyclePending = null;
+let cyclePromise = null;
+let actionRunning = false;
+let stopRunning = false;
+const RETRY_ALARM = "sync-retry";
 async function runCycle(options = {}) {
-  if (cycleRunning) { if (options.pageTriggered) cyclePending = true; return; }
+  if (cycleRunning) {
+    if (options.manual) throw new Error('Scraping or syncing is already running. Wait for completion.');
+    if (options.forcePush) { await cyclePromise; return runCycle(options); }
+    if (options.pageTriggered) cyclePending = { pageTriggered: true };
+    return cyclePromise;
+  }
+  if ((actionRunning || stopRunning) && !options.manual && !options.actionOwned) { cyclePending = { pageTriggered: true }; return; }
   cycleRunning = true;
-  try { await collectCycle(options); } finally { cycleRunning = false; await scheduleNextCollect(); if (cyclePending) { cyclePending = false; await runCycle(); } }
+  cyclePromise = (async () => {
+    try { await patchStatus({ cycleBusy: true }); return await collectCycle(options); }
+    catch (error) { const status = await getStatus(); await patchStatus({ lastError: error.message, ...(status.scrapeState === 'Scraping' ? { scrapeState: 'Failed' } : {}) }); throw error; }
+    finally {
+      try { await patchStatus({ cycleBusy: false }); }
+      finally { cycleRunning = false; }
+      await scheduleNextCollect();
+    }
+  })();
+  try { return await cyclePromise; }
+  finally {
+    if (cyclePending && !actionRunning) {
+      const next = cyclePending; cyclePending = null;
+      runCycle(next).catch(error => patchStatus({ lastError: error.message }));
+    }
+  }
 }
 async function collectCycle({ forcePush = false, manual = false, scrapeOnly = false } = {}) {
   const config = await getSyncConfig();
   if (!manual && (!config.scrapingEnabled || !withinScrapingWindow(config))) {
+    await patchStatus({ scrapeState: config.scrapingEnabled ? 'Outside time window' : 'Stopped', syncState: config.scrapingEnabled ? 'Outside time window' : 'Stopped' });
     await scheduleNextCollect();
     return;
   }
   const scrapeConfig = await getScrapeConfig();
   const tab = await findTargetTab(scrapeConfig.targetUrl);
   if (!tab) {
-    await patchStatus({ lastError: 'No matching tab open — open the market page for auto-refresh to work.' });
+    await patchStatus({ scrapeState: 'Waiting for market tab', lastError: 'No matching tab open — open the market page for auto-refresh to work.' });
     await scheduleNextCollect();
+    if (manual) throw new Error('No matching market tab open. Open the configured market page first.');
     return;
   }
 
+  await patchStatus({ scrapeState: 'Scraping' });
   const result = await scrapeTab(tab);
   if (!result.ok) {
     await recordActivity({ type: 'scrape', success: false });
-    await patchStatus({ lastError: `Scrape failed: ${result.error}` });
-    scheduleNextCollect();
+    await patchStatus({ scrapeState: 'Scrape failed', lastError: `Scrape failed: ${result.error}` });
+    await scheduleNextCollect();
+    if (manual) throw new Error(`Scrape failed: ${result.error}`);
     return;
   }
 
@@ -440,6 +492,7 @@ async function collectCycle({ forcePush = false, manual = false, scrapeOnly = fa
   const auditBatchAt = await saveAudit(result, tab.url, manual ? 'manual' : 'automatic');
   const rows = result.rows || [];
   await patchStatus({
+    scrapeState: 'Watching prices',
     lastScrapeAt: Date.now(),
     lastScrapeCount: rows.length,
     lastStrategy: result.strategy,
@@ -447,23 +500,40 @@ async function collectCycle({ forcePush = false, manual = false, scrapeOnly = fa
   });
 
   if (!rows.length) {
-    scheduleNextCollect();
+    await scheduleNextCollect();
+    if (manual) throw new Error('No valid prices found on the market page.');
     return;
   }
 
   const status = await getStatus();
   const syncConfig = await getSyncConfig();
-  const due = forcePush || syncConfig.minPushIntervalMinutes === 0 || !status.nextPushAt || Date.now() >= status.nextPushAt;
+  if (!scrapeOnly && typeof getAuth === 'function' && !await getAuth()) {
+    await patchStatus({ syncState: 'Waiting for sign-in', lastSyncError: '', retryAt: null });
+    await chrome.alarms.clear?.(RETRY_ALARM);
+    if (manual && forcePush) throw new Error('Scrape saved locally. Sign in to sync prices.');
+    return;
+  }
+  const due = forcePush || (!status.retryAt || Date.now() >= status.retryAt) && (syncConfig.minPushIntervalMinutes === 0 || !status.nextPushAt || Date.now() >= status.nextPushAt);
+  if (!scrapeOnly && !due) {
+    await patchStatus({ syncState: status.retryAt ? 'Retrying' : 'Waiting for push interval' });
+    chrome.alarms.create(RETRY_ALARM, { when: status.retryAt || status.nextPushAt });
+  }
 
   if (!scrapeOnly && due && (manual || (await getSyncConfig()).scrapingEnabled)) {
+    let syncFailure = '';
+    await patchStatus({ syncState: 'Syncing' });
     try {
       const { pushed, namesPushed, total, errors, syncedTickers } = await pushRows(rows);
       await recordActivity({ type: 'sync', count: pushed, success: pushed === total && !errors.length, error: errors.slice(0, 3).join(' ') });
       try { await markAuditSynced(auditBatchAt, syncedTickers); }
       catch (error) { errors.push(`Prices synced; local audit update failed: ${error.message}`); }
+      const retryAt = errors.length ? Date.now() + Math.max(5000, syncConfig.minPushIntervalMinutes * 60000) : null;
+      if (retryAt) chrome.alarms.create(RETRY_ALARM, { when: retryAt });
+      else await chrome.alarms.clear?.(RETRY_ALARM);
       const nextPushAt = Date.now() + pushDelayMs(syncConfig);
       await patchStatus({
-        lastPushAt: Date.now(),
+        syncState: errors.length ? 'Retrying' : 'Synced', retryAt,
+        lastPushAt: pushed > 0 ? Date.now() : status.lastPushAt,
         lastPushCount: pushed,
         lastPushTotal: total,
         lastNamesCount: namesPushed,
@@ -471,20 +541,32 @@ async function collectCycle({ forcePush = false, manual = false, scrapeOnly = fa
         lastError: errors.slice(0, 3).join(' '),
         lastSyncError: errors.slice(0, 3).join(' '),
       });
+      pushedSnapshot = null;
+      if (manual && errors.length) syncFailure = errors.slice(0, 3).join(' ');
       if (errors.length) console.warn('[thegroup-price-sync] push errors:', errors);
     } catch (e) {
       await recordActivity({ type: 'sync', count: 0, success: false, error: e.message || String(e) });
-      await patchStatus({ lastError: e.message || String(e), lastSyncError: e.message || String(e), nextPushAt: Date.now() + syncConfig.minPushIntervalMinutes * 60000 });
+      const retryAt = Date.now() + Math.max(5000, syncConfig.minPushIntervalMinutes * 60000);
+      chrome.alarms.create(RETRY_ALARM, { when: retryAt });
+      await patchStatus({ syncState: 'Retrying', retryAt, lastError: e.message || String(e), lastSyncError: e.message || String(e), nextPushAt: retryAt });
+      if (manual) throw e;
     }
+    if (syncFailure) throw new Error(syncFailure);
   }
 
   await scheduleNextCollect();
+  return { scraped: rows.length, status: await getStatus() };
 }
 
 async function scheduleNextCollect() {
   if (!(await getSyncConfig()).scrapingEnabled) { await chrome.alarms.clear(COLLECT_ALARM); return; }
   const interval = (await getSyncConfig()).scrapeIntervalSeconds;
-  if (interval === 0) { await chrome.alarms.clear(COLLECT_ALARM); return; }
+  if (interval === 0 && (await getSyncConfig()).respectTimeWindows === false) { await chrome.alarms.clear(COLLECT_ALARM); return; }
+  if (interval === 0) {
+    if (!withinScrapingWindow(await getSyncConfig())) chrome.alarms.create(COLLECT_ALARM, { when: Date.now() + 60000 });
+    else await chrome.alarms.clear(COLLECT_ALARM);
+    return;
+  }
   const delaySec = interval === undefined ? randInt(COLLECT_MIN_SECONDS, COLLECT_MAX_SECONDS) : Math.max(30, interval);
   const config = await getSyncConfig();
   const status = config.pushTimingMode === 'constant' ? await getStatus() : {};
@@ -494,7 +576,7 @@ async function scheduleNextCollect() {
 }
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === COLLECT_ALARM) runCycle().catch(e => patchStatus({ lastError: e.message || String(e) }));
+  if (alarm.name === COLLECT_ALARM || alarm.name === RETRY_ALARM) runCycle().catch(e => patchStatus({ lastError: e.message || String(e) }));
 });
 
 chrome.runtime.onInstalled.addListener(() => scheduleNextCollect());
@@ -502,27 +584,42 @@ chrome.runtime.onStartup.addListener(() => scheduleNextCollect());
 
 // ---------- Messages from popup.js / options.js ----------
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, _sender, reply) => {
+  let response;
+  const sendResponse = value => { response = value; };
   (async () => {
+    const exclusive = ['START_SCRAPING', 'SCRAPE_NOW_MANUAL', 'PUSH_NOW', 'TEST_SCRAPE', 'MUTATE_PUSHED_DATA', 'SIGN_IN', 'SIGN_UP', 'SIGN_OUT', 'SAVE_CONFIGS'].includes(message?.type);
+    if (stopRunning || (exclusive || message?.type === 'STOP_SCRAPING' && !cycleRunning) && (actionRunning || cycleRunning)) throw new Error('Another action is running. Wait for completion.');
+    if (exclusive) actionRunning = true;
+    try {
+    if (exclusive) await patchStatus({ actionBusy: true, currentAction: message.type, actionError: '' });
     switch (message?.type) {
       case 'PAGE_SCRAPE_TRIGGER': {
         const [config, scrape] = await Promise.all([getSyncConfig(), getScrapeConfig()]);
-        if (!_sender.tab || !_sender.tab.url.startsWith(scrape.targetUrl) || (message.reason === 'price' ? !config.scrapeOnPriceChange : !(config.scrapeIntervalSeconds > 0 && config.scrapeIntervalSeconds < 30))) { sendResponse({ ok: false }); break; }
+        if (!_sender.tab || !matchesMarketUrl(_sender.tab.url, scrape.targetUrl) || (message.reason === 'price' ? !config.scrapeOnPriceChange : !(config.scrapeIntervalSeconds > 0 && config.scrapeIntervalSeconds < 30))) { sendResponse({ ok: false }); break; }
         await runCycle({ pageTriggered: true });
         sendResponse({ ok: true });
         break;
       }
       case 'START_SCRAPING': {
         await setSyncConfig({ scrapingEnabled: true });
-        await runCycle();
+        await runCycle({ actionOwned: true });
         await scheduleNextCollect();
         sendResponse({ ok: true });
         break;
       }
       case 'STOP_SCRAPING': {
+        stopRunning = true;
+        try {
+        await patchStatus({ currentAction: 'STOP_SCRAPING', actionBusy: true });
         await setSyncConfig({ scrapingEnabled: false });
+        cyclePending = null;
+        if (cycleRunning) await cyclePromise.catch(() => {});
         await chrome.alarms.clear(COLLECT_ALARM);
+        await chrome.alarms.clear(RETRY_ALARM);
+        await patchStatus({ scrapeState: 'Stopped', syncState: 'Stopped', actionBusy: false, currentAction: '', actionCompletedAt: Date.now() });
         sendResponse({ ok: true });
+        } finally { stopRunning = false; }
         break;
       }
       case 'GET_PUSHED_DATA': {
@@ -553,15 +650,19 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         break;
       }
       case 'LOAD_EXTENSION_CONFIGS': {
+        await patchStatus({ actionBusy: actionRunning, cycleBusy: cycleRunning });
         await restoreExtensionConfigs(await getFreshAuth());
-        await patchStatus({ configSyncError:'' });
+        await patchStatus({ configSyncError:'', actionBusy: actionRunning, cycleBusy: cycleRunning });
         sendResponse({ ok: true }); break;
       }
       case 'SIGN_IN': {
         try {
           const auth = await signInWithPassword(message.email, message.password);
           await restoreExtensionConfigs(auth).catch(error => patchStatus({ configSyncError: error.message }));
-          sendResponse({ ok: true, email: auth.email, uid: auth.uid });
+          await recordActivity({ type: 'auth' });
+          await patchStatus({ lastSyncError: '', lastError: '', nextPushAt: 0, retryAt: null, syncState: 'Ready to sync' });
+          await runCycle({ forcePush: true, actionOwned: true }).catch(error => patchStatus({ lastSyncError: error.message }));
+          sendResponse({ ok: true, email: auth.email, uid: auth.uid, status: await getStatus() });
         } catch (e) {
           sendResponse({ ok: false, error: e.message || String(e) });
         }
@@ -570,7 +671,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       case 'SIGN_UP': {
         try {
           const auth = await signUpWithPassword(message.email, message.password);
-          sendResponse({ ok: true, email: auth.email, uid: auth.uid });
+          await restoreExtensionConfigs(auth).catch(error => patchStatus({ configSyncError: error.message }));
+          await recordActivity({ type: 'auth' });
+          await patchStatus({ lastSyncError: '', lastError: '', nextPushAt: 0, retryAt: null, syncState: 'Ready to sync' });
+          await runCycle({ forcePush: true, actionOwned: true }).catch(error => patchStatus({ lastSyncError: error.message }));
+          sendResponse({ ok: true, email: auth.email, uid: auth.uid, status: await getStatus() });
         } catch (e) {
           sendResponse({ ok: false, error: e.message || String(e) });
         }
@@ -578,18 +683,28 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       }
       case 'SIGN_OUT': {
         await clearAuth();
+        await recordActivity({ type: 'auth' });
+        await patchStatus({ syncState: 'Waiting for sign-in', lastSyncError: '', retryAt: null });
+        await chrome.alarms.clear(RETRY_ALARM);
         sendResponse({ ok: true });
         break;
       }
       case 'SCRAPE_NOW_MANUAL': {
-        await runCycle({ forcePush: false, manual: true, scrapeOnly: true });
-        sendResponse({ ok: true });
+        const result = await runCycle({ forcePush: false, manual: true, scrapeOnly: true });
+        sendResponse({ ok: true, ...result });
         break;
       }
       case 'PUSH_NOW': {
-        await runCycle({ forcePush: true, manual: true });
-        sendResponse({ ok: true });
+        const result = await runCycle({ forcePush: true, manual: true });
+        sendResponse({ ok: true, ...result });
         break;
+      }
+      case 'SAVE_CONFIGS': {
+        const target = new URL(message.scrape?.targetUrl);
+        if (target.origin !== 'https://webd.thegroup.com.qa') throw new Error('Use a supported market URL.');
+        await setSyncConfig(message.sync);
+        await setScrapeConfig({ targetUrl: target.href });
+        sendResponse({ ok: true }); break;
       }
       case 'TEST_SCRAPE': {
         const scrapeConfig = await getScrapeConfig();
@@ -602,7 +717,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         // Use the caller's draft selectors (possibly unsaved) rather than
         // whatever's currently saved, so Options' "Test scrape" reflects
         // in-progress edits immediately.
+        await patchStatus({ scrapeState: 'Testing scrape' });
         const result = await scrapeTab(tab, message.config);
+        await patchStatus({ scrapeState: result.ok ? 'Test complete' : 'Test failed', lastError: result.ok ? '' : result.error });
         await recordActivity({ type: 'scrape', success: !!result.ok, count: result.rows?.length || 0, source: 'test' });
         if (result.ok) await saveAudit(result, tab.url, 'test');
         sendResponse({ ...result, auditSaved: !!result.ok });
@@ -611,7 +728,19 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       default:
         sendResponse({ ok: false, error: `Unknown message type: ${message?.type}` });
     }
-  })().catch(e => sendResponse({ ok: false, error: e.message || String(e) }));
+    } finally {
+      if (exclusive) {
+        actionRunning = false;
+        await patchStatus({ actionBusy: false, currentAction: '', actionCompletedAt: Date.now(), actionError: response?.ok === false ? response.error || 'Action failed.' : '' });
+        if (cyclePending) { const next = cyclePending; cyclePending = null; runCycle(next).catch(error => patchStatus({ lastError: error.message })); }
+      }
+    }
+    if (response && (exclusive || message?.type === 'STOP_SCRAPING')) response = { ...response, status: await getStatus() };
+    reply(response || { ok: true });
+  })().catch(async e => {
+    if (!actionRunning) await patchStatus({ actionError: e.message || String(e) }).catch(() => {});
+    reply({ ok: false, error: e.message || String(e) });
+  });
   return true; // async response
 });
 
