@@ -1,5 +1,4 @@
 import { PageHeading } from '../../../components/PageHeading';
-import { InvestmentBalanceSummary } from '../../../components/InvestmentBalanceSummary';
 import { InvestmentPlans } from '../../../components/InvestmentPlans';
 import { InvestmentTransactions } from '../../../components/InvestmentTransactions';
 import { useUrlTransactionFilters } from '../../../hooks/useUrlTransactionFilters';
@@ -327,7 +326,7 @@ export function DashboardPage() {
   const rawWorkbook = useWorkbookStore((s) => s.workbook);
   const tickerOptions = useMemo(() => [...new Set(rawWorkbook.transactions.map((tx) => tx.ticker))].sort(), [rawWorkbook.transactions]);
   const selectedTickers = selectedEntityValues(params, tickerOptions);
-  const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
+  const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters('all');
   const official = useQSEDerived(selectedTickers);
   const strategic = useQSEStrategicDerived();
   const { workbook, rows, summary } = official;
@@ -410,11 +409,12 @@ export function DashboardPage() {
       </div>
 
       <Tabs
-        defaultKey="summary"
+        defaultKey="broker"
         tabs={[
           {
             key: 'broker',
             label: 'Broker Style',
+            defaultOpen: true,
             headerExtra: <StatSourceBadge source="official" />,
             content: (
               <DashboardPositionsView
@@ -430,6 +430,7 @@ export function DashboardPage() {
           {
             key: 'strategic',
             label: 'Strategic Trades',
+            defaultOpen: true,
             headerExtra: <StatSourceBadge source="advisory" />,
             content: (
               <DashboardPositionsView
@@ -442,10 +443,9 @@ export function DashboardPage() {
               />
             ),
           },
-          { key: 'summary', label: 'Account summary', defaultOpen: true, content: <><InvestmentBalanceSummary transactions={workbook.transactions} plans={workbook.tradePlans} marketPrices={workbook.marketPrices} priceHistory={workbook.priceHistory} tickers={selectedTickers} currency={currency} filters={filters} /></> },
-          { key: 'plans', label: 'Plans', defaultOpen: false, content: <><InvestmentPlans market="qse" items={selectedTickers.map(ticker => ({ id: ticker, name: ticker, currency }))} filters={filters} /></> },
-          { key: 'transactions', label: 'Transactions', defaultOpen: false, content: <><InvestmentTransactions market="qse" transactions={workbook.transactions.filter(tx => selectedTickers.includes(tx.ticker))} currency={currency} filters={filters} /></> },
-          { key: 'alerts', label: 'Alerts', defaultOpen: false, content: <AlertsBox /> },
+          { key: 'plans', label: 'Plans', defaultOpen: true, content: <><InvestmentPlans market="qse" items={selectedTickers.map(ticker => ({ id: ticker, name: ticker, currency }))} filters={filters} /></> },
+          { key: 'transactions', label: 'Transactions', defaultOpen: true, content: <><InvestmentTransactions market="qse" transactions={workbook.transactions.filter(tx => selectedTickers.includes(tx.ticker))} currency={currency} filters={filters} /></> },
+          { key: 'alerts', label: 'Alerts', defaultOpen: true, content: <AlertsBox /> },
         ]}
       />
 

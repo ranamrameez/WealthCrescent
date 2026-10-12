@@ -9,7 +9,7 @@ import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { useSortableRows } from '../../../hooks/useSortableRows';
 import { fmtQSEPrice } from '../../../lib/format';
 import { qatarDay } from '../../../lib/stockData/qsePrices';
-import { filterMarketRows,lifetimeBounds,marketDateRange,MARKET_PERIODS,type MarketRow,type MarketSource } from '../../../lib/stockData/marketPageModel';
+import { filterMarketRows,lifetimeBounds,marketDateRange,MARKET_PERIODS,previousSessionClose,type MarketRow,type MarketSource } from '../../../lib/stockData/marketPageModel';
 import { useWorkbookStore } from '../../../store/workbookStore';
 import { useQSEStockData } from '../hooks/useQSEStockData';
 import { useQSEDerived } from '../hooks/useQSEDerived';
@@ -39,6 +39,7 @@ export function MarketPricesPage() {
   const data=useMarketPageData(ticker,from,to,source);
   const invalidDates=!!from&&!!to&&from>to;
   const rows=useMemo(()=>invalidDates?[]:filterMarketRows(data.rows,source,from,to,flags),[data.rows,source,from,to,flags,invalidDates]);
+  const previousClose=useMemo(()=>previousSessionClose(filterMarketRows(data.rows,source,'','')),[data.rows,source]);
   const bounds=useMemo(()=>lifetimeBounds(data.manual,data.bounds,source),[data.manual,data.bounds,source]);
   const day=to || qatarDay(),dayRows=useMemo(()=>rows.filter(row=>row.date===day),[rows,day]);
   const cardPrices=source==='manual'?workbook.marketPrices:source==='app'?appCards.prices:{...appCards.prices,...derived.workbook.marketPrices};
@@ -83,8 +84,8 @@ export function MarketPricesPage() {
     <StandardPageSections defaultKey="favourites" sections={[
       {key:'favourites',label:'Favourites',defaultOpen:true,summary:favourites.size+' tickers',content:cardTickers.some(symbol=>favourites.has(symbol))?cards(cardTickers.filter(symbol=>favourites.has(symbol))):<p className="text-muted">{favourites.size?'No favourites match the ticker-card filters.':'Choose a star on a ticker card to add your favourite stocks.'}</p>},
       {key:'tickers',label:'All tickers',defaultOpen:true,summary:cardTickers.length+' tickers',content:<><p className="text-muted">Cards show the latest known prices for the selected source. Choose a card to update the charts and table.</p>{cards(cardTickers)}</>},
-      {key:'today',label:'Today price chart',defaultOpen:true,summary:day,content:<MarketPriceChart rows={dayRows} bounds={bounds} label={ticker+' - '+day+' ? Qatar time'}/>},
-      {key:'lifetime',label:'Lifetime price chart',defaultOpen:true,content:<><div className="market-timeframes" role="group" aria-label="Chart timeframe">{MARKET_PERIODS.map(period=><button key={period} type="button" className={'chip'+(currentPeriod===period?' active':'')} aria-pressed={currentPeriod===period} onClick={()=>change({...marketDateRange(period),period:period==='all'?'':period})}>{period==='all'?'All time':period}</button>)}</div><MarketPriceChart rows={rows} bounds={bounds} label={ticker+' - '+(from || 'All dates')+' to '+(to || 'latest')}/></>},
+      {key:'today',label:'Today price chart',defaultOpen:true,summary:day,content:<MarketPriceChart rows={dayRows} bounds={bounds} previousClose={previousClose} label={ticker+' - '+day+' ? Qatar time'}/>},
+      {key:'lifetime',label:'Lifetime price chart',defaultOpen:true,content:<><div className="market-timeframes" role="group" aria-label="Chart timeframe">{MARKET_PERIODS.map(period=><button key={period} type="button" className={'chip'+(currentPeriod===period?' active':'')} aria-pressed={currentPeriod===period} onClick={()=>change({...marketDateRange(period),period:period==='all'?'':period})}>{period==='all'?'All time':period}</button>)}</div><MarketPriceChart rows={rows} bounds={bounds} previousClose={previousClose} label={ticker+' - '+(from || 'All dates')+' to '+(to || 'latest')}/></>},
       {key:'updates',label:'Price updates',defaultOpen:false,summary:rows.length+' observations',content:table},
     ]}/>
   </div>;

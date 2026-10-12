@@ -314,7 +314,7 @@ export function StockPage() {
   return (
     <div className="standard-page">
       <div className="d-flex gap-6">
-        <PageHeading back={<BackButton to="/portfolio">← Back to Portfolio</BackButton>}><h1 className="pagetitle d-flex align-items-center">
+        <PageHeading back={<BackButton to="/qse">← Back to Dashboard</BackButton>}><h1 className="pagetitle d-flex align-items-center">
           <TickerLogo ticker={ticker} size="lg" exchange="qse" />
           {ticker} &nbsp; {name && <span className="text-muted" style={{ fontSize: 16 }}>{shortenCompanyName(name, 40)}</span>}
         </h1></PageHeading>

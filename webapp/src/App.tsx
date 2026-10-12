@@ -37,6 +37,7 @@ import { WatchlistPage as PSXWatchlistPage } from './features/psx/pages/Watchlis
 import { StockPage as PSXStockPage } from './features/psx/pages/StockPage';
 import { SettingsPage as PSXSettingsPage } from './features/psx/pages/SettingsPage';
 import { TradeStrategyPage as PSXTradeStrategyPage } from './features/psx/pages/TradeStrategyPage';
+import { MarketPricesPage as PSXMarketPricesPage } from './features/psx/pages/MarketPricesPage';
 import { RiskAnalysisPage as PSXRiskAnalysisPage } from './features/psx/pages/RiskAnalysisPage';
 import { CashCurrencyPage, CashPage } from './features/cash/pages/CashPage';
 import { useCashFirebaseSync } from './lib/firebase/useCashFirebaseSync';
@@ -196,6 +197,7 @@ function App() {
               <Route path="/psx/portfolio" element={<PSXPortfolioPage />} />
               <Route path="/psx/transactions" element={<PSXTransactionsPage />} />
               <Route path="/psx/watchlist" element={<PSXWatchlistPage />} />
+              <Route path="/psx/market-prices" element={<PSXMarketPricesPage />} />
               <Route path="/psx/stock/:ticker" element={<PSXStockPage />} />
               <Route path="/psx/analytics" element={<PSXAnalyticsPage />} />
               <Route path="/psx/trade-planner" element={<Navigate to="/psx/trade-strategy" replace />} />

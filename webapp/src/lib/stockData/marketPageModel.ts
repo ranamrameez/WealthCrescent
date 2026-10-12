@@ -28,6 +28,11 @@ export function priceMedian(rows:{price:number}[]) {
   const prices=rows.map(row=>row.price).filter(Number.isFinite).sort((a,b)=>a-b);
   const middle=Math.floor(prices.length/2);return !prices.length?null:prices.length%2?prices[middle]:(prices[middle-1]+prices[middle])/2;
 }
+export function previousSessionClose(rows:MarketRow[]) {
+  const ordered=[...rows].sort((a,b)=>(a.time || a.date).localeCompare(b.time || b.date));
+  const latestDate=ordered.at(-1)?.date;
+  return latestDate ? ordered.filter(row=>row.date<latestDate).at(-1)?.price : undefined;
+}
 export function lifetimeBounds(manual:{price:number}[],app:{low:number;high:number}|null,source:MarketSource) {
   const values=source==='app'?[]:manual.map(row=>row.price).filter(value=>Number.isFinite(value)&&value>0);
   if(source!=='manual'&&app)values.push(app.low,app.high);

@@ -1,5 +1,5 @@
 import { expect,it } from 'vitest';
-import { filterMarketRows,lifetimeBounds,marketDateRange,marketRows,priceMedian } from '../marketPageModel';
+import { filterMarketRows,lifetimeBounds,marketDateRange,marketRows,previousSessionClose,priceMedian } from '../marketPageModel';
 import type { MarketObservation } from '../qsePrices';
 import { marketChartData } from '../../../features/qse/components/MarketPriceChart';
 it('uses Qatar dates and clamps month/year presets',()=>{
@@ -30,4 +30,14 @@ it('chart guides include lifetime low/high and the exact median; overview sampli
  expect(chart.guides.map(guide=>guide.label)).toEqual(['Lifetime low','Lifetime high','Median']);
  expect(chart.guides[2].value).toBe(10);expect(chart.total).toBe(5000);expect(chart.ordered.length).toBeLessThanOrEqual(2000);
  expect(chart.ordered.some(row=>row.price===1)).toBe(true);expect(chart.ordered.some(row=>row.price===99)).toBe(true);
+});
+it('uses the prior trading session close to color the current price trend',()=>{
+ const rows=marketRows([
+  {id:'now',source:'shared',date:'2026-10-12',time:'2026-10-12T10:00:00Z',price:11},
+  {id:'close',source:'shared',date:'2026-10-09',time:'2026-10-09T10:00:00Z',price:12},
+ ]);
+ const close=previousSessionClose(rows);
+ expect(close).toBe(12);
+ expect(marketChartData(rows,null,close).datasets[0].borderColor).toBe('#dc2626');
+ expect(marketChartData(rows.map(row=>row.id==='now'?{...row,price:13}:row),null,close).datasets[0].borderColor).toBe('#16a34a');
 });

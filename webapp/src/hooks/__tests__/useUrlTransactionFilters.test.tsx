@@ -7,11 +7,22 @@ import { useUrlTransactionFilters } from '../useUrlTransactionFilters';
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date(2026, 8, 25, 12)); });
 afterEach(() => vi.useRealTimers());
 
-function setup(url = '/bank/account/a1') {
-  return renderHook(() => ({ ...useUrlTransactionFilters(), location: useLocation() }), {
+function setup(url = '/bank/account/a1', defaultPeriod: 'since-month' | 'all' = 'since-month') {
+  return renderHook(() => ({ ...useUrlTransactionFilters(defaultPeriod), location: useLocation() }), {
     wrapper: ({ children }: { children: ReactNode }) => <MemoryRouter initialEntries={[url]}>{children}</MemoryRouter>,
   });
 }
+
+it('supports an all-time page default without changing the shared default', () => {
+  const { result } = setup('/qse', 'all');
+  expect(result.current.filters).toMatchObject({ period: 'all', fromDate: '', toDate: '' });
+  expect(result.current.activeCount).toBe(0);
+
+  act(() => result.current.setFilters({ period: '3', fromDate: '2026-07-01', toDate: '2026-09-30' }));
+  expect(result.current.activeCount).toBe(1);
+  act(() => result.current.resetFilters());
+  expect(result.current.filters).toMatchObject({ period: 'all', fromDate: '', toDate: '' });
+});
 
 it('defaults to the first of this month without an upper date limit', () => {
   const { result } = setup();

@@ -15,12 +15,12 @@ export interface TransactionPageFilters {
   accountId: string;
 }
 
-export function useUrlTransactionFilters() {
+export function useUrlTransactionFilters(defaultPeriod: TransactionPeriod = 'since-month') {
   const [params, setParams] = useSearchParams();
   const defaults = useMemo(() => currentMonthRange(), []);
-  const period = (params.get('period') as TransactionPeriod | null) ?? 'since-month';
-  const fromDate = params.get('from') ?? defaults.startDate;
-  const toDate = params.get('to') ?? defaults.endDate;
+  const period = (params.get('period') as TransactionPeriod | null) ?? defaultPeriod;
+  const fromDate = params.get('from') ?? (defaultPeriod === 'all' ? '' : defaults.startDate);
+  const toDate = params.get('to') ?? '';
   const direction = (params.get('direction') as TransactionDirectionFilter | null) ?? 'all';
   const category = params.get('category') || 'all';
   const source = (params.get('source') as TransactionSourceFilter | null) ?? 'all';
@@ -37,11 +37,11 @@ export function useUrlTransactionFilters() {
   useEffect(() => {
     if (params.has('from') && params.has('to') && params.has('period')) return;
     const next = new URLSearchParams(params);
-    if (!next.has('from')) next.set('from', defaults.startDate);
-    if (!next.has('to')) next.set('to', defaults.endDate);
-    if (!next.has('period')) next.set('period', 'since-month');
+    if (!next.has('from')) next.set('from', defaultPeriod === 'all' ? '' : defaults.startDate);
+    if (!next.has('to')) next.set('to', '');
+    if (!next.has('period')) next.set('period', defaultPeriod);
     setParams(next, { replace: true });
-  }, [params, setParams, defaults.startDate]);
+  }, [params, setParams, defaults.startDate, defaultPeriod]);
   const setFilters = useCallback((patch: Partial<TransactionPageFilters>) => {
     const value = { ...filters, ...patch }, next = new URLSearchParams(params);
     next.set('period', value.period);
@@ -54,9 +54,9 @@ export function useUrlTransactionFilters() {
     setParams(next);
   }, [filters, params, setParams]);
   const resetFilters = useCallback(() => {
-    const range = currentMonthRange();
-    setFilters({ period: 'since-month', fromDate: range.startDate, toDate: range.endDate, direction: 'all', category: 'all', source: 'all', accountId: 'all' });
-  }, [setFilters]);
-  const activeCount = (filters.period !== 'since-month' ? 1 : 0) + (filters.direction !== 'all' ? 1 : 0) + (filters.category !== 'all' ? 1 : 0) + (filters.source !== 'all' ? 1 : 0) + (filters.accountId !== 'all' ? 1 : 0);
+    const fromDate = defaultPeriod === 'all' ? '' : currentMonthRange().startDate;
+    setFilters({ period: defaultPeriod, fromDate, toDate: '', direction: 'all', category: 'all', source: 'all', accountId: 'all' });
+  }, [setFilters, defaultPeriod]);
+  const activeCount = (filters.period !== defaultPeriod ? 1 : 0) + (filters.direction !== 'all' ? 1 : 0) + (filters.category !== 'all' ? 1 : 0) + (filters.source !== 'all' ? 1 : 0) + (filters.accountId !== 'all' ? 1 : 0);
   return { filters, setFilters, resetFilters, activeCount };
 }

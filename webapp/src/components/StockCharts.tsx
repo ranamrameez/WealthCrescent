@@ -12,7 +12,7 @@ function fill(color: unknown, alpha: number) {
   return Array.isArray(color) ? color.map(value => tint(value, alpha)) : tint(color, alpha);
 }
 function axes<T extends 'bar' | 'line'>(kind: T, options?: ChartOptions<T>): ChartOptions<T> {
-  const axis = { grid: { color: cssVar('--border') || '#232b33' }, ticks: { color: cssVar('--muted') || '#94a3b8', maxTicksLimit: 6, maxRotation: 0 } };
+  const axis = { grid: { color: chartAlpha(cssVar('--border') || '#232b33', .35) }, ticks: { color: cssVar('--muted') || '#94a3b8', maxTicksLimit: 6, maxRotation: 0 } };
   const supplied = options?.scales ?? {};
   return {
     ...options, responsive: true, maintainAspectRatio: false,

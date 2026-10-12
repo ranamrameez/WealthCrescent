@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { PricePoint } from '../types/workbook';
 import { AnalyticsChartCard } from './AnalyticsChartCard';
 import { StockLine } from './StockCharts';
-import { STOCK_BUY_COLOR, STOCK_HOLDINGS_COLOR } from '../lib/stockChartTheme';
+import { STOCK_HOLDINGS_COLOR, stockPriceChangeColor } from '../lib/stockChartTheme';
 
 export function StockPriceCharts({ points, currency, formatPrice }: { points: PricePoint[]; currency: string; formatPrice: (n: number) => string }) {
   const ordered = [...points].sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''));
@@ -12,6 +12,11 @@ export function StockPriceCharts({ points, currency, formatPrice }: { points: Pr
   const date = dates.includes(chosenDate) ? chosenDate : dates.at(-1) ?? '';
   const daily = ordered.filter(p => p.date === date);
   const closings = [...new Map(ordered.map(p => [p.date, p])).values()];
+  const dateIndex = dates.indexOf(date);
+  const previousClose = dateIndex > 0 ? closings[dateIndex - 1]?.price : undefined;
+  const dailyColor = stockPriceChangeColor(daily.at(-1)?.price, previousClose);
+  const lifetimePreviousClose = closings.length > 1 ? closings.at(-2)?.price : undefined;
+  const lifetimeColor = stockPriceChangeColor(ordered.at(-1)?.price, lifetimePreviousClose);
   const lifetime = view === 'entries' ? ordered : closings;
   const averagesByPoint = new Map<PricePoint, number>();
   let total = 0;
@@ -29,11 +34,11 @@ export function StockPriceCharts({ points, currency, formatPrice }: { points: Pr
     </div>
     <div className="analytics-grid">
       <AnalyticsChartCard title="Daily price updates" height="sm" tooltip="Every recorded price update on the selected date only. Defaults to the latest date with recorded prices, not the entire history.">
-        <StockLine data={{ labels: daily.map((p, i) => p.time?.includes('T') ? p.time.slice(11, 19) : p.time || `Update ${i + 1}`), datasets: [{ label: `Price on ${date}`, data: daily.map(p => p.price), borderColor: STOCK_BUY_COLOR, pointRadius: 3 }] }} options={options} />
+        <StockLine data={{ labels: daily.map((p, i) => p.time?.includes('T') ? p.time.slice(11, 19) : p.time || `Update ${i + 1}`), datasets: [{ label: `Price on ${date}`, data: daily.map(p => p.price), borderColor: dailyColor, pointBackgroundColor: dailyColor, pointRadius: 3 }] }} options={options} />
       </AnalyticsChartCard>
       <AnalyticsChartCard title="Lifetime market prices" height="sm" tooltip="Every recorded update or the last recorded price on each date, plus the running average of all recorded updates. Price averages are meaningful; summing unit prices is not a portfolio valuation.">
         <StockLine data={{ labels: lifetime.map((p, i) => view === 'entries' ? `${p.date} ${p.time?.includes('T') ? p.time.slice(11, 19) : p.time || `#${i + 1}`}` : p.date), datasets: [
-          { label: view === 'entries' ? 'Recorded price' : 'Daily closing price', data: lifetime.map(p => p.price), borderColor: STOCK_BUY_COLOR, pointRadius: 2 },
+          { label: view === 'entries' ? 'Recorded price' : 'Daily closing price', data: lifetime.map(p => p.price), borderColor: lifetimeColor, pointBackgroundColor: lifetimeColor, pointRadius: 2 },
           { label: 'Lifetime average recorded price', data: averages, borderColor: STOCK_HOLDINGS_COLOR, borderDash: [5, 4], pointRadius: 0 },
         ] }} options={options} />
       </AnalyticsChartCard>

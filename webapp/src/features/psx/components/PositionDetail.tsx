@@ -1,6 +1,6 @@
-import { StockPriceCharts } from '../../../components/StockPriceCharts';
+import { MarketPriceHistory } from './MarketPriceHistory';
 import { PriceInput } from "../../../components/ui/PriceInput";
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ComponentProps } from 'react';
 import { StockBar as Bar } from '../../../components/StockCharts';
 import { STOCK_BUY_COLOR, STOCK_SELL_COLOR } from '../../../lib/stockChartTheme';
 import { StandardCard } from '../../../components/StandardCard';
@@ -29,6 +29,11 @@ import type { PricePoint } from '../../../types/workbook';
 import { usePSXDerived } from '../hooks/usePSXDerived';
 import { gridAutoStyle } from '../../../lib/gridStyle';
 
+function DetailCard({section,title,children,...props}: ComponentProps<typeof StandardCard> & {section:string}) {
+  return section === 'all' ? <StandardCard title={title} {...props}>{children}</StandardCard>
+    : <div className={props.className}>{section !== 'lots' && section !== 'closed' && <h3>{title}</h3>}{children}</div>;
+}
+
 function CompactChart({ height, children }: { height: number; children: React.ReactNode }) {
   return <div style={{ height, position: 'relative' }}>{children}</div>;
 }
@@ -37,7 +42,7 @@ function CompactChart({ height, children }: { height: number; children: React.Re
  * estimated CGT-on-gain stat for open positions (README items 5/6: PSX
  * capital gains tax is a real cost QSE doesn't have, so it's worth
  * surfacing here rather than only in the trade calculator). */
-export function PositionDetail({ ticker }: { ticker: string }) {
+export function PositionDetail({ ticker, section = 'all' }: { ticker: string; section?: 'all' | 'current' | 'all-time' | 'lots' | 'closed' | 'prices' }) {
   const { workbook, positions, calcFee, lots } = usePSXDerived();
   const setMarketPrice = usePSXWorkbookStore((s) => s.setMarketPrice);
   const updatePricePoint = usePSXWorkbookStore((s) => s.updatePricePoint);
@@ -228,11 +233,11 @@ export function PositionDetail({ ticker }: { ticker: string }) {
     // tradeoff (left-column content shows first when collapsed to one
     // column, not the original top-to-bottom order).
     <>
-      <div className="position-split">
-      <div className="position-split-left">
+      <div>
+      <div>
 
-        {isOpen && (
-          <StandardCard title={<span>Current position <StatSourceBadge source="official" /></span>} className="mb-12">
+        {(section === 'all' || section === 'current') && isOpen && (
+          <DetailCard section={section} title={<span>Current position <StatSourceBadge source="official" /></span>} className="mb-12">
             <div className="grid-auto" style={gridAutoStyle(140, 8)} >
               <div className="stat-card card" style={hueStyle(HUES[2])}>
                 <div className="label">Trend</div>
@@ -285,11 +290,11 @@ export function PositionDetail({ ticker }: { ticker: string }) {
                 <div className="value fs-14">{statusLabel}</div>
               </div>
             </div>
-          </StandardCard>
+          </DetailCard>
         )}
 
-        {position && (position.buyCount > 0 || position.sellCount > 0) && (
-          <StandardCard title={<span>All-time stats <StatSourceBadge source="official" /></span>} className="mb-12">
+        {(section === 'all' || section === 'all-time') && position && (position.buyCount > 0 || position.sellCount > 0) && (
+          <DetailCard section={section} title={<span>All-time stats <StatSourceBadge source="official" /></span>} className="mb-12">
             <div className="grid-auto" style={gridAutoStyle(100, 8)}>
               <div className="stat-card card" style={hueStyle(HUES[0])}>
                 <div className="label">Bought / Sold</div>
@@ -317,12 +322,12 @@ export function PositionDetail({ ticker }: { ticker: string }) {
               </div>
               {!isOpen && <div className="stat-card card" style={hueStyle(HUES[6])}><div className="label">Held</div><div className="value">{holdingDays}d</div></div>}
             </div>
-          </StandardCard>
+          </DetailCard>
         )}
 
 
-        {lotRows.length ? (
-          <StandardCard title={<span>Open lots <StatSourceBadge source="official" /></span>} className="mb-12">
+        {(section === 'all' || section === 'lots') && lotRows.length ? (
+          <DetailCard section={section} title={<span>Open lots <StatSourceBadge source="official" /></span>} className="mb-12">
             <div className="table-scroll">
               <table>
                 <thead><tr><LotTh col="buyDate">Buy date</LotTh><LotTh col="buyPrice">Buy price</LotTh><LotTh col="remainingShares">Remaining</LotTh><LotTh col="costPerShare">Cost/share</LotTh></tr></thead>
@@ -341,13 +346,13 @@ export function PositionDetail({ ticker }: { ticker: string }) {
             <p className="text-muted" style={{ marginTop: 4 }}>
               A future sell of {ticker} will consume {workbook.settings.costBasisMethod === 'fifo' ? 'the oldest lot first (FIFO)' : 'the cheapest lot first'}, unless it targets a specific lot via "Sell this lot."
             </p>
-          </StandardCard>
+          </DetailCard>
         ) : null}
 
 
 
-        {reportOpenLots.length > 0 && (
-          <StandardCard title={<span>Open lots <StatSourceBadge source="history" /></span>} className="mb-12">
+        {(section === 'all' || section === 'lots') && reportOpenLots.length > 0 && (
+          <DetailCard section={section} title={<span>Open lots <StatSourceBadge source="history" /></span>} className="mb-12">
             <div className="table-scroll">
               <table>
                 <thead>
@@ -366,14 +371,14 @@ export function PositionDetail({ ticker }: { ticker: string }) {
                 </tbody>
               </table>
             </div>
-          </StandardCard>
+          </DetailCard>
         )}
 
       </div>
-      <div className="position-split-right">
+      <div>
 
-        <StandardCard title={<span>Daily and lifetime market prices</span>} className="mb-12">
-        <StockPriceCharts points={stats?.chronological ?? []} currency={workbook.settings.currency} formatPrice={fmtPSXPrice} />
+        {(section === 'all' || section === 'prices') && <DetailCard section={section} title={<span>Market price chart</span>} className="mb-12">
+        <MarketPriceHistory ticker={ticker} />
       <div className="row gap-sm mt-sm">
           <PriceInput exchange="psx"
             type="number"
@@ -387,10 +392,10 @@ export function PositionDetail({ ticker }: { ticker: string }) {
           />
           <button className="btn secondary small" onClick={commitPrice}><SaveIcon size={12} />Save price</button>
         </div>
-        </StandardCard>
+        </DetailCard>}
 
-        {isOpen && (
-          <StandardCard title={<span>Buy vs. current vs. break-even</span>} className="mb-12">
+        {(section === 'all' || section === 'current') && isOpen && (
+          <DetailCard section={section} title={<span>Buy vs. current vs. break-even</span>} className="mb-12">
             <CompactChart height={lastSellPrice > 0 ? 150 : 115}>
               <Bar
                 data={{
@@ -415,11 +420,11 @@ export function PositionDetail({ ticker }: { ticker: string }) {
                 }}
               />
             </CompactChart>
-          </StandardCard>
+          </DetailCard>
         )}
 
-        {stats && (
-          <StandardCard title={<span>Price range</span>}>
+        {(section === 'all' || section === 'prices') && stats && (
+          <DetailCard section={section} title={<span>Price range</span>}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 8 }}>
               <div className="stat-card card" style={hueStyle(HUES[5])}><div className="label">Lowest</div><div className="value">{fmtPSXPrice(stats.min)}</div><div className="sub">{stats.minDate}</div></div>
               <div className="stat-card card" style={hueStyle(HUES[1])}>
@@ -473,7 +478,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
               </div>
               <button className="btn secondary small mt-sm" onClick={exportPriceHistory}>Export price history CSV</button>
             </details>
-          </StandardCard>
+          </DetailCard>
         )}
 
       </div>
@@ -482,8 +487,8 @@ export function PositionDetail({ ticker }: { ticker: string }) {
             SOLD shares of this stock — Buy price+date, Fee, BE, Total buy
             amount, Sell price+date, Total sale amount, PL/share, Net profit.
             Naturally absent for a still-fully-open position. */}
-        {sortedClosedTrades.length > 0 && (
-          <StandardCard title={<span>Closed Round-Trips <StatSourceBadge source="history" /></span>} className="mb-12">
+        {(section === 'all' || section === 'closed') && sortedClosedTrades.length > 0 && (
+          <DetailCard section={section} title={<span>Closed Round-Trips <StatSourceBadge source="history" /></span>} className="mb-12">
             <div className="table-scroll">
               <table>
                 <thead>
@@ -523,7 +528,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
                 </tbody>
               </table>
             </div>
-          </StandardCard>
+          </DetailCard>
         )}
 
     </>

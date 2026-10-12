@@ -1,6 +1,6 @@
 import { DateValue } from '../../../components/DateValue';
 import { PageHeading } from '../../../components/PageHeading';
-import { InvestmentBalanceSummary } from '../../../components/InvestmentBalanceSummary';
+import { StockPortfolioSummary } from '../components/StockPortfolioSummary';
 import { useUrlTransactionFilters, type TransactionPageFilters } from '../../../hooks/useUrlTransactionFilters';
 import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu';
 import { InvestmentPlans } from '../../../components/InvestmentPlans';
@@ -380,25 +380,30 @@ export function StockPage() {
   return (
     <div className="standard-page">
       <div className="d-flex gap-6 align-items-center">
-        <PageHeading back={<BackButton to="/psx/portfolio">← Back to Portfolio</BackButton>}><h1 className="pagetitle d-flex align-items-center">
+        <PageHeading back={<BackButton to="/psx">← Back to Dashboard</BackButton>}><h1 className="pagetitle d-flex align-items-center">
           <TickerLogo ticker={ticker} size="lg" exchange="psx" />
           {ticker}&nbsp;&nbsp;{name && <span className="text-muted" style={{ fontSize: 16 }}>{shortenCompanyName(name, 40)}</span>}
         </h1></PageHeading>
       </div>
 
-      <StandardPageSections
+      <StandardPageSections preserveOrder defaultKey="prices"
         sections={[
-          { key: 'summary', label: 'Summary', content: <><InvestmentBalanceSummary transactions={workbook.transactions} plans={workbook.tradePlans} marketPrices={workbook.marketPrices} priceHistory={workbook.priceHistory} tickers={[ticker]} currency={workbook.settings.currency} filters={filters} /><PositionDetail ticker={ticker} /></>, unframed: true },
-          { key: 'plans', label: 'Plans', content: <InvestmentPlans market="psx" items={[{ id: ticker, name: ticker, currency: workbook.settings.currency }]} filters={filters} /> },
+          { key: 'prices', label: 'Lifetime Chart', defaultOpen: true, content: <PositionDetail ticker={ticker} section="prices" /> },
+          { key: 'summary', label: 'Summary', defaultOpen: true, content: <StockPortfolioSummary ticker={ticker} /> },
+          { key: 'lots', label: 'Open Lots', defaultOpen: true, content: <PositionDetail ticker={ticker} section="lots" /> },
           {
             key: 'transactions',
             label: 'Trades',
+            defaultOpen: true,
             content: <TickerTransactions ticker={ticker} filters={filters} />,
             headerEnd: hasRows ? <button className="btn secondary small" onClick={exportStatement}>Export CSV</button> : undefined,
           },
+          { key: 'plans', label: 'Plans', defaultOpen: true, content: <InvestmentPlans market="psx" items={[{ id: ticker, name: ticker, currency: workbook.settings.currency }]} filters={filters} /> },
+          { key: 'closed', label: 'Closed', defaultOpen: true, content: <PositionDetail ticker={ticker} section="closed" /> },
           {
             key: 'analytics',
             label: 'Analytics',
+            defaultOpen: true,
             content: <ExchangeStockAnalytics filters={filters} ticker={ticker} transactions={workbook.transactions} priceHistory={workbook.priceHistory} calcFee={calcFee} method={workbook.settings.costBasisMethod} currency={workbook.settings.currency} formatPrice={fmtPSXPrice} />,
           },
           // Pending item 49 ("assess a stock in one go"): see the identical
@@ -407,6 +412,7 @@ export function StockPage() {
             ? [{
                 key: 'risk',
                 label: 'Risk Analysis',
+                defaultOpen: true,
                 content: (
                   <RiskCalculator
                     rows={rows}

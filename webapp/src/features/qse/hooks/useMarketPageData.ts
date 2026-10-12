@@ -19,8 +19,10 @@ export function useMarketPageData(ticker:string,from:string,to:string,source:Mar
     if(!db||!authResolved||!user||!ticker||source==='manual')return;
     if(from&&to&&from>to){setData(state=>({...state,loading:false,error:'From date must precede To date.'}));return;}
     const constraints:QueryConstraint[]=[orderByChild('date')];
-    // Include the previous UTC date so older UTC-dated points at Qatar midnight survive.
-    if(from){const date=new Date(from+'T00:00:00Z');date.setUTCDate(date.getUTCDate()-1);constraints.push(startAt(date.toISOString().slice(0,10)));}
+    // Keep a short lookback outside the visible range so price charts can
+    // compare the latest session with the previous trading day's close,
+    // including across a weekend. Callers still filter the displayed rows.
+    if(from){const date=new Date(from+'T00:00:00Z');date.setUTCDate(date.getUTCDate()-7);constraints.push(startAt(date.toISOString().slice(0,10)));}
     if(to)constraints.push(endAt(to));
     const stopPrices=onValue(query(ref(db,'QSE/tickers/'+ticker+'/allPrices'),...constraints),snapshot=>{if(!disposed)setData(state=>({...state,shared:snapshot.val() || {},loading:false}));},error=>{if(!disposed)setData(state=>({...state,shared:{},loading:false,error:'App prices: '+error.message}));});
     const stopBounds=onValue(ref(db,'QSE/tickers/'+ticker+'/allTimeBounds'),snapshot=>{if(!disposed){const value=snapshot.val();setData(state=>({...state,bounds:Number.isFinite(value?.low)&&Number.isFinite(value?.high)?value:null}));}},error=>{if(!disposed)setData(state=>({...state,error:'App price bounds: '+error.message}));});
