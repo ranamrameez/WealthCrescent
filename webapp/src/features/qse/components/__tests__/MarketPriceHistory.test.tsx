@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { qatarDay } from '../../../../lib/stockData/qsePrices';
 const state=vi.hoisted(()=>({denied:false,paths:[] as string[]}));
 vi.mock('../../../../lib/firebase/client',()=>({db:{}}));
@@ -28,12 +28,9 @@ it('keeps manual history visible when shared reads fail',()=>{
   expect(screen.getByText(/0 shared points; 1 manual points/)).toBeTruthy();expect(screen.getByRole('alert').textContent).toContain('Denied');
 });
 
-it('defaults to Today and applies custom dates to the chart',()=>{
-  render(<MarketPriceHistory ticker="QFLS" />);
-  expect(screen.getByRole('button',{name:'Today'}).getAttribute('aria-pressed')).toBe('true');
-  fireEvent.change(screen.getByLabelText('From (Qatar)'),{target:{value:'2000-01-01'}});
-  fireEvent.change(screen.getByLabelText('To (Qatar)'),{target:{value:'2000-01-02'}});
+it('applies the stock page date filter to the chart',()=>{
+  const {rerender}=render(<MarketPriceHistory ticker="QFLS" fromDate="2000-01-01" toDate="2000-01-02" />);
   expect(screen.getByText(/0 shared points; 0 manual points/)).toBeTruthy();
-  fireEvent.click(screen.getByRole('button',{name:'All time'}));
+  rerender(<MarketPriceHistory ticker="QFLS" />);
   expect(screen.getByText(/1 shared points; 1 manual points/)).toBeTruthy();
 });

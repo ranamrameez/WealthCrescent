@@ -27,11 +27,11 @@ it('lifetime bounds respect source and include reported extrema; medians use obs
 it('labels period low, high and current while keeping reference guides hidden',()=>{
  const rows=Array.from({length:5000},(_,index)=>({id:String(index),source:'shared' as const,date:'2026-10-12',price:index===777?1:index===2345?99:10,outlier:false,deltaPct:null}));
  const chart=marketChartData(rows,{low:0.5,high:120},9);
- expect([...chart.highlights.values()].flat().some(label=>label.startsWith('Period low '))).toBe(true);
- expect([...chart.highlights.values()].flat().some(label=>label.startsWith('Period high '))).toBe(true);
- expect([...chart.highlights.values()].flat().some(label=>label.startsWith('Current '))).toBe(true);
- const guides=chart.datasets.filter(dataset=>['Lifetime low','Lifetime high','Period median','Previous close'].includes(dataset.label||''));
- expect(guides.map(dataset=>dataset.label)).toEqual(['Lifetime low','Lifetime high','Period median','Previous close']);
+ expect([...chart.highlights.values()].flat().some(label=>label.startsWith('Low price '))).toBe(true);
+ expect([...chart.highlights.values()].flat().some(label=>label.startsWith('High price '))).toBe(true);
+ expect([...chart.highlights.values()].flat().some(label=>label.startsWith('Current price '))).toBe(true);
+ const guides=chart.datasets.filter(dataset=>['All-time low price','All-time high price','Median price','Previous close price'].includes(dataset.label||''));
+ expect(guides.map(dataset=>dataset.label)).toEqual(['All-time low price','All-time high price','Median price','Previous close price']);
  expect(guides.every(dataset=>dataset.hidden===true)).toBe(true);expect(chart.total).toBe(5000);expect(chart.ordered.length).toBeLessThanOrEqual(2000);
  expect(chart.ordered.some(row=>row.price===1)).toBe(true);expect(chart.ordered.some(row=>row.price===99)).toBe(true);
 });

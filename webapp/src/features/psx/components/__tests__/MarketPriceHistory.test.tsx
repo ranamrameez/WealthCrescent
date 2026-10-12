@@ -10,5 +10,4 @@ afterEach(cleanup);
 it('uses trade prices when manual PSX price history is not available',()=>{
   render(<MarketPriceHistory ticker="TEST" />);
   expect(screen.getByText('1 PSX points | PKR | Asia/Karachi')).toBeTruthy();
-  expect(screen.getByRole('button',{name:'Today'}).getAttribute('aria-pressed')).toBe('true');
 });

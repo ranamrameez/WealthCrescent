@@ -42,7 +42,7 @@ function CompactChart({ height, children }: { height: number; children: React.Re
  * estimated CGT-on-gain stat for open positions (README items 5/6: PSX
  * capital gains tax is a real cost QSE doesn't have, so it's worth
  * surfacing here rather than only in the trade calculator). */
-export function PositionDetail({ ticker, section = 'all' }: { ticker: string; section?: 'all' | 'current' | 'all-time' | 'lots' | 'closed' | 'prices' }) {
+export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate = '' }: { ticker: string; section?: 'all' | 'current' | 'all-time' | 'lots' | 'closed' | 'prices'; fromDate?: string; toDate?: string }) {
   const { workbook, positions, calcFee, lots } = usePSXDerived();
   const setMarketPrice = usePSXWorkbookStore((s) => s.setMarketPrice);
   const updatePricePoint = usePSXWorkbookStore((s) => s.updatePricePoint);
@@ -93,8 +93,8 @@ export function PositionDetail({ ticker, section = 'all' }: { ticker: string; se
   // costBasisMethod this workbook is set to — see computeClosedTrades'
   // own doc comment for why it's a separate reporting ledger.
   const closedTrades = useMemo(
-    () => computeClosedTrades(workbook.transactions.filter((t) => t.ticker === ticker), calcFee),
-    [workbook.transactions, ticker, calcFee],
+    () => computeClosedTrades(workbook.transactions.filter((t) => t.ticker === ticker), calcFee).filter(trade => (!fromDate || trade.sellDate >= fromDate) && (!toDate || trade.sellDate <= toDate)),
+    [workbook.transactions, ticker, calcFee, fromDate, toDate],
   );
   type CTCol = 'buyDate' | 'sellDate' | 'shares' | 'netPL' | 'holdingDays';
   const ctSortValue = (t: (typeof closedTrades)[number], col: CTCol): number | string =>
@@ -379,7 +379,7 @@ export function PositionDetail({ ticker, section = 'all' }: { ticker: string; se
       <div>
 
         {(section === 'all' || section === 'prices') && <DetailCard section={section} title={<span>Market Price</span>} className="mb-12">
-        <MarketPriceHistory ticker={ticker} />
+        <MarketPriceHistory ticker={ticker} fromDate={fromDate} toDate={toDate} />
         </DetailCard>}
 
         {(section === 'all' || section === 'current') && isOpen && (
@@ -412,17 +412,7 @@ export function PositionDetail({ ticker, section = 'all' }: { ticker: string; se
         )}
 
         {(section === 'all' || section === 'prices') && stats && (
-          <DetailCard section={section} title={<span>Price range</span>}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 8 }}>
-              <div className="stat-card card" style={hueStyle(HUES[5])}><div className="label">Lowest</div><div className="value">{fmtPSXPrice(stats.min)}</div><div className="sub">{stats.minDate}</div></div>
-              <div className="stat-card card" style={hueStyle(HUES[1])}>
-                <div className="label">Median (fair value)</div>
-                <Tooltip text="A simple fair-value estimate: the middle price across every update you've recorded for this ticker.">
-                  <div className="value">{fmtPSXPrice(stats.median)}</div>
-                </Tooltip>
-              </div>
-              <div className="stat-card card" style={hueStyle(HUES[2])}><div className="label">Highest</div><div className="value">{fmtPSXPrice(stats.max)}</div><div className="sub">{stats.maxDate}</div></div>
-            </div>
+          <DetailCard section={section} title={<span>Price history</span>}>
             <details>
               <summary className="text-muted clickable">
                 {showAllPrices ? `All updates (${stats.totalUpdates})` : `Recent updates (${stats.recent.length} of ${stats.totalUpdates})`}

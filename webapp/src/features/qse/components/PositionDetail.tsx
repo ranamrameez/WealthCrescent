@@ -46,7 +46,7 @@ function CompactChart({ height, children }: { height: number; children: React.Re
  * too, which is what the quick popup used to be missing entirely), and
  * price range. Shared between the quick popup (PositionModal) and the full
  * dedicated stock page (StockPage) so they never drift apart. */
-export function PositionDetail({ ticker, section = 'all' }: { ticker: string; section?: 'all' | 'current' | 'all-time' | 'lots' | 'closed' | 'prices' }) {
+export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate = '' }: { ticker: string; section?: 'all' | 'current' | 'all-time' | 'lots' | 'closed' | 'prices'; fromDate?: string; toDate?: string }) {
   const { workbook, positions, calcFee, lots } = useQSEDerived();
   const setMarketPrice = useWorkbookStore((s) => s.setMarketPrice);
   const updatePricePoint = useWorkbookStore((s) => s.updatePricePoint);
@@ -111,8 +111,8 @@ export function PositionDetail({ ticker, section = 'all' }: { ticker: string; se
   // new calc logic. Empty for a ticker with no sells yet, which naturally
   // satisfies "skip Selling data" for a still-fully-open position.
   const closedTrades = useMemo(
-    () => computeClosedTrades(workbook.transactions.filter((t) => t.ticker === ticker), calcFee),
-    [workbook.transactions, ticker, calcFee],
+    () => computeClosedTrades(workbook.transactions.filter((t) => t.ticker === ticker), calcFee).filter(trade => (!fromDate || trade.sellDate >= fromDate) && (!toDate || trade.sellDate <= toDate)),
+    [workbook.transactions, ticker, calcFee, fromDate, toDate],
   );
   type CTCol = 'buyDate' | 'sellDate' | 'shares' | 'netPL' | 'holdingDays';
   const ctSortValue = (t: (typeof closedTrades)[number], col: CTCol): number | string =>
@@ -376,7 +376,7 @@ export function PositionDetail({ ticker, section = 'all' }: { ticker: string; se
       {/* Daily price — the single most-asked-about number, so it leads
           instead of being buried under other sections. */}
       {(section === 'all' || section === 'prices') && <DetailCard section={section} title={<span>Market Price</span>} className="mb-12">
-      <MarketPriceHistory ticker={ticker} />
+      <MarketPriceHistory ticker={ticker} fromDate={fromDate} toDate={toDate} />
       </DetailCard>}
 
       {(section === 'all' || section === 'current') && isOpen && (
@@ -409,17 +409,7 @@ export function PositionDetail({ ticker, section = 'all' }: { ticker: string; se
       )}
 
       {(section === 'all' || section === 'prices') && stats && (
-        <DetailCard section={section} title={<span>Price range</span>}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 8 }}>
-            <div className="stat-card card" style={hueStyle(HUES[5])}><div className="label">Lowest</div><div className="value">{fmtQSEPrice(stats.min)}</div><div className="sub">{stats.minDate}</div></div>
-            <div className="stat-card card" style={hueStyle(HUES[1])}>
-              <div className="label">Median (fair value)</div>
-              <Tooltip text="A simple fair-value estimate: the middle price across every update you've recorded for this ticker.">
-                <div className="value">{fmtQSEPrice(stats.median)}</div>
-              </Tooltip>
-            </div>
-            <div className="stat-card card" style={hueStyle(HUES[2])}><div className="label">Highest</div><div className="value">{fmtQSEPrice(stats.max)}</div><div className="sub">{stats.maxDate}</div></div>
-          </div>
+        <DetailCard section={section} title={<span>Price history</span>}>
           <details>
             <summary className="text-muted clickable">
               {showAllPrices ? `All updates (${stats.totalUpdates})` : `Recent updates (${stats.recent.length} of ${stats.totalUpdates})`}

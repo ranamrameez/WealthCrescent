@@ -6,7 +6,7 @@ import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu
 import { InvestmentPlans } from '../../../components/InvestmentPlans';
 import { BackButton } from '../../../components/BackButton';
 import { PriceInput } from "../../../components/ui/PriceInput";
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { CheckIcon, EditIcon, SaveIcon, TrashIcon, XIcon } from '../../../components/icons';
@@ -109,6 +109,11 @@ function TickerTransactions({ ticker, filters }: { ticker: string; filters: Tran
     }
   };
   const { sorted: rows, Th } = useSortableRows(filteredRows, sortValue, 'date', 'desc');
+  const [page,setPage]=useState(1),[pageSize,setPageSize]=useState(25);
+  const pageCount=Math.max(1,Math.ceil(rows.length/pageSize)),safePage=Math.min(page,pageCount);
+  const pageRows=rows.slice((safePage-1)*pageSize,safePage*pageSize);
+  useEffect(()=>setPage(1),[filters.fromDate,filters.toDate,filters.direction,filters.source,pageSize,ticker]);
+  useEffect(()=>{if(page>pageCount)setPage(pageCount);},[page,pageCount]);
 
   const submit = async () => {
     const shares = Number(sharesInput);
@@ -205,7 +210,7 @@ function TickerTransactions({ ticker, filters }: { ticker: string; filters: Tran
             <tr><Th col="date">Date</Th><Th col="action">Action</Th><Th col="shares">Shares</Th><Th col="price">Price</Th><Th col="cost">Cost</Th><Th col="fee">Fee</Th><th></th></tr>
           </thead>
           <tbody>
-            {rows.map(({ tx, i }) =>
+            {pageRows.map(({ tx, i }) =>
               editIndex === i && editRow ? (
                 <Fragment key={i}>
                 <tr>
@@ -317,6 +322,7 @@ function TickerTransactions({ ticker, filters }: { ticker: string; filters: Tran
           </tbody>
         </table>
       </div>
+      <div className="pagination-bar"><span className="text-muted">{rows.length?`Showing ${(safePage-1)*pageSize+1}–${Math.min(safePage*pageSize,rows.length)} of ${rows.length}`:'No rows'}</span><div className="pagination-actions"><label>Rows <select value={pageSize} onChange={event=>setPageSize(Number(event.target.value))}><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select></label><button className="btn secondary small" disabled={safePage<=1} onClick={()=>setPage(value=>Math.max(1,value-1))}>Previous</button><button className="btn secondary small" disabled={safePage>=pageCount} onClick={()=>setPage(value=>Math.min(pageCount,value+1))}>Next</button></div></div>
     </div>
   );
 }
@@ -388,7 +394,7 @@ export function StockPage() {
 
       <StandardPageSections preserveOrder defaultKey="prices"
         sections={[
-          { key: 'prices', label: 'Market Price', defaultOpen: true, content: <PositionDetail ticker={ticker} section="prices" /> },
+          { key: 'prices', label: 'Market Price', defaultOpen: true, content: <PositionDetail ticker={ticker} section="prices" fromDate={filters.fromDate} toDate={filters.toDate} /> },
           { key: 'summary', label: 'Summary', defaultOpen: true, content: <StockPortfolioSummary ticker={ticker} /> },
           { key: 'lots', label: 'Open Lots', defaultOpen: true, content: <PositionDetail ticker={ticker} section="lots" /> },
           {
@@ -399,7 +405,7 @@ export function StockPage() {
             headerEnd: hasRows ? <button className="btn secondary small" onClick={exportStatement}>Export CSV</button> : undefined,
           },
           { key: 'plans', label: 'Plans', defaultOpen: true, content: <InvestmentPlans market="psx" items={[{ id: ticker, name: ticker, currency: workbook.settings.currency }]} filters={filters} /> },
-          { key: 'closed', label: 'Closed', defaultOpen: true, content: <PositionDetail ticker={ticker} section="closed" /> },
+          { key: 'closed', label: 'Closed', defaultOpen: true, content: <PositionDetail ticker={ticker} section="closed" fromDate={filters.fromDate} toDate={filters.toDate} /> },
           {
             key: 'analytics',
             label: 'Analytics',

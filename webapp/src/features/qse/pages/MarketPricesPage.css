@@ -17,14 +17,13 @@
 .market-chart-caption {font-size:12px;margin:0 0 12px;}
 .market-chart-legend,.market-page-summary,.market-timeframes,.market-updates-pager {display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;}
 .market-chart-legend {font-size:12px;margin-top:12px;}
-.market-price-groups {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px;}
-.market-price-group {display:flex;flex-direction:column;gap:8px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;min-width:0;}
-.market-price-group-values {display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px 12px;}
-.market-price-group-values span {display:flex;flex-direction:column;color:var(--muted);font-size:11px;}
-.market-price-group-values b {color:var(--text);font-size:13px;font-variant-numeric:tabular-nums;}
-.market-price-group small {color:var(--muted);}
+.market-price-groups {display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:16px;margin-top:14px;}
+.market-price-groups section {min-width:0;}
+.market-price-groups h4 {margin:0 0 8px;}
+.market-price-groups small {display:block;margin-top:6px;color:var(--muted);}
 .market-current-price {margin-left:auto;display:flex;flex-direction:column;gap:4px;}
 .market-current-price-control {display:flex;align-items:center;gap:6px;}
+.market-price-actions {display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:12px;}
 .market-page-summary {margin:8px 0 16px;font-size:13px;color:var(--muted);}
 .market-timeframes {margin:0 0 12px;gap:6px;}
 .market-filter-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
@@ -41,7 +40,7 @@
 .searchable-entity-group {padding:6px 8px;font-size:11px;color:var(--muted);font-weight:700;}
 .searchable-entity-options button {display:block;width:100%;padding:8px;text-align:left;border:0;border-radius:5px;background:transparent;color:var(--text);cursor:pointer;}
 .searchable-entity-options button.active,.searchable-entity-options button:hover {background:color-mix(in srgb,var(--accent,#2563eb) 15%,transparent);}
-@media(max-width:600px){.market-ticker-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}.market-filter-grid{grid-template-columns:1fr;}.market-ticker-select{padding-right:25px;}.searchable-entity-switch{max-width:55vw;width:210px;}.market-chart-canvas{height:280px;}.market-price-groups{grid-template-columns:1fr;}.market-current-price{margin-left:0;}}
+@media(max-width:600px){.market-ticker-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}.market-filter-grid{grid-template-columns:1fr;}.market-ticker-select{padding-right:25px;}.searchable-entity-switch{max-width:55vw;width:210px;}.market-chart-canvas{height:280px;}.market-current-price{margin-left:0;}.market-price-actions{align-items:stretch;flex-direction:column;}.market-price-groups{grid-template-columns:1fr;}}
 
 .market-ticker-card .ticker-logo {width:28px;height:28px;margin-right:0;align-self:center;}
 .market-ticker-card .ticker-logo-fallback {font-size:11px;}
