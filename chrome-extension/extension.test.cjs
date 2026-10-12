@@ -682,3 +682,42 @@ test('Extension modules resolve every local import', () => {
   assert.match(container.textContent,/day high: 0.971; day low: 0.941/);
   assert.match(container.textContent,/Extrema time unknown/);
 });
+
+
+test('Live price observer sends changes, ignores unchanged prices and honors Stop', async () => {
+  const { JSDOM } = require('../webapp/node_modules/jsdom');
+  const dom = new JSDOM('<div role="row" class="ag-row" row-id="QFLS"><div col-id="lastPrice">10</div></div>');
+  let observer, storageListener, pending, config = { scrapingEnabled: true, scrapeIntervalSeconds: 0, scrapeOnPriceChange: true };
+  const messages = [];
+  const ctx = vm.createContext({ document: dom.window.document, console,
+    MutationObserver: class { constructor(fn) { observer = fn; } observe() {} },
+    setTimeout: fn => { pending = fn; return 1; }, clearTimeout: () => { pending = undefined; },
+    setInterval: () => { throw new Error('Zero must not create a timer'); }, clearInterval() {},
+    chrome: { runtime: { onMessage: { addListener() {} }, sendMessage: async message => messages.push(message) },
+      storage: { local: { get: async () => ({ syncConfig: config }) }, onChanged: { addListener: fn => { storageListener = fn; } } } },
+  });
+  vm.runInContext(read('content.js'), ctx);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(messages.length, 1);
+  observer(); pending();
+  assert.equal(messages.length, 1);
+  dom.window.document.querySelector('[col-id]').textContent = '11';
+  observer(); pending();
+  assert.equal(messages.length, 2);
+  assert.equal(messages[1].reason, 'price');
+  config = { ...config, scrapingEnabled: false };
+  storageListener({ syncConfig: {} }, 'local');
+  await new Promise(resolve => setImmediate(resolve));
+  dom.window.document.querySelector('[col-id]').textContent = '12'; observer();
+  assert.equal(pending, undefined);
+  assert.equal(messages.length, 2);
+});
+
+test('Scrape interval validation and all-day window override', async () => {
+  const common = await import('data:text/javascript;base64,' + Buffer.from(read('common.js')).toString('base64'));
+  await common.setSyncConfig({ scrapeIntervalSeconds: 0, scrapeOnPriceChange: true });
+  assert.equal((await common.getSyncConfig()).scrapeIntervalSeconds, 0);
+  await assert.rejects(common.setSyncConfig({ scrapeIntervalSeconds: -1 }));
+  await assert.rejects(common.setSyncConfig({ scrapeIntervalSeconds: 0, scrapeOnPriceChange: false }));
+  assert.equal(common.withinScrapingWindow({ respectTimeWindows: false, timeWindows: [] }), true);
+});

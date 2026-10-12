@@ -13,23 +13,11 @@ export const SECURE_TOKEN_BASE = 'https://securetoken.googleapis.com/v1';
 
 export const DEFAULT_TARGET_URL = 'https://webd.thegroup.com.qa/en/markets/qatar';
 
-// Every ticker the scraper finds is synced — there is no allow-list. What IS
-// throttled is how often we're willing to actually WRITE to Firebase RTDB:
-// collection (scraping the page) happens on a short, randomized cadence
-// since it's free/local, but a push to Firebase only happens once at least
-// `minPushIntervalMinutes` have elapsed, PLUS a random extra delay on top
-// (so the real gap between pushes is randomized between 1x and 2x the
-// floor, never a perfectly predictable period) — this is both kinder to
-// Firebase RTDB's write-rate limits and less bot-like as a request pattern
-// against the brokerage's own page.
+// Scrape cadence and Firebase push cadence are configured independently.
 export const MIN_PUSH_INTERVAL_MINUTES_FLOOR = 0;
 export const DEFAULT_MIN_PUSH_INTERVAL_MINUTES = 2;
 
-// Collection (local scrape, no network write) cadence — randomized between
-// these two bounds each cycle, not user-adjustable (see README: this is
-// intentionally not exposed as a "make it faster" knob, since scraping the
-// live brokerage page too aggressively risks being flagged as bot traffic
-// regardless of whether anything gets pushed to Firebase yet).
+// Legacy bounds retained for older scheduler callers.
 export const COLLECT_MIN_SECONDS = 45;
 export const COLLECT_MAX_SECONDS = 90;
 
@@ -48,6 +36,9 @@ export const DEFAULT_SYNC_CONFIG = {
   minPushIntervalMinutes: DEFAULT_MIN_PUSH_INTERVAL_MINUTES,
   pushTimingMode: 'random',
   scrapingEnabled: true,
+  scrapeIntervalSeconds: 5,
+  scrapeOnPriceChange: true,
+  respectTimeWindows: true,
   timeWindows: [{ start: '09:30', end: '13:00' }, { start: '13:10', end: '13:15' }],
 };
 
@@ -95,6 +86,9 @@ export async function setSyncConfig(patch) {
   const next = { ...current, ...patch };
   if (!['random', 'constant'].includes(next.pushTimingMode)) throw new Error('Choose random or constant push timing.');
   if (!Array.isArray(next.timeWindows) || !next.timeWindows.length || next.timeWindows.some(w => !/^([01]\d|2[0-3]):[0-5]\d$/.test(w.start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(w.end) || w.start === w.end)) throw new Error('Provide at least one valid start/end pair with different times.');
+  if (!Number.isFinite(Number(next.scrapeIntervalSeconds)) || Number(next.scrapeIntervalSeconds) < 0) throw new Error('Scrape interval must be zero or a positive number of seconds.');
+  next.scrapeIntervalSeconds = Number(next.scrapeIntervalSeconds);
+  if (!next.scrapeIntervalSeconds && !next.scrapeOnPriceChange) throw new Error('Enable price-change scraping or set a positive scrape interval.');
   next.minPushIntervalMinutes = Math.max(MIN_PUSH_INTERVAL_MINUTES_FLOOR, Number.isFinite(Number(next.minPushIntervalMinutes)) ? Number(next.minPushIntervalMinutes) : DEFAULT_MIN_PUSH_INTERVAL_MINUTES);
   await setStorage({ [STORAGE_KEYS.SYNC_CONFIG]: next });
   return next;
@@ -107,6 +101,7 @@ export function pushDelayMs(config, random = Math.random) {
 }
 
 export function withinScrapingWindow(config, now = new Date()) {
+  if (config.respectTimeWindows === false) return true;
   const time = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Qatar', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(now);
   return config.timeWindows.some(({ start, end }) => start < end ? time >= start && time < end : time >= start || time < end);
 }

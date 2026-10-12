@@ -321,3 +321,42 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   return undefined;
 });
+
+// Page timers provide sub-30-second collection while the worker can sleep.
+// Observe rendered prices rather than unrelated DOM updates or animations.
+if (typeof MutationObserver !== 'undefined') {
+  let liveConfig = {}, timer, pending, lastPrices = '';
+  function priceSignature() {
+    const previousAudit = auditRows;
+    auditRows = [];
+    try { return JSON.stringify(scrapeHeuristic().map(row => [row.ticker, row.price]).sort((a, b) => a[0].localeCompare(b[0]))); }
+    finally { auditRows = previousAudit; }
+  }
+  async function notify(reason) {
+    if (liveConfig.scrapingEnabled === false) return;
+    try { await chrome.runtime.sendMessage({ type: 'PAGE_SCRAPE_TRIGGER', reason }); }
+    catch (_) { /* Reload the market tab after replacing the extension. */ }
+  }
+  async function configureLiveScraping() {
+    const stored = await chrome.storage.local.get('syncConfig');
+    liveConfig = { scrapingEnabled: true, scrapeIntervalSeconds: 5, scrapeOnPriceChange: true, ...stored.syncConfig };
+    clearInterval(timer);
+    clearTimeout(pending); pending = undefined;
+    lastPrices = priceSignature();
+    const seconds = Number(liveConfig.scrapeIntervalSeconds);
+    if (liveConfig.scrapingEnabled && seconds > 0 && seconds < 30) timer = setInterval(() => notify('interval'), Math.max(100, seconds * 1000));
+    if (liveConfig.scrapingEnabled && liveConfig.scrapeOnPriceChange) notify('price');
+  }
+  new MutationObserver(() => {
+    if (!liveConfig.scrapingEnabled || !liveConfig.scrapeOnPriceChange || pending !== undefined) return;
+    pending = setTimeout(() => {
+      pending = undefined;
+      const prices = priceSignature();
+      if (prices !== lastPrices) { lastPrices = prices; notify('price'); }
+    }, 250);
+  }).observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['value', 'data-value'] });
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.syncConfig) configureLiveScraping().catch(() => {});
+  });
+  configureLiveScraping().catch(() => {});
+}

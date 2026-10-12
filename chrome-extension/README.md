@@ -25,8 +25,7 @@ is what actually fills in the app's ticker coverage, not a one-off manual edit.
   real `nameSelector` set in Options (same "Test scrape" workflow as the other selectors)
   is far more reliable once you've seen the real page's layout.
 - **`background.js`** (the MV3 service worker) does everything else:
-  - **Collects** (asks the content script to re-scrape) every ~45–90 seconds (randomized,
-    not a fixed period) while scraping is enabled, within the configured Qatar-time windows, and the market page is open in a tab. This is free/local —
+  - **Collects** on the configured scrape interval (default 5 seconds) and on rendered price changes while enabled, within the configured Qatar-time windows, and with the market page open. This is free/local ?—
     no network request beyond talking to the tab.
   - **Pushes** the latest scrape to Firebase only once at least the configured minimum
     number of minutes has passed since the last push, **plus a random extra delay on top**
@@ -257,8 +256,8 @@ history write fails, with the history failure shown as a partial-sync warning.
 
 Configurations offer Random (1?2 times the interval) and Constant push timing.
 Intervals may be zero: every successful automatic scrape then syncs immediately,
-without an additional Firebase push delay. Collection remains every 45?90 seconds
-and follows the Qatar-time scraping windows. Constant timing aligns the next
+without an additional Firebase push delay. Collection uses the configured scrape interval and price-change trigger,
+and follows Qatar-time windows when enabled. Constant timing aligns the next
 collection alarm with the push due time where possible; browser alarm delays and
 time windows still apply. Configuration changes recalculate the next push time.
 
@@ -323,3 +322,7 @@ already covered by parent rules (do not replace the existing rules tree):
 
 The existing authenticated QSE write permission must also cover `tickers`. Rules
 are documented here, not deployed by the extension.
+
+### Live collection controls
+
+Configure **Scrape interval (seconds)** independently of Firebase push timing. Zero disables periodic collection. Enable **Scrape on every price change** to observe rendered ticker prices (updates are grouped for 250 ms); set the Firebase push interval to zero to sync each collected update. **Follow Qatar time windows** can be disabled for collection throughout the day. Start/Stop applies to both triggers. Short intervals use the open market tab timer; Chrome can throttle background tabs, so timing is best effort. Longer intervals use Chrome alarms. Reload the extension and refresh the market tab after installing this update.

@@ -408,10 +408,11 @@ async function scrapeTab(tab, overrideConfig) {
 // ---------- The collect → throttled/randomized push cycle ----------
 
 let cycleRunning = false;
+let cyclePending = false;
 async function runCycle(options = {}) {
-  if (cycleRunning) return;
+  if (cycleRunning) { if (options.pageTriggered) cyclePending = true; return; }
   cycleRunning = true;
-  try { await collectCycle(options); } finally { cycleRunning = false; await scheduleNextCollect(); }
+  try { await collectCycle(options); } finally { cycleRunning = false; await scheduleNextCollect(); if (cyclePending) { cyclePending = false; await runCycle(); } }
 }
 async function collectCycle({ forcePush = false, manual = false, scrapeOnly = false } = {}) {
   const config = await getSyncConfig();
@@ -482,7 +483,9 @@ async function collectCycle({ forcePush = false, manual = false, scrapeOnly = fa
 
 async function scheduleNextCollect() {
   if (!(await getSyncConfig()).scrapingEnabled) { await chrome.alarms.clear(COLLECT_ALARM); return; }
-  const delaySec = randInt(COLLECT_MIN_SECONDS, COLLECT_MAX_SECONDS);
+  const interval = (await getSyncConfig()).scrapeIntervalSeconds;
+  if (interval === 0) { await chrome.alarms.clear(COLLECT_ALARM); return; }
+  const delaySec = interval === undefined ? randInt(COLLECT_MIN_SECONDS, COLLECT_MAX_SECONDS) : Math.max(30, interval);
   const config = await getSyncConfig();
   const status = config.pushTimingMode === 'constant' ? await getStatus() : {};
   const now = Date.now();
@@ -502,6 +505,13 @@ chrome.runtime.onStartup.addListener(() => scheduleNextCollect());
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {
     switch (message?.type) {
+      case 'PAGE_SCRAPE_TRIGGER': {
+        const [config, scrape] = await Promise.all([getSyncConfig(), getScrapeConfig()]);
+        if (!_sender.tab || !_sender.tab.url.startsWith(scrape.targetUrl) || (message.reason === 'price' ? !config.scrapeOnPriceChange : !(config.scrapeIntervalSeconds > 0 && config.scrapeIntervalSeconds < 30))) { sendResponse({ ok: false }); break; }
+        await runCycle({ pageTriggered: true });
+        sendResponse({ ok: true });
+        break;
+      }
       case 'START_SCRAPING': {
         await setSyncConfig({ scrapingEnabled: true });
         await runCycle();
@@ -609,9 +619,7 @@ chrome.storage?.onChanged?.addListener((changes, area) => {
   if (area !== 'local') return;
   if (CONFIG_KEYS.some(key => changes[key])) saveExtensionConfigs(getFreshAuth, true).then(() => patchStatus({ configSyncError:'' })).catch(error => patchStatus({ configSyncError: error.message }));
   if (!changes.syncConfig) return;
-  const before = changes.syncConfig.oldValue || {};
-  const after = changes.syncConfig.newValue || {};
-  if (before.pushTimingMode === after.pushTimingMode && before.minPushIntervalMinutes === after.minPushIntervalMinutes) return;
+
   (async () => {
     const [config, status] = await Promise.all([getSyncConfig(), getStatus()]);
     if (status.lastPushAt) await patchStatus({ nextPushAt: status.lastPushAt + pushDelayMs(config) });
