@@ -117,7 +117,7 @@ test('Firebase history normalizes arrays and keyed points, filters Qatar dates a
   assert.equal(first.total, 2);
   assert.equal(first.rows[0].price, 13);
   assert.equal(second.rows[0].price, 12);
-  assert.deepEqual(module.paginatePushed(module.pushedRecords({ history: null, prices: null })), { rows: [], total: 0, tickers: [], chartRows: [], outlierRows: [] });
+  assert.deepEqual(module.paginatePushed(module.pushedRecords({ history: null, prices: null })), { rows: [], total: 0, outlierTotal: 0, tickers: [], chartRows: [], outlierRows: [] });
 });
 
 test('Pushed-data handler reads Firebase and returns previous history without scraping', async () => {
@@ -248,7 +248,7 @@ test('Table populates ticker dropdown and selected-row edit sends the expected c
   assert.match(document.getElementById('dataRows').textContent, /lastPrice/);
   assert.match(document.getElementById('dataRows').textContent, /FLAG 25.00%/);
   const checkbox = document.querySelector('#dataRows input');
-  assert.equal(checkbox.checked, true, 'Outliers are selected automatically');
+  assert.equal(checkbox.checked, false, 'Deletion selection is explicit');
   checkbox.checked = false; checkbox.onchange();
   await document.getElementById('refreshData').onclick();
   assert.equal(document.querySelector('#dataRows input').checked, false, 'Manual deselection survives refresh');
@@ -764,7 +764,7 @@ test('Navigation opens collapsed sections and preserves card contents', async ()
   document.querySelector('a[href="#section-configCard"]').click();
   assert.equal(settings.open, true);
   assert.ok(settings.contains(document.getElementById('configCard')));
-  assert.equal(document.querySelectorAll('details').length, 8);
+  assert.equal(document.querySelectorAll('details.collapsible-section').length, 9);
 });
 
 

@@ -108,35 +108,36 @@ export async function markAuditSynced(capturedAt, tickers) {
   } finally { db.close(); }
 }
 
-export async function queryAudit({ from = '', to = '', ticker = '', strategy = '', accepted = '', source = '', outliers = '', page = 1, pageSize = 25, includeRecords = false } = {}) {
-  const db = await openDB();
-  try {
-    return await new Promise((resolve, reject) => {
-      const tx = db.transaction('rows');
-      const request = tx.objectStore('rows').openCursor();
-      const tickers = new Set();
-      const previous = new Map();
-      const rows = [];
-      request.onsuccess = () => {
-        const cursor = request.result;
-        if (!cursor) return;
-        const row = cursor.value;
-        tickers.add(row.ticker);
-        Object.assign(row, priceDeviation(row.price, previous.get(row.ticker)));
-        if (row.accepted !== false && Number.isFinite(row.price) && row.price > 0) previous.set(row.ticker, row.price);
-        rows.push(row);
-        cursor.continue();
-      };
-      tx.oncomplete = () => {
-        const annotated = flagPriceOutliers(rows).reverse();
-        const filtered = annotated.filter(row => {
-          const date = qatarDate(row.capturedAt);
-          return (!from || date >= from) && (!to || date <= to) && (!ticker || (row.ticker || '').toUpperCase().includes(ticker.toUpperCase())) && (!strategy || row.strategy === strategy) && (!source || row.source === source) && (!accepted || String(row.accepted) === accepted) && (!outliers || row.outlier);
-        });
-        resolve({ rows: filtered.slice((page - 1) * pageSize, page * pageSize), ...(includeRecords ? { records: filtered } : {}), total: filtered.length, tickers: [...tickers].filter(Boolean).sort(), chartRows: filtered.map(({ ticker, price, capturedAt, outlier, deltaPct, outlierDeltaPct, referencePrice, referenceCount, dayHigh, dayLow }) => ({ ticker, price, capturedAt, outlier, deltaPct, outlierDeltaPct, referencePrice, referenceCount, dayHigh, dayLow })), outlierRows: filtered.filter(row => row.outlier).slice(0, 100).map(({ id, ticker, price }) => ({ id, ticker, price })) });
-      };
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error || new Error('Audit query was interrupted.'));
-    });
-  } finally { db.close(); }
+let auditSnapshot = null;
+async function readAuditSnapshot() {
+  const cacheable = typeof chrome !== 'undefined' && chrome.storage?.local?.get;
+  const { auditUpdatedAt = 0 } = cacheable ? await chrome.storage.local.get('auditUpdatedAt') : {};
+  if (cacheable && auditSnapshot?.version === auditUpdatedAt && Date.now() - auditSnapshot.at < 5000) return auditSnapshot.promise;
+  const pending = { version: auditUpdatedAt, at: Date.now() };
+  pending.promise = (async () => {
+    const db = await openDB();
+    try {
+      const rows = await new Promise((resolve, reject) => {
+        const tx = db.transaction('rows'), request = tx.objectStore('rows').openCursor(), rows = [], previous = new Map();
+        request.onsuccess = () => {
+          const cursor = request.result; if (!cursor) return;
+          const row = cursor.value;
+          Object.assign(row, priceDeviation(row.price, previous.get(row.ticker)));
+          if (row.accepted !== false && Number.isFinite(row.price) && row.price > 0) previous.set(row.ticker, row.price);
+          row.date = qatarDate(row.capturedAt); rows.push(row); cursor.continue();
+        };
+        tx.oncomplete = () => resolve(rows); tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error || new Error('Audit query interrupted.'));
+      });
+      return { rows, version: auditUpdatedAt, annotated: null };
+    } finally { db.close(); }
+  })().catch(error => { if (auditSnapshot === pending) auditSnapshot = null; throw error; });
+  if (cacheable) auditSnapshot = pending;
+  return pending.promise;
+}
+export async function queryAudit({ from = '', to = '', ticker = '', strategy = '', accepted = '', source = '', outliers = '', page = 1, pageSize = 25, includeRecords = false, rawOnly = false } = {}) {
+  const snapshot = await readAuditSnapshot();
+  if (rawOnly && includeRecords) return { records: snapshot.rows, auditVersion: snapshot.version };
+  snapshot.annotated ||= flagPriceOutliers(snapshot.rows).reverse();
+  const filtered = snapshot.annotated.filter(row => (!from || row.date >= from) && (!to || row.date <= to) && (!ticker || (row.ticker || '').toUpperCase().includes(ticker.toUpperCase())) && (!strategy || row.strategy === strategy) && (!source || row.source === source) && (!accepted || String(row.accepted) === accepted) && (!outliers || row.outlier));
+  return { rows: filtered.slice((page - 1) * pageSize, page * pageSize), ...(includeRecords ? { records: filtered } : {}), total: filtered.length, outlierTotal: filtered.filter(row => row.outlier).length, tickers: [...new Set(snapshot.rows.map(row => row.ticker))].filter(Boolean).sort(), chartRows: filtered.map(({ ticker, price, capturedAt, outlier, deltaPct, outlierDeltaPct, referencePrice, referenceCount, outlierMethod, dayHigh, dayLow }) => ({ ticker, price, capturedAt, outlier, deltaPct, outlierDeltaPct, referencePrice, referenceCount, outlierMethod, dayHigh, dayLow })), outlierRows: filtered.filter(row => row.outlier).slice(0, 100) };
 }

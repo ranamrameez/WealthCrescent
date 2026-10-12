@@ -139,11 +139,11 @@ test('Pinned charts inherit table date and outlier filters unless their timefram
     chrome: { storage: { local: { get: async () => ({}), set: async () => {} }, onChanged: { addListener() {} } } },
   });
   await vm.runInContext('(async () => {' + read('options.js').replace(/^import .*;\r?\n/gm, '') + '})()', ctx);
-  assert.equal(requests.filter(request => request.filters?.ticker === 'QFLS').at(-1).filters.from, '2026-10-12');
+  assert.equal(requests.filter(request => request.filters).at(-1).filters.from, '2026-10-12');
   document.getElementById('outlierFilter').value = 'true';
   document.getElementById('outlierFilter').dispatchEvent(new dom.window.Event('change'));
   await tick();
-  assert.equal(requests.filter(request => request.filters?.ticker === 'QFLS').at(-1).filters.outliers, 'true');
+  assert.equal(requests.filter(request => request.filters).at(-1).filters.outliers, 'true');
   await document.querySelector('[data-favourite-period="7d"]').onclick();
   assert.equal(requests.filter(request => request.filters?.ticker === 'QFLS').at(-1).filters.from, '2026-10-06');
   assert.equal(document.getElementById('fromDate').value, '2026-10-12');

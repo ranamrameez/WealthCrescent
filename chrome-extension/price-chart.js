@@ -5,12 +5,18 @@ export function renderPriceChart(container, rows, ticker, options = {}) {
     const tickers = [...new Set(rows.filter(row => Number.isFinite(row.price) && Number.isFinite(row.capturedAt)).map(row => row.ticker))].sort();
     if (!tickers.length) { container.textContent = 'No dated prices in the current filters.'; return; }
     const grid = document.createElement('div'); grid.className = 'chart-grid';
-    for (const symbol of tickers) {
+    let shown = 0;
+    const more = document.createElement('button'); more.textContent = 'Show more ticker charts';
+    const status = document.createElement('p'); status.className = 'muted';
+    const appendNext = () => {
+    for (const symbol of tickers.slice(shown, shown + 6)) {
       const card = document.createElement('section'); const heading = document.createElement('h3'); heading.textContent = symbol;
       const chart = document.createElement('div'); card.append(heading, chart); grid.append(card);
       renderPriceChart(chart, rows, symbol, options);
     }
-    container.append(grid);
+    shown = Math.min(tickers.length, shown + 6); status.textContent = `Showing ${shown} of ${tickers.length} ticker charts. Choose a chart ticker to focus on one.`; more.hidden = shown >= tickers.length;
+    };
+    more.onclick = appendNext; appendNext(); container.append(status, grid, more);
     return;
   }
   const toolbar = document.createElement('div'); toolbar.className = 'chart-toolbar';
@@ -46,7 +52,9 @@ export function renderPriceChart(container, rows, ticker, options = {}) {
     }
   };
   toolbar.append(fullscreen); container.append(toolbar);
-  const points = rows.filter(row => row.ticker === ticker && Number.isFinite(row.price) && Number.isFinite(row.capturedAt)).sort((a, b) => a.capturedAt - b.capturedAt);
+  const allPoints = rows.filter(row => row.ticker === ticker && Number.isFinite(row.price) && Number.isFinite(row.capturedAt)).sort((a, b) => a.capturedAt - b.capturedAt);
+  const points = sampleChartPoints(allPoints);
+  if (allPoints.length > points.length) { const note = document.createElement('p'); note.className = 'muted'; note.textContent = `Showing ${points.length} of ${allPoints.length} samples. The records table retains all observations.`; container.append(note); }
   if (!points.length) { const message = document.createElement('p'); message.textContent = 'No dated prices for this ticker in the current filters.'; container.append(message); return; }
   const ns = 'http://www.w3.org/2000/svg';
   const node = (name, attrs, text) => {
@@ -81,7 +89,7 @@ export function renderPriceChart(container, rows, ticker, options = {}) {
       svg.append(range);
     }
     const circle = node('circle', { cx: x(point), cy: y(point), r: point.outlier ? 5 : 3, fill: point.outlier ? '#b91c1c' : '#1d4ed8', tabindex: 0 });
-    circle.append(node('title', {}, `${ticker} · ${date(point.capturedAt)} · ${point.price}${point.outlier ? ` · Flag: ${point.outlierDeltaPct?.toFixed(2)}% from nearby median ${point.referencePrice} (${point.referenceCount} prices)` : ''}`));
+    circle.append(node('title', {}, `${ticker} · ${date(point.capturedAt)} · ${point.price}${point.outlier ? ` · Flag: ${point.outlierDeltaPct?.toFixed(2)}% from reference median ${point.referencePrice} (${point.referenceCount} prices)` : ''}`));
     svg.append(circle);
   }
   svg.append(node('text', { x: 80, y: 290, fill: '#17283c', 'font-size': 13 }, date(start)));
@@ -92,4 +100,17 @@ export function renderPriceChart(container, rows, ticker, options = {}) {
     legend.textContent = 'Blue: sampled price. Green: reported daily high/low at scrape time; the time of each extremum is unknown.';
     container.append(legend);
   }
+}
+
+export function sampleChartPoints(points, limit = 500) {
+  if (points.length <= limit) return points;
+  const selected = new Set([points[0], points.at(-1)]);
+  const buckets = Math.floor((limit - 2) / 3);
+  for (let bucket = 0; bucket < buckets; bucket++) {
+    const start = Math.floor(bucket * points.length / buckets), end = Math.floor((bucket + 1) * points.length / buckets);
+    let low = points[start], high = low, flagged = null;
+    for (let index = start; index < end; index++) { const point = points[index]; if (point.price < low.price) low = point; if (point.price > high.price) high = point; if (point.outlier && !flagged) flagged = point; }
+    selected.add(low); selected.add(high); if (flagged) selected.add(flagged);
+  }
+  return [...selected].sort((a, b) => a.capturedAt - b.capturedAt);
 }

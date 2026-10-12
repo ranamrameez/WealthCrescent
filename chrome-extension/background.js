@@ -40,6 +40,7 @@ function networkRequest(url, options = {}) {
 }
 let pushedSnapshot = null;
 let pushedRead = null;
+let combinedSnapshot = null;
 let rootReady = false;
 async function ensureQseRoot(auth) {
   if (rootReady) return;
@@ -627,14 +628,16 @@ chrome.runtime.onMessage.addListener((message, _sender, reply) => {
         break;
       }
       case 'GET_ALL_DATA': {
-        const local = await queryAudit({ includeRecords: true });
+        const local = await queryAudit({ includeRecords: true, rawOnly: true });
         let firebase = [];
         let warning = '';
         try {
           await queryPushedData({}, !!message.refresh);
           firebase = pushedSnapshot.rows;
         } catch (error) { warning = `Firebase unavailable: ${error.message} Showing local records; their sync state may be unverified.`; }
-        const rows = flagPriceOutliers(combineRecords(firebase, local.records));
+        const key = [local.auditVersion, pushedSnapshot?.uid, pushedSnapshot?.at, warning].join(':');
+        if (local.auditVersion === undefined || combinedSnapshot?.key !== key) combinedSnapshot = { key, rows: flagPriceOutliers(combineRecords(firebase, local.records)) };
+        const rows = combinedSnapshot.rows;
         sendResponse({ ok: true, ...paginatePushed(rows, message.filters || {}), warning });
         break;
       }

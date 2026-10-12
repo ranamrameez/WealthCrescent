@@ -18,7 +18,7 @@ function render() {
       if (!control.disabled) control.disabled = true;
     } else if (control.hasAttribute('data-action-locked')) {
       delete control.dataset.actionLocked;
-      control.disabled = control.classList.contains('start-control') ? status.scrapingEnabled === true : control.id === 'deleteOutliers' ? !(parseInt(document.getElementById('outlierCount')?.textContent, 10) > 0) : control.id === 'editSelected' || control.id === 'deleteSelected' ? !(parseInt(document.getElementById('selectionInfo')?.textContent, 10) > 0) : false;
+      control.disabled = control.classList.contains('start-control') ? status.scrapingEnabled === true : control.id === 'deleteOutliers' ? control.dataset.previewStale === 'true' || !(parseInt(document.getElementById('outlierCount')?.textContent, 10) > 0) : control.id === 'editSelected' || control.id === 'deleteSelected' ? !(parseInt(document.getElementById('selectionInfo')?.textContent, 10) > 0) : false;
     }
   }
 }

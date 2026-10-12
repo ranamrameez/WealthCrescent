@@ -77,6 +77,7 @@ test('Remove flagged outliers submits only flagged records, even when a normal r
   });
   await vm.runInContext('(async () => {' + read('options.js').split(String.fromCharCode(10)).filter(line => !line.startsWith('import ')).join(String.fromCharCode(10)) + '})()', ctx);
   const normalCheckbox = document.querySelector('#dataRows input'); normalCheckbox.checked = true; normalCheckbox.onchange();
+  document.getElementById('selectPreviewOutliers').onclick();
   await document.getElementById('deleteOutliers').onclick();
   assert.equal(mutation.operation, 'delete');
   assert.deepEqual(Array.from(mutation.entries, row => row.id), ['bad']);
@@ -107,4 +108,34 @@ test('Local outlier-only queries classify against the complete neighboring audit
   assert.equal(result.total, 1);
   assert.equal(result.rows[0].price, 1000);
   assert.equal(result.chartRows[0].referencePrice, 10);
+});
+
+
+test('Early wrong batches are flagged against later trusted prices across dates', async () => {
+  const { flagPriceOutliers } = await load();
+  const early = samples([1000, 1000, 1000, 1000]);
+  const later = samples([10, 10.01, 9.99, 10, 10.01, 9.99, 10, 10]).map(row => ({ ...row, id: 'trusted-' + row.id, capturedAt: row.capturedAt + 86400000, priceKey: 'lastPrice' }));
+  const result = flagPriceOutliers([...early, ...later]);
+  assert.equal(result.slice(0, early.length).every(row => row.outlier), true);
+  assert.equal(result.slice(early.length).some(row => row.outlier), false);
+  assert.equal(result[0].outlierMethod, 'historical-consensus');
+  assert.ok(result[0].outlierEvidence.some(item => item.method === 'historical-forward'));
+  assert.ok(result[0].outlierEvidence.some(item => item.method === 'historical-both'));
+  assert.ok(result[0].outlierEvidence.some(item => item.method === 'historical-sampled'));
+  assert.deepEqual(flagPriceOutliers([...early, ...later]), result);
+});
+
+test('Historical fallback does not flag ordinary drift or an uncorroborated starting value', async () => {
+  const { flagPriceOutliers } = await load();
+  const later = samples([10, 10.01, 9.99, 10, 10.01, 9.99]).map(row => ({ ...row, capturedAt: row.capturedAt + 86400000, priceKey: 'lastPrice' }));
+  assert.equal(flagPriceOutliers([...samples([12]), ...later])[0].outlier, false);
+  assert.equal(flagPriceOutliers([...samples([1000]), ...later.slice(0, 3)])[0].outlier, false);
+  assert.equal(flagPriceOutliers([...samples([1000]), ...later.map(row => ({ ...row, priceKey: null }))])[0].outlier, false);
+});
+
+test('Near-time evidence records backward, forward, combined and sampled comparisons', async () => {
+  const { flagPriceOutliers } = await load();
+  const result = flagPriceOutliers(samples([10, 10, 10, 1000, 10, 10, 10]));
+  assert.deepEqual(result[3].outlierEvidence.map(item => item.method), ['nearby-forward', 'nearby-backward', 'nearby-both', 'nearby-sampled']);
+  assert.equal(result[3].outlier, true);
 });

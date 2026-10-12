@@ -51,3 +51,18 @@ button:disabled { opacity: .45; cursor: default; }
 .collapsible-section > .card { margin:0; border:0; }
 
 .action-status { position:sticky; top:70px; z-index:9; padding:10px; background:#eef4fb; border:1px solid #9aadc2; border-radius:6px; color:#17283c; }
+
+/* Focused sections and explicit disclosure for advanced controls. */
+body:has(.extension-nav) { max-width:1400px; margin:0 auto; padding:20px; }
+.collapsible-section > summary { padding:16px; font-size:15px; }
+.advanced-controls { margin:12px 0; padding:10px; border:1px solid #b0bfd0; border-radius:6px; }
+.advanced-controls > summary { cursor:pointer; font-weight:600; }
+.column-toggle { display:flex; gap:6px; align-items:center; font-size:12px; }
+.column-toggle input { width:auto; }
+.compact-records th:nth-child(5), .compact-records td:nth-child(5), .compact-records th:nth-child(6), .compact-records td:nth-child(6), .compact-records th:nth-child(7), .compact-records td:nth-child(7), .compact-records th:nth-child(10), .compact-records td:nth-child(10) { display:none; }
+.outlier-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:12px 0; }
+.preview-scroll { max-height:480px; overflow:auto; border:1px solid #b0bfd0; border-radius:6px; }
+.preview-scroll thead { position:sticky; top:0; background:#e8eef6; }
+.preview-scroll input[type=checkbox] { width:auto; }
+#outliersCard pre { max-width:520px; white-space:pre-wrap; }
+@media(max-width:700px) { body:has(.extension-nav) { padding:10px; } .extension-nav { gap:3px; padding:6px; } }

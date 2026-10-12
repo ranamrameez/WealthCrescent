@@ -342,3 +342,19 @@ Run the outlier regressions along with the other extension checks:
 ```powershell
 node --test chrome-extension/outliers.test.cjs chrome-extension/audit-regression.test.cjs chrome-extension/extension.test.cjs chrome-extension/data-storage.test.cjs
 ```
+
+## Historical starting-batch checks (v0.1.19)
+
+Outlier details now include forward, backward, combined, and repeatable pseudo-random sampled comparison evidence. Near-time detection retains the 10% threshold. The wider historical fallback applies only to initial legacy records without price-column provenance, before the first positive observation with recorded column provenance. It uses at least six provenance-bearing records per usable comparison, requires an 80% stable cluster, and requires at least two historical comparisons to agree on reference price and direction with no usable historical comparison contradicting them. Historical discrepancies must exceed 1.5 times the reference price or fall below two thirds of it. This stricter cross-date threshold avoids classifying ordinary drift solely from later prices; it does not establish an authoritative historical market price.
+
+Use All time in the extension page to review the initial records. Raw details include outlierMethod and outlierEvidence; the removal action uses the resulting flags and retains its deletion confirmation. Flags are recomputed from loaded data; no production records are deleted merely by loading or classifying them.
+
+## Focused page and rendering performance (v0.1.20)
+
+The page mounts local controls without waiting for cloud settings. Activity, controls and records open by default; charts, account, settings, tests and outlier review have visible collapsible sections and navigation links. Existing collapse preferences are retained. Advanced record actions and help use labelled disclosures. Show all columns restores the additional record columns. Test scrape preserves the current data view and filters.
+
+Detected outliers has its own preview table with reference prices, deviation, source and expandable comparison evidence. Nothing is selected for deletion by default; select individual records or Select all flagged. The preview shows at most 100 records and reports the full flagged count. Review all time exposes historical records. Deletion still requires confirmation. Failed loads keep the last results visible, mark the preview outdated and prevent deletion until a successful refresh.
+
+Local audit reads/classification share a versioned short-lived snapshot, combined data reuses classification across requests, matching local/Firebase prices uses an index, and date filtering caches computed Qatar dates. Pinned Table dates charts reuse the main query. Closed chart sections skip rendering. Large plots render at most 500 representative points (including bucket extrema and available flagged points), with a visible sample count; underlying records remain complete. All-ticker plots initially render six charts and offer Show more ticker charts. Raw record JSON and outlier evidence are built when opened. Auto-refresh is coalesced over 750 ms; activity evidence refreshes on completion or after its five-second cache expires.
+
+Regression checks include performance.test.cjs. UI interaction checks run in jsdom; actual Chrome visual layout and production timing are not verified in this session.

@@ -9,7 +9,7 @@ import { sendWorkerMessage } from './common.js';
 import { mountConfig, mountControls } from './config-ui.js';
 import { queryAudit, mutateAudit } from './audit.js';
 const $ = id => document.getElementById(id);
-await sendWorkerMessage({ type:'LOAD_EXTENSION_CONFIGS' }).catch(error => { $('dataMessage').textContent = error.message; });
+sendWorkerMessage({ type:'LOAD_EXTENSION_CONFIGS' }).catch(error => { $('dataMessage').textContent = error.message; });
 const favourites = new Set(await getChartFavourites());
 const savedConfig = await chrome.storage.local?.get(['favouriteTimeframes','viewPreferences']) || {};
 let favouriteTimeframes = savedConfig.favouriteTimeframes || {};
@@ -34,12 +34,10 @@ $('testBtn').onclick = async () => {
     const config = Object.fromEntries(['targetUrl'].map(key => [key, form.elements[key].value.trim()]));
     const result = await sendWorkerMessage({ type: 'TEST_SCRAPE', targetUrl: config.targetUrl, config });
     if (!result?.ok) throw new Error(result?.error || 'No response');
-    $('dataView').value = 'local';
     if (!result.auditSaved) await saveAudit(result, config.targetUrl, 'test');
-    for (const id of ['tickerFilter', 'strategyFilter', 'acceptedFilter', 'sourceFilter']) $(id).value = '';
-    $('testStrategy').textContent = `Strategy: ${result.strategy}`;
+    $('testStrategy').textContent = `Strategy: ${result.strategy}. Saved locally; your current view and filters are unchanged.`;
     $('testOutput').textContent = JSON.stringify(result, null, 2);
-    selected.clear(); page = 1; await renderData();
+    await renderData();
   } catch (error) { $('testOutput').textContent = error.message; }
   finally { $('testBtn').disabled = false; }
 };
@@ -52,12 +50,29 @@ let favouriteRows = [];
 const favouriteChartRows = new Map();
 let visibleRows = [];
 let flaggedOutlierRows = [];
+let flaggedOutlierTotal = 0;
 let batchBusy = false;
+const previewSelected = new Map();
+let previewStale = false;
+function sectionOpen(id) { const details = $(id)?.closest('details.collapsible-section'); return !details || details.open; }
+function showOutlierPreview() {
+  const list = $('outlierPreviewRows'); list.replaceChildren();
+  for (const row of flaggedOutlierRows) {
+    const tr = document.createElement('tr'), td = document.createElement('td'), check = document.createElement('input');
+    check.type = 'checkbox'; check.checked = previewSelected.has(row.id); check.setAttribute('aria-label', 'Delete flagged ' + row.ticker + ' ' + row.price);
+    check.onchange = () => { if (check.checked) previewSelected.set(row.id, row); else previewSelected.delete(row.id); updateSelection(); }; td.append(check); tr.append(td);
+    for (const value of [row.capturedAt == null ? 'Unknown time' : new Date(row.capturedAt).toLocaleString('en-GB', { timeZone:'Asia/Qatar' }), row.ticker, row.price, row.referencePrice ?? 'See record details', row.outlierDeltaPct == null ? '-' : row.outlierDeltaPct.toFixed(2) + '%', row.origin || row.source || $('dataView').value]) { const cell = document.createElement('td'); cell.textContent = value; tr.append(cell); }
+    const evidence = document.createElement('td'), details = document.createElement('details'), summary = document.createElement('summary'); summary.textContent = row.outlierMethod || 'Comparison evidence'; details.append(summary);
+    details.ontoggle = () => { if (details.open && !details.querySelector('pre')) { const pre = document.createElement('pre'); pre.textContent = JSON.stringify(row.outlierEvidence || { referencePrice:row.referencePrice, referenceCount:row.referenceCount }, null, 2); details.append(pre); } }; evidence.append(details); tr.append(evidence); list.append(tr);
+  }
+  $('outlierPreviewMessage').textContent = flaggedOutlierRows.length ? 'Showing ' + flaggedOutlierRows.length + ' of ' + flaggedOutlierTotal + ' flagged records in the current filters. Select records below to delete (maximum 100).' : 'No detected outliers in the current filters. Use Review all time to inspect older values.';
+}
 function updateSelection() {
   $('selectionInfo').textContent = `${selected.size} selected`;
   $('editSelected').disabled = $('deleteSelected').disabled = batchBusy || !selected.size;
-  $('deleteOutliers').disabled = batchBusy || !flaggedOutlierRows.length;
-  $('outlierCount').textContent = `${flaggedOutlierRows.length} flagged (up to 100 per removal)`;
+  $('deleteOutliers').dataset.previewStale = String(previewStale);
+  $('deleteOutliers').disabled = batchBusy || previewStale || !previewSelected.size;
+  $('outlierCount').textContent = `${previewSelected.size} selected / ${flaggedOutlierTotal} flagged`;
   $('selectAll').checked = visibleRows.length > 0 && visibleRows.every(row => selected.has(row.id));
   $('selectAll').indeterminate = visibleRows.some(row => selected.has(row.id)) && !$('selectAll').checked;
 }
@@ -79,7 +94,9 @@ async function renderData(refresh = false) {
     if (page > pages) { page = pages; return renderData(); }
     const pinned = await Promise.all([...favourites].map(async ticker => {
       const period = favouriteTimeframes[ticker] || 'filters';
-      const range = period === 'filters' ? {} : dateRange(period);
+      if (period === 'filters') return [ticker, result.chartRows || result.rows];
+      if (!sectionOpen('favouriteCharts')) return [ticker, favouriteChartRows.get(ticker) || []];
+      const range = dateRange(period);
       if (filters.ticker && !ticker.toUpperCase().includes(filters.ticker.toUpperCase())) return [ticker, []];
       const chartFilters = { ...filters, ...range, ticker };
       const data = combined ? await sendWorkerMessage({ type:'GET_ALL_DATA', filters:chartFilters }) : firebase ? await sendWorkerMessage({ type:'GET_PUSHED_DATA',filters:chartFilters }) : await queryAudit(chartFilters);
@@ -91,6 +108,11 @@ async function renderData(refresh = false) {
     $('tickerFilter').value = tickerValue;
     visibleRows = result.rows;
     flaggedOutlierRows = result.outlierRows || result.rows.filter(row => row.outlier);
+    flaggedOutlierTotal = result.outlierTotal ?? flaggedOutlierRows.length;
+    previewStale = false;
+    const previouslyLoaded = new Set(previewSelected.keys()); previewSelected.clear();
+    for (const row of flaggedOutlierRows) if (previouslyLoaded.has(row.id)) previewSelected.set(row.id, row);
+    showOutlierPreview();
     const flaggedIds = new Set(flaggedOutlierRows.map(row => row.id));
     for (const id of autoSelectedOutliers) if (!flaggedIds.has(id)) { selected.delete(id); autoSelectedOutliers.delete(id); }
     if ($('autoSelectOutliers').checked) {
@@ -114,10 +136,10 @@ async function renderData(refresh = false) {
       const tr = document.createElement('tr');
       if (row.outlier) tr.classList.add('outlier');
       const selectCell = document.createElement('td'); const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = selected.has(row.id); checkbox.setAttribute('aria-label', `Select ${row.ticker} ${row.price}`); checkbox.onchange = () => { autoSelectedOutliers.delete(row.id); if (checkbox.checked) { selected.set(row.id, row); deselectedOutliers.delete(row.id); } else { selected.delete(row.id); deselectedOutliers.add(row.id); } updateSelection(); }; selectCell.append(checkbox); tr.append(selectCell);
-      const values = [row.capturedAt == null ? 'Timestamp not recorded' : new Date(row.capturedAt).toLocaleString('en-GB', { timeZone: 'Asia/Qatar' }), row.ticker || '—', row.price ?? '-', row.dayHigh ?? '-', row.dayLow ?? '-', row.priceKey || 'Legacy record (grid key not captured)', row.referencePrice == null ? 'Insufficient nearby consensus' : `${row.outlier ? 'FLAG ' : ''}${row.outlierDeltaPct.toFixed(2)}% vs nearby median ${row.referencePrice} (${row.referenceCount} prices)`, row.syncStatus || (firebase ? 'Stored in Firebase' : row.accepted ? 'Accepted' : 'Rejected'), firebase || row.origin === 'firebase' ? row.source : `${row.strategy} / ${row.source}`];
+      const values = [row.capturedAt == null ? 'Timestamp not recorded' : new Date(row.capturedAt).toLocaleString('en-GB', { timeZone: 'Asia/Qatar' }), row.ticker || '—', row.price ?? '-', row.dayHigh ?? '-', row.dayLow ?? '-', row.priceKey || 'Legacy record (grid key not captured)', row.referencePrice == null ? 'Insufficient nearby consensus' : `${row.outlier ? 'FLAG ' : ''}${row.outlierDeltaPct.toFixed(2)}% vs reference median ${row.referencePrice} (${row.referenceCount} prices; ${row.outlierMethod || "nearby-consensus"})`, row.syncStatus || (firebase ? 'Stored in Firebase' : row.accepted ? 'Accepted' : 'Rejected'), firebase || row.origin === 'firebase' ? row.source : `${row.strategy} / ${row.source}`];
       for (const value of values) { const td = document.createElement('td'); td.textContent = value; tr.append(td); }
       const td = document.createElement('td'); const details = document.createElement('details'); const summary = document.createElement('summary'); summary.textContent = (firebase || row.origin === 'firebase') && !row.raw?.length ? 'Stored record (raw source unavailable)' : `${row.raw?.length || 0} raw pairs`;
-      const pre = document.createElement('pre'); pre.textContent = JSON.stringify({ priceKey: row.priceKey, highLowKey: row.highLowKey, highLowRaw: row.highLowRaw, rangeError: row.rangeError, previousPrice: row.previousPrice, deltaPct: row.deltaPct, referencePrice: row.referencePrice, referenceCount: row.referenceCount, outlierDeltaPct: row.outlierDeltaPct, stored: row.stored, raw: row.raw, selected: row.selected, parsed: { ticker: row.ticker, price: row.price, dayHigh: row.dayHigh, dayLow: row.dayLow, name: row.name, changePct: row.changePct }, url: row.url }, null, 2);
+      const pre = document.createElement('pre'); details.ontoggle = () => { if (details.open && !pre.textContent) pre.textContent = JSON.stringify({ priceKey: row.priceKey, highLowKey: row.highLowKey, highLowRaw: row.highLowRaw, rangeError: row.rangeError, previousPrice: row.previousPrice, deltaPct: row.deltaPct, referencePrice: row.referencePrice, referenceCount: row.referenceCount, outlierDeltaPct: row.outlierDeltaPct, outlierMethod: row.outlierMethod, outlierEvidence: row.outlierEvidence, stored: row.stored, raw: row.raw, selected: row.selected, parsed: { ticker: row.ticker, price: row.price, dayHigh: row.dayHigh, dayLow: row.dayLow, name: row.name, changePct: row.changePct }, url: row.url }, null, 2); };
       details.append(summary, pre); td.append(details); tr.append(td); $('dataRows').append(tr);
     }
     $('dataMessage').textContent = result.total ? `${result.total} matching records` : combined ? 'No matching synced or pending records for these dates.' : firebase ? 'No matching pushed data in Firebase.' : 'No matching local audit records. Run a scrape to collect raw records.';
@@ -125,7 +147,7 @@ async function renderData(refresh = false) {
     $('pageInfo').textContent = `Page ${page} of ${pages}`;
     updateSelection();
     $('prevPage').disabled = page <= 1; $('nextPage').disabled = page >= pages;
-  } catch (error) { if (version !== requestVersion) return; $('dataMessage').textContent = error.message; $('dataRows').replaceChildren(); $('priceChart').replaceChildren(); $('favouriteChartList').replaceChildren(); $('prevPage').disabled = true; $('nextPage').disabled = true; }
+  } catch (error) { if (version !== requestVersion) return; $('dataMessage').textContent = error.message + ' Previous results remain visible; retry Refresh data.'; previewStale = true; $('outlierPreviewMessage').textContent = 'Preview is outdated because loading failed. Refresh before deleting.'; updateSelection(); $('prevPage').disabled = true; $('nextPage').disabled = true; }
 }
 for (const id of ['dataView', 'fromDate', 'toDate', 'tickerFilter', 'strategyFilter', 'acceptedFilter', 'sourceFilter', 'outlierFilter', 'pageSize']) $(id).addEventListener('change', () => { page = 1; selected.clear(); autoSelectedOutliers.clear(); deselectedOutliers.clear(); updateSelection(); renderData(); });
 $('refreshData').onclick = () => renderData(true);
@@ -182,7 +204,8 @@ function renderCharts() {
     favourites.clear(); next.forEach(symbol => favourites.add(symbol));
     await renderData();
   } };
-  renderPriceChart($('priceChart'), chartRows, $('chartTicker').value, options);
+  if (sectionOpen('chartCard')) renderPriceChart($('priceChart'), chartRows, $('chartTicker').value, options);
+  if (!sectionOpen('favouriteCharts')) return;
   const list = $('favouriteChartList'); list.replaceChildren();
   if (!favourites.size) { list.textContent = 'Choose Favourite on a chart to pin it here.'; return; }
   const grid = document.createElement('div'); grid.className = 'chart-grid';
@@ -204,20 +227,27 @@ function renderCharts() {
     const chart = document.createElement('div'); card.append(title, periods, chart); grid.append(card);
     renderPriceChart(chart, favouriteChartRows.get(ticker) || favouriteRows, ticker, options);
   }
-  list.append(grid);
+  if (!grid.children.length) list.textContent = 'No pinned tickers match the current ticker filter. Clear the ticker filter to show them.';
+  else list.append(grid);
 }
+$('showAllColumns').onchange = () => $('auditCard').classList.toggle('compact-records', !$('showAllColumns').checked);
+$('auditCard').classList.add('compact-records');
 $('editSelected').onclick = () => applyBatch('edit');
 $('deleteSelected').onclick = () => applyBatch('delete');
 $('deleteOutliers').onclick = async () => {
-  if (batchBusy || !flaggedOutlierRows.length) return;
-  selected.clear(); flaggedOutlierRows.forEach(row => selected.set(row.id, row)); updateSelection();
+  if (batchBusy || previewStale || !previewSelected.size) return;
+  selected.clear(); [...previewSelected.values()].forEach(row => selected.set(row.id, row)); updateSelection();
   await applyBatch('delete');
 };
+$('selectPreviewOutliers').onclick = () => { previewSelected.clear(); flaggedOutlierRows.forEach(row => previewSelected.set(row.id, row)); showOutlierPreview(); updateSelection(); };
+$('clearPreviewOutliers').onclick = () => { previewSelected.clear(); showOutlierPreview(); updateSelection(); };
+$('reviewOutliers').onclick = async () => { $('fromDate').value = $('toDate').value = ''; for (const button of document.querySelectorAll('[data-period]')) button.setAttribute('aria-pressed', String(button.dataset.period === 'all')); page = 1; await renderData(); const section = $('outliersCard').closest('details'); if (section) section.open = true; };
+document.addEventListener('extension-section-open', event => { if (['chartCard','favouriteCharts'].includes(event.detail.id)) renderData(); });
 await renderData();
 let refreshTimer;
 function scheduleDataRefresh(force = false) {
   clearTimeout(refreshTimer);
-  refreshTimer = setTimeout(() => { if (batchBusy) { scheduleDataRefresh(force); return; } renderData(force); }, 150);
+  refreshTimer = setTimeout(() => { if (batchBusy) { scheduleDataRefresh(force); return; } renderData(force); }, 750);
 }
 for (const id of ['dataView','pageSize','outlierFilter','autoSelectOutliers']) $(id).addEventListener('change', async () => {
   const viewPreferences = Object.fromEntries(['dataView','pageSize','outlierFilter','autoSelectOutliers'].map(key => [key, key === 'autoSelectOutliers' ? $(key).checked : $(key).value]));

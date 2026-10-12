@@ -18,7 +18,7 @@ export async function mountStats(container) {
   let evidenceCache = null;
   let evidencePending = null;
   async function evidence() {
-    if (evidenceCache && evidenceCache.date === qatarDate() && Date.now() - evidenceCache.at < 30000) return evidenceCache;
+    if (evidenceCache && evidenceCache.date === qatarDate() && Date.now() - evidenceCache.at < 5000) return evidenceCache;
     if (evidencePending) return evidencePending;
     evidencePending = summarizeAuditToday().then(audit => {
       evidenceCache = { at: Date.now(), date: qatarDate(), audit, error: '' };
@@ -67,10 +67,11 @@ export async function mountStats(container) {
     const { configSyncStatus } = await chrome.storage.local?.get('configSyncStatus') || {};
     if (disposed || version !== renderVersion) return;
     if (configSyncStatus?.error) error.textContent += ' ' + configSyncStatus.error;
-    container.replaceChildren(heading, list, note, error);
+    const explanation = document.createElement('details'), summary = document.createElement('summary'); summary.textContent = 'How statistics are counted'; explanation.append(summary, note);
+    container.replaceChildren(heading, list, explanation, error);
   }
   const refresh = () => render().catch(error => { if (!disposed) container.textContent = `Cannot load statistics: ${error.message}`; });
-  const listener = (changes, area) => { if (area === 'local' && (changes.activity || changes.status || changes.syncConfig || changes.auditUpdatedAt || changes.auth || changes.configSyncStatus)) { if (changes.auditUpdatedAt) evidenceCache = null; refresh(); } };
+  const listener = (changes, area) => { if (area === 'local' && (changes.activity || changes.status || changes.syncConfig || changes.auditUpdatedAt || changes.auth || changes.configSyncStatus)) { if (changes.status?.newValue?.actionCompletedAt !== changes.status?.oldValue?.actionCompletedAt) evidenceCache = null; refresh(); } };
   chrome.storage.onChanged.addListener(listener);
   const timer = setInterval(refresh, 5000);
   window.addEventListener('pagehide', () => { disposed = true; clearInterval(timer); chrome.storage.onChanged.removeListener(listener); }, { once: true });
