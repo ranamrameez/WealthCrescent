@@ -88,7 +88,7 @@ export function PositionDetail({ ticker, section = 'all' }: { ticker: string; se
   const [priceInput, setPriceInput] = useState(mp > 0 ? String(mp) : '');
   // Re-prefill from the stored price whenever the ticker changes (this
   // component is reused across stock pages without remounting).
-  const [editingPrice,setEditingPrice] = useState(false);
+  const [editingPrice] = useState(false);
   const [priceDirty,setPriceDirty] = useState(false);
   useEffect(() => { if (!editingPrice && !priceDirty) setPriceInput(mp > 0 ? String(mp) : ''); }, [ticker,mp,editingPrice,priceDirty]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {setPriceDirty(false);setPriceInput(mp > 0 ? String(mp) : '');}, [ticker]);
@@ -226,6 +226,7 @@ export function PositionDetail({ ticker, section = 'all' }: { ticker: string; se
     // saved instead, so the field shows the value it actually holds now.
     setPriceInput(String(val));
   };
+  void commitPrice;
 
   return (
     // Pending items 54/56/57: charts + Price range move to a right-hand
@@ -376,21 +377,6 @@ export function PositionDetail({ ticker, section = 'all' }: { ticker: string; se
           instead of being buried under other sections. */}
       {(section === 'all' || section === 'prices') && <DetailCard section={section} title={<span>Market Price</span>} className="mb-12">
       <MarketPriceHistory ticker={ticker} />
-      <div className="row gap-sm mt-sm">
-        <PriceInput exchange="qse"
-          type="number"
-          step="0.001"
-          className="price-input"
-          placeholder="Update price"
-          onFocus={() => setEditingPrice(true)}
-          onBlur={() => setEditingPrice(false)}
-          value={priceInput}
-          onChange={(e) => {setPriceDirty(true);setPriceInput(e.target.value);}}
-          onKeyDown={(e) => e.key === 'Enter' && commitPrice()}
-          style={{ width: 150 }}
-        />
-        <button className="btn secondary small" onClick={commitPrice}><SaveIcon size={12} />Save price</button>
-      </div>
       </DetailCard>}
 
       {(section === 'all' || section === 'current') && isOpen && (

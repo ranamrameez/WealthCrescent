@@ -24,13 +24,15 @@ it('lifetime bounds respect source and include reported extrema; medians use obs
  expect(lifetimeBounds([{price:10}],{low:8,high:13},'app')).toEqual({low:8,high:13});
  expect(priceMedian([{price:1},{price:3},{price:2},{price:4}])).toBe(2.5);
 });
-it('labels low, high and current at chart points; overview sampling retains price extrema',()=>{
+it('labels period low, high and current while keeping reference guides hidden',()=>{
  const rows=Array.from({length:5000},(_,index)=>({id:String(index),source:'shared' as const,date:'2026-10-12',price:index===777?1:index===2345?99:10,outlier:false,deltaPct:null}));
- const chart=marketChartData(rows,{low:1,high:99});
- expect([...chart.highlights.values()].flat().some(label=>label.startsWith('Low '))).toBe(true);
- expect([...chart.highlights.values()].flat().some(label=>label.startsWith('High '))).toBe(true);
+ const chart=marketChartData(rows,{low:0.5,high:120},9);
+ expect([...chart.highlights.values()].flat().some(label=>label.startsWith('Period low '))).toBe(true);
+ expect([...chart.highlights.values()].flat().some(label=>label.startsWith('Period high '))).toBe(true);
  expect([...chart.highlights.values()].flat().some(label=>label.startsWith('Current '))).toBe(true);
- expect(chart.datasets.map(dataset=>dataset.label)).not.toContain('Median');expect(chart.total).toBe(5000);expect(chart.ordered.length).toBeLessThanOrEqual(2000);
+ const guides=chart.datasets.filter(dataset=>['Lifetime low','Lifetime high','Period median','Previous close'].includes(dataset.label||''));
+ expect(guides.map(dataset=>dataset.label)).toEqual(['Lifetime low','Lifetime high','Period median','Previous close']);
+ expect(guides.every(dataset=>dataset.hidden===true)).toBe(true);expect(chart.total).toBe(5000);expect(chart.ordered.length).toBeLessThanOrEqual(2000);
  expect(chart.ordered.some(row=>row.price===1)).toBe(true);expect(chart.ordered.some(row=>row.price===99)).toBe(true);
 });
 it('uses the prior trading session close to color the current price trend',()=>{

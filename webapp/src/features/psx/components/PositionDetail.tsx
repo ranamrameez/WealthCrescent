@@ -225,6 +225,7 @@ export function PositionDetail({ ticker, section = 'all' }: { ticker: string; se
     // saved instead, so the field shows the value it actually holds now.
     setPriceInput(String(val));
   };
+  void commitPrice;
 
   return (
     // Pending items 54/56/57: charts + Price range move to a right-hand
@@ -379,19 +380,6 @@ export function PositionDetail({ ticker, section = 'all' }: { ticker: string; se
 
         {(section === 'all' || section === 'prices') && <DetailCard section={section} title={<span>Market Price</span>} className="mb-12">
         <MarketPriceHistory ticker={ticker} />
-      <div className="row gap-sm mt-sm">
-          <PriceInput exchange="psx"
-            type="number"
-            step="0.01"
-            className="price-input"
-            placeholder="Update price"
-            value={priceInput}
-            onChange={(e) => setPriceInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && commitPrice()}
-            style={{ width: 150 }}
-          />
-          <button className="btn secondary small" onClick={commitPrice}><SaveIcon size={12} />Save price</button>
-        </div>
         </DetailCard>}
 
         {(section === 'all' || section === 'current') && isOpen && (
