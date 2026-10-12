@@ -81,7 +81,7 @@ export function renderPriceChart(container, rows, ticker, options = {}) {
       svg.append(range);
     }
     const circle = node('circle', { cx: x(point), cy: y(point), r: point.outlier ? 5 : 3, fill: point.outlier ? '#b91c1c' : '#1d4ed8', tabindex: 0 });
-    circle.append(node('title', {}, `${ticker} · ${date(point.capturedAt)} · ${point.price}${point.outlier ? ` · Flag: ${point.deltaPct?.toFixed(2)}%` : ''}`));
+    circle.append(node('title', {}, `${ticker} · ${date(point.capturedAt)} · ${point.price}${point.outlier ? ` · Flag: ${point.outlierDeltaPct?.toFixed(2)}% from nearby median ${point.referencePrice} (${point.referenceCount} prices)` : ''}`));
     svg.append(circle);
   }
   svg.append(node('text', { x: 80, y: 290, fill: '#17283c', 'font-size': 13 }, date(start)));

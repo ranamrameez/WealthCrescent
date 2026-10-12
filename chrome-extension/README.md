@@ -196,9 +196,7 @@ were not appended by the existing writer, so Firebase history is not a complete 
 Market selectors are no longer configurable; automatic detection selects the named
 price grid column. New local audit records and Firebase history points retain the
 selected priceKey and raw cell pairs. Existing records without provenance display
-Unavailable rather than inferring a key. Price changes greater than 10% in either
-direction relative to the previous chronological price for that ticker are highlighted,
-with an outlier-only filter. The first record has no comparison baseline.
+Unavailable rather than inferring a key. Outliers are classified against a nearby same-ticker price cluster rather than the previous chronological price. An outlier-only filter is available. Records without enough nearby consensus remain unflagged. See Nearby consensus outliers below.
 
 The ticker dropdown is populated from all records in the selected view. Select rows
 individually or select the current page; selections can span pages up to 100 records.
@@ -332,3 +330,15 @@ Sign-in and account creation clear stale authentication errors and immediately r
 ## Action completion and filter audit (v0.1.17)
 
 Options and popup show a shared live action banner. Conflicting actions are disabled and rejected by the worker; manual scrape/push replies arrive after completion and surface failures. Stop waits for ongoing work before reporting Stopped. Pinned charts default to Table dates and inherit all table filters; explicit per-ticker timeframes override dates only. Combined view supports local source, strategy and accepted/rejected filtering. Source-level findings, automated evidence and remaining live checks are in [AUDIT.md](AUDIT.md).
+
+## Nearby consensus outliers (v0.1.18)
+
+Price movement from a single previous quote is no longer classified as an outlier. For each ticker, observations within five minutes before or after a record are compared (up to 60 nearby positive samples). At least three peers must cluster within 10% of their median and represent at least two thirds of the comparison samples. A record is flagged only when it differs by more than 10% from that cluster median. Zero and negative observations can be flagged; they cannot act as reference prices. Sparse, undated or conflicting evidence produces no flag. Identical timestamp/price observations are deduplicated across sources. Classification runs before filters, so filtering does not redefine the baseline.
+
+The table and chart tooltips show the reference median and supporting sample count. Remove flagged outliers selects only flagged records under the current filters, confirms the deletion, and removes at most 100 per batch from their respective local or Firebase stores. It does not delete normal manually selected records. Prices remain stored until that removal action is used. Previously automatically selected records are deselected when new evidence clears their flag.
+
+Run the outlier regressions along with the other extension checks:
+
+```powershell
+node --test chrome-extension/outliers.test.cjs chrome-extension/audit-regression.test.cjs chrome-extension/extension.test.cjs chrome-extension/data-storage.test.cjs
+```

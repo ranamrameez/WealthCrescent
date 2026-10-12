@@ -1,7 +1,7 @@
 // Shared feedback and lock for options and popup actions.
 const localOperations = new Set();
 let status = {}, renderVersion = 0, localAction = '';
-const selectors = '#signInBtn, #signOutBtn, #testBtn, #editSelected, #deleteSelected, #scrapeNowBtn, #pushNowBtn, .start-control, .scrape-control, .push-control, #configCard button';
+const selectors = '#signInBtn, #signOutBtn, #testBtn, #editSelected, #deleteSelected, #deleteOutliers, #scrapeNowBtn, #pushNowBtn, .start-control, .scrape-control, .push-control, #configCard button';
 const banner = document.createElement('p'); banner.className = 'action-status'; banner.setAttribute('role', 'status'); banner.setAttribute('aria-live', 'polite');
 document.querySelector('h1')?.after(banner);
 if (!banner.isConnected) document.body.prepend(banner);
@@ -18,7 +18,7 @@ function render() {
       if (!control.disabled) control.disabled = true;
     } else if (control.hasAttribute('data-action-locked')) {
       delete control.dataset.actionLocked;
-      control.disabled = control.classList.contains('start-control') ? status.scrapingEnabled === true : control.id === 'editSelected' || control.id === 'deleteSelected' ? !(parseInt(document.getElementById('selectionInfo')?.textContent, 10) > 0) : false;
+      control.disabled = control.classList.contains('start-control') ? status.scrapingEnabled === true : control.id === 'deleteOutliers' ? !(parseInt(document.getElementById('outlierCount')?.textContent, 10) > 0) : control.id === 'editSelected' || control.id === 'deleteSelected' ? !(parseInt(document.getElementById('selectionInfo')?.textContent, 10) > 0) : false;
     }
   }
 }

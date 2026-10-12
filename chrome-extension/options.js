@@ -46,14 +46,18 @@ $('testBtn').onclick = async () => {
 let page = 1;
 const selected = new Map();
 const deselectedOutliers = new Set();
+const autoSelectedOutliers = new Set();
 let chartRows = [];
 let favouriteRows = [];
 const favouriteChartRows = new Map();
 let visibleRows = [];
+let flaggedOutlierRows = [];
 let batchBusy = false;
 function updateSelection() {
   $('selectionInfo').textContent = `${selected.size} selected`;
   $('editSelected').disabled = $('deleteSelected').disabled = batchBusy || !selected.size;
+  $('deleteOutliers').disabled = batchBusy || !flaggedOutlierRows.length;
+  $('outlierCount').textContent = `${flaggedOutlierRows.length} flagged (up to 100 per removal)`;
   $('selectAll').checked = visibleRows.length > 0 && visibleRows.every(row => selected.has(row.id));
   $('selectAll').indeterminate = visibleRows.some(row => selected.has(row.id)) && !$('selectAll').checked;
 }
@@ -86,9 +90,15 @@ async function renderData(refresh = false) {
     $('tickerFilter').replaceChildren(...['', ...(result.tickers || [])].map(ticker => { const option = document.createElement('option'); option.value = ticker; option.textContent = ticker || 'All tickers'; return option; }));
     $('tickerFilter').value = tickerValue;
     visibleRows = result.rows;
+    flaggedOutlierRows = result.outlierRows || result.rows.filter(row => row.outlier);
+    const flaggedIds = new Set(flaggedOutlierRows.map(row => row.id));
+    for (const id of autoSelectedOutliers) if (!flaggedIds.has(id)) { selected.delete(id); autoSelectedOutliers.delete(id); }
     if ($('autoSelectOutliers').checked) {
       for (const row of result.outlierRows || result.rows.filter(row => row.outlier)) {
-        if (!deselectedOutliers.has(row.id) && (selected.has(row.id) || selected.size < 100)) selected.set(row.id, row);
+        if (!deselectedOutliers.has(row.id) && (selected.has(row.id) || selected.size < 100)) {
+          if (!selected.has(row.id)) autoSelectedOutliers.add(row.id);
+          selected.set(row.id, row);
+        }
       }
     }
     chartRows = result.chartRows || result.rows;
@@ -103,11 +113,11 @@ async function renderData(refresh = false) {
     for (const row of result.rows) {
       const tr = document.createElement('tr');
       if (row.outlier) tr.classList.add('outlier');
-      const selectCell = document.createElement('td'); const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = selected.has(row.id); checkbox.setAttribute('aria-label', `Select ${row.ticker} ${row.price}`); checkbox.onchange = () => { if (checkbox.checked) { selected.set(row.id, row); deselectedOutliers.delete(row.id); } else { selected.delete(row.id); deselectedOutliers.add(row.id); } updateSelection(); }; selectCell.append(checkbox); tr.append(selectCell);
-      const values = [row.capturedAt == null ? 'Timestamp not recorded' : new Date(row.capturedAt).toLocaleString('en-GB', { timeZone: 'Asia/Qatar' }), row.ticker || '—', row.price ?? '-', row.dayHigh ?? '-', row.dayLow ?? '-', row.priceKey || 'Legacy record (grid key not captured)', row.deltaPct == null ? 'No previous value' : `${row.outlier ? 'FLAG ' : ''}${row.deltaPct.toFixed(2)}% (previous ${row.previousPrice})`, row.syncStatus || (firebase ? 'Stored in Firebase' : row.accepted ? 'Accepted' : 'Rejected'), firebase || row.origin === 'firebase' ? row.source : `${row.strategy} / ${row.source}`];
+      const selectCell = document.createElement('td'); const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = selected.has(row.id); checkbox.setAttribute('aria-label', `Select ${row.ticker} ${row.price}`); checkbox.onchange = () => { autoSelectedOutliers.delete(row.id); if (checkbox.checked) { selected.set(row.id, row); deselectedOutliers.delete(row.id); } else { selected.delete(row.id); deselectedOutliers.add(row.id); } updateSelection(); }; selectCell.append(checkbox); tr.append(selectCell);
+      const values = [row.capturedAt == null ? 'Timestamp not recorded' : new Date(row.capturedAt).toLocaleString('en-GB', { timeZone: 'Asia/Qatar' }), row.ticker || '—', row.price ?? '-', row.dayHigh ?? '-', row.dayLow ?? '-', row.priceKey || 'Legacy record (grid key not captured)', row.referencePrice == null ? 'Insufficient nearby consensus' : `${row.outlier ? 'FLAG ' : ''}${row.outlierDeltaPct.toFixed(2)}% vs nearby median ${row.referencePrice} (${row.referenceCount} prices)`, row.syncStatus || (firebase ? 'Stored in Firebase' : row.accepted ? 'Accepted' : 'Rejected'), firebase || row.origin === 'firebase' ? row.source : `${row.strategy} / ${row.source}`];
       for (const value of values) { const td = document.createElement('td'); td.textContent = value; tr.append(td); }
       const td = document.createElement('td'); const details = document.createElement('details'); const summary = document.createElement('summary'); summary.textContent = (firebase || row.origin === 'firebase') && !row.raw?.length ? 'Stored record (raw source unavailable)' : `${row.raw?.length || 0} raw pairs`;
-      const pre = document.createElement('pre'); pre.textContent = JSON.stringify({ priceKey: row.priceKey, highLowKey: row.highLowKey, highLowRaw: row.highLowRaw, rangeError: row.rangeError, previousPrice: row.previousPrice, deltaPct: row.deltaPct, stored: row.stored, raw: row.raw, selected: row.selected, parsed: { ticker: row.ticker, price: row.price, dayHigh: row.dayHigh, dayLow: row.dayLow, name: row.name, changePct: row.changePct }, url: row.url }, null, 2);
+      const pre = document.createElement('pre'); pre.textContent = JSON.stringify({ priceKey: row.priceKey, highLowKey: row.highLowKey, highLowRaw: row.highLowRaw, rangeError: row.rangeError, previousPrice: row.previousPrice, deltaPct: row.deltaPct, referencePrice: row.referencePrice, referenceCount: row.referenceCount, outlierDeltaPct: row.outlierDeltaPct, stored: row.stored, raw: row.raw, selected: row.selected, parsed: { ticker: row.ticker, price: row.price, dayHigh: row.dayHigh, dayLow: row.dayLow, name: row.name, changePct: row.changePct }, url: row.url }, null, 2);
       details.append(summary, pre); td.append(details); tr.append(td); $('dataRows').append(tr);
     }
     $('dataMessage').textContent = result.total ? `${result.total} matching records` : combined ? 'No matching synced or pending records for these dates.' : firebase ? 'No matching pushed data in Firebase.' : 'No matching local audit records. Run a scrape to collect raw records.';
@@ -117,12 +127,12 @@ async function renderData(refresh = false) {
     $('prevPage').disabled = page <= 1; $('nextPage').disabled = page >= pages;
   } catch (error) { if (version !== requestVersion) return; $('dataMessage').textContent = error.message; $('dataRows').replaceChildren(); $('priceChart').replaceChildren(); $('favouriteChartList').replaceChildren(); $('prevPage').disabled = true; $('nextPage').disabled = true; }
 }
-for (const id of ['dataView', 'fromDate', 'toDate', 'tickerFilter', 'strategyFilter', 'acceptedFilter', 'sourceFilter', 'outlierFilter', 'pageSize']) $(id).addEventListener('change', () => { page = 1; selected.clear(); deselectedOutliers.clear(); updateSelection(); renderData(); });
+for (const id of ['dataView', 'fromDate', 'toDate', 'tickerFilter', 'strategyFilter', 'acceptedFilter', 'sourceFilter', 'outlierFilter', 'pageSize']) $(id).addEventListener('change', () => { page = 1; selected.clear(); autoSelectedOutliers.clear(); deselectedOutliers.clear(); updateSelection(); renderData(); });
 $('refreshData').onclick = () => renderData(true);
 $('prevPage').onclick = () => { page--; renderData(); };
 $('nextPage').onclick = () => { page++; renderData(); };
 $('selectAll').onchange = () => {
-  for (const row of visibleRows) { if ($('selectAll').checked) { selected.set(row.id, row); deselectedOutliers.delete(row.id); } else { selected.delete(row.id); deselectedOutliers.add(row.id); } }
+  for (const row of visibleRows) { autoSelectedOutliers.delete(row.id); if ($('selectAll').checked) { selected.set(row.id, row); deselectedOutliers.delete(row.id); } else { selected.delete(row.id); deselectedOutliers.add(row.id); } }
   renderData();
 };
 async function applyBatch(operation) {
@@ -198,6 +208,11 @@ function renderCharts() {
 }
 $('editSelected').onclick = () => applyBatch('edit');
 $('deleteSelected').onclick = () => applyBatch('delete');
+$('deleteOutliers').onclick = async () => {
+  if (batchBusy || !flaggedOutlierRows.length) return;
+  selected.clear(); flaggedOutlierRows.forEach(row => selected.set(row.id, row)); updateSelection();
+  await applyBatch('delete');
+};
 await renderData();
 let refreshTimer;
 function scheduleDataRefresh(force = false) {

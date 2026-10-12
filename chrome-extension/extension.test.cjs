@@ -166,18 +166,18 @@ test('Page defaults to combined data and today, with working chart date presets'
   assert.ok(document.getElementById('activityStats').compareDocumentPosition(document.querySelector('.top-sections')) & 4);
 });
 
-test('Outliers flag changes beyond 10 percent in either direction, with source keys retained', async () => {
+test('Price movement alone is not an outlier and source keys are retained', async () => {
   const module = await import('data:text/javascript;base64,' + Buffer.from(read('pushed-data.js')).toString('base64'));
   assert.equal(module.priceDeviation(110, 100).outlier, false);
   assert.equal(module.priceDeviation(90, 100).outlier, false);
-  assert.equal(module.priceDeviation(111, 100).outlier, true);
-  assert.equal(module.priceDeviation(89, 100).outlier, true);
+  assert.equal(module.priceDeviation(111, 100).outlier, false);
+  assert.equal(module.priceDeviation(89, 100).outlier, false);
   assert.equal(module.priceDeviation(10, null).outlier, false);
   const rows = module.pushedRecords({ history: { QNBK: [{ date: '2026-10-01', price: 10 }, { date: '2026-10-02', price: 12, priceKey: 'lastPrice', raw: [{ key: 'lastPrice', value: '12' }] }] } });
-  assert.equal(rows[0].outlier, true);
+  assert.equal(rows[0].outlier, false);
   assert.equal(rows[0].priceKey, 'lastPrice');
   assert.equal(rows[0].key, '1');
-  assert.equal(module.paginatePushed(rows, { outliers: 'true' }).total, 1);
+  assert.equal(module.paginatePushed(rows, { outliers: 'true' }).total, 0);
 });
 
 function mutationContext(initial, conflict = false) {
@@ -234,7 +234,7 @@ test('Table populates ticker dropdown and selected-row edit sends the expected c
   const { JSDOM } = require('../webapp/node_modules/jsdom');
   const document = new JSDOM(read('options.html')).window.document;
   let mutation, preview;
-  const row = { id: 'history:QNBK:2', kind: 'history', key: '2', ticker: 'QNBK', price: 25, priceKey: 'lastPrice', capturedAt: Date.now(), deltaPct: 25, previousPrice: 20, outlier: true, origin: 'firebase', syncStatus: 'Synced', source: 'Firebase history', stored: { time: '2026-10-04' } };
+  const row = { id: 'history:QNBK:2', kind: 'history', key: '2', ticker: 'QNBK', price: 25, priceKey: 'lastPrice', capturedAt: Date.now(), deltaPct: 25, previousPrice: 20, referencePrice: 20, referenceCount: 3, outlierDeltaPct: 25, outlier: true, origin: 'firebase', syncStatus: 'Synced', source: 'Firebase history', stored: { time: '2026-10-04' } };
   const ctx = vm.createContext({ document, window: { confirm: text => { preview = text; return true; } }, console, Date, JSON, Number,
     mountConfig: async () => {}, mountControls: async () => {},
     sendWorkerMessage: async message => {
@@ -269,7 +269,7 @@ test('Price chart renders chronological prices, outlier markers and single-price
   const module = await import('data:text/javascript;base64,' + Buffer.from(read('price-chart.js')).toString('base64'));
   const document = new JSDOM('<div id="chart"></div>').window.document;
   const container = document.getElementById('chart');
-  const rows = [{ ticker: 'QNBK', price: 12, capturedAt: 2000, outlier: true, deltaPct: 20 }, { ticker: 'QNBK', price: 10, capturedAt: 1000 }, { ticker: 'QIBK', price: 50, capturedAt: 1500 }];
+  const rows = [{ ticker: 'QNBK', price: 12, capturedAt: 2000, outlier: true, deltaPct: 20, referencePrice: 10, referenceCount: 3, outlierDeltaPct: 20 }, { ticker: 'QNBK', price: 10, capturedAt: 1000 }, { ticker: 'QIBK', price: 50, capturedAt: 1500 }];
   module.renderPriceChart(container, rows, 'QNBK');
   assert.equal(container.querySelectorAll('circle').length, 2);
   assert.equal(container.querySelectorAll('circle[fill="#b91c1c"]').length, 1);
@@ -307,6 +307,8 @@ test('Audit cursor returns complete totals, charts and second-page results witho
   } };
   const ctx = vm.createContext({
     indexedDB: { open() { const request = {}; queueMicrotask(() => { request.result = db; request.onsuccess(); }); return request; } },
+    flagPriceOutliers: (await import('data:text/javascript;base64,' + Buffer.from(read('pushed-data.js')).toString('base64'))).flagPriceOutliers,
+    qatarDate: time => new Date(time + 3 * 3600000).toISOString().slice(0, 10),
     priceDeviation: (price, previousPrice) => ({ previousPrice, deltaPct: previousPrice ? (price - previousPrice) / previousPrice * 100 : null, outlier: previousPrice ? Math.abs(price / previousPrice - 1) > .1 + 1e-9 : false }),
   });
   vm.runInContext(read('audit.js').replace(/^import .*;\r?\n/gm, '').replace(/export /g, ''), ctx);
@@ -314,7 +316,7 @@ test('Audit cursor returns complete totals, charts and second-page results witho
   assert.equal(result.total, 3);
   assert.equal(result.rows[0].price, 11);
   assert.equal(result.chartRows.length, 3);
-  assert.equal(result.outlierRows.length, 1);
+  assert.equal(result.outlierRows.length, 0);
 });
 
 test('Activity counts scrapes and syncs, persists last-sync time and resets at Qatar midnight', async () => {

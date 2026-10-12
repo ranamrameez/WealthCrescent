@@ -1,4 +1,4 @@
-import { priceDeviation } from './pushed-data.js';
+import { priceDeviation, flagPriceOutliers } from './pushed-data.js';
 import { qatarDate } from './activity.js';
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -124,15 +124,17 @@ export async function queryAudit({ from = '', to = '', ticker = '', strategy = '
         tickers.add(row.ticker);
         Object.assign(row, priceDeviation(row.price, previous.get(row.ticker)));
         if (row.accepted !== false && Number.isFinite(row.price) && row.price > 0) previous.set(row.ticker, row.price);
-        const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Qatar', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(row.capturedAt);
-        const part = type => parts.find(value => value.type === type).value;
-        const date = part('year') + '-' + part('month') + '-' + part('day');
-        if ((!from || date >= from) && (!to || date <= to) && (!ticker || (row.ticker || '').toUpperCase().includes(ticker.toUpperCase())) && (!strategy || row.strategy === strategy) && (!source || row.source === source) && (!accepted || String(row.accepted) === accepted) && (!outliers || row.outlier)) {
-          rows.push(row);
-        }
+        rows.push(row);
         cursor.continue();
       };
-      tx.oncomplete = () => resolve({ rows: rows.reverse().slice((page - 1) * pageSize, page * pageSize), ...(includeRecords ? { records: rows } : {}), total: rows.length, tickers: [...tickers].filter(Boolean).sort(), chartRows: rows.map(({ ticker, price, capturedAt, outlier, deltaPct, dayHigh, dayLow }) => ({ ticker, price, capturedAt, outlier, deltaPct, dayHigh, dayLow })), outlierRows: rows.filter(row => row.outlier).slice(0, 100).map(({ id, ticker, price }) => ({ id, ticker, price })) });
+      tx.oncomplete = () => {
+        const annotated = flagPriceOutliers(rows).reverse();
+        const filtered = annotated.filter(row => {
+          const date = qatarDate(row.capturedAt);
+          return (!from || date >= from) && (!to || date <= to) && (!ticker || (row.ticker || '').toUpperCase().includes(ticker.toUpperCase())) && (!strategy || row.strategy === strategy) && (!source || row.source === source) && (!accepted || String(row.accepted) === accepted) && (!outliers || row.outlier);
+        });
+        resolve({ rows: filtered.slice((page - 1) * pageSize, page * pageSize), ...(includeRecords ? { records: filtered } : {}), total: filtered.length, tickers: [...tickers].filter(Boolean).sort(), chartRows: filtered.map(({ ticker, price, capturedAt, outlier, deltaPct, outlierDeltaPct, referencePrice, referenceCount, dayHigh, dayLow }) => ({ ticker, price, capturedAt, outlier, deltaPct, outlierDeltaPct, referencePrice, referenceCount, dayHigh, dayLow })), outlierRows: filtered.filter(row => row.outlier).slice(0, 100).map(({ id, ticker, price }) => ({ id, ticker, price })) });
+      };
       tx.onerror = () => reject(tx.error);
       tx.onabort = () => reject(tx.error || new Error('Audit query was interrupted.'));
     });

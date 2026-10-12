@@ -3,7 +3,7 @@ import { restoreExtensionConfigs, saveExtensionConfigs, CONFIG_KEYS } from './cl
 import { recordActivity, qatarDate } from './activity.js';
 import { saveAudit, queryAudit, markAuditSynced } from './audit.js';
 import { combineRecords } from './combined-data.js';
-import { pushedRecords, paginatePushed, priceDeviation } from './pushed-data.js';
+import { pushedRecords, paginatePushed, priceDeviation, flagPriceOutliers } from './pushed-data.js';
 import { setSyncConfig, withinScrapingWindow, pushDelayMs } from './common.js';
 // Background service worker: owns the collect → (throttled, randomized)
 // push loop, Firebase Auth (email/password, via plain REST calls — no SDK
@@ -634,7 +634,7 @@ chrome.runtime.onMessage.addListener((message, _sender, reply) => {
           await queryPushedData({}, !!message.refresh);
           firebase = pushedSnapshot.rows;
         } catch (error) { warning = `Firebase unavailable: ${error.message} Showing local records; their sync state may be unverified.`; }
-        const rows = combineRecords(firebase, local.records);
+        const rows = flagPriceOutliers(combineRecords(firebase, local.records));
         sendResponse({ ok: true, ...paginatePushed(rows, message.filters || {}), warning });
         break;
       }
