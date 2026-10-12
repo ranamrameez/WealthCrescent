@@ -2636,3 +2636,7 @@ html[data-density="console"] { --page-card-gap: 8px; --page-card-padding-y: 6px;
 .page-topbar-right .topbar-controls { display: contents; }
 .page-topbar-right > .topbar-select-wrap { display: flex; align-items: center; gap: 6px; flex: 0 1 auto; width: auto; }
 .page-topbar .btn.topbar-filter-btn { width: auto; flex: 0 0 auto; }
+
+.app-notification-stack { position: fixed; bottom: 92px; right: 20px; z-index: 650; width: 360px; max-width: calc(100vw - 40px); max-height: calc(100dvh - 180px); overflow-y: auto; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+.app-notification-stack > * { pointer-events: auto; flex-shrink: 0; }
+.app-notification-stack .toast { position: static; width: 100%; box-sizing: border-box; pointer-events: auto; }

@@ -1,3 +1,4 @@
+import { useLiveQseWorkbook } from '../features/qse/hooks/useLiveQseWorkbook';
 import { useEnsureSignedIn } from '../lib/firebase/useEnsureSignedIn';
 import { computeFIFOPositions } from '../lib/calc/fifoPositions';
 import { computeLotAdvice } from '../lib/calc/partialTradeStrategy';
@@ -22,23 +23,14 @@ interface AlertRow extends PartialTradeOpportunity {
   key: string;
 }
 
-/** Opt-in, portfolio-wide popup listing every ticker (either exchange)
- * with a Partial Trade Strategy opportunity — "the user can decide if he
- * should sell any lots in one glance" (user's own framing). Off by
- * default per exchange (`QSESettings`/`PSXSettings`.
- * `partialTradeAlertsEnabled`) since this is explicitly a "risky
- * strategy" the user opts into, same reasoning as every other opt-in
- * advisory feature in this app. Mounted once at the App root, same
- * auto-hiding/per-occurrence-dismissible shape as
- * `SubscriptionAlertsPopup` (including reusing its dismissal-store
- * pattern) — link-only (confirmed via Q&A): clicking a row navigates to
- * that ticker's own page to act, no duplicate write path here. */
+/** App-wide, opt-in alerts for both exchanges, recomputed from live prices.
+ * Each occurrence can be dismissed or used to add profitable lots to a plan. */
 export function PartialTradeAlertsPopup() {
   const ensureSignedIn = useEnsureSignedIn();
   const planSell = async (row: AlertRow) => {
     if (!(await ensureSignedIn('Sign in to update trade plans.'))) return;
     const state = row.exchange === 'psx' ? usePSXWorkbookStore.getState() : useWorkbookStore.getState();
-    const wb = state.workbook;
+    const wb = row.exchange === 'qse' ? qseWorkbook : state.workbook;
     const fee = row.exchange === 'psx' ? makePSXFeeCalculator(usePSXWorkbookStore.getState().workbook.settings, wb.transactions) : makeQSEFeeCalculator(useWorkbookStore.getState().workbook.settings);
     const price = getMarketPrice(row.ticker, wb.marketPrices, wb.transactions);
     const lots = computeFIFOPositions(wb.transactions, fee, 'lowestCostFirst').lotsByTicker[row.ticker] || [];
@@ -54,9 +46,8 @@ export function PartialTradeAlertsPopup() {
     else state.addTradePlan({ id: crypto.randomUUID(), name: row.ticker + ' Plan', createdAt: today(), defaultTicker: row.ticker, isDefault: true, legs });
     setHidden(true);
   };
-  const qseSettings = useWorkbookStore((s) => s.workbook.settings);
-  const qseTx = useWorkbookStore((s) => s.workbook.transactions);
-  const qseMarketPrices = useWorkbookStore((s) => s.workbook.marketPrices);
+  const qseWorkbook = useLiveQseWorkbook();
+  const {settings:qseSettings,transactions:qseTx,marketPrices:qseMarketPrices} = qseWorkbook;
   const psxSettings = usePSXWorkbookStore((s) => s.workbook.settings);
   const psxTx = usePSXWorkbookStore((s) => s.workbook.transactions);
   const psxMarketPrices = usePSXWorkbookStore((s) => s.workbook.marketPrices);
@@ -64,8 +55,7 @@ export function PartialTradeAlertsPopup() {
   const isDismissed = usePartialTradeAlertDismissalStore((s) => s.isDismissed);
   const dismiss = usePartialTradeAlertDismissalStore((s) => s.dismiss);
 
-  // Snapshot once on mount (not live-recomputed) — same "what's due when
-  // you opened the app" spirit as SubscriptionAlertsPopup.
+  // Include incoming shared-feed prices as well as manual price updates.
   const initial = useMemo(() => {
     const rows: AlertRow[] = [];
     const date = today();
@@ -79,7 +69,7 @@ export function PartialTradeAlertsPopup() {
     if (psxSettings.partialTradeAlertsEnabled) {
       const calcFee = makePSXFeeCalculator(psxSettings, psxTx);
       scanPortfolioForOpportunities(psxTx, calcFee, psxMarketPrices, psxSettings.feePct, psxSettings.tick).forEach((o) => {
-        const key = `psx:${o.ticker}:${date}`;
+        const key = `psx:${o.ticker}:${date}:${o.sellableShares}:${o.bestUnrealizedPL}`;
         if (!isDismissed(key)) rows.push({ ...o, exchange: 'psx', currency: psxSettings.currency, key });
       });
     }
@@ -107,18 +97,18 @@ export function PartialTradeAlertsPopup() {
   };
 
   return (
-    <div
+    <div role="status" aria-label="Profitable share notifications"
       style={{
-        position: 'fixed', top: 16, right: 16, zIndex: 400, width: 340, maxWidth: 'calc(100vw - 32px)',
+        width: '100%',
         background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 10,
         boxShadow: '0 8px 28px rgba(0,0,0,.28)', padding: '12px 14px',
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ fontWeight: 700, fontSize: 14 }}>
-          Partial Trade: {visible.length} ticker{visible.length > 1 ? 's' : ''} sellable
+          Profitable shares: {visible.length} ticker{visible.length > 1 ? 's' : ''} sellable
         </div>
-        <button className="btn ghost" style={{ padding: 2, minHeight: 22, minWidth: 22 }} aria-label="Close" onClick={() => setHidden(true)}>
+        <button className="btn ghost" style={{ padding: 2, minHeight: 22, minWidth: 22 }} aria-label="Close profitable share notifications" onClick={() => setHidden(true)}>
           <XIcon size={13} />
         </button>
       </div>

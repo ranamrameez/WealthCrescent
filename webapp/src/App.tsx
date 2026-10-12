@@ -343,9 +343,11 @@ function App() {
           </ErrorBoundary>
         </AppShell>
         <CalculatorLauncher />
-        <SubscriptionAlertsPopup />
-        <PartialTradeAlertsPopup />
-        <Toast />
+        <div className="app-notification-stack">
+          <SubscriptionAlertsPopup />
+          <PartialTradeAlertsPopup />
+          <Toast />
+        </div>
         <TickerDatalist />
         <PSXTickerDatalist />
       </HashRouter>

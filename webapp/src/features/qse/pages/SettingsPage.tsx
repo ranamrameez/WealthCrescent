@@ -119,8 +119,8 @@ function CostBasisSettings() {
 
   return (
     <Card>
-      <ToggleChip checked={!!settings.partialTradeAlertsEnabled} onChange={next => updateSettings({ partialTradeAlertsEnabled: next })} label="Show realtime Partial Trade Alerts popup" />
       <h3 className="mt-0">Cost basis method</h3>
+      <ToggleChip checked={!!settings.partialTradeAlertsEnabled} onChange={next => updateSettings({ partialTradeAlertsEnabled: next })} label="Show realtime Partial Trade Alerts popup" />
       <p className="text-muted" style={{ marginTop: -4 }}>
         Average cost (the default, unchanged) blends every buy into one running average, so a sell
         can't be tied to a specific lot — this can make a real remaining loss look smaller (or
