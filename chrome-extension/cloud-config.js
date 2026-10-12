@@ -5,8 +5,8 @@ let queue = Promise.resolve(), restoring = false, lastSaved = '', activeUid = nu
 function enqueue(work) { const task = queue.catch(() => {}).then(work); queue = task; return task; }
 function pick(value) { return Object.fromEntries(CONFIG_KEYS.filter(key => value?.[key] !== undefined).map(key => [key, value[key]])); }
 function url(auth) { return RTDB_BASE_URL + '/users/' + encodeURIComponent(auth.uid) + '/extensionConfigs.json?auth=' + encodeURIComponent(auth.idToken); }
-async function upload(auth, snapshot, profiles) {
-  const response = await fetch(url(auth), { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ ...snapshot, schemaVersion:1, updatedAt:new Date().toISOString() }) });
+async function upload(auth, snapshot, profiles, keys = CONFIG_KEYS) {
+  const response = await fetch(url(auth), { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ ...Object.fromEntries(keys.map(key => [key, snapshot[key]])), schemaVersion:1, updatedAt:new Date().toISOString() }) });
   if (!response.ok) throw new Error('Configuration sync failed (' + response.status + '); settings retained locally for retry.');
   lastSaved = JSON.stringify(snapshot);
   profiles[auth.uid] = { values:snapshot, pending:false };
@@ -26,13 +26,14 @@ async function restore(auth) {
     if (!response.ok) throw new Error('Cannot load account configurations (' + response.status + ').');
     const cloud = await response.json();
     const own = profiles[auth.uid];
-    const snapshot = { ...defaults(), ...pick(own?.pending ? own.values : cloud || own?.values || (!local.extensionConfigOwner || local.extensionConfigOwner === auth.uid ? local : {})) };
+    const snapshot = { ...defaults(), ...pick(cloud || own?.values || (!local.extensionConfigOwner || local.extensionConfigOwner === auth.uid ? local : {})) };
+    if (own?.pending) for (const key of own.pendingKeys || CONFIG_KEYS) snapshot[key] = own.values[key];
     activeUid = auth.uid;
     restoring = true;
     lastSaved = JSON.stringify(snapshot);
     try { await chrome.storage.local.set({ ...snapshot, extensionConfigOwner:auth.uid }); }
     finally { restoring = false; }
-    if (!cloud || own?.pending) await upload(auth,snapshot,profiles);
+    if (!cloud || own?.pending) await upload(auth,snapshot,profiles, own?.pendingKeys || CONFIG_KEYS);
     else await chrome.storage.local.set({ configSyncStatus:{ uid:auth.uid, syncedAt:Date.now(), error:'' } });
 }
 export function restoreExtensionConfigs(auth) {
@@ -51,11 +52,13 @@ export function saveExtensionConfigs(getAuth, dirty = false) {
     if (activeUid !== auth.uid && !dirty) { await restore(auth); return; }
     if (JSON.stringify(snapshot) === lastSaved && !local.extensionConfigProfiles?.[auth.uid]?.pending) return;
     const profiles = local.extensionConfigProfiles || {};
-    profiles[auth.uid] = { values:snapshot, pending:true };
+    const previous = lastSaved ? JSON.parse(lastSaved) : {};
+    const keys = [...new Set([...(profiles[auth.uid]?.pendingKeys || []), ...CONFIG_KEYS.filter(key => JSON.stringify(snapshot[key]) !== JSON.stringify(previous[key]))])];
+    profiles[auth.uid] = { values:snapshot, pending:true, pendingKeys:keys.length ? keys : CONFIG_KEYS };
     await chrome.storage.local.set({ extensionConfigProfiles:profiles, extensionConfigOwner:auth.uid });
     try {
       if (activeUid !== auth.uid) await restore(auth);
-      else await upload(auth,snapshot,profiles);
+      else await upload(auth,snapshot,profiles,profiles[auth.uid].pendingKeys);
     }
     catch (error) { await chrome.storage.local.set({ configSyncStatus:{ uid:auth.uid,error:error.message } }); throw error; }
   });

@@ -50,14 +50,17 @@ export function TickerLogo({
   size = 'md',
   exchange = 'qse',
   className = '',
+  loadingFallback = false,
 }: {
   ticker: string;
   size?: 'sm' | 'md' | 'lg';
   exchange?: 'qse' | 'psx';
   className?: string;
+  loadingFallback?: boolean;
 }) {
   const symbol = String(ticker || '').toUpperCase();
   const [stage, setStage] = useState<Stage>('local');
+  const [loaded,setLoaded]=useState(false);
   if (!symbol) return null;
 
   const sizeClass = size === 'lg' ? ' lg' : size === 'sm' ? ' sm' : '';
@@ -79,13 +82,14 @@ export function TickerLogo({
   const remote = `${WSRV_PROXY}${encodeURIComponent(`${QSE_LOGO_CDN}${encodeURIComponent(symbol)}.svg`)}`;
   const src = stage === 'local' ? local : remote;
 
-  return (
-    <img
-      className={`ticker-logo${cls ? ' ' + cls : ''}`}
-      src={src}
-      alt={symbol}
-      loading="lazy"
-      onError={() => setStage((s) => (s === 'local' && exchange === 'qse' ? 'remote' : 'fallback'))}
-    />
-  );
+  const image = <img
+    className={`ticker-logo${cls ? ' ' + cls : ''}`} src={src} alt={symbol} loading="lazy"
+    aria-hidden={loadingFallback&&!loaded?true:undefined}
+    style={loadingFallback&&!loaded?{position:'absolute',opacity:0,pointerEvents:'none'}:undefined}
+    onLoad={()=>setLoaded(true)}
+    onError={()=>{setLoaded(false);setStage(stage=>stage==='local'&&exchange==='qse'?'remote':'fallback');}} />;
+  if(loadingFallback&&!loaded)return <span className="ticker-logo-stack" style={{position:'relative',display:'inline-grid'}}>
+    <span className={`ticker-logo ticker-logo-fallback${cls ? ' ' + cls : ''}`} aria-label={symbol} style={{'--ticker-accent':tickerColor(symbol)} as React.CSSProperties}>{symbol.slice(0,2)}</span>{image}
+  </span>;
+  return image;
 }

@@ -67,3 +67,22 @@ Inputs refresh from effective prices while resting and retain focused drafts.
 Calculator buy/sell overrides remain in place until selecting another ticker.
 Shared points in price history are labelled and cannot be edited through private
 workbook edit/delete controls. Account changes unsubscribe and clear live data.
+
+## Standalone market page and favourites
+
+The QSE Market Prices page at `/market-prices` has compact ticker cards, a
+searchable switcher grouped by opened, favourite, closed, and other tickers,
+and page filters for dates, Manual/App/All sources, and flagged price changes.
+Today and lifetime charts use every matching observation independently of table
+pagination; large series retain observed extrema in a chart overview. Lifetime
+low/high guides combine the selected sources, while the median describes the
+visible observations. Timeframe buttons update the shared date filters.
+
+QSE favourites are managed with each ticker card's star and stored separately for
+each account at `users/{uid}/extensionConfigs/chartFavourites`, shared with the
+extension. Guest favourites stay local. Failed saves retain a local pending copy
+for retry. Both app and extension update only changed config fields, preserving
+unrelated settings. PSX favourites are unchanged.
+
+Standard cards use a shared 16px bottom spacing token. Containers that already
+own section spacing suppress card margins to avoid doubling the gap.
