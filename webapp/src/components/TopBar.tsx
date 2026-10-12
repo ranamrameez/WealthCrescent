@@ -52,7 +52,7 @@ export function TopBar() {
           </button>
         ))}
       </div>
-      <div className="page-topbar-right">{category==='stocks' && !stockDetail && <TopBarSelect label="Stock" className="account-switch-select" value="" options={[{value:'',label:'All stocks'},...stockOptions.map(ticker=>({value:ticker,label:ticker}))]} onChange={event=>{if(event.target.value)navigate(`${exchange==='psx'?'/psx':''}/stock/${event.target.value}`);}} />}{rightSlot}</div>
+      <div className="page-topbar-right">{category==='stocks' && !stockDetail && !location.pathname.startsWith('/market-prices') && <TopBarSelect label="Stock" className="account-switch-select" value="" options={[{value:'',label:'All stocks'},...stockOptions.map(ticker=>({value:ticker,label:ticker}))]} onChange={event=>{if(event.target.value)navigate(`${exchange==='psx'?'/psx':''}/stock/${event.target.value}`);}} />}{rightSlot}</div>
     </div>
   );
 }

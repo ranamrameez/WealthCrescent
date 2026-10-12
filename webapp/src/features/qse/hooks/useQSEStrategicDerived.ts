@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { cashSummary, getMarketPrice, makeQSEFeeCalculator } from '../../../lib/calc';
 import { computeFIFOPositions } from '../../../lib/calc/fifoPositions';
-import { useWorkbookStore } from '../../../store/workbookStore';
+import { useLiveQseWorkbook } from './useLiveQseWorkbook';
 import type { QSERow } from './useQSEDerived';
 
 /** Dashboard's "Strategic Trades" tab: always computes `'lowestCostFirst'`,
@@ -14,7 +14,7 @@ import type { QSERow } from './useQSEDerived';
  * shape mirrors `useQSEDerived()`'s (minus `ledger`, which Dashboard never
  * reads) so `DashboardPositionsView` can be fed either hook's output. */
 export function useQSEStrategicDerived() {
-  const workbook = useWorkbookStore((s) => s.workbook);
+  const workbook = useLiveQseWorkbook();
 
   return useMemo(() => {
     const calcFee = makeQSEFeeCalculator(workbook.settings);

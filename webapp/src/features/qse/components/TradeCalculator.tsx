@@ -62,10 +62,14 @@ export function TradeCalculator({ initialTicker }: { initialTicker?: string } = 
   const [targetTouched, setTargetTouched] = useState(false);
 
   const [sellShares, setSellShares] = useState(0);
-  const [sellPrice, setSellPrice] = useState(0);
+  const [sellPrice, setSellPriceValue] = useState(0);
+  const [sellEdited,setSellEdited] = useState(false);
+  const setSellPrice = (price:number) => {setSellEdited(true);setSellPriceValue(price);};
   const [targetProfit, setTargetProfit] = useState(0);
 
-  const [buyPrice, setBuyPrice] = useState(0);
+  const [buyPrice, setBuyPriceValue] = useState(0);
+  const [buyEdited,setBuyEdited] = useState(false);
+  const setBuyPrice = (price:number) => {setBuyEdited(true);setBuyPriceValue(price);};
   const [newShares, setNewShares] = useState(0);
   // The Amount field is a reverse-entry convenience (type a $ amount,
   // back-derive shares) — it needs its OWN local text state rather than
@@ -112,8 +116,9 @@ export function TradeCalculator({ initialTicker }: { initialTicker?: string } = 
   useEffect(() => {
     setPriceOverride('');
     setSellShares(shares);
-    setSellPrice(mp);
-    setBuyPrice(mp);
+    setSellEdited(false);setBuyEdited(false);
+    setSellPriceValue(mp);
+    setBuyPriceValue(mp);
     setNewShares(0);
     setAmountInput('');
     setTargetProfit(0);
@@ -122,6 +127,8 @@ export function TradeCalculator({ initialTicker }: { initialTicker?: string } = 
     setTargetTouched(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticker]);
+
+  useEffect(() => {if (!sellEdited) setSellPriceValue(mp);if (!buyEdited) setBuyPriceValue(mp);}, [mp,sellEdited,buyEdited]);
 
   const buyAmount = newShares * buyPrice;
   const buyFee = buyPrice > 0 ? calcFee(buyAmount, true) : 0;

@@ -82,7 +82,10 @@ export function PositionDetail({ ticker }: { ticker: string }) {
   const [priceInput, setPriceInput] = useState(mp > 0 ? String(mp) : '');
   // Re-prefill from the stored price whenever the ticker changes (this
   // component is reused across stock pages without remounting).
-  useEffect(() => setPriceInput(mp > 0 ? String(mp) : ''), [ticker]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [editingPrice,setEditingPrice] = useState(false);
+  const [priceDirty,setPriceDirty] = useState(false);
+  useEffect(() => { if (!editingPrice && !priceDirty) setPriceInput(mp > 0 ? String(mp) : ''); }, [ticker,mp,editingPrice,priceDirty]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {setPriceDirty(false);setPriceInput(mp > 0 ? String(mp) : '');}, [ticker]);
   const lastBuyPrice = [...workbook.transactions].filter((t) => t.ticker === ticker && t.action === 'BUY').sort((a, b) => a.date.localeCompare(b.date)).pop()?.price || 0;
   const soldTx = workbook.transactions.filter((t) => t.ticker === ticker && t.action === 'SELL');
   const lastSellPrice = [...soldTx].sort((a, b) => a.date.localeCompare(b.date)).pop()?.price || 0;
@@ -159,7 +162,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
   // its real index — see `updatePricePoint`'s own doc comment in the store).
   const [editPriceIndex, setEditPriceIndex] = useState<number | null>(null);
   const [editPriceRow, setEditPriceRow] = useState<PricePoint | null>(null);
-  const rawHistory = workbook.priceHistory[ticker] ?? [];
+  const rawHistory = useWorkbookStore(s => s.workbook.priceHistory[ticker]) ?? [];
 
   const startEditPrice = (rawIndex: number, point: PricePoint) => {
     setEditPriceIndex(rawIndex);
@@ -208,6 +211,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
     if (!val || val <= 0) return;
     if (!(await ensureSignedIn('Sign in to save price updates.'))) return;
     setMarketPrice(ticker, val);
+    setPriceDirty(false);
     toast(`${ticker} price saved: ${fmtQSEPrice(val)}`);
     // User-reported bug: this used to reset to '', which blanked the input
     // right after a successful save even though the price WAS saved
@@ -372,8 +376,10 @@ export function PositionDetail({ ticker }: { ticker: string }) {
           step="0.001"
           className="price-input"
           placeholder="Update price"
+          onFocus={() => setEditingPrice(true)}
+          onBlur={() => setEditingPrice(false)}
           value={priceInput}
-          onChange={(e) => setPriceInput(e.target.value)}
+          onChange={(e) => {setPriceDirty(true);setPriceInput(e.target.value);}}
           onKeyDown={(e) => e.key === 'Enter' && commitPrice()}
           style={{ width: 150 }}
         />
@@ -438,10 +444,10 @@ export function PositionDetail({ ticker }: { ticker: string }) {
               <table>
                 <thead><tr><RecentTh col="when">When</RecentTh><RecentTh col="price">Price</RecentTh><th></th></tr></thead>
                 <tbody>
-                  {sortedRecent.map((p) => {
+                  {sortedRecent.map((p, rowIndex) => {
                     const rawIndex = rawHistory.indexOf(p);
                     return editPriceIndex === rawIndex && editPriceRow ? (
-                      <tr key={rawIndex}>
+                      <tr key={rawIndex >= 0 ? 'manual:'+rawIndex : 'shared:'+rowIndex}>
                         <td><input type="date" value={editPriceRow.date} onChange={(e) => setEditPriceRow({ ...editPriceRow, date: e.target.value })} className="w-130" /></td>
                         <td><PriceInput exchange="qse" type="number" step="0.001" value={editPriceRow.price} onChange={(e) => setEditPriceRow({ ...editPriceRow, price: Number(e.target.value) })} className="w-90" /></td>
                         <td>
@@ -450,12 +456,12 @@ export function PositionDetail({ ticker }: { ticker: string }) {
                         </td>
                       </tr>
                     ) : (
-                      <tr key={rawIndex}>
+                      <tr key={rawIndex >= 0 ? 'manual:'+rawIndex : 'shared:'+rowIndex}>
                         <td>{p.time ? new Date(p.time).toLocaleString() : p.date}</td>
-                        <td>{fmtQSEPrice(p.price)}</td>
+                        <td>{fmtQSEPrice(p.price)} {rawIndex < 0 && <small>Shared feed</small>}</td>
                         <td>
-                          <IconButton label="Edit" icon={<EditIcon size={12} />} onClick={() => startEditPrice(rawIndex, p)} />
-                          <IconButton label="Delete" icon={<TrashIcon size={12} />} onClick={() => removePricePoint(rawIndex)} />
+                          <IconButton label="Edit" disabled={rawIndex < 0} icon={<EditIcon size={12} />} onClick={() => startEditPrice(rawIndex, p)} />
+                          <IconButton label="Delete" disabled={rawIndex < 0} icon={<TrashIcon size={12} />} onClick={() => removePricePoint(rawIndex)} />
                         </td>
                       </tr>
                     );

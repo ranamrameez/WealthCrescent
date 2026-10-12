@@ -1,3 +1,4 @@
+import { useLiveQseWorkbook } from '../hooks/useLiveQseWorkbook';
 import { StandardCard } from '../../../components/StandardCard';
 import { PageHeading } from '../../../components/PageHeading';
 import { BackButton } from '../../../components/BackButton';
@@ -19,7 +20,7 @@ import type { Workbook, WatchlistItem } from '../../../types/workbook';
 import { useQSEStockData } from '../hooks/useQSEStockData';
 
 export function WatchlistPage() {
-  const workbook = useWorkbookStore((s) => s.workbook);
+  const workbook = useLiveQseWorkbook();
   const addWatchlistItem = useWorkbookStore((s) => s.addWatchlistItem);
   const updateWatchlistItem = useWorkbookStore((s) => s.updateWatchlistItem);
   const removeWatchlistItem = useWorkbookStore((s) => s.removeWatchlistItem);

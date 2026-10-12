@@ -68,7 +68,7 @@ function configContext() {
   const local={chartFavourites:['QFLS'],syncConfig:{minPushIntervalMinutes:0}},cloud={},calls=[];let fail=false;
   const ctx=vm.createContext({Date,JSON,encodeURIComponent,RTDB_BASE_URL:'https://db.example',DEFAULT_SCRAPE_CONFIG:{targetUrl:'https://market.example'},DEFAULT_SYNC_CONFIG:{minPushIntervalMinutes:2},
     chrome:{storage:{local:{get:async()=>structuredClone(local),set:async patch=>Object.assign(local,structuredClone(patch))}}},
-    fetch:async(url,options={})=>{const uid=new URL(url).pathname.split('/')[2];calls.push({uid,method:options.method || 'GET',body:options.body});if(fail) return {ok:false,status:403};if(options.method==='PUT') cloud[uid]=JSON.parse(options.body);return {ok:true,json:async()=>structuredClone(cloud[uid] || null)};},
+    fetch:async(url,options={})=>{const uid=new URL(url).pathname.split('/')[2];calls.push({uid,method:options.method || 'GET',body:options.body});if(fail) return {ok:false,status:403};if(options.method==='PUT') cloud[uid]=JSON.parse(options.body);if(options.method==='PATCH') cloud[uid]={...(cloud[uid] || {}),...JSON.parse(options.body)};return {ok:true,json:async()=>structuredClone(cloud[uid] || null)};},
   });
   vm.runInContext(read('cloud-config.js').replace(/^import .*;\r?\n/gm,'').replace(/export /g,''),ctx);
   return {ctx,local,cloud,calls,setFailure:value=>fail=value};
@@ -152,4 +152,12 @@ test('Root QSE migration preserves old history and existing root values without 
   assert.ok(calls.filter(c=>c.method!=='GET').every(c=>c.path==='QSE'));
   calls.length=0;await vm.runInContext('ensureQseRoot({idToken:"other-user"})',ctx);
   assert.equal(calls.length,0);
+});
+
+test('Saving extension timing preserves favourite changes made in the webapp',async()=>{
+ const {ctx,local,cloud,calls}=configContext();await vm.runInContext('restoreExtensionConfigs({uid:"alice",idToken:"token"})',ctx);
+ cloud.alice.chartFavourites=['QNBK'];local.syncConfig={minPushIntervalMinutes:9};
+ await vm.runInContext('saveExtensionConfigs(async()=>({uid:"alice",idToken:"token"}),true)',ctx);
+ assert.deepEqual(cloud.alice.chartFavourites,['QNBK']);assert.equal(cloud.alice.syncConfig.minPushIntervalMinutes,9);
+ const body=JSON.parse(calls.at(-1).body);assert.equal(body.chartFavourites,undefined);
 });

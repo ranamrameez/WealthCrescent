@@ -154,7 +154,7 @@
 .standard-section-anchor { scroll-margin-top: 96px; }
 .page-topbar .topbar-select-wrap > span { display: none; }
 .page-topbar .modal-overlay .topbar-select-wrap > span { display: inline; }
-.trade-strategy-page { gap: 10px; }
+.trade-strategy-page { gap: var(--page-card-gap,16px); }
 .trade-strategy-page > .page-heading { margin-bottom: 0; }
 .trade-strategy-heading { font-size: 16px; line-height: 1.3; margin: 10px 0 6px; }
 .trade-plan-card > .standard-card-header .standard-card-title { min-width: 0; width: 100%; }
@@ -174,9 +174,18 @@
 .profitable-share-alerts > p { margin-top: 0; }
 .page-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
 .page-heading-title-row{display:flex;align-items:center;gap:8px;margin-top:6px;}
-.standard-section-stack{display:flex;flex-direction:column;gap:16px;}
+.standard-section-stack{display:flex;flex-direction:column;gap:var(--page-card-gap,16px);}
 .standard-section-anchor{scroll-margin-top:84px;}
-.standard-card{padding: 0 !important;overflow:visible;}
+.standard-card{padding:0 !important;overflow:visible;margin-bottom:var(--page-card-gap,16px);}
+/* Gap-managed stacks supply their own spacing; plain sibling cards use margin. */
+.stack-lg > .standard-card,
+.standard-section-stack > .standard-card,
+.standard-section-anchor > .standard-card,
+.grid-auto > .standard-card,
+.grid > .standard-card,
+.standard-section-stack > * > .standard-card:last-child,
+.stack-lg > * > .standard-card:last-child {margin-bottom:0;}
+.standard-card.standard-card-fullscreen {margin-bottom:0;}
 .standard-card.standard-card-hued{
   background:color-mix(in srgb,var(--card-hue) 18%,var(--panel));
   border-color:color-mix(in srgb,var(--card-hue) 46%,var(--border));
