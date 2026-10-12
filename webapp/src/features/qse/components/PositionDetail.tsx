@@ -1,8 +1,9 @@
-import { StockPriceCharts } from '../../../components/StockPriceCharts';
+import { MarketPriceHistory } from './MarketPriceHistory';
 import { PriceInput } from "../../../components/ui/PriceInput";
 import { useEffect, useMemo, useState } from 'react';
 import { StockBar as Bar } from '../../../components/StockCharts';
 import { STOCK_BUY_COLOR, STOCK_SELL_COLOR } from '../../../lib/stockChartTheme';
+import type { ComponentProps } from 'react';
 import { StandardCard } from '../../../components/StandardCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { EditIcon, SaveIcon, TrashIcon, XIcon } from '../../../components/icons';
@@ -27,6 +28,11 @@ import type { PricePoint } from '../../../types/workbook';
 import { useQSEDerived } from '../hooks/useQSEDerived';
 import { gridAutoStyle } from '../../../lib/gridStyle';
 
+function DetailCard({section,title,children,...props}: ComponentProps<typeof StandardCard> & {section:string}) {
+  return section === 'all' ? <StandardCard title={title} {...props}>{children}</StandardCard>
+    : <div className={props.className}>{section !== 'lots' && section !== 'closed' && <h3>{title}</h3>}{children}</div>;
+}
+
 /** Small, fixed-height chart wrapper — Chart.js defaults to filling
  * whatever block-level space it's given, which meant every chart rendered
  * oversized. maintainAspectRatio:false + an explicit height keeps every
@@ -40,7 +46,7 @@ function CompactChart({ height, children }: { height: number; children: React.Re
  * too, which is what the quick popup used to be missing entirely), and
  * price range. Shared between the quick popup (PositionModal) and the full
  * dedicated stock page (StockPage) so they never drift apart. */
-export function PositionDetail({ ticker }: { ticker: string }) {
+export function PositionDetail({ ticker, section = 'all' }: { ticker: string; section?: 'all' | 'current' | 'all-time' | 'lots' | 'closed' | 'prices' }) {
   const { workbook, positions, calcFee, lots } = useQSEDerived();
   const setMarketPrice = useWorkbookStore((s) => s.setMarketPrice);
   const updatePricePoint = useWorkbookStore((s) => s.updatePricePoint);
@@ -86,8 +92,8 @@ export function PositionDetail({ ticker }: { ticker: string }) {
   const [priceDirty,setPriceDirty] = useState(false);
   useEffect(() => { if (!editingPrice && !priceDirty) setPriceInput(mp > 0 ? String(mp) : ''); }, [ticker,mp,editingPrice,priceDirty]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {setPriceDirty(false);setPriceInput(mp > 0 ? String(mp) : '');}, [ticker]);
-  const lastBuyPrice = [...workbook.transactions].filter((t) => t.ticker === ticker && t.action === 'BUY').sort((a, b) => a.date.localeCompare(b.date)).pop()?.price || 0;
-  const soldTx = workbook.transactions.filter((t) => t.ticker === ticker && t.action === 'SELL');
+  const lastBuyPrice = [...workbook.transactions].filter((t) => t.ticker === ticker && !t.isPending && t.action === 'BUY').sort((a, b) => a.date.localeCompare(b.date)).pop()?.price || 0;
+  const soldTx = workbook.transactions.filter((t) => t.ticker === ticker && !t.isPending && t.action === 'SELL');
   const lastSellPrice = [...soldTx].sort((a, b) => a.date.localeCompare(b.date)).pop()?.price || 0;
   const avgSellPrice = soldTx.length ? soldTx.reduce((s, t) => s + t.shares * t.price, 0) / soldTx.reduce((s, t) => s + t.shares, 0) : 0;
   const holdingDays = position
@@ -229,11 +235,11 @@ export function PositionDetail({ ticker }: { ticker: string }) {
     // column, not the original top-to-bottom order).
     <div>
 
-    <div className="position-split">
-    <div className="position-split-left">
+    <div>
+    <div>
 
-      {isOpen && (
-        <StandardCard title={<span>Current position <StatSourceBadge source="official" /></span>} className="mb-12">
+      {(section === 'all' || section === 'current') && isOpen && (
+        <DetailCard section={section} title={<span>Current position <StatSourceBadge source="official" /></span>} className="mb-12">
           <div className="grid-auto" style={gridAutoStyle(140, 8)}>
             <div className="stat-card card" style={hueStyle(HUES[2])}>
               <div className="label">Trend</div>
@@ -270,7 +276,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
               <div className="value fs-14">{statusLabel}</div>
             </div>
           </div>
-        </StandardCard>
+        </DetailCard>
       )}
 
       {/* All-time stats: the thing closed positions were missing entirely —
@@ -278,8 +284,8 @@ export function PositionDetail({ ticker }: { ticker: string }) {
           fully closed, but the lifetime record (what was bought, sold,
           realized, and over what period) is exactly what you'd want to
           look back on. */}
-      {position && (position.buyCount > 0 || position.sellCount > 0) && (
-        <StandardCard title={<span>All-time stats <StatSourceBadge source="official" /></span>} className="mb-12">
+      {(section === 'all' || section === 'all-time') && position && (position.buyCount > 0 || position.sellCount > 0) && (
+        <DetailCard section={section} title={<span>All-time stats <StatSourceBadge source="official" /></span>} className="mb-12">
           <div className="grid-auto" style={gridAutoStyle(100, 8)}>
             <div className="stat-card card" style={hueStyle(HUES[0])}>
               <div className="label">Bought / Sold</div>
@@ -307,16 +313,16 @@ export function PositionDetail({ ticker }: { ticker: string }) {
             </div>
             {!isOpen && <div className="stat-card card" style={hueStyle(HUES[6])}><div className="label">Held</div><div className="value">{holdingDays}d</div></div>}
           </div>
-        </StandardCard>
+        </DetailCard>
       )}
 
       {/* Open lots — official (this workbook's own real remaining lots,
           same engine as avg/BE above) when costBasisMethod is lot-based,
           else the independent pure-reporting fallback. See `usingLots`'
           own doc comment. */}
-      {usingLots ? (
+      {(section === 'all' || section === 'lots') && (usingLots ? (
         sortedOfficialLots.length > 0 && (
-          <StandardCard title={<span>Open Lots <StatSourceBadge source="official" /></span>} className="mb-12">
+          <DetailCard section={section} title={<span>Open Lots <StatSourceBadge source="official" /></span>} className="mb-12">
             <div className="table-scroll">
               <table>
                 <thead><tr><LotTh col="buyDate">Buy date</LotTh><LotTh col="buyPrice">Buy price</LotTh><LotTh col="remainingShares">Remaining</LotTh><LotTh col="costPerShare">Cost/share</LotTh></tr></thead>
@@ -335,11 +341,11 @@ export function PositionDetail({ ticker }: { ticker: string }) {
             <p className="text-muted" style={{ marginTop: 4 }}>
               A future sell of {ticker} will consume {workbook.settings.costBasisMethod === 'fifo' ? 'the oldest lot first (FIFO)' : 'the cheapest lot first'}, unless it targets a specific lot via "Sell this lot."
             </p>
-          </StandardCard>
+          </DetailCard>
         )
       ) : (
         reportOpenLots.length > 0 && (
-          <StandardCard title={<span>Open Lots <StatSourceBadge source="history" /></span>} className="mb-12">
+          <DetailCard section={section} title={<span>Open Lots <StatSourceBadge source="history" /></span>} className="mb-12">
             <div className="table-scroll">
               <table>
                 <thead>
@@ -358,18 +364,18 @@ export function PositionDetail({ ticker }: { ticker: string }) {
                 </tbody>
               </table>
             </div>
-          </StandardCard>
+          </DetailCard>
         )
-      )}
+      ))}
 
 
     </div>
-    <div className="position-split-right">
+    <div>
 
       {/* Daily price — the single most-asked-about number, so it leads
           instead of being buried under other sections. */}
-      <StandardCard title={<span>Daily and lifetime market prices</span>} className="mb-12">
-      <StockPriceCharts points={stats?.chronological ?? []} currency={workbook.settings.currency} formatPrice={fmtQSEPrice} />
+      {(section === 'all' || section === 'prices') && <DetailCard section={section} title={<span>Market price chart</span>} className="mb-12">
+      <MarketPriceHistory ticker={ticker} />
       <div className="row gap-sm mt-sm">
         <PriceInput exchange="qse"
           type="number"
@@ -385,10 +391,10 @@ export function PositionDetail({ ticker }: { ticker: string }) {
         />
         <button className="btn secondary small" onClick={commitPrice}><SaveIcon size={12} />Save price</button>
       </div>
-      </StandardCard>
+      </DetailCard>}
 
-      {isOpen && (
-        <StandardCard title={<span>Buy vs. current vs. break-even</span>} className="mb-12">
+      {(section === 'all' || section === 'current') && isOpen && (
+        <DetailCard section={section} title={<span>Buy vs. current vs. break-even</span>} className="mb-12">
           <CompactChart height={lastSellPrice > 0 ? 150 : 115}>
             <Bar
               data={{
@@ -413,11 +419,11 @@ export function PositionDetail({ ticker }: { ticker: string }) {
               }}
             />
           </CompactChart>
-        </StandardCard>
+        </DetailCard>
       )}
 
-      {stats && (
-        <StandardCard title={<span>Price range</span>}>
+      {(section === 'all' || section === 'prices') && stats && (
+        <DetailCard section={section} title={<span>Price range</span>}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 8 }}>
             <div className="stat-card card" style={hueStyle(HUES[5])}><div className="label">Lowest</div><div className="value">{fmtQSEPrice(stats.min)}</div><div className="sub">{stats.minDate}</div></div>
             <div className="stat-card card" style={hueStyle(HUES[1])}>
@@ -471,7 +477,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
             </div>
             <button className="btn secondary small mt-sm" onClick={exportPriceHistory}>Export price history CSV</button>
           </details>
-        </StandardCard>
+        </DetailCard>
       )}
 
     </div>
@@ -482,8 +488,8 @@ export function PositionDetail({ ticker }: { ticker: string }) {
           amount, Sell price+date, Total sale amount, PL/share, Net profit.
           Naturally absent for a still-fully-open position (nothing sold
           yet to show), matching the "skip Selling data" half of the ask. */}
-      {sortedClosedTrades.length > 0 && (
-        <StandardCard title={<span>Closed round-trips <StatSourceBadge source="history" /></span>} className="mb-12">
+      {(section === 'all' || section === 'closed') && sortedClosedTrades.length > 0 && (
+        <DetailCard section={section} title={<span>Closed round-trips <StatSourceBadge source="history" /></span>} className="mb-12">
           <div className="table-scroll">
             <table>
               <thead>
@@ -523,7 +529,7 @@ export function PositionDetail({ ticker }: { ticker: string }) {
               </tbody>
             </table>
           </div>
-        </StandardCard>
+        </DetailCard>
       )}
       
     </div>

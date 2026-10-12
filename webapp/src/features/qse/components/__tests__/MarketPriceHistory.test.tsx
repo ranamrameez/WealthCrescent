@@ -1,10 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { qatarDay } from '../../../../lib/stockData/qsePrices';
 const state=vi.hoisted(()=>({denied:false,paths:[] as string[]}));
 vi.mock('../../../../lib/firebase/client',()=>({db:{}}));
 vi.mock('../../../../lib/firebase/useAuthState',()=>({useAuthState:()=>({user:{uid:'alice'},authResolved:true})}));
-vi.mock('../../../../components/StockPriceCharts',()=>({StockPriceCharts:()=>null}));
+vi.mock('../MarketPriceChart',()=>({MarketPriceChart:({rows,bounds}:{rows:{source:string}[];bounds:{low:number;high:number}|null})=><div><span>{rows.filter(row=>row.source==='shared').length} shared points; {rows.filter(row=>row.source==='manual').length} manual points</span><span>Bounds {bounds?.low} to {bounds?.high}</span></div>}));
 vi.mock('../../../../store/workbookStore',()=>({useWorkbookStore:(selector:(s:unknown)=>unknown)=>selector({workbook:{priceHistory:{QFLS:[{date:qatarDay(),price:10}]},settings:{currency:'QAR'}}})}));
 vi.mock('firebase/database',()=>({
   ref:(_db:unknown,path:string)=>path,orderByChild:(key:string)=>key,startAt:(value:string)=>value,endAt:(value:string)=>value,query:(path:string)=>path,
@@ -19,11 +19,21 @@ import { MarketPriceHistory } from '../MarketPriceHistory';
 afterEach(()=>{cleanup();state.denied=false;state.paths=[];});
 it('shows both sources and reported bounds from the shared root',()=>{
   render(<MarketPriceHistory ticker="QFLS" />);
-  expect(screen.getByText('My manual entry')).toBeTruthy();expect(screen.getByText('Scraped feed')).toBeTruthy();
+  expect(screen.getByText('Bounds 9 to 13')).toBeTruthy();
   expect(screen.getByText(/1 shared points; 1 manual points/)).toBeTruthy();
   expect(state.paths).toEqual(['QSE/tickers/QFLS/allPrices','QSE/tickers/QFLS/allTimeBounds']);
 });
 it('keeps manual history visible when shared reads fail',()=>{
   state.denied=true;render(<MarketPriceHistory ticker="QFLS" />);
-  expect(screen.getByText('My manual entry')).toBeTruthy();expect(screen.getByRole('alert').textContent).toContain('Denied');
+  expect(screen.getByText(/0 shared points; 1 manual points/)).toBeTruthy();expect(screen.getByRole('alert').textContent).toContain('Denied');
+});
+
+it('defaults to Today and applies custom dates to the chart',()=>{
+  render(<MarketPriceHistory ticker="QFLS" />);
+  expect(screen.getByRole('button',{name:'Today'}).getAttribute('aria-pressed')).toBe('true');
+  fireEvent.change(screen.getByLabelText('From (Qatar)'),{target:{value:'2000-01-01'}});
+  fireEvent.change(screen.getByLabelText('To (Qatar)'),{target:{value:'2000-01-02'}});
+  expect(screen.getByText(/0 shared points; 0 manual points/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button',{name:'All time'}));
+  expect(screen.getByText(/1 shared points; 1 manual points/)).toBeTruthy();
 });

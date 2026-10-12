@@ -37,3 +37,9 @@
 .market-ticker-card .ticker-logo {width:28px;height:28px;margin-right:0;align-self:center;}
 .market-ticker-card .ticker-logo-fallback {font-size:11px;}
 .market-ticker-card .ticker-logo-stack {align-self:center;}
+
+.stock-portfolio-summary > div { flex: 1 1 300px; min-width: 0; }
+.stock-portfolio-summary .account-summary-card { margin-bottom: 12px; }
+
+.stock-portfolio-summary .stock-summary-value { color: var(--card-hue); background: transparent; border-color: transparent; }
+.stock-portfolio-summary .summary-metric .text-profit, .stock-portfolio-summary .summary-metric .text-loss { background: transparent; border-color: transparent; }

@@ -7,8 +7,8 @@ import { StandardCard, type StandardCardAction } from './StandardCard';
 
 export interface StandardPageSection { key:string; label:string; content:ReactNode; summary?:ReactNode; actions?:StandardCardAction[]; headerEnd?:ReactNode; defaultOpen?:boolean; hue?:string; unframed?:boolean; }
 
-export function StandardPageSections({sections: suppliedSections,defaultKey}:{sections:StandardPageSection[];defaultKey?:string}) {
-  const sections = orderedPageSections(suppliedSections);
+export function StandardPageSections({sections: suppliedSections,defaultKey,preserveOrder = false}:{sections:StandardPageSection[];defaultKey?:string;preserveOrder?:boolean}) {
+  const sections = preserveOrder ? suppliedSections : orderedPageSections(suppliedSections);
   const sectionId = useId();
   const [params,setParams]=useSearchParams();
   const firstKey=defaultKey||sections[0]?.key||'';
