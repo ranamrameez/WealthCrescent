@@ -1,3 +1,4 @@
+import { MarketPricesPage } from './features/qse/pages/MarketPricesPage';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { CalculatorLauncher } from './components/CalculatorLauncher';
@@ -175,6 +176,7 @@ function App() {
               <Route path="/portfolio" element={<PortfolioPage />} />
               <Route path="/transactions" element={<TransactionsPage />} />
               <Route path="/watchlist" element={<WatchlistPage />} />
+              <Route path="/market-prices" element={<MarketPricesPage />} />
               <Route path="/stock/:ticker" element={<StockPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/risk-analysis" element={<RiskAnalysisPage />} />

@@ -15,7 +15,8 @@ const QSE_NAV_ITEMS = [
   { num: '05', label: 'Analytics', to: '/analytics' },
   { num: '06', label: 'Risk Analysis', to: '/risk-analysis' },
   { num: '07', label: 'Trade Strategy', to: '/trade-strategy' },
-  { num: '08', label: 'Settings', to: '/settings' },
+  { num: '08', label: 'Market prices', to: '/market-prices' },
+  { num: '09', label: 'Settings', to: '/settings' },
 ];
 
 const PSX_NAV_ITEMS = [
