@@ -341,7 +341,7 @@ export function StockPage() {
           { key: 'closed', label: 'Closed', defaultOpen: true, content: <PositionDetail ticker={ticker} section="closed" fromDate={filters.fromDate} toDate={filters.toDate} /> },
           { key: 'analytics',
             label: 'Analytics',
-            defaultOpen: true,
+            defaultOpen: false,
             content: <ExchangeStockAnalytics filters={filters} ticker={ticker} transactions={workbook.transactions} priceHistory={workbook.priceHistory} calcFee={calcFee} method={workbook.settings.costBasisMethod} currency={workbook.settings.currency} formatPrice={fmtQSEPrice} />,
           },
           // Pending item 49 ("assess a stock in one go"): Risk Analysis used
@@ -354,7 +354,7 @@ export function StockPage() {
             ? [{
                 key: 'risk',
                 label: 'Risk Analysis',
-                defaultOpen: true,
+                defaultOpen: false,
                 content: (
                   <RiskCalculator
                     rows={rows}

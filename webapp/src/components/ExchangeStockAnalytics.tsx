@@ -68,7 +68,7 @@ export function ExchangeStockAnalytics({
   const buy = STOCK_BUY_COLOR;
   const sell = STOCK_SELL_COLOR;
   const holdings = STOCK_HOLDINGS_COLOR;
-  return <div>
+  return <div className="exchange-stock-analytics">
     <div className="grid-auto mb-md" style={gridAutoStyle(170, 12)}>
       <div className="stat-card card"><div className="label">Bought</div><MoneyValue n={analytics.buyValue} currency={currency} /><div className="sub">{analytics.buyShares.toLocaleString()} shares</div></div>
       <div className="stat-card card"><div className="label">Sold</div><MoneyValue n={analytics.sellValue} currency={currency} /><div className="sub">{analytics.sellShares.toLocaleString()} shares</div></div>

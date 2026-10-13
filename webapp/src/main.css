@@ -301,6 +301,17 @@
 .analytics-chart-actions{position:absolute;top:9px;right:10px;z-index:2;display:flex;align-items:center;gap:4px;}
 .analytics-chart:fullscreen{padding:20px;background:var(--panel);}
 .analytics-chart:fullscreen .chart-canvas-wrap{height:calc(100vh - 76px);}
+.exchange-stock-analytics{display:flex;flex-direction:column;gap:16px;}
+.exchange-stock-analytics > *{margin-block:0;}
+.exchange-stock-analytics > div:not(.grid-auto):not(.analytics-grid){display:flex;flex-direction:column;gap:12px;}
+.exchange-stock-analytics .analytics-grid{gap:12px;padding-inline:0;}
+.exchange-stock-analytics .analytics-grid > div{display:flex;min-width:0;flex-direction:column;gap:8px;}
+.exchange-stock-analytics .analytics-grid > div > .analytics-chart{flex:1;}
+.exchange-stock-analytics .row.mb-md{margin-bottom:0;}
+.exchange-stock-analytics p.text-muted{margin-block:0;line-height:1.45;}
+.exchange-stock-analytics .analytics-chart{height:100%;}
+.exchange-stock-analytics .analytics-chart-header{display:flex;min-height:28px;align-items:center;justify-content:center;margin-bottom:8px;padding-inline:52px;}
+.exchange-stock-analytics .analytics-chart-header h4{margin:0;}
 @media(max-width:900px){.standard-card-header{grid-template-columns:minmax(0,1fr) auto;}.standard-card-summary{grid-column:1/-1;grid-row:2;justify-content:flex-start;}.analytics-grid{grid-template-columns:1fr;}}
 @media(max-width:640px){.standard-card-header{padding:10px;}.standard-card-body{padding:10px;}.topbar-controls{width:100%;justify-content:flex-end;gap:5px;}.topbar-select-wrap:has(.account-switch-select),.account-switch-select{width:auto;flex:0 1 auto;}.topbar-filter-btn{width:auto;}}
 

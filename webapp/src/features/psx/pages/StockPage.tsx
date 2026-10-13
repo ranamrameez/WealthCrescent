@@ -409,7 +409,7 @@ export function StockPage() {
           {
             key: 'analytics',
             label: 'Analytics',
-            defaultOpen: true,
+            defaultOpen: false,
             content: <ExchangeStockAnalytics filters={filters} ticker={ticker} transactions={workbook.transactions} priceHistory={workbook.priceHistory} calcFee={calcFee} method={workbook.settings.costBasisMethod} currency={workbook.settings.currency} formatPrice={fmtPSXPrice} />,
           },
           // Pending item 49 ("assess a stock in one go"): see the identical
@@ -418,7 +418,7 @@ export function StockPage() {
             ? [{
                 key: 'risk',
                 label: 'Risk Analysis',
-                defaultOpen: true,
+                defaultOpen: false,
                 content: (
                   <RiskCalculator
                     rows={rows}
