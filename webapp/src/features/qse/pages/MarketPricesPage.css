@@ -53,7 +53,8 @@
 .market-ticker-card .ticker-logo-stack {align-self:center;}
 
 .stock-portfolio-summary { display: grid; gap: 10px; }
-.stock-portfolio-detail-grid, .stock-portfolio-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: start; }
+.stock-portfolio-detail-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr); gap: 10px; align-items: start; }
+.stock-portfolio-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: start; }
 .stock-portfolio-detail-grid > div { min-width: 0; }
 .stock-portfolio-detail-grid .mb-12, .stock-portfolio-summary-grid .account-summary-card { margin-bottom: 0; }
 @media(max-width:900px){.stock-portfolio-detail-grid,.stock-portfolio-summary-grid{grid-template-columns:1fr;}}
