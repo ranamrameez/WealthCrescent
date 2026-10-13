@@ -227,6 +227,10 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
     setPriceInput(String(val));
   };
   void commitPrice;
+  const comparisonValues=lastSellPrice>0?[lastBuyPrice,lastSellPrice,mp,be]:[lastBuyPrice,mp,be];
+  const comparisonLabels=lastSellPrice>0?['Latest buy','Latest sell','Market price','Break-even (fees)']:['Latest buy','Market price','Break-even (fees)'];
+  const comparisonTerms=lastSellPrice>0?['Latest executed buy price','Latest executed sell price','Current market price','Break-even price including fees']:['Latest executed buy price','Current market price','Break-even price including fees'];
+  const comparisonLow=Math.min(...comparisonValues),comparisonHigh=Math.max(...comparisonValues),comparisonPadding=Math.max((comparisonHigh-comparisonLow)*.15,comparisonHigh*.02,workbook.settings.tick);
 
   return (
     // Pending items 54/56/57: charts + Price range move to a right-hand
@@ -381,13 +385,13 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
 
       {(section === 'all' || section === 'current' || section === 'comparison') && isOpen && (
         <DetailCard section={section} title={<span>Price comparison</span>} className="mb-12">
-          <CompactChart height={lastSellPrice > 0 ? 150 : 115}>
+          <CompactChart height={lastSellPrice > 0 ? 220 : 180}>
             <Bar
               data={{
-                labels: lastSellPrice > 0 ? ['Latest executed buy price', 'Latest executed sell price', 'Current market price', 'Break-even price including fees'] : ['Latest executed buy price', 'Current market price', 'Break-even price including fees'],
+                labels: comparisonLabels,
                 datasets: [
                   {
-                    data: lastSellPrice > 0 ? [lastBuyPrice, lastSellPrice, mp, be] : [lastBuyPrice, mp, be],
+                    data: comparisonValues,
                     backgroundColor: lastSellPrice > 0
                       ? [STOCK_BUY_COLOR, STOCK_SELL_COLOR, '#a78bfa', '#c9a35a']
                       : [STOCK_BUY_COLOR, '#a78bfa', '#c9a35a'],
@@ -398,10 +402,11 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
               options={{
                 maintainAspectRatio: false,
                 indexAxis: 'y',
-                plugins: { legend: { display: false } },
+                interaction: { mode: 'nearest', axis: 'y', intersect: false },
+                plugins: { legend: { display: false }, datalabels:{display:false}, tooltip:{callbacks:{title:items=>comparisonTerms[items[0]?.dataIndex] || '',label:context=>fmtQSEPrice(Number(context.raw))}} },
                 // Done item 138: Chart.js's autoSkip was silently dropping
                 // "Sold"/"Break-even" labels from this 4-row category axis.
-                scales: { y: { ticks: { autoSkip: false } } },
+                scales: { x:{min:Math.max(0,comparisonLow-comparisonPadding),max:comparisonHigh+comparisonPadding,ticks:{callback:value=>fmtQSEPrice(Number(value))}},y: { ticks: { autoSkip: false } } },
               }}
             />
           </CompactChart>

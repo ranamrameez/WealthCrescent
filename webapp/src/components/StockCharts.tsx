@@ -17,7 +17,7 @@ function axes<T extends 'bar' | 'line'>(kind: T, options?: ChartOptions<T>): Cha
   return {
     ...options, responsive: true, maintainAspectRatio: false,
     interaction: { mode: 'index', intersect: false, ...options?.interaction },
-    plugins: { ...options?.plugins, datalabels: { ...spacedStockLabels(kind), ...options?.plugins?.datalabels, display: spacedStockLabels(kind).display } },
+    plugins: { ...options?.plugins, datalabels: { ...spacedStockLabels(kind), ...options?.plugins?.datalabels, display: options?.plugins?.datalabels?.display ?? spacedStockLabels(kind).display } },
     scales: Object.fromEntries(['x', 'y', ...Object.keys(supplied)].map(key => [key, { ...axis, ...supplied[key], grid: { ...axis.grid, ...supplied[key]?.grid }, ticks: { ...axis.ticks, ...supplied[key]?.ticks } }])),
   } as ChartOptions<T>;
 }
