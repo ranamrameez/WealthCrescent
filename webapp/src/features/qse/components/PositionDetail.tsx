@@ -380,11 +380,11 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
       </DetailCard>}
 
       {(section === 'all' || section === 'current' || section === 'comparison') && isOpen && (
-        <DetailCard section={section} title={<span>Buy vs. current vs. break-even</span>} className="mb-12">
+        <DetailCard section={section} title={<span>Price comparison</span>} className="mb-12">
           <CompactChart height={lastSellPrice > 0 ? 150 : 115}>
             <Bar
               data={{
-                labels: lastSellPrice > 0 ? ['Buy', 'Sold', 'Current', 'Break-even'] : ['Buy', 'Current', 'Break-even'],
+                labels: lastSellPrice > 0 ? ['Latest executed buy price', 'Latest executed sell price', 'Current market price', 'Break-even price including fees'] : ['Latest executed buy price', 'Current market price', 'Break-even price including fees'],
                 datasets: [
                   {
                     data: lastSellPrice > 0 ? [lastBuyPrice, lastSellPrice, mp, be] : [lastBuyPrice, mp, be],
