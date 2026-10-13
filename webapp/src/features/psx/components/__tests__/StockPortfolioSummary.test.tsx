@@ -1,9 +1,9 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 
-vi.mock('../PositionDetail',()=>({PositionDetail:()=>null}));
+vi.mock('../PositionDetail',()=>({PositionDetail:({section}:{section:string})=><div data-testid="position-detail">{section}</div>}));
 vi.mock('../../../../components/SummaryGroupCard',()=>({
-  SummaryGroupCard:({title,children}:{title:string;children:React.ReactNode})=><div>{title}{children}</div>,
+  SummaryGroupCard:({title,children}:{title:string;children:React.ReactNode})=><div data-testid="summary-group" data-title={title}>{title}{children}</div>,
   SummaryMetric:({label,value}:{label:string;value:React.ReactNode})=><div data-testid={label}>{value}</div>,
 }));
 vi.mock('../../hooks/usePSXDerived',()=>({usePSXDerived:()=>({
@@ -15,6 +15,8 @@ import { StockPortfolioSummary } from '../StockPortfolioSummary';
 afterEach(cleanup);
 it('keeps official current holdings separate from pending and planned PSX activity',()=>{
   render(<StockPortfolioSummary ticker="TEST" />);
+  expect(screen.getAllByTestId('position-detail').map(node=>node.textContent)).toEqual(['position','comparison','all-time']);
+  expect(screen.getAllByTestId('summary-group').map(node=>node.getAttribute('data-title'))).toEqual(['Current valuation','Lifetime performance','Planned activity']);
   expect(screen.getByTestId('Net liquidation value after sell fees').textContent).toContain('119');
   expect(screen.getByTestId('Total P/L').textContent).toContain('38');
   expect(screen.getByTestId('Buy cost including fees').textContent).toContain('51');

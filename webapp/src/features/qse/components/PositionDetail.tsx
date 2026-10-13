@@ -46,7 +46,7 @@ function CompactChart({ height, children }: { height: number; children: React.Re
  * too, which is what the quick popup used to be missing entirely), and
  * price range. Shared between the quick popup (PositionModal) and the full
  * dedicated stock page (StockPage) so they never drift apart. */
-export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate = '' }: { ticker: string; section?: 'all' | 'current' | 'all-time' | 'lots' | 'closed' | 'prices'; fromDate?: string; toDate?: string }) {
+export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate = '' }: { ticker: string; section?: 'all' | 'current' | 'position' | 'comparison' | 'all-time' | 'lots' | 'closed' | 'prices'; fromDate?: string; toDate?: string }) {
   const { workbook, positions, calcFee, lots } = useQSEDerived();
   const setMarketPrice = useWorkbookStore((s) => s.setMarketPrice);
   const updatePricePoint = useWorkbookStore((s) => s.updatePricePoint);
@@ -239,7 +239,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
     <div>
     <div>
 
-      {(section === 'all' || section === 'current') && isOpen && (
+      {(section === 'all' || section === 'current' || section === 'position') && isOpen && (
         <DetailCard section={section} title={<span>Current position <StatSourceBadge source="official" /></span>} className="mb-12">
           <div className="grid-auto" style={gridAutoStyle(140, 8)}>
             <div className="stat-card card" style={hueStyle(HUES[2])}>
@@ -379,7 +379,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
       <MarketPriceHistory ticker={ticker} />
       </DetailCard>}
 
-      {(section === 'all' || section === 'current') && isOpen && (
+      {(section === 'all' || section === 'current' || section === 'comparison') && isOpen && (
         <DetailCard section={section} title={<span>Buy vs. current vs. break-even</span>} className="mb-12">
           <CompactChart height={lastSellPrice > 0 ? 150 : 115}>
             <Bar
