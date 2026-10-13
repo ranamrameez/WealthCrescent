@@ -1155,7 +1155,7 @@ tbody td {
      the doubled/patchy borders `border` on every side would create once
      it merges with the table's own `border-collapse:collapse`. */
 tbody tr {
-	border-bottom: 1px solid var(--border);
+	border-bottom: var(--border-light-2);
 }
 tbody tr:last-child {
 	border-bottom: none;

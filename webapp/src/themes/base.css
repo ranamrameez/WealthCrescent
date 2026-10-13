@@ -63,6 +63,10 @@
 	--disp: "Space Grotesk", sans-serif;
 	--body: "Inter", sans-serif;
 	--border-light: 1px solid color-mix(in srgb, var(--border) 25%, transparent);
+	--border-light-2: 1px solid color-mix(in srgb, var(--border) 35%, transparent);
+	--border-light-3: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
+	--border-light-4: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+	--border-light-5: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
 }:root[data-theme="light"] {
 	color-scheme: light;
 	/* Same reasoning as the dark palette above — a touch greyer than the
