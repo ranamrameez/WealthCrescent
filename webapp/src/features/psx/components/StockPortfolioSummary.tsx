@@ -1,7 +1,11 @@
+import { SummaryGroupCard } from '../../../components/SummaryGroupCard';
+import { usePSXDerived } from '../hooks/usePSXDerived';
 import { PositionDetail } from './PositionDetail';
 
 export function StockPortfolioSummary({ticker}:{ticker:string}) {
+  const position=usePSXDerived().positions.find(item=>item.ticker===ticker);
+  if(!position?.shares)return <div className="stock-portfolio-summary"><PositionDetail ticker={ticker} section="all-time" /></div>;
   return <div className="stock-portfolio-summary">
-    <div className="stock-portfolio-detail-grid"><div><PositionDetail ticker={ticker} section="position" /></div><div><PositionDetail ticker={ticker} section="comparison" /></div></div>
+    <div className="stock-portfolio-detail-grid"><div><PositionDetail ticker={ticker} section="position" /></div><SummaryGroupCard title="Price comparison" className="stock-price-comparison-card"><PositionDetail ticker={ticker} section="comparison-summary" /></SummaryGroupCard></div>
   </div>;
 }

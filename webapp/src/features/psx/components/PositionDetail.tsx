@@ -31,7 +31,7 @@ import { gridAutoStyle } from '../../../lib/gridStyle';
 
 function DetailCard({section,title,children,...props}: ComponentProps<typeof StandardCard> & {section:string}) {
   return section === 'all' ? <StandardCard title={title} {...props}>{children}</StandardCard>
-    : <div className={`position-detail-section ${props.className||''}`.trim()}>{section !== 'lots' && section !== 'closed' && section !== 'prices' && <h3>{title}</h3>}{children}</div>;
+    : <div className={`position-detail-section ${props.className||''}`.trim()}>{section !== 'lots' && section !== 'closed' && section !== 'prices' && section !== 'comparison-summary' && <h3>{title}</h3>}{children}</div>;
 }
 
 function CompactChart({ height, children }: { height: number; children: React.ReactNode }) {
@@ -42,7 +42,7 @@ function CompactChart({ height, children }: { height: number; children: React.Re
  * estimated CGT-on-gain stat for open positions (README items 5/6: PSX
  * capital gains tax is a real cost QSE doesn't have, so it's worth
  * surfacing here rather than only in the trade calculator). */
-export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate = '' }: { ticker: string; section?: 'all' | 'current' | 'position' | 'comparison' | 'all-time' | 'lots' | 'closed' | 'prices'; fromDate?: string; toDate?: string }) {
+export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate = '' }: { ticker: string; section?: 'all' | 'current' | 'position' | 'comparison' | 'comparison-summary' | 'all-time' | 'lots' | 'closed' | 'prices'; fromDate?: string; toDate?: string }) {
   const { workbook, positions, calcFee, lots } = usePSXDerived();
   const setMarketPrice = usePSXWorkbookStore((s) => s.setMarketPrice);
   const updatePricePoint = usePSXWorkbookStore((s) => s.updatePricePoint);
@@ -246,7 +246,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
       <div>
 
         {(section === 'all' || section === 'current' || section === 'position') && isOpen && (
-          <DetailCard section={section} title={<span>Current position <StatSourceBadge source="official" /></span>} className="mb-12">
+          <DetailCard section={section} title={<span>Portfolio overview <StatSourceBadge source="official" /></span>} className="mb-12">
             <div className="current-position-sections">
               <section className="current-position-section" style={hueStyle(HUES[0])}><h4>Holding</h4><div className="current-position-lead"><div className="current-position-metrics"><div className="current-position-metric"><span>Shares</span><strong className="shares-box">{fmt(shares,0)}</strong>{profitableShares>0&&<small>{fmt(profitableShares,0)} profitable shares</small>}</div><div className="current-position-metric"><span>Current price</span><strong>{mp>0?fmtPSXPrice(mp):'—'}</strong></div></div><div className="current-position-trend"><span>Trend</span><Sparkline data={sparkData} formatValue={fmtPSXPrice}/></div></div><div className="current-position-metrics current-position-secondary"><div className="current-position-metric"><span>Lifetime bought / sold</span><strong>{fmt(position?.totalBoughtShares||0,0)} / {fmt(position?.totalSoldShares||0,0)}</strong><small>{position?.buyCount||0} buys · {position?.sellCount||0} sells</small></div><div className="current-position-metric"><span>Trade dates</span><strong>{position?.firstDate||'—'}</strong><small>{position?.lastDate?`to ${position.lastDate}`:''}</small></div></div></section>
               <section className="current-position-section" style={hueStyle(HUES[1])}><h4>Cost basis</h4><div className="current-position-metrics"><div className="current-position-metric"><Tooltip text="Average acquisition cost per share, including buy fees."><span className="clickable">Average cost / share</span></Tooltip><strong>{fmtPSXPrice(avg)}</strong><small>After buy fees</small></div><div className="current-position-metric"><Tooltip text="The selling price per share required to recover the invested capital and estimated sell fees."><span className="clickable">Break-even / share</span></Tooltip><strong>{fmtPSXPrice(be)}</strong><small>Including sell fees</small></div><div className="current-position-metric"><Tooltip text="PSX same-day netting waives commission and SST on the smaller matched leg; government levies still apply."><span className="clickable">Same-day break-even</span></Tooltip><strong>{fmtPSXPrice(beSameDay)}</strong><small>With same-day netting</small></div>{position&&position.sellCount>0&&<div className="current-position-metric"><span>Average / latest sell</span><strong>{fmtPSXPrice(avgSellPrice)}</strong><small>Latest {fmtPSXPrice(lastSellPrice)}</small></div>}</div></section>
@@ -346,7 +346,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
         <MarketPriceHistory ticker={ticker} />
         </DetailCard>}
 
-        {(section === 'all' || section === 'current' || section === 'comparison') && isOpen && (
+        {(section === 'all' || section === 'current' || section === 'comparison' || section === 'comparison-summary') && isOpen && (
           <DetailCard section={section} title={<span>Price comparison</span>} className="mb-12">
             <CompactChart height={lastSellPrice > 0 ? 220 : 180}>
               <Bar

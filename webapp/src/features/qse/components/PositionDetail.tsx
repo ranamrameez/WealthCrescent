@@ -30,7 +30,7 @@ import { gridAutoStyle } from '../../../lib/gridStyle';
 
 function DetailCard({section,title,children,...props}: ComponentProps<typeof StandardCard> & {section:string}) {
   return section === 'all' ? <StandardCard title={title} {...props}>{children}</StandardCard>
-    : <div className={`position-detail-section ${props.className||''}`.trim()}>{section !== 'lots' && section !== 'closed' && section !== 'prices' && <h3>{title}</h3>}{children}</div>;
+    : <div className={`position-detail-section ${props.className||''}`.trim()}>{section !== 'lots' && section !== 'closed' && section !== 'prices' && section !== 'comparison-summary' && <h3>{title}</h3>}{children}</div>;
 }
 
 /** Small, fixed-height chart wrapper — Chart.js defaults to filling
@@ -46,7 +46,7 @@ function CompactChart({ height, children }: { height: number; children: React.Re
  * too, which is what the quick popup used to be missing entirely), and
  * price range. Shared between the quick popup (PositionModal) and the full
  * dedicated stock page (StockPage) so they never drift apart. */
-export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate = '' }: { ticker: string; section?: 'all' | 'current' | 'position' | 'comparison' | 'all-time' | 'lots' | 'closed' | 'prices'; fromDate?: string; toDate?: string }) {
+export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate = '' }: { ticker: string; section?: 'all' | 'current' | 'position' | 'comparison' | 'comparison-summary' | 'all-time' | 'lots' | 'closed' | 'prices'; fromDate?: string; toDate?: string }) {
   const { workbook, positions, calcFee, lots } = useQSEDerived();
   const setMarketPrice = useWorkbookStore((s) => s.setMarketPrice);
   const updatePricePoint = useWorkbookStore((s) => s.updatePricePoint);
@@ -248,7 +248,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
     <div>
 
       {(section === 'all' || section === 'current' || section === 'position') && isOpen && (
-        <DetailCard section={section} title={<span>Current position <StatSourceBadge source="official" /></span>} className="mb-12">
+        <DetailCard section={section} title={<span>Portfolio overview <StatSourceBadge source="official" /></span>} className="mb-12">
           <div className="current-position-sections">
             <section className="current-position-section" style={hueStyle(HUES[0])}><h4>Holding</h4><div className="current-position-lead"><div className="current-position-metrics"><div className="current-position-metric"><span>Shares</span><strong className="shares-box">{fmt(shares,0)}</strong>{profitableShares>0&&<small>{fmt(profitableShares,0)} profitable shares</small>}</div><div className="current-position-metric"><span>Current price</span><strong>{mp>0?fmtQSEPrice(mp):'—'}</strong></div></div><div className="current-position-trend"><span>Trend</span><Sparkline data={sparkData} formatValue={fmtQSEPrice}/></div></div><div className="current-position-metrics current-position-secondary"><div className="current-position-metric"><span>Lifetime bought / sold</span><strong>{fmt(position?.totalBoughtShares||0,0)} / {fmt(position?.totalSoldShares||0,0)}</strong><small>{position?.buyCount||0} buys · {position?.sellCount||0} sells</small></div><div className="current-position-metric"><span>Trade dates</span><strong>{position?.firstDate||'—'}</strong><small>{position?.lastDate?`to ${position.lastDate}`:''}</small></div></div></section>
             <section className="current-position-section" style={hueStyle(HUES[1])}><h4>Cost basis</h4><div className="current-position-metrics"><div className="current-position-metric"><Tooltip text="Average acquisition cost per share, including buy fees."><span className="clickable">Average cost / share</span></Tooltip><strong>{fmtQSEPrice(avg)}</strong><small>After buy fees</small></div><div className="current-position-metric"><Tooltip text="The selling price per share required to recover the invested capital and estimated sell fees."><span className="clickable">Break-even / share</span></Tooltip><strong>{fmtQSEPrice(be)}</strong><small>Including sell fees</small></div>{position&&position.sellCount>0&&<div className="current-position-metric"><span>Average / latest sell</span><strong>{fmtQSEPrice(avgSellPrice)}</strong><small>Latest {fmtQSEPrice(lastSellPrice)}</small></div>}</div></section>
@@ -359,7 +359,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
       <MarketPriceHistory ticker={ticker} />
       </DetailCard>}
 
-      {(section === 'all' || section === 'current' || section === 'comparison') && isOpen && (
+      {(section === 'all' || section === 'current' || section === 'comparison' || section === 'comparison-summary') && isOpen && (
         <DetailCard section={section} title={<span>Price comparison</span>} className="mb-12">
           <CompactChart height={lastSellPrice > 0 ? 220 : 180}>
             <Bar
