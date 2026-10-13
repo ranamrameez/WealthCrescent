@@ -2,6 +2,10 @@ import type { MarketObservation } from './qsePrices';
 import { qatarDay } from './qsePrices';
 export type MarketSource='all'|'manual'|'app';
 export const MARKET_PERIODS=['1d','7d','1M','3M','6M','1Y','all'] as const;
+export const MARKET_PERIOD_LABELS:Record<string,string>={'1d':'Today','7d':'7 Days','1M':'1 Month','3M':'3 Months','6M':'6 Months','1Y':'1 Year','all':'All Time'};
+export function marketPeriodLabel(period:string,from='',to='') {
+  return MARKET_PERIOD_LABELS[period] || `From ${from || 'earliest'} to ${to || 'latest'}`;
+}
 export function marketDateRange(period:string,now=new Date().toISOString()) {
   if(period==='all')return {from:'',to:''};
   const to=qatarDay(now), date=new Date(to+'T00:00:00Z');

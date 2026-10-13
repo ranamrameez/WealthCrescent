@@ -1,5 +1,5 @@
 import { expect,it } from 'vitest';
-import { filterMarketRows,lifetimeBounds,marketDateRange,marketRows,previousSessionClose,priceMedian } from '../marketPageModel';
+import { filterMarketRows,lifetimeBounds,marketDateRange,marketPeriodLabel,marketRows,previousSessionClose,priceMedian } from '../marketPageModel';
 import type { MarketObservation } from '../qsePrices';
 import { marketChartData } from '../../../components/MarketPriceChart';
 it('uses Qatar dates and clamps month/year presets',()=>{
@@ -8,6 +8,9 @@ it('uses Qatar dates and clamps month/year presets',()=>{
  expect(marketDateRange('1M','2026-03-31T12:00:00Z').from).toBe('2026-02-28');
  expect(marketDateRange('1Y','2024-02-29T12:00:00Z').from).toBe('2023-02-28');
  expect(marketDateRange('all')).toEqual({from:'',to:''});
+ expect(marketPeriodLabel('1d')).toBe('Today');
+ expect(marketPeriodLabel('7d')).toBe('7 Days');
+ expect(marketPeriodLabel('custom','2026-10-01','2026-10-12')).toBe('From 2026-10-01 to 2026-10-12');
 });
 it('filters the same series by source, date and flags without dropping independent manual entries',()=>{
  const raw:MarketObservation[]=[{id:'s2',source:'shared',date:'2026-10-12',price:12},{id:'m1',source:'manual',date:'2026-10-12',price:20},{id:'s1',source:'shared',date:'2026-10-11',price:10}];
@@ -27,11 +30,11 @@ it('lifetime bounds respect source and include reported extrema; medians use obs
 it('labels period low, high and current while keeping reference guides hidden',()=>{
  const rows=Array.from({length:5000},(_,index)=>({id:String(index),source:'shared' as const,date:'2026-10-12',price:index===777?1:index===2345?99:10,outlier:false,deltaPct:null}));
  const chart=marketChartData(rows,{low:0.5,high:120},9);
- expect([...chart.highlights.values()].flat().some(label=>label.startsWith('Low price '))).toBe(true);
- expect([...chart.highlights.values()].flat().some(label=>label.startsWith('High price '))).toBe(true);
+ expect([...chart.highlights.values()].flat().some(label=>label.startsWith('Period low '))).toBe(true);
+ expect([...chart.highlights.values()].flat().some(label=>label.startsWith('Period high '))).toBe(true);
  expect([...chart.highlights.values()].flat().some(label=>label.startsWith('Current price '))).toBe(true);
- const guides=chart.datasets.filter(dataset=>['All-time low price','All-time high price','Median price','Previous close price'].includes(dataset.label||''));
- expect(guides.map(dataset=>dataset.label)).toEqual(['All-time low price','All-time high price','Median price','Previous close price']);
+ const guides=chart.datasets.filter(dataset=>['Period low','Period high','Lifetime low','Lifetime high','Median','Previous close'].includes(dataset.label||''));
+ expect(guides.map(dataset=>dataset.label)).toEqual(['Period low','Period high','Lifetime low','Lifetime high','Median','Previous close']);
  expect(guides.every(dataset=>dataset.hidden===true)).toBe(true);expect(chart.total).toBe(5000);expect(chart.ordered.length).toBeLessThanOrEqual(2000);
  expect(chart.ordered.some(row=>row.price===1)).toBe(true);expect(chart.ordered.some(row=>row.price===99)).toBe(true);
 });

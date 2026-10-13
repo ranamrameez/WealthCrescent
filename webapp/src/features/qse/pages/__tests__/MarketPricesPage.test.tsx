@@ -55,7 +55,7 @@ it('keeps grouped searchable ticker selection on the topbar and page fields in o
  expect(screen.getByRole('combobox',{name:'Price flags'})).toBeVisible();expect(screen.getByRole('combobox',{name:'Updates per page'})).toBeVisible();
 });
 it('applies timeframe and source to both charts and paginated updates',()=>{
- const {container}=show();fireEvent.click(screen.getByRole('button',{name:'1d'}));
+ const {container}=show();fireEvent.click(screen.getByRole('button',{name:'Today'}));
  fireEvent.click(container.querySelector('[data-page-section="updates"] .standard-card-toggle')!);
  expect(screen.getByText(/2 matching updates/)).toBeVisible();
  expect(screen.getAllByTestId('market-chart')).toHaveLength(2);
@@ -64,7 +64,7 @@ it('applies timeframe and source to both charts and paginated updates',()=>{
  fireEvent.click(screen.getByRole('button',{name:'Done'}));expect(screen.getByText(/1 matching updates/)).toBeVisible();
  expect(container.querySelector('[data-page-section="updates"] tbody')?.textContent).toContain('Manual');
  expect(container.querySelector('[data-page-section="updates"] tbody')?.textContent).not.toContain('App');
- fireEvent.click(screen.getByRole('button',{name:'All time'}));
+ fireEvent.click(screen.getByRole('button',{name:'All Time'}));
  expect(screen.getByText(/1 matching updates/)).toBeVisible();
- expect(mock.charts.at(-1)?.datasets.map(dataset=>dataset.label)).not.toContain('Median');
+ expect(mock.charts.at(-1)?.datasets.map(dataset=>dataset.label)).toEqual(expect.arrayContaining(['Period low','Period high','Lifetime low','Lifetime high','Median']));
 });

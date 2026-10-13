@@ -9,7 +9,7 @@ import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { useSortableRows } from '../../../hooks/useSortableRows';
 import { fmtPSXPrice } from '../../../lib/format';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
-import { filterMarketRows, lifetimeBounds, marketDateRange, marketRows, MARKET_PERIODS, previousSessionClose, type MarketRow } from '../../../lib/stockData/marketPageModel';
+import { filterMarketRows, lifetimeBounds, marketDateRange, marketRows, MARKET_PERIOD_LABELS, MARKET_PERIODS, marketPeriodLabel, previousSessionClose, type MarketRow } from '../../../lib/stockData/marketPageModel';
 import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
 import { toast } from '../../../components/Toast';
 import { MarketPriceChart } from '../../../components/MarketPriceChart';
@@ -55,7 +55,7 @@ export function MarketPricesPage() {
     <div className="row gap-sm mb-md"><PriceInput exchange="psx" type="number" step="0.01" value={priceInput} placeholder="Current price" onChange={event=>setPriceInput(event.target.value)} onKeyDown={event=>event.key==='Enter'&&void savePrice()}/><button className="btn secondary small" onClick={()=>void savePrice()}>Save price</button></div>
     <StandardPageSections preserveOrder sections={[
       {key:'tickers',label:'Ticker prices',defaultOpen:true,summary:visibleTickers.length+' tickers',content:<MarketTickerCards tickers={visibleTickers} names={tickerNames} prices={prices} selected={ticker} onSelect={choose} exchange="psx" formatPrice={fmtPSXPrice}/>},
-      {key:'chart',label:'Price chart',defaultOpen:true,content:<><div className="market-timeframes" role="group" aria-label="Chart timeframe">{MARKET_PERIODS.map(value=><button key={value} className={'chip'+(period===value?' active':'')} onClick={()=>change({...marketDateRange(value),period:value})}>{value==='1d'?'Today':value==='all'?'All time':value}</button>)}</div><MarketPriceChart rows={rows} bounds={bounds} previousClose={previousSessionClose(raw)} formatPrice={fmtPSXPrice} currency="PKR" timezone="Asia/Karachi" label={ticker+' - '+(from||'All dates')+' to '+(to||'latest')}/></>},
+      {key:'chart',label:'Price chart',defaultOpen:true,content:<><div className="market-timeframes" role="group" aria-label="Chart timeframe">{MARKET_PERIODS.map(value=><button key={value} className={'chip'+(period===value?' active':'')} onClick={()=>change({...marketDateRange(value),period:value})}>{MARKET_PERIOD_LABELS[value]}</button>)}</div><MarketPriceChart rows={rows} bounds={bounds} previousClose={previousSessionClose(raw)} formatPrice={fmtPSXPrice} currency="PKR" timezone="Asia/Karachi" selectedPeriodLabel={marketPeriodLabel(period,from,to)}/></>},
       {key:'updates',label:'Price updates',defaultOpen:true,summary:rows.length+' observations',content:<div className="market-updates-table"><table><thead><tr><Th col="date">Recorded</Th><Th col="price">Price</Th><th>Source</th></tr></thead><tbody>{sorted.map(row=><tr key={row.id}><td>{row.time||row.date}</td><td>{fmtPSXPrice(row.price)}</td><td><span className="market-source-badge">{row.id.startsWith('trade-')?'Trade':'Recorded'}</span></td></tr>)}</tbody></table>{!rows.length&&<p className="text-muted">No price observations match this timeframe. Save a current price or record a trade to begin the chart.</p>}</div>},
     ]}/>
   </div>;
