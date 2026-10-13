@@ -27,7 +27,7 @@
 .market-price-group-values .price-low {color:#e5484d;}.market-price-group-values .price-median {color:#c9a227;}.market-price-group-values .price-high {color:#34c77b;}.market-price-group-values .price-current {color:#3b6bd6;}
 .market-price-filters {display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
 .market-price-filters > label {display:flex;flex-direction:column;gap:4px;}
-.market-price-toolbar {display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:12px;}
+.market-price-toolbar {display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:-6px 0 12px;}
 .market-current-price {margin-left:auto;display:flex;flex-direction:column;gap:4px;}
 .market-current-price-control {display:flex;align-items:center;gap:6px;}
 .market-page-summary {margin:8px 0 16px;font-size:13px;color:var(--muted);}
