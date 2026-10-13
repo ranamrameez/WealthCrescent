@@ -760,16 +760,16 @@ hr {
 
 .position-detail-section > h3 { margin: 0 0 8px; }
 .current-position-sections { display: grid; grid-template-columns: repeat(auto-fit,minmax(250px,1fr)); gap: 10px; align-items: stretch; }
-.current-position-section { --card-hue: var(--accent); min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: transparent; }
-.current-position-section h4 { margin: 0 0 8px; color: var(--text); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+.current-position-section { --card-hue: var(--accent); min-width: 0; padding: 8px 12px 12px; border: 1px solid color-mix(in srgb,var(--border) 65%,transparent); border-radius: 8px; background: transparent; }
+.current-position-section h4 { margin: 0 0 12px; color: var(--text); font-size: 12px; font-weight: 700; letter-spacing: .035em; text-transform: uppercase; }
 .current-position-metrics { display: grid; grid-template-columns: repeat(auto-fit,minmax(120px,1fr)); gap: 10px 16px; }
 .current-position-metric { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
-.current-position-metric > span, .current-position-trend > span { color: var(--text-muted); font-size: 11px; }
-.current-position-metric strong { font-family: var(--mono); font-size: 15px; line-height: 1.25; }
+.current-position-metric > span, .current-position-trend > span { color: var(--muted); font-size: 10px; font-weight: 400; letter-spacing: .015em; line-height: 1.25; }
+.current-position-metric strong { color: var(--text); font-family: var(--mono); font-size: 15px; font-weight: 700; line-height: 1.3; }
 .current-position-metric strong.text-profit { color: var(--profit); }
 .current-position-metric strong.text-loss { color: var(--loss); }
 .current-position-status { align-self: flex-start; font-family: inherit !important; font-size: 11px !important; }
-.current-position-metric small { color: var(--text-muted); font-size: 10.5px; }
+.current-position-metric small { color: var(--muted); font-size: 10px; line-height: 1.3; }
 .current-position-lead { display: grid; grid-template-columns: minmax(120px,.8fr) minmax(140px,1.2fr); gap: 12px; align-items: center; }
 .current-position-trend { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
 .current-position-secondary { margin-top: 10px; padding-top: 10px; border-top: 1px solid color-mix(in srgb,var(--card-hue) 24%,var(--border)); }
