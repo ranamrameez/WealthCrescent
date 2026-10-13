@@ -1256,14 +1256,14 @@ textarea {
 	background: var(--panel-2);
 	border: 1px solid var(--border);
 	color: var(--text);
-	padding: 10px 11px;
+	padding: 8px 9px;
 	border-radius: 7px;
 	font-family: var(--body);
 	font-size: 14px;
 	transition:
 		border-color 0.15s ease,
 		box-shadow 0.15s ease;
-	min-height: 38px;
+	min-height: 34px;
 	min-width: 70px;
 }
 select {
