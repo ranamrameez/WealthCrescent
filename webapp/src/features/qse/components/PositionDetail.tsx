@@ -231,6 +231,8 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
   const comparisonLabels=lastSellPrice>0?['Latest buy','Latest sell','Market price','Break-even (fees)']:['Latest buy','Market price','Break-even (fees)'];
   const comparisonTerms=lastSellPrice>0?['Latest executed buy price','Latest executed sell price','Current market price','Break-even price including fees']:['Latest executed buy price','Current market price','Break-even price including fees'];
   const comparisonLow=Math.min(...comparisonValues),comparisonHigh=Math.max(...comparisonValues),comparisonPadding=Math.max((comparisonHigh-comparisonLow)*.15,comparisonHigh*.02,workbook.settings.tick);
+  const profitableShares=mp>0?[...(usingLots?officialLots:reportOpenLots)].filter(lot=>mp>=breakEvenPrice(lot.remainingShares*(lot.buyPrice+lot.buyFeeTotal/lot.originalShares),lot.remainingShares,workbook.settings.feePct,workbook.settings.tick,calcFee)).reduce((sum,lot)=>sum+lot.remainingShares,0):0;
+  const netValue=mp>0?value-sellFee:NaN;
 
   return (
     // Pending items 54/56/57: charts + Price range move to a right-hand
@@ -245,41 +247,12 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
 
       {(section === 'all' || section === 'current' || section === 'position') && isOpen && (
         <DetailCard section={section} title={<span>Current position <StatSourceBadge source="official" /></span>} className="mb-12">
-          <div className="grid-auto" style={gridAutoStyle(140, 8)}>
-            <div className="stat-card card" style={hueStyle(HUES[2])}>
-              <div className="label">Trend</div>
-              <div className="value"><Sparkline data={sparkData} formatValue={fmtQSEPrice} /></div>
-            </div>
-            <div className="stat-card card" style={hueStyle(HUES[0])}><div className="label">Shares</div><div className="value shares-box">{fmt(shares, 0)}</div></div>
-            <div className="stat-card card" style={hueStyle(HUES[1])}>
-              <Tooltip text="Cost: what you paid per share on average. BE (break-even): the price you'd need to sell at to get your money back, including fees.">
-                <div className="label clickable">Cost</div>
-              </Tooltip>
-              <div className="value">{fmtQSEPrice(avg)}</div>
-              <div className="sub" style={{ color: mp > 0 ? (mp >= be ? 'var(--profit)' : 'var(--loss)') : undefined }}>BE {fmtQSEPrice(be)}</div>
-            </div>
-            <div className="stat-card card" style={hueStyle(HUES[3])}><div className="label">Invested</div><div className="value">{fmtMoney(invested, currency)}</div></div>
-            <div className="stat-card card" style={hueStyle(HUES[4])}>
-              <div className="label">Value</div>
-              <div className="value">{mp > 0 ? fmtMoney(value, currency) : '—'}</div>
-            </div>
-            <div className="stat-card card" style={hueStyle(Number.isFinite(profit) ? (profit >= 0 ? 'var(--profit)' : 'var(--loss)') : HUES[7])}>
-              <Tooltip text="Unrealized — what you'd gain or lose if you sold everything you still hold right now at the current market price. See All-time stats below for what's already been realized (locked in) from past sells.">
-                <div className="label clickable">Unrealized P/L</div>
-              </Tooltip>
-              <div className="value">{Number.isFinite(profit) ? fmtMoney(profit, currency) : '—'}</div>
-              <div className="sub">{Number.isFinite(profit) && invested > 0 ? `${((profit / invested) * 100).toFixed(1)}%` : ''}</div>
-            </div>
-            <div className="stat-card card" style={hueStyle(HUES[5])}>
-              <div className="label">Exit targets</div>
-              <div className="value" style={{ fontSize: 13 }}>
-                +1% {fmtQSEPrice(exitTarget(1))}<br />+2% {fmtQSEPrice(exitTarget(2))}<br />+5% {fmtQSEPrice(exitTarget(5))}
-              </div>
-            </div>
-            <div className="stat-card card" style={hueStyle(statusHue || HUES[6])}>
-              <div className="label">Status</div>
-              <div className="value fs-14">{statusLabel}</div>
-            </div>
+          <div className="current-position-sections">
+            <section className="current-position-section"><h4>Holding</h4><div className="current-position-lead"><div className="current-position-metrics"><div className="current-position-metric"><span>Shares</span><strong className="shares-box">{fmt(shares,0)}</strong>{profitableShares>0&&<small>{fmt(profitableShares,0)} profitable shares</small>}</div><div className="current-position-metric"><span>Current price</span><strong>{mp>0?fmtQSEPrice(mp):'—'}</strong></div></div><div className="current-position-trend"><span>Trend</span><Sparkline data={sparkData} formatValue={fmtQSEPrice}/></div></div></section>
+            <section className="current-position-section"><h4>Cost basis</h4><div className="current-position-metrics"><div className="current-position-metric"><Tooltip text="Average acquisition cost per share, including buy fees."><span className="clickable">Average cost / share</span></Tooltip><strong>{fmtQSEPrice(avg)}</strong><small>After buy fees</small></div><div className="current-position-metric"><Tooltip text="The selling price per share required to recover the invested capital and estimated sell fees."><span className="clickable">Break-even / share</span></Tooltip><strong>{fmtQSEPrice(be)}</strong><small>Including sell fees</small></div></div></section>
+            <section className="current-position-section"><h4>Valuation</h4><div className="current-position-metrics"><div className="current-position-metric"><span>{mp>=avg?'↑':'↓'} Market value</span><strong>{mp>0?fmtMoney(value,currency):'—'}</strong></div><div className="current-position-metric"><span>Net invested</span><strong>{fmtMoney(invested,currency)}</strong><small>Including buy fees</small></div><div className="current-position-metric"><span>Net liquidation value</span><strong>{Number.isFinite(netValue)?fmtMoney(netValue,currency):'—'}</strong><small>After estimated sell fees</small></div></div></section>
+            <section className="current-position-section"><h4>Performance</h4><div className="current-position-metrics"><div className="current-position-metric" style={{color:Number.isFinite(profit)?profit>=0?'var(--profit)':'var(--loss)':undefined}}><span>Unrealized P/L</span><strong>{Number.isFinite(profit)?fmtMoney(profit,currency):'—'}</strong></div><div className="current-position-metric" style={{color:Number.isFinite(profit)?profit>=0?'var(--profit)':'var(--loss)':undefined}}><span>Return</span><strong>{Number.isFinite(profit)&&invested>0?`${((profit/invested)*100).toFixed(1)}%`:'—'}</strong></div></div></section>
+            <section className="current-position-section"><h4>Suggestions</h4><div className="current-position-metrics"><div className="current-position-metric" style={{color:statusHue}}><span>Status</span><strong>{statusLabel}</strong></div><div className="current-position-metric"><span>Exit targets</span><strong className="current-position-targets">+1% {fmtQSEPrice(exitTarget(1))}<br/>+2% {fmtQSEPrice(exitTarget(2))}<br/>+5% {fmtQSEPrice(exitTarget(5))}</strong></div></div></section>
           </div>
         </DetailCard>
       )}

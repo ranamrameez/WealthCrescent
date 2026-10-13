@@ -761,6 +761,20 @@ hr {
 	flex-direction: column;
 }
 
+.current-position-sections { display: grid; gap: 12px; }
+.current-position-section { min-width: 0; padding-top: 12px; border-top: 1px solid var(--border); }
+.current-position-section:first-child { padding-top: 0; border-top: 0; }
+.current-position-section h4 { margin: 0 0 8px; color: var(--text-muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+.current-position-metrics { display: grid; grid-template-columns: repeat(auto-fit,minmax(120px,1fr)); gap: 10px 16px; }
+.current-position-metric { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.current-position-metric > span, .current-position-trend > span { color: var(--text-muted); font-size: 11px; }
+.current-position-metric strong { font-family: var(--mono); font-size: 15px; line-height: 1.25; }
+.current-position-metric small { color: var(--text-muted); font-size: 10.5px; }
+.current-position-lead { display: grid; grid-template-columns: minmax(170px,.8fr) minmax(180px,1.2fr); gap: 16px; align-items: center; }
+.current-position-trend { min-width: 0; }
+.current-position-targets { font-size: 13px !important; line-height: 1.45 !important; }
+@media(max-width:600px){.current-position-lead{grid-template-columns:1fr;}}
+
 .holdings-price-row {
   display: flex;
   align-items: center;

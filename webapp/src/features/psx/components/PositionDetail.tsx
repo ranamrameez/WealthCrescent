@@ -230,6 +230,8 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
   const comparisonLabels=lastSellPrice>0?['Latest buy','Latest sell','Market price','Break-even (fees)']:['Latest buy','Market price','Break-even (fees)'];
   const comparisonTerms=lastSellPrice>0?['Latest executed buy price','Latest executed sell price','Current market price','Break-even price including fees']:['Latest executed buy price','Current market price','Break-even price including fees'];
   const comparisonLow=Math.min(...comparisonValues),comparisonHigh=Math.max(...comparisonValues),comparisonPadding=Math.max((comparisonHigh-comparisonLow)*.15,comparisonHigh*.02,workbook.settings.tick);
+  const profitableShares=mp>0?[...(usingLots?lotRows:reportOpenLots)].filter(lot=>mp>=breakEvenPrice(lot.remainingShares*(lot.buyPrice+lot.buyFeeTotal/lot.originalShares),lot.remainingShares,workbook.settings.feePct,workbook.settings.tick,calcFee)).reduce((sum,lot)=>sum+lot.remainingShares,0):0;
+  const netValue=mp>0?grossValue-estSellFee:NaN;
 
   return (
     // Pending items 54/56/57: charts + Price range move to a right-hand
@@ -243,57 +245,12 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
 
         {(section === 'all' || section === 'current' || section === 'position') && isOpen && (
           <DetailCard section={section} title={<span>Current position <StatSourceBadge source="official" /></span>} className="mb-12">
-            <div className="grid-auto" style={gridAutoStyle(140, 8)} >
-              <div className="stat-card card" style={hueStyle(HUES[2])}>
-                <div className="label">Trend</div>
-                <div className="value"><Sparkline data={sparkData} formatValue={fmtPSXPrice} /></div>
-              </div>
-              <div className="stat-card card" style={hueStyle(HUES[0])}><div className="label">Shares</div><div className="value shares-box">{fmt(shares, 0)}</div></div>
-              <div className="stat-card card" style={hueStyle(HUES[1])}>
-                <Tooltip text="Cost: what you paid per share on average. BE (break-even): the price you'd need to sell at to get your money back, including fees.">
-                  <div className="label clickable">Cost</div>
-                </Tooltip>
-                <div className="value">{fmtPSXPrice(avg)}</div>
-                <div className="sub" style={{ color: mp > 0 ? (mp >= be ? 'var(--profit)' : 'var(--loss)') : undefined }}>BE {fmtPSXPrice(be)}</div>
-              </div>
-              <div className="stat-card card" style={hueStyle(HUES[1])}>
-                <Tooltip text="PSX nets commission when you buy and sell the same ticker on the same day — the smaller-quantity leg (ties go to the buy) pays no commission or SST, only government levies. 'Same-day' assumes this sell nets against a same-day buy; 'Other day' assumes the full commission applies, same as a regular trade.">
-                  <div className="label clickable">BE: same-day vs. other day</div>
-                </Tooltip>
-                <div className="value fs-14">{fmtPSXPrice(beSameDay)}</div>
-                <div className="sub">same-day · other day {fmtPSXPrice(be)}</div>
-              </div>
-              <div className="stat-card card" style={hueStyle(HUES[3])}><div className="label">Invested</div><div className="value">{fmtMoney(invested, currency)}</div></div>
-              <div className="stat-card card" style={hueStyle(HUES[4])}>
-                <div className="label">Value</div>
-                <div className="value">{mp > 0 ? fmtMoney(grossValue, currency) : '—'}</div>
-              </div>
-              <div className="stat-card card" style={hueStyle(Number.isFinite(netProfit) ? (netProfit >= 0 ? 'var(--profit)' : 'var(--loss)') : HUES[7])}>
-                <Tooltip text="Unrealized — what you'd gain or lose if you sold everything you still hold right now at the current market price. See All-time stats below for what's already been realized (locked in) from past sells.">
-                  <div className="label clickable">Unrealized P/L</div>
-                </Tooltip>
-                <div className="value">{Number.isFinite(netProfit) ? fmtMoney(netProfit, currency) : '—'}</div>
-                <div className="sub">{Number.isFinite(netProfit) && invested > 0 ? `${((netProfit / invested) * 100).toFixed(1)}%` : ''}</div>
-              </div>
-              {grossValue > 0 && (
-                <div className="stat-card card" style={hueStyle(HUES[5])}>
-                  <Tooltip text="CGT = Capital Gains Tax, a government tax on profit from selling stock. This is only an estimate of what you'd owe if you sold at today's price — it's not withheld automatically.">
-                    <div className="label clickable">Est. CGT if sold now</div>
-                  </Tooltip>
-                  <div className="value">{fmtMoney(estCGT, currency)}</div>
-                  <div className="sub">{workbook.settings.filerStatus === 'filer' ? `${workbook.settings.cgtFilerPct}% filer rate` : `${workbook.settings.cgtNonFilerPct}% non-filer rate`}</div>
-                </div>
-              )}
-              <div className="stat-card card" style={hueStyle(HUES[6])}>
-                <div className="label">Exit targets</div>
-                <div className="value" style={{ fontSize: 13 }}>
-                  +1% {fmtPSXPrice(exitTarget(1))}<br />+2% {fmtPSXPrice(exitTarget(2))}<br />+5% {fmtPSXPrice(exitTarget(5))}
-                </div>
-              </div>
-              <div className="stat-card card" style={hueStyle(statusHue || HUES[7])}>
-                <div className="label">Status</div>
-                <div className="value fs-14">{statusLabel}</div>
-              </div>
+            <div className="current-position-sections">
+              <section className="current-position-section"><h4>Holding</h4><div className="current-position-lead"><div className="current-position-metrics"><div className="current-position-metric"><span>Shares</span><strong className="shares-box">{fmt(shares,0)}</strong>{profitableShares>0&&<small>{fmt(profitableShares,0)} profitable shares</small>}</div><div className="current-position-metric"><span>Current price</span><strong>{mp>0?fmtPSXPrice(mp):'—'}</strong></div></div><div className="current-position-trend"><span>Trend</span><Sparkline data={sparkData} formatValue={fmtPSXPrice}/></div></div></section>
+              <section className="current-position-section"><h4>Cost basis</h4><div className="current-position-metrics"><div className="current-position-metric"><Tooltip text="Average acquisition cost per share, including buy fees."><span className="clickable">Average cost / share</span></Tooltip><strong>{fmtPSXPrice(avg)}</strong><small>After buy fees</small></div><div className="current-position-metric"><Tooltip text="The selling price per share required to recover the invested capital and estimated sell fees."><span className="clickable">Break-even / share</span></Tooltip><strong>{fmtPSXPrice(be)}</strong><small>Including sell fees</small></div><div className="current-position-metric"><Tooltip text="PSX same-day netting waives commission and SST on the smaller matched leg; government levies still apply."><span className="clickable">Same-day break-even</span></Tooltip><strong>{fmtPSXPrice(beSameDay)}</strong><small>With same-day netting</small></div></div></section>
+              <section className="current-position-section"><h4>Valuation</h4><div className="current-position-metrics"><div className="current-position-metric"><span>{mp>=avg?'↑':'↓'} Market value</span><strong>{mp>0?fmtMoney(grossValue,currency):'—'}</strong></div><div className="current-position-metric"><span>Net invested</span><strong>{fmtMoney(invested,currency)}</strong><small>Including buy fees</small></div><div className="current-position-metric"><span>Net liquidation value</span><strong>{Number.isFinite(netValue)?fmtMoney(netValue,currency):'—'}</strong><small>After estimated sell fees</small></div></div></section>
+              <section className="current-position-section"><h4>Performance</h4><div className="current-position-metrics"><div className="current-position-metric" style={{color:Number.isFinite(netProfit)?netProfit>=0?'var(--profit)':'var(--loss)':undefined}}><span>Unrealized P/L</span><strong>{Number.isFinite(netProfit)?fmtMoney(netProfit,currency):'—'}</strong></div><div className="current-position-metric" style={{color:Number.isFinite(netProfit)?netProfit>=0?'var(--profit)':'var(--loss)':undefined}}><span>Return</span><strong>{Number.isFinite(netProfit)&&invested>0?`${((netProfit/invested)*100).toFixed(1)}%`:'—'}</strong></div>{grossValue>0&&<div className="current-position-metric"><Tooltip text="Estimated capital gains tax if the position were sold at the current market price."><span className="clickable">Estimated CGT</span></Tooltip><strong>{fmtMoney(estCGT,currency)}</strong><small>{workbook.settings.filerStatus==='filer'?`${workbook.settings.cgtFilerPct}% filer rate`:`${workbook.settings.cgtNonFilerPct}% non-filer rate`}</small></div>}</div></section>
+              <section className="current-position-section"><h4>Suggestions</h4><div className="current-position-metrics"><div className="current-position-metric" style={{color:statusHue}}><span>Status</span><strong>{statusLabel}</strong></div><div className="current-position-metric"><span>Exit targets</span><strong className="current-position-targets">+1% {fmtPSXPrice(exitTarget(1))}<br/>+2% {fmtPSXPrice(exitTarget(2))}<br/>+5% {fmtPSXPrice(exitTarget(5))}</strong></div></div></section>
             </div>
           </DetailCard>
         )}
