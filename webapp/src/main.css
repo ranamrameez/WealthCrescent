@@ -771,7 +771,7 @@ hr {
 
 .position-detail-section > h3 { margin: 0 0 8px; }
 .current-position-sections { display: grid; grid-template-columns: repeat(auto-fit,minmax(250px,1fr)); gap: 10px; align-items: stretch; }
-.current-position-section { --card-hue: var(--accent); min-width: 0; padding: 8px 12px 12px; border: 1px solid color-mix(in srgb,var(--border) 65%,transparent); border-radius: 8px; background: transparent; }
+.current-position-section { --card-hue: var(--accent); min-width: 0; padding: 8px 12px 12px; border: 1px solid color-mix(in srgb,var(--border) 25%,transparent); border-radius: 8px; background: transparent; }
 .current-position-section h4 { margin: 0 0 12px; color: var(--text); font-size: 12px; font-weight: 700; letter-spacing: .035em; text-transform: uppercase; }
 .current-position-metrics { display: grid; grid-template-columns: repeat(auto-fit,minmax(120px,1fr)); gap: 10px 16px; }
 .current-position-metric { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
