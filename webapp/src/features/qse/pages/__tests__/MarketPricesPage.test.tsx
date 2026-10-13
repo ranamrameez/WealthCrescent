@@ -66,5 +66,5 @@ it('applies timeframe and source to both charts and paginated updates',()=>{
  expect(container.querySelector('[data-page-section="updates"] tbody')?.textContent).not.toContain('App');
  fireEvent.click(screen.getByRole('button',{name:'All Time'}));
  expect(screen.getByText(/1 matching updates/)).toBeVisible();
- expect(mock.charts.at(-1)?.datasets.map(dataset=>dataset.label)).toEqual(expect.arrayContaining(['Period low','Period high','Lifetime low','Lifetime high','Median']));
+ expect(mock.charts.at(-1)?.datasets.map(dataset=>dataset.label)).toEqual(expect.arrayContaining(['All Time low','All Time high','Lifetime low','Lifetime high','Median']));
 });

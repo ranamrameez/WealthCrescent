@@ -35,6 +35,8 @@ it('labels period low, high and current while keeping reference guides hidden',(
  expect([...chart.highlights.values()].flat().some(label=>label.startsWith('Current price '))).toBe(true);
  const guides=chart.datasets.filter(dataset=>['Period low','Period high','Lifetime low','Lifetime high','Median','Previous close'].includes(dataset.label||''));
  expect(guides.map(dataset=>dataset.label)).toEqual(['Period low','Period high','Lifetime low','Lifetime high','Median','Previous close']);
+ const sevenDayGuides=marketChartData(rows,{low:0.5,high:120},9,undefined,'7 Day').datasets.map(dataset=>dataset.label);
+ expect(sevenDayGuides).toEqual(expect.arrayContaining(['7 Day low','7 Day high']));
  expect(guides.every(dataset=>dataset.hidden===true)).toBe(true);expect(chart.total).toBe(5000);expect(chart.ordered.length).toBeLessThanOrEqual(2000);
  expect(chart.ordered.some(row=>row.price===1)).toBe(true);expect(chart.ordered.some(row=>row.price===99)).toBe(true);
 });
