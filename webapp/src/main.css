@@ -1239,6 +1239,10 @@ tbody td:last-child:has(button) {
 	background: var(--accent);
 }
 
+.current-position-metric strong.shares-box {
+	color: var(--on-accent, #fff);
+}
+
 label {
 	display: block;
 	font-size: 12.5px;
