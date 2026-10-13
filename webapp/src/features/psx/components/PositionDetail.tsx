@@ -31,7 +31,7 @@ import { gridAutoStyle } from '../../../lib/gridStyle';
 
 function DetailCard({section,title,children,...props}: ComponentProps<typeof StandardCard> & {section:string}) {
   return section === 'all' ? <StandardCard title={title} {...props}>{children}</StandardCard>
-    : <div className={`position-detail-section ${props.className||''}`.trim()}>{section !== 'lots' && section !== 'closed' && section !== 'prices' && section !== 'comparison-summary' && <h3>{title}</h3>}{children}</div>;
+    : <div className={`position-detail-section ${props.className||''}`.trim()}>{section !== 'lots' && section !== 'closed' && section !== 'prices' && section !== 'position' && <h3>{title}</h3>}{children}</div>;
 }
 
 function CompactChart({ height, children }: { height: number; children: React.ReactNode }) {
