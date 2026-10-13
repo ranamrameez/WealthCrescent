@@ -406,7 +406,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
                   maintainAspectRatio: false,
                   indexAxis: 'y',
                   interaction: { mode: 'nearest', axis: 'y', intersect: false },
-                  plugins: { legend: { display: false }, datalabels:{display:false}, tooltip:{callbacks:{title:items=>comparisonTerms[items[0]?.dataIndex] || '',label:context=>fmtPSXPrice(Number(context.raw))}} },
+                  plugins: { legend: { display: false }, datalabels:{display:true,formatter:value=>fmtPSXPrice(Number(value))}, tooltip:{callbacks:{title:items=>comparisonTerms[items[0]?.dataIndex] || '',label:context=>fmtPSXPrice(Number(context.raw))}} },
                   // Done item 138: Chart.js's autoSkip was silently dropping
                   // "Sold"/"Break-even" labels from this 4-row category axis.
                   scales: { x:{min:Math.max(0,comparisonLow-comparisonPadding),max:comparisonHigh+comparisonPadding,ticks:{callback:value=>fmtPSXPrice(Number(value))}},y: { ticks: { autoSkip: false } } },
