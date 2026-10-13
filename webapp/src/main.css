@@ -764,7 +764,7 @@ hr {
 .current-position-section h4 { margin: 0 0 12px; color: var(--text); font-size: 12px; font-weight: 700; letter-spacing: .035em; text-transform: uppercase; }
 .current-position-metrics { display: grid; grid-template-columns: repeat(auto-fit,minmax(120px,1fr)); gap: 10px 16px; }
 .current-position-metric { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
-.current-position-metric > span, .current-position-trend > span { color: var(--text-muted); font-size: 11px; font-weight: 500; letter-spacing: 0; line-height: 1.3; }
+.current-position-metric > span, .current-position-trend > span { color: var(--muted); font-size: 11px; font-weight: 500; letter-spacing: 0; line-height: 1.3; }
 .current-position-metric strong { color: var(--text); font-family: var(--mono); font-size: 15px; font-weight: 700; line-height: 1.3; }
 .current-position-primary { grid-column: 1 / -1; }
 .current-position-primary strong { font-size: 19px; line-height: 1.2; }
@@ -772,6 +772,7 @@ hr {
 .current-position-key strong { font-size: 16px; }
 .current-position-metric strong.text-profit { color: var(--profit); }
 .current-position-metric strong.text-loss { color: var(--loss); }
+.current-position-break-even strong { color: var(--warn); }
 .current-position-status { align-self: flex-start; font-family: inherit !important; font-size: 11px !important; }
 .current-position-metric small { color: var(--muted); font-size: 10px; line-height: 1.3; }
 .current-position-lead { display: grid; grid-template-columns: minmax(120px,.8fr) minmax(140px,1.2fr); gap: 12px; align-items: center; }
