@@ -75,7 +75,7 @@ export async function mountControls(container, { manualActions = false } = {}) {
   }
   async function refresh() {
     const config = await getSyncConfig();
-    container.querySelector('.run-state').textContent = config.scrapingEnabled ? config.respectTimeWindows ? 'Scraping enabled (follows Qatar time windows)' : 'Scraping enabled (all day)' : 'Scraping stopped';
+    container.querySelector('.run-state').textContent = config.scrapingEnabled ? config.respectTimeWindows ? 'Automatic scraping enabled. Qatar-time schedule: ' + config.timeWindows.map(pair => pair.start + ' to ' + pair.end).join(', ') : 'Automatic scraping enabled all day' : 'Automatic scraping stopped. Manual actions remain available.';
     container.querySelector('.start-control').disabled = config.scrapingEnabled;
     container.querySelector('.stop-control').disabled = !config.scrapingEnabled;
   }

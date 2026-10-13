@@ -609,6 +609,8 @@ test('Favourites persist and pinned charts appear before the table', async () =>
     chrome: { storage: { onChanged: { addListener() {} } } },
   });
   await vm.runInContext('(async () => {' + read('options.js').replace(/^import .*;\r?\n/gm, '') + '\n})()', ctx);
+  assert.equal(document.querySelectorAll('#favouriteChartList svg').length, 0);
+  document.getElementById('loadFavouriteCharts').onclick();
   assert.equal(document.querySelectorAll('#favouriteChartList svg').length, 1);
   assert.ok(document.getElementById('favouriteCharts').compareDocumentPosition(document.getElementById('dataRows')) & 4);
   await document.querySelector('#priceChart button[aria-label="Favourite QNBK"]').onclick();
@@ -616,6 +618,15 @@ test('Favourites persist and pinned charts appear before the table', async () =>
   assert.equal(document.querySelectorAll('#favouriteChartList svg').length, 2);
   await document.querySelector('#favouriteChartList button[aria-label="Unfavourite QFLS"]').onclick();
   assert.deepEqual([...saved], ['QNBK']);
+  const search = document.querySelector('.ticker-manager input[type="search"]');
+  search.value = 'qfl'; search.oninput();
+  assert.equal(document.querySelectorAll('.ticker-favourite-list input').length, 1);
+  const favouriteCheck = document.querySelector('.ticker-favourite-list input');
+  favouriteCheck.checked = true; const pendingSave = favouriteCheck.onchange();
+  assert.equal(document.querySelector('.ticker-favourite-list input').disabled, true);
+  await pendingSave;
+  assert.deepEqual([...saved].sort(), ['QFLS','QNBK']);
+  assert.equal(document.querySelector('.ticker-favourite-list input').checked, true);
 });
 
 test('Zero interval syncs every automatic scrape and manual scrape-only does not push', async () => {
@@ -764,7 +775,7 @@ test('Navigation opens collapsed sections and preserves card contents', async ()
   document.querySelector('a[href="#section-configCard"]').click();
   assert.equal(settings.open, true);
   assert.ok(settings.contains(document.getElementById('configCard')));
-  assert.equal(document.querySelectorAll('details.collapsible-section').length, 9);
+  assert.equal(document.querySelectorAll('details.collapsible-section').length, 10);
 });
 
 

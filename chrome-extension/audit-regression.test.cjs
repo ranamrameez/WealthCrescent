@@ -93,10 +93,10 @@ test('Shared action UI blocks conflicting clicks, shows phase changes and unlock
   const document = dom.window.document;
   let listener, stored = { status: {}, syncConfig: { scrapingEnabled: true } }, clicks = 0;
   document.querySelector('.push-control').onclick = () => clicks++;
-  const ctx = vm.createContext({ document, MutationObserver: dom.window.MutationObserver,
+  const ctx = vm.createContext({ document, MutationObserver: dom.window.MutationObserver, resolveActionFeedback: (await import('data:text/javascript;base64,' + Buffer.from(read('notifications.js')).toString('base64'))).resolveActionFeedback,
     chrome: { storage: { local: { get: async () => stored }, onChanged: { addListener(fn) { listener = fn; } } } },
   });
-  vm.runInContext(read('action-ui.js'), ctx); await tick();
+  vm.runInContext(read('action-ui.js').replace(/^import .*;\r?\n/gm, ''), ctx); await tick();
   document.dispatchEvent(new dom.window.CustomEvent('extension-action', { detail: { key: 'worker-message', busy: true } }));
   const button = document.querySelector('.push-control');
   assert.equal(button.disabled, true);
@@ -110,7 +110,7 @@ test('Shared action UI blocks conflicting clicks, shows phase changes and unlock
   await tick();
   assert.equal(button.disabled, false);
   button.click(); assert.equal(clicks, 1);
-  assert.match(document.querySelector('.action-status').textContent, /Action complete.*Synced/);
+  assert.match(document.querySelector('.action-status').textContent, /Prices collected and synced/);
   dom.window.close();
 });
 
@@ -129,7 +129,7 @@ test('Combined filters consistently select table and chart records', async () =>
   assert.equal(paginatePushed(rows, { ticker: 'QNBK', accepted: 'true' }).total, 1);
 });
 
-test('Pinned charts inherit table date and outlier filters unless their timeframe is explicit', async () => {
+test('Saved charts load on demand and use only the shared date and outlier filters', async () => {
   const dom = new JSDOM(read('options.html')), document = dom.window.document;
   const requests = [], rows = [{ id: '1', ticker: 'QFLS', price: 10, capturedAt: Date.now(), origin: 'firebase' }];
   const ctx = vm.createContext({ document, Date, Number, JSON,
@@ -144,10 +144,12 @@ test('Pinned charts inherit table date and outlier filters unless their timefram
   document.getElementById('outlierFilter').dispatchEvent(new dom.window.Event('change'));
   await tick();
   assert.equal(requests.filter(request => request.filters).at(-1).filters.outliers, 'true');
-  await document.querySelector('[data-favourite-period="7d"]').onclick();
-  assert.equal(requests.filter(request => request.filters?.ticker === 'QFLS').at(-1).filters.from, '2026-10-06');
-  assert.equal(document.getElementById('fromDate').value, '2026-10-12');
-  assert.equal(requests.filter(request => request.filters?.ticker === 'QFLS').at(-1).filters.outliers, 'true');
+  document.getElementById('loadFavouriteCharts').onclick();
+  assert.equal(document.querySelectorAll('[data-favourite-period]').length, 0);
+  await document.querySelector('[data-period="7d"]').onclick();
+  assert.equal(requests.filter(request => request.filters).at(-1).filters.from, '2026-10-06');
+  assert.equal(document.getElementById('fromDate').value, '2026-10-06');
+  assert.equal(requests.filter(request => request.filters).at(-1).filters.outliers, 'true');
   dom.window.close();
 });
 
@@ -215,4 +217,23 @@ test('Concurrent Firebase data queries reuse the same in-flight snapshot read', 
   await tick(); assert.equal(reads, 4);
   hold.resolve(); await Promise.all([first, second]);
   assert.equal(reads, 4);
+});
+
+
+test('Manual collection and sync bypass time windows and the stopped automatic state', async () => {
+  let pushes = 0;
+  const w = worker({ push: async () => { pushes++; return { pushed: 1, namesPushed: 0, total: 1, errors: [], syncedTickers: ['QFLS'] }; } });
+  w.ctx.withinScrapingWindow = () => false;
+  await vm.runInContext('runCycle()', w.ctx);
+  assert.equal(w.events.length, 0);
+  assert.equal(w.status.scrapeState, 'Outside time window');
+  assert.equal((await w.send('SCRAPE_NOW_MANUAL')).ok, true);
+  assert.equal((await w.send('PUSH_NOW')).ok, true);
+  assert.equal(pushes, 1);
+  await w.send('STOP_SCRAPING');
+  assert.equal((await w.send('SCRAPE_NOW_MANUAL')).ok, true);
+  assert.equal((await w.send('PUSH_NOW')).ok, true);
+  assert.equal(pushes, 2);
+  assert.equal((await w.send('START_SCRAPING')).ok, true);
+  assert.equal(pushes, 3, 'Start takes an immediate sample outside the schedule');
 });

@@ -466,7 +466,7 @@ async function runCycle(options = {}) {
 async function collectCycle({ forcePush = false, manual = false, scrapeOnly = false } = {}) {
   const config = await getSyncConfig();
   if (!manual && (!config.scrapingEnabled || !withinScrapingWindow(config))) {
-    await patchStatus({ scrapeState: config.scrapingEnabled ? 'Outside time window' : 'Stopped', syncState: config.scrapingEnabled ? 'Outside time window' : 'Stopped' });
+    await patchStatus({ scrapeState: config.scrapingEnabled ? 'Outside time window' : 'Stopped', syncState: config.scrapingEnabled ? 'Outside time window' : 'Stopped', lastError: '', actionError: '' });
     await scheduleNextCollect();
     return;
   }
@@ -483,7 +483,7 @@ async function collectCycle({ forcePush = false, manual = false, scrapeOnly = fa
   const result = await scrapeTab(tab);
   if (!result.ok) {
     await recordActivity({ type: 'scrape', success: false });
-    await patchStatus({ scrapeState: 'Scrape failed', lastError: `Scrape failed: ${result.error}` });
+    await patchStatus({ scrapeState: 'Scrape failed', lastScrapeError: result.error, lastScrapeErrorAt: Date.now(), lastError: `Scrape failed: ${result.error}` });
     await scheduleNextCollect();
     if (manual) throw new Error(`Scrape failed: ${result.error}`);
     return;
@@ -604,7 +604,7 @@ chrome.runtime.onMessage.addListener((message, _sender, reply) => {
       }
       case 'START_SCRAPING': {
         await setSyncConfig({ scrapingEnabled: true });
-        await runCycle({ actionOwned: true });
+        await runCycle({ actionOwned: true, manual: true });
         await scheduleNextCollect();
         sendResponse({ ok: true });
         break;
@@ -618,7 +618,7 @@ chrome.runtime.onMessage.addListener((message, _sender, reply) => {
         if (cycleRunning) await cyclePromise.catch(() => {});
         await chrome.alarms.clear(COLLECT_ALARM);
         await chrome.alarms.clear(RETRY_ALARM);
-        await patchStatus({ scrapeState: 'Stopped', syncState: 'Stopped', actionBusy: false, currentAction: '', actionCompletedAt: Date.now() });
+        await patchStatus({ scrapeState: 'Stopped', syncState: 'Stopped', actionBusy: false, currentAction: '', actionCompletedAt: Date.now(), lastActionType: 'STOP_SCRAPING', lastActionScrapeState:'Stopped', lastActionSyncState:'Stopped', actionError: '', lastError: '' });
         sendResponse({ ok: true });
         } finally { stopRunning = false; }
         break;
@@ -734,14 +734,15 @@ chrome.runtime.onMessage.addListener((message, _sender, reply) => {
     } finally {
       if (exclusive) {
         actionRunning = false;
-        await patchStatus({ actionBusy: false, currentAction: '', actionCompletedAt: Date.now(), actionError: response?.ok === false ? response.error || 'Action failed.' : '' });
+        const completed = await getStatus();
+        await patchStatus({ lastActionScrapeState: completed.scrapeState, lastActionSyncState: completed.syncState, actionBusy: false, currentAction: '', actionCompletedAt: Date.now(), lastActionType: message.type, actionError: response?.ok === false ? response.error || 'Action failed.' : '' });
         if (cyclePending) { const next = cyclePending; cyclePending = null; runCycle(next).catch(error => patchStatus({ lastError: error.message })); }
       }
     }
     if (response && (exclusive || message?.type === 'STOP_SCRAPING')) response = { ...response, status: await getStatus() };
     reply(response || { ok: true });
   })().catch(async e => {
-    if (!actionRunning) await patchStatus({ actionError: e.message || String(e) }).catch(() => {});
+    if (!actionRunning && ['START_SCRAPING','STOP_SCRAPING','SCRAPE_NOW_MANUAL','PUSH_NOW','TEST_SCRAPE','MUTATE_PUSHED_DATA','SIGN_IN','SIGN_UP','SIGN_OUT','SAVE_CONFIGS'].includes(message?.type)) await patchStatus({ actionError: e.message || String(e) }).catch(() => {});
     reply({ ok: false, error: e.message || String(e) });
   });
   return true; // async response

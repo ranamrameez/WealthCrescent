@@ -1,0 +1,80 @@
+/* Include padding and borders in component widths, including popup toasts. */
+*, *::before, *::after { box-sizing:border-box; }
+/* One set of Material Teal components for options and popup. */
+html[data-color="material-teal"] .wc-button { --button-bg:var(--accent); --button-text:var(--on-accent); padding:9px 16px; min-height:36px; border-radius:999px; font:600 13px/1.3 var(--body); margin:0; background:var(--button-bg); color:var(--button-text); }
+html[data-color="material-teal"] .wc-button--secondary { --button-bg:var(--accent-soft); --button-text:var(--accent); }
+html[data-color="material-teal"] .wc-button--danger { --button-bg:var(--loss); --button-text:#fff; }
+html[data-color="material-teal"] .wc-chip { --button-bg:var(--panel); --button-text:var(--accent); border:1px solid var(--border); }
+html[data-color="material-teal"] .wc-chip[aria-pressed=true], html[data-color="material-teal"] .chart-favourite[aria-pressed=true] { --button-bg:var(--accent); --button-text:var(--on-accent); }
+html[data-color="material-teal"] .wc-chip[aria-pressed=true] { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft); }
+.wc-chip[aria-pressed=true]::after { content:'Selected'; font-size:10px; margin-left:7px; opacity:.9; }
+html[data-color="material-teal"] .wc-card { border-radius:var(--radius-lg); }
+.wc-toolbar,.chart-ranges,.manual-actions,.outlier-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:12px 0; }
+html[data-color="material-teal"] .wc-info-wrap { background:var(--panel-2); border:1px solid var(--border); border-radius:var(--radius-md); padding:12px; margin:12px 0; }
+.wc-info-wrap > summary { cursor:pointer; font-weight:600; }
+.filter-summary { color:var(--muted); margin:10px 0; }
+html[data-color="material-teal"] .wc-toast.action-status { position:fixed; inset:auto 16px 16px 16px; top:auto; z-index:650; width:auto; max-width:440px; min-width:0; margin-left:auto; display:flex; align-items:flex-start; gap:12px; padding:14px 16px; background:var(--panel); color:var(--text); border:1px solid var(--border); border-left:5px solid var(--toast-color,var(--accent)); border-radius:var(--radius-md); box-shadow:var(--shadow-lg); margin-top:0; margin-right:0; margin-bottom:0; }
+html[data-color="material-teal"] .wc-toast[hidden] { display:none; }
+.wc-toast[data-type=success] { --toast-color:var(--profit); }
+.wc-toast[data-type=warning] { --toast-color:var(--warn); }
+.wc-toast[data-type=error] { --toast-color:var(--loss); }
+.wc-toast[data-type=stopped] { --toast-color:var(--muted); }
+.wc-toast-message { flex:1 1 auto; min-width:0; font-size:13px; overflow-wrap:anywhere; max-height:min(240px,40dvh); overflow:auto; }
+html[data-color="material-teal"] .wc-toast-dismiss { flex:none; padding:6px 10px; min-height:28px; font-size:11px; }
+@media(max-width:500px) { html[data-color="material-teal"] .wc-toast.action-status { left:12px; right:12px; bottom:12px; width:auto; max-width:none; } }
+
+:root { --wc-panel-padding:16px; --wc-control-gap:8px; }
+html[data-color="material-teal"] .wc-card { padding:var(--wc-panel-padding); }
+.wc-toolbar,.chart-ranges,.manual-actions,.outlier-actions { gap:var(--wc-control-gap); }
+
+/* Consistent panel spacing on options and the narrower popup. */
+.activity-sections { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+html[data-color="material-teal"] .activity-sections > section { padding:12px; min-width:0; margin:0; }
+.activity-sections h3 { margin:0 0 10px; font-size:14px; line-height:1.4; }
+.activity-sections .stats-grid { margin:0; }
+.stats-grid dt,.stats-grid dd { min-width:0; overflow-wrap:anywhere; }
+html[data-color="material-teal"] .extension-popup { width:360px; max-width:100%; padding:12px; margin:0; }
+.extension-popup .activity-sections { grid-template-columns:minmax(0,1fr); }
+.extension-popup #activityStats { margin:12px 0; }
+.extension-popup #activityStats > h2 { margin:0 0 12px; }
+.extension-popup #scrapingControls { display:flex; flex-wrap:wrap; gap:8px; }
+.extension-popup #scrapingControls .run-state,.extension-popup #scrapingControls .control-error { flex:0 0 100%; margin:0; }
+.extension-popup #scrapingControls .start-control,.extension-popup #scrapingControls .stop-control { flex:1 1 120px; min-width:0; }
+.extension-popup .actions { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.extension-popup .actions button { min-width:0; white-space:normal; }
+@media(max-width:640px) { .activity-sections { grid-template-columns:minmax(0,1fr); } }
+
+/* Match the webapp's page-filter modal, keeping all shared filters together. */
+html[data-color="material-teal"] .filter-dialog { width:min(760px,calc(100vw - 24px)); max-height:calc(100dvh - 24px); padding:20px; border:1px solid var(--border); border-radius:16px; background:var(--panel); color:var(--text); overflow:auto; }
+.filter-dialog::backdrop { background:rgba(10,30,30,.45); }
+.filter-dialog-header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:16px; }
+.filter-dialog-header h2 { margin:0; }
+html[data-color="material-teal"] .filter-dialog #filterCard { padding:0; margin:0; border:0; box-shadow:none; background:transparent; }
+.filter-dialog #filterCard > h2 { display:none; }
+.ticker-manager { border-top:1px solid var(--border); margin-top:20px; padding-top:16px; }
+.ticker-manager h3 { margin:0 0 12px; }
+.ticker-manager > input { width:100%; }
+.ticker-favourite-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:12px; max-height:260px; overflow:auto; padding:16px 0; }
+.ticker-favourite-list label { display:flex; align-items:center; gap:8px; color:var(--text); }
+.ticker-favourite-list input { width:auto; margin:0; }
+
+html[data-color="material-teal"][data-theme="light"] { --text:#142e2f; --muted:#405d5e; --panel-2:#fff; --accent-soft:#e4f2f2; --border:#bdcece; }
+.collapsible-section > .card > h2,.collapsible-section > .account-section > h2,.collapsible-section .table-header > h2 { display:none; }
+html[data-color="material-teal"] .collapsible-section > .card,html[data-color="material-teal"] .collapsible-section > .account-section { border:0; box-shadow:none; border-radius:0; margin:0; }
+html[data-color="material-teal"] #account .card,html[data-color="material-teal"] .activity-sections > section { border:0; box-shadow:none; background:transparent; }
+html[data-color="material-teal"] .collapsible-section > summary { background:var(--panel); color:var(--text); }
+.chart-toolbar { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-bottom:12px; }
+.chart-toolbar h3 { margin:0 auto 0 0; font-size:18px; }
+html[data-color="material-teal"] .chart-toolbar button { width:36px; height:36px; padding:0; font-size:20px; }
+.chart-legend { display:flex; flex-wrap:wrap; gap:16px; font-size:12px; margin-top:12px; }
+.legend-item { display:inline-flex; align-items:center; gap:6px; }
+.legend-item::before { content:''; display:inline-block; width:18px; height:3px; background:var(--accent); }
+.legend-range::before { height:12px; width:10px; border:2px solid #047857; background:transparent; }
+.legend-outlier::before { width:8px; height:8px; border-radius:50%; background:var(--loss); }
+html[data-color="material-teal"] .config-sections { grid-template-columns:repeat(auto-fit,minmax(240px,320px)); align-items:start; }
+html[data-color="material-teal"] .config-section { background:transparent; box-shadow:none; border:0; padding:12px 0; }
+@media(max-width:500px) { html[data-color="material-teal"] .config-sections { grid-template-columns:minmax(0,1fr); } }
+
+.action-group { display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:12px; border-left:2px solid var(--border); }
+.action-group > strong { flex-basis:100%; font-size:13px; }
+.batch-toolbar { align-items:flex-start; }

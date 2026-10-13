@@ -362,3 +362,21 @@ Regression checks include performance.test.cjs. UI interaction checks run in jsd
 ## Material Teal appearance (v0.1.21)
 
 Options and popup use the webapp Material Teal light palette. themes/base.css and themes/material-teal.css are local copies of the webapp theme sources, keeping the unpacked extension self-contained. themes/extension.css maps extension controls, sections, navigation, tables, preview and charts to those tokens, using the webapp typography stacks, rounded controls and surface styles. Destructive actions and outliers retain semantic warning/error colors. Refresh the copied source files when updating the shared webapp palette.
+
+## Shared filters, feedback and manual controls (v0.1.22)
+
+Filters for records and charts is the only source of date, ticker, data-view and outlier filters. The date presets use explicit labels such as Today and Past 7 days, an accessible pressed state, and a visible Selected indicator. Saved ticker charts replaces Favourite price charts; Load saved charts renders the saved subset of the already-filtered dataset, and Unload charts retains saved tickers. Legacy per-ticker timeframe settings remain stored for compatibility but are not read or applied.
+
+About activity statistics uses the same information-wrap styles as the other explanations and preserves its open state across updates. Prior scrape errors are identified as history inside that wrap; current schedule pauses do not surface an old scrape error as a current failure. Action feedback is a dismissible toast with progress, success, warning, error, stopped or information type. It reflects the completed manual action even when automatic collection subsequently returns to a gated state, and background cycles do not repeatedly produce completion toasts.
+
+Manual Scrape now, Push now and Test bypass Qatar-time windows. Start enables automatic collection and also takes an immediate manual sample. Subsequent automatic collection follows the displayed saved Qatar-time schedule when enabled; disable Follow Qatar time windows for continuous automatic collection. The market tab must be open and reachable, and syncing requires sign-in. This change does not establish why a previous live session stopped early; its saved schedule and page connection were not inspected.
+
+Shared ui-controls.js and shared-ui.css apply consistent Material Teal button, chip, card and info-wrap classes to both static and generated controls. Controls, navigation, summaries and table headings have descriptive native tooltips. ui-regression.test.cjs covers manual schedule bypass, saved-chart filters, persistent information wraps, tooltip coverage and non-repeating typed toasts.
+
+## Narrow-popup spacing (v0.1.23)
+
+All extension components use border-box sizing. Toasts fit between the viewport edges instead of adding padding outside a viewport-based width; long messages wrap and can scroll while Dismiss remains visible. The popup uses a bounded width, flexible paired actions, and a single-column activity layout. Activity subcards use the shared inset-card class, explicit inner padding, heading spacing and panel gaps on both surfaces. Progress messages use plain ASCII ellipses.
+
+### 0.1.24
+- Top-bar Filters opens shared page filters and a searchable favourite-ticker checklist in a responsive modal. Favourite saves disable the checklist until completion and report failures.
+- Charts use header icons, a visual legend, larger labels and one latest reported range per day. Account and activity panels are flatter, settings are more compact, and record actions are grouped by purpose.

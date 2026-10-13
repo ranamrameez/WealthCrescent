@@ -33,7 +33,8 @@ export async function mountStats(container) {
     const daily = activity.daily;
     const tracked = !!activity.trackingStartedAt;
     const stale = !!status.lastScrapeAt && (!activity.lastScrapeAt || status.lastScrapeAt > activity.lastScrapeAt + 5000);
-    const syncError = status.syncState === 'Waiting for sign-in' || status.syncState === 'Ready to sync' ? '' : activity.lastSyncError || status.lastSyncError || '';
+    const gated = ['Stopped', 'Outside time window'].includes(status.scrapeState) || ['Stopped', 'Outside time window'].includes(status.syncState);
+    const syncError = gated || status.syncState === 'Waiting for sign-in' || status.syncState === 'Ready to sync' ? '' : activity.lastSyncError || status.lastSyncError || '';
     const hasFailures = daily.syncFailures > 0;
     const lastSyncAt = activity.lastSyncAt || recorded.audit?.lastSyncAt || (status.lastPushCount > 0 ? status.lastPushAt : null);
     const lines = [
@@ -53,7 +54,7 @@ export async function mountStats(container) {
     const list = document.createElement('div'); list.className = 'activity-sections';
     const localLabels = new Set(['Scrape status','Since last scrape','Local scrapes recorded today','Scrapes counted today','Scrape failures / tests today']);
     for (const [title, isLocal] of [['Local scrape',true],['DB sync',false]]) {
-      const section = document.createElement('section'); const heading = document.createElement('h3'); heading.textContent = title;
+      const section = document.createElement('section'); section.className = 'wc-card wc-card--inset'; const heading = document.createElement('h3'); heading.textContent = title;
       const details = document.createElement('dl'); details.className = 'stats-grid';
       for (const [label,value] of lines.filter(([label]) => localLabels.has(label) === isLocal)) {
         const term = document.createElement('dt'); term.textContent = label;
@@ -63,14 +64,19 @@ export async function mountStats(container) {
     }
     const note = document.createElement('p'); note.className = 'muted';
     note.textContent = `Today uses Qatar time. Statistics cover all tickers; table filters do not affect them. Local records count retained scrape batches. Stats come from this extension; no Firebase read is needed. Confirmed synced rows are retained audit records marked after a successful price write. ${tracked ? `Activity counters started ${new Date(activity.trackingStartedAt).toLocaleString('en-GB', { timeZone: 'Asia/Qatar' })}; tests are included.` : 'Activity counters have not started; reload the extension in chrome://extensions to load the updated worker.'}${stale ? ' Saved status is newer than the activity counters; reload the extension to resume tracking.' : ''}`;
-    const error = document.createElement('p'); error.className = 'error'; error.textContent = [...new Set([syncError, status.lastError, status.configSyncError, recorded.error].filter(Boolean))].join(' ');
+    const error = document.createElement('p'); error.className = 'error'; error.textContent = [...new Set([syncError, gated ? null : status.lastError, status.configSyncError, recorded.error].filter(Boolean))].join(' ');
     const { configSyncStatus } = await chrome.storage.local?.get('configSyncStatus') || {};
     if (disposed || version !== renderVersion) return;
     if (configSyncStatus?.error) error.textContent += ' ' + configSyncStatus.error;
-    const explanation = document.createElement('details'), summary = document.createElement('summary'); summary.textContent = 'How statistics are counted'; explanation.append(summary, note);
+    const explanation = container.querySelector('details.statistics-info') || document.createElement('details');
+    explanation.className = 'advanced-controls wc-info-wrap statistics-info';
+    const summary = explanation.querySelector('summary') || document.createElement('summary'); summary.textContent = 'About activity statistics';
+    const history = document.createElement('p'); history.className = 'muted';
+    history.textContent = status.lastScrapeError ? 'Previous scrape error: ' + status.lastScrapeError : '';
+    explanation.replaceChildren(summary, note, history);
     container.replaceChildren(heading, list, explanation, error);
   }
-  const refresh = () => render().catch(error => { if (!disposed) container.textContent = `Cannot load statistics: ${error.message}`; });
+  const refresh = () => render().catch(error => { if (disposed) return; const warning = container.querySelector('.statistics-load-error') || document.createElement('p'); warning.className = 'error statistics-load-error'; warning.textContent = 'Cannot refresh activity: ' + error.message + '. Previous statistics remain visible.'; if (!warning.isConnected) container.append(warning); });
   const listener = (changes, area) => { if (area === 'local' && (changes.activity || changes.status || changes.syncConfig || changes.auditUpdatedAt || changes.auth || changes.configSyncStatus)) { if (changes.status?.newValue?.actionCompletedAt !== changes.status?.oldValue?.actionCompletedAt) evidenceCache = null; refresh(); } };
   chrome.storage.onChanged.addListener(listener);
   const timer = setInterval(refresh, 5000);

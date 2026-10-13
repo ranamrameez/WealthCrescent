@@ -11,8 +11,8 @@ import { queryAudit, mutateAudit } from './audit.js';
 const $ = id => document.getElementById(id);
 sendWorkerMessage({ type:'LOAD_EXTENSION_CONFIGS' }).catch(error => { $('dataMessage').textContent = error.message; });
 const favourites = new Set(await getChartFavourites());
-const savedConfig = await chrome.storage.local?.get(['favouriteTimeframes','viewPreferences']) || {};
-let favouriteTimeframes = savedConfig.favouriteTimeframes || {};
+const savedConfig = await chrome.storage.local?.get(['viewPreferences']) || {};
+let favouriteChartsLoaded = false;
 function applyViewPreferences(preferences) {
 for (const [id,value] of Object.entries(preferences || {})) {
   if (['dataView','pageSize','outlierFilter','autoSelectOutliers'].includes(id) && $(id)) {
@@ -46,8 +46,6 @@ const selected = new Map();
 const deselectedOutliers = new Set();
 const autoSelectedOutliers = new Set();
 let chartRows = [];
-let favouriteRows = [];
-const favouriteChartRows = new Map();
 let visibleRows = [];
 let flaggedOutlierRows = [];
 let flaggedOutlierTotal = 0;
@@ -76,12 +74,19 @@ function updateSelection() {
   $('selectAll').checked = visibleRows.length > 0 && visibleRows.every(row => selected.has(row.id));
   $('selectAll').indeterminate = visibleRows.some(row => selected.has(row.id)) && !$('selectAll').checked;
 }
+function updateFilterSummary() {
+  const active = [...document.querySelectorAll('[data-period]')].find(button => button.getAttribute('aria-pressed') === 'true');
+  const from = $('fromDate').value, to = $('toDate').value;
+  const range = !from && !to ? 'All dates' : (from || 'Beginning') + ' to ' + (to || 'Latest');
+  $('filterSummary').textContent = (active ? 'Selected range: ' + active.textContent : 'Custom date range') + ' | ' + range + ' | ' + ($('tickerFilter').value || 'All tickers') + ' | ' + $('dataView').selectedOptions[0].textContent;
+}
 let requestVersion = 0;
 async function renderData(refresh = false) {
   if (document.fullscreenElement || batchBusy) return;
   const version = ++requestVersion;
   try {
     if ($('fromDate').value && $('toDate').value && $('fromDate').value > $('toDate').value) throw new Error('From date must be before or equal to To date.');
+    updateFilterSummary();
     const pageSize = Number($('pageSize').value);
     const firebase = $('dataView').value === 'firebase';
     const combined = $('dataView').value === 'all';
@@ -92,17 +97,6 @@ async function renderData(refresh = false) {
     if (version !== requestVersion || document.fullscreenElement) return;
     const pages = Math.max(1, Math.ceil(result.total / pageSize));
     if (page > pages) { page = pages; return renderData(); }
-    const pinned = await Promise.all([...favourites].map(async ticker => {
-      const period = favouriteTimeframes[ticker] || 'filters';
-      if (period === 'filters') return [ticker, result.chartRows || result.rows];
-      if (!sectionOpen('favouriteCharts')) return [ticker, favouriteChartRows.get(ticker) || []];
-      const range = dateRange(period);
-      if (filters.ticker && !ticker.toUpperCase().includes(filters.ticker.toUpperCase())) return [ticker, []];
-      const chartFilters = { ...filters, ...range, ticker };
-      const data = combined ? await sendWorkerMessage({ type:'GET_ALL_DATA', filters:chartFilters }) : firebase ? await sendWorkerMessage({ type:'GET_PUSHED_DATA',filters:chartFilters }) : await queryAudit(chartFilters);
-      return [ticker, data.chartRows || data.rows];
-    }));
-    if (version !== requestVersion || document.fullscreenElement || batchBusy) return;
     const tickerValue = $('tickerFilter').value;
     $('tickerFilter').replaceChildren(...['', ...(result.tickers || [])].map(ticker => { const option = document.createElement('option'); option.value = ticker; option.textContent = ticker || 'All tickers'; return option; }));
     $('tickerFilter').value = tickerValue;
@@ -128,8 +122,6 @@ async function renderData(refresh = false) {
     const chartTickers = [...new Set(chartRows.map(row => row.ticker))].sort();
     $('chartTicker').replaceChildren(...['', ...chartTickers].map(ticker => { const option = document.createElement('option'); option.value = ticker; option.textContent = ticker || 'All tickers'; return option; }));
     $('chartTicker').value = chartTickers.includes(tickerValue) ? tickerValue : chartTickers.includes(previousChartTicker) ? previousChartTicker : '';
-    favouriteRows = chartRows;
-    favouriteChartRows.clear(); pinned.forEach(([ticker,rows]) => favouriteChartRows.set(ticker,rows));
     renderCharts();
     $('dataRows').replaceChildren();
     for (const row of result.rows) {
@@ -192,7 +184,7 @@ for (const button of document.querySelectorAll('[data-period]')) button.onclick 
   for (const toggle of document.querySelectorAll('[data-period]')) toggle.setAttribute('aria-pressed', String(toggle === button));
   page = 1; selected.clear(); deselectedOutliers.clear(); await renderData();
 };
-for (const id of ['fromDate', 'toDate']) $(id).addEventListener('change', () => { for (const toggle of document.querySelectorAll('[data-period]')) toggle.setAttribute('aria-pressed', 'false'); });
+for (const id of ['fromDate', 'toDate']) $(id).addEventListener('change', () => { for (const toggle of document.querySelectorAll('[data-period]')) toggle.setAttribute('aria-pressed', 'false'); updateFilterSummary(); });
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) renderData(); });
 $('chartTicker').onchange = () => renderCharts();
 $('autoSelectOutliers').onchange = () => { selected.clear(); deselectedOutliers.clear(); renderData(); };
@@ -206,30 +198,22 @@ function renderCharts() {
   } };
   if (sectionOpen('chartCard')) renderPriceChart($('priceChart'), chartRows, $('chartTicker').value, options);
   if (!sectionOpen('favouriteCharts')) return;
-  const list = $('favouriteChartList'); list.replaceChildren();
-  if (!favourites.size) { list.textContent = 'Choose Favourite on a chart to pin it here.'; return; }
+  const list = $('favouriteChartList');
+  if (!favouriteChartsLoaded) { if (list.children.length) list.replaceChildren(); $('favouriteChartStatus').textContent = 'Charts are not loaded. Choose Load saved charts to display them.'; return; }
+  list.replaceChildren();
+  $('favouriteChartStatus').textContent = `Loaded saved charts. ${$('filterSummary').textContent}`;
+  if (!favourites.size) { list.textContent = 'No saved tickers yet. Choose Favourite on a price-history chart to save a ticker.'; return; }
   const grid = document.createElement('div'); grid.className = 'chart-grid';
   for (const ticker of [...favourites].sort().filter(ticker => !$('tickerFilter').value || ticker.includes($('tickerFilter').value))) {
     const card = document.createElement('section'); const title = document.createElement('h3'); title.textContent = ticker;
-    const periods = document.createElement('div'); periods.className = 'chart-ranges'; periods.setAttribute('role','group'); periods.setAttribute('aria-label', ticker + ' timeframe');
-    for (const period of ['filters','1d','7d','1M','3M','6M','1Y','all']) {
-      const button = document.createElement('button'); button.textContent = period === 'filters' ? 'Table dates' : period === 'all' ? 'All time' : period;
-      button.dataset.favouritePeriod = period; button.setAttribute('aria-pressed', String((favouriteTimeframes[ticker] || 'filters') === period));
-      button.onclick = async () => {
-        button.disabled = true;
-        try {
-        favouriteTimeframes = { ...favouriteTimeframes, [ticker]:period };
-        await chrome.storage.local?.set({ favouriteTimeframes }); await renderData();
-        } catch (error) { $('dataMessage').textContent = error.message; }
-        finally { button.disabled = false; }
-      }; periods.append(button);
-    }
-    const chart = document.createElement('div'); card.append(title, periods, chart); grid.append(card);
-    renderPriceChart(chart, favouriteChartRows.get(ticker) || favouriteRows, ticker, options);
+    const chart = document.createElement('div'); card.append(chart); grid.append(card);
+    renderPriceChart(chart, chartRows, ticker, options);
   }
   if (!grid.children.length) list.textContent = 'No pinned tickers match the current ticker filter. Clear the ticker filter to show them.';
   else list.append(grid);
 }
+$('loadFavouriteCharts').onclick = () => { favouriteChartsLoaded = true; $('unloadFavouriteCharts').disabled = false; renderCharts(); };
+$('unloadFavouriteCharts').onclick = () => { favouriteChartsLoaded = false; $('unloadFavouriteCharts').disabled = true; $('favouriteChartList').replaceChildren(); $('favouriteChartStatus').textContent = 'Charts unloaded. Your saved tickers are unchanged.'; };
 $('showAllColumns').onchange = () => $('auditCard').classList.toggle('compact-records', !$('showAllColumns').checked);
 $('auditCard').classList.add('compact-records');
 $('editSelected').onclick = () => applyBatch('edit');
@@ -256,5 +240,36 @@ for (const id of ['dataView','pageSize','outlierFilter','autoSelectOutliers']) $
 
 chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && changes.chartFavourites) { favourites.clear(); (changes.chartFavourites.newValue || []).forEach(ticker => favourites.add(ticker)); renderData(); }
   if (area === 'local' && changes.viewPreferences) { applyViewPreferences(changes.viewPreferences.newValue); page = 1; renderData(); }
-  if (area === 'local' && changes.favouriteTimeframes) { favouriteTimeframes = changes.favouriteTimeframes.newValue || {}; renderData(); }
   if (area === 'local' && (changes.auditUpdatedAt || changes.auth || changes.status?.newValue?.lastPushAt !== changes.status?.oldValue?.lastPushAt)) scheduleDataRefresh(!!changes.auth || !!changes.status); });
+
+// Manage favourites without rendering the chart collection.
+const tickerManager = document.createElement('section'); tickerManager.className = 'ticker-manager';
+const managerTitle = document.createElement('h3'); managerTitle.textContent = 'Favourite tickers';
+const tickerSearch = document.createElement('input'); tickerSearch.type = 'search'; tickerSearch.placeholder = 'Search tickers'; tickerSearch.setAttribute('aria-label', 'Search favourite ticker list'); tickerSearch.title = 'Search available and saved ticker symbols';
+const tickerList = document.createElement('div'); tickerList.className = 'ticker-favourite-list';
+const favouriteMessage = document.createElement('p'); favouriteMessage.setAttribute('role', 'status');
+tickerManager.append(managerTitle, tickerSearch, tickerList, favouriteMessage); $('filterCard').append(tickerManager);
+let savingFavourite = false;
+function renderTickerManager() {
+  const symbols = [...new Set([...favourites, ...Array.from($('chartTicker').options).map(option => option.value).filter(Boolean)])].sort();
+  tickerList.replaceChildren();
+  for (const ticker of symbols.filter(symbol => symbol.toLowerCase().includes(tickerSearch.value.trim().toLowerCase()))) {
+    const label = document.createElement('label'), check = document.createElement('input');
+    check.type = 'checkbox'; check.checked = favourites.has(ticker); check.disabled = savingFavourite;
+    check.setAttribute('aria-label', 'Save ' + ticker + ' as a favourite'); check.title = 'Show ' + ticker + ' in saved ticker charts';
+    check.onchange = async () => {
+      if (savingFavourite) return;
+      savingFavourite = true; const next = new Set(favourites); if (check.checked) next.add(ticker); else next.delete(ticker); renderTickerManager();
+      try { await setChartFavourites([...next]); favourites.clear(); next.forEach(symbol => favourites.add(symbol)); favouriteMessage.textContent = 'Favourites saved.'; renderCharts(); }
+      catch (error) { favouriteMessage.textContent = 'Could not save favourites: ' + error.message; }
+      finally { savingFavourite = false; renderTickerManager(); }
+    };
+    label.append(check, document.createTextNode(ticker)); tickerList.append(label);
+  }
+  if (!tickerList.children.length) tickerList.textContent = symbols.length ? 'No matching tickers.' : 'No tickers in the selected data. Try a broader date range or data view.';
+}
+tickerSearch.oninput = renderTickerManager;
+document.addEventListener('extension-filters-open', renderTickerManager);
+const tickerObserver = new document.defaultView.MutationObserver(renderTickerManager); tickerObserver.observe($('chartTicker'), { childList:true });
+chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && changes.chartFavourites) renderTickerManager(); });
+renderTickerManager();

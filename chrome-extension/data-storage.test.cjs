@@ -93,7 +93,7 @@ test('Failed configuration writes remain pending and retry without losing local 
   assert.deepEqual(cloud.alice.chartFavourites,['QNBK']);assert.equal(local.extensionConfigProfiles.alice.pending,false);
 });
 
-test('Favourite timeframe filters independently of table dates and persists its selection',async()=>{
+test('Saved charts ignore old individual timeframes and share central date filters',async()=>{
   const {JSDOM}=require('../webapp/node_modules/jsdom');
   const document=new JSDOM(read('options.html')).window.document;
   const requests=[],storage={favouriteTimeframes:{QFLS:'7d'}};
@@ -106,13 +106,15 @@ test('Favourite timeframe filters independently of table dates and persists its 
   });
   await vm.runInContext('(async()=>{'+read('options.js').replace(/^import .*;\r?\n/gm,'')+'\n})()',ctx);
   const tableRequest=requests.find(r=>r.type==='GET_ALL_DATA'&&!r.filters.ticker);
-  const favouriteRequest=requests.find(r=>r.type==='GET_ALL_DATA'&&r.filters.ticker==='QFLS');
-  assert.equal(tableRequest.filters.from,'2026-10-11');assert.equal(favouriteRequest.filters.from,'2026-10-05');
-  await document.querySelector('#favouriteChartList [data-favourite-period="all"]').onclick();
-  assert.equal(storage.favouriteTimeframes.QFLS,'all');
-  assert.equal(requests.filter(r=>r.filters?.ticker==='QFLS').at(-1).filters.from,'');
-  assert.equal(document.getElementById('fromDate').value,'2026-10-11');
-  assert.equal(document.querySelectorAll('#favouriteChartList [data-favourite-period]').length,8);
+  assert.equal(tableRequest.filters.from,'2026-10-11');
+  const reads=requests.length; document.getElementById('loadFavouriteCharts').onclick();
+  assert.equal(requests.length,reads);
+  await document.querySelector('[data-period="all"]').onclick();
+  assert.equal(requests.filter(r=>r.filters).at(-1).filters.from,'');
+  assert.equal(document.getElementById('fromDate').value,'');
+  assert.equal(document.querySelectorAll('#favouriteChartList [data-favourite-period]').length,0);
+  document.getElementById('unloadFavouriteCharts').onclick();
+  assert.equal(document.getElementById('favouriteChartList').children.length,0);
 });
 
 test('Current-price corrections also update allPrices and bounds; deleting current clears latest',async()=>{
