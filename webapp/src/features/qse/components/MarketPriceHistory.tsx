@@ -6,7 +6,7 @@ import { toast } from '../../../components/Toast';
 import { getMarketPrice } from '../../../lib/calc';
 import { fmtQSEPrice } from '../../../lib/format';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
-import { filterMarketRows, lifetimeBounds, previousSessionClose } from '../../../lib/stockData/marketPageModel';
+import { filterMarketRows, lifetimeBounds, marketDateRange, MARKET_PERIODS, previousSessionClose } from '../../../lib/stockData/marketPageModel';
 import { useWorkbookStore } from '../../../store/workbookStore';
 import { useMarketPageData } from '../hooks/useMarketPageData';
 import '../pages/MarketPricesPage.css';
@@ -17,17 +17,20 @@ export function MarketPriceHistory({ticker,fromDate='',toDate=''}:{ticker:string
   const ensureSignedIn=useEnsureSignedIn();
   const current=getMarketPrice(ticker,workbook.marketPrices??{},workbook.transactions??[]);
   const [priceInput,setPriceInput]=useState(current>0?String(current):'');
+  const [period,setPeriod]=useState('custom');
+  const [range,setRange]=useState({from:fromDate,to:toDate});
+  useEffect(()=>setRange({from:fromDate,to:toDate}),[fromDate,toDate]);
   useEffect(()=>setPriceInput(current>0?String(current):''),[ticker,current]);
-  const data=useMarketPageData(ticker,fromDate,toDate,'all');
-  const invalid=!!fromDate&&!!toDate&&fromDate>toDate;
-  const rows=invalid?[]:filterMarketRows(data.rows,'all',fromDate,toDate);
+  const data=useMarketPageData(ticker,range.from,range.to,'all');
+  const invalid=!!range.from&&!!range.to&&range.from>range.to;
+  const rows=invalid?[]:filterMarketRows(data.rows,'all',range.from,range.to);
   const previousClose=previousSessionClose(filterMarketRows(data.rows,'all','',''));
   const save=async()=>{const value=Number(priceInput);if(!value||value<=0)return toast('Enter a valid price.');if(!(await ensureSignedIn('Sign in to save price updates.')))return;setMarketPrice(ticker,value);setPriceInput(String(value));toast(`${ticker} price saved: ${fmtQSEPrice(value)}`);};
   return <div>
-    <div className="market-price-actions"><span className="text-muted">Date range uses the page filter.</span><label className="market-current-price">Current price<span className="market-current-price-control"><PriceInput exchange="qse" type="number" step="0.001" className="price-input" value={priceInput} onChange={event=>setPriceInput(event.target.value)} onKeyDown={event=>event.key==='Enter'&&save()} style={{width:150}}/><button className="btn secondary small" type="button" onClick={save}><SaveIcon size={12}/>Save</button></span></label></div>
+    <div className="market-timeframes" role="group" aria-label="Chart timeframe">{MARKET_PERIODS.map(value=><button key={value} type="button" className={'chip'+(period===value?' active':'')} aria-pressed={period===value} onClick={()=>{setPeriod(value);setRange(marketDateRange(value));}}>{value==='1d'?'Today':value==='all'?'All time':value}</button>)}</div><div className="d-flex gap-2 flex-wrap"><label>From (Qatar)<input type="date" value={range.from} onChange={event=>{setPeriod('custom');setRange({...range,from:event.target.value});}} /></label><label>To (Qatar)<input type="date" value={range.to} onChange={event=>{setPeriod('custom');setRange({...range,to:event.target.value});}} /></label><div className="market-price-actions"><label className="market-current-price">Current price<span className="market-current-price-control"><PriceInput exchange="qse" type="number" step="0.001" className="price-input" value={priceInput} onChange={event=>setPriceInput(event.target.value)} onKeyDown={event=>event.key==='Enter'&&save()} style={{width:150}}/><button className="btn secondary small" type="button" onClick={save}><SaveIcon size={12}/>Save</button></span></label></div></div>
     {!data.signedIn&&<p className="text-muted">Sign in to include shared prices. Manual history remains available.</p>}
     {data.loading&&<p className="text-muted">Loading prices...</p>}
     {(invalid||data.error)&&<p role="alert">{invalid?'From date must precede To date.':data.error}</p>}
-    <MarketPriceChart rows={rows} bounds={lifetimeBounds(data.manual,data.bounds,'all')} previousClose={previousClose} label={ticker+' — '+(fromDate||'All dates')+' to '+(toDate||'latest')}/>
+    <MarketPriceChart rows={rows} bounds={lifetimeBounds(data.manual,data.bounds,'all')} previousClose={previousClose} label={ticker+' — '+(range.from||'All dates')+' to '+(range.to||'latest')}/>
   </div>;
 }

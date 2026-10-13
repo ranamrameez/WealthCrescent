@@ -17,10 +17,15 @@
 .market-chart-caption {font-size:12px;margin:0 0 12px;}
 .market-chart-legend,.market-page-summary,.market-timeframes,.market-updates-pager {display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;}
 .market-chart-legend {font-size:12px;margin-top:12px;}
-.market-price-groups {display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:16px;margin-top:14px;}
-.market-price-groups section {min-width:0;}
+.market-price-groups {display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:10px;margin-top:14px;}
+.market-price-group {min-width:0;padding:10px 12px;border:1px solid var(--border);border-radius:8px;}
 .market-price-groups h4 {margin:0 0 8px;}
 .market-price-groups small {display:block;margin-top:6px;color:var(--muted);}
+.market-price-group-values {display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:6px 12px;}
+.market-price-group-values span {display:flex;flex-direction:column;font-size:11px;}
+.market-price-group-values b {font-size:13px;font-variant-numeric:tabular-nums;}
+.market-price-group-values em {color:var(--muted);font-size:10px;font-style:normal;}
+.market-price-group-values .price-low {color:#e5484d;}.market-price-group-values .price-median {color:#c9a227;}.market-price-group-values .price-high {color:#34c77b;}.market-price-group-values .price-current {color:#3b6bd6;}
 .market-current-price {margin-left:auto;display:flex;flex-direction:column;gap:4px;}
 .market-current-price-control {display:flex;align-items:center;gap:6px;}
 .market-price-actions {display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:12px;}
