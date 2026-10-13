@@ -14,7 +14,6 @@
 .market-chart-canvas {position:relative;height:320px;min-height:240px;}
 .market-chart-empty {display:grid;place-items:center;text-align:center;}
 .standard-card-fullscreen .market-chart-canvas {height:65vh;}
-.market-chart-caption {font-size:12px;margin:0 0 12px;}
 .market-chart-legend,.market-page-summary,.market-timeframes,.market-updates-pager {display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;}
 .market-chart-legend {font-size:12px;margin-top:12px;}
 .market-price-groups {display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:10px;margin-top:14px;}
