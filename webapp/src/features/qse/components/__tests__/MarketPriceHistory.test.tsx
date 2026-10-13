@@ -28,9 +28,8 @@ it('keeps manual history visible when shared reads fail',()=>{
   expect(screen.getByText(/0 shared points; 1 manual points/)).toBeTruthy();expect(screen.getByRole('alert').textContent).toContain('Denied');
 });
 
-it('applies the stock page date filter to the chart',()=>{
-  const {rerender}=render(<MarketPriceHistory ticker="QFLS" fromDate="2000-01-01" toDate="2000-01-02" />);
-  expect(screen.getByText(/0 shared points; 0 manual points/)).toBeTruthy();
-  rerender(<MarketPriceHistory ticker="QFLS" />);
+it('defaults the chart timeframe to Today',()=>{
+  render(<MarketPriceHistory ticker="QFLS" />);
+  expect(screen.getByRole('button',{name:'Today'}).getAttribute('aria-pressed')).toBe('true');
   expect(screen.getByText(/1 shared points; 1 manual points/)).toBeTruthy();
 });

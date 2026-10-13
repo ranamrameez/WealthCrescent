@@ -11,20 +11,21 @@ import { useWorkbookStore } from '../../../store/workbookStore';
 import { useMarketPageData } from '../hooks/useMarketPageData';
 import '../pages/MarketPricesPage.css';
 
-export function MarketPriceHistory({ticker,fromDate='',toDate=''}:{ticker:string;fromDate?:string;toDate?:string}) {
+export function MarketPriceHistory({ticker}:{ticker:string}) {
   const workbook=useWorkbookStore(state=>state.workbook);
   const setMarketPrice=useWorkbookStore(state=>state.setMarketPrice);
   const ensureSignedIn=useEnsureSignedIn();
   const current=getMarketPrice(ticker,workbook.marketPrices??{},workbook.transactions??[]);
   const [priceInput,setPriceInput]=useState(current>0?String(current):'');
-  const [period,setPeriod]=useState('custom');
-  const [showDates,setShowDates]=useState(Boolean(fromDate||toDate));
-  const [range,setRange]=useState({from:fromDate,to:toDate});
-  useEffect(()=>setRange({from:fromDate,to:toDate}),[fromDate,toDate]);
+  const [period,setPeriod]=useState('1d');
+  const [showDates,setShowDates]=useState(false);
+  const [range,setRange]=useState(()=>marketDateRange('1d'));
   useEffect(()=>setPriceInput(current>0?String(current):''),[ticker,current]);
   const data=useMarketPageData(ticker,range.from,range.to,'all');
   const invalid=!!range.from&&!!range.to&&range.from>range.to;
-  const rows=invalid?[]:filterMarketRows(data.rows,'all',range.from,range.to);
+  const requestedRows=invalid?[]:filterMarketRows(data.rows,'all',range.from,range.to);
+  const priorDate=period==='1d'&&!requestedRows.length?[...new Set(data.rows.map(row=>row.date).filter(date=>date<range.from))].sort().at(-1):undefined;
+  const rows=priorDate?filterMarketRows(data.rows,'all',priorDate,priorDate):requestedRows;
   const previousClose=previousSessionClose(filterMarketRows(data.rows,'all','',''));
   const save=async()=>{const value=Number(priceInput);if(!value||value<=0)return toast('Enter a valid price.');if(!(await ensureSignedIn('Sign in to save price updates.')))return;setMarketPrice(ticker,value);setPriceInput(String(value));toast(`${ticker} price saved: ${fmtQSEPrice(value)}`);};
   return <div>

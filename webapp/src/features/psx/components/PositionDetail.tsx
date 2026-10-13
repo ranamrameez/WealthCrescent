@@ -379,7 +379,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
       <div>
 
         {(section === 'all' || section === 'prices') && <DetailCard section={section} title={<span>Market Price</span>} className="mb-12">
-        <MarketPriceHistory ticker={ticker} fromDate={fromDate} toDate={toDate} />
+        <MarketPriceHistory ticker={ticker} />
         </DetailCard>}
 
         {(section === 'all' || section === 'current') && isOpen && (
