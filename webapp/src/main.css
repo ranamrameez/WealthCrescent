@@ -764,8 +764,12 @@ hr {
 .current-position-section h4 { margin: 0 0 12px; color: var(--text); font-size: 12px; font-weight: 700; letter-spacing: .035em; text-transform: uppercase; }
 .current-position-metrics { display: grid; grid-template-columns: repeat(auto-fit,minmax(120px,1fr)); gap: 10px 16px; }
 .current-position-metric { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
-.current-position-metric > span, .current-position-trend > span { color: var(--muted); font-size: 10px; font-weight: 400; letter-spacing: .015em; line-height: 1.25; }
+.current-position-metric > span, .current-position-trend > span { color: var(--text-muted); font-size: 11px; font-weight: 500; letter-spacing: 0; line-height: 1.3; }
 .current-position-metric strong { color: var(--text); font-family: var(--mono); font-size: 15px; font-weight: 700; line-height: 1.3; }
+.current-position-primary { grid-column: 1 / -1; }
+.current-position-primary strong { font-size: 19px; line-height: 1.2; }
+.current-position-metrics > .current-position-primary { order: -1; }
+.current-position-key strong { font-size: 16px; }
 .current-position-metric strong.text-profit { color: var(--profit); }
 .current-position-metric strong.text-loss { color: var(--loss); }
 .current-position-status { align-self: flex-start; font-family: inherit !important; font-size: 11px !important; }
@@ -774,6 +778,11 @@ hr {
 .current-position-trend { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
 .current-position-secondary { margin-top: 10px; padding-top: 10px; border-top: 1px solid color-mix(in srgb,var(--card-hue) 24%,var(--border)); }
 .current-position-targets { font-size: 13px !important; line-height: 1.45 !important; }
+.current-position-comparison { grid-column: span 2; }
+.current-position-supporting { display: grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); gap: 8px; margin-top: 10px; }
+.current-position-supporting > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid color-mix(in srgb,var(--border) 48%,transparent); border-radius: 7px; background: color-mix(in srgb,var(--panel-2) 42%,transparent); }
+.current-position-supporting span,.current-position-supporting small { color: var(--muted); font-size: 10px; }
+.current-position-supporting strong { color: var(--text-muted); font-family: var(--mono); font-size: 12px; }
 @media(max-width:600px){.current-position-lead{grid-template-columns:1fr;}}
 
 .holdings-price-row {
@@ -1226,7 +1235,7 @@ tbody td:last-child:has(button) {
 	font-size: 12.5px;
 	font-family: var(--mono);
 	font-weight: 700;
-	color: color-mix(in srgb, var(--accent) 16%, var(--panel));
+	color: var(--on-accent, #fff);
 	background: var(--accent);
 }
 

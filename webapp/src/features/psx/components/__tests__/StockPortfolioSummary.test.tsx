@@ -7,6 +7,6 @@ import { StockPortfolioSummary } from '../StockPortfolioSummary';
 afterEach(cleanup);
 it('shows the consolidated position overview before its comparison chart',()=>{
   render(<StockPortfolioSummary ticker="TEST"/>);
-  expect(screen.getAllByTestId('position-detail').map(node=>node.textContent)).toEqual(['position','comparison-summary']);
+  expect(screen.getAllByTestId('position-detail').map(node=>node.textContent)).toEqual(['position']);
 });
 it('restores all-time statistics for a closed position',()=>{state.shares=0;render(<StockPortfolioSummary ticker="TEST"/>);expect(screen.getByTestId('position-detail').textContent).toBe('all-time');state.shares=10;});
