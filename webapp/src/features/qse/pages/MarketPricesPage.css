@@ -28,10 +28,11 @@
 .market-price-group-values .price-low {color:#e5484d;}.market-price-group-values .price-median {color:#c9a227;}.market-price-group-values .price-high {color:#34c77b;}.market-price-group-values .price-current {color:#3b6bd6;}
 .market-price-filters {display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
 .market-price-filters > label {display:flex;flex-direction:column;gap:4px;}
+.market-price-toolbar {display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:12px;}
 .market-current-price {margin-left:auto;display:flex;flex-direction:column;gap:4px;}
 .market-current-price-control {display:flex;align-items:center;gap:6px;}
 .market-page-summary {margin:8px 0 16px;font-size:13px;color:var(--muted);}
-.market-timeframes {margin:0 0 12px;gap:6px;}
+.market-timeframes {margin:0;gap:6px;}
 .market-filter-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
 .market-filter-grid label {display:flex;flex-direction:column;gap:5px;min-width:0;}
 .market-filter-grid input,.market-filter-grid select {width:100%;}
@@ -46,7 +47,7 @@
 .searchable-entity-group {padding:6px 8px;font-size:11px;color:var(--muted);font-weight:700;}
 .searchable-entity-options button {display:block;width:100%;padding:8px;text-align:left;border:0;border-radius:5px;background:transparent;color:var(--text);cursor:pointer;}
 .searchable-entity-options button.active,.searchable-entity-options button:hover {background:color-mix(in srgb,var(--accent,#2563eb) 15%,transparent);}
-@media(max-width:600px){.market-ticker-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}.market-filter-grid{grid-template-columns:1fr;}.market-ticker-select{padding-right:25px;}.searchable-entity-switch{max-width:55vw;width:210px;}.market-chart-canvas{height:280px;}.market-current-price{margin-left:0;}.market-price-filters{align-items:stretch;flex-direction:column;}.market-price-groups{grid-template-columns:1fr;}}
+@media(max-width:600px){.market-ticker-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}.market-filter-grid{grid-template-columns:1fr;}.market-ticker-select{padding-right:25px;}.searchable-entity-switch{max-width:55vw;width:210px;}.market-chart-canvas{height:280px;}.market-current-price{margin-left:0;}.market-price-toolbar{align-items:stretch;flex-direction:column;}.market-price-filters{align-items:stretch;flex-direction:column;}.market-price-groups{grid-template-columns:1fr;}}
 
 .market-ticker-card .ticker-logo {width:28px;height:28px;margin-right:0;align-self:center;}
 .market-ticker-card .ticker-logo-fallback {font-size:11px;}
