@@ -122,7 +122,7 @@
  * (not three one-off inline border styles) so all three call sites stay
  * visually identical. */
 .entry-row {
-  border: 1px solid var(--border);
+  border: var(--border-light);
   border-radius: 8px;
   padding: 10px 12px;
   margin-bottom: 10px;
@@ -792,7 +792,7 @@ hr {
 .current-position-targets { font-size: 13px !important; line-height: 1.45 !important; }
 .current-position-comparison { grid-column: span 2; }
 .current-position-supporting { display: grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); gap: 8px; margin-top: 10px; }
-.current-position-supporting > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid color-mix(in srgb,var(--border) 48%,transparent); border-radius: 7px; background: color-mix(in srgb,var(--panel-2) 42%,transparent); }
+.current-position-supporting > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; padding: 8px 10px; border: var(--border-light); border-radius: 7px; background: color-mix(in srgb,var(--panel-2) 42%,transparent); }
 .current-position-supporting span,.current-position-supporting small { color: var(--muted); font-size: 10px; }
 .current-position-supporting strong { color: var(--text-muted); font-family: var(--mono); font-size: 12px; }
 @media(max-width:600px){.current-position-lead{grid-template-columns:1fr;}}
