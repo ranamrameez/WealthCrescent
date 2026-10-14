@@ -9,10 +9,11 @@ import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { filterMarketRows, lifetimeBounds, marketDateRange, MARKET_PERIOD_LABELS, MARKET_PERIODS, marketPeriodLabel, previousSessionClose } from '../../../lib/stockData/marketPageModel';
 import { useWorkbookStore } from '../../../store/workbookStore';
 import { useMarketPageData } from '../hooks/useMarketPageData';
+import { useLiveQseWorkbook } from '../hooks/useLiveQseWorkbook';
 import '../pages/MarketPricesPage.css';
 
 export function MarketPriceHistory({ticker}:{ticker:string}) {
-  const workbook=useWorkbookStore(state=>state.workbook);
+  const workbook=useLiveQseWorkbook();
   const setMarketPrice=useWorkbookStore(state=>state.setMarketPrice);
   const ensureSignedIn=useEnsureSignedIn();
   const current=getMarketPrice(ticker,workbook.marketPrices??{},workbook.transactions??[]);

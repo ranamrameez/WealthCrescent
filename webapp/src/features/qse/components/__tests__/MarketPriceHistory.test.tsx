@@ -16,7 +16,8 @@ vi.mock('firebase/database',()=>({
   },
 }));
 import { MarketPriceHistory } from '../MarketPriceHistory';
-afterEach(()=>{cleanup();state.denied=false;state.paths=[];});
+import { useQseFeed } from '../../hooks/useLiveQseWorkbook';
+afterEach(()=>{cleanup();state.denied=false;state.paths=[];useQseFeed.setState({points:{},error:''});});
 it('shows both sources and reported bounds from the shared root',()=>{
   render(<MarketPriceHistory ticker="QFLS" />);
   expect(screen.getByText('Bounds 9 to 13')).toBeTruthy();
@@ -32,4 +33,9 @@ it('defaults the chart timeframe to Today',()=>{
   render(<MarketPriceHistory ticker="QFLS" />);
   expect(screen.getByRole('button',{name:'Today'}).getAttribute('aria-pressed')).toBe('true');
   expect(screen.getByText(/1 shared points; 1 manual points/)).toBeTruthy();
+});
+it('updates the price input when a scraped price arrives',()=>{
+  useQseFeed.setState({points:{QFLS:[{date:qatarDay(),time:new Date().toISOString(),price:14}]},error:''});
+  render(<MarketPriceHistory ticker="QFLS" />);
+  expect(Number((screen.getByRole('spinbutton') as HTMLInputElement).value)).toBe(14);
 });
