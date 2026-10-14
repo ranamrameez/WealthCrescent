@@ -296,6 +296,9 @@ export interface QSESettings {
    * portfolio-wide popup listing every ticker with a sell-the-cheap-lot
    * opportunity) is opt-in, off by default. */
   partialTradeAlertsEnabled?: boolean;
+  /** Show profitable-share P/L alerts through the browser notification API.
+   * Permission is requested only when the user enables this setting. */
+  desktopProfitAlertsEnabled?: boolean;
   /** Added 2026-09-17, real financial-loss bug report: the user's real
    * broker statement's Avg Buy Price diverged sharply from this app's
    * displayed Cost for a heavily-traded ticker (IQCD) — traced to

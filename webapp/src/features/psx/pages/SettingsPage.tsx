@@ -1,4 +1,5 @@
 import { ToggleChip } from '../../../components/ui/ToggleChip';
+import { DesktopProfitAlertsToggle } from '../../../components/DesktopProfitAlertsToggle';
 import { PageHeading } from '../../../components/PageHeading';
 import { BackButton } from '../../../components/BackButton';
 import type { User } from 'firebase/auth';
@@ -241,7 +242,6 @@ function CostBasisSettings() {
   return (
     <Card>
       <h3 className="mt-0">Cost basis method</h3>
-      <ToggleChip checked={!!settings.partialTradeAlertsEnabled} onChange={next => updateSettings({ partialTradeAlertsEnabled: next })} label="Show realtime Partial Trade Alerts popup" />
       <p className="text-muted" style={{ marginTop: -4 }}>
         Average cost blends every buy into one running average, so a sell can't be tied to a
         specific lot — this can make a real remaining loss look smaller (or even profitable) once
@@ -270,6 +270,16 @@ function CostBasisSettings() {
   );
 }
 
+function AlertSettings() {
+  const settings = usePSXWorkbookStore((s) => s.workbook.settings);
+  const updateSettings = usePSXWorkbookStore((s) => s.updateSettings);
+  return <Card>
+    <h3 className="mt-0">P/L alerts</h3>
+    <ToggleChip checked={!!settings.partialTradeAlertsEnabled} onChange={next => updateSettings({ partialTradeAlertsEnabled: next })} label="Show realtime Partial Trade Alerts popup" />
+    <DesktopProfitAlertsToggle checked={!!settings.desktopProfitAlertsEnabled} onChange={next => updateSettings({ desktopProfitAlertsEnabled: next })} />
+  </Card>;
+}
+
 function AmountSettings() {
   const settings = usePSXWorkbookStore((s) => s.workbook.settings);
   const updateSettings = usePSXWorkbookStore((s) => s.updateSettings);
@@ -288,6 +298,7 @@ function AmountSettings() {
       </div>
       <CGTSettings />
       <CostBasisSettings />
+      <AlertSettings />
       <Card>
         <h3 className="mt-0">General</h3>
         <div className="row" style={{ gap: 12 }}>

@@ -1,7 +1,7 @@
 import { useQseFeed } from '../../features/qse/hooks/useLiveQseWorkbook';
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { PartialTradeAlertsPopup } from '../PartialTradeAlertsPopup';
 import { useWorkbookStore } from '../../store/workbookStore';
 import { usePSXWorkbookStore } from '../../store/psxWorkbookStore';
@@ -14,6 +14,7 @@ afterEach(() => {
   useQseFeed.setState({points:{}});
   useWorkbookStore.setState({ workbook: qse });
   usePSXWorkbookStore.setState({ workbook: psx });
+  vi.unstubAllGlobals();
 });
 
 it('opens on a price rise after mount and clears when the lots become unprofitable', () => {
@@ -44,4 +45,22 @@ it('respects the disabled popup setting even when shared prices are profitable',
   usePSXWorkbookStore.setState({workbook:{...psx,transactions:[]}});
   render(<MemoryRouter><PartialTradeAlertsPopup /></MemoryRouter>);
   expect(screen.queryByLabelText('Profitable share notifications')).toBeNull();
+});
+
+it('sends a desktop P/L alert without requiring the popup setting', () => {
+  const notify = Object.assign(vi.fn(), { permission: 'granted', requestPermission: vi.fn() });
+  vi.stubGlobal('Notification', notify);
+  usePartialTradeAlertDismissalStore.setState({ dismissed: {} });
+  usePSXWorkbookStore.setState({ workbook: { ...psx, transactions: [] } });
+  useWorkbookStore.setState({ workbook: {
+    ...qse,
+    settings: { ...qse.settings, partialTradeAlertsEnabled: false, desktopProfitAlertsEnabled: true },
+    transactions: [{ date: '2026-01-01', ticker: 'QFLS', action: 'BUY', shares: 68, price: 10 }],
+    marketPrices: { QFLS: 12.1 },
+  } });
+  render(<MemoryRouter><PartialTradeAlertsPopup /></MemoryRouter>);
+  expect(screen.queryByLabelText('Profitable share notifications')).toBeNull();
+  expect(notify).toHaveBeenCalledTimes(1);
+  expect(notify.mock.calls[0][0]).toContain('QSE QFLS');
+  expect(notify.mock.calls[0][1].body).toContain('P/L');
 });

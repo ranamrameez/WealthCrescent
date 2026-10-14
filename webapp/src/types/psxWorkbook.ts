@@ -80,6 +80,9 @@ export interface PSXSettings {
    * configurable in settings, if user like to opt this risky strategy."
    * See `QSESettings.partialTradeAlertsEnabled`'s identical doc comment. */
   partialTradeAlertsEnabled?: boolean;
+  /** Show profitable-share P/L alerts through the browser notification API.
+   * Permission is requested only when the user enables this setting. */
+  desktopProfitAlertsEnabled?: boolean;
 }
 
 export interface PSXWorkbook {
