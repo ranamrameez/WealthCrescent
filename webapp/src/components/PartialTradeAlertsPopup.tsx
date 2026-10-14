@@ -3,7 +3,7 @@ import { useEnsureSignedIn } from '../lib/firebase/useEnsureSignedIn';
 import { computeFIFOPositions } from '../lib/calc/fifoPositions';
 import { computeLotAdvice } from '../lib/calc/partialTradeStrategy';
 import { getMarketPrice } from '../lib/calc/priceHistory';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { makeQSEFeeCalculator } from '../lib/calc/fees';
 import { makePSXFeeCalculator } from '../lib/calc/psxFees';
@@ -59,14 +59,14 @@ export function PartialTradeAlertsPopup() {
   const initial = useMemo(() => {
     const rows: AlertRow[] = [];
     const date = today();
-    if (qseSettings.partialTradeAlertsEnabled) {
+    if (qseSettings.partialTradeAlertsEnabled || qseSettings.desktopProfitAlertsEnabled) {
       const calcFee = makeQSEFeeCalculator(qseSettings);
       scanPortfolioForOpportunities(qseTx, calcFee, qseMarketPrices, qseSettings.feePct, qseSettings.tick).forEach((o) => {
         const key = `qse:${o.ticker}:${date}:${o.sellableShares}:${o.bestUnrealizedPL}`;
         if (!isDismissed(key)) rows.push({ ...o, exchange: 'qse', currency: qseSettings.currency, key });
       });
     }
-    if (psxSettings.partialTradeAlertsEnabled) {
+    if (psxSettings.partialTradeAlertsEnabled || psxSettings.desktopProfitAlertsEnabled) {
       const calcFee = makePSXFeeCalculator(psxSettings, psxTx);
       scanPortfolioForOpportunities(psxTx, calcFee, psxMarketPrices, psxSettings.feePct, psxSettings.tick).forEach((o) => {
         const key = `psx:${o.ticker}:${date}:${o.sellableShares}:${o.bestUnrealizedPL}`;
@@ -77,18 +77,37 @@ export function PartialTradeAlertsPopup() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qseSettings, qseTx, qseMarketPrices, psxSettings, psxTx, psxMarketPrices, isDismissed]);
 
-  const [visibleKeys, setVisibleKeys] = useState<string[]>(() => initial.map((d) => d.key));
+  const popupRows = useMemo(() => initial.filter(row => row.exchange === 'qse'
+    ? qseSettings.partialTradeAlertsEnabled
+    : psxSettings.partialTradeAlertsEnabled), [initial, qseSettings.partialTradeAlertsEnabled, psxSettings.partialTradeAlertsEnabled]);
+  const [visibleKeys, setVisibleKeys] = useState<string[]>(() => popupRows.map((d) => d.key));
   const [hidden, setHidden] = useState(false);
+  const notifiedKeys = useRef(new Set<string>());
 
   useEffect(() => {
-    setVisibleKeys(initial.map(row => row.key));
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    initial.forEach((row) => {
+      const enabled = row.exchange === 'qse'
+        ? qseSettings.desktopProfitAlertsEnabled
+        : psxSettings.desktopProfitAlertsEnabled;
+      if (!enabled || notifiedKeys.current.has(row.key)) return;
+      notifiedKeys.current.add(row.key);
+      new Notification(`${row.exchange.toUpperCase()} ${row.ticker}: profitable shares`, {
+        body: `${row.sellableShares}/${row.totalShares} shares sellable · P/L ${fmtMoney(row.bestUnrealizedPL, row.currency)}`,
+        tag: `profit-alert:${row.key}`,
+      });
+    });
+  }, [initial, qseSettings.desktopProfitAlertsEnabled, psxSettings.desktopProfitAlertsEnabled]);
+
+  useEffect(() => {
+    setVisibleKeys(popupRows.map(row => row.key));
     setHidden(false);
-    if (!initial.length) return;
+    if (!popupRows.length) return;
     const t = setTimeout(() => setHidden(true), AUTO_HIDE_MS);
     return () => clearTimeout(t);
-  }, [initial]);
+  }, [popupRows]);
 
-  const visible = initial.filter((d) => visibleKeys.includes(d.key));
+  const visible = popupRows.filter((d) => visibleKeys.includes(d.key));
   if (hidden || !visible.length) return null;
 
   const dismissOne = (key: string) => {
