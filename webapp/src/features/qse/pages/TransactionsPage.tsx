@@ -1,3 +1,4 @@
+import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { useQSEStockData } from '../hooks/useQSEStockData';
 import { shortenCompanyName } from '../../../lib/shortenName';
@@ -27,7 +28,7 @@ import { usePageFabActions } from '../../../hooks/usePageFabActions';
 import { fmt, fmtMoney, fmtQSEPrice } from '../../../lib/format';
 import { closedPLBySellTxId, computeClosedTrades, type LotMatchOrder } from '../../../lib/calc/closedTrades';
 import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
-import { confirmAndDeleteLinkable, propagateLinkedEdit, resolveLinkedEdit } from '../../../lib/linkCascade';
+import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
 import { transferRunningBalance } from '../../../lib/calc/transferBalance';
 import { Field } from '../../../components/ui/Field';
 import { AmountInput } from '../../../components/ui/AmountInput';
@@ -503,7 +504,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
               {g.rows.map(({ tx, i }) =>
                 editIndex === i && editRow ? (
                   <Fragment key={i}>
-                  <tr>
+                  <RecordRow market="qse" record={{ tx, i }} onCancel={() => setEditIndex(null)}>
                     <td><input type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} className="w-130" /></td>
                     <td><input value={editRow.ticker} onChange={(e) => setEditRow({ ...editRow, ticker: e.target.value.toUpperCase() })} className="w-70" /></td>
                     <td>
@@ -525,7 +526,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
                       <IconButton label="Save" icon={<SaveIcon size={13} />} align="right" onClick={saveEdit} />{' '}
                       <IconButton label="Cancel" icon={<XIcon size={13} />} align="right" onClick={() => setEditIndex(null)} />
                     </td>
-                  </tr>
+                  </RecordRow>
                   {editRow.action === 'SELL' && showEditLotAllocation && (
                     <tr>
                       <td colSpan={8}>
@@ -540,7 +541,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
                   )}
                   </Fragment>
                 ) : (
-                  <tr key={i} onClick={() => setDetailTx(tx)} className="clickable">
+                  <RecordRow market="qse" onEdit={() => startEdit(i, tx)}    record={{ tx, i }}  key={i}  className="clickable">
                     <td><DateValue value={tx.date} />{modifying && <span onClick={event => event.stopPropagation()}><QseReorder kind="transactions" row={tx} rows={sorted.map(row => row.tx)} /></span>}</td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <TickerLogo ticker={tx.ticker} size="sm" exchange="qse" /><Link to={`/stock/${tx.ticker}`}>{tx.ticker}</Link>
@@ -580,7 +581,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
                         }}
                       /></>}
                     </td>
-                  </tr>
+                  </RecordRow>
                 ),
               )}
             </Fragment>
@@ -628,7 +629,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
             </thead>
             <tbody>
               {openLotsPage.rows.map((l, i) => (
-                <tr key={i}>
+                <RecordRow market="qse" onEdit={() => { const source = workbook.transactions.find(row => row.id === l.buyId); if (source) setSourceEditRequest({ ...source, id: source.id! }); }}    record={l}  key={i}>
                   <td><TickerLogo ticker={l.ticker} size="sm" exchange="qse" /><Link to={`/stock/${l.ticker}`}>{l.ticker}</Link></td>
                   <td>{l.buyDate}</td>
                   <td>{fmtQSEPrice(l.buyPrice)}</td>
@@ -636,7 +637,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
                   <td>{fmtMoney(l.remainingShares * l.buyPrice, currency)}</td>
                   <td>{fmtMoney(l.buyFeeTotal, currency)}</td>
                   <td><span className="pill pill-info">Open</span></td>{modifying && <td><IconButton label="Edit buy" icon={<EditIcon size={13} />} align="right" onClick={() => { const source = workbook.transactions.find(row => row.id === l.buyId); if (source) setSourceEditRequest({ ...source, id: source.id! }); }} /></td>}
-                </tr>
+                </RecordRow>
               ))}
               {!sortedOpenLots.length && (
                 <tr><td colSpan={modifying ? 8 : 7} className="text-muted">No open lots — everything bought so far has been sold.</td></tr>
@@ -667,7 +668,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
             </thead>
             <tbody>
               {closedTradesPage.rows.map((t, i) => (
-                <tr key={i}>
+                <RecordRow market="qse" onEdit={() => { const source = workbook.transactions.find(row => row.id === t.sellTxId); if (source) setSourceEditRequest({ ...source, id: source.id! }); }}    record={t}  key={i}>
                   <td><TickerLogo ticker={t.ticker} size="sm" exchange="qse" /><Link to={`/stock/${t.ticker}`}>{t.ticker}</Link></td>
                   <td>{t.buyDate}</td>
                   <td>{fmtQSEPrice(t.buyPrice)}</td>
@@ -679,7 +680,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
                   <td className={t.netPL >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(t.netPL, currency)}</td>
                   <td>{t.holdingDays}</td>
                   <td><span className="pill pill-info">Closed</span></td>{modifying && <td><IconButton label="Edit sell" icon={<EditIcon size={13} />} align="right" onClick={() => { const source = workbook.transactions.find(row => row.id === t.sellTxId); if (source) setSourceEditRequest({ ...source, id: source.id! }); }} /></td>}
-                </tr>
+                </RecordRow>
               ))}
               {!sortedClosedTrades.length && (
                 <tr><td colSpan={modifying ? 12 : 11} className="text-muted">No closed round-trips yet.</td></tr>
@@ -728,7 +729,7 @@ function TransfersSection({ sectionProps }: { sectionProps?: SectionCardProps } 
   const links = useInterEntityTransfersStore((s) => s.workbook.entries);
   const ensureSignedIn = useEnsureSignedIn();
   const sideLabel = useLinkSideLabel();
-  const [editId, setEditId] = useState<string | null>(null);
+
   const [editRow, setEditRow] = useState<Transfer | null>(null);
   const typeFilter = pageFilters.transferType || 'all';
 
@@ -762,25 +763,9 @@ function TransfersSection({ sectionProps }: { sectionProps?: SectionCardProps } 
   };
 
   const page = useQseTablePagination(sorted);
-  const startEdit = (t: Transfer) => { setEditId(t.id); setEditRow({ ...t }); };
-  const saveEdit = async () => {
-    if (editId === null || !editRow) return;
-    if (!(await ensureSignedIn('Sign in to save changes.'))) return;
-    const choice = await resolveLinkedEdit('qse', editId);
-    if (choice === 'cancel') return;
-    updateTransfer(editId, editRow);
-    let msg = 'Transfer updated.';
-    if (choice === 'both') {
-      const result = propagateLinkedEdit('qse', editId, { date: editRow.date, amount: editRow.gross, direction: editRow.type === 'DEPOSIT' ? 'in' : 'out' });
-      if (result.error) msg = result.error;
-      else if (result.message) msg = result.message;
-    }
-    toast(msg);
-    setEditId(null);
-    setEditRow(null);
-  };
+  const startEdit = (t: Transfer) => setEditRow({ ...t });
 
-  return (
+  return (<>
     <QseRecordCard dateSort={dateSort} title="Cash transfers" sectionProps={sectionProps} kind="transfers" rows={sorted} modifying={modifying} onModify={() => setModifying(value => !value)}>
       <div className="table-scroll">
         <table>
@@ -798,25 +783,8 @@ function TransfersSection({ sectionProps }: { sectionProps?: SectionCardProps } 
             {page.rows.map((t) => {
               const link = linkByRecordId.get(t.id);
               const otherSide = link ? (link.from.module === 'qse' && link.fromRecordId === t.id ? link.to : link.from) : undefined;
-              return editId === t.id && editRow ? (
-                <tr key={t.id}>
-                  <td><input type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} className="w-130" /></td>
-                  <td>
-                    <select value={editRow.type} onChange={(e) => setEditRow({ ...editRow, type: e.target.value as Transfer['type'] })}>
-                      <option value="DEPOSIT">Deposit</option>
-                      <option value="WITHDRAWAL">Withdrawal</option>
-                    </select>
-                  </td>
-                  <td><input type="number" value={editRow.gross} onChange={(e) => setEditRow({ ...editRow, gross: Number(e.target.value) })} className="w-90" /></td>
-                  <td><input type="number" value={editRow.fee} onChange={(e) => setEditRow({ ...editRow, fee: Number(e.target.value) })} className="w-70" /></td>
-                  <td></td>
-                  <td>
-                    <IconButton label="Save" icon={<SaveIcon size={13} />} align="right" onClick={saveEdit} />{' '}
-                    <IconButton label="Cancel" icon={<XIcon size={13} />} align="right" onClick={() => setEditId(null)} />
-                  </td>
-                </tr>
-              ) : (
-                <tr key={t.id}>
+              return (
+                <RecordRow market="qse" onEdit={() => startEdit(t)}    record={t}  key={t.id}>
                   <td>
                     <DateValue value={t.date} />{' '}
                     {modifying && <ReorderButtons
@@ -847,7 +815,7 @@ function TransfersSection({ sectionProps }: { sectionProps?: SectionCardProps } 
                     {modifying && <><IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => startEdit(t)} />{' '}
                     <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => confirmAndDeleteLinkable('qse', t.id, () => deleteTransfer(t.id))} /></>}
                   </td>
-                </tr>
+                </RecordRow>
               );
             })}
             {!sorted.length && <tr><td colSpan={6} className="text-muted">No transfers yet.</td></tr>}
@@ -856,6 +824,8 @@ function TransfersSection({ sectionProps }: { sectionProps?: SectionCardProps } 
       </div>
       {page.controls}
     </QseRecordCard>
+      {editRow && <TransactionEntryModal editTransfer={{ module: 'qse', record: editRow }} onClose={() => setEditRow(null)} />}
+    </>
   );
 }
 
@@ -909,7 +879,7 @@ function AdjustmentsSection({ sectionProps }: { sectionProps?: SectionCardProps 
           <tbody>
             {page.rows.map(({ a, i }) =>
               editIndex === i && editRow ? (
-                <tr key={i}>
+                <RecordRow market="qse" record={{ a, i }} onCancel={() => setEditIndex(null)} key={i}>
                   <td><input type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} className="w-130" /></td>
                   <td><input type="number" step="0.01" value={editRow.amount} onChange={(e) => setEditRow({ ...editRow, amount: Number(e.target.value) })} className="w-90" /></td>
                   <td><input value={editRow.note ?? ''} onChange={(e) => setEditRow({ ...editRow, note: e.target.value })} /></td>
@@ -917,9 +887,9 @@ function AdjustmentsSection({ sectionProps }: { sectionProps?: SectionCardProps 
                     <IconButton label="Save" icon={<SaveIcon size={13} />} align="right" onClick={saveEdit} />{' '}
                     <IconButton label="Cancel" icon={<XIcon size={13} />} align="right" onClick={() => setEditIndex(null)} />
                   </td>
-                </tr>
+                </RecordRow>
               ) : (
-                <tr key={i}>
+                <RecordRow market="qse" onEdit={() => startEdit(i, a)}    record={{ a, i }}  key={i}>
                   <td><DateValue value={a.date} />{modifying && <QseReorder kind="adjustments" row={a} rows={sorted.map(row => row.a)} />}</td>
                   <td>{fmtMoney(a.amount, currency)}</td>
                   <td>{a.note}</td>
@@ -927,7 +897,7 @@ function AdjustmentsSection({ sectionProps }: { sectionProps?: SectionCardProps 
                     {modifying && <><IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => startEdit(i, a)} />{' '}
                     <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => deleteAdjustment(i)} /></>}
                   </td>
-                </tr>
+                </RecordRow>
               ),
             )}
             {!sorted.length && <tr><td colSpan={4} className="text-muted">No adjustments yet.</td></tr>}
@@ -977,7 +947,7 @@ function CashLedgerSection({ sectionProps }: { sectionProps?: SectionCardProps }
         const info = description || `Fee: ${fmtMoney(event.fee, workbook.settings.currency)}`;
         const rowId = event.kind + (event.sourceId || index);
         const expanded = expandedId === rowId;
-        return <Fragment key={rowId}><tr>
+        return <Fragment key={rowId}><RecordRow market="qse" onEdit={(source) ? () => setEditRequest({ ...source }) : undefined}    record={{ source, ...event }} >
           <td><button type="button" className="cash-ledger-expand" aria-label={expanded ? 'Collapse details' : 'Expand details'} aria-expanded={expanded} onClick={() => setExpandedId(expanded ? null : rowId)}><svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m6 3 5 5-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg></button></td>
           <td><DateValue value={event.date} />{modifying && source && <QseReorder kind="ledger" row={source} rows={sources(filtered)} />}</td>
           <td className={event.kind === 'trade' ? event.action === 'BUY' ? 'pill-buy' : 'pill-sell' : undefined}>
@@ -993,7 +963,7 @@ function CashLedgerSection({ sectionProps }: { sectionProps?: SectionCardProps }
           <td>{fmtMoney(event.balance, workbook.settings.currency)}</td>
           {modifying && <td>{source && <><IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => setEditRequest({ ...source })} /><IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => remove(source)} /></>}</td>}
 
-        </tr>{expanded && <tr className="cash-ledger-details"><td colSpan={modifying ? 9 : 8}>{description && <div><strong>Description: </strong>{description}</div>}<div><strong>Fee: </strong>{fmtMoney(event.fee, workbook.settings.currency)}</div></td></tr>}</Fragment>;
+        </RecordRow>{expanded && <tr className="cash-ledger-details"><td colSpan={modifying ? 9 : 8}>{description && <div><strong>Description: </strong>{description}</div>}<div><strong>Fee: </strong>{fmtMoney(event.fee, workbook.settings.currency)}</div></td></tr>}</Fragment>;
       })}{!filtered.length && <tr><td colSpan={modifying ? 9 : 8} className="text-muted">Nothing recorded yet.</td></tr>}</tbody>
     </table></div>
     {page.controls}

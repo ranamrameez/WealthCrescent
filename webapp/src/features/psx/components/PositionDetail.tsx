@@ -1,3 +1,4 @@
+import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { MarketPriceHistory } from './MarketPriceHistory';
 import { PriceInput } from "../../../components/ui/PriceInput";
@@ -303,12 +304,12 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
                 <thead><tr><LotTh col="buyDate">Buy date</LotTh><LotTh col="buyPrice">Buy price</LotTh><LotTh col="remainingShares">Remaining</LotTh><LotTh col="costPerShare">Cost/share</LotTh></tr></thead>
                 <tbody>
                   {sortedLots.map((lot, i) => (
-                    <tr key={i}>
+                    <RecordRow market="psx" record={lot} key={i}>
                       <td>{lot.buyDate}</td>
                       <td>{fmtPSXPrice(lot.buyPrice)}</td>
                       <td><span className="shares-box">{fmt(lot.remainingShares, 0)}</span></td>
                       <td>{fmtPSXPrice(lot.buyPrice + lot.buyFeeTotal / lot.originalShares)}</td>
-                    </tr>
+                    </RecordRow>
                   ))}
                 </tbody>
               </table>
@@ -330,13 +331,13 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
                 </thead>
                 <tbody>
                   {dateSort.rows(reportOpenLots, { date: row => row.buyDate }).map((l, i) => (
-                    <tr key={i}>
+                    <RecordRow market="psx" record={l} key={i}>
                       <td>{l.buyDate}</td>
                       <td>{fmtPSXPrice(l.buyPrice)}</td>
                       <td><span className="shares-box">{fmt(l.remainingShares, 0)}</span></td>
                       <td>{fmtMoney(l.remainingShares * l.buyPrice, currency)}</td>
                       <td>{fmtMoney(l.buyFeeTotal, currency)}</td>
-                    </tr>
+                    </RecordRow>
                   ))}
                 </tbody>
               </table>
@@ -402,23 +403,23 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
                     {sortedRecent.map((p) => {
                       const rawIndex = rawHistory.indexOf(p);
                       return editPriceIndex === rawIndex && editPriceRow ? (
-                        <tr key={rawIndex}>
+                        <RecordRow market="psx" record={p} onCancel={cancelEditPrice} key={rawIndex}>
                           <td><input type="date" value={editPriceRow.date} onChange={(e) => setEditPriceRow({ ...editPriceRow, date: e.target.value })} className="w-130" /></td>
                           <td><PriceInput exchange="psx" type="number" step="0.01" value={editPriceRow.price} onChange={(e) => setEditPriceRow({ ...editPriceRow, price: Number(e.target.value) })} className="w-90" /></td>
                           <td>
                             <IconButton label="Save" icon={<SaveIcon size={12} />} onClick={saveEditPrice} />
                             <IconButton label="Cancel" icon={<XIcon size={12} />} onClick={cancelEditPrice} />
                           </td>
-                        </tr>
+                        </RecordRow>
                       ) : (
-                        <tr key={rawIndex}>
+                        <RecordRow market="psx" onEdit={() => startEditPrice(rawIndex, p)}    record={p}  key={rawIndex}>
                           <td>{p.time ? new Date(p.time).toLocaleString() : p.date}</td>
                           <td>{fmtPSXPrice(p.price)}</td>
                           <td>
                             <IconButton label="Edit" icon={<EditIcon size={12} />} onClick={() => startEditPrice(rawIndex, p)} />
                             <IconButton label="Delete" icon={<TrashIcon size={12} />} onClick={() => removePricePoint(rawIndex)} />
                           </td>
-                        </tr>
+                        </RecordRow>
                       );
                     })}
                   </tbody>
@@ -460,7 +461,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
                     const costBasis = totalBuy + t.buyFee;
                     const be = breakEvenPrice(costBasis, t.shares, workbook.settings.feePct, workbook.settings.tick, calcFee);
                     return (
-                      <tr key={i}>
+                      <RecordRow market="psx" record={t} key={i}>
                         <td>{t.buyDate}<br /><span className="text-muted">{fmtPSXPrice(t.buyPrice)} · {fmtMoney(totalBuy, currency)}</span><br /><span className="text-muted">fee {fmtMoney(t.buyFee, currency)}</span></td>
                         <td>{t.sellDate}<br /><span className="text-muted">{fmtPSXPrice(t.sellPrice)} · {fmtMoney(totalSale, currency)}</span><br /><span className="text-muted">fee {fmtMoney(t.sellFee, currency)}</span></td>
                         <td><span className="shares-box">{fmt(t.shares, 0)}</span></td>
@@ -470,7 +471,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
                           <br /><span className="text-muted">{fmtMoney(t.netPL / t.shares, currency)}/sh</span>
                         </td>
                         <td>{t.holdingDays}d</td>
-                      </tr>
+                      </RecordRow>
                     );
                   })}
                 </tbody>

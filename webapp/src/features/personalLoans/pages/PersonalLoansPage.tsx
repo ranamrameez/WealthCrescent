@@ -1,3 +1,4 @@
+import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { PlanEditorModal } from '../../../components/PlanEditorModal';
 import { DateValue } from '../../../components/DateValue';
@@ -379,7 +380,7 @@ function RepaymentsSection({
                 const link = linkByRecordId.get(r.id);
                 const otherSide = link ? (link.from.module === 'personalLoans' && link.fromRecordId === r.id ? link.to : link.from) : undefined;
                 return (
-                  <tr key={r.id} onClick={() => setDetailRow(r)} className="clickable">
+                  <RecordRow onEdit={() => onEditPayment(r)}    record={r}  key={r.id}  className="clickable">
                     <td>
                       <DateValue value={r.date} />{' '}
                       {showActions && <span onClick={(e) => e.stopPropagation()}>
@@ -437,7 +438,7 @@ function RepaymentsSection({
                         onClick={() => confirmAndDeleteLinkable('personalLoans', r.id, () => deleteRepayment(r.id))}
                       /></>}
                     </td>
-                  </tr>
+                  </RecordRow>
                 );
               })}
               {!sorted.length && (
@@ -586,10 +587,10 @@ function ImportRepaymentsSection({ loan, onClose }: { loan: PersonalLoan; onClos
               <thead><tr><dateSort.Th rows={mappedPreview} column="date">Date</dateSort.Th><th>Amount</th></tr></thead>
               <tbody>
                 {dateSort.rows(mappedPreview, { date: row => row }).map((r, i) => (
-                  <tr key={i}>
+                  <RecordRow record={r} key={i}>
                     <td><DateValue value={r.date} /></td>
                     <td>{fmtMoney(r.amount, loan.currencyCode)}</td>
-                  </tr>
+                  </RecordRow>
                 ))}
               </tbody>
             </table>
@@ -715,7 +716,7 @@ function PersonalLoanPlansSection({ loan, showActions }: { loan: PersonalLoan; s
           <thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th><th></th></tr></thead>
           <tbody>
             {dateSort.rows(rows, { date: row => row }).map((plan) => (
-              <tr key={plan.id}>
+              <RecordRow record={plan} key={plan.id}>
                 <td><DateValue value={plan.date} /></td>
                 <td>{plan.description || '—'}</td>
                 <td>{categoryName(plan.categoryID, categories)}</td>
@@ -727,7 +728,7 @@ function PersonalLoanPlansSection({ loan, showActions }: { loan: PersonalLoan; s
                     <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => deletePlan(plan.id)} />
                   </>}
                 </td>
-              </tr>
+              </RecordRow>
             ))}
             {!rows.length && <tr><td colSpan={6} className="text-muted">No plans for this loan yet.</td></tr>}
           </tbody>
@@ -1148,13 +1149,13 @@ function PersonalLoansModulePlans({
           {dateSort.rows(rows, { date: row => row }).map((plan) => {
             const loan = visibleLoans.get(plan.loanId)!;
             return (
-              <tr key={plan.id} className="clickable" onClick={() => onSelectLoan(loan)}>
+              <RecordRow record={plan} onOpen={() => onSelectLoan(loan)} key={plan.id} className="clickable" >
                 <td><DateValue value={plan.date} /></td>
                 <td>{loan.person}</td>
                 <td>{plan.description || '—'}</td>
                 <td>{fmtMoney(plan.amount, loan.currencyCode)}</td>
                 <td>{plan.executed ? 'Executed' : 'Planned'}</td>
-              </tr>
+              </RecordRow>
             );
           })}
           {!rows.length && <tr><td colSpan={5} className="text-muted">No plans match this loan filter.</td></tr>}
@@ -1198,14 +1199,14 @@ function PersonalLoansModulePayments({
           {dateSort.rows(rows, { date: row => row }).map((payment) => {
             const loan = visibleLoans.get(payment.loanId)!;
             return (
-              <tr key={payment.id} className="clickable" onClick={() => onSelectLoan(loan)}>
+              <RecordRow record={payment} onOpen={() => onSelectLoan(loan)} key={payment.id} className="clickable" >
                 <td><DateValue value={payment.date} /></td>
                 <td>{loan.person}</td>
                 <td>{payment.description || '—'}</td>
                 <td>{categoryName(payment.categoryID, categories)}</td>
                 <td>{fmtMoney(payment.amount, loan.currencyCode)}</td>
                 <td>{payment.isPending ? 'Pending' : 'Cleared'}</td>
-              </tr>
+              </RecordRow>
             );
           })}
           {!rows.length && <tr><td colSpan={6} className="text-muted">No payments match this loan filter.</td></tr>}

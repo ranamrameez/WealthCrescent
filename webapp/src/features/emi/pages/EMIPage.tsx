@@ -1,3 +1,4 @@
+import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { DateValue } from '../../../components/DateValue';
@@ -708,7 +709,7 @@ function LoanDetail({ loan, onSelect, onBack, startInEditMode }: { loan: EMILoan
               const markupPct = netToReturn > 0 ? (r.interest / netToReturn) * 100 : 0;
               const rowRepayment = loanRepayments.find((rp) => rp.month === r.month);
               return (
-              <tr key={r.month}>
+              <RecordRow   record={{ r, status }} onCancel={() => { setOverrideMonth(null); setOverrideLinkMode(false); }} key={r.month}>
                 <td>#{r.month}</td>
                 {overrideMonth === r.month ? (
                   <td colSpan={6}>
@@ -781,7 +782,7 @@ function LoanDetail({ loan, onSelect, onBack, startInEditMode }: { loan: EMILoan
                     </div>
                   ) : null}
                 </td>
-              </tr>
+              </RecordRow>
               );
             })}
             {sum.elapsed >= sum.rows.length && <tr><td colSpan={8} className="text-muted">Loan fully repaid.</td></tr>}
@@ -979,7 +980,7 @@ function RepaymentLog({ loan, repayments }: { loan: EMILoan; repayments: EMIRepa
               const link = linkByRecordId.get(r.id);
               const otherSide = link ? (link.from.module === 'emi' && link.fromRecordId === r.id ? link.to : link.from) : undefined;
               return (
-              <tr key={r.id}>
+              <RecordRow onEdit={(!(editId === r.id)) ? () => { setEditId(r.id); setEditAmount(r.amount); } : undefined}    record={r}  onCancel={() => setEditId(null)} key={r.id}>
                 <td>#{r.month}</td>
                 <td>{installmentDueDate(loan, r.month)}</td>
                 <td>
@@ -1010,7 +1011,7 @@ function RepaymentLog({ loan, repayments }: { loan: EMILoan; repayments: EMIRepa
                     </div>
                   )}
                 </td>
-              </tr>
+              </RecordRow>
               );
             })}
           </tbody>
@@ -1033,8 +1034,8 @@ function HomepagePlans({ loans, filters }: { loans: EMILoan[]; filters: Transact
     });
     return <TableCard title={<>{loan.name}<span className="text-muted">({loan.currencyCode})</span></>} dateSort={dateSort} key={loan.id}>
 
-      <div className="table-scroll"><table><thead><tr><dateSort.Th rows={rows} column="month">Month</dateSort.Th><dateSort.Th column="date">Due date</dateSort.Th><th>Installment</th><th>Balance</th></tr></thead><tbody>
-        {dateSort.rows(rows, { date: row => resolvedDueDate(loan, row.month, loanRepayments), month: row => row.month }).map((row) => <tr key={row.month}><td>#{row.month}</td><td><DateValue value={resolvedDueDate(loan, row.month, loanRepayments)} /></td><td>{fmtMoney(row.emi, loan.currencyCode)}</td><td>{fmtMoney(row.balance, loan.currencyCode)}</td></tr>)}
+      <div className="table-scroll"><table><thead><RecordRow record={loan}><dateSort.Th rows={rows} column="month">Month</dateSort.Th><dateSort.Th column="date">Due date</dateSort.Th><th>Installment</th><th>Balance</th></RecordRow></thead><tbody>
+        {dateSort.rows(rows, { date: row => resolvedDueDate(loan, row.month, loanRepayments), month: row => row.month }).map((row) => <RecordRow record={row} key={row.month}><td>#{row.month}</td><td><DateValue value={resolvedDueDate(loan, row.month, loanRepayments)} /></td><td>{fmtMoney(row.emi, loan.currencyCode)}</td><td>{fmtMoney(row.balance, loan.currencyCode)}</td></RecordRow>)}
         {!rows.length && <tr><td colSpan={4} className="text-muted">No installments match the page filters.</td></tr>}
       </tbody></table></div>
     </TableCard>;

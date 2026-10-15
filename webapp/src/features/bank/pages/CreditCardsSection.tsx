@@ -1,3 +1,4 @@
+import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { CreditCardPositionSummary } from '../../../components/CreditCardPositionSummary';
 import { DateValue } from '../../../components/DateValue';
@@ -485,7 +486,7 @@ function TransactionsTable({ card, filters, showActions = false }: { card: Credi
         <thead><tr><dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th><th>Type</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr></thead>
         <tbody>
           {pageRows.map((t) => (
-            <tr key={t.id} className="clickable" onClick={() => setDetail(t)}>
+            <RecordRow onEdit={() => setEditingTransaction(t)}    record={t}  key={t.id} className="clickable" >
               <td><DateValue value={t.date} /></td>
               <td className={t.kind === 'payment' ? 'pill pill-positive' : 'pill pill-negative'} style={{ display: 'inline-block' }}>{KIND_LABELS[t.kind]}</td>
               <td className="cell-clip" title={t.description}>{t.description}</td>
@@ -502,7 +503,7 @@ function TransactionsTable({ card, filters, showActions = false }: { card: Credi
                   }}
                 />}
               </td>
-            </tr>
+            </RecordRow>
           ))}
           {!pageRows.length && <tr><td colSpan={6} className="text-muted">No transactions match these filters.</td></tr>}
         </tbody>
@@ -1050,7 +1051,7 @@ function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: Pl
           <thead><tr><dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th><th>Type</th><th>Description</th><th>Amount</th><th>Repeats / status</th><th></th></tr></thead>
           <tbody>
             {sorted.map((p) => (
-              <tr key={p.id}>
+              <RecordRow onEdit={() => setEditingPlan(allPlans.find((plan) => plan.id === (p.planId ?? p.id)) ?? p)}    record={p}  key={p.id}>
                 <td><DateValue value={p.date} /></td>
                 <td className={p.kind === 'payment' ? 'pill pill-positive' : 'pill pill-negative'} style={{ display: 'inline-block' }}>{KIND_LABELS[p.kind]}</td>
                 <td className="cell-clip" title={p.description}>{p.description}</td>
@@ -1070,7 +1071,7 @@ function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: Pl
                     }}
                   />
                 </td>
-              </tr>
+              </RecordRow>
             ))}
             {!sorted.length && <tr><td colSpan={6} className="text-muted">No planned charges or payments for this card yet.</td></tr>}
           </tbody>

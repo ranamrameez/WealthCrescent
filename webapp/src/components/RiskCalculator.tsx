@@ -1,3 +1,4 @@
+import { RecordRow } from './RecordRow';
 import { TableCard } from './TableCard';
 import { PriceInput } from "./ui/PriceInput";
 import { useEffect, useMemo, useState } from 'react';
@@ -309,7 +310,7 @@ export function RiskCalculator({
                     const isBest = best?.add === s.add;
                     const isDiminishing = diminishing?.add === s.add;
                     return (
-                      <tr key={s.add} style={isBest ? { fontWeight: 700 } : undefined}>
+                      <RecordRow record={s} key={s.add} style={isBest ? { fontWeight: 700 } : undefined}>
                         <td>{fmtMoney(s.add, currency)}</td>
                         <td><span className="shares-box">{fmt(s.newShares, 0)} ({fmt(s.newShares - s.extraShares, 0)} + {fmt(s.extraShares, 0)})</span></td>
                         <td>{fmtPrice(s.newAvg)}</td>
@@ -325,7 +326,7 @@ export function RiskCalculator({
                             <span className="pill pill-positive">Useful</span>
                           )}
                         </td>
-                      </tr>
+                      </RecordRow>
                     );
                   })}
                   {!scenarios.length && <tr><td colSpan={7} className="text-muted">Not enough data to model scenarios.</td></tr>}

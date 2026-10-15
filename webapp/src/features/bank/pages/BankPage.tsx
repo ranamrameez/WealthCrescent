@@ -1,3 +1,4 @@
+import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { ToggleChip } from '../../../components/ui/ToggleChip';
@@ -1341,7 +1342,7 @@ function TransactionsList({ account, ledger, allLedgerCount, showActions }: { ac
         {pageRows.map(({ tx, balance }, index) => {
           const link = linkByRecordId.get(tx.id);
           const otherSide = link ? (link.from.module === 'bank' && link.fromRecordId === tx.id ? link.to : link.from) : undefined;
-          return <tr key={tx.id} onClick={() => setDetailTx(tx)} className="clickable">
+          return <RecordRow financeModule="bank" onEdit={() => setEditingTx(tx)}    record={{ tx, balance }}  key={tx.id}  className="clickable">
             <td className="text-muted">{tx.serialNumber ?? '—'}{showActions && <> {' '}<span onClick={(event) => event.stopPropagation()}><ReorderButtons rows={sorted} index={(safePage - 1) * pageSize + index} instantOf={instantOf} idOf={(row) => row.tx.id} orderOf={(row) => row.tx.serialNumber} onMove={reorder} /></span></>}</td>
             <td>{formatDate(tx.date, dateFormat)}</td>
             <td className="cell-clip" title={tx.description} onClick={(event) => event.stopPropagation()}>{tx.description}{tx.isPending && <span className="pill-warn ml-6">Pending</span>}{link && <Link to={linkTargetPath(otherSide!)} className="pill-info ml-6">🔗 {sideLabel(link.from)} → {sideLabel(link.to)}</Link>}</td>
@@ -1354,7 +1355,7 @@ function TransactionsList({ account, ledger, allLedgerCount, showActions }: { ac
               <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => setEditingTx(tx)} />{' '}
               <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => confirmAndDeleteLinkable('bank', tx.id, () => deleteTransaction(tx.id))} />
             </td>}
-          </tr>;
+          </RecordRow>;
         })}
         {!sorted.length && <tr><td colSpan={showActions ? 8 : 7} className="text-muted">{allLedgerCount ? 'No transactions match the page filters.' : 'No transactions for this account yet.'}</td></tr>}
       </tbody>
@@ -1609,10 +1610,10 @@ function BankingScopeTransactions({ accounts, filters }: { accounts: BankAccount
   }, [filters.period, filters.fromDate, filters.toDate, filters.direction, filters.category, filters.source, filters.accountId, pageSize]);
   return <><div className="table-responsive"><table>
     <thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Account</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th></tr></thead>
-    <tbody>{pageRows.map((tx) => { const account = accountById.get(tx.accountId)!; return <tr key={tx.id} className="clickable" onClick={() => navigate(`/bank/account/${account.id}`)}>
+    <tbody>{pageRows.map((tx) => { const account = accountById.get(tx.accountId)!; return <RecordRow financeModule="bank" record={tx} onOpen={() => navigate(`/bank/account/${account.id}`)} key={tx.id} className="clickable" >
       <td>{formatDate(tx.date, dateFormat)}</td><td>{accountDisplayName(account)}</td><td>{tx.description}</td><td><span className="pill-info">{categoryName(tx.categoryID, categories)}</span></td>
       <td className={tx.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(tx.amount, account.currencyCode)}</td><td>{tx.isPending ? <span className="pill-warn">Pending</span> : 'Cleared'}</td>
-    </tr>;})}{!rows.length && <tr><td colSpan={6} className="text-muted">No transactions match the selected filters.</td></tr>}</tbody>
+    </RecordRow>;})}{!rows.length && <tr><td colSpan={6} className="text-muted">No transactions match the selected filters.</td></tr>}</tbody>
   </table></div><div className="pagination-bar"><span className="text-muted">{rows.length ? `Showing ${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, rows.length)} of ${rows.length}` : 'No rows'}</span><div className="pagination-actions"><Field label="Rows" width={78}><Select value={String(pageSize)} onChange={(event) => setPageSize(Number(event.target.value))}><option value="25">25</option><option value="50">50</option><option value="100">100</option></Select></Field><StandardButton tone="secondary" size="small" icon={<ArrowLeftIcon />} disabled={safePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</StandardButton><StandardButton tone="secondary" size="small" icon={<ArrowRightIcon />} disabled={safePage >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Next</StandardButton></div></div></>;
 }
 
@@ -1740,7 +1741,7 @@ function ImportStatementSection({ account, compact = false }: { account: BankAcc
             <table className="table-responsive"><thead><tr><th>#</th><dateSort.Th rows={mappedRows} column="date">Date</dateSort.Th><th>Description</th><th>Amount</th><th>Status</th></tr></thead>
               <tbody>{dateSort.rows(mappedRows, { date: row => row }).slice(0, 100).map((r) => {
                 const duplicate = r.valid && r.date ? existingByFingerprint.has(fingerprint({ date: r.date, description: r.description, amount: r.amount })) : false;
-                return <tr key={r.index}><td>{r.index + 1}</td><td>{r.date ? formatDate(r.date, dateFormat) : r.rawDate || '—'}</td><td>{r.description}</td><td className={r.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{Number.isFinite(r.amount) ? fmtMoney(r.amount, account.currencyCode) : 'Invalid'}</td><td className={r.valid ? (duplicate ? 'text-loss' : 'text-profit') : 'text-loss'}>{r.valid ? (duplicate ? 'Duplicate' : 'New') : 'Invalid'}</td></tr>;
+                return <RecordRow financeModule="bank" record={r} key={r.index}><td>{r.index + 1}</td><td>{r.date ? formatDate(r.date, dateFormat) : r.rawDate || '—'}</td><td>{r.description}</td><td className={r.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{Number.isFinite(r.amount) ? fmtMoney(r.amount, account.currencyCode) : 'Invalid'}</td><td className={r.valid ? (duplicate ? 'text-loss' : 'text-profit') : 'text-loss'}>{r.valid ? (duplicate ? 'Duplicate' : 'New') : 'Invalid'}</td></RecordRow>;
               })}</tbody>
             </table>
           </div>
@@ -1992,7 +1993,7 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
           </thead>
           <tbody>
             {sorted.map((p) => (
-              <tr key={p.id}>
+              <RecordRow financeModule="bank" onEdit={() => setEditingPlan(allPlans.find((plan) => plan.id === (p.planId ?? p.id)) ?? p)}    record={p}  key={p.id}>
                 <td>{formatDate(p.date, dateFormat)}</td>
                 <td><Link to={`/planning?plan=${encodeURIComponent(p.planId ?? p.id)}`} className="plan-link">{p.description}</Link></td>
                 <td className={p.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(p.amount, account.currencyCode)}</td>
@@ -2012,7 +2013,7 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
                     }}
                   /></>}
                 </td>
-              </tr>
+              </RecordRow>
             ))}
             {!sorted.length && <tr><td colSpan={6} className="text-muted">No plans for this account yet.</td></tr>}
           </tbody>
@@ -2152,13 +2153,13 @@ function AnalyticsTab({ bankId, filters }: { bankId?: string; filters: BankingFi
             <thead><tr><th>Category</th><th>Budget</th><th>Actual</th><th>Remaining</th><th></th></tr></thead>
             <tbody>
               {budgetRows.map((row) => (
-                <tr key={row.category}>
+                <RecordRow financeModule="bank" onEdit={() => setBudgetEditor({ category: row.category, amount: row.budget, originalCategory: row.category })}    record={row}  key={row.category}>
                   <td>{row.category}</td>
                   <td>{row.budget > 0 ? fmtMoney(row.budget, account.currencyCode) : '—'}</td>
                   <td className={row.budget > 0 && row.actual > row.budget ? 'pill-negative' : ''}>{fmtMoney(row.actual, account.currencyCode)}</td>
                   <td className={row.budget > 0 ? (row.budget - row.actual >= 0 ? 'pill-positive' : 'pill-negative') : ''}>{row.budget > 0 ? fmtMoney(row.budget - row.actual, account.currencyCode) : '—'}</td>
                   <td><IconButton label="Edit budget" icon={<EditIcon size={13} />} align="right" onClick={() => setBudgetEditor({ category: row.category, amount: row.budget, originalCategory: row.category })} /></td>
-                </tr>
+                </RecordRow>
               ))}
               {!budgetRows.length && <tr><td colSpan={5} className="text-muted">No spend or budget targets for this account yet.</td></tr>}
             </tbody>

@@ -1,3 +1,4 @@
+import { RecordRow } from '../../../components/RecordRow';
 import { SortIcon } from '../../../components/icons';
 import { DateValue } from '../../../components/DateValue';
 import { PageFilters } from '../../../components/PageFilters';
@@ -187,7 +188,7 @@ export function DividendsSection() {
           <tbody>
             {rows.map((d) =>
               editIndex === d.i && editRow ? (
-                <tr key={d.i}>
+                <RecordRow market="psx" record={d} onCancel={() => setEditIndex(null)} key={d.i}>
                   <td><input type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} className="w-130" /></td>
                   <td><input value={editRow.ticker} onChange={(e) => setEditRow({ ...editRow, ticker: e.target.value.toUpperCase() })} className="w-80" /></td>
                   <td><PriceInput exchange="psx" type="number" step="0.01" value={editRow.perShare} onChange={(e) => setEditRow({ ...editRow, perShare: Number(e.target.value) })} className="w-80" /></td>
@@ -197,9 +198,9 @@ export function DividendsSection() {
                     <IconButton label="Save" icon={<SaveIcon size={13} />} align="right" onClick={saveEdit} />{' '}
                     <IconButton label="Cancel" icon={<XIcon size={13} />} align="right" onClick={() => setEditIndex(null)} />
                   </td>
-                </tr>
+                </RecordRow>
               ) : (
-                <tr key={d.i}>
+                <RecordRow market="psx" onEdit={() => startEdit(d.i, d)}    record={d}  key={d.i}>
                   <td><DateValue value={d.date} /></td>
                   <td><TickerLogo ticker={d.ticker} size="sm" exchange="psx" /><Link to={`/psx/stock/${d.ticker}`}>{d.ticker}</Link></td>
                   <td>{fmtPSXPrice(d.perShare)}</td>
@@ -209,7 +210,7 @@ export function DividendsSection() {
                     <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => startEdit(d.i, d)} />{' '}
                     <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => removeDividend(d.i)} />
                   </td>
-                </tr>
+                </RecordRow>
               ),
             )}
             {!rows.length && (
@@ -235,7 +236,7 @@ export function DividendsSection() {
               <thead><tr><HeldTh col="ticker">Ticker</HeldTh><HeldTh col="shares">Shares</HeldTh><HeldTh col="estPerShare">Est. annual/share</HeldTh><HeldTh col="projected">Projected annual</HeldTh></tr></thead>
               <tbody>
                 {sortedHeld.map((p) => (
-                  <tr key={p.ticker}>
+                  <RecordRow market="psx" record={p} key={p.ticker}>
                     <td><TickerLogo ticker={p.ticker} size="sm" exchange="psx" /><Link to={`/psx/stock/${p.ticker}`}>{p.ticker}</Link></td>
                     <td>{fmt(p.shares, 0)}</td>
                     <td>
@@ -248,7 +249,7 @@ export function DividendsSection() {
                       />
                     </td>
                     <td>{fmtMoney((estimates[p.ticker] || 0) * p.shares, currency)}</td>
-                  </tr>
+                  </RecordRow>
                 ))}
               </tbody>
               <tfoot>

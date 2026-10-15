@@ -1,3 +1,4 @@
+import { RecordRow } from '../../../components/RecordRow';
 import { useLiveQseWorkbook } from '../hooks/useLiveQseWorkbook';
 import { StandardCard } from '../../../components/StandardCard';
 import { PageHeading } from '../../../components/PageHeading';
@@ -124,7 +125,7 @@ function WatchlistTable({
         </thead>
         <tbody>
           {sorted.map(({ item, gap, sparkData }) => (
-            <tr key={item.ticker}>
+            <RecordRow market="qse" record={{ item, gap, sparkData }} key={item.ticker}>
               <td><TickerLogo ticker={item.ticker} size="sm" exchange="qse" /><Link to={`/stock/${item.ticker}`}>{item.ticker}</Link></td>
               <td style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>{tickerNames[item.ticker] ? shortenCompanyName(tickerNames[item.ticker]) : ''}</td>
               <td className="w-82"><Sparkline data={sparkData} formatValue={fmtQSEPrice} /></td>
@@ -154,7 +155,7 @@ function WatchlistTable({
                   <TrashIcon size={12} />Remove
                 </button>
               </td>
-            </tr>
+            </RecordRow>
           ))}
           {!sorted.length && (
             <tr>

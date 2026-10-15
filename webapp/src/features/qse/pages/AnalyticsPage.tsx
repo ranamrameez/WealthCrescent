@@ -1,3 +1,4 @@
+import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
 import { PageHeading } from '../../../components/PageHeading';
 import { BackButton } from '../../../components/BackButton';
@@ -311,7 +312,7 @@ function FundamentalsCard({
               {sorted.map((t) => {
                 const f = fundamentals[t];
                 return (
-                  <tr key={t}>
+                  <RecordRow market="qse" record={t} key={t}>
                     <td>{t}</td>
                     <td>{tickerNames[t] || f.name}</td>
                     <td>{f.period}</td>
@@ -319,7 +320,7 @@ function FundamentalsCard({
                     <td>{f.priorEps === null ? '—' : fmtQSEPrice(f.priorEps)}</td>
                     <td>{f.dps === null ? '—' : fmtQSEPrice(f.dps)}</td>
                     <td>{f.status}</td>
-                  </tr>
+                  </RecordRow>
                 );
               })}
             </tbody>

@@ -4,11 +4,13 @@ export function YesNoChips({
   value,
   onChange,
   disableYes = false,
+  disabled = false,
   title,
 }: {
   value: boolean;
   onChange: (value: boolean) => void;
   disableYes?: boolean;
+  disabled?: boolean;
   title?: string;
 }) {
   return (
@@ -20,7 +22,7 @@ export function YesNoChips({
           className={`chip${value === option ? ' active' : ''}`}
           style={{ flexShrink: 0 }}
           aria-pressed={value === option}
-          disabled={option && disableYes}
+          disabled={disabled || option && disableYes}
           title={title}
           onClick={() => onChange(option)}
         >

@@ -1,3 +1,4 @@
+import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { DateValue } from '../../../components/DateValue';
 import { ToggleChip } from '../../../components/ui/ToggleChip';
@@ -61,7 +62,7 @@ import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { ReorderButtons } from '../../../components/ui/ReorderButtons';
 import { dateOnlyMs } from '../../../lib/datetime';
 import { firebaseReady } from '../../../lib/firebase/client';
-import { confirmAndDeleteLinkable, propagateLinkedEdit, resolveLinkedEdit } from '../../../lib/linkCascade';
+import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
 import { useAppearanceStore } from '../../../store/appearanceStore';
 import { createEmptyFundsWorkbook } from '../../../store/defaultFundsWorkbook';
 import { useFundsWorkbookStore } from '../../../store/fundsWorkbookStore';
@@ -805,7 +806,7 @@ function SnapshotImportSection() {
               </thead>
               <tbody>
                 {plan.map((p, i) => (
-                  <tr key={i}>
+                  <RecordRow market="funds" record={p} key={i}>
                     <td><TextInput value={p.row.bank} onChange={(e) => editRow(i, { bank: e.target.value })} className="w-140" /></td>
                     <td><TextInput value={p.row.code} onChange={(e) => editRow(i, { code: e.target.value.toUpperCase() })} className="w-90" /></td>
                     <td><TextInput value={p.row.name} onChange={(e) => editRow(i, { name: e.target.value })} style={{ width: 200 }} /></td>
@@ -814,7 +815,7 @@ function SnapshotImportSection() {
                     <td>{fmtMoney(p.row.currentBalance, currencyCode)}</td>
                     <td className={p.closed ? 'pill-negative' : 'pill-positive'}>{p.closed ? 'Closed' : 'Open'}</td>
                     <td>{p.navUpdate !== null ? fmtPrice(p.navUpdate) : '—'}</td>
-                  </tr>
+                  </RecordRow>
                 ))}
               </tbody>
             </table>
@@ -1295,7 +1296,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
           <tbody>
             {txs.map(({ t, i }) =>
               editIndex === i && editRow ? (
-                <tr key={i}>
+                <RecordRow market="funds" record={{ t, i }} onCancel={() => setEditIndex(null)} key={i}>
                   <td><input type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} className="w-130" /></td>
                   <td>
                     <select value={editRow.action} onChange={(e) => setEditRow({ ...editRow, action: e.target.value as 'BUY' | 'SELL' })}>
@@ -1315,9 +1316,9 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
                     <IconButton label="Save" icon={<SaveIcon size={13} />} align="right" onClick={saveEdit} />{' '}
                     <IconButton label="Cancel" icon={<XIcon size={13} />} align="right" onClick={() => setEditIndex(null)} />
                   </td>
-                </tr>
+                </RecordRow>
               ) : (
-                <tr key={i} onClick={() => setDetailTx(t)} className="clickable">
+                <RecordRow market="funds" onEdit={() => startEdit(i, t)}    record={{ t, i }}  key={i}  className="clickable">
                   <td>
                     <DateValue value={t.date} />
                     {t.isPending && (
@@ -1353,7 +1354,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
                       }}
                     />
                   </td>
-                </tr>
+                </RecordRow>
               ),
             )}
             {!txs.length && (
@@ -1387,7 +1388,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
                   {updateRows.map((r) => {
                     const rawIndex = rawPriceHistory.indexOf(r.point);
                     return editUpdateIndex === rawIndex && editUpdateRow ? (
-                      <tr key={rawIndex}>
+                      <RecordRow market="funds" record={r} onCancel={() => { setEditUpdateIndex(null); setEditUpdateRow(null); }} key={rawIndex}>
                         <td className="text-muted">{r.index}</td>
                         <td><input type="date" value={editUpdateRow.date} onChange={(e) => setEditUpdateRow({ ...editUpdateRow, date: e.target.value })} className="w-130" /></td>
                         <td>{fmtMoney(r.prevBalance, fund.currencyCode)}</td>
@@ -1400,9 +1401,9 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
                           <IconButton label="Save" icon={<SaveIcon size={12} />} align="right" onClick={saveEditUpdate} />
                           <IconButton label="Cancel" icon={<XIcon size={12} />} align="right" onClick={() => { setEditUpdateIndex(null); setEditUpdateRow(null); }} />
                         </td>
-                      </tr>
+                      </RecordRow>
                     ) : (
-                      <tr key={rawIndex}>
+                      <RecordRow market="funds" onEdit={() => startEditUpdate(rawIndex, r.point)}    record={r}  key={rawIndex}>
                         <td className="text-muted">{r.index}</td>
                         <td>{r.time ? new Date(r.time).toLocaleString() : r.date}</td>
                         <td>{fmtMoney(r.prevBalance, fund.currencyCode)}</td>
@@ -1415,7 +1416,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
                           <IconButton label="Edit" icon={<EditIcon size={12} />} align="right" onClick={() => startEditUpdate(rawIndex, r.point)} />
                           <IconButton label="Delete" icon={<TrashIcon size={12} />} align="right" onClick={() => removeUpdate(rawIndex)} />
                         </td>
-                      </tr>
+                      </RecordRow>
                     );
                   })}
                 </tbody>
@@ -1472,7 +1473,7 @@ function FundsTransfersSection() {
   const deleteTransfer = useFundsWorkbookStore((s) => s.deleteTransfer);
   const currency = workbook.settings.defaultCurrency;
   const links = useInterEntityTransfersStore((s) => s.workbook.entries);
-  const [editId, setEditId] = useState<string | null>(null);
+
   const [editRow, setEditRow] = useState<Transfer | null>(null);
   // User-requested (2026-09-06): "although we are removing sorting, we
   // must add all fields as filters in all tables" — QSE's/PSX's own
@@ -1514,24 +1515,9 @@ function FundsTransfersSection() {
     for (const p of pair) updateTransfer(p.id, { seq: p.order });
   };
 
-  const startEdit = (t: Transfer) => { setEditId(t.id); setEditRow({ ...t }); };
-  const saveEdit = async () => {
-    if (editId === null || !editRow) return;
-    const choice = await resolveLinkedEdit('funds', editId);
-    if (choice === 'cancel') return;
-    updateTransfer(editId, editRow);
-    let msg = 'Transfer updated.';
-    if (choice === 'both') {
-      const result = propagateLinkedEdit('funds', editId, { date: editRow.date, amount: editRow.gross, direction: editRow.type === 'DEPOSIT' ? 'in' : 'out' });
-      if (result.error) msg = result.error;
-      else if (result.message) msg = result.message;
-    }
-    toast(msg);
-    setEditId(null);
-    setEditRow(null);
-  };
+  const startEdit = (t: Transfer) => setEditRow({ ...t });
 
-  return (
+  return (<>
     <div>
       <p className="text-muted mb-12">
         Cash moved into or out of this Funds account, separate from buying/selling fund units —
@@ -1562,25 +1548,8 @@ function FundsTransfersSection() {
             {sorted.map((t, i) => {
               const link = linkByRecordId.get(t.id);
               const otherSide = link ? (link.from.module === 'funds' && link.fromRecordId === t.id ? link.to : link.from) : undefined;
-              return editId === t.id && editRow ? (
-                <tr key={t.id}>
-                  <td><input type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} className="w-130" /></td>
-                  <td>
-                    <select value={editRow.type} onChange={(e) => setEditRow({ ...editRow, type: e.target.value as Transfer['type'] })}>
-                      <option value="DEPOSIT">Deposit</option>
-                      <option value="WITHDRAWAL">Withdrawal</option>
-                    </select>
-                  </td>
-                  <td><input type="number" value={editRow.gross} onChange={(e) => setEditRow({ ...editRow, gross: Number(e.target.value) })} className="w-90" /></td>
-                  <td><input type="number" value={editRow.fee} onChange={(e) => setEditRow({ ...editRow, fee: Number(e.target.value) })} className="w-70" /></td>
-                  <td></td>
-                  <td>
-                    <IconButton label="Save" icon={<SaveIcon size={13} />} align="right" onClick={saveEdit} />{' '}
-                    <IconButton label="Cancel" icon={<XIcon size={13} />} align="right" onClick={() => setEditId(null)} />
-                  </td>
-                </tr>
-              ) : (
-                <tr key={t.id}>
+              return (
+                <RecordRow market="funds" onEdit={() => startEdit(t)}    record={t}  key={t.id}>
                   <td>
                     <DateValue value={t.date} />{' '}
                     <ReorderButtons
@@ -1611,7 +1580,7 @@ function FundsTransfersSection() {
                     <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => startEdit(t)} />{' '}
                     <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => confirmAndDeleteLinkable('funds', t.id, () => deleteTransfer(t.id))} />
                   </td>
-                </tr>
+                </RecordRow>
               );
             })}
             {!sorted.length && <tr><td colSpan={6} className="text-muted">No transfers yet.</td></tr>}
@@ -1619,6 +1588,8 @@ function FundsTransfersSection() {
         </table>
       </div>
     </div>
+      {editRow && <TransactionEntryModal editTransfer={{ module: 'funds', record: editRow }} onClose={() => setEditRow(null)} />}
+    </>
   );
 }
 

@@ -179,6 +179,23 @@ from the lot system."*
 
 ## Done
 
+- **Shared transfer editing and table-row details (2026-10-15):** ordinary data
+  rows across the app use RecordRow to open complete source details with click,
+  Enter or Space, while nested links, inputs and buttons retain their actions.
+  The detail popup opens the native editor for editable records. Investment rows
+  support source-backed trade, adjustment, watchlist and transfer forms; other
+  record tables retain their existing editors, with legacy inline editing shown
+  in a form popup. Calculated summaries remain derived. QSE, PSX and Funds transfer
+  edits now reuse TransactionEntryModal, as do linked Bank/Cash edits. Fees,
+  time/timezone and source IDs are preserved, with one-side/both-side choices and
+  stale-record checks. Transfer identity pickers stay locked while editing existing
+  records. Subscription renewal alerts and projected subscription rows expose
+  their respective source editors. Local audit/import files remain ignored.
+  Verification: full local suite has 1,002 passing tests and the same eight
+  documented baseline failures. Focused checks cover complete row details,
+  keyboard access, independent row controls, popup editing, and fee-preserving
+  linked edits from both exchange and bank sides.
+
 - **Nested Batch Editor and action-column consistency (2026-10-15):** Batch
   Editor opens above its triggering popup/fullscreen card using shared overlay
   layering and portals. Child confirmation dialogs and tooltips follow that

@@ -1,3 +1,4 @@
+import { RecordRow } from '../../../components/RecordRow';
 import { PageHeading } from '../../../components/PageHeading';
 import { InvestmentPlans } from '../../../components/InvestmentPlans';
 import { InvestmentTransactions } from '../../../components/InvestmentTransactions';
@@ -161,7 +162,7 @@ function DashboardPositionsView({ workbook, calcFee, positions, rows, summary, r
             </thead>
             <tbody>
               {held.map((r) => (
-                <tr key={r.ticker} className="clickable">
+                <RecordRow market="qse" record={r} key={r.ticker} className="clickable">
                   <td onClick={() => navigate(`/stock/${r.ticker}`)} style={{ maxWidth: 170 }}>
                     <div className="hd-name">
                       <TickerLogo ticker={r.ticker} size="sm" exchange="qse" />
@@ -246,7 +247,7 @@ function DashboardPositionsView({ workbook, calcFee, positions, rows, summary, r
                     +1% {fmtQSEPrice(r.t1)}<br />+2% {fmtQSEPrice(r.t2)}<br />+5% {fmtQSEPrice(r.t3)}
                   </td>
                   <td onClick={() => navigate(`/stock/${r.ticker}`)} className={r.statusClass}>{r.statusLabel}</td>
-                </tr>
+                </RecordRow>
               ))}
             </tbody>
           </table>

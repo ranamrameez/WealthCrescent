@@ -1,5 +1,6 @@
 import type { TableCardDateSort } from '../../../components/tableSortContext';
 import { parseTheGroupStatement, readStatementXlsx, type StatementRecord } from '../../../lib/theGroupStatement';
+import { TransactionEntryModal } from '../../../components/TransactionEntryModal';
 import { TableCard } from '../../../components/TableCard';
 import type { SectionCardProps } from '../../../components/StandardPageSections';
 import { IconButton } from '../../../components/ui/IconButton';
@@ -85,6 +86,8 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
   const [dismissedRequest, setDismissedRequest] = useState<Row | null>(null);
   const requestSnapshot = useMemo(() => editRequest ? { rows: [structuredClone(editRequest)], owner: getCurrentUser()?.uid, single: true } : null, [editRequest]);
   const editing = requestSnapshot && dismissedRequest !== editRequest ? requestSnapshot : storedEditing;
+  const transferEdit = editing?.single && (kind === 'transfers' || editing.rows[0].kind === 'transfer');
+  const closeEditor = () => { setEditing(null); setDismissedRequest(editRequest ?? null); };
   const columns = qseColumns(kind === 'ledger' && editing?.single ? editing.rows[0].kind === 'trade' ? 'transactions' : editing.rows[0].kind === 'transfer' ? 'transfers' : 'adjustments' : kind);
   const allRows = (allRecords ?? (kind === 'ledger' ? recordsFor(kind) : workbook[kind])) as Row[];
   const createRow = (): Row => {
@@ -219,7 +222,8 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
   const header = { actions, summary: <SummaryChip label="Filtered" value={rows.length} />, headerEnd: modifying ? <IconButton label="Hide modification options" icon={<XIcon size={13} />} align="right" onClick={onModify} /> : null };
   return <>{render ? render(header) : <div className="section-toolbar">{header.summary}<CardActionMenu actions={actions} /></div>}
   <input id={inputId} type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void importFile(file); }} />
-  {editing && <BatchEditGrid title={`${editing.single ? 'Edit' : 'Batch edit'} QSE ${kind}`} description="Reorder records sharing an effective time with the move buttons. Linked transfers must be edited individually." rows={editing.rows} columns={columns} getRowId={row => row.id} getRowDate={row => row.date} getReorderGroup={row => `${row.date} ${toInstantMs(row.date, row.time, row.timezone)}${kind === 'transactions' ? ` ${row.ticker} ${row.action}` : kind === 'ledger' ? ` ${row.kind} ${row.kind === 'trade' ? `${row.ticker} ${row.action}` : ''}` : ''}`} orderKey="seq" createRow={editing.single ? undefined : createRow} validateRow={row => validateQseRow(kind, row)} rowReadOnly={editing.single ? undefined : locked} onClose={() => { setEditing(null); setDismissedRequest(editRequest ?? null); }} onSave={async (changes, mutations) => {
+  {editing && transferEdit && <TransactionEntryModal editTransfer={{ module: 'qse', record: Object.fromEntries(Object.entries(editing.rows[0]).filter(([key]) => key !== 'kind')) as unknown as Transfer }} onClose={closeEditor} />}
+  {editing && !transferEdit && <BatchEditGrid title={`${editing.single ? 'Edit' : 'Batch edit'} QSE ${kind}`} description="Reorder records sharing an effective time with the move buttons. Linked transfers must be edited individually." rows={editing.rows} columns={columns} getRowId={row => row.id} getRowDate={row => row.date} getReorderGroup={row => `${row.date} ${toInstantMs(row.date, row.time, row.timezone)}${kind === 'transactions' ? ` ${row.ticker} ${row.action}` : kind === 'ledger' ? ` ${row.kind} ${row.kind === 'trade' ? `${row.ticker} ${row.action}` : ''}` : ''}`} orderKey="seq" createRow={editing.single ? undefined : createRow} validateRow={row => validateQseRow(kind, row)} rowReadOnly={editing.single ? undefined : locked} onClose={closeEditor} onSave={async (changes, mutations) => {
     if (!(await ensureSignedIn('Sign in to save changes.'))) throw new Error('Sign in is required.');
     if (editing.owner && editing.owner !== getCurrentUser()?.uid) throw new Error('Signed-in account changed. Reopen the editor.');
     let linkChoice: 'both' | 'this' | 'cancel' | undefined;

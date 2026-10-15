@@ -61,8 +61,8 @@ it('edits the original trade from Cash ledger Modify and refreshes its balance',
   expect(within(header).getByRole('button', { name: 'Hide modification options' })).toBeVisible();
   const buyRow = within(section).getByText('Buy').closest('tr')!;
   fireEvent.click(within(buyRow).getByRole('button', { name: 'Edit' }));
-  fireEvent.change(screen.getByLabelText('Row 1, Price'), { target: { value: '20' } });
-  fireEvent.click(screen.getByText('Save all changes'));
+  fireEvent.change(screen.getByLabelText('Price'), { target: { value: '20' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   expect(useWorkbookStore.getState().workbook.transactions.find(row => row.id === 'buy')?.price).toBe(20);
   expect(within(section).getByText('20.00')).toBeVisible();

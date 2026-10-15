@@ -1,3 +1,4 @@
+import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { EntityActions } from '../../../components/EntityEditorModal';
@@ -230,12 +231,12 @@ function CategoryBreakdown({ currencyCode, entries: suppliedEntries }: { currenc
               <table>
                 <tbody>
                   {rows.map(([cat, amount]) => (
-                    <tr key={cat}>
+                    <RecordRow financeModule="cash" record={{ cat, amount }} key={cat}>
                       <td>{cat}</td>
                       <td className={amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(amount, code)}</td>
-                    </tr>
+                    </RecordRow>
                   ))}
-                  {!rows.length && <tr><td className="text-muted">No matching categories.</td></tr>}
+                  {!rows.length && <RecordRow financeModule="cash" record={{ code, rows }}><td className="text-muted">No matching categories.</td></RecordRow>}
                 </tbody>
               </table>
             </div>
@@ -393,7 +394,7 @@ function CashStatementTable({ code, rows: allRows }: { code: string; rows: CashL
               const link = linkByRecordId.get(entry.id);
               const otherSide = link ? (link.from.module === 'cash' && link.fromRecordId === entry.id ? link.to : link.from) : undefined;
               return (
-                <tr key={entry.id} onClick={() => setDetailEntry(entry)} className="clickable">
+                <RecordRow financeModule="cash" onEdit={() => setEditingEntry(entry)}    record={{ entry, balance }}  key={entry.id}  className="clickable">
                   <td>
                     {formatDate(entry.date, dateFormat)}{' '}
                     <span onClick={(e) => e.stopPropagation()}>
@@ -446,7 +447,7 @@ function CashStatementTable({ code, rows: allRows }: { code: string; rows: CashL
                       onClick={() => confirmAndDeleteLinkable('cash', entry.id, () => deleteEntry(entry.id))}
                     />
                   </td>
-                </tr>
+                </RecordRow>
               );
             })}
             {!sorted.length && <tr><td colSpan={8} className="text-muted">No matching entries.</td></tr>}
@@ -761,12 +762,12 @@ function ImportTab() {
               <thead><tr><dateSort.Th rows={mappedPreview} column="date">Date</dateSort.Th><th>Type</th><th>Amount</th><th>Category</th></tr></thead>
               <tbody>
                 {dateSort.rows(mappedPreview, { date: row => row }).map((r, i) => (
-                  <tr key={i}>
+                  <RecordRow financeModule="cash" record={r} key={i}>
                     <td><DateValue value={r.date} /></td>
                     <td className={r.isDeposit ? 'pill-positive' : 'pill-negative'}>{r.isDeposit ? 'Cash in' : 'Cash out'}</td>
                     <td>{fmtMoney(r.amount, currencyCode)}</td>
                     <td>{r.category || '—'}</td>
-                  </tr>
+                  </RecordRow>
                 ))}
               </tbody>
             </table>
@@ -917,7 +918,7 @@ function PlanCurrencyTable({
           <tbody>
             {sorted.map((p) =>
               (
-                <tr key={p.id}>
+                <RecordRow financeModule="cash" onEdit={() => startEdit(p)}    record={p}  key={p.id}>
                   <td><DateValue value={p.date} /></td>
                   <td className={p.type === 'IN' ? 'pill-positive' : 'pill-negative'}>{p.type === 'IN' ? 'Cash in' : 'Cash out'}</td>
                   <td>{fmtMoney(p.amount, p.currencyCode)}</td>
@@ -938,7 +939,7 @@ function PlanCurrencyTable({
                       }}
                     />
                   </td>
-                </tr>
+                </RecordRow>
               ),
             )}
             {!sorted.length && <tr><td colSpan={7} className="text-muted">No plans yet — add one above.</td></tr>}

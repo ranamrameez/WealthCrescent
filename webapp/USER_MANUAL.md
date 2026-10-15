@@ -223,6 +223,21 @@ When modification controls appear, **Actions** is the last column, after Balance
 Batch Editor also places its reorder/delete controls in the last Actions column
 and opens above the popup or fullscreen table that launched it.
 
+Click a data row to see its full source details, including values hidden or shortened
+in the table. You can also focus the row and press Enter or Space. Links, buttons and
+inputs within a row continue to work independently. Use **Edit** in the detail popup
+to open that record's form. Calculated summaries show their inputs; change the source
+records to update computed balances and totals. Where a row previously navigated to
+an account or stock, **Open** in its details keeps that destination available.
+
+Adding and editing QSE, PSX and Funds transfers use the same Transfer form, including
+fees, date, time, timezone and description. Linked transfers opened from Bank or Cash
+also use this form. The account identities stay fixed during an edit. For a linked
+record, choose whether to update both sides or just the current entry. Same-currency
+amount changes applied to both sides stay aligned; cross-currency amounts remain
+independently entered. If either record changes while you edit, reopen the form to
+avoid overwriting the newer values.
+
 QSE Trade list and Cash ledger also offer **Import The Group statement** for the
 broker's Cash statement in XLSX or CSV format. The importer reads prices and share
 counts, uses deposit gross/fee detail rows and avoids importing commissions twice.

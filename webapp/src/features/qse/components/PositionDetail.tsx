@@ -1,3 +1,4 @@
+import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { MarketPriceHistory } from './MarketPriceHistory';
 import { PriceInput } from "../../../components/ui/PriceInput";
@@ -314,12 +315,12 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
                 <thead><tr><LotTh col="buyDate">Buy date</LotTh><LotTh col="buyPrice">Buy price</LotTh><LotTh col="remainingShares">Remaining</LotTh><LotTh col="costPerShare">Cost/share</LotTh></tr></thead>
                 <tbody>
                   {sortedOfficialLots.map((lot, i) => (
-                    <tr key={i}>
+                    <RecordRow market="qse" record={lot} key={i}>
                       <td>{lot.buyDate}</td>
                       <td>{fmtQSEPrice(lot.buyPrice)}</td>
                       <td><span className="shares-box">{fmt(lot.remainingShares, 0)}</span></td>
                       <td>{fmtQSEPrice(lot.buyPrice + lot.buyFeeTotal / lot.originalShares)}</td>
-                    </tr>
+                    </RecordRow>
                   ))}
                 </tbody>
               </table>
@@ -339,13 +340,13 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
                 </thead>
                 <tbody>
                   {dateSort.rows(reportOpenLots, { date: row => row.buyDate }).map((l, i) => (
-                    <tr key={i}>
+                    <RecordRow market="qse" record={l} key={i}>
                       <td>{l.buyDate}</td>
                       <td>{fmtQSEPrice(l.buyPrice)}</td>
                       <td><span className="shares-box">{fmt(l.remainingShares, 0)}</span></td>
                       <td>{fmtMoney(l.remainingShares * l.buyPrice, currency)}</td>
                       <td>{fmtMoney(l.buyFeeTotal, currency)}</td>
-                    </tr>
+                    </RecordRow>
                   ))}
                 </tbody>
               </table>
@@ -415,23 +416,23 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
                   {sortedRecent.map((p, rowIndex) => {
                     const rawIndex = rawHistory.indexOf(p);
                     return editPriceIndex === rawIndex && editPriceRow ? (
-                      <tr key={rawIndex >= 0 ? 'manual:'+rawIndex : 'shared:'+rowIndex}>
+                      <RecordRow market="qse" record={p} onCancel={cancelEditPrice} key={rawIndex >= 0 ? 'manual:'+rawIndex : 'shared:'+rowIndex}>
                         <td><input type="date" value={editPriceRow.date} onChange={(e) => setEditPriceRow({ ...editPriceRow, date: e.target.value })} className="w-130" /></td>
                         <td><PriceInput exchange="qse" type="number" step="0.001" value={editPriceRow.price} onChange={(e) => setEditPriceRow({ ...editPriceRow, price: Number(e.target.value) })} className="w-90" /></td>
                         <td>
                           <IconButton label="Save" icon={<SaveIcon size={12} />} onClick={saveEditPrice} />
                           <IconButton label="Cancel" icon={<XIcon size={12} />} onClick={cancelEditPrice} />
                         </td>
-                      </tr>
+                      </RecordRow>
                     ) : (
-                      <tr key={rawIndex >= 0 ? 'manual:'+rawIndex : 'shared:'+rowIndex}>
+                      <RecordRow market="qse" onEdit={() => startEditPrice(rawIndex, p)}    record={p}  key={rawIndex >= 0 ? 'manual:'+rawIndex : 'shared:'+rowIndex}>
                         <td>{p.time ? new Date(p.time).toLocaleString() : p.date}</td>
                         <td>{fmtQSEPrice(p.price)} {rawIndex < 0 && <small>Shared feed</small>}</td>
                         <td>
                           <IconButton label="Edit" disabled={rawIndex < 0} icon={<EditIcon size={12} />} onClick={() => startEditPrice(rawIndex, p)} />
                           <IconButton label="Delete" disabled={rawIndex < 0} icon={<TrashIcon size={12} />} onClick={() => removePricePoint(rawIndex)} />
                         </td>
-                      </tr>
+                      </RecordRow>
                     );
                   })}
                 </tbody>
@@ -475,7 +476,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
                   const costBasis = totalBuy + t.buyFee;
                   const be = breakEvenPrice(costBasis, t.shares, workbook.settings.feePct, workbook.settings.tick, calcFee);
                   return (
-                    <tr key={i}>
+                    <RecordRow market="qse" record={t} key={i}>
                       <td>{t.buyDate}<br /><span className="text-muted">{fmtQSEPrice(t.buyPrice)} · {fmtMoney(totalBuy, currency)}</span><br /><span className="text-muted">fee {fmtMoney(t.buyFee, currency)}</span></td>
                       <td>{t.sellDate}<br /><span className="text-muted">{fmtQSEPrice(t.sellPrice)} · {fmtMoney(totalSale, currency)}</span><br /><span className="text-muted">fee {fmtMoney(t.sellFee, currency)}</span></td>
                       <td><span className="shares-box">{fmt(t.shares, 0)}</span></td>
@@ -485,7 +486,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
                         <br /><span className="text-muted">{fmtMoney(t.netPL / t.shares, currency)}/sh</span>
                       </td>
                       <td>{t.holdingDays}d</td>
-                    </tr>
+                    </RecordRow>
                   );
                 })}
               </tbody>

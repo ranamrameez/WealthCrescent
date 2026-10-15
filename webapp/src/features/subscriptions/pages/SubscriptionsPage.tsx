@@ -1,3 +1,4 @@
+import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { DateValue } from '../../../components/DateValue';
@@ -11,7 +12,7 @@ import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu
 import { useUrlTransactionFilters, type TransactionPageFilters } from '../../../hooks/useUrlTransactionFilters';
 import { ModuleDetailTemplate } from '../../../components/ModuleDetailTemplate';
 import type { User } from 'firebase/auth';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ComponentProps } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { Card, EntityCard, MoneyValue } from '../../../components/Card';
@@ -310,6 +311,7 @@ function AlertsSection({ sub }: { sub: Subscription }) {
   const updateEntry = useSubscriptionsWorkbookStore((s) => s.updateEntry);
   const ensureSignedIn = useEnsureSignedIn();
   const [customAt, setCustomAt] = useState('');
+  const [editingAlert, setEditingAlert] = useState<SubscriptionAlert | null>(null);
   const alerts = sub.alerts ?? [];
 
   const addAlert = async (patch: Pick<SubscriptionAlert, 'daysBefore' | 'customAt'>) => {
@@ -330,7 +332,7 @@ function AlertsSection({ sub }: { sub: Subscription }) {
   };
 
   return (
-    <TableCard rows={alerts} title={<h3 className="m-0">Renewal / expiry alerts</h3>} className="mb-md">
+    <><TableCard rows={alerts} title={<h3 className="m-0">Renewal / expiry alerts</h3>} className="mb-md">
       <p className="text-muted mt-0">
         Get reminded before this renews or expires — pick a suggested lead time, or set an exact date and time.
       </p>
@@ -365,13 +367,13 @@ function AlertsSection({ sub }: { sub: Subscription }) {
           <table>
             <tbody>
               {alerts.map((a) => (
-                <tr key={a.id}>
+                <RecordRow record={a} onEdit={() => setEditingAlert(a)} key={a.id}>
                   <td>{describe(a)}</td>
                   <td className="text-muted">
                     {sub.active ? new Date(alertTriggerMs(sub, a) ?? 0).toLocaleString() : 'Subscription cancelled'}
                   </td>
                   <td><IconButton label="Remove" icon={<TrashIcon size={13} />} align="right" onClick={() => removeAlert(a.id)} /></td>
-                </tr>
+                </RecordRow>
               ))}
             </tbody>
           </table>
@@ -379,8 +381,30 @@ function AlertsSection({ sub }: { sub: Subscription }) {
       ) : (
         <p className="text-muted" style={{ marginBottom: 0 }}>No alerts configured yet.</p>
       )}
-    </TableCard>
+    </TableCard>{editingAlert && <SubscriptionAlertEditor subscription={sub} alert={editingAlert} onClose={() => setEditingAlert(null)} />}</>
   );
+}
+
+function SubscriptionAlertEditor({ subscription, alert, onClose }: { subscription: Subscription; alert: SubscriptionAlert; onClose: () => void }) {
+  const [original] = useState(() => structuredClone(alert));
+  const [custom, setCustom] = useState(!!alert.customAt);
+  const [days, setDays] = useState(alert.daysBefore ?? 1);
+  const [at, setAt] = useState(alert.customAt ?? '');
+  const [error, setError] = useState('');
+  const ensureSignedIn = useEnsureSignedIn();
+  const save = async () => {
+    if (custom ? !at || !Number.isFinite(new Date(at).getTime()) : !Number.isInteger(days) || days < 0) return setError('Choose a valid alert date or a whole number of days.');
+    if (!(await ensureSignedIn('Sign in to edit this alert.'))) return;
+    const store = useSubscriptionsWorkbookStore.getState();
+    const alerts = store.workbook.entries.find(row => row.id === subscription.id)?.alerts;
+    if (!alerts || JSON.stringify(alerts.find(row => row.id === original.id)) !== JSON.stringify(original)) return setError('This alert changed. Reopen its editor.');
+    store.updateEntry(subscription.id, { alerts: alerts.map(row => row.id === original.id ? { id: original.id, ...(custom ? { customAt: at } : { daysBefore: days }) } : row) });
+    onClose();
+  };
+  return <EntityEditorModal title="Edit renewal alert" onClose={onClose}><Field label="Alert type"><select value={custom ? 'custom' : 'relative'} onChange={event => setCustom(event.target.value === 'custom')}><option value="relative">Days before renewal</option><option value="custom">Exact date and time</option></select></Field>
+    {custom ? <Field label="Date and time"><TextInput type="datetime-local" value={at} onChange={event => setAt(event.target.value)} /></Field> : <Field label="Days before renewal"><TextInput type="number" min="0" step="1" value={days} onChange={event => setDays(Number(event.target.value))} /></Field>}
+    {error && <p role="alert">{error}</p>}<button className="btn mt-md" onClick={() => void save()}>Save</button>
+  </EntityEditorModal>;
 }
 
 function SubscriptionAccountSummary({ sub, subscriptions, filters }: { sub?: Subscription; subscriptions?: Subscription[]; filters: TransactionPageFilters }) {
@@ -624,6 +648,11 @@ function useSubscriptionPaymentPlans() {
   return [...bank, ...cash, ...cards];
 }
 
+function SubscriptionRecordRow({ subscription, ...props }: ComponentProps<typeof RecordRow> & { subscription: Subscription }) {
+  const [editing, setEditing] = useState(false);
+  return <><RecordRow {...props} onEdit={() => setEditing(true)} />{editing && <EntityEditorModal title="Edit subscription" onClose={() => setEditing(false)}><AddSubscriptionForm subscription={subscription} onSaved={() => setEditing(false)} /></EntityEditorModal>}</>;
+}
+
 function SubscriptionPlansOverview({ subscriptions, filters }: { subscriptions: Subscription[]; filters: TransactionPageFilters }) {
   const dateSort = useDateTableSort();
   const payments = useSubscriptionPaymentPlans();
@@ -631,7 +660,7 @@ function SubscriptionPlansOverview({ subscriptions, filters }: { subscriptions: 
   const categories = useCategoryStore(state => state.workbook.categories);
   const rows = subscriptions.flatMap(subscription => generateRenewalOccurrences(subscription).filter(occurrence => !payments.some(plan => plan.sourceSubscriptionId === subscription.id && plan.executed && plan.date === occurrence.date)).map(occurrence => ({ subscription, ...occurrence })))
     .filter(row => (!filters.fromDate || row.date >= filters.fromDate) && (!filters.toDate || row.date <= filters.toDate) && filters.direction !== 'in' && filters.source !== 'statement-import' && (filters.category === 'all' || subCategoryLabel(row.subscription, categories) === filters.category)).sort((a, b) => a.date.localeCompare(b.date));
-  return <div className="table-scroll"><table><thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Subscription</th><th>Paying account</th><th>Amount</th></tr></thead><tbody>{dateSort.rows(rows, { date: row => row }).map(row => <tr key={row.subscription.id + ':' + row.date}><td>{formatDate(row.date, dateFormat)}</td><td>{row.subscription.name}</td><td>{row.subscription.paidVia?.module ?? 'Not linked'}</td><td>{fmtMoney(row.amount, row.subscription.currencyCode)}</td></tr>)}</tbody></table>{!rows.length && <p className="text-muted">No unpaid renewals in this period.</p>}</div>;
+  return <div className="table-scroll"><table><thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Subscription</th><th>Paying account</th><th>Amount</th></tr></thead><tbody>{dateSort.rows(rows, { date: row => row }).map(row => <SubscriptionRecordRow subscription={row.subscription} record={row} key={row.subscription.id + ':' + row.date}><td>{formatDate(row.date, dateFormat)}</td><td>{row.subscription.name}</td><td>{row.subscription.paidVia?.module ?? 'Not linked'}</td><td>{fmtMoney(row.amount, row.subscription.currencyCode)}</td></SubscriptionRecordRow>)}</tbody></table>{!rows.length && <p className="text-muted">No unpaid renewals in this period.</p>}</div>;
 }
 
 function SubscriptionPaymentsOverview({ subscriptions, filters }: { subscriptions: Subscription[]; filters: TransactionPageFilters }) {
@@ -641,7 +670,7 @@ function SubscriptionPaymentsOverview({ subscriptions, filters }: { subscription
   const rows = plans.filter(plan => plan.executed && subscriptions.some(sub => sub.id === plan.sourceSubscriptionId && (filters.category === 'all' || subCategoryLabel(sub, categories) === filters.category)))
     .map(plan => ({ plan, date: plan.fulfilledDate ?? plan.date, sub: subscriptions.find(sub => sub.id === plan.sourceSubscriptionId)! }))
     .filter(row => (!filters.fromDate || row.date >= filters.fromDate) && (!filters.toDate || row.date <= filters.toDate) && filters.direction !== 'in' && filters.source !== 'statement-import').sort((a, b) => b.date.localeCompare(a.date));
-  return <div className="table-scroll"><table><thead><tr><dateSort.Th rows={rows} column="date">Paid on</dateSort.Th><th>Subscription</th><dateSort.Th rows={rows} column="renewal">Scheduled renewal</dateSort.Th><th>Amount</th></tr></thead><tbody>{dateSort.rows(rows, { date: row => row, renewal: row => row.plan }).map(row => <tr key={row.plan.id}><td><DateValue value={row.date} /></td><td>{row.sub.name}</td><td><DateValue value={row.plan.date} /></td><td>{fmtMoney(Math.abs(row.plan.amount), row.sub.currencyCode)}</td></tr>)}</tbody></table>{!rows.length && <p className="text-muted">No fulfilled renewal plans in this period.</p>}</div>;
+  return <div className="table-scroll"><table><thead><tr><dateSort.Th rows={rows} column="date">Paid on</dateSort.Th><th>Subscription</th><dateSort.Th rows={rows} column="renewal">Scheduled renewal</dateSort.Th><th>Amount</th></tr></thead><tbody>{dateSort.rows(rows, { date: row => row, renewal: row => row.plan }).map(row => <RecordRow record={row} key={row.plan.id}><td><DateValue value={row.date} /></td><td>{row.sub.name}</td><td><DateValue value={row.plan.date} /></td><td>{fmtMoney(Math.abs(row.plan.amount), row.sub.currencyCode)}</td></RecordRow>)}</tbody></table>{!rows.length && <p className="text-muted">No fulfilled renewal plans in this period.</p>}</div>;
 }
 
 function SubscriptionAlertsOverview({ subscriptions }: { subscriptions: Subscription[] }) {
@@ -721,11 +750,11 @@ function AnalyticsTab({ selectedIds, currencyCode }: { selectedIds?: string[]; c
               <thead><tr><dateSort.Th rows={renewals} column="date">Date</dateSort.Th><th>Name</th><th>Amount</th></tr></thead>
               <tbody>
                 {dateSort.rows(renewals, { date: row => row }).map((r) => (
-                  <tr key={r.subscription.id}>
+                  <RecordRow record={r} key={r.subscription.id}>
                     <td><DateValue value={r.date} /></td>
                     <td>{r.subscription.name}</td>
                     <td>{fmtMoney(r.subscription.amount, r.subscription.currencyCode)}</td>
-                  </tr>
+                  </RecordRow>
                 ))}
               </tbody>
             </table>

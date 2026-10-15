@@ -1,3 +1,4 @@
+import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { DateValue } from '../../../components/DateValue';
@@ -511,7 +512,7 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
           <thead><tr><dateSort.Th rows={propertyPlans} column="date">Date</dateSort.Th><th>Type</th><th>Description</th><th>Amount</th><th>Status</th><th></th></tr></thead>
           <tbody>
             {dateSort.rows(propertyPlans, { date: row => row }).map((p) => (
-              <tr key={p.id}>
+              <RecordRow onEdit={(!p.executed) ? () => setEditingPlan(p) : undefined}  record={p}  key={p.id}>
                 <td><DateValue value={p.date} /></td>
                 <td>{p.type === 'RENT_INCOME' ? 'Rent income' : 'Expense'}</td>
                 <td>{p.note || p.category || '—'}</td>
@@ -526,7 +527,7 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
                     </>
                   )}
                 </td>
-              </tr>
+              </RecordRow>
             ))}
             {!propertyPlans.length && <tr><td colSpan={6} className="text-muted">No plans yet. Add a plan or generate projected rent from the lease details above.</td></tr>}
           </tbody>
@@ -813,7 +814,7 @@ function EntriesList({ property, filters }: { property: Property; filters: Trans
             const link = linkByRecordId.get(e.id);
             const otherSide = link ? (link.from.module === 'rentals' && link.fromRecordId === e.id ? link.to : link.from) : undefined;
             return (
-              <tr key={e.id} onClick={() => setDetailEntry(e)} className="clickable">
+              <RecordRow onEdit={() => setEditingEntry(e)}    record={e}  key={e.id}  className="clickable">
                 <td>{formatDate(e.date, dateFormat)}</td>
                 <td className={e.isDeposit ? 'pill-positive' : 'pill-negative'}>{e.isDeposit ? 'Rent income' : 'Expense'}</td>
                 <td className={e.isDeposit ? 'pill-positive' : 'pill-negative'}>{fmtMoney(e.isDeposit ? e.amount : -e.amount, property.currencyCode)}</td>
@@ -853,7 +854,7 @@ function EntriesList({ property, filters }: { property: Property; filters: Trans
                     onClick={() => confirmAndDeleteLinkable('rentals', e.id, () => deleteEntry(e.id))}
                   />
                 </td>
-              </tr>
+              </RecordRow>
             );
           })}
           {!sorted.length && (
@@ -1034,12 +1035,12 @@ function ImportTab() {
               <thead><tr><dateSort.Th rows={mappedPreview} column="date">Date</dateSort.Th><th>Type</th><th>Amount</th><th>Category</th></tr></thead>
               <tbody>
                 {dateSort.rows(mappedPreview, { date: row => row }).map((r, i) => (
-                  <tr key={i}>
+                  <RecordRow record={r} key={i}>
                     <td><DateValue value={r.date} /></td>
                     <td className={r.isDeposit ? 'pill-positive' : 'pill-negative'}>{r.isDeposit ? 'Rent income' : 'Expense'}</td>
                     <td>{property ? fmtMoney(r.amount, property.currencyCode) : r.amount}</td>
                     <td>{r.category || '—'}</td>
-                  </tr>
+                  </RecordRow>
                 ))}
               </tbody>
             </table>
@@ -1070,10 +1071,10 @@ function CategoryAndRollup({ property, entries: suppliedEntries }: { property: P
             <table>
               <tbody>
                 {cats.map((cat) => (
-                  <tr key={cat}>
+                  <RecordRow record={cat} key={cat}>
                     <td>{cat}</td>
                     <td className={byCategory[cat] >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(byCategory[cat], property.currencyCode)}</td>
-                  </tr>
+                  </RecordRow>
                 ))}
               </tbody>
             </table>
@@ -1087,12 +1088,12 @@ function CategoryAndRollup({ property, entries: suppliedEntries }: { property: P
               <thead><tr><dateSort.Th rows={rollup} column="date">Month</dateSort.Th><th>Income</th><th>Expense</th><th>Net</th></tr></thead>
               <tbody>
                 {dateSort.rows(rollup, { date: row => row.month }).map((r) => (
-                  <tr key={r.month}>
+                  <RecordRow record={r} key={r.month}>
                     <td>{r.month}</td>
                     <td>{fmtMoney(r.income, property.currencyCode)}</td>
                     <td>{fmtMoney(r.expense, property.currencyCode)}</td>
                     <td className={r.net >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(r.net, property.currencyCode)}</td>
-                  </tr>
+                  </RecordRow>
                 ))}
               </tbody>
             </table>
@@ -1226,7 +1227,7 @@ function RentalPlansOverview({ propertyIds, filters }: { propertyIds: string[]; 
     const error=fulfillRentalPlan(id);
     if (error) toast(error);
   };
-  return <><button className="btn secondary small" disabled={!properties.length} onClick={() => setEditing('new')}>+ Add plan</button><div className="table-scroll mt-12"><table><thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Property</th><th>Plan</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead><tbody>{dateSort.rows(rows, { date: row => row }).map(plan => <tr key={plan.id}><td><DateValue value={plan.date} /></td><td>{properties.find(p => p.id === plan.propertyId)?.name}</td><td>{plan.note || plan.category || plan.type}</td><td>{fmtMoney(plan.amount, properties.find(p => p.id === plan.propertyId)?.currencyCode ?? '')}</td><td>{plan.executed ? 'Done' : 'Planned'}</td><td>{!plan.executed && <><button className="btn secondary small" onClick={() => setEditing(plan)}>Edit</button>{' '}<button className="btn secondary small" onClick={() => setFinancePlanId(plan.id)}>Link finance</button>{' '}<button className="btn secondary small" onClick={() => void fulfill(plan.id)}>Mark done</button>{' '}<button className="btn secondary small" onClick={async () => { if (await ensureSignedIn('Sign in to remove this plan.')) usePlannedRentalsWorkbookStore.getState().deleteEntry(plan.id); }}>Remove</button></>}</td></tr>)}</tbody></table>{!rows.length && <p className="text-muted">No plans in this period.</p>}</div>{financePlanId && <FinancePlanEditor reference={{ module:"rentals",id:financePlanId }} onClose={() => setFinancePlanId(null)} />}{editing && <PlanEditorModal title={editing === 'new' ? 'Add rental plan' : 'Edit rental plan'} onClose={() => setEditing(null)}>{editing === 'new' && properties.length > 1 && <Field label="Property"><Select value={effectiveId} onChange={event => setNewPropertyId(event.target.value)}>{properties.map(property => <option key={property.id} value={property.id}>{property.name}</option>)}</Select></Field>}<RentalPlanEditor key={editing === 'new' ? effectiveId : editing.id} propertyId={editing === 'new' ? effectiveId : editing.propertyId} plan={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} /></PlanEditorModal>}</>;
+  return <><button className="btn secondary small" disabled={!properties.length} onClick={() => setEditing('new')}>+ Add plan</button><div className="table-scroll mt-12"><table><thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Property</th><th>Plan</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead><tbody>{dateSort.rows(rows, { date: row => row }).map(plan => <RecordRow onEdit={(!plan.executed) ? () => setEditing(plan) : undefined}    record={plan}  key={plan.id}><td><DateValue value={plan.date} /></td><td>{properties.find(p => p.id === plan.propertyId)?.name}</td><td>{plan.note || plan.category || plan.type}</td><td>{fmtMoney(plan.amount, properties.find(p => p.id === plan.propertyId)?.currencyCode ?? '')}</td><td>{plan.executed ? 'Done' : 'Planned'}</td><td>{!plan.executed && <><button className="btn secondary small" onClick={() => setEditing(plan)}>Edit</button>{' '}<button className="btn secondary small" onClick={() => setFinancePlanId(plan.id)}>Link finance</button>{' '}<button className="btn secondary small" onClick={() => void fulfill(plan.id)}>Mark done</button>{' '}<button className="btn secondary small" onClick={async () => { if (await ensureSignedIn('Sign in to remove this plan.')) usePlannedRentalsWorkbookStore.getState().deleteEntry(plan.id); }}>Remove</button></>}</td></RecordRow>)}</tbody></table>{!rows.length && <p className="text-muted">No plans in this period.</p>}</div>{financePlanId && <FinancePlanEditor reference={{ module:"rentals",id:financePlanId }} onClose={() => setFinancePlanId(null)} />}{editing && <PlanEditorModal title={editing === 'new' ? 'Add rental plan' : 'Edit rental plan'} onClose={() => setEditing(null)}>{editing === 'new' && properties.length > 1 && <Field label="Property"><Select value={effectiveId} onChange={event => setNewPropertyId(event.target.value)}>{properties.map(property => <option key={property.id} value={property.id}>{property.name}</option>)}</Select></Field>}<RentalPlanEditor key={editing === 'new' ? effectiveId : editing.id} propertyId={editing === 'new' ? effectiveId : editing.propertyId} plan={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} /></PlanEditorModal>}</>;
 }
 
 export function RentalsPage({

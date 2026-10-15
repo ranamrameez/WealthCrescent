@@ -1,3 +1,4 @@
+import { RecordRow } from './RecordRow';
 import { useDateTableSort } from '../hooks/useDateTableSort';
 import { DateValue } from './DateValue';
 import { Link } from 'react-router-dom';
@@ -9,5 +10,5 @@ export function InvestmentTransactions({ transactions, currency, market, filters
   const dateSort = useDateTableSort();
   const rows = [...transactions].filter(row => (!filters?.fromDate || row.date >= filters.fromDate) && (!filters?.toDate || row.date <= filters.toDate) && (!filters || filters.direction === 'all' || (filters.direction === 'in' ? row.action === 'BUY' : row.action === 'SELL')) && (!filters || filters.source !== 'statement-import'))
     .sort((a, b) => b.date.localeCompare(a.date) || (b.seq ?? 0) - (a.seq ?? 0));
-  return <div className="table-scroll"><table><thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Stock</th><th>Action</th><th>Shares</th><th>Amount</th><th>Status</th></tr></thead><tbody>{dateSort.rows(rows, { date: row => row }).map(row => <tr key={row.id}><td><DateValue value={row.date} /></td><td><Link to={`${market === 'psx' ? '/psx' : ''}/stock/${encodeURIComponent(row.ticker)}`}>{row.ticker}</Link></td><td>{row.action}</td><td>{row.shares}</td><td>{fmtMoney(row.shares * row.price, currency)}</td><td>{row.isPending ? 'Pending' : 'Cleared'}</td></tr>)}</tbody></table>{!rows.length && <p className="text-muted">No trades in this view.</p>}</div>;
+  return <div className="table-scroll"><table><thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Stock</th><th>Action</th><th>Shares</th><th>Amount</th><th>Status</th></tr></thead><tbody>{dateSort.rows(rows, { date: row => row }).map(row => <RecordRow market={market} record={row} key={row.id}><td><DateValue value={row.date} /></td><td><Link to={`${market === 'psx' ? '/psx' : ''}/stock/${encodeURIComponent(row.ticker)}`}>{row.ticker}</Link></td><td>{row.action}</td><td>{row.shares}</td><td>{fmtMoney(row.shares * row.price, currency)}</td><td>{row.isPending ? 'Pending' : 'Cleared'}</td></RecordRow>)}</tbody></table>{!rows.length && <p className="text-muted">No trades in this view.</p>}</div>;
 }

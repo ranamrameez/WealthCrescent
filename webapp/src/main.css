@@ -768,6 +768,9 @@ hr {
 .position-detail-section > h3 { margin: 0 0 8px; }
 .current-position-sections { display: grid; grid-template-columns: repeat(auto-fit,minmax(250px,1fr)); gap: 10px; align-items: stretch; }
 .current-position-section { --card-hue: var(--accent); min-width: 0; padding: 8px 12px 12px; border: 1px solid color-mix(in srgb,var(--border) 25%,transparent); border-radius: 8px; background: transparent; }
+.current-position-section:hover {
+	border: 1px solid color-mix(in srgb,var(--border) 85%,transparent);
+}
 .current-position-section h4 { margin: 0 0 12px; color: var(--text); font-size: 12px; font-weight: 700; letter-spacing: .035em; text-transform: uppercase; }
 .current-position-metrics { display: grid; grid-template-columns: repeat(auto-fit,minmax(120px,1fr)); gap: 10px 16px; }
 .current-position-metric { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
@@ -2698,3 +2701,8 @@ th.sortable:focus-visible { outline: 2px solid currentColor; outline-offset: -2p
 .cash-ledger-details > td { text-align: left; padding: 12px; }
 
 .cash-ledger-table > thead > tr > th { text-align: center; }
+
+.record-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.record-edit-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; }
+.record-edit-field { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.record-edit-field input, .record-edit-field select { max-width: 100%; }

@@ -1,3 +1,4 @@
+import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { SummaryChip } from '../../../components/StandardCard';
 import { useActivePageSection } from '../../../hooks/useActivePageSection';
@@ -256,7 +257,7 @@ function PartialTradeAdvisor({ ticker, onSellLot, onSellLots }: { ticker: string
           </thead>
           <tbody>
             {sortedAdvice.map((a, i) => (
-              <tr key={i}>
+              <RecordRow market="psx" record={a} key={i}>
                 <td>{a.buyDate}</td>
                 <td>{fmtPSXPrice(a.buyPrice)}</td>
                 <td>{fmt(a.remainingShares, 0)}</td>
@@ -265,7 +266,7 @@ function PartialTradeAdvisor({ ticker, onSellLot, onSellLots }: { ticker: string
                 <td className={a.unrealizedPL >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(a.unrealizedPL, currency)}</td>
                 <td><span className={a.suggestion === 'sell' ? 'pill-positive' : 'text-muted'}>{a.suggestion === 'sell' ? 'Sell' : 'Hold'}</span></td>
                 <td>{a.suggestion === 'sell' && <button className="btn secondary small" onClick={() => onSellLot(a)}>Sell this lot</button>}</td>
-              </tr>
+              </RecordRow>
             ))}
           </tbody>
         </table>
@@ -802,7 +803,7 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
           <tbody>
             {sortedLegRows.map(({ leg, originalIndex: i }) => {
               if (editLegIndex === i && editLeg) return (
-                <tr key={i}>
+                <RecordRow market="psx" record={{ leg, i }} onCancel={() => setEditLegIndex(null)} key={i}>
                   <td><input type="date" value={editLeg.date} onChange={(e) => setEditLeg({ ...editLeg, date: e.target.value })} className="w-130" /></td>
                   <td>{editLeg.ticker}</td>
                   <td>
@@ -834,11 +835,11 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
                     <button className="btn secondary small" onClick={saveLeg}><SaveIcon size={12} />Save</button>{' '}
                     <button className="btn secondary small" onClick={() => setEditLegIndex(null)}>Cancel</button>
                   </td>
-                </tr>
+                </RecordRow>
               );
 
               if (editingTxLegIndex === i && editTxRow) return (
-                <tr key={i}>
+                <RecordRow market="psx" record={{ leg, i }} onCancel={() => { setEditingTxLegIndex(null); setEditTxRow(null); }} key={i}>
                   <td><input type="date" value={editTxRow.date} onChange={(e) => setEditTxRow({ ...editTxRow, date: e.target.value })} className="w-130" /></td>
                   <td>{editTxRow.ticker}</td>
                   <td>
@@ -856,7 +857,7 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
                     <button className="btn secondary small" onClick={saveEditTx}><SaveIcon size={12} />Save</button>{' '}
                     <button className="btn secondary small" onClick={() => { setEditingTxLegIndex(null); setEditTxRow(null); }}>Cancel</button>
                   </td>
-                </tr>
+                </RecordRow>
               );
 
               const linkedTx = leg.executed ? resolveExecutedTx(leg) : null;
@@ -865,7 +866,7 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
               const scenarios = !leg.executed ? legFeeScenarios(leg) : null;
               return (
                 <Fragment key={i}>
-                  <tr style={(leg.executed || leg.ignored) ? { opacity: 0.6, borderLeft: '3px solid var(--profit)' } : { borderLeft: '3px solid transparent' }}>
+                  <RecordRow market="psx" onEdit={(!leg.executed) ? () => startEditLeg(i) : undefined}    record={{ leg, i }}  style={(leg.executed || leg.ignored) ? { opacity: 0.6, borderLeft: '3px solid var(--profit)' } : { borderLeft: '3px solid transparent' }}>
                     <td><DateValue value={display.date} />{stale && (
                       <Tooltip text="No linked transaction found — showing the plan's original snapshot from when this was marked done. Use Link below to fix this.">
                         <span style={{ cursor: 'pointer', color: 'var(--warn)' }}> ⚠</span>
@@ -918,7 +919,7 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
                         <button className="btn secondary small" onClick={() => setLinkingLegIndex(linkingLegIndex === i ? null : i)}>Link…</button>
                       )}
                     </td>
-                  </tr>
+                  </RecordRow>
                   {linkingLegIndex === i && (
                     <tr>
                       <td colSpan={9} style={{ padding: 0 }}>
@@ -1048,13 +1049,13 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
               <thead><tr><dateSort.Th rows={missedOpportunity?.lots ?? []} column="date">Buy date</dateSort.Th><th>Buy price</th><th>Peak</th><dateSort.Th rows={missedOpportunity?.lots ?? []} column="peakDate">Peak date</dateSort.Th><th>Potential P/L</th></tr></thead>
               <tbody>
                 {dateSort.rows(missedOpportunity.lots, { date: row => row.buyDate, peakDate: row => row.peakDate }).map((lot, index) => (
-                  <tr key={index}>
+                  <RecordRow market="psx" record={lot} key={index}>
                     <td>{lot.buyDate}</td>
                     <td>{fmtPSXPrice(lot.buyPrice)}</td>
                     <td>{fmtPSXPrice(lot.peakPrice)}</td>
                     <td>{lot.peakDate}</td>
                     <td className={lot.wouldHaveProfited >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(lot.wouldHaveProfited, currency)}</td>
-                  </tr>
+                  </RecordRow>
                 ))}
               </tbody>
             </table>

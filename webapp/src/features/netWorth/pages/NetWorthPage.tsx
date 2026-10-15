@@ -1,3 +1,4 @@
+import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { DateValue } from '../../../components/DateValue';
@@ -105,10 +106,10 @@ function NetWorthDrilldownModal({ drilldown, onClose }: { drilldown: Drilldown; 
             <thead><tr><th>Module</th><th style={{ textAlign: 'right' }}>Amount</th></tr></thead>
             <tbody>
               {drilldown.rows.map((r, i) => (
-                <tr key={i}>
+                <RecordRow record={r} key={i}>
                   <td>{r.label}</td>
                   <td style={{ textAlign: 'right' }}><MoneyValue n={r.amount} currency={r.currency} /></td>
-                </tr>
+                </RecordRow>
               ))}
             </tbody>
           </table>
@@ -124,14 +125,14 @@ function NetWorthDrilldownModal({ drilldown, onClose }: { drilldown: Drilldown; 
               <thead><tr><dateSort.Th rows={drilldown.kind === 'flow' ? drilldown.items : []} column="date">Date</dateSort.Th><th>Source</th><th>Description</th><th style={{ textAlign: 'right' }}>Amount</th></tr></thead>
               <tbody>
                 {dateSort.rows(drilldown.items, { date: row => row }).map((it, i) => (
-                  <tr key={i}>
+                  <RecordRow record={it} key={i}>
                     <td><DateValue value={it.date} /></td>
                     <td>{it.module}{it.accountName ? ` (${it.accountName})` : ''}</td>
                     <td>{it.description}</td>
                     <td style={{ textAlign: 'right', color: it.amount >= 0 ? 'var(--profit)' : 'var(--loss)' }}>
                       {it.amount >= 0 ? '+' : ''}{fmtMoney(it.amount, drilldown.currency)}
                     </td>
-                  </tr>
+                  </RecordRow>
                 ))}
               </tbody>
             </table>
@@ -150,14 +151,14 @@ function NetWorthDrilldownModal({ drilldown, onClose }: { drilldown: Drilldown; 
                 const now = drilldown.current.find((b) => b.module === m)?.amount ?? 0;
                 const delta = now - prev;
                 return (
-                  <tr key={m}>
+                  <RecordRow record={m} key={m}>
                     <td>{m}</td>
                     <td style={{ textAlign: 'right' }}><MoneyValue n={prev} currency={drilldown.currency} /></td>
                     <td style={{ textAlign: 'right' }}><MoneyValue n={now} currency={drilldown.currency} /></td>
                     <td style={{ textAlign: 'right', color: delta >= 0 ? 'var(--profit)' : 'var(--loss)' }}>
                       {delta >= 0 ? '+' : ''}{fmtMoney(delta, drilldown.currency)}
                     </td>
-                  </tr>
+                  </RecordRow>
                 );
               })}
             </tbody>
@@ -940,7 +941,7 @@ function NetWorthPlanningReality({ activities, selectedModules, currencies, curr
       })}
     </div>
     <div className="table-scroll"><table><thead><tr><dateSort.Th rows={planned.slice().sort((a, b) => a.date.localeCompare(b.date))} column="date">Date</dateSort.Th><th>Source</th><th>Description</th><th>Category</th><th>Amount</th></tr></thead><tbody>
-      {dateSort.rows(planned.slice().sort((a, b) => a.date.localeCompare(b.date)), { date: row => row }).map((activity) => <tr key={`${activity.module}:${activity.id}`}><td><DateValue value={activity.date} /></td><td>{activity.sourceLabel}</td><td>{activity.description}</td><td>{activity.category || 'Uncategorized'}</td><td className={activity.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(activity.amount, activity.currencyCode)}</td></tr>)}
+      {dateSort.rows(planned.slice().sort((a, b) => a.date.localeCompare(b.date)), { date: row => row }).map((activity) => <RecordRow record={activity} key={`${activity.module}:${activity.id}`}><td><DateValue value={activity.date} /></td><td>{activity.sourceLabel}</td><td>{activity.description}</td><td>{activity.category || 'Uncategorized'}</td><td className={activity.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(activity.amount, activity.currencyCode)}</td></RecordRow>)}
       {!planned.length && <tr><td colSpan={5} className="text-muted">No plans fall within this horizon and source scope.</td></tr>}
     </tbody></table></div>
     <p className="text-muted mb-0">Projection includes EMI liability reduction without counting a linked bank installment twice.</p>

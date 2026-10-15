@@ -1,3 +1,4 @@
+import { RecordRow } from '../../../components/RecordRow';
 import { PageHeading } from '../../../components/PageHeading';
 import { BackButton } from '../../../components/BackButton';
 import { StockPLCharts } from '../../../components/StockPLCharts';
@@ -114,7 +115,7 @@ function OpenPositionsTable({ onSelect }: { onSelect: (ticker: string) => void }
         </thead>
         <tbody>
           {sorted.map((r) => (
-            <tr key={r.ticker} className="clickable">
+            <RecordRow market="qse" record={r} key={r.ticker} className="clickable">
               <td onClick={() => onSelect(r.ticker)} style={{ maxWidth: 190 }}>
                 <div className="hd-name">
                   <TickerLogo ticker={r.ticker} size="sm" exchange="qse" />
@@ -189,7 +190,7 @@ function OpenPositionsTable({ onSelect }: { onSelect: (ticker: string) => void }
                 +1% {fmtQSEPrice(r.t1)}<br />+2% {fmtQSEPrice(r.t2)}<br />+5% {fmtQSEPrice(r.t3)}
               </td>
               <td onClick={() => onSelect(r.ticker)} className={r.statusClass}>{r.statusLabel}</td>
-            </tr>
+            </RecordRow>
           ))}
         </tbody>
       </table>
@@ -241,7 +242,7 @@ function ClosedPositionsTable({ onSelect }: { onSelect: (ticker: string) => void
         </thead>
         <tbody>
           {sorted.map((p) => (
-            <tr key={p.ticker} className="clickable" onClick={() => onSelect(p.ticker)}>
+            <RecordRow market="qse" record={p} onOpen={() => onSelect(p.ticker)} key={p.ticker} className="clickable" >
               <td style={{ maxWidth: 190 }}>
                 <div className="hd-name">
                   <TickerLogo ticker={p.ticker} size="sm" exchange="qse" />
@@ -264,7 +265,7 @@ function ClosedPositionsTable({ onSelect }: { onSelect: (ticker: string) => void
               <td className="text-muted" style={{ whiteSpace: 'nowrap' }}>
                 {p.firstDate} → {p.lastDate}
               </td>
-            </tr>
+            </RecordRow>
           ))}
           {!sorted.length && (
             <tr><td colSpan={4} className="text-muted">No closed positions yet.</td></tr>

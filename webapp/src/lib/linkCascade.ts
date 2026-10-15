@@ -72,6 +72,19 @@ function resolveTransferInput(input: InterEntityTransferInput, link?: InterEntit
   const timezone = input.timezone ?? defaultTimezoneForCurrency(resolveSideCurrency(input.from) ?? resolveSideCurrency(input.to) ?? 'USD');
   return { ...input, time: input.time ?? defaultTimeForDate(input.date, timezone), timezone, from: resolveTransferSide(input.from, 'out', link?.fromRecordId), to: resolveTransferSide(input.to, 'in', link?.toRecordId) };
 }
+export function getLinkedSideRecord(cfg: LinkSideConfig, id: string): LinkSideRecord['record'] | undefined {
+  switch (cfg.module) {
+    case 'bank': return useBankWorkbookStore.getState().workbook.transactions.find(row => row.id === id);
+    case 'cash': return useCashWorkbookStore.getState().workbook.entries.find(row => row.id === id);
+    case 'qse': return useWorkbookStore.getState().workbook.transfers.find(row => row.id === id);
+    case 'psx': return usePSXWorkbookStore.getState().workbook.transfers.find(row => row.id === id);
+    case 'funds': return useFundsWorkbookStore.getState().workbook.transfers.find(row => row.id === id);
+    case 'rentals': return useRentalsWorkbookStore.getState().workbook.entries.find(row => row.id === id);
+    case 'personalLoans': return usePersonalLoansWorkbookStore.getState().workbook.repayments.find(row => row.id === id);
+    case 'emi': return useEMIWorkbookStore.getState().workbook.repayments.find(row => row.id === id);
+    case 'creditCard': return useCreditCardWorkbookStore.getState().workbook.transactions.find(row => row.id === id);
+  }
+}
 
 /** Creates a linked transfer's two side records + the link record itself.
  * Code-review finding (PR #2): the three writes below aren't a real
@@ -226,7 +239,7 @@ export async function resolveLinkedEdit(module: LinkModule, id: string): Promise
  * imports from this file — so this file importing back from
  * `TransferLinksPage.tsx` would close the loop. The switch itself is small
  * enough that duplicating it here is safer than untangling that cycle. */
-function resolveSideCurrency(cfg: LinkSideConfig): string | null {
+export function resolveSideCurrency(cfg: LinkSideConfig): string | null {
   switch (cfg.module) {
     case 'cash': return cfg.currencyCode || useCashWorkbookStore.getState().workbook.settings.defaultCurrency;
     case 'bank': return useBankWorkbookStore.getState().workbook.settings.accounts.find((a) => a.id === cfg.ref)?.currencyCode ?? null;
@@ -269,7 +282,7 @@ function resolveSideCurrency(cfg: LinkSideConfig): string | null {
 export function propagateLinkedEdit(
   module: LinkModule,
   id: string,
-  changes: { date?: string; amount?: number; note?: string; categoryID?: string; direction?: 'in' | 'out' },
+  changes: { date?: string; time?: string; timezone?: string; amount?: number; note?: string; categoryID?: string; direction?: 'in' | 'out' },
 ): { error?: string; message?: string } {
   const link = findLinkForRecord(module, id);
   if (!link) return {};
@@ -316,8 +329,8 @@ export function propagateLinkedEdit(
     toAmount,
     from: resolveTransferSide(fromCfg, 'out', fromRecordId),
     to: resolveTransferSide(toCfg, 'in', toRecordId),
-    time: link.time,
-    timezone: link.timezone,
+    time: changes.time ?? link.time,
+    timezone: changes.timezone ?? link.timezone,
     categoryID: changes.categoryID !== undefined ? changes.categoryID : link.categoryID,
     note: changes.note !== undefined ? changes.note : link.note,
     rateSource: link.rateSource,

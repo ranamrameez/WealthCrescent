@@ -15,8 +15,8 @@ import { defaultTimeForDate, defaultTimezoneForCurrency, nowTime } from '../lib/
 import { loanCategoryForDirection, loanDirectionForTransfer, transferDirectionForLoan } from '../lib/calc/personalLoansModule';
 import { convertAmount, loadCachedFxRates } from '../lib/fx';
 import { useEnsureSignedIn } from '../lib/firebase/useEnsureSignedIn';
-import { defaultLinkedOtherSide, isSupportedLinkPair, linkSideRequiresRef } from '../lib/interEntityLink';
-import { createLinkedTransfer, propagateLinkedEdit, resolveLinkedEdit, resolveTransferSide } from '../lib/linkCascade';
+import { buildLinkedRecords, defaultLinkedOtherSide, isSupportedLinkPair, linkSideRequiresRef } from '../lib/interEntityLink';
+import { createLinkedTransfer, dispatchUpdate, findLinkForRecord, getLinkedSideRecord, propagateLinkedEdit, resolveLinkedEdit, resolveSideCurrency, resolveTransferSide, updateLinkedTransfer } from '../lib/linkCascade';
 import { useBankWorkbookStore } from '../store/bankWorkbookStore';
 import { useCashWorkbookStore } from '../store/cashWorkbookStore';
 import { useCreditCardWorkbookStore } from '../store/creditCardWorkbookStore';
@@ -28,8 +28,11 @@ import { useRentalsWorkbookStore } from '../store/rentalsWorkbookStore';
 import { useSubscriptionsWorkbookStore } from '../store/subscriptionsWorkbookStore';
 import { useAppearanceStore } from '../store/appearanceStore';
 import { useWorkbookStore } from '../store/workbookStore';
-import type { LinkModule, LinkSideConfig } from '../types/interEntityTransfer';
+import type { InterEntityTransfer, LinkModule, LinkSideConfig } from '../types/interEntityTransfer';
 import type { PersonalLoanRepayment } from '../types/personalLoansWorkbook';
+import type { Transfer } from '../types/workbook';
+
+export interface TransferEditRequest { module: 'qse' | 'psx' | 'funds'; record: Transfer }
 
 const today = () => new Date().toISOString().slice(0, 10);
 const uid = () => crypto.randomUUID();
@@ -186,13 +189,13 @@ function emptyRow(
   };
 }
 
-function TransferFeeField({ side, direction, amount, onChange }: { side: LinkSideConfig; direction: 'in' | 'out'; amount: number; onChange: (side: LinkSideConfig) => void }) {
+function TransferFeeField({ side, direction, amount, onChange, disabled }: { side: LinkSideConfig; direction: 'in' | 'out'; amount: number; onChange: (side: LinkSideConfig) => void; disabled?: boolean }) {
   const qseDefault = useWorkbookStore(state => state.workbook.settings.depositFee);
   const psxDefault = usePSXWorkbookStore(state => state.workbook.settings.depositFee);
   if (!['qse', 'psx', 'funds'].includes(side.module)) return null;
   const fee = side.fee ?? (direction === 'in' ? side.module === 'qse' ? qseDefault : side.module === 'psx' ? psxDefault : 0 : 0);
   return <Field label={side.module.toUpperCase() + ' transfer fee'} title="Starts from this module's saved deposit fee. Amount is gross; deposits receive gross minus fee, withdrawals cost gross plus fee.">
-    <AmountInput value={fee} onChange={value => onChange({ ...side, fee: value })} />
+    <AmountInput disabled={disabled} value={fee} onChange={value => onChange({ ...side, fee: value })} />
     <small>{direction === 'in' ? 'Net received: ' : 'Total debit: '}{(Math.abs(amount) + (direction === 'in' ? -fee : fee)).toFixed(2)}</small>
   </Field>;
 }
@@ -207,12 +210,16 @@ function TxRowFields({
   onRemove,
   canRemove,
   financeLocked = false,
+  transferEditing = false,
+  wholeLinkEditing = false,
 }: {
   row: TxRow;
   onChange: (row: TxRow) => void;
   onRemove: () => void;
   canRemove: boolean;
   financeLocked?: boolean;
+  transferEditing?: boolean;
+  wholeLinkEditing?: boolean;
 }) {
   const personalLoans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const otherCurrency = useSideCurrency(row.other);
@@ -376,6 +383,7 @@ function TxRowFields({
         <Field label="Link to another finance">
           <YesNoChips
             value={row.linked}
+            disabled={transferEditing}
             disableYes={row.subscriptionMode}
             title={row.subscriptionMode ? 'Subscription payments use the subscription\'s configured Paid via finance and are not two-sided transfer links.' : undefined}
             onChange={(linked) => {
@@ -395,6 +403,7 @@ function TxRowFields({
         <div className="mt-sm">
           <SideFields
             label="Other finance"
+            disabled={transferEditing}
             cfg={row.other}
             onChange={(other) => onChange({ ...row, other, toAmount: undefined, toAmountTouched: false })}
             preferredCurrency={financeCurrency ?? undefined}
@@ -411,12 +420,14 @@ function TxRowFields({
                     type="number"
                     step="0.01"
                     value={row.toAmount ?? ''}
+                    disabled={transferEditing && !wholeLinkEditing}
                     onChange={(e) => onChange({ ...row, toAmount: e.target.value === '' ? undefined : Number(e.target.value), toAmountTouched: true })}
                   />
                 </Field>
                 <Field label="Rate source (optional)" title="Where this conversion rate came from — e.g. your bank's rate, a specific exchange name — for your own future reference.">
                   <TextInput
                     value={row.rateSource}
+                    disabled={transferEditing && !wholeLinkEditing}
                     onChange={(e) => onChange({ ...row, rateSource: e.target.value })}
                     placeholder="e.g. UBL bank rate"
                   />
@@ -437,7 +448,7 @@ function TxRowFields({
       )}
       <div className="row gap-sm mt-sm">
         <TransferFeeField side={row.finance} direction={row.direction} amount={row.amount} onChange={finance => onChange({ ...row, finance })} />
-        {row.linked && <TransferFeeField side={row.other} direction={row.direction === 'in' ? 'out' : 'in'} amount={row.toAmount ?? row.amount} onChange={other => onChange({ ...row, other })} />}
+        {row.linked && <TransferFeeField disabled={transferEditing && !wholeLinkEditing} side={row.other} direction={row.direction === 'in' ? 'out' : 'in'} amount={row.toAmount ?? row.amount} onChange={other => onChange({ ...row, other })} />}
       </div>
       {canRemove && (
         <div className="d-flex justify-end mt-sm">
@@ -476,12 +487,22 @@ function getSideCurrency(cfg: LinkSideConfig): string | undefined {
 export function TransactionEntryModal({
   defaultFinance,
   editPersonalLoanPayment,
+  editTransfer: requestedTransfer,
+  editLink: requestedLink,
   onClose,
 }: {
   defaultFinance?: LinkSideConfig;
   editPersonalLoanPayment?: PersonalLoanRepayment;
+  editTransfer?: TransferEditRequest;
+  editLink?: { link: InterEntityTransfer; recordId: string };
   onClose: () => void;
 }) {
+  const [editTransfer] = useState(() => requestedTransfer ? structuredClone(requestedTransfer) : undefined);
+  const [editLink] = useState(() => {
+    if (!requestedLink) return undefined;
+    const module = requestedLink.recordId === requestedLink.link.fromRecordId ? requestedLink.link.from.module : requestedLink.link.to.module;
+    return { recordId: requestedLink.recordId, link: structuredClone(findLinkForRecord(module, requestedLink.recordId) ?? requestedLink.link) };
+  });
   const ensureSignedIn = useEnsureSignedIn();
   const addBankTransactions = useBankWorkbookStore((s) => s.addTransactions);
   const addCashEntry = useCashWorkbookStore((s) => s.addEntry);
@@ -520,15 +541,15 @@ export function TransactionEntryModal({
   const editFinance: LinkSideConfig | undefined = editPersonalLoanPayment
     ? { module: 'personalLoans', ref: editPersonalLoanPayment.loanId, currencyCode: editingLoan?.currencyCode }
     : undefined;
-  const baseFinance = editFinance ?? defaultFinance;
+  const linkIsFrom = editLink?.recordId === editLink?.link.fromRecordId;
+  const linkFinance = editLink ? linkIsFrom ? editLink.link.from : editLink.link.to : undefined;
+  const [linkSnapshot] = useState(() => editLink ? [structuredClone(getLinkedSideRecord(editLink.link.from, editLink.link.fromRecordId)), structuredClone(getLinkedSideRecord(editLink.link.to, editLink.link.toRecordId))] : []);
+  const baseFinance = linkFinance ?? (editTransfer ? { module: editTransfer.module, fee: editTransfer.record.fee } : editFinance ?? defaultFinance);
   const resolvedDefaultFinance: LinkSideConfig = baseFinance
     ? (baseFinance.module === 'cash' && !baseFinance.currencyCode ? { ...baseFinance, currencyCode: cashDefaultCurrency } : baseFinance)
     : { module: 'cash', currencyCode: cashDefaultCurrency };
 
-  const resolvedDefaultCurrency = resolvedDefaultFinance.currencyCode
-    ?? (resolvedDefaultFinance.module === 'bank'
-      ? bankAccounts.find((account) => account.id === resolvedDefaultFinance.ref)?.currencyCode
-      : undefined);
+  const resolvedDefaultCurrency = useSideCurrency(resolvedDefaultFinance) ?? undefined;
   const initialPersonalLoan = resolvedDefaultFinance.module === 'personalLoans'
     ? personalLoans.find((loan) => loan.id === resolvedDefaultFinance.ref)
     : undefined;
@@ -541,6 +562,31 @@ export function TransactionEntryModal({
       transferDefaultDescription,
       resolvedDefaultCurrency,
     );
+    if (editLink && linkFinance) {
+      const link = editLink.link, own = linkSnapshot[linkIsFrom ? 0 : 1];
+      const direction = linkIsFrom ? 'out' : 'in';
+      return [{ ...base, finance: resolveTransferSide(linkFinance, direction, editLink.recordId), linked: true,
+        other: resolveTransferSide(linkIsFrom ? link.to : link.from, linkIsFrom ? 'in' : 'out', linkIsFrom ? link.toRecordId : link.fromRecordId),
+        direction, amount: own && 'gross' in own ? own.gross : own && 'amount' in own ? Math.abs(own.amount) : linkIsFrom ? link.fromAmount : link.toAmount,
+        toAmount: linkIsFrom ? link.toAmount : link.fromAmount, toAmountTouched: true,
+        date: own?.date ?? link.date, time: own && 'time' in own ? own.time : link.time ?? base.time,
+        timezone: own && 'timezone' in own ? own.timezone : link.timezone ?? base.timezone,
+        description: own && 'description' in own ? own.description ?? '' : own && 'title' in own ? own.title ?? '' : link.note ?? '',
+        categoryID: link.categoryID ?? base.categoryID, rateSource: link.rateSource ?? '',
+      }];
+    }
+    if (editTransfer) {
+      const transfer = editTransfer.record;
+      const link = findLinkForRecord(editTransfer.module, transfer.id);
+      const isFrom = link?.fromRecordId === transfer.id;
+      return [{ ...base, amount: transfer.gross, direction: transfer.type === 'DEPOSIT' ? 'in' : 'out',
+        date: transfer.date, time: transfer.time ?? defaultTimeForDate(transfer.date, transfer.timezone ?? base.timezone), timeTouched: !!transfer.time,
+        timezone: transfer.timezone ?? base.timezone, description: transfer.description ?? '',
+        linked: !!link, other: link ? isFrom ? link.to : link.from : base.other,
+        toAmount: link ? isFrom ? link.toAmount : link.fromAmount : undefined, toAmountTouched: !!link,
+        rateSource: link?.rateSource ?? '', categoryID: link?.categoryID ?? base.categoryID,
+      }];
+    }
     if (!editPersonalLoanPayment) {
       if (initialPersonalLoan && !base.categoryTouched) {
         base.direction = transferDirectionForLoan(initialPersonalLoan.direction);
@@ -575,6 +621,7 @@ export function TransactionEntryModal({
     const valid = rows.filter((r) => r.amount !== 0);
     if (!valid.length) return toast('Enter an amount on at least one row.');
     for (const r of valid) {
+      if (r.finance.module === 'bank' && !r.description.trim()) return toast('Enter a description for this transaction.');
       if (!r.date || !/^\d{4}-\d{2}-\d{2}$/.test(r.date)) return toast('Choose a valid date.');
       for (const side of [resolveTransferSide(r.finance, r.direction), ...(r.linked ? [resolveTransferSide(r.other, r.direction === 'in' ? 'out' : 'in')] : [])]) {
         if (side.fee !== undefined && (!Number.isFinite(side.fee) || side.fee < 0)) return toast('Fee must be a non-negative number.');
@@ -590,6 +637,37 @@ export function TransactionEntryModal({
       }
     }
     if (!(await ensureSignedIn(editPersonalLoanPayment ? 'Sign in to update this payment.' : 'Sign in to save transactions.'))) return;
+
+    if (editLink && linkFinance) {
+      const { link, recordId } = editLink, row = valid[0];
+      if (JSON.stringify(getLinkedSideRecord(link.from, link.fromRecordId)) !== JSON.stringify(linkSnapshot[0]) || JSON.stringify(getLinkedSideRecord(link.to, link.toRecordId)) !== JSON.stringify(linkSnapshot[1])) return toast('A linked record changed. Reopen this editor.');
+      const choice = await resolveLinkedEdit(linkFinance.module, recordId);
+      if (choice === 'cancel') return;
+      if (JSON.stringify(findLinkForRecord(linkFinance.module, recordId)) !== JSON.stringify(link) || JSON.stringify(getLinkedSideRecord(link.from, link.fromRecordId)) !== JSON.stringify(linkSnapshot[0]) || JSON.stringify(getLinkedSideRecord(link.to, link.toRecordId)) !== JSON.stringify(linkSnapshot[1])) return toast('A linked record changed. Reopen this editor.');
+      const from = row.direction === 'out' ? row.finance : row.other, to = row.direction === 'out' ? row.other : row.finance;
+      const switched = (link.fromRecordId === recordId) !== (row.direction === 'out');
+      const ids = { ...link, fromRecordId: switched ? link.toRecordId : link.fromRecordId, toRecordId: switched ? link.fromRecordId : link.toRecordId };
+      const sameCurrency = resolveSideCurrency(from) && resolveSideCurrency(from) === resolveSideCurrency(to);
+      const otherAmount = sameCurrency ? Math.abs(row.amount) : row.toAmount ?? Math.abs(row.amount);
+      const input = { date: row.date, time: row.time, timezone: row.timezone, from, to, fromAmount: row.direction === 'out' ? Math.abs(row.amount) : otherAmount, toAmount: row.direction === 'out' ? otherAmount : Math.abs(row.amount), note: row.description.trim() || undefined, categoryID: row.categoryID, rateSource: row.rateSource || undefined };
+      if (choice === 'both') { const result = updateLinkedTransfer(input, ids); if ('error' in result) return toast(result.error); }
+      else { const built = buildLinkedRecords(input, { linkId: link.id, fromRecordId: ids.fromRecordId, toRecordId: ids.toRecordId }); dispatchUpdate(built.from.record.id === recordId ? built.from : built.to); }
+      toast(choice === 'both' ? 'Linked transfer updated.' : 'This entry updated; other-side changes were not saved.'); onClose(); return;
+    }
+    if (editTransfer) {
+      const row = valid[0], { module, record } = editTransfer;
+      const store = module === 'qse' ? useWorkbookStore.getState() : module === 'psx' ? usePSXWorkbookStore.getState() : useFundsWorkbookStore.getState();
+      const current = store.workbook.transfers.find(item => item.id === record.id);
+      if (!current || JSON.stringify(current) !== JSON.stringify(record)) return toast('This transfer changed. Reopen its editor.');
+      const choice = await resolveLinkedEdit(module, record.id);
+      if (choice === 'cancel') return;
+      store.updateTransfer(record.id, { date: row.date, time: row.time, timezone: row.timezone, gross: Math.abs(row.amount), fee: row.finance.fee ?? record.fee, type: row.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', description: row.description.trim() || undefined });
+      if (choice === 'both') {
+        const result = propagateLinkedEdit(module, record.id, { date: row.date, time: row.time, timezone: row.timezone, amount: Math.abs(row.amount), direction: row.direction, note: row.description.trim() || undefined });
+        if (result.error) { toast(result.error); return; }
+      }
+      toast('Transfer updated.'); onClose(); return;
+    }
 
     if (editPersonalLoanPayment) {
       const r = valid[0];
@@ -761,7 +839,7 @@ export function TransactionEntryModal({
     onClose();
   };
 
-  const modalTitle = editPersonalLoanPayment
+  const modalTitle = editTransfer || editLink ? 'Edit transfer' : editPersonalLoanPayment
     ? 'Edit payment'
     : defaultFinance?.module === 'personalLoans' && defaultFinance.ref
       ? 'Add payment'
@@ -775,11 +853,13 @@ export function TransactionEntryModal({
           row={r}
           onChange={(row) => updateRow(r.key, row)}
           onRemove={() => removeRow(r.key)}
-          canRemove={!editPersonalLoanPayment && rows.length > 1}
-          financeLocked={!!editPersonalLoanPayment}
+          canRemove={!editPersonalLoanPayment && !editTransfer && !editLink && rows.length > 1}
+          financeLocked={!!editPersonalLoanPayment || !!editTransfer || !!editLink}
+          transferEditing={!!editTransfer || !!editLink}
+          wholeLinkEditing={!!editLink}
         />
       ))}
-      {!editPersonalLoanPayment && (
+      {!editPersonalLoanPayment && !editTransfer && !editLink && (
         <div className="row" style={{ gap: 8, marginTop: 16 }}>
           <button className="btn secondary" onClick={addRow}><PlusIcon size={12} />Add row</button>
         </div>

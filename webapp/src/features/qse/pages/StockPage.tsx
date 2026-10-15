@@ -1,3 +1,4 @@
+import { RecordRow } from '../../../components/RecordRow';
 import { StockPortfolioSummary } from '../components/StockPortfolioSummary';
 import { DateValue } from '../../../components/DateValue';
 import { PageHeading } from '../../../components/PageHeading';
@@ -179,7 +180,7 @@ function TickerTransactions({ ticker, filters }: { ticker: string; filters: Tran
             {pageRows.map(({ tx, i }) =>
               editIndex === i && editRow ? (
                 <Fragment key={i}>
-                <tr>
+                <RecordRow market="qse" record={{ tx, i }} onCancel={() => setEditIndex(null)}>
                   <td><input type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} className="w-130" /></td>
                   <td>
                     <select value={editRow.action} onChange={(e) => setEditRow({ ...editRow, action: e.target.value as 'BUY' | 'SELL' })}>
@@ -199,7 +200,7 @@ function TickerTransactions({ ticker, filters }: { ticker: string; filters: Tran
                     <IconButton label="Save" icon={<SaveIcon size={13} />} align="right" onClick={saveEdit} />{' '}
                     <IconButton label="Cancel" icon={<XIcon size={13} />} align="right" onClick={() => setEditIndex(null)} />
                   </td>
-                </tr>
+                </RecordRow>
                 {editRow.action === 'SELL' && showLotAllocation && (
                   <tr>
                     <td colSpan={6}>
@@ -214,7 +215,7 @@ function TickerTransactions({ ticker, filters }: { ticker: string; filters: Tran
                 )}
                 </Fragment>
               ) : (
-                <tr key={i}>
+                <RecordRow market="qse" onEdit={() => startEdit(i, tx)}    record={{ tx, i }}  key={i}>
                   <td>
                     <DateValue value={tx.date} />
                     {tx.isPending && (
@@ -250,7 +251,7 @@ function TickerTransactions({ ticker, filters }: { ticker: string; filters: Tran
                       }}
                     />
                   </td>
-                </tr>
+                </RecordRow>
               ),
             )}
             {!rows.length && <tr><td colSpan={6} className="text-muted">No transactions for {ticker} yet.</td></tr>}
