@@ -1,11 +1,35 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BatchEditGrid, type BatchColumn } from '../BatchEditGrid';
+import { Modal } from '../Modal';
+import { useState } from 'react';
 
 type Row = { id: string; description: string; amount: number; pending?: boolean; date?: string };
 const rows: Row[] = [{ id: 'a', description: 'First', amount: 10 }, { id: 'b', description: 'Second', amount: 20 }];
 const columns: BatchColumn<Row>[] = [{ key: 'description', label: 'Description' }, { key: 'amount', label: 'Amount', type: 'amount' }, { key: 'pending', label: 'Pending', type: 'boolean' }];
 afterEach(cleanup);
+it('opens above the triggering popup, uses shared reorder icons, and keeps Actions last', () => {
+  const closeParent = vi.fn();
+  function Trigger() {
+    const [open, setOpen] = useState(false);
+    return <Modal title="Parent popup" onClose={closeParent} zIndex={3000}>
+      <button onClick={() => setOpen(true)}>Open batch</button>
+      {open && <BatchEditGrid title="Nested batch" rows={rows} columns={columns} getRowId={row => row.id} orderKey="amount" createRow={() => ({ id: 'new', description: '', amount: 0 })} onSave={() => {}} onClose={() => setOpen(false)} />}
+    </Modal>;
+  }
+  render(<Trigger />);
+  fireEvent.click(screen.getByText('Open batch'));
+  const overlay = screen.getByRole('dialog').closest('.batch-edit-overlay')! as HTMLElement;
+  expect(overlay.parentElement).toBe(document.body);
+  expect(Number(overlay.style.zIndex)).toBeGreaterThan(3000);
+  expect(screen.getAllByRole('columnheader').at(-1)?.textContent).toBe('Actions');
+  const up = screen.getByRole('button', { name: 'Move row 1 up' });
+  expect(up.querySelector('path')?.getAttribute('d')).toBe('M12 19V5M5 12l7-7 7 7');
+  expect(up.closest('td')).toBe(up.closest('tr')?.lastElementChild);
+  fireEvent.keyDown(screen.getByLabelText('Row 1, Description'), { key: 'Escape' });
+  expect(closeParent).not.toHaveBeenCalled();
+  expect(screen.getByText('Parent popup')).toBeTruthy();
+});
 function setup(extra = {}) {
   const save = vi.fn(), close = vi.fn();
   const props = { title: 'Edit payments', rows, columns, getRowId: (r: Row) => r.id, onSave: save, onClose: close, validateRow: (r: Row) => r.amount <= 0 ? { amount: 'Must be positive' } : {}, ...extra };

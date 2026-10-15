@@ -134,7 +134,7 @@ it('matches the ledger column layout, keeps one type info icon and expands detai
   expect(within(section).queryByText(/BUY 10 QNBK/)).toBeNull();
   fireEvent.click(within(header).getByRole('button', { name: 'Card options' }));
   fireEvent.click(within(header).getByText('Modify'));
-  expect(headers().slice(-2)).toEqual(['Actions', 'Balance']);
+  expect(headers().slice(-2)).toEqual(['Balance', 'Actions']);
 });
 
 it('preserves user-entered descriptions in cash ledger details', () => {

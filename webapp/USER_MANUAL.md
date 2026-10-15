@@ -219,6 +219,34 @@ options menu for **Import CSV**, **Export filtered**, **Export all**, **Batch ed
 or **Modify**. Modify reveals editing, deletion and eligible reorder controls; editing
 a ledger event updates its original trade, transfer or adjustment. Linked transfers
 follow the existing linked-record editing flow.
+When modification controls appear, **Actions** is the last column, after Balance.
+Batch Editor also places its reorder/delete controls in the last Actions column
+and opens above the popup or fullscreen table that launched it.
+
+QSE Trade list and Cash ledger also offer **Import The Group statement** for the
+broker's Cash statement in XLSX or CSV format. The importer reads prices and share
+counts, uses deposit gross/fee detail rows and avoids importing commissions twice.
+Before the import confirmation, a separate warning explains that rounded Excel
+figures may produce incorrect balances and calculations. Cancel there to stop
+without changing any records, or continue to review the import counts.
+Existing combined fills are retained. If existing quantities conflict or a nearby
+trade has a different date, resolve that record before importing. The Group's XLSX
+may store cash values rounded to whole riyals: check transfer precision against your
+receipt. Rounded reward rows are excluded; existing exact rewards stay in place.
+Add missing reward amounts from an exact broker record.
+
+For corrections, import a native CSV with the original **id** column. Matching IDs
+are updated, new IDs are added, and unrelated records remain. The confirmation shows
+the number of additions and updates. Keep those IDs to make re-importing safe.
+Linked transfer fee/description corrections can be imported; change a linked gross
+amount, direction or date through single-record Modify so both accounts stay aligned.
+
+In the shared Transfer form, QSE/PSX deposits start with that module's saved deposit
+fee. You can change the fee, including setting it explicitly to zero. Amount means
+gross: a deposit receives gross minus the module fee; a withdrawal debits gross plus
+the fee. Fees appear for each selected exchange/fund side, even when the form starts
+from a bank account. Date inputs use the browser's built-in date control and calendar;
+dates are stored as ISO values. Appearance preferences still format displayed dates.
 
 Click a sortable Date header to switch between newest and oldest first. Arrowheads
 show the direction. Sorting changes the display order; each event retains its balance

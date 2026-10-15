@@ -970,7 +970,7 @@ function CashLedgerSection({ sectionProps }: { sectionProps?: SectionCardProps }
   };
   return <QseRecordCard dateSort={dateSort} title="Cash ledger" sectionProps={sectionProps} kind="ledger" rows={sources(filtered)} allRecords={sources(sorted)} modifying={modifying} onModify={() => setModifying(value => !value)} editRequest={editRequest} exportData={{ rows: exportRows(filtered), allRows: exportRows(sorted) }}>
     <div className="table-scroll"><table className="cash-ledger-table">
-      <thead><tr><th aria-label="Details" /><dateSort.Th rows={dateSortInput}>Date</dateSort.Th><th>Type</th><th>Count</th><th>Unit</th><th>Price</th><th>Amount</th>{modifying && <th>Actions</th>}<th>Balance</th></tr></thead>
+      <thead><tr><th aria-label="Details" /><dateSort.Th rows={dateSortInput}>Date</dateSort.Th><th>Type</th><th>Count</th><th>Unit</th><th>Price</th><th>Amount</th><th>Balance</th>{modifying && <th>Actions</th>}</tr></thead>
       <tbody>{page.rows.map((event, index) => {
         const source = sourceFor(event);
         const description = source?.description || source?.note;
@@ -990,8 +990,9 @@ function CashLedgerSection({ sectionProps }: { sectionProps?: SectionCardProps }
           <td>{event.kind === 'trade' && event.ticker ? <span className="cash-ledger-unit"><TickerLogo ticker={event.ticker} size="sm" exchange="qse" /><Link to={`/stock/${event.ticker}`}>{tickerNames[event.ticker] ? shortenCompanyName(tickerNames[event.ticker]) : event.ticker}</Link></span> : <span className="cash-ledger-unit"><CashIcon size={19} />{workbook.settings.currency === 'QAR' ? 'Riyal' : workbook.settings.currency}</span>}</td>
           <td className="text-center">{event.kind === 'trade' ? fmtQSEPrice(source?.price ?? 0) : '-'}</td>
           <td className={event.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(event.amount, workbook.settings.currency)}</td>
-          {modifying && <td>{source && <><IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => setEditRequest({ ...source })} /><IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => remove(source)} /></>}</td>}
           <td>{fmtMoney(event.balance, workbook.settings.currency)}</td>
+          {modifying && <td>{source && <><IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => setEditRequest({ ...source })} /><IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => remove(source)} /></>}</td>}
+
         </tr>{expanded && <tr className="cash-ledger-details"><td colSpan={modifying ? 9 : 8}>{description && <div><strong>Description: </strong>{description}</div>}<div><strong>Fee: </strong>{fmtMoney(event.fee, workbook.settings.currency)}</div></td></tr>}</Fragment>;
       })}{!filtered.length && <tr><td colSpan={modifying ? 9 : 8} className="text-muted">Nothing recorded yet.</td></tr>}</tbody>
     </table></div>

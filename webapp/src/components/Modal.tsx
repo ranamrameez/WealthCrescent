@@ -1,5 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { CollapseIcon, ExpandIcon } from './icons';
+import { createPortal } from 'react-dom';
+import { highestOverlayLayer, OverlayLayerContext, useOverlayLayer } from './overlayLayer';
 
 export function Modal({
   title,
@@ -12,20 +14,21 @@ export function Modal({
   title: string;
   onClose: () => void;
   children: ReactNode;
-  /** Overrides the shared `.modal-overlay`'s default z-index. */
+  /** Minimum layer; a new popup always clears already open overlays. */
   zIndex?: number;
   /** Overrides `.modal-box`'s default width cap. */
   width?: string;
   widthClass?: '40' | '50' | '60';
 }) {
   const [fullScreen, setFullScreen] = useState(false);
+  const layer = useOverlayLayer(zIndex ?? 100);
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') { if (fullScreen) setFullScreen(false); else onClose(); } };
+    const onKeyDown = (event: KeyboardEvent) => { if (!event.defaultPrevented && event.key === 'Escape' && highestOverlayLayer() <= layer) { if (fullScreen) setFullScreen(false); else onClose(); } };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [fullScreen, onClose]);
-  return (
-    <div className="modal-overlay show" style={zIndex ? { zIndex } : undefined} onClick={onClose}>
+  }, [fullScreen, onClose, layer]);
+  return createPortal(<OverlayLayerContext.Provider value={layer}>
+    <div className="modal-overlay show" style={{ zIndex: layer }} onClick={onClose}>
       <div
         className={`modal-box${fullScreen ? ' fullscreen' : ''}${!fullScreen && widthClass ? ` modal-width-${widthClass}` : ''}`}
         style={!fullScreen && width ? { maxWidth: width } : undefined}
@@ -50,6 +53,5 @@ export function Modal({
         </div>
         <div className="modal-body">{children}</div>
       </div>
-    </div>
-  );
+    </div></OverlayLayerContext.Provider>, document.body);
 }

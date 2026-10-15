@@ -1,8 +1,5 @@
-import { useEffect, useRef, useState, type ChangeEvent, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
+import { type ChangeEvent, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
 import { Tooltip } from '../Tooltip';
-import { CalendarIcon } from '../icons';
-import { formatDate, parseDateInput, dateInputFormat } from '../../lib/format';
-import { useAppearanceStore } from '../../store/appearanceStore';
 
 /** Labeled form field wrapper — consistent label+control spacing instead of
  * ad-hoc inline styles scattered per page.
@@ -112,83 +109,11 @@ export function Select({ width, children, ...rest }: SelectHTMLAttributes<HTMLSe
 }
 
 
-/** One app-wide editing format: DD-MMM-YYYY (01-Aug-2026).
- * Appearance date formats are display-only. A native calendar remains
- * available beside the text field, and invalid/partial text never escapes
- * into application state. */
-export function DateInput({ value, onChange, width, min, max, disabled, ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'> & {
+/** Native date editing keeps ISO values and uses the browser's calendar and validation. */
+export function DateInput({ value, onChange, width, ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'> & {
   value: string;
   onChange: (event: { target: { value: string } }) => void;
   width?: number;
 }) {
-  const preferredFormat = useAppearanceStore(s=>s.appearance.dateFormat);
-  const inputFormat = dateInputFormat(preferredFormat ?? 'DD-MMM-YYYY');
-  const calendarRef = useRef<HTMLInputElement>(null);
-  const displayValue = value ? formatDate(value, inputFormat) : '';
-  const [draft, setDraft] = useState(displayValue);
-
-  useEffect(() => setDraft(displayValue), [displayValue]);
-
-  const withinBounds = (iso: string) => (!min || iso >= String(min)) && (!max || iso <= String(max));
-  const commit = (text: string) => {
-    const parsed = parseDateInput(text, inputFormat);
-    if (!parsed || !withinBounds(parsed)) return false;
-    onChange({ target: { value: parsed } });
-    setDraft(formatDate(parsed, inputFormat));
-    return true;
-  };
-
-  return (
-    <div className="date-input-wrap" style={{ width }}>
-      <input
-        {...rest}
-        type="text"
-        autoComplete="off"
-        value={draft}
-        disabled={disabled}
-        placeholder={formatDate('2026-08-01', inputFormat)}
-        onChange={(event) => {
-          setDraft(event.target.value);
-          commit(event.target.value);
-        }}
-        onBlur={() => {
-          if (!draft.trim()) {
-            onChange({ target: { value: '' } });
-            setDraft('');
-          } else if (!commit(draft)) {
-            setDraft(displayValue);
-          }
-        }}
-      />
-      <button
-        type="button"
-        className="date-input-calendar"
-        aria-label="Choose date from calendar"
-        disabled={disabled}
-        onClick={() => {
-          const picker = calendarRef.current;
-          if (!picker || disabled) return;
-          try { picker.showPicker(); } catch { picker.click(); }
-        }}
-      >
-        <CalendarIcon size={14} />
-      </button>
-      <input
-        ref={calendarRef}
-        className="date-input-native"
-        type="date"
-        value={value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : ''}
-        min={min}
-        max={max}
-        disabled={disabled}
-        tabIndex={-1}
-        aria-hidden="true"
-        onChange={(event) => {
-          if (!event.target.value || !withinBounds(event.target.value)) return;
-          onChange({ target: { value: event.target.value } });
-          setDraft(formatDate(event.target.value, inputFormat));
-        }}
-      />
-    </div>
-  );
+  return <input {...rest} type="date" value={value} onChange={onChange} style={{ width, ...rest.style }} />;
 }

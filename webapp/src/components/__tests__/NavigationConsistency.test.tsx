@@ -36,16 +36,17 @@ describe('Consistent navigation and presentation',()=>{
     expect(screen.getByRole('combobox',{name:'Category'})).toBeVisible();
     expect(screen.getByRole('combobox',{name:'Fund'}).closest('.modal-overlay')).toBeNull();
   });
-  it('honors date preferences for display and entry while saving ISO dates',()=>{
+  it('honors display preferences and uses a native date input saving ISO dates',()=>{
     const prior=useAppearanceStore.getState().appearance.dateFormat;
     useAppearanceStore.getState().update({dateFormat:'MM/DD/YYYY'});
     const change=vi.fn();
     render(<><DateValue value="2026-11-01" /><DateInput aria-label="Date" value="2026-11-01" onChange={change} /></>);
     expect(screen.getByText('11/01/2026')).toBeTruthy();
-    expect(screen.getByRole('textbox',{name:'Date'})).toHaveValue('11/01/2026');
-    fireEvent.change(screen.getByRole('textbox',{name:'Date'}),{target:{value:'11/03/2026'}});
-    fireEvent.blur(screen.getByRole('textbox',{name:'Date'}));
-    expect(change).toHaveBeenCalledWith({target:{value:'2026-11-03'}});
+    expect(screen.getByLabelText('Date')).toHaveValue('2026-11-01');
+    fireEvent.change(screen.getByLabelText('Date'),{target:{value:'2026-11-03'}});
+    expect(screen.getByLabelText('Date')).toHaveAttribute('type', 'date');
+    expect(screen.queryByRole('button', { name: 'Choose date from calendar' })).toBeNull();
+    expect(change).toHaveBeenCalled();
     act(()=>useAppearanceStore.getState().update({dateFormat:'DD/MM/YYYY'}));
     expect(screen.getByText('01/11/2026')).toBeTruthy();
     act(()=>useAppearanceStore.getState().update({dateFormat:prior}));

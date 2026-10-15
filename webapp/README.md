@@ -179,12 +179,40 @@ from the lot system."*
 
 ## Done
 
+- **Nested Batch Editor and action-column consistency (2026-10-15):** Batch
+  Editor opens above its triggering popup/fullscreen card using shared overlay
+  layering and portals. Child confirmation dialogs and tooltips follow that
+  layering; Escape leaves the parent popup open while handling the editor.
+  Batch reorder buttons use the same ArrowUpIcon/ArrowDownIcon controls as tables.
+  Its row actions now occupy the last column. Audited table headers and moved Cash
+  Ledger modification actions after Balance, so Actions is last when visible.
+  Final local regression run: 998 passing tests and the same eight baseline
+  failures; production build passed. All 86 table headers were scanned for a
+  labeled Actions column followed by another column; none remain.
+
+- **The Group imports and linked-transfer fee correction (2026-10-15):** QSE
+  Trade list/Cash ledger accept The Group Cash XLSX or CSV statements through
+  their header menu. Import reads trade quantities/prices and deposit detail
+  breakdowns, excludes duplicate commission-detail rows, reconciles existing
+  combined fills, and flags rounded cash precision. Rounded rewards are excluded
+  rather than replacing exact amounts. Native CSV imports update matching stable
+  IDs without deleting other records, preserve lot targets/fee overrides, and
+  allow linked fee corrections while requiring Modify for linked amount changes.
+  Shared transfer forms expose exchange/fund fees, default incoming QSE/PSX fees
+  from module settings, and retain time/timezone and explicit zero fees. Linked
+  edits preserve module-side fee corrections. Date fields use a single native
+  date input with its built-in picker. Local account statements, audit evidence,
+  and correction files are ignored by Git under webapp/audit.
+  Import shows a separate, cancellable rounded-figures warning before its record
+  confirmation. Verification: 75 focused checks passed; full local run had 997
+  passes and the same eight documented baseline failures, with no new failures.
+
 - **Shared table cards and QSE transaction controls (2026-10-15):** table sections
   use TableCard, built on StandardCard, with header action menus and shared date
   sorting using up/down arrowheads. QSE Trade Transactions uses central filters;
   its tables support import, filtered/all exports, batch editing and Modify.
   Cash Ledger modifications target the original trade, transfer or adjustment.
-  The ledger shows Date, Type, Count, Unit, Price, Amount and Balance (last),
+  The ledger shows Date, Type, Count, Unit, Price, Amount and Balance,
   with portfolio-style Buy/Sell cells, stock logos, and expandable user notes/fees.
   Generated descriptions and duplicate type info icons have been removed.
   The balance reconciliation is recorded in audit/balance-mismatch-15-oct-2026;

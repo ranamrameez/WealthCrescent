@@ -1,4 +1,5 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useContext, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { OverlayLayerContext } from './overlayLayer';
 import { createPortal } from 'react-dom';
 import { InfoIcon } from './icons';
 
@@ -41,6 +42,7 @@ interface Pos {
  * transform — the standard fix for this exact CSS interaction, not
  * something specific to this one card. */
 export function Tooltip({ text, children, align = 'left' }: { text: string; children?: ReactNode; align?: 'left' | 'right' }) {
+  const overlayLayer = useContext(OverlayLayerContext);
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<Pos | null>(null);
   const [measured, setMeasured] = useState(false);
@@ -117,7 +119,7 @@ export function Tooltip({ text, children, align = 'left' }: { text: string; chil
             // while staying below the deliberately-highest blocking layers
             // (TradePlanner fullscreen 999/1000, TermsGateModal 1000), which
             // are meant to sit above literally everything, tooltips included.
-            zIndex: 600,
+            zIndex: Math.max(600, overlayLayer + 10),
             // Raising the z-index above FabPanel also surfaced a real,
             // separate problem: a tooltip placed BELOW its trigger can land
             // right on top of a sibling FAB button stacked underneath it

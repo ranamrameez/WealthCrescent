@@ -65,10 +65,14 @@ export interface LinkSideConfig {
    * simplicity as Personal Loans' plain loan picker) since `buildSideRecord`
    * has no store access to compute it from the loan's own schedule. */
   emiMonth?: number;
+  /** Fee charged on this exchange/fund side, in its own currency. */
+  fee?: number;
 }
 
 export interface InterEntityTransferInput {
   date: string;
+  time?: string;
+  timezone?: string;
   /** Always positive, in the `from` side's own currency. */
   fromAmount: number;
   /** Always positive, in the `to` side's own currency. Independent of

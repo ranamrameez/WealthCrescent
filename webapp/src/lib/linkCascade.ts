@@ -12,6 +12,7 @@ import { useRentalsWorkbookStore } from '../store/rentalsWorkbookStore';
 import { useWorkbookStore } from '../store/workbookStore';
 import { LINK_MODULE_LABELS, type InterEntityTransfer, type InterEntityTransferInput, type LinkModule, type LinkSideConfig } from '../types/interEntityTransfer';
 import { buildLinkedRecords, type LinkSideRecord } from './interEntityLink';
+import { defaultTimeForDate, defaultTimezoneForCurrency } from './datetime';
 
 /** Dispatches a side record into the module store it belongs to. Shared by
  * the Transfers page (create/edit/delete a link) and every native module's
@@ -59,6 +60,19 @@ export function dispatchRemove(module: LinkModule, id: string) {
   }
 }
 
+/** Fill absent exchange fees from user settings; explicit zero stays zero. */
+export function resolveTransferSide(cfg: LinkSideConfig, direction: 'in' | 'out', recordId?: string): LinkSideConfig {
+  if (!['qse', 'psx', 'funds'].includes(cfg.module)) return cfg;
+  const workbook = cfg.module === 'qse' ? useWorkbookStore.getState().workbook : cfg.module === 'psx' ? usePSXWorkbookStore.getState().workbook : useFundsWorkbookStore.getState().workbook;
+  const existing = recordId ? workbook.transfers.find(row => row.id === recordId) : undefined;
+  const defaultFee = direction === 'in' && 'depositFee' in workbook.settings ? Number(workbook.settings.depositFee) || 0 : 0;
+  return { ...cfg, fee: existing?.fee ?? cfg.fee ?? defaultFee };
+}
+function resolveTransferInput(input: InterEntityTransferInput, link?: InterEntityTransfer): InterEntityTransferInput {
+  const timezone = input.timezone ?? defaultTimezoneForCurrency(resolveSideCurrency(input.from) ?? resolveSideCurrency(input.to) ?? 'USD');
+  return { ...input, time: input.time ?? defaultTimeForDate(input.date, timezone), timezone, from: resolveTransferSide(input.from, 'out', link?.fromRecordId), to: resolveTransferSide(input.to, 'in', link?.toRecordId) };
+}
+
 /** Creates a linked transfer's two side records + the link record itself.
  * Code-review finding (PR #2): the three writes below aren't a real
  * database transaction — there's no way to make a client-only app with
@@ -82,7 +96,7 @@ export function createLinkedTransfer(input: InterEntityTransferInput): { link: I
   const ids = { linkId: crypto.randomUUID(), fromRecordId: crypto.randomUUID(), toRecordId: crypto.randomUUID() };
   const written: { module: LinkSideRecord['module']; id: string }[] = [];
   try {
-    const { from, to, link } = buildLinkedRecords(input, ids);
+    const { from, to, link } = buildLinkedRecords(resolveTransferInput(input), ids);
     dispatchAdd(from);
     written.push({ module: from.module, id: ids.fromRecordId });
     dispatchAdd(to);
@@ -113,7 +127,11 @@ export function updateLinkedTransfer(
   link: InterEntityTransfer,
 ): { link: InterEntityTransfer } | { error: string } {
   const ids = { linkId: link.id, fromRecordId: link.fromRecordId, toRecordId: link.toRecordId };
-  const { from, to, link: updated } = buildLinkedRecords(input, ids);
+  const resolved = resolveTransferInput(input);
+  const { from, to, link: updated } = buildLinkedRecords({ ...resolved,
+    from: { ...resolveTransferSide(input.from, 'out', link.fromRecordId), ...input.from },
+    to: { ...resolveTransferSide(input.to, 'in', link.toRecordId), ...input.to },
+  }, ids);
   try {
     dispatchUpdate(from);
     dispatchUpdate(to);
@@ -296,8 +314,10 @@ export function propagateLinkedEdit(
     date: changes.date ?? link.date,
     fromAmount,
     toAmount,
-    from: fromCfg,
-    to: toCfg,
+    from: resolveTransferSide(fromCfg, 'out', fromRecordId),
+    to: resolveTransferSide(toCfg, 'in', toRecordId),
+    time: link.time,
+    timezone: link.timezone,
     categoryID: changes.categoryID !== undefined ? changes.categoryID : link.categoryID,
     note: changes.note !== undefined ? changes.note : link.note,
     rateSource: link.rateSource,

@@ -292,3 +292,22 @@ describe('propagateLinkedEdit', () => {
     expect(useInterEntityTransfersStore.getState().workbook.entries[0].note).toBe('renamed');
   });
 });
+import { useWorkbookStore } from '../../store/workbookStore';
+import { createEmptyWorkbook } from '../../store/defaultWorkbook';
+it('defaults bank-to-QSE fees, preserves explicit zero, time and later module-side fee corrections', () => {
+  useWorkbookStore.getState().setWorkbook(createEmptyWorkbook());
+  useBankWorkbookStore.getState().setWorkbook({ ...createEmptyBankWorkbook(), settings: { accounts: [{ id: bankAccountId, name: 'QAR Bank', currencyCode: 'QAR', openingBalance: 0 }] } });
+  const input: InterEntityTransferInput = { date: '2026-10-15', time: '10:15', timezone: 'Asia/Qatar', fromAmount: 6010, toAmount: 6010, from: { module: 'bank', ref: bankAccountId, currencyCode: 'QAR' }, to: { module: 'qse', currencyCode: 'QAR' } };
+  const result = createLinkedTransfer(input);
+  expect('link' in result).toBe(true);
+  if (!('link' in result)) return;
+  let transfer = useWorkbookStore.getState().workbook.transfers[0];
+  expect(transfer).toMatchObject({ gross: 6010, fee: 10, time: '10:15', timezone: 'Asia/Qatar' });
+  useWorkbookStore.getState().updateTransfer(transfer.id!, { fee: 12 });
+  propagateLinkedEdit('bank', result.link.fromRecordId, { amount: 6100 });
+  transfer = useWorkbookStore.getState().workbook.transfers[0];
+  expect(transfer).toMatchObject({ gross: 6100, fee: 12, time: '10:15', timezone: 'Asia/Qatar' });
+  const zero = createLinkedTransfer({ ...input, to: { ...input.to, fee: 0 } });
+  expect('link' in zero).toBe(true);
+  expect(useWorkbookStore.getState().workbook.transfers[1].fee).toBe(0);
+});

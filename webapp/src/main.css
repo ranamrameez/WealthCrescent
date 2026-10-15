@@ -258,10 +258,6 @@
 .filter-fields-grid{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;}
 .filter-fields-grid > *{flex:1 1 150px;min-width:140px;max-width:100%;}
 .modal-footer-actions{display:flex;justify-content:space-between;gap:8px;margin-top:16px;}
-.date-input-wrap{display:flex;align-items:center;gap:4px;position:relative;}
-.date-input-wrap>input[type="text"]{flex:1;min-width:0;}
-.date-input-calendar{width:32px;height:32px;min-width:32px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:7px;background:var(--panel-2);color:var(--text);cursor:pointer;}
-.date-input-native{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;}
 .usage-bar{margin-top:14px;}
 .usage-bar-track{height:10px;border-radius:999px;overflow:hidden;background:color-mix(in srgb,var(--profit) 30%,var(--panel-2));}
 .usage-bar-used{width:var(--usage-pct,0%);height:100%;background:var(--loss);}

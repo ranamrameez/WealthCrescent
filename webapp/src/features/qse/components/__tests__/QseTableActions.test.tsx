@@ -6,11 +6,14 @@ import { useWorkbookStore } from '../../../../store/workbookStore';
 import { createEmptyWorkbook } from '../../../../store/defaultWorkbook';
 import { useInterEntityTransfersStore } from '../../../../store/interEntityTransfersStore';
 import { toCSV } from '../../../../lib/csv';
+import { confirmDialog } from '../../../../components/ConfirmDialog';
+import { zipSync, strToU8 } from 'fflate';
 vi.mock('../../../../lib/firebase/useEnsureSignedIn', () => ({ useEnsureSignedIn: () => async () => true }));
 vi.mock('../../../../lib/firebase/useAuthState', () => ({ getCurrentUser: () => ({ uid: 'test' }) }));
-vi.mock('../../../../components/ConfirmDialog', () => ({ confirmDialog: async () => true }));
+vi.mock('../../../../components/ConfirmDialog', () => ({ confirmDialog: vi.fn(async () => true) }));
 vi.mock('../../../../components/Toast', () => ({ toast: vi.fn() }));
 beforeEach(() => {
+  vi.mocked(confirmDialog).mockReset().mockResolvedValue(true);
   const workbook = createEmptyWorkbook();
   workbook.transactions = [{ id: 'buy', seq: 1, date: '2026-10-01', ticker: 'QNBK', action: 'BUY', shares: 10, price: 12, feeOverride: 3 }, { id: 'sell', seq: 2, date: '2026-10-02', ticker: 'QNBK', action: 'SELL', shares: 2, price: 13 }];
   useWorkbookStore.setState({ workbook });
@@ -122,4 +125,38 @@ it('imports mixed ledger records into their owning collections and skips duplica
   expect(wb.adjustments[0]).toMatchObject({ amount: -5, note: 'Correction' });
   expect(wb.transfers[0]).not.toHaveProperty('kind');
   expect(wb.transfers[0]).not.toHaveProperty('shares');
+});
+it('updates correction CSV IDs in place, adds one sale, and remains idempotent', async () => {
+  const { container } = show();
+  const makeFile = () => {
+    const file = new File([], 'corrections.csv', { type: 'text/csv' });
+    Object.defineProperty(file, 'text', { value: async () => toCSV([
+      ['id', 'date', 'ticker', 'action', 'shares', 'price'],
+      ['buy', '2026-10-01', 'QNBK', 'BUY', '10', '12.24'],
+      ['sale-new', '2026-10-15', 'QNBK', 'SELL', '1', '13'],
+    ]) });
+    return file;
+  };
+  const input = container.querySelector('input[type=file]')!;
+  fireEvent.change(input, { target: { files: [makeFile()] } });
+  await waitFor(() => expect(useWorkbookStore.getState().workbook.transactions).toHaveLength(3));
+  expect(useWorkbookStore.getState().workbook.transactions.find(row => row.id === 'buy')).toMatchObject({ price: 12.24, feeOverride: 3 });
+  fireEvent.change(input, { target: { files: [makeFile()] } });
+  await waitFor(() => expect(useWorkbookStore.getState().workbook.transactions).toHaveLength(3));
+});
+it('warns about rounded Excel figures before import confirmation and lets the user cancel', async () => {
+  const { container } = show();
+  const bytes = zipSync({ 'xl/worksheets/sheet1.xml': strToU8('<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row><c r="A1" t="inlineStr"><is><t>Date</t></is></c><c r="B1" t="inlineStr"><is><t>Type</t></is></c><c r="C1" t="inlineStr"><is><t>Count</t></is></c></row><row><c r="A2" t="inlineStr"><is><t>15/10/2026</t></is></c><c r="B2" t="inlineStr"><is><t>Buy</t></is></c><c r="C2"><v>1</v></c><c r="D2" t="inlineStr"><is><t>Qatar Fuel</t></is></c><c r="E2"><v>12.24</v></c></row></sheetData></worksheet>') });
+  const file = new File([], 'statement.xlsx');
+  Object.defineProperty(file, 'arrayBuffer', { value: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) });
+  const input = container.querySelector('input[type=file]')!;
+  vi.mocked(confirmDialog).mockResolvedValueOnce(false);
+  fireEvent.change(input, { target: { files: [file] } });
+  await waitFor(() => expect(confirmDialog).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(confirmDialog).mock.calls[0]).toEqual([expect.stringContaining('incorrect balances'), 'Warning: rounded statement figures']);
+  expect(useWorkbookStore.getState().workbook.transactions).toHaveLength(2);
+  vi.mocked(confirmDialog).mockClear().mockResolvedValue(true);
+  fireEvent.change(input, { target: { files: [file] } });
+  await waitFor(() => expect(useWorkbookStore.getState().workbook.transactions).toHaveLength(3));
+  expect(vi.mocked(confirmDialog).mock.calls.map(call => call[1])).toEqual(['Warning: rounded statement figures', 'Import QSE transactions?']);
 });

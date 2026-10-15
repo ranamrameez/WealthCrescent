@@ -5,6 +5,9 @@ import { cellValue, parseBatchRow, type BatchMutations, type BatchChange, type B
 import { FormulaInput } from './ui/FormulaInput';
 import { ToggleChip } from './ui/ToggleChip';
 import { DateInput } from './ui/Field';
+import { ArrowDownIcon, ArrowUpIcon, TrashIcon } from './icons';
+import { IconButton } from './ui/IconButton';
+import { OverlayLayerContext, useOverlayLayer } from './overlayLayer';
 import './BatchEditGrid.css';
 
 export type { BatchMutations, BatchChange, BatchColumn, RowErrors } from './batchEditModel';
@@ -22,6 +25,8 @@ export function BatchEditGrid<T>({ title, description, rows, columns, getRowId, 
   onSave: (changes: BatchChange<T>[], mutations: BatchMutations<T>) => void | Promise<void>;
   onClose: () => void;
 }) {
+  const layer = useOverlayLayer(800);
+  const hasActions = !!createRow || !!orderKey;
   // Snapshot once: cloud/store updates must never replace unsaved drafts.
   const [added, setAdded] = useState<T[]>([]);
   const [deleted, setDeleted] = useState<string[]>([]);
@@ -154,7 +159,7 @@ export function BatchEditGrid<T>({ title, description, rows, columns, getRowId, 
     finally { saving.current = false; setBusy(false); }
   };
 
-  return createPortal(<div className="batch-edit-overlay">
+  return createPortal(<OverlayLayerContext.Provider value={layer}><div className="batch-edit-overlay" style={{ zIndex: layer }}>
     <div className="batch-edit-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} ref={dialog} onKeyDown={keyDown}>
       <header className="batch-edit-header">
         <div><h2 id={titleId}>{title}</h2><p>{description}</p></div>
@@ -183,18 +188,15 @@ export function BatchEditGrid<T>({ title, description, rows, columns, getRowId, 
         const el = event.currentTarget;
         if (el.scrollTop > 0 && el.scrollHeight - el.scrollTop - el.clientHeight < 160 && limit < filtered.length) setLimit(value => Math.min(value + 50, filtered.length));
       }}>
-        <table className="batch-edit-table" style={{ width: 110 + columns.reduce((sum, col) => sum + (col.width ?? 160), 0) }}>
-          <colgroup><col style={{ width: 110 }} />{columns.map(c => <col key={c.key} style={{ width: c.width ?? 160 }} />)}</colgroup>
-          <thead><tr><th scope="col">Row / status</th>{columns.map(c => <th scope="col" key={c.key} className={dirtyColumns.has(c.key) ? 'batch-edit-column-dirty' : undefined}>{c.label}{dirtyColumns.has(c.key) && <small> Edited</small>}</th>)}</tr></thead>
+        <table className="batch-edit-table" style={{ width: 110 + (hasActions ? 130 : 0) + columns.reduce((sum, col) => sum + (col.width ?? 160), 0) }}>
+          <colgroup><col style={{ width: 110 }} />{columns.map(c => <col key={c.key} style={{ width: c.width ?? 160 }} />)}{hasActions && <col style={{ width: 130 }} />}</colgroup>
+          <thead><tr><th scope="col">Row / status</th>{columns.map(c => <th scope="col" key={c.key} className={dirtyColumns.has(c.key) ? 'batch-edit-column-dirty' : undefined}>{c.label}{dirtyColumns.has(c.key) && <small> Edited</small>}</th>)}{hasActions && <th scope="col">Actions</th>}</tr></thead>
           <tbody>{visible.map(({ before, after, dirtyKeys, errors, index, isNew }) => {
             const id = getRowId(before), locked = rowReadOnly?.(before);
             return <tr key={id}>
               <th scope="row">{index + 1}
                 {isNew && <small>New</small>}
-                {!locked && createRow && <div className="batch-edit-row-actions">
-                  {orderKey && [-1, 1].map(step => <button key={step} type="button" aria-label={`Move row ${index + 1} ${step < 0 ? 'up' : 'down'}`} disabled={!prepared[index + step] || (getReorderGroup ?? getRowDate)?.(prepared[index + step].after) !== (getReorderGroup ?? getRowDate)?.(prepared[index].after) || !!rowReadOnly?.(prepared[index + step].before)} onClick={() => move(index, step)}>{step < 0 ? '↑' : '↓'}</button>)}
-                  <button type="button" aria-label={`Delete row ${index + 1}`} onClick={() => remove(before)}>×</button>
-                </div>}{dirtyKeys.length > 0 ? ' · Changed' : ''}{locked && <span className="batch-edit-linked-pill" title={locked}>Read-only</span>}<small>{showErrors && errors._row}</small></th>
+                {dirtyKeys.length > 0 ? ' · Changed' : ''}{locked && <span className="batch-edit-linked-pill" title={locked}>Read-only</span>}<small>{showErrors && errors._row}</small></th>
               {columns.map((col, ci) => {
                 const editable = !locked && col.editable !== false && (typeof col.editable !== 'function' || col.editable(before));
                 const value = drafts[id]?.[col.key] ?? cellValue(before, col);
@@ -215,6 +217,10 @@ export function BatchEditGrid<T>({ title, description, rows, columns, getRowId, 
                   {error && <small id={errorId} className="batch-edit-error">{error}</small>}
                 </td>;
               })}
+              {hasActions && <td>{!locked && <div className="batch-edit-row-actions">
+                {orderKey && [-1, 1].map(step => <IconButton key={step} type="button" label={`Move row ${index + 1} ${step < 0 ? 'up' : 'down'}`} icon={step < 0 ? <ArrowUpIcon size={12} /> : <ArrowDownIcon size={12} />} disabled={!prepared[index + step] || (getReorderGroup ?? getRowDate)?.(prepared[index + step].after) !== (getReorderGroup ?? getRowDate)?.(prepared[index].after) || !!rowReadOnly?.(prepared[index + step].before)} onClick={() => move(index, step)} />)}
+                {createRow && <IconButton type="button" label={`Delete row ${index + 1}`} icon={<TrashIcon size={12} />} onClick={() => remove(before)} />}
+              </div>}</td>}
             </tr>;
           })}</tbody>
         </table>
@@ -222,5 +228,5 @@ export function BatchEditGrid<T>({ title, description, rows, columns, getRowId, 
         {limit < filtered.length && <button className="btn secondary batch-edit-load" onClick={() => setLimit(value => value + 50)}>Load 50 more rows ({filtered.length - visible.length} remaining)</button>}
       </div>
     </div>
-  </div>, document.body);
+  </div></OverlayLayerContext.Provider>, document.body);
 }

@@ -16,7 +16,7 @@ import { loanCategoryForDirection, loanDirectionForTransfer, transferDirectionFo
 import { convertAmount, loadCachedFxRates } from '../lib/fx';
 import { useEnsureSignedIn } from '../lib/firebase/useEnsureSignedIn';
 import { defaultLinkedOtherSide, isSupportedLinkPair, linkSideRequiresRef } from '../lib/interEntityLink';
-import { createLinkedTransfer, propagateLinkedEdit, resolveLinkedEdit } from '../lib/linkCascade';
+import { createLinkedTransfer, propagateLinkedEdit, resolveLinkedEdit, resolveTransferSide } from '../lib/linkCascade';
 import { useBankWorkbookStore } from '../store/bankWorkbookStore';
 import { useCashWorkbookStore } from '../store/cashWorkbookStore';
 import { useCreditCardWorkbookStore } from '../store/creditCardWorkbookStore';
@@ -184,6 +184,17 @@ function emptyRow(
     toAmountTouched: false,
     rateSource: '',
   };
+}
+
+function TransferFeeField({ side, direction, amount, onChange }: { side: LinkSideConfig; direction: 'in' | 'out'; amount: number; onChange: (side: LinkSideConfig) => void }) {
+  const qseDefault = useWorkbookStore(state => state.workbook.settings.depositFee);
+  const psxDefault = usePSXWorkbookStore(state => state.workbook.settings.depositFee);
+  if (!['qse', 'psx', 'funds'].includes(side.module)) return null;
+  const fee = side.fee ?? (direction === 'in' ? side.module === 'qse' ? qseDefault : side.module === 'psx' ? psxDefault : 0 : 0);
+  return <Field label={side.module.toUpperCase() + ' transfer fee'} title="Starts from this module's saved deposit fee. Amount is gross; deposits receive gross minus fee, withdrawals cost gross plus fee.">
+    <AmountInput value={fee} onChange={value => onChange({ ...side, fee: value })} />
+    <small>{direction === 'in' ? 'Net received: ' : 'Total debit: '}{(Math.abs(amount) + (direction === 'in' ? -fee : fee)).toFixed(2)}</small>
+  </Field>;
 }
 
 /** One row of the shared "Transfers" popup — its own component instance so
@@ -424,6 +435,10 @@ function TxRowFields({
           )}
         </div>
       )}
+      <div className="row gap-sm mt-sm">
+        <TransferFeeField side={row.finance} direction={row.direction} amount={row.amount} onChange={finance => onChange({ ...row, finance })} />
+        {row.linked && <TransferFeeField side={row.other} direction={row.direction === 'in' ? 'out' : 'in'} amount={row.toAmount ?? row.amount} onChange={other => onChange({ ...row, other })} />}
+      </div>
       {canRemove && (
         <div className="d-flex justify-end mt-sm">
           <button className="btn secondary small" onClick={onRemove}>
@@ -560,6 +575,10 @@ export function TransactionEntryModal({
     const valid = rows.filter((r) => r.amount !== 0);
     if (!valid.length) return toast('Enter an amount on at least one row.');
     for (const r of valid) {
+      if (!r.date || !/^\d{4}-\d{2}-\d{2}$/.test(r.date)) return toast('Choose a valid date.');
+      for (const side of [resolveTransferSide(r.finance, r.direction), ...(r.linked ? [resolveTransferSide(r.other, r.direction === 'in' ? 'out' : 'in')] : [])]) {
+        if (side.fee !== undefined && (!Number.isFinite(side.fee) || side.fee < 0)) return toast('Fee must be a non-negative number.');
+      }
       if (r.linked) {
         if (linkSideRequiresRef(r.finance) && !r.finance.ref) return toast('Pick the account/entity for the first finance side.');
         if (linkSideRequiresRef(r.other) && !r.other.ref) return toast('Pick the account/entity for the linked finance side.');
@@ -626,6 +645,8 @@ export function TransactionEntryModal({
         const otherAmount = r.toAmount ?? abs;
         const result = createLinkedTransfer({
           date: r.date,
+          time: r.time,
+          timezone: r.timezone,
           fromAmount: r.direction === 'out' ? financeAmount : otherAmount,
           toAmount: r.direction === 'out' ? otherAmount : financeAmount,
           from: r.direction === 'out' ? resolvedFinance : resolvedOther,
@@ -697,13 +718,13 @@ export function TransactionEntryModal({
           break;
         }
         case 'qse':
-          addQSETransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: 0, description: r.description.trim() || undefined });
+          addQSETransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: resolveTransferSide(r.finance, r.direction).fee ?? 0, description: r.description.trim() || undefined });
           break;
         case 'psx':
-          addPSXTransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: 0, description: r.description.trim() || undefined });
+          addPSXTransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: resolveTransferSide(r.finance, r.direction).fee ?? 0, description: r.description.trim() || undefined });
           break;
         case 'funds':
-          addFundsTransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: 0, description: r.description.trim() || undefined });
+          addFundsTransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: resolveTransferSide(r.finance, r.direction).fee ?? 0, description: r.description.trim() || undefined });
           break;
         case 'creditCard': {
           // User-reported (2026-09-14): "no choice of expense or payment,

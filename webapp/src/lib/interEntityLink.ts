@@ -76,7 +76,7 @@ function buildSideRecord(
     case 'funds':
       return {
         module: cfg.module,
-        record: { id, date, type: direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: amount, fee: 0, description: note },
+        record: { id, date, type: direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: amount, fee: cfg.fee ?? 0, description: note },
       };
     case 'rentals':
       // Unlike Bank/Cash/QSE/PSX/Funds, Rentals has no real balance of its
@@ -165,6 +165,14 @@ export function buildLinkedRecords(
 ): { from: LinkSideRecord; to: LinkSideRecord; link: InterEntityTransfer } {
   const from = buildSideRecord(input.from, ids.fromRecordId, input.date, input.fromAmount, 'out', input.note, input.categoryID);
   const to = buildSideRecord(input.to, ids.toRecordId, input.date, input.toAmount, 'in', input.note, input.categoryID);
+  for (const side of [from, to]) {
+    if (side.module === 'emi') continue;
+    if (input.time !== undefined) side.record.time = input.time;
+    if (input.timezone !== undefined) side.record.timezone = input.timezone;
+  }
+  for (const side of [from, to]) {
+    if ('fee' in side.record && (!Number.isFinite(side.record.fee) || side.record.fee < 0)) throw new Error('Fee must be a non-negative number.');
+  }
   const link: InterEntityTransfer = {
     ...input,
     id: ids.linkId,
