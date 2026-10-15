@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { useRef } from 'react';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { collectTopBarSections, useTopBarPageSections } from '../useTopBarPageSections';
 import { StandardCard } from '../../components/StandardCard';
@@ -47,7 +47,7 @@ describe('page section navigation', () => {
     expect(sections[0]).toMatchObject({ key: 'stock', label: 'Stock plan', registered: control });
   });
 
-  it('uses registered section actions to expand without toggling an already open section closed', () => {
+  it('uses registered section actions to expand without toggling an already open section closed', async () => {
     vi.stubGlobal('requestAnimationFrame', () => 1);
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
     const { container } = render(<MemoryRouter><RegisteredPage /></MemoryRouter>);
@@ -58,7 +58,7 @@ describe('page section navigation', () => {
     fireEvent.click(plans);
     expect(screen.getByText('Plan contents')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: /Plans/, expanded: true }));
-    expect(screen.queryByText('Plan contents')).toBeNull();
+    await waitFor(() => expect(screen.queryByText('Plan contents')).toBeNull());
     fireEvent.click(plans);
     expect(screen.getByText('Plan contents')).toBeVisible();
   });

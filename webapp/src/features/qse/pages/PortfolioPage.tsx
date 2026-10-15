@@ -1,3 +1,4 @@
+import { StatCard2 } from '../../../components/StatCard2';
 import { RecordRow } from '../../../components/RecordRow';
 import { PageHeading } from '../../../components/PageHeading';
 import { BackButton } from '../../../components/BackButton';
@@ -183,7 +184,7 @@ function OpenPositionsTable({ onSelect }: { onSelect: (ticker: string) => void }
                 </div>
               </td>
               <td onClick={() => onSelect(r.ticker)} className={Number.isFinite(r.net) ? (r.net >= 0 ? 'pill-positive' : 'pill-negative') : ''}>
-                <div>{Number.isFinite(r.net) ? fmtMoney(r.net, currency) : '—'}</div>
+                <StatCard2 label="Net P/L" value={Number.isFinite(r.net) ? fmtMoney(r.net, currency) : '—'} valueColor={Number.isFinite(r.net) ? r.net >= 0 ? 'var(--profit)' : 'var(--loss)' : undefined} />
                 <div className="text-muted">{Number.isFinite(r.netPct) ? `${r.netPct >= 0 ? '+' : ''}${r.netPct.toFixed(1)}%` : ''}</div>
               </td>
               <td onClick={() => onSelect(r.ticker)} className="text-muted" style={{ whiteSpace: 'nowrap' }}>
@@ -259,8 +260,7 @@ function ClosedPositionsTable({ onSelect }: { onSelect: (ticker: string) => void
                 <div className="text-muted">{fmt(p.totalSoldShares, 0)} sold</div>
               </td>
               <td className={p.realized >= 0 ? 'pill-positive' : 'pill-negative'}>
-                <div>{fmtMoney(p.realized, currency)}</div>
-                <div className="text-muted">Fees {fmtMoney(p.buyFees + p.sellFees, currency)}</div>
+                <StatCard2 label="Realized P/L" value={fmtMoney(p.realized, currency)} valueColor={p.realized >= 0 ? 'var(--profit)' : 'var(--loss)'} description={`Fees ${fmtMoney(p.buyFees + p.sellFees, currency)}`} />
               </td>
               <td className="text-muted" style={{ whiteSpace: 'nowrap' }}>
                 {p.firstDate} → {p.lastDate}

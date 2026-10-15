@@ -791,9 +791,6 @@ hr {
 .current-position-targets { font-size: 13px !important; line-height: 1.45 !important; }
 .current-position-comparison { grid-column: span 2; }
 .current-position-supporting { display: grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); gap: 8px; margin-top: 10px; }
-.current-position-supporting > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; padding: 8px 10px; border: var(--border-light); border-radius: 7px; background: color-mix(in srgb,var(--panel-2) 42%,transparent); }
-.current-position-supporting span,.current-position-supporting small { color: var(--muted); font-size: 10px; }
-.current-position-supporting strong { color: var(--text-muted); font-family: var(--mono); font-size: 12px; }
 @media(max-width:600px){.current-position-lead{grid-template-columns:1fr;}}
 
 .holdings-price-row {
@@ -2706,3 +2703,27 @@ th.sortable:focus-visible { outline: 2px solid currentColor; outline-offset: -2p
 .record-edit-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; }
 .record-edit-field { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .record-edit-field input, .record-edit-field select { max-width: 100%; }
+
+/* Compact shared metrics, independent of dashboard stat-card styling. */
+.stat-card-2-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); gap: 8px; }
+.stat-card-2 { display: flex; min-width: 0; flex-direction: column; gap: 2px; padding: 8px 10px; border: var(--border-light); border-radius: 7px; background: color-mix(in srgb,var(--panel-2) 42%,transparent); }
+.stat-card-2-key,.stat-card-2-description { color: var(--muted); font-size: 10px; }
+.stat-card-2-value { color: var(--text-muted); font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
+.record-detail-grid { align-items: start; }
+.section-transition { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 180ms ease, opacity 180ms ease; }
+.section-transition.is-open { grid-template-rows: 1fr; opacity: 1; }
+.section-transition-content { min-height: 0; overflow: clip; }
+@starting-style { .section-transition.is-open { grid-template-rows: 0fr; opacity: 0; } }
+.page-route-enter { animation: page-enter 160ms ease-out; }
+.page-loading { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 1000; display: flex; align-items: center; gap: 8px; padding: 10px 16px; border: var(--border-light); border-radius: 8px; background: var(--panel); color: var(--text); box-shadow: 0 4px 16px #0002; }
+.loading-spinner { width: 14px; height: 14px; border: 2px solid var(--muted); border-top-color: var(--accent); border-radius: 50%; animation: loading-spin 700ms linear infinite; }
+@keyframes loading-spin { to { transform: rotate(360deg); } }
+@keyframes page-enter { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .section-transition { transition: none; } .page-route-enter,.loading-spinner { animation: none; } }
+
+.standard-section .section-transition-content > .standard-card-body { padding-inline: 0; }
+.standard-card-fullscreen > .section-transition { flex: 1; min-height: 0; }
+.standard-card-fullscreen .section-transition-content { overflow: auto; }
+
+.section-transition.is-open > .section-transition-content { overflow: visible; }
+.standard-card-fullscreen > .section-transition.is-open > .section-transition-content { overflow: auto; }

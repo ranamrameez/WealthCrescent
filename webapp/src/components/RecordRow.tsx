@@ -1,4 +1,4 @@
-import { Children, Fragment, isValidElement, lazy, Suspense, useLayoutEffect, useRef, useState, type HTMLAttributes, type MouseEventHandler, type MouseEvent, type ReactNode } from 'react';
+import { Children, cloneElement, Fragment, isValidElement, lazy, Suspense, useLayoutEffect, useRef, useState, type HTMLAttributes, type MouseEventHandler, type MouseEvent, type ReactNode } from 'react';
 import { RecordDetailModal, type DetailField } from './RecordDetailModal';
 import { Modal } from './Modal';
 import { InvestmentTransactionEditor } from './InvestmentTransactionEditor';
@@ -32,6 +32,15 @@ function hasControl(children: ReactNode, name: string): boolean {
 function rowCells(children: ReactNode): React.ReactElement<ChildProps>[] {
   return Children.toArray(children).flatMap(child => !isValidElement<ChildProps>(child) ? [] : child.type === Fragment ? rowCells(child.props.children) : [child]);
 }
+function markInteractive(children: ReactNode): ReactNode {
+  return Children.map(children, child => {
+    if (!isValidElement<ChildProps>(child)) return child;
+    return cloneElement(child, {
+      ...(typeof child.type === 'string' && child.props.onClick ? { 'data-record-interactive': true } : {}),
+      ...(child.props.children !== undefined ? { children: markInteractive(child.props.children) } : {}),
+    });
+  });
+}
 function textContent(children: ReactNode): string {
   return Children.toArray(children).map(child => {
     if (!isValidElement<ChildProps & { value?: unknown; ticker?: string }>(child)) return typeof child === 'string' || typeof child === 'number' ? String(child) : '';
@@ -62,11 +71,11 @@ export function RecordRow({ record, market, financeModule, onEdit, onCancel, onO
   const [headers, setHeaders] = useState<string[]>([]);
   const editing = !!onCancel && hasControl(children, 'save') && hasControl(children, 'cancel');
   useLayoutEffect(() => {
-    if (!editing) {
+    if (open || editing) {
       const labels = Array.from(rowRef.current?.closest('table')?.querySelectorAll('thead tr:last-child th') ?? []).map(cell => cell.textContent?.trim() || 'Field');
       setHeaders(previous => JSON.stringify(previous) === JSON.stringify(labels) ? previous : labels);
     }
-  }, [children, editing]);
+  }, [open, editing]);
   const cells = rowCells(children);
   const fields = open ? [...recordFields(source ? { ...data, source } : record), ...cells.flatMap((cell, index) => {
     const value = textContent(cell.props.children);
@@ -74,7 +83,7 @@ export function RecordRow({ record, market, financeModule, onEdit, onCancel, onO
   })] : [];
   const interact = (event: MouseEvent<HTMLTableRowElement>) => {
     const target = event.target as HTMLElement;
-    if (!event.currentTarget.contains(target) || target.closest('button,a,input,select,textarea,label,[role="button"],.tooltip-trigger,[contenteditable="true"]') || window.getSelection()?.toString()) return;
+    if (event.defaultPrevented || !event.currentTarget.contains(target) || target.closest('button,a,input,select,textarea,label,[role="button"],[role="link"],[data-record-interactive],.tooltip-trigger,[contenteditable="true"]') || window.getSelection()?.toString()) return;
     event.stopPropagation(); setOpen(true);
   };
   return <>
@@ -88,7 +97,7 @@ export function RecordRow({ record, market, financeModule, onEdit, onCancel, onO
     }} onClick={interact} onKeyDown={event => {
       props.onKeyDown?.(event);
       if (event.target === event.currentTarget && ['Enter', ' '].includes(event.key)) { event.preventDefault(); event.stopPropagation(); setOpen(true); }
-    }}>{editing ? <td colSpan={Math.max(1, cells.length)}>Editing record…</td> : children}</tr>
+    }}>{editing ? <td colSpan={Math.max(1, cells.length)}>Editing record…</td> : markInteractive(children)}</tr>
     {open && !editing && <RecordDetailModal title={title} fields={fields} onClose={() => setOpen(false)} onEdit={nativeEdit ? () => { setOpen(false); setEditTrade(true); } : onEdit ? event => { setOpen(false); onEdit(event); } : undefined} onOpen={onOpen ? () => { setOpen(false); onOpen(); } : undefined} />}
     {editTrade && market && transaction && <InvestmentTransactionEditor transaction={transaction} market={market} onClose={() => setEditTrade(false)} />}
     {editTrade && market && !transaction && transfer && <Suspense fallback={<Modal title="Edit transfer" onClose={() => setEditTrade(false)}><p role="status">Opening transfer editor…</p></Modal>}><TransferEditor editTransfer={{ module: market, record: transfer }} onClose={() => setEditTrade(false)} /></Suspense>}

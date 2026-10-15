@@ -984,3 +984,7 @@ If a number here ever disagrees with your official statement, trust the statemen
 Cash: select a date range and other ledger filters, then choose **Batch edit** beside the currency ledger. Rentals: choose a property and date period, then **Batch edit** above its income/expense entries. Use positive amounts and the direction checkbox (Cash in or Rent income). Formula amounts such as `=5*986.5` work in either editor. Save applies the whole validated batch; discard leaves the ledger unchanged. Linked transfers use the existing single-record editing flow.
 
 EMI, Funds, brokers, and Subscriptions now use the same section navigation and fullscreen cards as Banking. Cash and Rentals have separate Summary sections. Use the section chips to jump to details, plans, activity, or analytics where available. Existing transaction and planning controls remain within their relevant sections.
+
+
+### Row details and navigation
+Click a plain table cell to view the complete record. Ticker links and cells with their own actions open their destination directly. Supporting metrics use consistent compact cards in ticker pages, portfolios, and detail popups. A loading indicator appears while a destination page is being prepared. Section headers animate open and closed; reduced-motion preferences are respected.

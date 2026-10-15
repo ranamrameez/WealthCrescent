@@ -16,6 +16,22 @@ vi.mock('../../lib/firebase/useEnsureSignedIn', () => ({ useEnsureSignedIn: () =
 vi.mock('../../lib/firebase/useAuthState', () => ({ useAuthState: () => ({ user: null, authResolved: true }), getCurrentUser: () => ({ uid: 'test' }) }));
 vi.mock('../LinkedEditChoiceDialog', () => ({ linkedEditChoiceDialog: vi.fn(async () => 'both') }));
 afterEach(cleanup);
+it('lets cell navigation, nested handlers and links run without also opening details', () => {
+  const navigate = vi.fn();
+  render(<table><tbody><RecordRow record={{ ticker: 'QFLS' }}>
+    <td onClick={navigate}><span>QFLS ticker</span></td>
+    <td><span onClick={navigate}><svg data-testid="ticker-logo" /></span></td>
+    <td><a href="#stock/QFLS">Ticker link</a></td>
+    <td>Plain record cell</td>
+  </RecordRow></tbody></table>);
+  fireEvent.click(screen.getByText('QFLS ticker'));
+  fireEvent.click(screen.getByTestId('ticker-logo'));
+  fireEvent.click(screen.getByText('Ticker link'));
+  expect(navigate).toHaveBeenCalledTimes(2);
+  expect(screen.queryByText('Record details')).toBeNull();
+  fireEvent.click(screen.getByText('Plain record cell'));
+  expect(screen.getByText('Record details')).toBeVisible();
+});
 it('shows complete source values by click and keyboard and opens the existing editor', () => {
   const edit = vi.fn(), link = vi.fn();
   render(<table><thead><tr><th>Description</th><th>Actions</th></tr></thead><tbody><RecordRow record={{ id: 'record', description: 'A complete untruncated description', timezone: 'Asia/Qatar', amount: 123.456 }} onEdit={edit}><td>Short description</td><td><button onClick={link}>Existing action</button></td></RecordRow></tbody></table>);

@@ -1,5 +1,5 @@
 import type { ReactNode, MouseEventHandler } from 'react';
-import { Fragment } from 'react';
+import { StatCard2, type StatCard2Props } from './StatCard2';
 import { Modal } from './Modal';
 import { DateValue } from './DateValue';
 import { EditIcon } from './icons';
@@ -7,6 +7,8 @@ import { EditIcon } from './icons';
 export interface DetailField {
   label: string;
   value: ReactNode;
+  keyColor?: StatCard2Props['keyColor'];
+  valueColor?: StatCard2Props['valueColor'];
 }
 
 /** User-reported (2026-09-09): "We should also show a transaction record in
@@ -21,13 +23,8 @@ export interface DetailField {
 export function RecordDetailModal({ title, fields, onClose, onEdit, onOpen }: { title: string; fields: DetailField[]; onClose: () => void; onEdit?: MouseEventHandler<HTMLButtonElement>; onOpen?: () => void }) {
   return (
     <Modal title={title} onClose={onClose}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '10px 16px', alignItems: 'start' }}>
-        {fields.map((f, i) => (
-          <Fragment key={i}>
-            <div className="text-muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{f.label}</div>
-            <div style={{ wordBreak: 'break-word' }}>{typeof f.value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(f.value) ? <DateValue value={f.value} /> : f.value}</div>
-          </Fragment>
-        ))}
+      <div className="stat-card-2-grid record-detail-grid">
+        {fields.map((f, i) => <StatCard2 key={i} label={f.label} keyColor={f.keyColor} valueColor={f.valueColor} value={typeof f.value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(f.value) ? <DateValue value={f.value} /> : f.value} />)}
       </div>
       {onEdit && <div className="d-flex justify-end mt-md"><button type="button" className="btn" onClick={onEdit}><EditIcon size={14} />Edit</button></div>}
       {onOpen && <div className="d-flex justify-end mt-md"><button type="button" className="btn secondary" onClick={onOpen}>Open</button></div>}

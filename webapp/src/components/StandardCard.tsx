@@ -1,3 +1,4 @@
+import { AnimatedSection } from './AnimatedSection';
 import { Children, isValidElement, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { ArchiveIcon, CheckIcon, CollapseIcon, EditIcon, ExpandIcon, ExportIcon, FlaskIcon, MenuIcon, PlanningIcon, PlusIcon, SaveIcon, TrashIcon, XIcon } from './icons';
 import { StandardIconButton } from './standard';
@@ -82,6 +83,6 @@ export function StandardCard({ title, summary, actions=[], headerEnd, defaultOpe
         <CardActionMenu actions={actions} onAction={()=>{if(!open){if(onToggle)onToggle(true);else setInternalOpen(true);}}}/>
       </div>
     </header>
-    {open && <div className="standard-card-body">{children}</div>}
+    <AnimatedSection open={open}>{children}</AnimatedSection>
   </section></>;
 }

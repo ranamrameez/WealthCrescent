@@ -179,6 +179,8 @@ from the lot system."*
 
 ## Done
 
+- 2026-10-15: Row details respect links and custom cell navigation without opening a second popup. Shared `StatCard2` compact metrics now serve QSE/PSX ticker supporting stats, portfolio P/L, and record details, with independent label/value colors. Page switches show pending feedback; standard sections animate collapse/expand with reduced-motion support. Table headers are read only when details/editing opens instead of on every row render.
+
 - **Shared transfer editing and table-row details (2026-10-15):** ordinary data
   rows across the app use RecordRow to open complete source details with click,
   Enter or Space, while nested links, inputs and buttons retain their actions.

@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { TopBarControls, TopBarSelect, QuickEntitySwitch } from '../TopBarControls';
 import { DateValue } from '../DateValue';
 import { DateInput } from '../ui/Field';
@@ -51,11 +51,11 @@ describe('Consistent navigation and presentation',()=>{
     expect(screen.getByText('01/11/2026')).toBeTruthy();
     act(()=>useAppearanceStore.getState().update({dateFormat:prior}));
   });
-  it('preserves summary metric cards and flattens a redundant single-card wrapper',()=>{
+  it('preserves summary metric cards and flattens a redundant single-card wrapper',async()=>{
     const {container}=render(<><StandardCard title="Account summary"><SummaryGroupCard title="Actual balance">100</SummaryGroupCard></StandardCard><StandardCard title="Wrapper"><StandardCard title="Advanced options">Existing controls</StandardCard></StandardCard></>);
     expect(container.querySelectorAll('.card')).toHaveLength(3);
     expect(screen.getByText('Existing controls')).toBeVisible();
     fireEvent.click(screen.getByRole('button',{name:/Advanced options/}));
-    expect(screen.queryByText('Existing controls')).toBeNull();
+    await waitFor(() => expect(screen.queryByText('Existing controls')).toBeNull());
   });
 });
