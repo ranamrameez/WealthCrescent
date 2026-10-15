@@ -1,6 +1,6 @@
 import { MarketPricesPage } from './features/qse/pages/MarketPricesPage';
 import { HashRouter, Navigate, Route } from 'react-router-dom';
-import { PageRoutes } from './components/PageRoutes';
+import { PageContent } from './components/PageContent';
 import { AppShell } from './components/AppShell';
 import { CalculatorLauncher } from './components/CalculatorLauncher';
 import { ConfirmDialogHost } from './components/ConfirmDialog';
@@ -169,10 +169,10 @@ function App() {
       <ConfirmDialogHost />
       <LinkedEditChoiceDialogHost />
       <SignInModalHost />
-      <HashRouter>
+      <HashRouter useTransitions={false}>
         <AppShell user={user}>
           <ErrorBoundary>
-            <PageRoutes>
+            <PageContent>
               <Route path="/" element={<Navigate to="/net-worth" replace />} />
               <Route path="/qse" element={<DashboardPage />} />
               <Route path="/portfolio" element={<PortfolioPage />} />
@@ -342,7 +342,7 @@ function App() {
               <Route path="/app-data" element={<AppDataPage />} />
               <Route path="/account" element={<AccountPage syncStatuses={syncStatuses} />} />
               <Route path="/legal" element={<LegalPage />} />
-            </PageRoutes>
+            </PageContent>
           </ErrorBoundary>
         </AppShell>
         <CalculatorLauncher />

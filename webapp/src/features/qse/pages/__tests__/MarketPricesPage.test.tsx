@@ -37,6 +37,9 @@ it('uses ordered standard sections, compact cards and independent favourite cont
  for(const key of ['favourites','today','lifetime'])expect(container.querySelector('[data-page-section="'+key+'"] .standard-card-toggle')).toHaveAttribute('aria-expanded','true');
  expect(container.querySelector('[data-page-section="updates"] .standard-card-toggle')).toHaveAttribute('aria-expanded','false');
  const all=container.querySelector('[data-page-section="tickers"]')!;
+ expect(all.querySelector('.standard-card-toggle')).toHaveAttribute('aria-expanded','false');
+ expect(all.querySelectorAll('.market-ticker-card')).toHaveLength(0);
+ fireEvent.click(within(all as HTMLElement).getByRole('button',{name:'All tickers',expanded:false}));
  expect(all.querySelectorAll('.market-ticker-card')).toHaveLength(3);
  fireEvent.click(within(all as HTMLElement).getByRole('button',{name:'Favourite QIBK'}));
  const favourites=container.querySelector('[data-page-section="favourites"]')!;

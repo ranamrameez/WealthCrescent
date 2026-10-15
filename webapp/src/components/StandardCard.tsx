@@ -1,7 +1,7 @@
-import { AnimatedSection } from './AnimatedSection';
 import { Children, isValidElement, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { ArchiveIcon, CheckIcon, CollapseIcon, EditIcon, ExpandIcon, ExportIcon, FlaskIcon, MenuIcon, PlanningIcon, PlusIcon, SaveIcon, TrashIcon, XIcon } from './icons';
 import { StandardIconButton } from './standard';
+import { LoadingSurface } from './LoadingSurface';
 
 export interface StandardCardAction {
   label: string;
@@ -83,6 +83,6 @@ export function StandardCard({ title, summary, actions=[], headerEnd, defaultOpe
         <CardActionMenu actions={actions} onAction={()=>{if(!open){if(onToggle)onToggle(true);else setInternalOpen(true);}}}/>
       </div>
     </header>
-    <AnimatedSection open={open}>{children}</AnimatedSection>
+    {open && <LoadingSurface className="standard-card-body">{children}</LoadingSurface>}
   </section></>;
 }

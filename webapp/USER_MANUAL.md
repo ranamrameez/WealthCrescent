@@ -987,4 +987,8 @@ EMI, Funds, brokers, and Subscriptions now use the same section navigation and f
 
 
 ### Row details and navigation
-Click a plain table cell to view the complete record. Ticker links and cells with their own actions open their destination directly. Supporting metrics use consistent compact cards in ticker pages, portfolios, and detail popups. A loading indicator appears while a destination page is being prepared. Section headers animate open and closed; reduced-motion preferences are respected.
+Click a plain table cell to view the complete record. Ticker links and cells with their own actions open their destination directly. Supporting metrics use consistent compact cards in ticker pages, portfolios, and detail popups. New pages and newly opened sections show a subtle loading mask until their content is ready, then fade it away. The mask does not move or stretch the content. Reduced-motion preferences disable the shimmer and fade. Changing section selections preserves other sections' open/closed state.
+
+The All tickers section on QSE Market Prices and the Ticker prices section on PSX Market Prices start collapsed. Open the section header when you want to browse all ticker cards.
+
+Loading masks use small rounded stat placeholders and large 600px section cards containing smaller stat cards and a content panel with a few lines across the loading area. Opening a different page starts at the top, including when using browser Back or Forward; section and filter changes on the same page retain your scroll position.

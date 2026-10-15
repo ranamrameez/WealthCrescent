@@ -41,6 +41,8 @@ ask if something outside already-decided scope comes up. Also maintain a
 **user manual** (`webapp/USER_MANUAL.md`, end-user facing — how to use the
 app, not developer notes) continuously as features ship.
 
+**Latest user instruction (2026-10-15): Do not automatically push code. Keep changes local for review unless the user explicitly requests a commit or push. This supersedes the earlier auto-commit/push standing instruction.**
+
 ## Current status (as of 2026-08-23)
 
 Continuation update (2026-09-29): home now redirects to the cross-module Dashboard;

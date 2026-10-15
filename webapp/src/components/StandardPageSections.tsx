@@ -19,7 +19,11 @@ export function StandardPageSections({sections: suppliedSections,defaultKey,pres
   const activeKey=requested&&sections.some(s=>s.key===requested)?requested:firstKey;
   const [openKeys,setOpenKeys]=useState<Record<string,boolean>>(()=>Object.fromEntries(sections.map(s=>[s.key,s.defaultOpen??s.key===activeKey])));
   const refs=useRef<Record<string,HTMLElement|null>>({});
-  useEffect(()=>{if(activeKey)setOpenKeys(p=>({...p,[activeKey]:true}));},[activeKey]);
+  // Clearing the selected section must not reopen the default section.
+  // Initial defaults are handled by the state initializer; only explicit URL
+  // selections should open a section after that (including browser history).
+  const requestedKey = requested && sections.some(s => s.key === requested) ? requested : null;
+  useEffect(()=>{if(requestedKey)setOpenKeys(p=>p[requestedKey]?p:({...p,[requestedKey]:true}));},[requestedKey]);
   const setSection=(key:string|null)=>{const next=new URLSearchParams(params); if(key)next.set('section',key); else next.delete('section'); setParams(next);};
   const jump=(key:string)=>{setOpenKeys(p=>({...p,[key]:true}));setSection(key);requestAnimationFrame(()=>refs.current[key]?.scrollIntoView({behavior:'smooth',block:'start'}));};
   const allOpen=sections.length>0&&sections.every(s=>openKeys[s.key]);
