@@ -1,3 +1,4 @@
+import { TableCard } from '../../../components/TableCard';
 import { PageHeading } from '../../../components/PageHeading';
 import { BackButton } from '../../../components/BackButton';
 import { StockPLCharts } from '../../../components/StockPLCharts';
@@ -6,7 +7,6 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { StockBar as Bar, StockDoughnut as Doughnut, StockLine as Line } from '../../../components/StockCharts';
 import { stockTickerColor as tickerColor, STOCK_BUY_COLOR, STOCK_SELL_COLOR } from '../../../lib/stockChartTheme';
-import { Card } from '../../../components/Card';
 import { ChartFilterBar } from '../../../components/ChartFilterBar';
 import { Tabs } from '../../../components/Tabs';
 import { useSortableRows } from '../../../hooks/useSortableRows';
@@ -291,8 +291,8 @@ function FundamentalsCard({
   const { sorted, Th } = useSortableRows(fundamentalsRows, sortValue, 'ticker', 'asc');
 
   return (
-    <Card className="mt-md">
-      <h3 className="mt-0">Fundamentals (held tickers)</h3>
+    <TableCard title={<>Fundamentals (held tickers)</>} rows={sorted} className="mt-md">
+
       {sorted.length ? (
         <div className="table-scroll">
           <table>
@@ -328,6 +328,6 @@ function FundamentalsCard({
       ) : (
         <p className="text-muted">No fundamentals data for currently held tickers.</p>
       )}
-    </Card>
+    </TableCard>
   );
 }

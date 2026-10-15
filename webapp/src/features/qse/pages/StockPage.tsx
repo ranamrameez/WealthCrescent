@@ -327,18 +327,18 @@ export function StockPage() {
       </div>
 
       <StandardPageSections preserveOrder defaultKey="prices" sections={[
-          { key: 'prices', label: 'Market Price', defaultOpen: true, content: <PositionDetail ticker={ticker} section="prices" fromDate={filters.fromDate} toDate={filters.toDate} /> },
-          { key: 'summary', label: 'Summary', defaultOpen: true, content: <StockPortfolioSummary ticker={ticker} /> },
-          { key: 'lots', label: 'Open Lots', defaultOpen: true, content: <PositionDetail ticker={ticker} section="lots" /> },
-          {
+          { table: true, key: 'prices', label: 'Market Price', defaultOpen: true, content: <PositionDetail ticker={ticker} section="prices" fromDate={filters.fromDate} toDate={filters.toDate} /> },
+          { table: true, key: 'summary', label: 'Summary', defaultOpen: true, content: <StockPortfolioSummary ticker={ticker} /> },
+          { table: true, key: 'lots', label: 'Open Lots', defaultOpen: true, content: <PositionDetail ticker={ticker} section="lots" /> },
+          { table: true,
             key: 'transactions',
             label: 'Trades',
             defaultOpen: true,
             content: <TickerTransactions ticker={ticker} filters={filters} />,
             headerEnd: hasRows ? <button className="btn secondary small" onClick={exportStatement}>Export CSV</button> : undefined,
           },
-          { key: 'plans', label: 'Plans', defaultOpen: true, content: <InvestmentPlans market="qse" items={[{ id: ticker, name: ticker, currency: workbook.settings.currency }]} filters={filters} /> },
-          { key: 'closed', label: 'Closed', defaultOpen: true, content: <PositionDetail ticker={ticker} section="closed" fromDate={filters.fromDate} toDate={filters.toDate} /> },
+          { table: true, key: 'plans', label: 'Plans', defaultOpen: true, content: <InvestmentPlans market="qse" items={[{ id: ticker, name: ticker, currency: workbook.settings.currency }]} filters={filters} /> },
+          { table: true, key: 'closed', label: 'Closed', defaultOpen: true, content: <PositionDetail ticker={ticker} section="closed" fromDate={filters.fromDate} toDate={filters.toDate} /> },
           { key: 'analytics',
             label: 'Analytics',
             defaultOpen: false,
@@ -351,7 +351,7 @@ export function StockPage() {
           // stock's own page. Only meaningful for an open position, same
           // gate PositionDetail's "Current position" section already uses.
           ...(isOpen
-            ? [{
+            ? [{ table: true,
                 key: 'risk',
                 label: 'Risk Analysis',
                 defaultOpen: false,

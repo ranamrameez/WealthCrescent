@@ -1,3 +1,4 @@
+import { SortIcon } from '../../../components/icons';
 import { DateValue } from '../../../components/DateValue';
 import { PageFilters } from '../../../components/PageFilters';
 import { PriceInput } from "../../../components/ui/PriceInput";
@@ -111,7 +112,6 @@ export function DividendsSection() {
   const updateDividend = usePSXWorkbookStore((s) => s.updateDividend);
   const setDividendEstimate = usePSXWorkbookStore((s) => s.setDividendEstimate);
   const currency = workbook.settings.currency;
-  const [sort, setSort] = useState<{ col: string; dir: 'asc' | 'desc' }>({ col: 'date', dir: 'desc' });
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [editRow, setEditRow] = useState<Dividend | null>(null);
   // User-requested (2026-09-03): "add filters to other tables as well."
@@ -136,17 +136,9 @@ export function DividendsSection() {
       default: return d.date;
     }
   };
-  const rows = [...workbook.dividends.map((d, i) => ({ ...d, i }))]
-    .filter((d) => tickerFilter === 'ALL' || d.ticker === tickerFilter)
-    .sort((a, b) => {
-    const av = sortValue(a, sort.col);
-    const bv = sortValue(b, sort.col);
-    const cmp = typeof av === 'string' ? av.localeCompare(bv as string) : (av as number) - (bv as number);
-    return sort.dir === 'asc' ? cmp : -cmp;
-  });
-  const toggleSort = (col: string) =>
-    setSort((s) => (s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'desc' }));
-  const arrow = (col: string) => (sort.col === col ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '');
+  const { sorted: rows, sort, toggleSort } = useSortableRows([...workbook.dividends.map((d, i) => ({ ...d, i }))]
+    .filter((d) => tickerFilter === 'ALL' || d.ticker === tickerFilter), sortValue, 'date');
+  const arrow = (col: string) => <SortIcon direction={sort.col === col ? sort.dir : undefined} />;
   // Reflects the ticker filter above, so "Total collected" always matches
   // what's actually shown in the table above it.
   const total = rows.reduce((s, d) => s + d.amount, 0);

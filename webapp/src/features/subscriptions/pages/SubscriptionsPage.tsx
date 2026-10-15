@@ -1,3 +1,5 @@
+import { TableCard } from '../../../components/TableCard';
+import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { DateValue } from '../../../components/DateValue';
 import { QuickEntitySwitch } from '../../../components/QuickEntitySwitch';
 import { PageHeading } from '../../../components/PageHeading';
@@ -12,7 +14,7 @@ import type { User } from 'firebase/auth';
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Bar, Doughnut } from 'react-chartjs-2';
-import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
+import { Card, EntityCard, MoneyValue } from '../../../components/Card';
 import { CategorySelect } from '../../../components/CategorySelect';
 import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
@@ -328,7 +330,7 @@ function AlertsSection({ sub }: { sub: Subscription }) {
   };
 
   return (
-    <CollapsibleCard title={<h3 className="m-0">Renewal / expiry alerts</h3>} className="mb-md">
+    <TableCard rows={alerts} title={<h3 className="m-0">Renewal / expiry alerts</h3>} className="mb-md">
       <p className="text-muted mt-0">
         Get reminded before this renews or expires — pick a suggested lead time, or set an exact date and time.
       </p>
@@ -377,7 +379,7 @@ function AlertsSection({ sub }: { sub: Subscription }) {
       ) : (
         <p className="text-muted" style={{ marginBottom: 0 }}>No alerts configured yet.</p>
       )}
-    </CollapsibleCard>
+    </TableCard>
   );
 }
 
@@ -606,10 +608,10 @@ function SubscriptionDetail({ sub, onSelect, onBack }: { sub: Subscription; onSe
           </button>
         </div>
       </> },
-{ key: 'plans', label: 'Plans', defaultOpen: true, content: <SubscriptionPlansOverview subscriptions={[sub]} filters={filters} /> },
-{ key: 'payments', label: 'Payments', content: <SubscriptionPaymentsOverview subscriptions={[sub]} filters={filters} /> },
-{ key: 'analytics', label: 'Analytics', content: <AnalyticsTab selectedIds={[sub.id]} currencyCode={sub.currencyCode} /> },
-{ key: 'alerts', label: 'Alerts', defaultOpen: true,  content: <><AlertsSection sub={sub} /></> }]} >{editing && <EntityEditorModal title="Edit subscription" onClose={() => setEditing(false)}><AddSubscriptionForm subscription={sub} onSaved={() => setEditing(false)} /></EntityEditorModal>}<EntityActions actions={[{label:"Edit subscription",onClick:()=>setEditing(true)}]} /></ModuleDetailTemplate>
+{ table: true, key: 'plans', label: 'Plans', defaultOpen: true, content: <SubscriptionPlansOverview subscriptions={[sub]} filters={filters} /> },
+{ table: true, key: 'payments', label: 'Payments', content: <SubscriptionPaymentsOverview subscriptions={[sub]} filters={filters} /> },
+{ table: true, key: 'analytics', label: 'Analytics', content: <AnalyticsTab selectedIds={[sub.id]} currencyCode={sub.currencyCode} /> },
+{ table: true, key: 'alerts', label: 'Alerts', defaultOpen: true,  content: <><AlertsSection sub={sub} /></> }]} >{editing && <EntityEditorModal title="Edit subscription" onClose={() => setEditing(false)}><AddSubscriptionForm subscription={sub} onSaved={() => setEditing(false)} /></EntityEditorModal>}<EntityActions actions={[{label:"Edit subscription",onClick:()=>setEditing(true)}]} /></ModuleDetailTemplate>
   );
 }
 
@@ -623,21 +625,23 @@ function useSubscriptionPaymentPlans() {
 }
 
 function SubscriptionPlansOverview({ subscriptions, filters }: { subscriptions: Subscription[]; filters: TransactionPageFilters }) {
+  const dateSort = useDateTableSort();
   const payments = useSubscriptionPaymentPlans();
   const dateFormat = useAppearanceStore(state => state.appearance.dateFormat);
   const categories = useCategoryStore(state => state.workbook.categories);
   const rows = subscriptions.flatMap(subscription => generateRenewalOccurrences(subscription).filter(occurrence => !payments.some(plan => plan.sourceSubscriptionId === subscription.id && plan.executed && plan.date === occurrence.date)).map(occurrence => ({ subscription, ...occurrence })))
     .filter(row => (!filters.fromDate || row.date >= filters.fromDate) && (!filters.toDate || row.date <= filters.toDate) && filters.direction !== 'in' && filters.source !== 'statement-import' && (filters.category === 'all' || subCategoryLabel(row.subscription, categories) === filters.category)).sort((a, b) => a.date.localeCompare(b.date));
-  return <div className="table-scroll"><table><thead><tr><th>Date</th><th>Subscription</th><th>Paying account</th><th>Amount</th></tr></thead><tbody>{rows.map(row => <tr key={row.subscription.id + ':' + row.date}><td>{formatDate(row.date, dateFormat)}</td><td>{row.subscription.name}</td><td>{row.subscription.paidVia?.module ?? 'Not linked'}</td><td>{fmtMoney(row.amount, row.subscription.currencyCode)}</td></tr>)}</tbody></table>{!rows.length && <p className="text-muted">No unpaid renewals in this period.</p>}</div>;
+  return <div className="table-scroll"><table><thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Subscription</th><th>Paying account</th><th>Amount</th></tr></thead><tbody>{dateSort.rows(rows, { date: row => row }).map(row => <tr key={row.subscription.id + ':' + row.date}><td>{formatDate(row.date, dateFormat)}</td><td>{row.subscription.name}</td><td>{row.subscription.paidVia?.module ?? 'Not linked'}</td><td>{fmtMoney(row.amount, row.subscription.currencyCode)}</td></tr>)}</tbody></table>{!rows.length && <p className="text-muted">No unpaid renewals in this period.</p>}</div>;
 }
 
 function SubscriptionPaymentsOverview({ subscriptions, filters }: { subscriptions: Subscription[]; filters: TransactionPageFilters }) {
+  const dateSort = useDateTableSort();
   const plans = useSubscriptionPaymentPlans();
   const categories = useCategoryStore(state => state.workbook.categories);
   const rows = plans.filter(plan => plan.executed && subscriptions.some(sub => sub.id === plan.sourceSubscriptionId && (filters.category === 'all' || subCategoryLabel(sub, categories) === filters.category)))
     .map(plan => ({ plan, date: plan.fulfilledDate ?? plan.date, sub: subscriptions.find(sub => sub.id === plan.sourceSubscriptionId)! }))
     .filter(row => (!filters.fromDate || row.date >= filters.fromDate) && (!filters.toDate || row.date <= filters.toDate) && filters.direction !== 'in' && filters.source !== 'statement-import').sort((a, b) => b.date.localeCompare(a.date));
-  return <div className="table-scroll"><table><thead><tr><th>Paid on</th><th>Subscription</th><th>Scheduled renewal</th><th>Amount</th></tr></thead><tbody>{rows.map(row => <tr key={row.plan.id}><td><DateValue value={row.date} /></td><td>{row.sub.name}</td><td><DateValue value={row.plan.date} /></td><td>{fmtMoney(Math.abs(row.plan.amount), row.sub.currencyCode)}</td></tr>)}</tbody></table>{!rows.length && <p className="text-muted">No fulfilled renewal plans in this period.</p>}</div>;
+  return <div className="table-scroll"><table><thead><tr><dateSort.Th rows={rows} column="date">Paid on</dateSort.Th><th>Subscription</th><dateSort.Th rows={rows} column="renewal">Scheduled renewal</dateSort.Th><th>Amount</th></tr></thead><tbody>{dateSort.rows(rows, { date: row => row, renewal: row => row.plan }).map(row => <tr key={row.plan.id}><td><DateValue value={row.date} /></td><td>{row.sub.name}</td><td><DateValue value={row.plan.date} /></td><td>{fmtMoney(Math.abs(row.plan.amount), row.sub.currencyCode)}</td></tr>)}</tbody></table>{!rows.length && <p className="text-muted">No fulfilled renewal plans in this period.</p>}</div>;
 }
 
 function SubscriptionAlertsOverview({ subscriptions }: { subscriptions: Subscription[] }) {
@@ -646,6 +650,7 @@ function SubscriptionAlertsOverview({ subscriptions }: { subscriptions: Subscrip
 }
 
 function AnalyticsTab({ selectedIds, currencyCode }: { selectedIds?: string[]; currencyCode?: string } = {}) {
+  const dateSort = useDateTableSort();
   const subs = useSubscriptionsWorkbookStore((s) => s.workbook.entries);
   const scopedSubs = selectedIds ? subs.filter((s) => selectedIds.includes(s.id)) : subs;
   const categoryRegistry = useCategoryStore((s) => s.workbook.categories);
@@ -713,9 +718,9 @@ function AnalyticsTab({ selectedIds, currencyCode }: { selectedIds?: string[]; c
         <ChartCard title="Upcoming renewals (next 30 days)" empty={!renewals.length}>
           <div className="table-scroll">
             <table>
-              <thead><tr><th>Date</th><th>Name</th><th>Amount</th></tr></thead>
+              <thead><tr><dateSort.Th rows={renewals} column="date">Date</dateSort.Th><th>Name</th><th>Amount</th></tr></thead>
               <tbody>
-                {renewals.map((r) => (
+                {dateSort.rows(renewals, { date: row => row }).map((r) => (
                   <tr key={r.subscription.id}>
                     <td><DateValue value={r.date} /></td>
                     <td>{r.subscription.name}</td>
@@ -856,10 +861,10 @@ export function SubscriptionsPage({
                 </div>
               ),
             },
-            { key: 'plans', label: 'Plans', content: <SubscriptionPlansOverview subscriptions={selectedSubscriptions} filters={filters} /> },
-            { key: 'payments', label: 'Payments', content: <SubscriptionPaymentsOverview subscriptions={selectedSubscriptions} filters={filters} /> },
-            { key: 'alerts', label: 'Alerts', content: <SubscriptionAlertsOverview subscriptions={selectedSubscriptions} /> },
-            { key: 'analytics', label: 'Analytics', content: <div className="stack-lg">{selectedCurrencies.map((currency) => <Card key={currency}><h3 className="mt-0">{currency}</h3><AnalyticsTab selectedIds={selectedIds} currencyCode={currency} /></Card>)}</div> },
+            { table: true, key: 'plans', label: 'Plans', content: <SubscriptionPlansOverview subscriptions={selectedSubscriptions} filters={filters} /> },
+            { table: true, key: 'payments', label: 'Payments', content: <SubscriptionPaymentsOverview subscriptions={selectedSubscriptions} filters={filters} /> },
+            { table: true, key: 'alerts', label: 'Alerts', content: <SubscriptionAlertsOverview subscriptions={selectedSubscriptions} /> },
+            { table: true, key: 'analytics', label: 'Analytics', content: <div className="stack-lg">{selectedCurrencies.map((currency) => <Card key={currency}><h3 className="mt-0">{currency}</h3><AnalyticsTab selectedIds={selectedIds} currencyCode={currency} /></Card>)}</div> },
             {
               key: 'settings',
               label: 'Settings',

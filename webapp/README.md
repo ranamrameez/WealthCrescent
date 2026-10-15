@@ -179,6 +179,17 @@ from the lot system."*
 
 ## Done
 
+- **Shared table cards and QSE transaction controls (2026-10-15):** table sections
+  use TableCard, built on StandardCard, with header action menus and shared date
+  sorting using up/down arrowheads. QSE Trade Transactions uses central filters;
+  its tables support import, filtered/all exports, batch editing and Modify.
+  Cash Ledger modifications target the original trade, transfer or adjustment.
+  The ledger shows Date, Type, Count, Unit, Price, Amount and Balance (last),
+  with portfolio-style Buy/Sell cells, stock logos, and expandable user notes/fees.
+  Generated descriptions and duplicate type info icons have been removed.
+  The balance reconciliation is recorded in audit/balance-mismatch-15-oct-2026;
+  four proposed data corrections are documented without changing live records.
+
 - **Dashboard and Planning follow-up (2026-09-29):** the home route opens the cross-module
   Dashboard; the QSE dashboard is available at `/qse` through Stock Exchanges. Overall
   summaries show enabled and held currencies together. The shared Page filters popup
@@ -10139,6 +10150,13 @@ from the lot system."*
   the Bank Account balance, flow, category, and expected-balance chart family.
 
 ## Pending
+
+- **Verification baseline (2026-10-15):** the full suite previously had eight
+  failures reproduced on unchanged HEAD: planControls accessible names,
+  sharedExchangeDerived identity, two categoryMerge cases, resetLocalData timing,
+  PriceInput PSX rounding, and two bankNavigation visibility cases. These remain
+  separate from the table-card changes. Production build and the focused table/QSE
+  checks pass; the final ledger layout has ten passing page tests.
 
 - Explicit application type-check (`tsc -p tsconfig.app.json --noEmit`, 2026-10-04)
   still reports errors in CashPage, PlanningPage, and RentalsPage. The current build

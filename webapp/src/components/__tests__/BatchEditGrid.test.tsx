@@ -127,3 +127,12 @@ describe('BatchEditGrid', () => {
     expect(save).not.toHaveBeenCalled();
   });
 });
+
+it('restricts reordering to the supplied effective-time group without changing date filters', () => {
+  type Ordered = Row & { seq: number; time: string };
+  const items: Ordered[] = [{ ...rows[0], seq: 1, date: '2026-10-01', time: '09:00' }, { ...rows[1], seq: 2, date: '2026-10-01', time: '10:00' }];
+  render(<BatchEditGrid<Ordered> title="Timed records" rows={items} columns={[{ key: 'description', label: 'Description' }, { key: 'seq', label: '#', type: 'number', editable: false }]} createRow={() => ({ ...items[0], id: 'new' })} getRowId={row => row.id} getRowDate={row => row.date!} getReorderGroup={row => row.date + row.time} orderKey="seq" onSave={() => {}} onClose={() => {}} />);
+  expect((screen.getByRole('button', { name: 'Move row 1 down' }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText('Batch to date'), { target: { value: '2026-10-01' } });
+  expect(screen.getByLabelText('Row 2, Description')).toBeTruthy();
+});

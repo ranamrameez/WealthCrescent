@@ -1,3 +1,4 @@
+import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { PlanEditorModal } from '../../../components/PlanEditorModal';
 import { DateValue } from '../../../components/DateValue';
 import { QuickEntitySwitch } from '../../../components/QuickEntitySwitch';
@@ -310,6 +311,7 @@ function RepaymentsSection({
   onEditPayment: (payment: PersonalLoanRepayment) => void;
   showActions: boolean;
 }) {
+  const dateSort = useDateTableSort();
   // Select the raw array (a stable reference from the store) and filter it
   // in a memo — filtering *inside* the zustand selector would return a new
   // array identity on every render, which zustand's useSyncExternalStore
@@ -357,10 +359,11 @@ function RepaymentsSection({
   // that genuinely needs fixing (two same-instant repayments in the wrong
   // relative order).
   const instantOf = (r: PersonalLoanRepayment) => dateOnlyMs(r.date);
-  const sorted = useMemo(
+  const dateSortInput = useMemo(
     () => [...filteredRepayments].sort((a, b) => instantOf(b) - instantOf(a) || (b.seq ?? 0) - (a.seq ?? 0)),
     [filteredRepayments],
   );
+  const sorted = dateSort.rows(dateSortInput, { date: row => row });
   const reorder = async (pair: [{ id: string; order: number }, { id: string; order: number }]) => {
     if (!(await ensureSignedIn('Sign in to reorder payments.'))) return;
     for (const p of pair) updateRepayment(p.id, { seq: p.order });
@@ -370,7 +373,7 @@ function RepaymentsSection({
     <div>
         <div className="table-scroll">
           <table>
-            <thead><tr><th>Date</th><th>Description</th><th>Amount</th><th>Category</th><th>Remaining</th><th>Source</th><th></th></tr></thead>
+            <thead><tr><dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th><th>Description</th><th>Amount</th><th>Category</th><th>Remaining</th><th>Source</th><th></th></tr></thead>
             <tbody>
               {sorted.map((r, i) => {
                 const link = linkByRecordId.get(r.id);
@@ -480,6 +483,7 @@ function RepaymentsSection({
  * it's always a positive amount against the loan — so there's no
  * "Flip sign" checkbox here, just Date + Amount (absolute value). */
 function ImportRepaymentsSection({ loan, onClose }: { loan: PersonalLoan; onClose: () => void }) {
+  const dateSort = useDateTableSort();
   const addRepayments = usePersonalLoansWorkbookStore((s) => s.addRepayments);
   const ensureSignedIn = useEnsureSignedIn();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -579,9 +583,9 @@ function ImportRepaymentsSection({ loan, onClose }: { loan: PersonalLoan; onClos
           </div>
           <div className="table-scroll mt-sm">
             <table>
-              <thead><tr><th>Date</th><th>Amount</th></tr></thead>
+              <thead><tr><dateSort.Th rows={mappedPreview} column="date">Date</dateSort.Th><th>Amount</th></tr></thead>
               <tbody>
-                {mappedPreview.map((r, i) => (
+                {dateSort.rows(mappedPreview, { date: row => row }).map((r, i) => (
                   <tr key={i}>
                     <td><DateValue value={r.date} /></td>
                     <td>{fmtMoney(r.amount, loan.currencyCode)}</td>
@@ -676,6 +680,7 @@ function PersonalLoanPlanForm({ loan, onSaved }: { loan: PersonalLoan; onSaved?:
 }
 
 function PersonalLoanPlansSection({ loan, showActions }: { loan: PersonalLoan; showActions: boolean }) {
+  const dateSort = useDateTableSort();
   const plans = usePersonalLoansWorkbookStore((s) => s.workbook.plans ?? []);
   const addRepayment = usePersonalLoansWorkbookStore((s) => s.addRepayment);
   const updatePlan = usePersonalLoansWorkbookStore((s) => s.updatePlan);
@@ -707,9 +712,9 @@ function PersonalLoanPlansSection({ loan, showActions }: { loan: PersonalLoan; s
     <div>
       <div className="table-responsive">
         <table>
-          <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th><th></th></tr></thead>
           <tbody>
-            {rows.map((plan) => (
+            {dateSort.rows(rows, { date: row => row }).map((plan) => (
               <tr key={plan.id}>
                 <td><DateValue value={plan.date} /></td>
                 <td>{plan.description || '—'}</td>
@@ -962,7 +967,7 @@ function LoanDetail({ loan, onSelect, onBack }: { loan: PersonalLoan; onSelect: 
         ]} />
       ),
     },
-    {
+    { table: true,
       key: 'plans',
       label: 'Plans',
       hue: loan.color,
@@ -974,7 +979,7 @@ function LoanDetail({ loan, onSelect, onBack }: { loan: PersonalLoan; onSelect: 
       headerEnd: showPlanActions ? <IconButton label="Hide modification options" icon={<XIcon size={13} />} align="right" onClick={() => setShowPlanActions(false)} /> : undefined,
       content: <PersonalLoanPlansSection loan={loan} showActions={showPlanActions} />,
     },
-    {
+    { table: true,
       key: 'payments',
       label: 'Payments',
       hue: loan.color,
@@ -1121,6 +1126,7 @@ function PersonalLoansModulePlans({
   selectedIds: string[];
   filters: TransactionPageFilters;
 }) {
+  const dateSort = useDateTableSort();
   const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const plans = usePersonalLoansWorkbookStore((s) => s.workbook.plans ?? []);
   const categories = useCategoryStore((s) => s.workbook.categories);
@@ -1137,9 +1143,9 @@ function PersonalLoansModulePlans({
   return (
     <div className="table-responsive">
       <table>
-        <thead><tr><th>Date</th><th>Loan</th><th>Description</th><th>Amount</th><th>Status</th></tr></thead>
+        <thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Loan</th><th>Description</th><th>Amount</th><th>Status</th></tr></thead>
         <tbody>
-          {rows.map((plan) => {
+          {dateSort.rows(rows, { date: row => row }).map((plan) => {
             const loan = visibleLoans.get(plan.loanId)!;
             return (
               <tr key={plan.id} className="clickable" onClick={() => onSelectLoan(loan)}>
@@ -1169,6 +1175,7 @@ function PersonalLoansModulePayments({
   selectedIds: string[];
   filters: TransactionPageFilters;
 }) {
+  const dateSort = useDateTableSort();
   const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const payments = usePersonalLoansWorkbookStore((s) => s.workbook.repayments);
   const categories = useCategoryStore((s) => s.workbook.categories);
@@ -1186,9 +1193,9 @@ function PersonalLoansModulePayments({
   return (
     <div className="table-responsive">
       <table>
-        <thead><tr><th>Date</th><th>Loan</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th></tr></thead>
+        <thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Loan</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th></tr></thead>
         <tbody>
-          {rows.map((payment) => {
+          {dateSort.rows(rows, { date: row => row }).map((payment) => {
             const loan = visibleLoans.get(payment.loanId)!;
             return (
               <tr key={payment.id} className="clickable" onClick={() => onSelectLoan(loan)}>
@@ -1331,17 +1338,17 @@ export function PersonalLoansPage({
       summary: <SummaryChip label="Open" value={loans.filter((loan) => loan.isActive !== false).length} />,
       content: <LoanList onSelect={setSelected} filter={filter} showArchived={showArchived} selectedIds={scopedIds} />,
     },
-    {
+    { table: true,
       key: 'plans',
       label: 'Plans',
       content: <PersonalLoansModulePlans filter={filter} onSelectLoan={setSelected} selectedIds={scopedIds} filters={transactionFilters} />,
     },
-    {
+    { table: true,
       key: 'payments',
       label: 'Payments',
       content: <PersonalLoansModulePayments filter={filter} onSelectLoan={setSelected} selectedIds={scopedIds} filters={transactionFilters} />,
     },
-    {
+    { table: true,
       key: 'analytics',
       label: 'Analytics',
       content: <AnalyticsTab filter={filter} selectedIds={scopedIds} filters={transactionFilters} />,

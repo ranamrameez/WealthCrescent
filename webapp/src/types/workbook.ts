@@ -403,6 +403,8 @@ export interface Position {
 }
 
 export interface CashLedgerEvent {
+  sourceId?: string;
+  ticker?: string;
   date: string;
   /** Pending item 41 — carried through from whichever record produced this
    * event, for real chronological sorting and (optionally) display. */

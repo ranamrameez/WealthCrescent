@@ -1,16 +1,22 @@
+import { useDateTableSort } from '../../../hooks/useDateTableSort';
+import { useQSEStockData } from '../hooks/useQSEStockData';
+import { shortenCompanyName } from '../../../lib/shortenName';
+import { Modal } from '../../../components/Modal';
+import { useQseTablePagination } from '../components/useQseTablePagination';
+import { StandardPageSections, type SectionCardProps } from '../../../components/StandardPageSections';
+import { QseFilterProvider } from '../components/QseFilters';
+import { useQseFilters, matchesQseFilters } from '../components/qseFilterModel';
+import { QseRecordCard, QseReorder, type QseRow } from '../components/QseTableActions';
 import { DateValue } from '../../../components/DateValue';
 import { PageHeading } from '../../../components/PageHeading';
 import { BackButton } from '../../../components/BackButton';
-import { PageFilters } from '../../../components/PageFilters';
 import { PriceInput } from "../../../components/ui/PriceInput";
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { QSE_TICKER_DATALIST_ID } from '../../../components/TickerDatalist';
 import { TickerLogo } from '../../../components/TickerLogo';
 import { confirmDialog } from '../../../components/ConfirmDialog';
-import { CheckIcon, EditIcon, ExportIcon, PlusIcon, SaveIcon, TrashIcon, TransferIcon, XIcon } from '../../../components/icons';
-import { Tabs } from '../../../components/Tabs';
-import { StatSourceBadge } from '../../../components/StatSourceBadge';
+import { ArrowLeftIcon, ArrowRightIcon, CashIcon, CheckIcon, EditIcon, PlusIcon, SaveIcon, TrashIcon, TransferIcon, XIcon } from '../../../components/icons';
 import { toast } from '../../../components/Toast';
 import { Tooltip } from '../../../components/Tooltip';
 import { TransactionEntryModal } from '../../../components/TransactionEntryModal';
@@ -23,7 +29,7 @@ import { closedPLBySellTxId, computeClosedTrades, type LotMatchOrder } from '../
 import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
 import { confirmAndDeleteLinkable, propagateLinkedEdit, resolveLinkedEdit } from '../../../lib/linkCascade';
 import { transferRunningBalance } from '../../../lib/calc/transferBalance';
-import { Field, Select } from '../../../components/ui/Field';
+import { Field } from '../../../components/ui/Field';
 import { AmountInput } from '../../../components/ui/AmountInput';
 import { IconButton } from '../../../components/ui/IconButton';
 import { TimeZoneFields } from '../../../components/ui/TimeZoneFields';
@@ -31,7 +37,7 @@ import { defaultTimeForDate, defaultTimezoneForCurrency, defaultTimezoneForMarke
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { ReorderButtons } from '../../../components/ui/ReorderButtons';
 import { PendingToggle } from '../../../components/ui/PendingToggle';
-import { dateOnlyMs } from '../../../lib/datetime';
+import { toInstantMs } from '../../../lib/datetime';
 import { createEmptyWorkbook } from '../../../store/defaultWorkbook';
 import { useWorkbookStore } from '../../../store/workbookStore';
 import { useInterEntityTransfersStore } from '../../../store/interEntityTransfersStore';
@@ -257,25 +263,28 @@ function groupKey(tx: Transaction, groupBy: GroupBy): string {
   }
 }
 
-function TransactionList() {
+function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } = {}) {
+  const pageFilters = useQseFilters();
+  const [modifying, setModifying] = useState(false);
   const { workbook, calcFee, positions } = useQSEDerived();
   const deleteTransaction = useWorkbookStore((s) => s.deleteTransaction);
   const updateTransaction = useWorkbookStore((s) => s.updateTransaction);
   const ensureSignedIn = useEnsureSignedIn();
   const currency = workbook.settings.currency;
 
-  const [filterTicker, setFilterTicker] = useState('ALL');
-  const [filterAction, setFilterAction] = useState<'ALL' | Transaction['action']>('ALL');
-  const [groupBy, setGroupBy] = useState<GroupBy>('none');
+  const filterTicker = pageFilters.ticker || 'ALL';
+  const filterAction = pageFilters.action || 'ALL';
+  const groupBy = (pageFilters.group || 'none') as GroupBy;
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [editRow, setEditRow] = useState<Transaction | null>(null);
   const [detailTx, setDetailTx] = useState<Transaction | null>(null);
+  const [sourceEditRequest, setSourceEditRequest] = useState<QseRow | null>(null);
   // User-reported (2026-09-13): the flat 0.275% fee never depends on which
   // lot a sale is later attributed to, so FIFO's "oldest lot first" is a
   // pure reporting convention here, not a real constraint — offer the
   // cheapest-lot-first alternative as a second, explicitly comparison-only
   // view (see `closedTrades.ts`'s own `LotMatchOrder` doc comment).
-  const [ctMatchOrder, setCtMatchOrder] = useState<LotMatchOrder>('fifo');
+  const ctMatchOrder: LotMatchOrder = pageFilters.matchOrder === 'lowestCostFirst' ? 'lowestCostFirst' : 'fifo';
 
   // Pending item 143: manual lot allocation for the inline edit-row SELL
   // form — same gate as `TransactionRows`' add-row copy above. Lots are
@@ -295,7 +304,6 @@ function TransactionList() {
   }, [showEditLotAllocation, editIndex, editRow, workbook.transactions, calcFee, editMethod]);
 
   const indexed = workbook.transactions.map((tx, i) => ({ tx, i }));
-  const tickers = useMemo(() => [...new Set(workbook.transactions.map((t) => t.ticker))].sort(), [workbook.transactions]);
 
   // Which tickers are currently open (nonzero shares) vs. fully closed —
   // user request: split the flat transaction log into two sections, same
@@ -304,7 +312,8 @@ function TransactionList() {
 
   const filtered = indexed
     .filter((r) => filterTicker === 'ALL' || r.tx.ticker === filterTicker)
-    .filter((r) => filterAction === 'ALL' || r.tx.action === filterAction);
+    .filter((r) => filterAction === 'ALL' || r.tx.action === filterAction)
+    .filter(r => matchesQseFilters(r.tx, pageFilters));
   type TxCol = 'date' | 'ticker' | 'action' | 'shares' | 'price' | 'amount';
   const sortValue = (r: (typeof filtered)[number], col: TxCol): number | string => {
     switch (col) {
@@ -313,15 +322,15 @@ function TransactionList() {
       case 'shares': return r.tx.shares;
       case 'price': return r.tx.price;
       case 'amount': return r.tx.shares * r.tx.price;
-      default: return r.tx.date;
+      default: return `${toInstantMs(r.tx.date, r.tx.time, r.tx.timezone)} ${String(r.tx.seq ?? 0).padStart(12, '0')}`;
     }
   };
-  const { sorted, Th } = useSortableRows(filtered, sortValue, 'date', 'desc');
+  const { sorted, Th, dateSort } = useSortableRows(filtered, sortValue, 'date', 'desc');
 
   const openSorted = useMemo(() => sorted.filter((r) => openTickers.has(r.tx.ticker)), [sorted, openTickers]);
   const closedSorted = useMemo(() => sorted.filter((r) => !openTickers.has(r.tx.ticker)), [sorted, openTickers]);
 
-  const groupRows = (rows: typeof sorted) => {
+  const groupRows = useCallback((rows: typeof sorted) => {
     if (groupBy === 'none') return [{ key: '', rows }];
     const map: Record<string, typeof sorted> = {};
     rows.forEach((r) => {
@@ -332,9 +341,11 @@ function TransactionList() {
     return Object.entries(map)
       .sort((a, b) => b[0].localeCompare(a[0]))
       .map(([key, rows]) => ({ key, rows }));
-  };
-  const openGroups = useMemo(() => groupRows(openSorted), [openSorted, groupBy]);
-  const closedGroups = useMemo(() => groupRows(closedSorted), [closedSorted, groupBy]);
+  }, [groupBy]);
+  const openPage = useQseTablePagination(openSorted);
+  const closedPage = useQseTablePagination(closedSorted);
+  const openGroups = groupRows(openPage.rows);
+  const closedGroups = groupRows(closedPage.rows);
 
   // User's own words: "Individual stock should be marker as open/close with
   // its own buy & selling price, B&S taxes, net Buy/sale, so that sold/
@@ -348,11 +359,11 @@ function TransactionList() {
   const closedTrades = useMemo(
     () =>
       computeClosedTrades(
-        filterTicker === 'ALL' ? workbook.transactions : workbook.transactions.filter((t) => t.ticker === filterTicker),
+        workbook.transactions,
         calcFee,
         ctMatchOrder,
       ),
-    [workbook.transactions, calcFee, filterTicker, ctMatchOrder],
+    [workbook.transactions, calcFee, ctMatchOrder],
   );
   type CTCol = 'ticker' | 'buyDate' | 'buyPrice' | 'sellDate' | 'sellPrice' | 'shares' | 'buyFee' | 'sellFee' | 'netPL' | 'holdingDays';
   const ctSortValue = (t: (typeof closedTrades)[number], col: CTCol): number | string => {
@@ -369,11 +380,11 @@ function TransactionList() {
       default: return t.buyDate;
     }
   };
-  const { sorted: sortedClosedTrades, Th: CTTh } = useSortableRows(closedTrades, ctSortValue, 'sellDate', 'desc');
+  const { sorted: sortedClosedTrades, Th: CTTh, dateSort: closedDateSort } = useSortableRows(closedTrades.filter(row => (filterTicker === 'ALL' || row.ticker === filterTicker) && filterAction !== 'BUY' && matchesQseFilters({ date: row.sellDate, ticker: row.ticker, action: 'SELL' }, pageFilters)), ctSortValue, 'sellDate', 'desc');
 
   // User's own ask (2026-09-08): "show the sold price and PL w.r.t. that
   // lot's buy price... inline in the main trade row." Computed from the
-  // WHOLE workbook (not `filterTicker`-scoped like `closedTrades` above) so
+  // WHOLE workbook before display filters are applied so
   // a row's own P&L figure never changes just because the ticker filter is
   // narrowed to something else. Shares `ctMatchOrder` with the Closed Trades
   // table above (2026-09-13) — a feature rolled out to one view of a sell's
@@ -397,14 +408,14 @@ function TransactionList() {
   // `LotMatchOrder`'s own doc comment) so the two tables always add up to
   // the same picture of which lots are still open vs. already sold.
   const openLots = useMemo(() => {
-    const txs = filterTicker === 'ALL' ? workbook.transactions : workbook.transactions.filter((t) => t.ticker === filterTicker);
+    const txs = workbook.transactions;
     const { lotsByTicker } = computeFIFOPositions(txs, calcFee, ctMatchOrder);
     const flat: (FIFOLot & { ticker: string })[] = [];
     for (const [ticker, lots] of Object.entries(lotsByTicker)) {
       for (const lot of lots) flat.push({ ticker, ...lot });
     }
     return flat;
-  }, [workbook.transactions, calcFee, filterTicker, ctMatchOrder]);
+  }, [workbook.transactions, calcFee, ctMatchOrder]);
   type OLCol = 'ticker' | 'buyDate' | 'buyPrice' | 'shares' | 'invested' | 'buyFeeTotal';
   const olSortValue = (l: (typeof openLots)[number], col: OLCol): number | string => {
     switch (col) {
@@ -416,14 +427,18 @@ function TransactionList() {
       default: return l.buyDate;
     }
   };
-  const { sorted: sortedOpenLots, Th: OLTh } = useSortableRows(openLots, olSortValue, 'buyDate', 'desc');
+  const { sorted: sortedOpenLots, Th: OLTh, dateSort: openDateSort } = useSortableRows(openLots.filter(row => (filterTicker === 'ALL' || row.ticker === filterTicker) && filterAction !== 'SELL' && matchesQseFilters({ date: row.buyDate, ticker: row.ticker, action: 'BUY' }, pageFilters)), olSortValue, 'buyDate', 'desc');
+
+  const openLotsPage = useQseTablePagination(sortedOpenLots);
+  const closedTradesPage = useQseTablePagination(sortedClosedTrades);
 
   const startEdit = (i: number, tx: Transaction) => {
     setEditIndex(i);
     setEditRow({ ...tx });
   };
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (editIndex === null || !editRow) return;
+    if (!(await ensureSignedIn('Sign in to save changes.'))) return;
     updateTransaction(editIndex, editRow);
     toast('Transaction updated.');
     setEditIndex(null);
@@ -446,13 +461,14 @@ function TransactionList() {
       'This clears all transactions, prices and watchlist entries in this browser.',
       'Clear all transaction data?',
     );
-    if (!ok) return;
+    if (!ok || !(await ensureSignedIn('Sign in to clear transaction data.'))) return;
     setWorkbook({ ...createEmptyWorkbook(), settings: workbook.settings, appearance: workbook.appearance });
     toast('All transaction data cleared.');
   };
 
   const renderTable = (groups: typeof openGroups, emptyMessage: string) => (
-    <div className="table-scroll">
+    <>
+    <div className="table-responsive">
       <table>
         <thead>
           <tr>
@@ -525,7 +541,7 @@ function TransactionList() {
                   </Fragment>
                 ) : (
                   <tr key={i} onClick={() => setDetailTx(tx)} className="clickable">
-                    <td><DateValue value={tx.date} /></td>
+                    <td><DateValue value={tx.date} />{modifying && <span onClick={event => event.stopPropagation()}><QseReorder kind="transactions" row={tx} rows={sorted.map(row => row.tx)} /></span>}</td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <TickerLogo ticker={tx.ticker} size="sm" exchange="qse" /><Link to={`/stock/${tx.ticker}`}>{tx.ticker}</Link>
                       {tx.isPending && (
@@ -542,7 +558,7 @@ function TransactionList() {
                       {tx.id && sellPLById[tx.id] ? fmtMoney(sellPLById[tx.id].netPL, currency) : '—'}
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
-                      {tx.isPending && (
+                      {modifying && <>{tx.isPending && (
                         <IconButton
                           label="Mark cleared"
                           icon={<CheckIcon size={13} />}
@@ -562,7 +578,7 @@ function TransactionList() {
                         onClick={async () => {
                           if (await confirmDialog('This cannot be undone.', `Delete ${tx.action} ${tx.shares} ${tx.ticker}?`)) deleteTransaction(i);
                         }}
-                      />
+                      /></>}
                     </td>
                   </tr>
                 ),
@@ -574,36 +590,18 @@ function TransactionList() {
           )}
         </tbody>
       </table>
-    </div>
+    </div></>
   );
 
   return (
-    <div>
-      <PageFilters><div className="row gap-sm mb-sm">
-        <select value={filterTicker} onChange={(e) => setFilterTicker(e.target.value)}>
-          <option value="ALL">All tickers</option>
-          {tickers.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
-        <select value={filterAction} onChange={(e) => setFilterAction(e.target.value as typeof filterAction)}>
-          <option value="ALL">Buy &amp; sell</option>
-          <option value="BUY">Buy only</option>
-          <option value="SELL">Sell only</option>
-        </select>
-        <select value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupBy)}>
-          <option value="none">No grouping</option>
-          <option value="ticker">Group by ticker</option>
-          <option value="action">Group by buy/sell</option>
-          <option value="month">Group by month</option>
-        </select>
-        <IconButton label="Export JSON" icon={<ExportIcon size={14} />} className="btn secondary" align="right" onClick={exportJSON} />
-        <IconButton label="Clear all" icon={<TrashIcon size={14} />} className="btn secondary" align="right" onClick={clearAll} />
-      </div></PageFilters>
+    <QseRecordCard dateSort={dateSort} title="Trade list" editRequest={sourceEditRequest} sectionProps={sectionProps} kind="transactions" rows={sorted.map(row => row.tx)} modifying={modifying} onModify={() => setModifying(value => !value)} extraActions={[{ label: 'Export workbook backup', onClick: exportJSON }, { label: 'Clear all transaction data', tone: 'danger', onClick: clearAll }]}>
 
       <details open className="mb-md">
         <summary className="summary-heading">
           Open positions — {openSorted.length} txns
         </summary>
         {renderTable(openGroups, 'No transactions for a currently open position.')}
+        {openPage.controls}
       </details>
 
       <details open>
@@ -611,28 +609,10 @@ function TransactionList() {
           Closed positions — {closedSorted.length} txns
         </summary>
         {renderTable(closedGroups, 'No transactions for a fully closed position yet.')}
+        {closedPage.controls}
       </details>
 
-      <div className="row gap-sm mb-sm mt-md" style={{ alignItems: 'center' }}>
-        <Tooltip text="QSE's fee is a flat % of trade value — it never depends on which lot a sale is credited to, so this is purely which STORY the Open trades and Closed trades sections below tell, not a real amount. FIFO (oldest lot first) is what most brokers default to. Cheapest-lot-first re-tells the same history against your lowest-cost lots instead — it never changes your real position, fees, or total P/L, only which lots count as still open vs. already sold.">
-          Match order
-        </Tooltip>
-        <button type="button" className={`chip${ctMatchOrder === 'fifo' ? ' active' : ''}`} onClick={() => setCtMatchOrder('fifo')}>
-          {ctMatchOrder === 'fifo' && <CheckIcon size={11} />}FIFO (oldest first)
-        </button>
-        <button type="button" className={`chip${ctMatchOrder === 'lowestCostFirst' ? ' active' : ''}`} onClick={() => setCtMatchOrder('lowestCostFirst')}>
-          {ctMatchOrder === 'lowestCostFirst' && <CheckIcon size={11} />}Cheapest lot first
-        </button>
-      </div>
-
-      <details open>
-        <summary className="summary-heading">
-          <Tooltip text="Each buy lot that hasn't been fully sold yet, matched against your real sells per the Match order picked above — the mirror image of Closed trades below, so it's always clear which shares are still open vs. already sold.">
-            Open trades (not yet sold)
-          </Tooltip>{' '}
-          — {sortedOpenLots.length}
-          <StatSourceBadge source="history" />
-        </summary>
+      <QseRecordCard dateSort={openDateSort} title="Open trades (not yet sold)" kind="transactions" rows={workbook.transactions.filter(tx => sortedOpenLots.some(row => row.buyId === tx.id))} allRecords={workbook.transactions.filter(tx => openLots.some(row => row.buyId === tx.id))} modifying={modifying} onModify={() => setModifying(value => !value)} exportData={{ rows: sortedOpenLots, allRows: openLots }}>
         <div className="table-scroll">
           <table>
             <thead>
@@ -643,11 +623,11 @@ function TransactionList() {
                 <OLTh col="shares">Shares</OLTh>
                 <OLTh col="invested">Invested</OLTh>
                 <OLTh col="buyFeeTotal">Buy fee</OLTh>
-                <th>Status</th>
+                <th>Status</th>{modifying && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
-              {sortedOpenLots.map((l, i) => (
+              {openLotsPage.rows.map((l, i) => (
                 <tr key={i}>
                   <td><TickerLogo ticker={l.ticker} size="sm" exchange="qse" /><Link to={`/stock/${l.ticker}`}>{l.ticker}</Link></td>
                   <td>{l.buyDate}</td>
@@ -655,25 +635,19 @@ function TransactionList() {
                   <td>{fmt(l.remainingShares, 0)}</td>
                   <td>{fmtMoney(l.remainingShares * l.buyPrice, currency)}</td>
                   <td>{fmtMoney(l.buyFeeTotal, currency)}</td>
-                  <td><span className="pill pill-info">Open</span></td>
+                  <td><span className="pill pill-info">Open</span></td>{modifying && <td><IconButton label="Edit buy" icon={<EditIcon size={13} />} align="right" onClick={() => { const source = workbook.transactions.find(row => row.id === l.buyId); if (source) setSourceEditRequest({ ...source, id: source.id! }); }} /></td>}
                 </tr>
               ))}
               {!sortedOpenLots.length && (
-                <tr><td colSpan={7} className="text-muted">No open lots — everything bought so far has been sold.</td></tr>
+                <tr><td colSpan={modifying ? 8 : 7} className="text-muted">No open lots — everything bought so far has been sold.</td></tr>
               )}
             </tbody>
           </table>
         </div>
-      </details>
+        {openLotsPage.controls}
+      </QseRecordCard>
 
-      <details open className="mt-md">
-        <summary className="summary-heading">
-          <Tooltip text="Each fully or partially closed round-trip, matched buy-to-sell, with its own buy price, sell price, fees on both legs, and net P/L — so a closed trade's own numbers stay separate from whatever the currently-open position shows.">
-            Closed trades (realized round-trips)
-          </Tooltip>{' '}
-          — {sortedClosedTrades.length}
-          <StatSourceBadge source="history" />
-        </summary>
+      <QseRecordCard dateSort={closedDateSort} title="Closed trades (realized round-trips)" kind="transactions" rows={workbook.transactions.filter(tx => sortedClosedTrades.some(row => row.sellTxId === tx.id))} allRecords={workbook.transactions.filter(tx => closedTrades.some(row => row.sellTxId === tx.id))} modifying={modifying} onModify={() => setModifying(value => !value)} exportData={{ rows: sortedClosedTrades, allRows: closedTrades }}>
         <div className="table-scroll">
           <table>
             <thead>
@@ -688,11 +662,11 @@ function TransactionList() {
                 <CTTh col="sellFee">Sell fee</CTTh>
                 <CTTh col="netPL">Net P/L</CTTh>
                 <CTTh col="holdingDays">Days held</CTTh>
-                <th>Status</th>
+                <th>Status</th>{modifying && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
-              {sortedClosedTrades.map((t, i) => (
+              {closedTradesPage.rows.map((t, i) => (
                 <tr key={i}>
                   <td><TickerLogo ticker={t.ticker} size="sm" exchange="qse" /><Link to={`/stock/${t.ticker}`}>{t.ticker}</Link></td>
                   <td>{t.buyDate}</td>
@@ -704,16 +678,17 @@ function TransactionList() {
                   <td>{fmtMoney(t.sellFee, currency)}</td>
                   <td className={t.netPL >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(t.netPL, currency)}</td>
                   <td>{t.holdingDays}</td>
-                  <td><span className="pill pill-info">Closed</span></td>
+                  <td><span className="pill pill-info">Closed</span></td>{modifying && <td><IconButton label="Edit sell" icon={<EditIcon size={13} />} align="right" onClick={() => { const source = workbook.transactions.find(row => row.id === t.sellTxId); if (source) setSourceEditRequest({ ...source, id: source.id! }); }} /></td>}
                 </tr>
               ))}
               {!sortedClosedTrades.length && (
-                <tr><td colSpan={11} className="text-muted">No closed round-trips yet.</td></tr>
+                <tr><td colSpan={modifying ? 12 : 11} className="text-muted">No closed round-trips yet.</td></tr>
               )}
             </tbody>
           </table>
         </div>
-      </details>
+        {closedTradesPage.controls}
+      </QseRecordCard>
 
       {detailTx && (
         <RecordDetailModal
@@ -735,14 +710,17 @@ function TransactionList() {
           ]}
         />
       )}
-    </div>
+    </QseRecordCard>
   );
 }
 
 /** User-requested (2026-09-03): "add filters to other tables as well" —
  * extends the Type/Category filter treatment Cash's statement tables got
  * (README Done item 224) to QSE's own Transfers table. */
-function TransfersSection() {
+function TransfersSection({ sectionProps }: { sectionProps?: SectionCardProps } = {}) {
+  const pageFilters = useQseFilters();
+  const dateSort = useDateTableSort();
+  const [modifying, setModifying] = useState(false);
   const workbook = useWorkbookStore((s) => s.workbook);
   const updateTransfer = useWorkbookStore((s) => s.updateTransfer);
   const deleteTransfer = useWorkbookStore((s) => s.deleteTransfer);
@@ -752,7 +730,7 @@ function TransfersSection() {
   const sideLabel = useLinkSideLabel();
   const [editId, setEditId] = useState<string | null>(null);
   const [editRow, setEditRow] = useState<Transfer | null>(null);
-  const [typeFilter, setTypeFilter] = useState<'all' | Transfer['type']>('all');
+  const typeFilter = pageFilters.transferType || 'all';
 
   const linkByRecordId = useMemo(() => {
     const map = new Map<string, (typeof links)[number]>();
@@ -770,31 +748,24 @@ function TransfersSection() {
   const balances = useMemo(() => transferRunningBalance(workbook.transfers), [workbook.transfers]);
 
   const filteredTransfers = useMemo(
-    () => (typeFilter === 'all' ? workbook.transfers : workbook.transfers.filter((t) => t.type === typeFilter)),
-    [workbook.transfers, typeFilter],
+    () => workbook.transfers.filter(t => (typeFilter === 'all' || t.type === typeFilter) && matchesQseFilters(t, pageFilters)),
+    [workbook.transfers, typeFilter, pageFilters],
   );
 
-  // User-reported (2026-09-06): "we may stop sorting options for
-  // chronologically important tables (only sequence-aware tables) to
-  // avoid the disordered mess" — same reasoning as Bank's/Cash's/Personal
-  // Loans' own ledger tables (Done item 235): the Balance column only
-  // makes sense in real chronological+sequence order, so free column
-  // sorting is gone here, replaced by `ReorderButtons` for the one thing
-  // that genuinely needs fixing (two same-instant transfers in the wrong
-  // relative order).
-  const instantOf = (t: Transfer) => dateOnlyMs(t.date);
-  const sorted = useMemo(
-    () => [...filteredTransfers].sort((a, b) => instantOf(b) - instantOf(a) || (b.seq ?? 0) - (a.seq ?? 0)),
-    [filteredTransfers],
-  );
+  // Display direction preserves chronological sequence ties and precomputed balances.
+  const instantOf = (t: Transfer) => toInstantMs(t.date, t.time, t.timezone);
+  const dateSortInput = [...filteredTransfers].sort((a, b) => instantOf(b) - instantOf(a) || (b.seq ?? 0) - (a.seq ?? 0));
+  const sorted = dateSort.rows(dateSortInput, { date: row => row });
   const reorderTransfer = async (pair: [{ id: string; order: number }, { id: string; order: number }]) => {
     if (!(await ensureSignedIn('Sign in to reorder transfers.'))) return;
     for (const p of pair) updateTransfer(p.id, { seq: p.order });
   };
 
+  const page = useQseTablePagination(sorted);
   const startEdit = (t: Transfer) => { setEditId(t.id); setEditRow({ ...t }); };
   const saveEdit = async () => {
     if (editId === null || !editRow) return;
+    if (!(await ensureSignedIn('Sign in to save changes.'))) return;
     const choice = await resolveLinkedEdit('qse', editId);
     if (choice === 'cancel') return;
     updateTransfer(editId, editRow);
@@ -810,21 +781,12 @@ function TransfersSection() {
   };
 
   return (
-    <div>
-      <PageFilters><div className="row gap-sm mb-sm">
-        <Field label="Type" width={140}>
-          <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}>
-            <option value="all">All</option>
-            <option value="DEPOSIT">Deposit</option>
-            <option value="WITHDRAWAL">Withdrawal</option>
-          </Select>
-        </Field>
-      </div></PageFilters>
+    <QseRecordCard dateSort={dateSort} title="Cash transfers" sectionProps={sectionProps} kind="transfers" rows={sorted} modifying={modifying} onModify={() => setModifying(value => !value)}>
       <div className="table-scroll">
         <table>
           <thead>
             <tr>
-              <th>Date</th>
+              <dateSort.Th rows={dateSortInput}>Date</dateSort.Th>
               <th>Type</th>
               <th>Gross</th>
               <th>Fee</th>
@@ -833,7 +795,7 @@ function TransfersSection() {
             </tr>
           </thead>
           <tbody>
-            {sorted.map((t, i) => {
+            {page.rows.map((t) => {
               const link = linkByRecordId.get(t.id);
               const otherSide = link ? (link.from.module === 'qse' && link.fromRecordId === t.id ? link.to : link.from) : undefined;
               return editId === t.id && editRow ? (
@@ -857,14 +819,14 @@ function TransfersSection() {
                 <tr key={t.id}>
                   <td>
                     <DateValue value={t.date} />{' '}
-                    <ReorderButtons
+                    {modifying && <ReorderButtons
                       rows={sorted}
-                      index={i}
+                      index={sorted.findIndex(row => row.id === t.id)}
                       instantOf={instantOf}
                       idOf={(row) => row.id}
                       orderOf={(row) => row.seq}
                       onMove={reorderTransfer}
-                    />
+                    />}
                   </td>
                   <td>
                     {t.type}
@@ -882,8 +844,8 @@ function TransfersSection() {
                     </Tooltip>
                   </td>
                   <td>
-                    <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => startEdit(t)} />{' '}
-                    <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => confirmAndDeleteLinkable('qse', t.id, () => deleteTransfer(t.id))} />
+                    {modifying && <><IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => startEdit(t)} />{' '}
+                    <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => confirmAndDeleteLinkable('qse', t.id, () => deleteTransfer(t.id))} /></>}
                   </td>
                 </tr>
               );
@@ -892,16 +854,21 @@ function TransfersSection() {
           </tbody>
         </table>
       </div>
-    </div>
+      {page.controls}
+    </QseRecordCard>
   );
 }
 
-function AdjustmentsSection() {
+function AdjustmentsSection({ sectionProps }: { sectionProps?: SectionCardProps } = {}) {
+  const [adding, setAdding] = useState(false);
+  const ensureSignedIn = useEnsureSignedIn();
+  const pageFilters = useQseFilters();
+  const [modifying, setModifying] = useState(false);
   const workbook = useWorkbookStore((s) => s.workbook);
   const updateAdjustment = useWorkbookStore((s) => s.updateAdjustment);
   const deleteAdjustment = useWorkbookStore((s) => s.deleteAdjustment);
   const currency = workbook.settings.currency;
-  const indexed = workbook.adjustments.map((a, i) => ({ a, i }));
+  const indexed = workbook.adjustments.map((a, i) => ({ a, i })).filter(row => matchesQseFilters(row.a, pageFilters));
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [editRow, setEditRow] = useState<Adjustment | null>(null);
 
@@ -910,14 +877,16 @@ function AdjustmentsSection() {
     switch (col) {
       case 'amount': return r.a.amount;
       case 'note': return r.a.note ?? '';
-      default: return r.a.date;
+      default: return `${toInstantMs(r.a.date, r.a.time, r.a.timezone)} ${String(r.a.seq ?? 0).padStart(12, '0')}`;
     }
   };
-  const { sorted, Th } = useSortableRows(indexed, sortValue, 'date', 'desc');
+  const { sorted, Th, dateSort } = useSortableRows(indexed, sortValue, 'date', 'desc');
 
+  const page = useQseTablePagination(sorted);
   const startEdit = (i: number, a: Adjustment) => { setEditIndex(i); setEditRow({ ...a }); };
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (editIndex === null || !editRow) return;
+    if (!(await ensureSignedIn('Sign in to save changes.'))) return;
     updateAdjustment(editIndex, editRow);
     toast('Adjustment updated.');
     setEditIndex(null);
@@ -925,8 +894,8 @@ function AdjustmentsSection() {
   };
 
   return (
-    <div>
-      <AdjustmentForm />
+    <QseRecordCard dateSort={dateSort} title="Rewards & adjustments" extraActions={[{ label: 'Add adjustment', onClick: () => setAdding(true) }]} sectionProps={sectionProps} kind="adjustments" rows={sorted.map(row => row.a)} modifying={modifying} onModify={() => setModifying(value => !value)}>
+      {adding && <Modal title="Add adjustment" onClose={() => setAdding(false)}><AdjustmentForm /></Modal>}
       <div className="table-scroll mt-sm">
         <table>
           <thead>
@@ -938,7 +907,7 @@ function AdjustmentsSection() {
             </tr>
           </thead>
           <tbody>
-            {sorted.map(({ a, i }) =>
+            {page.rows.map(({ a, i }) =>
               editIndex === i && editRow ? (
                 <tr key={i}>
                   <td><input type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} className="w-130" /></td>
@@ -951,12 +920,12 @@ function AdjustmentsSection() {
                 </tr>
               ) : (
                 <tr key={i}>
-                  <td><DateValue value={a.date} /></td>
+                  <td><DateValue value={a.date} />{modifying && <QseReorder kind="adjustments" row={a} rows={sorted.map(row => row.a)} />}</td>
                   <td>{fmtMoney(a.amount, currency)}</td>
                   <td>{a.note}</td>
                   <td>
-                    <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => startEdit(i, a)} />{' '}
-                    <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => deleteAdjustment(i)} />
+                    {modifying && <><IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => startEdit(i, a)} />{' '}
+                    <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => deleteAdjustment(i)} /></>}
                   </td>
                 </tr>
               ),
@@ -965,79 +934,75 @@ function AdjustmentsSection() {
           </tbody>
         </table>
       </div>
-    </div>
+      {page.controls}
+    </QseRecordCard>
   );
 }
 
 /** User-requested (2026-09-03): "add filters to other tables as well." */
-function CashLedgerSection() {
+function CashLedgerSection({ sectionProps }: { sectionProps?: SectionCardProps } = {}) {
+  const filters = useQseFilters();
+  const { tickerNames } = useQSEStockData();
+  const dateSort = useDateTableSort();
   const { workbook, ledger } = useQSEDerived();
-  const currency = workbook.settings.currency;
-  const [kindFilter, setKindFilter] = useState<'all' | (typeof ledger)[number]['kind']>('all');
-
-  const filtered = useMemo(
-    () => (kindFilter === 'all' ? ledger : ledger.filter((e) => e.kind === kindFilter)),
-    [ledger, kindFilter],
-  );
-
-  // User-reported (2026-09-06): "we may stop sorting options for
-  // chronologically important tables (only sequence-aware tables) to
-  // avoid the disordered mess" — a merged trades+transfers+adjustments
-  // ledger's Balance column only makes sense in `buildCashLedger`'s own
-  // real chronological order (which also enforces the domain rule that a
-  // transfer settles before a same-instant trade — see that function's
-  // own doc comment), so free column sorting is gone here. Unlike
-  // Bank/Cash/Personal Loans/Transfers above, this merged view has no
-  // `ReorderButtons` of its own: each row here is DERIVED from a real
-  // trade/transfer/adjustment record living in its own native table
-  // (Trade Transactions / the Transfers section just above / Adjustments)
-  // — reordering happens there, and flows through to this view
-  // automatically since it's fully computed from the same `seq` fields.
-  const sorted = [...filtered].reverse();
-
-  return (
-    <div>
-      <PageFilters><div className="row gap-sm mb-sm">
-        <Field label="Kind" width={140}>
-          <Select value={kindFilter} onChange={(e) => setKindFilter(e.target.value as typeof kindFilter)}>
-            <option value="all">All</option>
-            <option value="trade">Trade</option>
-            <option value="transfer">Transfer</option>
-            <option value="adjustment">Adjustment</option>
-          </Select>
-        </Field>
-      </div></PageFilters>
-      <div className="table-scroll">
-      <table>
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Kind</th>
-            <th>Label</th>
-            <th>Amount</th>
-            <th>Balance</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((e, i) => (
-            <tr key={i}>
-              <td><DateValue value={e.date} /></td>
-              <td>{e.kind}</td>
-              <td>{e.label}</td>
-              <td className={e.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(e.amount, currency)}</td>
-              <td>{fmtMoney(e.balance, currency)}</td>
-            </tr>
-          ))}
-          {!sorted.length && <tr><td colSpan={5} className="text-muted">Nothing recorded yet.</td></tr>}
-        </tbody>
-      </table>
-      </div>
-    </div>
-  );
+  const ensureSignedIn = useEnsureSignedIn();
+  const [modifying, setModifying] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editRequest, setEditRequest] = useState<QseRow | null>(null);
+  const sourceFor = (event: (typeof ledger)[number]): QseRow | undefined => {
+    const collection = event.kind === 'trade' ? workbook.transactions : event.kind === 'transfer' ? workbook.transfers : workbook.adjustments;
+    const record = collection.find(row => row.id === event.sourceId);
+    return record ? { ...record, id: record.id!, kind: event.kind } : undefined;
+  };
+  const dateSortInput = [...ledger].reverse();
+  const sorted = dateSort.rows(dateSortInput, { date: row => ({ ...row, seq: ledger.indexOf(row) }) });
+  const filtered = sorted.filter(event => (!filters.kind || event.kind === filters.kind) && matchesQseFilters({ ...event, description: event.label }, filters));
+  const page = useQseTablePagination(filtered);
+  const sources = (events: typeof ledger) => events.map(sourceFor).filter((row): row is QseRow => !!row);
+  const exportRows = (events: typeof ledger) => events.map(event => ({ ...sourceFor(event), description: sourceFor(event)?.description ?? '', amount: event.amount, balance: event.balance }));
+  const remove = async (source: QseRow) => {
+    if (!(await ensureSignedIn('Sign in to delete records.'))) return;
+    if (source.kind === 'transfer') return confirmAndDeleteLinkable('qse', source.id, () => useWorkbookStore.getState().deleteTransfer(source.id));
+    if (!(await confirmDialog('This cannot be undone.', 'Delete this ledger record?'))) return;
+    const state = useWorkbookStore.getState();
+    if (source.kind === 'trade') { const index = state.workbook.transactions.findIndex(row => row.id === source.id); if (index >= 0) state.deleteTransaction(index); }
+    else { const index = state.workbook.adjustments.findIndex(row => row.id === source.id); if (index >= 0) state.deleteAdjustment(index); }
+  };
+  return <QseRecordCard dateSort={dateSort} title="Cash ledger" sectionProps={sectionProps} kind="ledger" rows={sources(filtered)} allRecords={sources(sorted)} modifying={modifying} onModify={() => setModifying(value => !value)} editRequest={editRequest} exportData={{ rows: exportRows(filtered), allRows: exportRows(sorted) }}>
+    <div className="table-scroll"><table className="cash-ledger-table">
+      <thead><tr><th aria-label="Details" /><dateSort.Th rows={dateSortInput}>Date</dateSort.Th><th>Type</th><th>Count</th><th>Unit</th><th>Price</th><th>Amount</th>{modifying && <th>Actions</th>}<th>Balance</th></tr></thead>
+      <tbody>{page.rows.map((event, index) => {
+        const source = sourceFor(event);
+        const description = source?.description || source?.note;
+        const info = description || `Fee: ${fmtMoney(event.fee, workbook.settings.currency)}`;
+        const rowId = event.kind + (event.sourceId || index);
+        const expanded = expandedId === rowId;
+        return <Fragment key={rowId}><tr>
+          <td><button type="button" className="cash-ledger-expand" aria-label={expanded ? 'Collapse details' : 'Expand details'} aria-expanded={expanded} onClick={() => setExpandedId(expanded ? null : rowId)}><svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m6 3 5 5-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg></button></td>
+          <td><DateValue value={event.date} />{modifying && source && <QseReorder kind="ledger" row={source} rows={sources(filtered)} />}</td>
+          <td className={event.kind === 'trade' ? event.action === 'BUY' ? 'pill-buy' : 'pill-sell' : undefined}>
+            <span className="cash-ledger-type">{event.kind === 'trade' && <span className="cash-ledger-direction">{event.action === 'BUY' ? <ArrowRightIcon size={13} /> : <ArrowLeftIcon size={13} />}</span>}
+              {event.kind === 'trade' ? event.action === 'BUY' ? 'Buy' : 'Sell' : event.kind === 'transfer' ? source?.description || (event.action === 'DEPOSIT' ? 'Deposit' : 'Withdrawal') : source?.note || (event.amount >= 0 ? 'Trading reward' : 'Adjustment')}
+              <Tooltip text={info} />
+            </span>
+          </td>
+          <td className="text-center">{event.kind === 'trade' ? fmt(source?.shares ?? 0, 0) : ''}</td>
+          <td>{event.kind === 'trade' && event.ticker ? <span className="cash-ledger-unit"><TickerLogo ticker={event.ticker} size="sm" exchange="qse" /><Link to={`/stock/${event.ticker}`}>{tickerNames[event.ticker] ? shortenCompanyName(tickerNames[event.ticker]) : event.ticker}</Link></span> : <span className="cash-ledger-unit"><CashIcon size={19} />{workbook.settings.currency === 'QAR' ? 'Riyal' : workbook.settings.currency}</span>}</td>
+          <td className="text-center">{event.kind === 'trade' ? fmtQSEPrice(source?.price ?? 0) : '-'}</td>
+          <td className={event.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(event.amount, workbook.settings.currency)}</td>
+          {modifying && <td>{source && <><IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => setEditRequest({ ...source })} /><IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => remove(source)} /></>}</td>}
+          <td>{fmtMoney(event.balance, workbook.settings.currency)}</td>
+        </tr>{expanded && <tr className="cash-ledger-details"><td colSpan={modifying ? 9 : 8}>{description && <div><strong>Description: </strong>{description}</div>}<div><strong>Fee: </strong>{fmtMoney(event.fee, workbook.settings.currency)}</div></td></tr>}</Fragment>;
+      })}{!filtered.length && <tr><td colSpan={modifying ? 9 : 8} className="text-muted">Nothing recorded yet.</td></tr>}</tbody>
+    </table></div>
+    {page.controls}
+  </QseRecordCard>;
 }
 
 export function TransactionsPage() {
-  return (
+  const workbook = useWorkbookStore(s => s.workbook);
+  const tickers = useMemo(() => [...new Set([...workbook.transactions, ...workbook.dividends].map(row => row.ticker))].sort(), [workbook.transactions, workbook.dividends]);
+  return (<QseFilterProvider tickers={tickers}>
     <div className="standard-page">
       <PageHeading back={<BackButton to="/qse">← QSE</BackButton>}><h1 className="pagetitle">Trade Transactions</h1></PageHeading>
       {/* User-reported (2026-08-28, real audit after "you're ignoring what's
@@ -1051,16 +1016,16 @@ export function TransactionsPage() {
          page load. Moved to the page's own top level so it's mounted
          unconditionally, matching every other module. */}
       <TransfersFab />
-      <Tabs
-        tabs={[
+      <StandardPageSections
+        sections={[
           { key: 'add', label: 'Add trades', content: <TransactionRows /> },
-          { key: 'list', label: 'Trade list', content: <TransactionList /> },
-          { key: 'transfers', label: 'Cash transfers', content: <TransfersSection /> },
-          { key: 'adjustments', label: 'Rewards & adjustments', content: <AdjustmentsSection /> },
-          { key: 'ledger', label: 'Cash ledger', content: <CashLedgerSection /> },
-          { key: 'dividends', label: 'Dividends', content: <DividendsSection /> },
+          { key: 'list', label: 'Trade list', content: null, render: sectionProps => <TransactionList sectionProps={sectionProps} /> },
+          { key: 'transfers', label: 'Cash transfers', content: null, render: sectionProps => <TransfersSection sectionProps={sectionProps} /> },
+          { key: 'adjustments', label: 'Rewards & adjustments', content: null, render: sectionProps => <AdjustmentsSection sectionProps={sectionProps} /> },
+          { key: 'ledger', label: 'Cash ledger', content: null, render: sectionProps => <CashLedgerSection sectionProps={sectionProps} /> },
+          { key: 'dividends', label: 'Dividends', content: null, render: sectionProps => <DividendsSection sectionProps={sectionProps} /> },
         ]}
       />
-    </div>
+    </div></QseFilterProvider>
   );
 }

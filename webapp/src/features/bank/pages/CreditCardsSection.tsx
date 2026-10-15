@@ -1,3 +1,4 @@
+import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { CreditCardPositionSummary } from '../../../components/CreditCardPositionSummary';
 import { DateValue } from '../../../components/DateValue';
 import { ToggleChip } from '../../../components/ui/ToggleChip';
@@ -447,6 +448,8 @@ function CreditCardTransactionEditModal({
 }
 
 function TransactionsTable({ card, filters, showActions = false }: { card: CreditCard; filters: TransactionPageFilters; showActions?: boolean }) {
+  const dateSort = useDateTableSort();
+  useEffect(() => setPage(1), [dateSort.selection]);
   const transactions = useCreditCardWorkbookStore((s) => s.workbook.transactions);
   const deleteTransaction = useCreditCardWorkbookStore((s) => s.deleteTransaction);
   const categories = useCategoryStore((s) => s.workbook.categories);
@@ -458,7 +461,7 @@ function TransactionsTable({ card, filters, showActions = false }: { card: Credi
     () => [...transactions].filter((t) => t.cardId === card.id).sort((a, b) => b.date.localeCompare(a.date) || (b.seq ?? 0) - (a.seq ?? 0)),
     [transactions, card.id],
   );
-  const filtered = useMemo(() => cardTxs.filter((transaction) => {
+  const dateSortInput = useMemo(() => cardTxs.filter((transaction) => {
     if (filters.fromDate && transaction.date < filters.fromDate) return false;
     if (filters.toDate && transaction.date > filters.toDate) return false;
     if (filters.direction === 'in' && transaction.kind !== 'payment') return false;
@@ -467,6 +470,7 @@ function TransactionsTable({ card, filters, showActions = false }: { card: Credi
     if (filters.source !== 'all' && (transaction.source ?? 'manual') !== filters.source) return false;
     return true;
   }), [cardTxs, filters, categories]);
+  const filtered = dateSort.rows(dateSortInput, { date: row => row });
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, pageCount);
   const pageRows = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
@@ -478,7 +482,7 @@ function TransactionsTable({ card, filters, showActions = false }: { card: Credi
     <div className="section-toolbar"><span className="text-muted">Central filters apply to this ledger: {filtered.length} of {cardTxs.length} transactions</span></div>
     <div className="table-responsive">
       <table>
-        <thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr></thead>
+        <thead><tr><dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th><th>Type</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr></thead>
         <tbody>
           {pageRows.map((t) => (
             <tr key={t.id} className="clickable" onClick={() => setDetail(t)}>
@@ -999,6 +1003,7 @@ function AddCardPlanForm({ cardId, onSaved, plan }: { cardId: string; onSaved?: 
 }
 
 function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: PlanningHorizonDays }) {
+  const dateSort = useDateTableSort();
   const allPlans = usePlannedCreditCardWorkbookStore((s) => s.workbook.entries);
   const updatePlan = usePlannedCreditCardWorkbookStore((s) => s.updateEntry);
   const addCompletedPlan = usePlannedCreditCardWorkbookStore((s) => s.addEntry);
@@ -1012,7 +1017,8 @@ function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: Pl
     () => planOccurrences(allPlans, undefined, undefined, asOf, horizonDays).filter((p) => p.cardId === card.id),
     [allPlans, card.id, horizonDays, asOf],
   );
-  const sorted = useMemo(() => [...plans].sort((a, b) => a.date.localeCompare(b.date)), [plans]);
+  const dateSortInput = useMemo(() => [...plans].sort((a, b) => a.date.localeCompare(b.date)), [plans]);
+  const sorted = dateSort.rows(dateSortInput, { date: row => row });
 
   const markDone = async (p: PlannedCreditCardTransaction & { planId?: string }) => {
     const occurrenceDate = p.date;
@@ -1041,7 +1047,7 @@ function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: Pl
     <div>
       <div className="table-responsive">
         <table>
-          <thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>Repeats / status</th><th></th></tr></thead>
+          <thead><tr><dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th><th>Type</th><th>Description</th><th>Amount</th><th>Repeats / status</th><th></th></tr></thead>
           <tbody>
             {sorted.map((p) => (
               <tr key={p.id}>

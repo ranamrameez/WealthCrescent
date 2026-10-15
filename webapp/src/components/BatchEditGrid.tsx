@@ -9,10 +9,11 @@ import './BatchEditGrid.css';
 
 export type { BatchMutations, BatchChange, BatchColumn, RowErrors } from './batchEditModel';
 
-export function BatchEditGrid<T>({ title, description, rows, columns, getRowId, getRowDate, validateRow, rowReadOnly, onSave, onClose, createRow, orderKey, addLabel = 'Add row' }: {
+export function BatchEditGrid<T>({ title, description, rows, columns, getRowId, getRowDate, getReorderGroup, validateRow, rowReadOnly, onSave, onClose, createRow, orderKey, addLabel = 'Add row' }: {
   title: string; description?: string; rows: T[]; columns: BatchColumn<T>[];
   getRowId: (row: T) => string;
   getRowDate?: (row: T) => string;
+  getReorderGroup?: (row: T) => string;
   validateRow?: (row: T) => RowErrors;
   rowReadOnly?: (row: T) => string | undefined;
   createRow?: () => T;
@@ -128,7 +129,7 @@ export function BatchEditGrid<T>({ title, description, rows, columns, getRowId, 
   const move = (index: number, step: number) => {
     if (!orderKey) return;
     const a = prepared[index], b = prepared[index + step];
-    if (!b || getRowDate?.(a.after) !== getRowDate?.(b.after) || rowReadOnly?.(a.before) || rowReadOnly?.(b.before)) return;
+    if (!b || (getReorderGroup ?? getRowDate)?.(a.after) !== (getReorderGroup ?? getRowDate)?.(b.after) || rowReadOnly?.(a.before) || rowReadOnly?.(b.before)) return;
     const ids = allRows.map(getRowId); [ids[index], ids[index + step]] = [ids[index + step], ids[index]];
     setOrder(ids);
     setDrafts(prev => ({ ...prev,
@@ -191,7 +192,7 @@ export function BatchEditGrid<T>({ title, description, rows, columns, getRowId, 
               <th scope="row">{index + 1}
                 {isNew && <small>New</small>}
                 {!locked && createRow && <div className="batch-edit-row-actions">
-                  {orderKey && [-1, 1].map(step => <button key={step} type="button" aria-label={`Move row ${index + 1} ${step < 0 ? 'up' : 'down'}`} disabled={!prepared[index + step] || getRowDate?.(prepared[index + step].after) !== getRowDate?.(prepared[index].after) || !!rowReadOnly?.(prepared[index + step].before)} onClick={() => move(index, step)}>{step < 0 ? '↑' : '↓'}</button>)}
+                  {orderKey && [-1, 1].map(step => <button key={step} type="button" aria-label={`Move row ${index + 1} ${step < 0 ? 'up' : 'down'}`} disabled={!prepared[index + step] || (getReorderGroup ?? getRowDate)?.(prepared[index + step].after) !== (getReorderGroup ?? getRowDate)?.(prepared[index].after) || !!rowReadOnly?.(prepared[index + step].before)} onClick={() => move(index, step)}>{step < 0 ? '↑' : '↓'}</button>)}
                   <button type="button" aria-label={`Delete row ${index + 1}`} onClick={() => remove(before)}>×</button>
                 </div>}{dirtyKeys.length > 0 ? ' · Changed' : ''}{locked && <span className="batch-edit-linked-pill" title={locked}>Read-only</span>}<small>{showErrors && errors._row}</small></th>
               {columns.map((col, ci) => {

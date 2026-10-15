@@ -209,8 +209,21 @@ Any other cash-affecting event that isn't a trade or transfer — a broker rewar
 correction, etc. Editable and deletable.
 
 ### Cash ledger
-A read-only, chronological view of every cash-affecting event (trades, transfers,
-adjustments) with a running balance — like a bank statement for your trading account.
+A view of every cash-affecting event (trades, transfers and adjustments) with a running
+balance. On QSE, columns show Date, Type, Count, Unit, Price, Amount and Balance.
+Blue Buy and orange Sell cells identify trades, and Unit shows the stock logo/name
+or cash currency. Expand a row to see its fee and any user-entered description or note.
+
+Use the central **Filters** button to filter QSE transactions. Open a table's header
+options menu for **Import CSV**, **Export filtered**, **Export all**, **Batch edit**
+or **Modify**. Modify reveals editing, deletion and eligible reorder controls; editing
+a ledger event updates its original trade, transfer or adjustment. Linked transfers
+follow the existing linked-record editing flow.
+
+Click a sortable Date header to switch between newest and oldest first. Arrowheads
+show the direction. Sorting changes the display order; each event retains its balance
+calculated in chronological order. Shared table cards elsewhere in the app expose
+their available actions in the header; unavailable actions are disabled.
 
 ### Dividends
 Log dividends received (by ticker, per-share rate, and/or a flat total), see your

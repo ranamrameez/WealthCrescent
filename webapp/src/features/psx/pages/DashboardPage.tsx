@@ -387,7 +387,7 @@ export function DashboardPage() {
       <Tabs
         defaultKey="broker"
         tabs={[
-          {
+          { table: true,
             key: 'broker',
             label: 'Broker Style',
             defaultOpen: true,
@@ -403,7 +403,7 @@ export function DashboardPage() {
               />
             ),
           },
-          {
+          { table: true,
             key: 'strategic',
             label: 'Strategic Trades',
             defaultOpen: true,
@@ -419,8 +419,8 @@ export function DashboardPage() {
               />
             ),
           },
-          { key: 'plans', label: 'Plans', defaultOpen: true, content: <><InvestmentPlans market="psx" items={selectedTickers.map(ticker => ({ id: ticker, name: ticker, currency }))} filters={filters} /></> },
-          { key: 'transactions', label: 'Transactions', defaultOpen: true, content: <><InvestmentTransactions market="psx" transactions={workbook.transactions.filter(tx => selectedTickers.includes(tx.ticker))} currency={currency} filters={filters} /></> },
+          { table: true, key: 'plans', label: 'Plans', defaultOpen: true, content: <><InvestmentPlans market="psx" items={selectedTickers.map(ticker => ({ id: ticker, name: ticker, currency }))} filters={filters} /></> },
+          { table: true, key: 'transactions', label: 'Transactions', defaultOpen: true, content: <><InvestmentTransactions market="psx" transactions={workbook.transactions.filter(tx => selectedTickers.includes(tx.ticker))} currency={currency} filters={filters} /></> },
           { key: 'alerts', label: 'Alerts', defaultOpen: true, content: <AlertsBox /> },
         ]}
       />

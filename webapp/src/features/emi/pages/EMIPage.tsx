@@ -1,3 +1,5 @@
+import { TableCard } from '../../../components/TableCard';
+import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { DateValue } from '../../../components/DateValue';
 import { ToggleChip } from '../../../components/ui/ToggleChip';
 import { QuickEntitySwitch } from '../../../components/QuickEntitySwitch';
@@ -16,7 +18,7 @@ import { TopBarControls } from '../../../components/TopBarControls';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { useUrlTransactionFilters, type TransactionPageFilters } from '../../../hooks/useUrlTransactionFilters';
 import { Bar, Line } from 'react-chartjs-2';
-import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
+import { Card, EntityCard, MoneyValue } from '../../../components/Card';
 import { ModuleDetailTemplate } from '../../../components/ModuleDetailTemplate';
 import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
@@ -410,6 +412,7 @@ function LoanStatZones({ loan, sum, loanRepayments }: { loan: EMILoan; sum: EMIS
 }
 
 function LoanDetail({ loan, onSelect, onBack, startInEditMode }: { loan: EMILoan; onSelect: (item: EMILoan) => void; onBack: () => void; startInEditMode?: boolean }) {
+  const dateSort = useDateTableSort();
   const switchEntities = useEMIWorkbookStore(s=>s.workbook.entries);
   const deleteEntry = useEMIWorkbookStore((s) => s.deleteEntry);
   const updateEntry = useEMIWorkbookStore((s) => s.updateEntry);
@@ -468,7 +471,8 @@ function LoanDetail({ loan, onSelect, onBack, startInEditMode }: { loan: EMILoan
         ? 'planned'
         : 'upcoming') as 'paid' | 'planned' | 'upcoming',
   }));
-  const visibleScheduleRows = scheduleWithStatus.filter(({ status, r }) => (statusFilter === 'all' || status === statusFilter) && filters.direction !== 'in' && filters.source !== 'statement-import' && (!filters.fromDate || resolvedDueDate(loan, r.month, loanRepayments) >= filters.fromDate) && (!filters.toDate || resolvedDueDate(loan, r.month, loanRepayments) <= filters.toDate));
+  const dateSortInput = scheduleWithStatus.filter(({ status, r }) => (statusFilter === 'all' || status === statusFilter) && filters.direction !== 'in' && filters.source !== 'statement-import' && (!filters.fromDate || resolvedDueDate(loan, r.month, loanRepayments) >= filters.fromDate) && (!filters.toDate || resolvedDueDate(loan, r.month, loanRepayments) <= filters.toDate));
+  const visibleScheduleRows = dateSort.rows(dateSortInput, { date: row => resolvedDueDate(loan, row.r.month, loanRepayments) });
 
   /** README item 6 of a 2026-08-26 feedback batch: some real loans aren't
    * a flat EMI every month — e.g. a property installment plan with one
@@ -652,7 +656,7 @@ function LoanDetail({ loan, onSelect, onBack, startInEditMode }: { loan: EMILoan
         {null}
 
       </> },
-{ key: 'plans', label: 'Plans', defaultOpen: true, headerEnd: <button className="btn secondary" onClick={exportSchedule}>Export full schedule CSV</button>, content: <>
+{ table: true, key: 'plans', label: 'Plans', defaultOpen: true, headerEnd: <button className="btn secondary" onClick={exportSchedule}>Export full schedule CSV</button>, content: <>
       <p className="text-muted mt-0">
         Click the pencil on any upcoming installment to set a different amount (and, optionally, a different due
         date) for just that month. Every later month recalculates from what's actually paid.
@@ -675,7 +679,7 @@ function LoanDetail({ loan, onSelect, onBack, startInEditMode }: { loan: EMILoan
         <table>
           <thead>
             <tr>
-              <th>#</th><th>Due date</th><th>Installment</th>
+              <th>#</th><dateSort.Th rows={dateSortInput} column="date">Due date</dateSort.Th><th>Installment</th>
               <th>Net paid</th><th>Net balance</th>
               <th>Breakdown</th><th>Status</th><th></th>
             </tr>
@@ -788,7 +792,7 @@ function LoanDetail({ loan, onSelect, onBack, startInEditMode }: { loan: EMILoan
         </table>
       </div>
       </> },
-{ key: 'payments', label: 'Payments', defaultOpen: true,  content: <><HomepagePayments loans={[loan]} filters={filters} /></> },
+{ table: true, key: 'payments', label: 'Payments', defaultOpen: true,  content: <><HomepagePayments loans={[loan]} filters={filters} /></> },
 { key: 'analytics', label: 'Analytics', defaultOpen: true,  content: <>
         <div style={{ height: 220 }}>
           <Bar
@@ -923,6 +927,7 @@ function LoanDetail({ loan, onSelect, onBack, startInEditMode }: { loan: EMILoan
  * This is also the addressable record Bank/Cash's Transfers-page linking
  * now points at. */
 function RepaymentLog({ loan, repayments }: { loan: EMILoan; repayments: EMIRepayment[] }) {
+  const dateSort = useDateTableSort();
   const ensureSignedIn = useEnsureSignedIn();
   const updateRepayment = useEMIWorkbookStore((s) => s.updateRepayment);
   const deleteRepayment = useEMIWorkbookStore((s) => s.deleteRepayment);
@@ -930,7 +935,8 @@ function RepaymentLog({ loan, repayments }: { loan: EMILoan; repayments: EMIRepa
   const sideLabel = useLinkSideLabel();
   const [editId, setEditId] = useState<string | null>(null);
   const [editAmount, setEditAmount] = useState(0);
-  const sorted = [...repayments].sort((a, b) => a.month - b.month);
+  const dateSortInput = [...repayments].sort((a, b) => a.month - b.month);
+  const sorted = dateSort.rows(dateSortInput, { date: row => installmentDueDate(loan, row.month), month: row => row.month });
 
   const linkByRecordId = useMemo(() => {
     const map = new Map<string, (typeof links)[number]>();
@@ -960,14 +966,14 @@ function RepaymentLog({ loan, repayments }: { loan: EMILoan; repayments: EMIRepa
   };
 
   return (
-    <CollapsibleCard title={<h3 className="m-0">Repayment log</h3>} className="mb-md">
+    <TableCard dateSort={dateSort} title={<h3 className="m-0">Repayment log</h3>} className="mb-md">
       <p className="text-muted mt-0">
         Every actual payment recorded against this loan. Linking it to a Bank/Cash account (via the "Link" option
         next to a schedule row, or the Transfers action) keeps deleting one side in sync with the other.
       </p>
       <div className="table-scroll">
         <table>
-          <thead><tr><th>Month</th><th>Due date</th><th>Amount</th><th>Source</th><th></th></tr></thead>
+          <thead><tr><dateSort.Th rows={dateSortInput} column="month">Month</dateSort.Th><dateSort.Th rows={dateSortInput} column="date">Due date</dateSort.Th><th>Amount</th><th>Source</th><th></th></tr></thead>
           <tbody>
             {sorted.map((r) => {
               const link = linkByRecordId.get(r.id);
@@ -1010,11 +1016,12 @@ function RepaymentLog({ loan, repayments }: { loan: EMILoan; repayments: EMIRepa
           </tbody>
         </table>
       </div>
-    </CollapsibleCard>
+    </TableCard>
   );
 }
 
 function HomepagePlans({ loans, filters }: { loans: EMILoan[]; filters: TransactionPageFilters }) {
+  const dateSort = useDateTableSort();
   const repayments = useEMIWorkbookStore((state) => state.workbook.repayments);
   if (filters.direction === 'in' || filters.source === 'statement-import') return <p className="text-muted">No planned installments match the page filters.</p>;
   return <div className="stack-lg">{loans.map((loan) => {
@@ -1024,13 +1031,13 @@ function HomepagePlans({ loans, filters }: { loans: EMILoan[]; filters: Transact
       const dueDate = resolvedDueDate(loan, row.month, loanRepayments);
       return (!filters.fromDate || dueDate >= filters.fromDate) && (!filters.toDate || dueDate <= filters.toDate);
     });
-    return <Card key={loan.id}>
-      <h3 className="mt-0">{loan.name} <span className="text-muted">({loan.currencyCode})</span></h3>
-      <div className="table-scroll"><table><thead><tr><th>Month</th><th>Due date</th><th>Installment</th><th>Balance</th></tr></thead><tbody>
-        {rows.map((row) => <tr key={row.month}><td>#{row.month}</td><td><DateValue value={resolvedDueDate(loan, row.month, loanRepayments)} /></td><td>{fmtMoney(row.emi, loan.currencyCode)}</td><td>{fmtMoney(row.balance, loan.currencyCode)}</td></tr>)}
+    return <TableCard title={<>{loan.name}<span className="text-muted">({loan.currencyCode})</span></>} dateSort={dateSort} key={loan.id}>
+
+      <div className="table-scroll"><table><thead><tr><dateSort.Th rows={rows} column="month">Month</dateSort.Th><dateSort.Th column="date">Due date</dateSort.Th><th>Installment</th><th>Balance</th></tr></thead><tbody>
+        {dateSort.rows(rows, { date: row => resolvedDueDate(loan, row.month, loanRepayments), month: row => row.month }).map((row) => <tr key={row.month}><td>#{row.month}</td><td><DateValue value={resolvedDueDate(loan, row.month, loanRepayments)} /></td><td>{fmtMoney(row.emi, loan.currencyCode)}</td><td>{fmtMoney(row.balance, loan.currencyCode)}</td></tr>)}
         {!rows.length && <tr><td colSpan={4} className="text-muted">No installments match the page filters.</td></tr>}
       </tbody></table></div>
-    </Card>;
+    </TableCard>;
   })}</div>;
 }
 
@@ -1280,8 +1287,8 @@ export function EMIPage({
           <StandardPageSections sections={[
             { key: 'summary', label: 'Summary', content: <div className="stack-lg"><EMIAccountSummary loans={selectedLoans} filters={filters} /><OverallSummary selectedIds={selectedIds} /></div> },
             { key: 'loans', label: 'Loans', content: <LoanList onSelect={openLoan} onEdit={editLoan} selectedIds={selectedIds} /> },
-            { key: 'plans', label: 'Plans', content: <HomepagePlans loans={selectedLoans} filters={filters} /> },
-            { key: 'payments', label: 'Payments', content: <HomepagePayments loans={selectedLoans} filters={filters} /> },
+            { table: true, key: 'plans', label: 'Plans', content: <HomepagePlans loans={selectedLoans} filters={filters} /> },
+            { table: true, key: 'payments', label: 'Payments', content: <HomepagePayments loans={selectedLoans} filters={filters} /> },
             { key: 'analytics', label: 'Analytics', content: <HomepageAnalytics loans={selectedLoans} filters={filters} /> },
             { key: 'settings', label: 'Settings', content: <AccountSection cloudEmpty={cloudEmpty} uploadLocalToCloud={uploadLocalToCloud} /> },
           ]} />

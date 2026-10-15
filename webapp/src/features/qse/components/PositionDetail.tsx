@@ -1,3 +1,4 @@
+import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { MarketPriceHistory } from './MarketPriceHistory';
 import { PriceInput } from "../../../components/ui/PriceInput";
 import { useEffect, useMemo, useState } from 'react';
@@ -47,6 +48,7 @@ function CompactChart({ height, children }: { height: number; children: React.Re
  * price range. Shared between the quick popup (PositionModal) and the full
  * dedicated stock page (StockPage) so they never drift apart. */
 export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate = '' }: { ticker: string; section?: 'all' | 'current' | 'position' | 'comparison' | 'comparison-summary' | 'all-time' | 'lots' | 'closed' | 'prices'; fromDate?: string; toDate?: string }) {
+  const dateSort = useDateTableSort();
   const { workbook, positions, calcFee, lots } = useQSEDerived();
   const setMarketPrice = useWorkbookStore((s) => s.setMarketPrice);
   const updatePricePoint = useWorkbookStore((s) => s.updatePricePoint);
@@ -333,10 +335,10 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
             <div className="table-scroll">
               <table>
                 <thead>
-                  <tr><th>Buy date</th><th>Buy price</th><th>Shares</th><th>Invested</th><th>Buy fee</th></tr>
+                  <tr><dateSort.Th rows={reportOpenLots} column="date">Buy date</dateSort.Th><th>Buy price</th><th>Shares</th><th>Invested</th><th>Buy fee</th></tr>
                 </thead>
                 <tbody>
-                  {reportOpenLots.map((l, i) => (
+                  {dateSort.rows(reportOpenLots, { date: row => row.buyDate }).map((l, i) => (
                     <tr key={i}>
                       <td>{l.buyDate}</td>
                       <td>{fmtQSEPrice(l.buyPrice)}</td>

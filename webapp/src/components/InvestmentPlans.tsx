@@ -1,3 +1,4 @@
+import { useDateTableSort } from '../hooks/useDateTableSort';
 import { useState } from 'react';
 import { useWorkbookStore } from '../store/workbookStore';
 import { usePSXWorkbookStore } from '../store/psxWorkbookStore';
@@ -17,6 +18,7 @@ import { confirmDialog } from './ConfirmDialog';
 
 /** The same saved plans, scoped to the module, broker, fund or stock being viewed. */
 export function InvestmentPlans({ market, items, filters }: { market: 'qse' | 'psx' | 'funds'; items: { id: string; name: string; currency: string }[]; filters?: TransactionPageFilters }) {
+  const dateSort = useDateTableSort();
   const useStore = market === 'qse' ? useWorkbookStore : market === 'psx' ? usePSXWorkbookStore : useFundsWorkbookStore;
   const plans = useStore().workbook.tradePlans;
   const ensureSignedIn = useEnsureSignedIn();
@@ -42,7 +44,7 @@ export function InvestmentPlans({ market, items, filters }: { market: 'qse' | 'p
   };
   return <>
     <button className="btn secondary small" disabled={!items.length} onClick={() => { setError(''); setDraft({ ticker: items[0]?.id ?? '', action: 'BUY', date: new Date().toISOString().slice(0, 10), shares: '', price: '' }); }}>+ Add plan</button>
-    <div className="table-scroll mt-12"><table><thead><tr><th>Date</th><th>Item</th><th>Plan</th><th>Units</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead><tbody>{rows.map(({ plan, leg, index }) => <tr key={`${plan.id}:${index}`}><td>{leg.date ? <DateValue value={leg.date} /> : 'Unscheduled'}</td><td>{items.find(item => item.id === leg.ticker)?.name}</td><td>{leg.action === 'BUY' ? 'Buy' : 'Sell'}</td><td>{leg.shares}</td><td>{fmtMoney(leg.shares * leg.price, items.find(item => item.id === leg.ticker)?.currency ?? '')}</td><td>{leg.executed ? 'Done' : 'Planned'}</td><td>{!leg.executed && <>
+    <div className="table-scroll mt-12"><table><thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Item</th><th>Plan</th><th>Units</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead><tbody>{dateSort.rows(rows, { date: row => row.leg }).map(({ plan, leg, index }) => <tr key={`${plan.id}:${index}`}><td>{leg.date ? <DateValue value={leg.date} /> : 'Unscheduled'}</td><td>{items.find(item => item.id === leg.ticker)?.name}</td><td>{leg.action === 'BUY' ? 'Buy' : 'Sell'}</td><td>{leg.shares}</td><td>{fmtMoney(leg.shares * leg.price, items.find(item => item.id === leg.ticker)?.currency ?? '')}</td><td>{leg.executed ? 'Done' : 'Planned'}</td><td>{!leg.executed && <>
       <button className="btn secondary small" onClick={() => { setError(''); setDraft({ planId: plan.id, index, original: JSON.stringify(leg), ticker: leg.ticker, action: leg.action, date: leg.date ?? '', shares: String(leg.shares), price: String(leg.price), manualSameDay:leg.manualSameDay, feeOverride:leg.feeOverride }); }}>Edit</button>{' '}
       <button className="btn secondary small" onClick={async () => { if (!(await confirmDialog('Add this planned trade to transaction history?', 'Mark plan as done?')) || !(await ensureSignedIn('Sign in to fulfill this plan.'))) return; const current = useStore.getState().workbook.tradePlans.find(item => item.id === plan.id); if (JSON.stringify(current?.legs[index]) === JSON.stringify(leg)) useStore.getState().executeTradePlanLeg(plan.id, index); }}>Mark done</button>{' '}
       <button className="btn secondary small" onClick={async () => { if (!(await confirmDialog('Remove this unfulfilled trade from the plan?')) || !(await ensureSignedIn('Sign in to remove this plan.'))) return; const current = useStore.getState().workbook.tradePlans.find(item => item.id === plan.id); if (current && !current.legs[index]?.executed && JSON.stringify(current.legs[index]) === JSON.stringify(leg)) useStore.getState().updateTradePlan(plan.id, { legs: current.legs.filter((_, i) => i !== index) }); }}>Remove</button>

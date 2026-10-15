@@ -1,3 +1,5 @@
+import { TableCard } from '../../../components/TableCard';
+import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { DateValue } from '../../../components/DateValue';
 import { ToggleChip } from '../../../components/ui/ToggleChip';
 import { QuickEntitySwitch } from '../../../components/QuickEntitySwitch';
@@ -20,7 +22,7 @@ import { TopBarControls } from '../../../components/TopBarControls';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { useUrlTransactionFilters, type TransactionPageFilters } from '../../../hooks/useUrlTransactionFilters';
 import { Bar, Doughnut } from 'react-chartjs-2';
-import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
+import { Card, EntityCard, MoneyValue } from '../../../components/Card';
 import { Notice } from '../../../components/Notice';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { ArchiveIcon, CheckIcon, EditIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon } from '../../../components/icons';
@@ -350,6 +352,7 @@ function LinkedRentCollectionFields({
  * from the lease's own details — see `lib/calc/rentalPlanning.ts` for the
  * pure date-math this button calls. */
 function PropertyDetailModal({ property, onClose }: { property: Property; onClose: () => void }) {
+  const dateSort = useDateTableSort();
   const updateProperty = useRentalsWorkbookStore((s) => s.updateProperty);
   const addRentalEntry = useRentalsWorkbookStore((s) => s.addEntry);
   const ensureSignedIn = useEnsureSignedIn();
@@ -505,9 +508,9 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
       {editingPlan && <RentalPlanEditor key={editingPlan === 'new' ? 'new' : editingPlan.id} propertyId={property.id} plan={editingPlan === 'new' ? undefined : editingPlan} onClose={() => setEditingPlan(null)} />}
       <div className="table-scroll" style={{ maxHeight: 260, overflowY: 'auto' }}>
         <table>
-          <thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><dateSort.Th rows={propertyPlans} column="date">Date</dateSort.Th><th>Type</th><th>Description</th><th>Amount</th><th>Status</th><th></th></tr></thead>
           <tbody>
-            {propertyPlans.map((p) => (
+            {dateSort.rows(propertyPlans, { date: row => row }).map((p) => (
               <tr key={p.id}>
                 <td><DateValue value={p.date} /></td>
                 <td>{p.type === 'RENT_INCOME' ? 'Rent income' : 'Expense'}</td>
@@ -898,6 +901,7 @@ function EntriesList({ property, filters }: { property: Property; filters: Trans
  * and the stored amount is always the absolute value, same approach as
  * Cash's `ImportTab`. */
 function ImportTab() {
+  const dateSort = useDateTableSort();
   const { properties, property, propertyId, setPropertyId } = usePropertyPicker();
   const addEntries = useRentalsWorkbookStore((s) => s.addEntries);
   const ensureSignedIn = useEnsureSignedIn();
@@ -1001,8 +1005,8 @@ function ImportTab() {
       </div>
 
       {headers.length > 0 && (
-        <Card className="mt-12">
-          <h3 className="mt-0">Map columns</h3>
+        <TableCard title={<>Map columns</>} dateSort={dateSort} className="mt-12">
+
           <div className="row gap-sm">
             <Field label="Date column" width={160}>
               <Select value={dateCol} onChange={(e) => setDateCol(e.target.value)}>
@@ -1027,9 +1031,9 @@ function ImportTab() {
           <h4>Preview (first 5 rows)</h4>
           <div className="table-scroll">
             <table>
-              <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Category</th></tr></thead>
+              <thead><tr><dateSort.Th rows={mappedPreview} column="date">Date</dateSort.Th><th>Type</th><th>Amount</th><th>Category</th></tr></thead>
               <tbody>
-                {mappedPreview.map((r, i) => (
+                {dateSort.rows(mappedPreview, { date: row => row }).map((r, i) => (
                   <tr key={i}>
                     <td><DateValue value={r.date} /></td>
                     <td className={r.isDeposit ? 'pill-positive' : 'pill-negative'}>{r.isDeposit ? 'Rent income' : 'Expense'}</td>
@@ -1043,13 +1047,14 @@ function ImportTab() {
           <button className="btn mt-12" onClick={doImport}>
             <PlusIcon />Import {rows.length} entr{rows.length === 1 ? 'y' : 'ies'}
           </button>
-        </Card>
+        </TableCard>
       )}
     </div>
   );
 }
 
 function CategoryAndRollup({ property, entries: suppliedEntries }: { property: Property; entries?: RentalEntry[] }) {
+  const dateSort = useDateTableSort();
   const storedEntries = useRentalsWorkbookStore((s) => s.workbook.entries);
   const entries = suppliedEntries ?? storedEntries;
   const categories = useCategoryStore((s) => s.workbook.categories);
@@ -1060,7 +1065,7 @@ function CategoryAndRollup({ property, entries: suppliedEntries }: { property: P
   return (
     <div className="grid-auto" style={{ ...gridAutoStyle(260, 16), marginBottom: 16 }}>
       {cats.length > 0 && (
-        <CollapsibleCard title={<h3 className="m-0">By category</h3>}>
+        <TableCard rows={cats} title={<h3 className="m-0">By category</h3>}>
           <div className="table-scroll">
             <table>
               <tbody>
@@ -1073,15 +1078,15 @@ function CategoryAndRollup({ property, entries: suppliedEntries }: { property: P
               </tbody>
             </table>
           </div>
-        </CollapsibleCard>
+        </TableCard>
       )}
       {rollup.length > 0 && (
-        <CollapsibleCard title={<h3 className="m-0">Monthly rollup</h3>}>
+        <TableCard dateSort={dateSort} title={<h3 className="m-0">Monthly rollup</h3>}>
           <div className="table-scroll">
             <table>
-              <thead><tr><th>Month</th><th>Income</th><th>Expense</th><th>Net</th></tr></thead>
+              <thead><tr><dateSort.Th rows={rollup} column="date">Month</dateSort.Th><th>Income</th><th>Expense</th><th>Net</th></tr></thead>
               <tbody>
-                {rollup.map((r) => (
+                {dateSort.rows(rollup, { date: row => row.month }).map((r) => (
                   <tr key={r.month}>
                     <td>{r.month}</td>
                     <td>{fmtMoney(r.income, property.currencyCode)}</td>
@@ -1092,7 +1097,7 @@ function CategoryAndRollup({ property, entries: suppliedEntries }: { property: P
               </tbody>
             </table>
           </div>
-        </CollapsibleCard>
+        </TableCard>
       )}
     </div>
   );
@@ -1205,6 +1210,7 @@ function DataManagement() {
 }
 
 function RentalPlansOverview({ propertyIds, filters }: { propertyIds: string[]; filters: TransactionPageFilters }) {
+  const dateSort = useDateTableSort();
   const plans = usePlannedRentalsWorkbookStore(state => state.workbook.entries);
   const properties = useRentalsWorkbookStore(state => state.workbook.settings.properties).filter(property => propertyIds.includes(property.id));
   const [editing, setEditing] = useState<PlannedRentalEntry | 'new' | null>(null);
@@ -1220,7 +1226,7 @@ function RentalPlansOverview({ propertyIds, filters }: { propertyIds: string[]; 
     const error=fulfillRentalPlan(id);
     if (error) toast(error);
   };
-  return <><button className="btn secondary small" disabled={!properties.length} onClick={() => setEditing('new')}>+ Add plan</button><div className="table-scroll mt-12"><table><thead><tr><th>Date</th><th>Property</th><th>Plan</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead><tbody>{rows.map(plan => <tr key={plan.id}><td><DateValue value={plan.date} /></td><td>{properties.find(p => p.id === plan.propertyId)?.name}</td><td>{plan.note || plan.category || plan.type}</td><td>{fmtMoney(plan.amount, properties.find(p => p.id === plan.propertyId)?.currencyCode ?? '')}</td><td>{plan.executed ? 'Done' : 'Planned'}</td><td>{!plan.executed && <><button className="btn secondary small" onClick={() => setEditing(plan)}>Edit</button>{' '}<button className="btn secondary small" onClick={() => setFinancePlanId(plan.id)}>Link finance</button>{' '}<button className="btn secondary small" onClick={() => void fulfill(plan.id)}>Mark done</button>{' '}<button className="btn secondary small" onClick={async () => { if (await ensureSignedIn('Sign in to remove this plan.')) usePlannedRentalsWorkbookStore.getState().deleteEntry(plan.id); }}>Remove</button></>}</td></tr>)}</tbody></table>{!rows.length && <p className="text-muted">No plans in this period.</p>}</div>{financePlanId && <FinancePlanEditor reference={{ module:"rentals",id:financePlanId }} onClose={() => setFinancePlanId(null)} />}{editing && <PlanEditorModal title={editing === 'new' ? 'Add rental plan' : 'Edit rental plan'} onClose={() => setEditing(null)}>{editing === 'new' && properties.length > 1 && <Field label="Property"><Select value={effectiveId} onChange={event => setNewPropertyId(event.target.value)}>{properties.map(property => <option key={property.id} value={property.id}>{property.name}</option>)}</Select></Field>}<RentalPlanEditor key={editing === 'new' ? effectiveId : editing.id} propertyId={editing === 'new' ? effectiveId : editing.propertyId} plan={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} /></PlanEditorModal>}</>;
+  return <><button className="btn secondary small" disabled={!properties.length} onClick={() => setEditing('new')}>+ Add plan</button><div className="table-scroll mt-12"><table><thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Property</th><th>Plan</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead><tbody>{dateSort.rows(rows, { date: row => row }).map(plan => <tr key={plan.id}><td><DateValue value={plan.date} /></td><td>{properties.find(p => p.id === plan.propertyId)?.name}</td><td>{plan.note || plan.category || plan.type}</td><td>{fmtMoney(plan.amount, properties.find(p => p.id === plan.propertyId)?.currencyCode ?? '')}</td><td>{plan.executed ? 'Done' : 'Planned'}</td><td>{!plan.executed && <><button className="btn secondary small" onClick={() => setEditing(plan)}>Edit</button>{' '}<button className="btn secondary small" onClick={() => setFinancePlanId(plan.id)}>Link finance</button>{' '}<button className="btn secondary small" onClick={() => void fulfill(plan.id)}>Mark done</button>{' '}<button className="btn secondary small" onClick={async () => { if (await ensureSignedIn('Sign in to remove this plan.')) usePlannedRentalsWorkbookStore.getState().deleteEntry(plan.id); }}>Remove</button></>}</td></tr>)}</tbody></table>{!rows.length && <p className="text-muted">No plans in this period.</p>}</div>{financePlanId && <FinancePlanEditor reference={{ module:"rentals",id:financePlanId }} onClose={() => setFinancePlanId(null)} />}{editing && <PlanEditorModal title={editing === 'new' ? 'Add rental plan' : 'Edit rental plan'} onClose={() => setEditing(null)}>{editing === 'new' && properties.length > 1 && <Field label="Property"><Select value={effectiveId} onChange={event => setNewPropertyId(event.target.value)}>{properties.map(property => <option key={property.id} value={property.id}>{property.name}</option>)}</Select></Field>}<RentalPlanEditor key={editing === 'new' ? effectiveId : editing.id} propertyId={editing === 'new' ? effectiveId : editing.propertyId} plan={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} /></PlanEditorModal>}</>;
 }
 
 export function RentalsPage({
@@ -1262,14 +1268,14 @@ export function RentalsPage({
       <StandardPageSections sections={[
           { key: 'summary', label: 'Account summary', defaultOpen: true, content: <RentalAccountSummary properties={properties.filter(p => selectedIds.includes(p.id))} entries={entries} visible={filteredEntries} filters={filters} /> },
           ...(propertyId ? [{ key: 'details', label: 'Property details', actions: [{ label: 'Edit property', onClick: () => setEditDetails(true) }], content: <dl><dt>Name</dt><dd>{selectedProperty?.name}</dd><dt>Currency</dt><dd>{selectedProperty?.currencyCode}</dd><dt>Monthly rent</dt><dd>{fmtMoney(selectedProperty?.monthlyRent ?? 0, selectedProperty?.currencyCode ?? '')}</dd><dt>Tenant</dt><dd>{selectedProperty?.tenantName || 'Unspecified'}</dd><dt>Lease</dt><dd>{selectedProperty?.leaseStartDate || 'Unspecified'} to {selectedProperty?.leaseEndDate || 'Open ended'}</dd></dl> }] : [{ key: 'properties', label: 'Properties', content: <PropertiesTab selectedIds={selectedIds} /> }]),
-          { key: 'plans', label: 'Plans', content: <RentalPlansOverview propertyIds={selectedIds} filters={filters} /> },
-          {
+          { table: true, key: 'plans', label: 'Plans', content: <RentalPlansOverview propertyIds={selectedIds} filters={filters} /> },
+          { table: true,
             key: 'entries',
             label: 'Income & expenses',
             content: <EntriesTab properties={properties} selectedIds={selectedIds} filters={filters} entries={filteredEntries} />,
           },
-          ...(propertyId ? [] : [{ key: 'import', label: 'Import', content: <ImportTab /> }]),
-          { key: 'analytics', label: 'Analytics', content: <AnalyticsTab selectedIds={selectedIds} entries={filteredEntries} /> },
+          ...(propertyId ? [] : [{ table: true, key: 'import', label: 'Import', content: <ImportTab /> }]),
+          { table: true, key: 'analytics', label: 'Analytics', content: <AnalyticsTab selectedIds={selectedIds} entries={filteredEntries} /> },
           ...(propertyId ? [] : [{
             key: 'settings',
             label: 'Settings',

@@ -1,3 +1,4 @@
+import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { DateValue } from '../../../components/DateValue';
 import { Line } from 'react-chartjs-2';
 import { BalanceSummaryCards, type BalanceSummary } from '../../../components/BalanceSummaryCards';
@@ -53,9 +54,10 @@ export function FundsScopePlans({ ids, filters }: { ids: string[]; filters: Tran
 }
 
 export function FundsScopeTransactions({ ids, filters, onSelect }: { ids: string[]; filters: TransactionPageFilters; onSelect?: (id: string) => void }) {
+  const dateSort = useDateTableSort();
   const { funds, transactions } = useScope(ids, filters);
   const navigate = useNavigate();
-  return <div className="table-scroll"><table><thead><tr><th>Date</th><th>Fund</th><th>Action</th><th>Units</th><th>Amount</th><th>Status</th></tr></thead><tbody>{[...transactions].sort((a, b) => b.date.localeCompare(a.date) || (b.seq ?? 0) - (a.seq ?? 0)).map(tx => {
+  return <div className="table-scroll"><table><thead><tr><dateSort.Th rows={[...transactions].sort((a, b) => b.date.localeCompare(a.date) || (b.seq ?? 0) - (a.seq ?? 0))} column="date">Date</dateSort.Th><th>Fund</th><th>Action</th><th>Units</th><th>Amount</th><th>Status</th></tr></thead><tbody>{dateSort.rows([...transactions].sort((a, b) => b.date.localeCompare(a.date) || (b.seq ?? 0) - (a.seq ?? 0)), { date: row => row }).map(tx => {
     const fund = funds.find(item => item.id === tx.ticker)!;
     return <tr key={tx.id} className="clickable" onClick={() => onSelect ? onSelect(fund.id) : navigate(`/funds?fund=${encodeURIComponent(fund.id)}`)}><td><DateValue value={tx.date} /></td><td>{fund.name}</td><td>{tx.action}</td><td>{tx.shares}</td><td>{fmtMoney(tx.shares * tx.price, fund.currencyCode)}</td><td>{tx.isPending ? 'Pending' : 'Cleared'}</td></tr>;
   })}</tbody></table>{!transactions.length && <p className="text-muted">No transactions in this view.</p>}</div>;

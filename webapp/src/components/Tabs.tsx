@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { StandardPageSections } from './StandardPageSections';
 
 export interface TabDef {
+  table?: boolean;
   key: string;
   label: string;
   content: ReactNode;
@@ -17,6 +18,7 @@ export function Tabs({ tabs, defaultKey }: { tabs: TabDef[]; defaultKey?: string
     <StandardPageSections
       defaultKey={defaultKey}
       sections={tabs.map((tab) => ({
+        table: tab.table,
         key: tab.key,
         label: tab.label,
         content: tab.content,

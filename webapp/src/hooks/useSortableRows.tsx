@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useContext, useEffect, useId, useState } from 'react';
+import { SortIcon } from '../components/icons';
+import { TableSortContext, type TableCardDateSort } from '../components/tableSortContext';
 
 function compareKeys(a: number[], b: number[]): number {
   for (let i = 0; i < Math.max(a.length, b.length); i++) {
@@ -40,8 +42,15 @@ export function useSortableRows<T, C extends string>(
   initialDir: 'asc' | 'desc' = 'desc',
   tiebreak?: (row: T) => number[],
 ) {
-  const [sort, setSort] = useState<{ col: C; dir: 'asc' | 'desc' }>({ col: initialCol, dir: initialDir });
+  const [localSort, setSort] = useState<{ col: C; dir: 'asc' | 'desc' }>({ col: initialCol, dir: initialDir });
 
+  const context = useContext(TableSortContext);
+  const id = useId();
+  const dateColumn = /date/i.test(initialCol) || initialCol === 'last';
+  const sort = context?.selection && dateColumn ? { col: initialCol, dir: context.selection.direction } : localSort;
+  useEffect(() => { context?.register(id, rows, dateColumn); });
+  const unregister = context?.unregister;
+  useEffect(() => () => unregister?.(id), [unregister, id]);
   const sorted = [...rows].sort((a, b) => {
     const av = sortValue(a, sort.col);
     const bv = sortValue(b, sort.col);
@@ -50,17 +59,19 @@ export function useSortableRows<T, C extends string>(
     return sort.dir === 'asc' ? cmp : -cmp;
   });
 
-  const toggleSort = (col: C) =>
-    setSort((s) => (s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'desc' }));
-
-  const arrow = (col: C) => (sort.col === col ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '');
-
+  const toggleSort = (col: C) => {
+    context?.setSelection(null);
+    setSort({ col, dir: sort.col === col && sort.dir === 'desc' ? 'asc' : 'desc' });
+  };
   const Th = ({ col, children }: { col: C; children: React.ReactNode }) => (
-    <th className="sortable" onClick={() => toggleSort(col)}>
-      {children}
-      {arrow(col)}
+    <th className="sortable" tabIndex={0} aria-sort={sort.col === col ? sort.dir === 'asc' ? 'ascending' : 'descending' : 'none'} onClick={() => toggleSort(col)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleSort(col); } }}>
+      {children}<SortIcon direction={sort.col === col ? sort.dir : undefined} />
     </th>
   );
 
-  return { sorted, sort, toggleSort, Th };
+  const dateSort: TableCardDateSort | undefined = dateColumn ? {
+    selection: sort.col === initialCol ? { column: 'date', direction: sort.dir } : null,
+    setSelection: selection => { context?.setSelection(null); if (selection) setSort({ col: initialCol, dir: selection.direction }); },
+  } : undefined;
+  return { sorted, sort, toggleSort, Th, dateSort };
 }

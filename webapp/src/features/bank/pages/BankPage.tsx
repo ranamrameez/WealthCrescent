@@ -1,3 +1,5 @@
+import { TableCard } from '../../../components/TableCard';
+import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { ToggleChip } from '../../../components/ui/ToggleChip';
 import { FinancePlanEditor } from '../../../components/FinancePlanEditor';
 import { EntityEditorModal } from '../../../components/EntityEditorModal';
@@ -10,7 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
-import { CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
+import { EntityCard, MoneyValue } from '../../../components/Card';
 import { SummaryChip, type StandardCardAction } from '../../../components/StandardCard';
 import { StandardPageSections, type StandardPageSection } from '../../../components/StandardPageSections';
 import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls';
@@ -732,8 +734,8 @@ export function BankDetailPage() {
         </div>
       ),
     },
-    { key: 'plans', label: 'Plans', hue: bank.color, content: <BankingScopePlans accounts={linkedAccounts} filters={filters} /> },
-    {
+    { table: true, key: 'plans', label: 'Plans', hue: bank.color, content: <BankingScopePlans accounts={linkedAccounts} filters={filters} /> },
+    { table: true,
       key: 'transactions',
       label: 'Transactions',
       summary: <SummaryChip label="Accounts" value={linkedAccounts.length} />,
@@ -741,7 +743,7 @@ export function BankDetailPage() {
       hue: bank.color,
       content: <BankingScopeTransactions accounts={linkedAccounts} filters={filters} />,
     },
-    { key: 'analytics', label: 'Analytics', hue: bank.color, content: <AnalyticsTab bankId={bank.id} filters={filters} /> },
+    { table: true, key: 'analytics', label: 'Analytics', hue: bank.color, content: <AnalyticsTab bankId={bank.id} filters={filters} /> },
   ];
 
   const transferDefault = linkedAccounts[0]
@@ -1119,7 +1121,7 @@ export function AccountDetailPage() {
         {account.isLiability && account.creditLimit ? <CreditUsageBar used={Math.max(0, -currentBalance)} limit={account.creditLimit} currency={account.currencyCode} /> : null}
       </>,
     },
-    {
+    { table: true,
       key: 'plans',
       label: 'Plans',
       hue: account.color,
@@ -1132,7 +1134,7 @@ export function AccountDetailPage() {
       headerEnd: showPlanActions ? <IconButton label="Hide modification options" icon={<XIcon size={13} />} align="right" onClick={() => setShowPlanActions(false)} /> : undefined,
       content: <AccountPlans account={account} showActions={showPlanActions} />,
     },
-    {
+    { table: true,
       key: 'transactions',
       label: 'Transactions',
       hue: account.color,
@@ -1294,6 +1296,8 @@ function EditTransactionModal({ tx, onClose }: { tx: BankTransaction; onClose: (
  * extends the Type/Category filter treatment Cash's statement tables got
  * (README Done item 224) here too. */
 function TransactionsList({ account, ledger, allLedgerCount, showActions }: { account: BankAccount; ledger: ReturnType<typeof accountRunningLedger>; allLedgerCount: number; showActions: boolean }) {
+  const dateSort = useDateTableSort();
+  useEffect(() => setPage(1), [dateSort.selection]);
   const dateFormat = useAppearanceStore((state) => state.appearance.dateFormat ?? 'DD-MMM-YYYY');
   const updateTransaction = useBankWorkbookStore((state) => state.updateTransaction);
   const deleteTransaction = useBankWorkbookStore((state) => state.deleteTransaction);
@@ -1306,7 +1310,8 @@ function TransactionsList({ account, ledger, allLedgerCount, showActions }: { ac
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
-  const sorted = useMemo(() => [...ledger].reverse(), [ledger]);
+  const dateSortInput = useMemo(() => [...ledger].reverse(), [ledger]);
+  const sorted = dateSort.rows(dateSortInput, { date: row => row.tx });
   const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
   const safePage = Math.min(page, pageCount);
   const pageRows = useMemo(() => sorted.slice((safePage - 1) * pageSize, safePage * pageSize), [sorted, safePage, pageSize]);
@@ -1331,7 +1336,7 @@ function TransactionsList({ account, ledger, allLedgerCount, showActions }: { ac
   return <>
     <div className="section-toolbar"><ImportStatementSection account={account} compact /></div>
     <div className="table-responsive"><table>
-      <thead><tr><th>#</th><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>Balance</th><th>Source</th>{showActions && <th></th>}</tr></thead>
+      <thead><tr><th>#</th><dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th><th>Description</th><th>Category</th><th>Amount</th><th>Balance</th><th>Source</th>{showActions && <th></th>}</tr></thead>
       <tbody>
         {pageRows.map(({ tx, balance }, index) => {
           const link = linkByRecordId.get(tx.id);
@@ -1583,6 +1588,8 @@ function bankingTransactionActions(
 }
 
 function BankingScopeTransactions({ accounts, filters }: { accounts: BankAccount[]; filters: BankingFilters }) {
+  const dateSort = useDateTableSort();
+  useEffect(() => setPage(1), [dateSort.selection]);
   const navigate = useNavigate();
   const transactions = useBankWorkbookStore((state) => state.workbook.transactions);
   const categories = useCategoryStore((state) => state.workbook.categories);
@@ -1596,12 +1603,12 @@ function BankingScopeTransactions({ accounts, filters }: { accounts: BankAccount
   );
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   const safePage = Math.min(page, pageCount);
-  const pageRows = rows.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const pageRows = dateSort.rows(rows, { date: row => row }).slice((safePage - 1) * pageSize, safePage * pageSize);
   useEffect(() => {
     setPage(1);
   }, [filters.period, filters.fromDate, filters.toDate, filters.direction, filters.category, filters.source, filters.accountId, pageSize]);
   return <><div className="table-responsive"><table>
-    <thead><tr><th>Date</th><th>Account</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th></tr></thead>
+    <thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Account</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th></tr></thead>
     <tbody>{pageRows.map((tx) => { const account = accountById.get(tx.accountId)!; return <tr key={tx.id} className="clickable" onClick={() => navigate(`/bank/account/${account.id}`)}>
       <td>{formatDate(tx.date, dateFormat)}</td><td>{accountDisplayName(account)}</td><td>{tx.description}</td><td><span className="pill-info">{categoryName(tx.categoryID, categories)}</span></td>
       <td className={tx.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(tx.amount, account.currencyCode)}</td><td>{tx.isPending ? <span className="pill-warn">Pending</span> : 'Cleared'}</td>
@@ -1619,6 +1626,7 @@ function BankingScopeTransactions({ accounts, filters }: { accounts: BankAccount
  * Scoped to the account whose detail page it's embedded in — no picker,
  * since there's nothing to pick, the account is already known. */
 function ImportStatementSection({ account, compact = false }: { account: BankAccount; compact?: boolean }) {
+  const dateSort = useDateTableSort();
   const dateFormat = useAppearanceStore((s) => s.appearance.dateFormat ?? 'DD-MMM-YYYY');
   const transactions = useBankWorkbookStore((s) => s.workbook.transactions);
   const addTransactions = useBankWorkbookStore((s) => s.addTransactions);
@@ -1729,8 +1737,8 @@ function ImportStatementSection({ account, compact = false }: { account: BankAcc
           </div>
           <h4>Preview</h4>
           <div style={{ maxHeight: 360 }}>
-            <table className="table-responsive"><thead><tr><th>#</th><th>Date</th><th>Description</th><th>Amount</th><th>Status</th></tr></thead>
-              <tbody>{mappedRows.slice(0, 100).map((r) => {
+            <table className="table-responsive"><thead><tr><th>#</th><dateSort.Th rows={mappedRows} column="date">Date</dateSort.Th><th>Description</th><th>Amount</th><th>Status</th></tr></thead>
+              <tbody>{dateSort.rows(mappedRows, { date: row => row }).slice(0, 100).map((r) => {
                 const duplicate = r.valid && r.date ? existingByFingerprint.has(fingerprint({ date: r.date, description: r.description, amount: r.amount })) : false;
                 return <tr key={r.index}><td>{r.index + 1}</td><td>{r.date ? formatDate(r.date, dateFormat) : r.rawDate || '—'}</td><td>{r.description}</td><td className={r.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{Number.isFinite(r.amount) ? fmtMoney(r.amount, account.currencyCode) : 'Invalid'}</td><td className={r.valid ? (duplicate ? 'text-loss' : 'text-profit') : 'text-loss'}>{r.valid ? (duplicate ? 'Duplicate' : 'New') : 'Invalid'}</td></tr>;
               })}</tbody>
@@ -1928,6 +1936,7 @@ export function AddBankPlanForm({ accountId, onSaved, plan }: { accountId: strin
 }
 
 function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = true }: { account: BankAccount; horizonDays: PlanningHorizonDays; fromDate?: string; toDate?: string; showActions?: boolean }) {
+  const dateSort = useDateTableSort();
   const dateFormat = useAppearanceStore((s) => s.appearance.dateFormat ?? 'DD-MMM-YYYY');
   const allPlans = usePlannedBankWorkbookStore((s) => s.workbook.entries);
   const updatePlan = usePlannedBankWorkbookStore((s) => s.updateEntry);
@@ -1942,7 +1951,8 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
     () => planOccurrences(allPlans, fromDate, toDate, asOf, horizonDays).filter((p) => p.accountId === account.id),
     [allPlans, account.id, horizonDays, asOf, fromDate, toDate],
   );
-  const sorted = useMemo(() => [...plans].sort((a, b) => a.date.localeCompare(b.date)), [plans]);
+  const dateSortInput = useMemo(() => [...plans].sort((a, b) => a.date.localeCompare(b.date)), [plans]);
+  const sorted = dateSort.rows(dateSortInput, { date: row => row });
 
   const markDone = async (p: PlannedBankTransaction & { planId?: string }) => {
     const occurrenceDate = p.date;
@@ -1978,7 +1988,7 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
       <div className="table-responsive">
         <table>
           <thead>
-            <tr><th>Date</th><th>Description</th><th>Amount</th><th>Category</th><th>Repeats / status</th><th></th></tr>
+            <tr><dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th><th>Description</th><th>Amount</th><th>Category</th><th>Repeats / status</th><th></th></tr>
           </thead>
           <tbody>
             {sorted.map((p) => (
@@ -2133,7 +2143,7 @@ function AnalyticsTab({ bankId, filters }: { bankId?: string; filters: BankingFi
         fromDate={filters.fromDate}
         toDate={filters.toDate}
       />
-      <CollapsibleCard title={<h3 className="m-0">Budget — {thisMonth}</h3>} className="mt-md">
+      <TableCard rows={budgetRows} title={<h3 className="m-0">Budget — {thisMonth}</h3>} className="mt-md">
         <p className="text-muted mt-0">
           Monthly spend targets for {accountDisplayName(account)}. Account selection and period come from the same centralized Filters control used by the charts.
         </p>
@@ -2174,7 +2184,7 @@ function AnalyticsTab({ bankId, filters }: { bankId?: string; filters: BankingFi
             </div>
           </Modal>
         )}
-      </CollapsibleCard>
+      </TableCard>
     </div>
   );
 }
@@ -2361,19 +2371,19 @@ export function BankPage({
         </div>
       ),
     },
-    {
+    { table: true,
       key: 'planning',
       label: 'Plans',
       content: <PlanningTab plannedCloudEmpty={plannedCloudEmpty} uploadPlannedLocalToCloud={uploadPlannedLocalToCloud} />,
     },
-    {
+    { table: true,
       key: 'transactions',
       label: 'Transactions',
       summary: <SummaryChip label="Filtered" value={transactions.filter((tx) => transactionMatchesFilters(tx, filters, categories)).length} />,
       actions: bankingTransactionActions(accounts, transactions, filters, categories),
       content: <BankingScopeTransactions accounts={accounts} filters={filters} />,
     },
-    { key: 'analytics', label: 'Analytics', content: <AnalyticsTab filters={filters} /> },
+    { table: true, key: 'analytics', label: 'Analytics', content: <AnalyticsTab filters={filters} /> },
     {
       key: 'settings',
       label: 'Settings',

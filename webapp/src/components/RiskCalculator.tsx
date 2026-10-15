@@ -1,3 +1,4 @@
+import { TableCard } from './TableCard';
 import { PriceInput } from "./ui/PriceInput";
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -291,8 +292,8 @@ export function RiskCalculator({
             </div>
           </Card>
 
-          <Card className="mb-md">
-            <h3 className="mt-0">Meaningful averaging points</h3>
+          <TableCard title={<>Meaningful averaging points</>} rows={scenarios} className="mb-md">
+
             <div className="table-scroll">
               <table>
                 <thead>
@@ -331,7 +332,7 @@ export function RiskCalculator({
                 </tbody>
               </table>
             </div>
-          </Card>
+          </TableCard>
 
           <Card className="mb-md">
             <h3 className="mt-0">Capital efficiency &amp; diminishing returns</h3>

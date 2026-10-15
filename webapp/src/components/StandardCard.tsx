@@ -27,14 +27,15 @@ export function CardActionMenu({ actions, onAction }: { actions: StandardCardAct
   if (!actions.length) return null;
   const actionIcon = (label: string) => {
     const name = label.toLowerCase();
-    if (name.includes('delete')) return <TrashIcon size={14} />;
+    if (name.includes('delete') || name.includes('clear')) return <TrashIcon size={14} />;
     if (name.includes('edit')) return <EditIcon size={14} />;
     if (name.includes('plan')) return <PlanningIcon size={14} />;
-    if (name.includes('import')) return <PlusIcon size={14} />;
+    if (name.includes('import') || name.startsWith('add ')) return <PlusIcon size={14} />;
     if (name.includes('export')) return <ExportIcon size={14} />;
     if (name.includes('filter')) return <FlaskIcon size={14} />;
     if (name.includes('save')) return <SaveIcon size={14} />;
     if (name.includes('done') || name.includes('complete')) return <CheckIcon size={14} />;
+    if (name.includes('modify')) return <EditIcon size={14} />;
     if (name.includes('cancel')) return <XIcon size={14} />;
     if (name.includes('close') || name.includes('archive')) return <ArchiveIcon size={14} />;
     return null;

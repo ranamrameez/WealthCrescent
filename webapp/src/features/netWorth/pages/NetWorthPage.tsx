@@ -1,3 +1,5 @@
+import { TableCard } from '../../../components/TableCard';
+import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { DateValue } from '../../../components/DateValue';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -91,6 +93,7 @@ type Drilldown =
   | { kind: 'delta'; title: string; explanation: string; currency: string; current: NetWorthBreakdownEntry[]; previous: NetWorthBreakdownEntry[] };
 
 function NetWorthDrilldownModal({ drilldown, onClose }: { drilldown: Drilldown; onClose: () => void }) {
+  const dateSort = useDateTableSort();
   return (
     <Modal title={drilldown.title} onClose={onClose}>
       <p className="text-muted mt-0">{drilldown.explanation}</p>
@@ -118,9 +121,9 @@ function NetWorthDrilldownModal({ drilldown, onClose }: { drilldown: Drilldown; 
             <div className="text-muted">No activity in this window.</div>
           ) : (
             <table>
-              <thead><tr><th>Date</th><th>Source</th><th>Description</th><th style={{ textAlign: 'right' }}>Amount</th></tr></thead>
+              <thead><tr><dateSort.Th rows={drilldown.kind === 'flow' ? drilldown.items : []} column="date">Date</dateSort.Th><th>Source</th><th>Description</th><th style={{ textAlign: 'right' }}>Amount</th></tr></thead>
               <tbody>
-                {drilldown.items.map((it, i) => (
+                {dateSort.rows(drilldown.items, { date: row => row }).map((it, i) => (
                   <tr key={i}>
                     <td><DateValue value={it.date} /></td>
                     <td>{it.module}{it.accountName ? ` (${it.accountName})` : ''}</td>
@@ -701,11 +704,11 @@ export function NetWorthPage({
             </details>
           );
         })}
-      </div>) }] : []), ...(sectionVisible('plans') ? [{
+      </div>) }] : []), ...(sectionVisible('plans') ? [{ table: true,
         key: 'plans',
         label: 'Plans',
         content: <NetWorthPlanningReality activities={activities} selectedModules={selectedModules} currencies={ownCurrencies} currentRows={rows} emiLoans={netWorthAsOfInputs.emiLoans} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} />,
-      }] : []), ...(sectionVisible('analytics') ? [{
+      }] : []), ...(sectionVisible('analytics') ? [{ table: true,
         key: 'analytics',
         label: 'Analytics',
         content: <NetWorthAnalyticsSection ownCurrencies={ownCurrencies} activities={activities} categories={categories} groups={categoryGroups} emiLoans={netWorthAsOfInputs.emiLoans} currentRows={rows} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} setDrilldown={setDrilldown} splitData={splitData} preferredCurrency={preferredCurrency} rentalsNet={selectedModules.includes('rentals') ? rentalsNet : {}} />,
@@ -897,6 +900,7 @@ function NetWorthPlanningReality({ activities, selectedModules, currencies, curr
   activities: BudgetActivity[]; selectedModules: string[]; currencies: string[]; currentRows: CurrencyNetWorth[];
   emiLoans: Parameters<typeof projectedNetWorthTrend>[0]['emiLoans']; netWorthAsOfInputs: NetWorthAsOfInputs; todayISODate: string;
 }) {
+  const dateSort = useDateTableSort();
   const [horizonDays, setHorizonDays] = useState<30 | 90 | 365>(90);
   const endDate = useMemo(() => {
     const date = new Date(`${todayISODate}T00:00:00Z`);
@@ -935,8 +939,8 @@ function NetWorthPlanningReality({ activities, selectedModules, currencies, curr
         </Card>;
       })}
     </div>
-    <div className="table-scroll"><table><thead><tr><th>Date</th><th>Source</th><th>Description</th><th>Category</th><th>Amount</th></tr></thead><tbody>
-      {planned.slice().sort((a, b) => a.date.localeCompare(b.date)).map((activity) => <tr key={`${activity.module}:${activity.id}`}><td><DateValue value={activity.date} /></td><td>{activity.sourceLabel}</td><td>{activity.description}</td><td>{activity.category || 'Uncategorized'}</td><td className={activity.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(activity.amount, activity.currencyCode)}</td></tr>)}
+    <div className="table-scroll"><table><thead><tr><dateSort.Th rows={planned.slice().sort((a, b) => a.date.localeCompare(b.date))} column="date">Date</dateSort.Th><th>Source</th><th>Description</th><th>Category</th><th>Amount</th></tr></thead><tbody>
+      {dateSort.rows(planned.slice().sort((a, b) => a.date.localeCompare(b.date)), { date: row => row }).map((activity) => <tr key={`${activity.module}:${activity.id}`}><td><DateValue value={activity.date} /></td><td>{activity.sourceLabel}</td><td>{activity.description}</td><td>{activity.category || 'Uncategorized'}</td><td className={activity.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(activity.amount, activity.currencyCode)}</td></tr>)}
       {!planned.length && <tr><td colSpan={5} className="text-muted">No plans fall within this horizon and source scope.</td></tr>}
     </tbody></table></div>
     <p className="text-muted mb-0">Projection includes EMI liability reduction without counting a linked bank installment twice.</p>
@@ -1346,12 +1350,15 @@ function netWorthBreakdownForMonth(
 }
 
 function MonthlySummaryTable({
-  currency, months, nowMonth, monthly, trend, activities, currentRows, netWorthAsOfInputs, setDrilldown,
+  currency, months: initialMonths, nowMonth, monthly, trend, activities, currentRows, netWorthAsOfInputs, setDrilldown,
 }: {
   currency: string; months: string[]; nowMonth: string; monthly: MonthlyIncomeExpense[]; trend: MonthlyNetWorthPoint[];
   activities: BudgetActivity[]; currentRows: CurrencyNetWorth[]; netWorthAsOfInputs: NetWorthAsOfInputs;
   setDrilldown: (d: Drilldown) => void;
 }) {
+  const monthSort = useDateTableSort();
+  const monthSortInput = initialMonths;
+  const months = monthSort.rows(monthSortInput, { date: month => month });
   const monthlyByMonth = new Map(monthly.map((m) => [m.month, m]));
   const trendByMonth = new Map(trend.map((m) => [m.month, m]));
 
@@ -1359,12 +1366,12 @@ function MonthlySummaryTable({
     m < nowMonth ? 'Actual' : m === nowMonth ? 'Current' : 'Projected';
 
   return (
-    <CollapsibleCard title={<h3 className="m-0">Monthly summary — {currency}</h3>}>
+    <TableCard dateSort={monthSort} rows={months.map(month => ({ month, ...monthlyByMonth.get(month), ...trendByMonth.get(month) }))} title={<h3 className="m-0">Monthly summary — {currency}</h3>}>
       <div className="table-scroll">
         <table>
           <thead>
             <tr>
-              <th>Month</th>
+              <monthSort.Th rows={monthSortInput}>Month</monthSort.Th>
               {months.map((m) => (
                 <th key={m} style={{ minWidth: 130 }}>
                   {new Date(`${m}-01`).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}<br />
@@ -1498,6 +1505,6 @@ function MonthlySummaryTable({
       <p className="text-muted" style={{ marginTop: 8, marginBottom: 0 }}>
         Net worth shows "—" only where this currency had no activity yet as of that month.
       </p>
-    </CollapsibleCard>
+    </TableCard>
   );
 }

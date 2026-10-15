@@ -286,9 +286,9 @@ export function PortfolioPage() {
       <p className="pagesub">Open positions and closed trade history.</p>
       <Tabs
         tabs={[
-          { key: 'open', label: 'Holdings', content: <OpenPositionsTable onSelect={goToStock} />, headerExtra: <StatSourceBadge source="official" /> },
+          { table: true, key: 'open', label: 'Holdings', content: <OpenPositionsTable onSelect={goToStock} />, headerExtra: <StatSourceBadge source="official" /> },
           { key: 'analytics', label: 'Analytics', content: <><StockTradingChart transactions={workbook.transactions} currency={workbook.settings.currency} /><StockPLCharts transactions={workbook.transactions} priceHistory={workbook.priceHistory} calcFee={calcFee} method={workbook.settings.costBasisMethod} currency={workbook.settings.currency} /></> },
-          { key: 'closed', label: 'History', content: <ClosedPositionsTable onSelect={goToStock} />, headerExtra: <StatSourceBadge source="official" /> },
+          { table: true, key: 'closed', label: 'History', content: <ClosedPositionsTable onSelect={goToStock} />, headerExtra: <StatSourceBadge source="official" /> },
         ]}
       />
     </div>

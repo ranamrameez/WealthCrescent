@@ -1,3 +1,4 @@
+import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { DateValue } from '../../../components/DateValue';
 import { ToggleChip } from '../../../components/ui/ToggleChip';
 import { QuickEntitySwitch } from '../../../components/QuickEntitySwitch';
@@ -215,7 +216,7 @@ function BrokerDetail({ broker, onBack, onSelectFund, onSelect }: { broker: Brok
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
   const linkedIds = linkedFunds.map(fund => fund.id);
   return (
-    <ModuleDetailTemplate title={broker.name} backLabel="All funds" onBack={onBack} topBarRight={<TopBarControls><QuickEntitySwitch label="Broker" value={broker.id} options={[{value:"",label:"All funds"},...workbook.brokers.map(item=>({value:item.id,label:item.name}))]} onChange={id=>{const next=workbook.brokers.find(item=>item.id===id);next?onSelect(next):onBack();}} /><TransactionFilterMenu value={filters} categories={[]} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls>} sections={[{ key: 'balances', label: 'Account summary', defaultOpen: true, content: <FundsScopeSummary ids={linkedIds} filters={filters} /> }, { key: 'plans', label: 'Plans', content: <FundsScopePlans ids={linkedIds} filters={filters} /> }, { key: 'transactions', label: 'Transactions', content: <FundsScopeTransactions ids={linkedIds} filters={filters} onSelect={id => { const fund = linkedFunds.find(item => item.id === id); if (fund) onSelectFund(fund); }} /> }, { key: 'analytics', label: 'Analytics', content: <FundsScopeAnalytics ids={linkedIds} filters={filters} /> },{ key: 'summary', label: 'Broker details', defaultOpen: true, headerEnd: !editing && (
+    <ModuleDetailTemplate title={broker.name} backLabel="All funds" onBack={onBack} topBarRight={<TopBarControls><QuickEntitySwitch label="Broker" value={broker.id} options={[{value:"",label:"All funds"},...workbook.brokers.map(item=>({value:item.id,label:item.name}))]} onChange={id=>{const next=workbook.brokers.find(item=>item.id===id);next?onSelect(next):onBack();}} /><TransactionFilterMenu value={filters} categories={[]} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls>} sections={[{ key: 'balances', label: 'Account summary', defaultOpen: true, content: <FundsScopeSummary ids={linkedIds} filters={filters} /> }, { table: true, key: 'plans', label: 'Plans', content: <FundsScopePlans ids={linkedIds} filters={filters} /> }, { table: true, key: 'transactions', label: 'Transactions', content: <FundsScopeTransactions ids={linkedIds} filters={filters} onSelect={id => { const fund = linkedFunds.find(item => item.id === id); if (fund) onSelectFund(fund); }} /> }, { key: 'analytics', label: 'Analytics', content: <FundsScopeAnalytics ids={linkedIds} filters={filters} /> },{ key: 'summary', label: 'Broker details', defaultOpen: true, headerEnd: !editing && (
             <>
               <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={startEdit} />
               <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={remove} />
@@ -830,6 +831,8 @@ function SnapshotImportSection() {
 /* ============================== Fund detail ============================== */
 
 function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; onSelect: (item: Fund) => void; onBack: () => void; onSelectBroker: (broker: Broker) => void }) {
+  const dateSort2 = useDateTableSort();
+  const dateSort = useDateTableSort();
   const switchEntities = useFundsWorkbookStore(s=>s.workbook.funds);
   const { positions, fundXIRR, workbook } = useFundsDerived();
   const setWorkbook = useFundsWorkbookStore((s) => s.setWorkbook);
@@ -891,7 +894,8 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
     [fund.id, workbook.transactions, workbook.priceHistory],
   );
   const [showAllUpdates, setShowAllUpdates] = useState(false);
-  const updateRows = showAllUpdates ? [...balanceRows].reverse() : balanceRows.slice(-8).reverse();
+  const dateSort2Input = showAllUpdates ? [...balanceRows].reverse() : balanceRows.slice(-8).reverse();
+  const updateRows = dateSort2.rows(dateSort2Input, { date: row => row });
   const rawPriceHistory = workbook.priceHistory[fund.id] ?? [];
   const [editUpdateIndex, setEditUpdateIndex] = useState<number | null>(null);
   const [editUpdateRow, setEditUpdateRow] = useState<{ date: string; price: number } | null>(null);
@@ -987,8 +991,9 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
   // a Type filter on the transaction table (export below stays unfiltered
   // by type, matching its own existing "whole statement for a date range"
   // behavior).
-  const txs = (typeFilter === 'all' ? allTxs : allTxs.filter((r) => r.t.action === typeFilter)).filter(row => (!fromDate || row.t.date >= fromDate) && (!toDate || row.t.date <= toDate) && filters.source !== 'statement-import')
+  const dateSortInput = (typeFilter === 'all' ? allTxs : allTxs.filter((r) => r.t.action === typeFilter)).filter(row => (!fromDate || row.t.date >= fromDate) && (!toDate || row.t.date <= toDate) && filters.source !== 'statement-import')
     .sort((a, b) => b.t.date.localeCompare(a.t.date));
+  const txs = dateSort.rows(dateSortInput, { date: row => row.t });
 
   /** README item 40: extends Banking's statement-export pattern (Done
    * item 58) to this module's own primary record — a fund's "statement"
@@ -1177,7 +1182,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
                 />
               </ChartCard>
             </div></> },
-{ key: 'plans', label: 'Plans', content: <FundsScopePlans ids={[fund.id]} filters={filters} /> },
+{ table: true, key: 'plans', label: 'Plans', content: <FundsScopePlans ids={[fund.id]} filters={filters} /> },
 { key: 'entry', label: 'Add transaction', defaultOpen: true,  content: <><h3>Add transaction</h3>
 <div className="row" style={{ gap: 8, marginBottom: 16 }}>
         <Field label="Action">
@@ -1264,7 +1269,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
           </div>
         </div>
       </> },
-{ key: 'transactions', label: 'Transactions', defaultOpen: true, headerEnd: txs.length > 0 ? (
+{ table: true, key: 'transactions', label: 'Transactions', defaultOpen: true, headerEnd: txs.length > 0 ? (
             <PageFilters><div className="row gap-sm">
               <Field label="From (optional)">
                 <TextInput type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
@@ -1286,7 +1291,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
       </div></PageFilters>
       <div className="table-scroll">
         <table>
-          <thead><tr><th>Date</th><th>Type</th><th>Units</th><th>NAV</th><th>Amount</th><th></th></tr></thead>
+          <thead><tr><dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th><th>Type</th><th>Units</th><th>NAV</th><th>Amount</th><th></th></tr></thead>
           <tbody>
             {txs.map(({ t, i }) =>
               editIndex === i && editRow ? (
@@ -1362,7 +1367,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
         </table>
       </div>
       </> },
-{ key: 'history', label: 'Balance history', defaultOpen: true, headerEnd: balanceRows.length > 0 ? <button className="btn secondary" onClick={exportBalanceHistory}>Export CSV</button> : undefined, content: <>
+{ table: true, key: 'history', label: 'Balance history', defaultOpen: true, headerEnd: balanceRows.length > 0 ? <button className="btn secondary" onClick={exportBalanceHistory}>Export CSV</button> : undefined, content: <>
         {!balanceRows.length && <p className="text-muted">No balance/NAV updates recorded yet — use "Update balance or NAV" above.</p>}
         {balanceRows.length > 0 && (
           <>
@@ -1375,7 +1380,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
               <table>
                 <thead>
                   <tr>
-                    <th>#</th><th>Date</th><th>Prev Balance</th><th>Prev NAV</th><th>New Balance</th><th>New NAV</th><th>Change</th><th>%</th><th></th>
+                    <th>#</th><dateSort2.Th rows={dateSort2Input} column="date">Date</dateSort2.Th><th>Prev Balance</th><th>Prev NAV</th><th>New Balance</th><th>New NAV</th><th>Change</th><th>%</th><th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1461,6 +1466,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
  * place, since fixing its placement too would leave two floating "+"
  * buttons stacked in the same corner whenever both were mounted. */
 function FundsTransfersSection() {
+  const dateSort = useDateTableSort();
   const workbook = useFundsWorkbookStore((s) => s.workbook);
   const updateTransfer = useFundsWorkbookStore((s) => s.updateTransfer);
   const deleteTransfer = useFundsWorkbookStore((s) => s.deleteTransfer);
@@ -1498,10 +1504,11 @@ function FundsTransfersSection() {
     () => (typeFilter === 'all' ? workbook.transfers : workbook.transfers.filter((t) => t.type === typeFilter)),
     [workbook.transfers, typeFilter],
   );
-  const sorted = useMemo(
+  const dateSortInput = useMemo(
     () => [...filteredTransfers].sort((a, b) => instantOf(b) - instantOf(a) || (b.seq ?? 0) - (a.seq ?? 0)),
     [filteredTransfers],
   );
+  const sorted = dateSort.rows(dateSortInput, { date: row => row });
   const reorderTransfer = async (pair: [{ id: string; order: number }, { id: string; order: number }]) => {
     if (!(await ensureSignedIn('Sign in to reorder transfers.'))) return;
     for (const p of pair) updateTransfer(p.id, { seq: p.order });
@@ -1543,7 +1550,7 @@ function FundsTransfersSection() {
         <table>
           <thead>
             <tr>
-              <th>Date</th>
+              <dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th>
               <th>Type</th>
               <th>Gross</th>
               <th>Fee</th>
@@ -1734,8 +1741,8 @@ export function FundsPage({
       ) : (
         <StandardPageSections sections={[
             { key: 'summary', label: 'Summary', content: <div className="stack-lg"><FundsScopeSummary ids={selectedIds} filters={filters} /><OverallSummary selectedIds={selectedIds} /></div> },
-            { key: 'plans', label: 'Plans', content: <FundsScopePlans ids={selectedIds} filters={filters} /> },
-            { key: 'transactions', label: 'Transactions', content: <FundsScopeTransactions ids={selectedIds} filters={filters} onSelect={id => setSelected(funds.find(fund => fund.id === id) ?? null)} /> },
+            { table: true, key: 'plans', label: 'Plans', content: <FundsScopePlans ids={selectedIds} filters={filters} /> },
+            { table: true, key: 'transactions', label: 'Transactions', content: <FundsScopeTransactions ids={selectedIds} filters={filters} onSelect={id => setSelected(funds.find(fund => fund.id === id) ?? null)} /> },
             {
               key: 'funds',
               label: 'Funds',
@@ -1748,8 +1755,8 @@ export function FundsPage({
                 </div>
               ),
             },
-            { key: 'transfers', label: 'Transfers', content: <FundsTransfersSection /> },
-            { key: 'import', label: 'Import', content: <SnapshotImportSection /> },
+            { table: true, key: 'transfers', label: 'Transfers', content: <FundsTransfersSection /> },
+            { table: true, key: 'import', label: 'Import', content: <SnapshotImportSection /> },
             {
               key: 'analytics',
               label: 'Analytics',

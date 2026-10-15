@@ -1,7 +1,14 @@
+import { SortIcon } from '../../../components/icons';
+import { Modal } from '../../../components/Modal';
+import { useQseTablePagination } from './useQseTablePagination';
+import type { SectionCardProps } from '../../../components/StandardPageSections';
+import { BatchEditGrid } from '../../../components/BatchEditGrid';
+import { getCurrentUser } from '../../../lib/firebase/useAuthState';
+import { useQseFilters, matchesQseFilters } from './qseFilterModel';
+import { QseRecordCard, QseExportActions, QseReorder } from './QseTableActions';
 import { DateValue } from '../../../components/DateValue';
-import { PageFilters } from '../../../components/PageFilters';
 import { PriceInput } from "../../../components/ui/PriceInput";
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { QSE_TICKER_DATALIST_ID } from '../../../components/TickerDatalist';
 import { TickerLogo } from '../../../components/TickerLogo';
@@ -11,7 +18,7 @@ import { Field } from '../../../components/ui/Field';
 import { IconButton } from '../../../components/ui/IconButton';
 import { TimeZoneFields } from '../../../components/ui/TimeZoneFields';
 import { fmt, fmtMoney, fmtQSEPrice } from '../../../lib/format';
-import { defaultTimeForDate, defaultTimezoneForCurrency, nowTime } from '../../../lib/datetime';
+import { toInstantMs, defaultTimeForDate, defaultTimezoneForCurrency, nowTime } from '../../../lib/datetime';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { useSortableRows } from '../../../hooks/useSortableRows';
 import { useWorkbookStore } from '../../../store/workbookStore';
@@ -105,22 +112,26 @@ function AddDividendForm() {
   );
 }
 
-export function DividendsSection() {
+export function DividendsSection({ sectionProps }: { sectionProps?: SectionCardProps } = {}) {
+  const pageFilters = useQseFilters();
+  const ensureSignedIn = useEnsureSignedIn();
+  const [modifying, setModifying] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [projectionEdit, setProjectionEdit] = useState<{ rows: Array<{ id: string; ticker: string; shares: number; perShare: number }>; owner?: string } | null>(null);
   const { workbook, positions } = useQSEDerived();
   const removeDividend = useWorkbookStore((s) => s.removeDividend);
   const updateDividend = useWorkbookStore((s) => s.updateDividend);
   const setDividendEstimate = useWorkbookStore((s) => s.setDividendEstimate);
   const currency = workbook.settings.currency;
-  const [sort, setSort] = useState<{ col: string; dir: 'asc' | 'desc' }>({ col: 'date', dir: 'desc' });
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [editRow, setEditRow] = useState<Dividend | null>(null);
   // User-requested (2026-09-03): "add filters to other tables as well."
-  const [tickerFilter, setTickerFilter] = useState('ALL');
-  const dividendTickers = useMemo(() => [...new Set(workbook.dividends.map((d) => d.ticker))].sort(), [workbook.dividends]);
+  const tickerFilter = pageFilters.ticker || 'ALL';
 
   const startEdit = (i: number, d: Dividend) => { setEditIndex(i); setEditRow({ ...d }); };
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (editIndex === null || !editRow) return;
+    if (!(await ensureSignedIn('Sign in to save changes.'))) return;
     updateDividend(editIndex, editRow);
     toast('Dividend updated.');
     setEditIndex(null);
@@ -133,27 +144,19 @@ export function DividendsSection() {
       case 'perShare': return d.perShare;
       case 'shares': return d.shares;
       case 'amount': return d.amount;
-      default: return d.date;
+      default: return `${toInstantMs(d.date, d.time, d.timezone)} ${String(d.seq ?? 0).padStart(12, '0')}`;
     }
   };
-  const rows = [...workbook.dividends.map((d, i) => ({ ...d, i }))]
-    .filter((d) => tickerFilter === 'ALL' || d.ticker === tickerFilter)
-    .sort((a, b) => {
-    const av = sortValue(a, sort.col);
-    const bv = sortValue(b, sort.col);
-    const cmp = typeof av === 'string' ? av.localeCompare(bv as string) : (av as number) - (bv as number);
-    return sort.dir === 'asc' ? cmp : -cmp;
-  });
-  const toggleSort = (col: string) =>
-    setSort((s) => (s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'desc' }));
-  const arrow = (col: string) => (sort.col === col ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '');
+  const { sorted: rows, sort, toggleSort, dateSort } = useSortableRows([...workbook.dividends.map((d, i) => ({ ...d, i }))]
+    .filter((d) => (tickerFilter === 'ALL' || d.ticker === tickerFilter) && matchesQseFilters(d, pageFilters)), sortValue, 'date');
+  const arrow = (col: string) => <SortIcon direction={sort.col === col ? sort.dir : undefined} />;
   // Reflects the ticker filter above, so "Total collected" always matches
   // what's actually shown in the table above it.
   const total = rows.reduce((s, d) => s + d.amount, 0);
 
   const held = positions.filter((p) => p.shares > 0);
   const estimates = workbook.dividendEstimates || {};
-  const totalProjected = held.reduce((s, p) => s + (estimates[p.ticker] || 0) * p.shares, 0);
+
 
   type HeldCol = 'ticker' | 'shares' | 'estPerShare' | 'projected';
   const heldSortValue = (p: (typeof held)[number], col: HeldCol): number | string => {
@@ -164,23 +167,15 @@ export function DividendsSection() {
       case 'projected': return (estimates[p.ticker] || 0) * p.shares;
     }
   };
-  const { sorted: sortedHeld, Th: HeldTh } = useSortableRows(held, heldSortValue, 'ticker', 'asc');
+  const { sorted: sortedHeld, Th: HeldTh } = useSortableRows(held.filter(row => (!pageFilters.ticker || row.ticker === pageFilters.ticker) && (!pageFilters.search || row.ticker.toLowerCase().includes(pageFilters.search.toLowerCase()))), heldSortValue, 'ticker', 'asc');
 
+  const page = useQseTablePagination(rows);
+  const projectionPage = useQseTablePagination(sortedHeld);
+  const totalProjected = sortedHeld.reduce((sum, row) => sum + (estimates[row.ticker] || 0) * row.shares, 0);
   return (
-    <div>
-      <h3>Add dividend</h3>
-      <AddDividendForm />
-
-      <h3 style={{ marginTop: 24 }}>Dividends log</h3>
-      <PageFilters><div className="row gap-sm mb-sm">
-        <Field label="Ticker">
-          <select value={tickerFilter} onChange={(e) => setTickerFilter(e.target.value)}>
-            <option value="ALL">All tickers</option>
-            {dividendTickers.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </Field>
-      </div></PageFilters>
-      <div className="table-scroll">
+    <QseRecordCard dateSort={dateSort} title="Dividends" extraActions={[{ label: 'Add dividend', onClick: () => setAdding(true) }]} sectionProps={sectionProps} kind="dividends" rows={rows.map(d => { const { i: _index, ...row } = d; return row; })} modifying={modifying} onModify={() => setModifying(value => !value)}>
+      {adding && <Modal title="Add dividend" onClose={() => setAdding(false)}><AddDividendForm /></Modal>}
+      <div className="table-responsive">
         <table>
           <thead>
             <tr>
@@ -193,7 +188,7 @@ export function DividendsSection() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((d) =>
+            {page.rows.map((d) =>
               editIndex === d.i && editRow ? (
                 <tr key={d.i}>
                   <td><input type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} className="w-130" /></td>
@@ -208,14 +203,14 @@ export function DividendsSection() {
                 </tr>
               ) : (
                 <tr key={d.i}>
-                  <td><DateValue value={d.date} /></td>
+                  <td><DateValue value={d.date} />{modifying && <QseReorder kind="dividends" row={d} rows={rows} />}</td>
                   <td><TickerLogo ticker={d.ticker} size="sm" exchange="qse" /><Link to={`/stock/${d.ticker}`}>{d.ticker}</Link></td>
                   <td>{fmtQSEPrice(d.perShare)}</td>
                   <td>{d.shares || '—'}</td>
                   <td className="pill-positive">{fmtMoney(d.amount, currency)}</td>
                   <td>
-                    <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => startEdit(d.i, d)} />{' '}
-                    <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => removeDividend(d.i)} />
+                    {modifying && <><IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => startEdit(d.i, d)} />{' '}
+                    <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => removeDividend(d.i)} /></>}
                   </td>
                 </tr>
               ),
@@ -234,26 +229,30 @@ export function DividendsSection() {
         </table>
       </div>
 
+      {page.controls}
       {held.length > 0 && (
         <>
-          <h3 style={{ marginTop: 24 }}>Yearly projection</h3>
           <p className="text-muted">Enter an estimated annual per-share dividend rate for each held ticker; projection = rate × shares held.</p>
+          <QseExportActions title="Yearly projection" actions={[
+            { label: 'Batch edit', onClick: () => setProjectionEdit({ rows: sortedHeld.map(p => ({ id: p.ticker, ticker: p.ticker, shares: p.shares, perShare: estimates[p.ticker] || 0 })), owner: getCurrentUser()?.uid }) },
+            { label: modifying ? 'Done modifying' : 'Modify', onClick: () => setModifying(value => !value) },
+          ]} name="dividend-projections" rows={sortedHeld.map(p => ({ ticker: p.ticker, shares: p.shares, perShare: estimates[p.ticker] || 0, projected: (estimates[p.ticker] || 0) * p.shares }))} allRows={held.map(p => ({ ticker: p.ticker, shares: p.shares, perShare: estimates[p.ticker] || 0, projected: (estimates[p.ticker] || 0) * p.shares }))}>
           <div className="table-scroll">
             <table>
               <thead><tr><HeldTh col="ticker">Ticker</HeldTh><HeldTh col="shares">Shares</HeldTh><HeldTh col="estPerShare">Est. annual/share</HeldTh><HeldTh col="projected">Projected annual</HeldTh></tr></thead>
               <tbody>
-                {sortedHeld.map((p) => (
+                {projectionPage.rows.map((p) => (
                   <tr key={p.ticker}>
                     <td><TickerLogo ticker={p.ticker} size="sm" exchange="qse" /><Link to={`/stock/${p.ticker}`}>{p.ticker}</Link></td>
                     <td>{fmt(p.shares, 0)}</td>
                     <td>
-                      <input
+                      {modifying ? <input
                         type="number"
                         step="0.001"
                         value={estimates[p.ticker] || ''}
-                        onChange={(e) => setDividendEstimate(p.ticker, Number(e.target.value))}
+                        onChange={async (e) => { const value = Number(e.target.value); if (!Number.isFinite(value) || value < 0) return; if (await ensureSignedIn('Sign in to save estimates.')) setDividendEstimate(p.ticker, value); }}
                         className="w-80"
-                      />
+                      /> : fmtQSEPrice(estimates[p.ticker] || 0)}
                     </td>
                     <td>{fmtMoney((estimates[p.ticker] || 0) * p.shares, currency)}</td>
                   </tr>
@@ -264,8 +263,24 @@ export function DividendsSection() {
               </tfoot>
             </table>
           </div>
+          {projectionPage.controls}
+          </QseExportActions>
         </>
       )}
-    </div>
+      {projectionEdit && <BatchEditGrid title="Batch edit dividend estimates" rows={projectionEdit.rows} columns={[
+        { key: 'ticker', label: 'Ticker', editable: false }, { key: 'shares', label: 'Shares', type: 'number', editable: false }, { key: 'perShare', label: 'Annual per share', type: 'number' },
+      ]} getRowId={row => row.id} validateRow={row => !Number.isFinite(row.perShare) || row.perShare < 0 ? { perShare: 'Enter a nonnegative estimate.' } : {}} onClose={() => setProjectionEdit(null)} onSave={async changes => {
+        if (!(await ensureSignedIn('Sign in to save estimates.'))) throw new Error('Sign in is required.');
+        if (projectionEdit.owner && projectionEdit.owner !== getCurrentUser()?.uid) throw new Error('Signed-in account changed. Reopen the editor.');
+        const state = useWorkbookStore.getState();
+        const next = { ...state.workbook.dividendEstimates };
+        for (const { before, after } of changes) {
+          if ((next[before.ticker] || 0) !== before.perShare) throw new Error('An estimate changed. Reopen the editor.');
+          next[before.ticker] = after.perShare;
+        }
+        state.setWorkbook({ ...state.workbook, dividendEstimates: next });
+        toast('Estimates saved.');
+      }} />}
+    </QseRecordCard>
   );
 }

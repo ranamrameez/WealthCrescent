@@ -390,3 +390,11 @@ export function PlanningIcon({ size = 14 }: IconProps) {
     </svg>
   );
 }
+
+/** Arrowheads reserved for sorting; shaft arrows remain move/reorder controls. */
+export function SortIcon({ direction, size = 14 }: IconProps & { direction?: 'asc' | 'desc' }) {
+  return <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" className="table-sort-icon">
+    <path d="M4 6 8 2 12 6Z" opacity={direction === 'desc' ? 0.25 : 1} />
+    <path d="m4 10 4 4 4-4Z" opacity={direction === 'asc' ? 0.25 : 1} />
+  </svg>;
+}

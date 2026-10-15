@@ -1,3 +1,4 @@
+import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { DateValue } from '../../../components/DateValue';
 import { PageHeading } from '../../../components/PageHeading';
 import { BackButton } from '../../../components/BackButton';
@@ -799,6 +800,7 @@ function TransactionList() {
 
 /** User-requested (2026-09-03): "add filters to other tables as well." */
 function TransfersSection() {
+  const dateSort = useDateTableSort();
   const workbook = usePSXWorkbookStore((s) => s.workbook);
   const updateTransfer = usePSXWorkbookStore((s) => s.updateTransfer);
   const deleteTransfer = usePSXWorkbookStore((s) => s.deleteTransfer);
@@ -838,10 +840,11 @@ function TransfersSection() {
   // `ReorderButtons` for the one thing that genuinely needs fixing (two
   // same-instant transfers in the wrong relative order).
   const instantOf = (t: Transfer) => dateOnlyMs(t.date);
-  const sorted = useMemo(
+  const dateSortInput = useMemo(
     () => [...filteredTransfers].sort((a, b) => instantOf(b) - instantOf(a) || (b.seq ?? 0) - (a.seq ?? 0)),
     [filteredTransfers],
   );
+  const sorted = dateSort.rows(dateSortInput, { date: row => row });
   const reorderTransfer = async (pair: [{ id: string; order: number }, { id: string; order: number }]) => {
     if (!(await ensureSignedIn('Sign in to reorder transfers.'))) return;
     for (const p of pair) updateTransfer(p.id, { seq: p.order });
@@ -879,7 +882,7 @@ function TransfersSection() {
         <table>
           <thead>
             <tr>
-              <th>Date</th>
+              <dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th>
               <th>Type</th>
               <th>Gross</th>
               <th>Fee</th>
@@ -1026,6 +1029,7 @@ function AdjustmentsSection() {
 
 /** User-requested (2026-09-03): "add filters to other tables as well." */
 function CashLedgerSection() {
+  const dateSort = useDateTableSort();
   const { workbook, ledger } = usePSXDerived();
   const currency = workbook.settings.currency;
   const [kindFilter, setKindFilter] = useState<'all' | (typeof ledger)[number]['kind']>('all');
@@ -1044,7 +1048,8 @@ function CashLedgerSection() {
   // from a real record living in its own native table (Trade Transactions
   // / the Transfers section above / Adjustments); reordering happens
   // there and flows through automatically.
-  const sorted = [...filtered].reverse();
+  const dateSortInput = [...filtered].reverse();
+  const sorted = dateSort.rows(dateSortInput, { date: row => ({ ...row, seq: ledger.indexOf(row) }) });
 
   return (
     <div>
@@ -1062,7 +1067,7 @@ function CashLedgerSection() {
       <table>
         <thead>
           <tr>
-            <th>Date</th>
+            <dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th>
             <th>Kind</th>
             <th>Label</th>
             <th>Amount</th>
@@ -1101,11 +1106,11 @@ export function TransactionsPage() {
       <Tabs
         tabs={[
           { key: 'add', label: 'Add trades', content: <TransactionRows /> },
-          { key: 'list', label: 'Trade list', content: <TransactionList /> },
-          { key: 'transfers', label: 'Cash transfers', content: <TransfersSection /> },
-          { key: 'adjustments', label: 'Rewards & adjustments', content: <AdjustmentsSection /> },
-          { key: 'ledger', label: 'Cash ledger', content: <CashLedgerSection /> },
-          { key: 'dividends', label: 'Dividends', content: <DividendsSection /> },
+          { table: true, key: 'list', label: 'Trade list', content: <TransactionList /> },
+          { table: true, key: 'transfers', label: 'Cash transfers', content: <TransfersSection /> },
+          { table: true, key: 'adjustments', label: 'Rewards & adjustments', content: <AdjustmentsSection /> },
+          { table: true, key: 'ledger', label: 'Cash ledger', content: <CashLedgerSection /> },
+          { table: true, key: 'dividends', label: 'Dividends', content: <DividendsSection /> },
         ]}
       />
     </div>

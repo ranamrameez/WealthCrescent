@@ -1,3 +1,4 @@
+import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { MarketPriceHistory } from './MarketPriceHistory';
 import { PriceInput } from "../../../components/ui/PriceInput";
 import { useEffect, useMemo, useState, type ComponentProps } from 'react';
@@ -43,6 +44,7 @@ function CompactChart({ height, children }: { height: number; children: React.Re
  * capital gains tax is a real cost QSE doesn't have, so it's worth
  * surfacing here rather than only in the trade calculator). */
 export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate = '' }: { ticker: string; section?: 'all' | 'current' | 'position' | 'comparison' | 'comparison-summary' | 'all-time' | 'lots' | 'closed' | 'prices'; fromDate?: string; toDate?: string }) {
+  const dateSort = useDateTableSort();
   const { workbook, positions, calcFee, lots } = usePSXDerived();
   const setMarketPrice = usePSXWorkbookStore((s) => s.setMarketPrice);
   const updatePricePoint = usePSXWorkbookStore((s) => s.updatePricePoint);
@@ -324,10 +326,10 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
             <div className="table-scroll">
               <table>
                 <thead>
-                  <tr><th>Buy date</th><th>Buy price</th><th>Shares</th><th>Invested</th><th>Buy fee</th></tr>
+                  <tr><dateSort.Th rows={reportOpenLots} column="date">Buy date</dateSort.Th><th>Buy price</th><th>Shares</th><th>Invested</th><th>Buy fee</th></tr>
                 </thead>
                 <tbody>
-                  {reportOpenLots.map((l, i) => (
+                  {dateSort.rows(reportOpenLots, { date: row => row.buyDate }).map((l, i) => (
                     <tr key={i}>
                       <td>{l.buyDate}</td>
                       <td>{fmtPSXPrice(l.buyPrice)}</td>

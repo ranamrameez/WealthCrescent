@@ -1,3 +1,4 @@
+import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { SummaryChip } from '../../../components/StandardCard';
 import { useActivePageSection } from '../../../hooks/useActivePageSection';
 import { ProfitableStockAlert } from '../../../components/ProfitableStockAlert';
@@ -428,6 +429,7 @@ function NewPlanFab() {
 }
 
 function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; onToggle?: (open: boolean) => void }) {
+  const dateSort = useDateTableSort();
   const updateTradePlan = useWorkbookStore((s) => s.updateTradePlan);
   const deleteTradePlan = useWorkbookStore((s) => s.deleteTradePlan);
   const executeTradePlanLeg = useWorkbookStore((s) => s.executeTradePlanLeg);
@@ -968,9 +970,9 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
           <p className="text-muted">Only prices on or after each buy date are considered.</p>
           <div className="table-scroll">
             <table>
-              <thead><tr><th>Buy date</th><th>Buy price</th><th>Peak</th><th>Peak date</th><th>Potential P/L</th></tr></thead>
+              <thead><tr><dateSort.Th rows={missedOpportunity?.lots ?? []} column="date">Buy date</dateSort.Th><th>Buy price</th><th>Peak</th><dateSort.Th rows={missedOpportunity?.lots ?? []} column="peakDate">Peak date</dateSort.Th><th>Potential P/L</th></tr></thead>
               <tbody>
-                {missedOpportunity.lots.map((lot, index) => (
+                {dateSort.rows(missedOpportunity.lots, { date: row => row.buyDate, peakDate: row => row.peakDate }).map((lot, index) => (
                   <tr key={index}>
                     <td>{lot.buyDate}</td>
                     <td>{fmtQSEPrice(lot.buyPrice)}</td>

@@ -1,3 +1,5 @@
+import { TableCard } from '../../../components/TableCard';
+import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { EntityActions } from '../../../components/EntityEditorModal';
 import { DateValue } from '../../../components/DateValue';
 import { ToggleChip } from '../../../components/ui/ToggleChip';
@@ -11,7 +13,7 @@ import type { User } from 'firebase/auth';
 import { useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
-import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
+import { Card, EntityCard, MoneyValue } from '../../../components/Card';
 import { Notice } from '../../../components/Notice';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { CheckIcon, EditIcon, PlusIcon, TransferIcon, TrashIcon } from '../../../components/icons';
@@ -222,8 +224,8 @@ function CategoryBreakdown({ currencyCode, entries: suppliedEntries }: { currenc
     <div>
       <div className="detail-grid">
         {filtered.map(({ code, rows }) => (
-          <Card key={code}>
-            <h4 className="mt-0">{code}</h4>
+          <TableCard title={<>{code}</>} rows={rows} key={code}>
+
             <div className="table-scroll">
               <table>
                 <tbody>
@@ -237,7 +239,7 @@ function CategoryBreakdown({ currencyCode, entries: suppliedEntries }: { currenc
                 </tbody>
               </table>
             </div>
-          </Card>
+          </TableCard>
         ))}
       </div>
     </div>
@@ -318,6 +320,7 @@ function EditEntryModal({ entry, onClose }: { entry: CashEntry; onClose: () => v
  * down. Also gained Type/Category filters, per "All tables should have
  * filter options to view filtered table data." */
 function CashStatementTable({ code, rows: allRows }: { code: string; rows: CashLedgerRow[] }) {
+  const dateSort = useDateTableSort();
   const [batchOpen, setBatchOpen] = useState(false);
   const dateFormat = useAppearanceStore(s => s.appearance.dateFormat);
   const deleteEntry = useCashWorkbookStore((s) => s.deleteEntry);
@@ -352,7 +355,8 @@ function CashStatementTable({ code, rows: allRows }: { code: string; rows: CashL
   // gone here too, replaced by `ReorderButtons` for the one thing that
   // genuinely needs fixing (two same-instant rows in the wrong relative
   // order).
-  const sorted = rows; // buildCashLedger already returns ascending chronological order
+  const dateSortInput = rows;
+  const sorted = dateSort.rows(dateSortInput, { date: row => row.entry }); // buildCashLedger already returns ascending chronological order
   const instantOf = (r: (typeof sorted)[number]) => dateOnlyMs(r.entry.date);
   const reorder = async (pair: [{ id: string; order: number }, { id: string; order: number }]) => {
     if (!(await ensureSignedIn('Sign in to reorder entries.'))) return;
@@ -360,8 +364,8 @@ function CashStatementTable({ code, rows: allRows }: { code: string; rows: CashL
   };
 
   return (
-    <Card>
-      <h4 className="mt-0">{code}</h4>
+    <TableCard title={<>{code}</>} dateSort={dateSort}>
+
       {batchOpen && <CashTransactionsBatchEditor currencyCode={code} rows={rows.map(row => row.entry)} onClose={() => setBatchOpen(false)} />}
       <div className="row gap-sm mb-sm justify-end">
         <button className="btn secondary" disabled={!rows.length} onClick={() => setBatchOpen(true)}>Batch edit</button>
@@ -370,7 +374,7 @@ function CashStatementTable({ code, rows: allRows }: { code: string; rows: CashL
         <table>
           <thead>
             <tr>
-              <th>Date</th>
+              <dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th>
               <th>Type</th>
               {/* User-reported (2026-08-28): "Description and Source are
                  making the table too large to read" + "Credit/Debit and
@@ -472,7 +476,7 @@ function CashStatementTable({ code, rows: allRows }: { code: string; rows: CashL
           ]}
         />
       )}
-    </Card>
+    </TableCard>
   );
 }
 
@@ -621,6 +625,7 @@ function AnalyticsTab({ currencyCode, entries: suppliedEntries, filters }: { cur
  * column's sign (after an optional flip) decides IN vs OUT, and the stored
  * `amount` is always the absolute value. */
 function ImportTab() {
+  const dateSort = useDateTableSort();
   const addEntries = useCashWorkbookStore((s) => s.addEntries);
   const primaryCurrency = usePrimaryCurrency();
   const workbookDefaultCurrency = useCashWorkbookStore((s) => s.workbook.settings.defaultCurrency);
@@ -727,8 +732,8 @@ function ImportTab() {
       </div>
 
       {headers.length > 0 && (
-        <Card className="mt-12">
-          <h3 className="mt-0">Map columns</h3>
+        <TableCard title={<>Map columns</>} dateSort={dateSort} className="mt-12">
+
           <div className="row gap-sm">
             <Field label="Date column" width={160}>
               <Select value={dateCol} onChange={(e) => setDateCol(e.target.value)}>
@@ -753,9 +758,9 @@ function ImportTab() {
           <h4>Preview (first 5 rows)</h4>
           <div className="table-scroll">
             <table>
-              <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Category</th></tr></thead>
+              <thead><tr><dateSort.Th rows={mappedPreview} column="date">Date</dateSort.Th><th>Type</th><th>Amount</th><th>Category</th></tr></thead>
               <tbody>
-                {mappedPreview.map((r, i) => (
+                {dateSort.rows(mappedPreview, { date: row => row }).map((r, i) => (
                   <tr key={i}>
                     <td><DateValue value={r.date} /></td>
                     <td className={r.isDeposit ? 'pill-positive' : 'pill-negative'}>{r.isDeposit ? 'Cash in' : 'Cash out'}</td>
@@ -769,7 +774,7 @@ function ImportTab() {
           <button className="btn mt-12" onClick={doImport}>
             <PlusIcon />Import {rows.length} entr{rows.length === 1 ? 'y' : 'ies'}
           </button>
-        </Card>
+        </TableCard>
       )}
     </div>
   );
@@ -900,7 +905,7 @@ function PlanCurrencyTable({
   };
 
   return (
-    <CollapsibleCard title={<h3 className="m-0">Plans — {code}</h3>}>
+    <TableCard rows={sorted} title={<h3 className="m-0">Plans — {code}</h3>}>
       <div className="table-scroll">
         <table>
           <thead>
@@ -941,7 +946,7 @@ function PlanCurrencyTable({
         </table>
       </div>
       {editRow && <FinancePlanEditor reference={{ module: "cash", id: editRow.id }} occurrenceDate={plans.find(p => p.id === editId)?.recurrence ? plans.find(p => p.id === editId)?.date : undefined} onClose={() => { setEditId(null); setEditRow(null); }} />}
-    </CollapsibleCard>
+    </TableCard>
   );
 }
 
@@ -1238,8 +1243,8 @@ export function CashPage({
       <StandardPageSections sections={[
           { key: 'summary', label: 'Cash summary', defaultOpen: true, content: <div className="stack-lg">{selectedCurrencies.map((code) => <div key={code}><h3>{code} cash</h3><CashAccountSummary currency={code} entries={entries} visible={filteredEntries} filters={filters} /></div>)}</div> },
           { key: 'currencies', label: 'Cash by currency', content: <BalancesSummary selectedCurrencies={selectedCurrencies} entries={entries.filter(entry => !filters.toDate || entry.date <= filters.toDate)} /> },
-          { key: 'statement', label: 'Transactions', content: <CashStatementTab entries={entries} selectedCurrencies={selectedCurrencies} filters={filters} categories={categories} /> },
-          {
+          { table: true, key: 'statement', label: 'Transactions', content: <CashStatementTab entries={entries} selectedCurrencies={selectedCurrencies} filters={filters} categories={categories} /> },
+          { table: true,
             key: 'plans',
             label: 'Plans',
             content: (
@@ -1252,13 +1257,13 @@ export function CashPage({
               />
             ),
           },
-          {
+          { table: true,
             key: 'analytics',
             label: 'Analytics',
             content: <div className="stack-lg">{selectedCurrencies.map((code) => <Card key={code}><h3 className="mt-0">{code}</h3><AnalyticsTab currencyCode={code} entries={filteredEntries} filters={filters} /></Card>)}</div>,
           },
-          { key: 'categories', label: 'Categories', content: <CategoryBreakdown entries={filteredEntries} /> },
-          { key: 'import', label: 'Import', content: <ImportTab /> },
+          { table: true, key: 'categories', label: 'Categories', content: <CategoryBreakdown entries={filteredEntries} /> },
+          { table: true, key: 'import', label: 'Import', content: <ImportTab /> },
           {
             key: 'settings',
             label: 'Settings',
@@ -1320,10 +1325,10 @@ export function CashCurrencyPage() {
         defaultOpen: true,
         content: <CashAccountSummary currency={currency} entries={entries} visible={filteredEntries} filters={filters} />,
       },
-      { key: 'plans', label: 'Plans', content: <PlanList horizonDays={null} selectedCurrencies={[currency]} filters={filters} /> },
-      { key: 'transactions', label: 'Transactions', content: <CashStatementGrid entries={entries} selectedCurrencies={[currency]} filters={filters} categories={categories} /> },
-      { key: 'analytics', label: 'Analytics', content: <AnalyticsTab currencyCode={currency} entries={filteredEntries} filters={filters} /> },
-      { key: 'categories', label: 'Categories', content: <CategoryBreakdown currencyCode={currency} entries={filteredEntries} /> },
+      { table: true, key: 'plans', label: 'Plans', content: <PlanList horizonDays={null} selectedCurrencies={[currency]} filters={filters} /> },
+      { table: true, key: 'transactions', label: 'Transactions', content: <CashStatementGrid entries={entries} selectedCurrencies={[currency]} filters={filters} categories={categories} /> },
+      { table: true, key: 'analytics', label: 'Analytics', content: <AnalyticsTab currencyCode={currency} entries={filteredEntries} filters={filters} /> },
+      { table: true, key: 'categories', label: 'Categories', content: <CategoryBreakdown currencyCode={currency} entries={filteredEntries} /> },
     ]} />
     <CashPageFab defaultCurrencyOverride={currency} />
   </div>;
