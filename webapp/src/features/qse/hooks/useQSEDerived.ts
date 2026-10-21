@@ -1,8 +1,12 @@
 import type { Workbook } from '../../../types/workbook';
 import { useMemo } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { buildCashLedger, cashSummary, computePositions, computeRealizedPLTimeSeries, getMarketPrice, makeQSEFeeCalculator } from '../../../lib/calc';
 import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
 import { useLiveQseWorkbook } from './useLiveQseWorkbook';
+import { useQseFeed } from './useLiveQseWorkbook';
+import { useWorkbookStore } from '../../../store/workbookStore';
+import { applyLiveQse } from '../../../lib/stockData/liveQse';
 
 export interface QSERow {
   ticker: string;
@@ -81,4 +85,21 @@ export function useQSEDerived(selectedTickers?: string[]) {
     }
     return calculateDerived(workbook, tickerKey.split('|'));
   }, [workbook, tickerKey]);
+}
+
+/** Strategy-card variant that ignores trade-plan-only workbook changes. */
+export function useQSEPortfolioDerived() {
+  const inputs = useWorkbookStore(useShallow((state) => ({
+    settings: state.workbook.settings,
+    transactions: state.workbook.transactions,
+    transfers: state.workbook.transfers,
+    adjustments: state.workbook.adjustments,
+    marketPrices: state.workbook.marketPrices,
+    priceHistory: state.workbook.priceHistory,
+  })));
+  const points = useQseFeed((state) => state.points);
+  return useMemo(() => {
+    const stored = { ...useWorkbookStore.getState().workbook, ...inputs };
+    return calculateDerived(applyLiveQse(stored, points));
+  }, [inputs, points]);
 }

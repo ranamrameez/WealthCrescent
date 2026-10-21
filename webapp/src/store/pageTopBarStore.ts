@@ -23,9 +23,17 @@ export const usePageTopBarStore = create<{
   setChips: (chips: TopBarChip[]) => void;
   rightSlot: ReactNode | null;
   setRightSlot: (node: ReactNode | null) => void;
+  loading: boolean;
+  pendingPath: string | null;
+  beginNavigation: (path: string) => void;
+  setLoading: (loading: boolean) => void;
 }>((set) => ({
   chips: [],
   setChips: (chips) => set({ chips }),
   rightSlot: null,
   setRightSlot: (rightSlot) => set({ rightSlot }),
+  loading: false,
+  pendingPath: null,
+  beginNavigation: (pendingPath) => set({ pendingPath, loading: true }),
+  setLoading: (loading) => set((state) => ({ loading, pendingPath: loading ? state.pendingPath : null })),
 }));

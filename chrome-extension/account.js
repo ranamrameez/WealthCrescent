@@ -7,6 +7,7 @@ function sendMessage(msg) {
 }
 
 async function renderAuthState() {
+  $('emailLabel').textContent = 'Loading account...';
   const auth = await getAuth();
   $('signedOutView').hidden = !!auth;
   $('signedInView').hidden = !auth;
@@ -44,4 +45,4 @@ $('signOutBtn').addEventListener('click', async () => {
 
 
 chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && changes.auth) renderAuthState(); });
-renderAuthState();
+renderAuthState().catch(error => { $('signInError').textContent = 'Cannot load account status: ' + error.message; });

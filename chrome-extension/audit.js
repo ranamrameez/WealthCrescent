@@ -65,6 +65,33 @@ export async function mutateAudit(entries, operation, price) {
   } finally { db.close(); }
 }
 
+// Remove only rows from the completed batch whose ticker was actually pushed.
+// Failed or pending rows stay local for a later retry.
+export async function clearPushedAuditRows(capturedAt, tickers) {
+  const pushed = new Set(tickers || []);
+  if (!capturedAt || !pushed.size) return 0;
+  const db = await openDB();
+  let deleted = 0;
+  try {
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction('rows', 'readwrite');
+      const request = tx.objectStore('rows').openCursor();
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) return;
+        const row = cursor.value;
+        if (row.capturedAt === capturedAt && pushed.has(row.ticker) && row.accepted !== false) { cursor.delete(); deleted++; }
+        cursor.continue();
+      };
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error('Local cleanup interrupted.'));
+    });
+    if (deleted) await chrome.storage.local.set({ auditUpdatedAt: Date.now() });
+    return deleted;
+  } finally { db.close(); }
+}
+
 export async function saveAudit(result, url, source = 'automatic') {
   const db = await openDB();
   const capturedAt = Date.now();
@@ -134,7 +161,7 @@ async function readAuditSnapshot() {
   if (cacheable) auditSnapshot = pending;
   return pending.promise;
 }
-export async function queryAudit({ from = '', to = '', ticker = '', strategy = '', accepted = '', source = '', outliers = '', page = 1, pageSize = 25, includeRecords = false, rawOnly = false } = {}) {
+export async function queryAudit({ from = '', to = '', ticker = '', strategy = '', accepted = '', source = '', outliers = '', page = 1, pageSize = 50, includeRecords = false, rawOnly = false } = {}) {
   const snapshot = await readAuditSnapshot();
   if (rawOnly && includeRecords) return { records: snapshot.rows, auditVersion: snapshot.version };
   snapshot.annotated ||= flagPriceOutliers(snapshot.rows).reverse();

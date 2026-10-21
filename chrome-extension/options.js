@@ -9,6 +9,7 @@ import { sendWorkerMessage } from './common.js';
 import { mountConfig, mountControls } from './config-ui.js';
 import { queryAudit, mutateAudit } from './audit.js';
 const $ = id => document.getElementById(id);
+$('dataMessage').textContent = 'Loading account, status and saved view...';
 sendWorkerMessage({ type:'LOAD_EXTENSION_CONFIGS' }).catch(error => { $('dataMessage').textContent = error.message; });
 const favourites = new Set(await getChartFavourites());
 const savedConfig = await chrome.storage.local?.get(['viewPreferences']) || {};
@@ -22,9 +23,11 @@ for (const [id,value] of Object.entries(preferences || {})) {
 }
 applyViewPreferences(savedConfig.viewPreferences);
 $('fromDate').value = $('toDate').value = qatarDate();
-await mountConfig($('configCard'));
-await mountControls($('scrapingControls'), { manualActions: true });
-await mountStats($('activityStats'));
+await Promise.all([
+  mountConfig($('configCard')),
+  mountControls($('scrapingControls'), { manualActions: true }),
+  mountStats($('activityStats')),
+]);
 
 $('testBtn').onclick = async () => {
   $('testBtn').disabled = true;
@@ -69,7 +72,8 @@ function updateSelection() {
   $('selectionInfo').textContent = `${selected.size} selected`;
   $('editSelected').disabled = $('deleteSelected').disabled = batchBusy || !selected.size;
   $('deleteOutliers').dataset.previewStale = String(previewStale);
-  $('deleteOutliers').disabled = batchBusy || previewStale || !previewSelected.size;
+  $('deleteOutliers').disabled = batchBusy || previewStale || !flaggedOutlierRows.length;
+  $('deleteOutliers').dataset.flaggedCount = String(flaggedOutlierRows.length);
   $('outlierCount').textContent = `${previewSelected.size} selected / ${flaggedOutlierTotal} flagged`;
   $('selectAll').checked = visibleRows.length > 0 && visibleRows.every(row => selected.has(row.id));
   $('selectAll').indeterminate = visibleRows.some(row => selected.has(row.id)) && !$('selectAll').checked;
@@ -219,7 +223,8 @@ $('auditCard').classList.add('compact-records');
 $('editSelected').onclick = () => applyBatch('edit');
 $('deleteSelected').onclick = () => applyBatch('delete');
 $('deleteOutliers').onclick = async () => {
-  if (batchBusy || previewStale || !previewSelected.size) return;
+  if (batchBusy || previewStale || !flaggedOutlierRows.length) return;
+  if (!previewSelected.size) flaggedOutlierRows.forEach(row => previewSelected.set(row.id, row));
   selected.clear(); [...previewSelected.values()].forEach(row => selected.set(row.id, row)); updateSelection();
   await applyBatch('delete');
 };

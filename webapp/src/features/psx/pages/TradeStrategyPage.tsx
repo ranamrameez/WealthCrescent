@@ -2,7 +2,7 @@ import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { SummaryChip } from '../../../components/StandardCard';
 import { useActivePageSection } from '../../../hooks/useActivePageSection';
-import { ProfitableStockAlert } from '../../../components/ProfitableStockAlert';
+import { PartialTradeAdviceTable } from '../../../components/PartialTradeAdviceTable';
 import { StarIcon, CalendarIcon, ChecklistIcon, ArchiveIcon, RestoreIcon } from '../../../components/icons';
 import { ProfitableLotAlerts } from '../../../components/ProfitableLotAlerts';
 import { PlanExecutionSummary } from '../../../components/PlanExecutionSummary';
@@ -42,8 +42,6 @@ import {
   computeLotAdvice,
   findMissedOpportunity,
   perShareCommission,
-  sellableShareSummary,
-  profitableLotTotals,
   type LotAdvice,
 } from '../../../lib/calc/partialTradeStrategy';
 import { fmt, fmtMoney, fmtPSXPrice } from '../../../lib/format';
@@ -51,7 +49,7 @@ import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { useAuthState } from '../../../lib/firebase/useAuthState';
 import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
 import type { Transaction, TradePlan, TradePlanLeg } from '../../../types/workbook';
-import { usePSXDerived } from '../hooks/usePSXDerived';
+import { usePSXDerived, usePSXPortfolioDerived } from '../hooks/usePSXDerived';
 import { usePSXStockData } from '../hooks/usePSXStockData';
 import { gridAutoStyle } from '../../../lib/gridStyle';
 
@@ -214,10 +212,6 @@ function PartialTradeAdvisor({ ticker, onSellLot, onSellLots }: { ticker: string
   const row = rows.find((r) => r.ticker === ticker.toUpperCase());
   const currentPrice = row?.marketPrice || 0;
   const advice = computeLotAdvice(lots, calcFee, currentPrice, feePct, tick);
-  type LotCol = 'buyDate' | 'buyPrice' | 'remainingShares' | 'costPerShare' | 'breakEven' | 'unrealizedPL' | 'suggestion';
-  const { sorted: sortedAdvice, Th: LotTh } = useSortableRows(advice, (lot: LotAdvice, col: LotCol) => lot[col], 'buyDate', 'desc');
-
-
   // User-reported (2026-09-16): a plan's ticker with zero matching
   // transactions at all (e.g. a mismatched/mistyped ticker string) used to
   // render nothing here, with no explanation — see the identical comment
@@ -240,39 +234,7 @@ function PartialTradeAdvisor({ ticker, onSellLot, onSellLots }: { ticker: string
   // page.
   if (!lots.length || currentPrice <= 0) return null;
 
-  const { sellable, total } = sellableShareSummary(advice);
-  const profitableTotals = profitableLotTotals(advice, currentPrice);
-
-  return (
-    <div style={{ marginBottom: 16 }}>
-      {sellable > 0 ? (
-        <ProfitableStockAlert sellable={sellable} total={total} price={currentPrice} {...profitableTotals} currency={currency} exchange="psx" onSell={() => onSellLots(advice.filter(lot => lot.suggestion === 'sell'))} />
-      ) : (
-        <p className="text-muted mb-sm">No lot of {ticker.toUpperCase()} is profitable at the current price ({fmtPSXPrice(currentPrice)}) yet.</p>
-      )}
-      <div className="table-scroll">
-        <table>
-          <thead>
-            <tr><LotTh col="buyDate">Buy date</LotTh><LotTh col="buyPrice">Buy price</LotTh><LotTh col="remainingShares">Shares</LotTh><LotTh col="costPerShare">Cost/share</LotTh><LotTh col="breakEven">Break-even</LotTh><LotTh col="unrealizedPL">Unrealized P/L</LotTh><LotTh col="suggestion">Suggestion</LotTh><th></th></tr>
-          </thead>
-          <tbody>
-            {sortedAdvice.map((a, i) => (
-              <RecordRow market="psx" record={a} key={i}>
-                <td>{a.buyDate}</td>
-                <td>{fmtPSXPrice(a.buyPrice)}</td>
-                <td>{fmt(a.remainingShares, 0)}</td>
-                <td>{fmtPSXPrice(a.costPerShare)}</td>
-                <td>{fmtPSXPrice(a.breakEven)}</td>
-                <td className={a.unrealizedPL >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(a.unrealizedPL, currency)}</td>
-                <td><span className={a.suggestion === 'sell' ? 'pill-positive' : 'text-muted'}>{a.suggestion === 'sell' ? 'Sell' : 'Hold'}</span></td>
-                <td>{a.suggestion === 'sell' && <button className="btn secondary small" onClick={() => onSellLot(a)}>Sell this lot</button>}</td>
-              </RecordRow>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+  return <PartialTradeAdviceTable advice={advice} currentPrice={currentPrice} currency={currency} exchange="psx" ticker={ticker} onSellLot={onSellLot} onSellLots={onSellLots} />;
 }
 
 /** "What if I exited at price X" — the sandbox part of the trade planner:
@@ -436,7 +398,7 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
   const executeTradePlanLeg = usePSXWorkbookStore((s) => s.executeTradePlanLeg);
   const setMarketPrice = usePSXWorkbookStore((s) => s.setMarketPrice);
   const ensureSignedIn = useEnsureSignedIn();
-  const { workbook, calcFee, rows, positions } = usePSXDerived();
+  const { workbook, calcFee, rows, positions } = usePSXPortfolioDerived();
   const { tickerNames } = usePSXStockData();
   const currency = workbook.settings.currency;
 
@@ -1075,7 +1037,8 @@ export function TradeStrategyPage() {
   const navigate = useNavigate();
   const exchange = "PSX";
   const [openPlans, setOpenPlans] = useState<Record<string, boolean>>({});
-  const planToggleHandlers = useMemo(() => Object.fromEntries(tradePlans.map(plan => [plan.id, (open: boolean) => setOpenPlans(current => ({ ...current, [plan.id]: open }))])), [tradePlans]);
+  const planIdsKey = tradePlans.map((plan) => plan.id).join('|');
+  const planToggleHandlers = useMemo(() => Object.fromEntries(planIdsKey.split('|').filter(Boolean).map(id => [id, (open: boolean) => setOpenPlans(current => ({ ...current, [id]: open }))])), [planIdsKey]);
   const { activeSection, setActiveSection } = useActivePageSection([
     { key: 'profitable-share-alerts', id: 'profitable-share-alerts' },
     ...sorted.map(plan => ({ key: plan.id, id: `trade-plan-${plan.id}` })),

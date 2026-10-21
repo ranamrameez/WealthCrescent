@@ -6,6 +6,7 @@ import { AppearancePanel } from './AppearancePanel';
 import { Avatar } from './Avatar';
 import { CategoryNav } from './CategoryNav';
 import { LogInIcon, LogoMark, SettingsIcon } from './icons';
+import { usePageTopBarStore } from '../store/pageTopBarStore';
 
 const QSE_NAV_ITEMS = [
   { num: '01', label: 'Dashboard', to: '/qse' },
@@ -78,12 +79,13 @@ function usePagesOpen() {
  * nav state that matches what's on screen. */
 function ExchangeSwitcher({ exchange }: { exchange: 'qse' | 'psx' }) {
   const navigate = useNavigate();
+  const beginNavigation = usePageTopBarStore((state) => state.beginNavigation);
   return (
     <div className="chip-tabs mb-sm">
-      <button type="button" className={`chip${exchange === 'qse' ? ' active' : ''}`} onClick={() => navigate('/qse')}>
+      <button type="button" className={`chip${exchange === 'qse' ? ' active' : ''}`} onClick={() => { beginNavigation('/qse'); navigate('/qse'); }}>
         QSE
       </button>
-      <button type="button" className={`chip${exchange === 'psx' ? ' active' : ''}`} onClick={() => navigate('/psx')}>
+      <button type="button" className={`chip${exchange === 'psx' ? ' active' : ''}`} onClick={() => { beginNavigation('/psx'); navigate('/psx'); }}>
         PSX
       </button>
     </div>
@@ -104,7 +106,10 @@ export function Sidebar({
   const profile = useProfile(user);
   const name = profile.displayName || user?.email || user?.phoneNumber || 'account';
   const location = useLocation();
-  const exchange: 'qse' | 'psx' = location.pathname.startsWith('/psx') ? 'psx' : 'qse';
+  const pendingPath = usePageTopBarStore((state) => state.pendingPath);
+  const beginNavigation = usePageTopBarStore((state) => state.beginNavigation);
+  const activePath = pendingPath ?? location.pathname;
+  const exchange: 'qse' | 'psx' = activePath.startsWith('/psx') ? 'psx' : 'qse';
   const navItems = exchange === 'psx' ? PSX_NAV_ITEMS : QSE_NAV_ITEMS;
   const { open: pagesOpen, toggle: togglePagesOpen } = usePagesOpen();
 
@@ -127,7 +132,7 @@ export function Sidebar({
       {pagesOpen && (
         <nav className="navlist">
           {navItems.map((item) => (
-            <NavLink key={item.to} to={item.to} end onClick={onNavigate} className={({ isActive }) => `navbtn${isActive ? ' active' : ''}`}>
+            <NavLink key={item.to} to={item.to} end onClick={() => { beginNavigation(item.to); onNavigate?.(); }} className={() => `navbtn${activePath === item.to ? ' active' : ''}`}>
               <span className="num">{item.num}</span>
               {item.label}
             </NavLink>
@@ -188,13 +193,13 @@ export function Sidebar({
            same destination the old button's affordance implied. */}
         <div className="sidebar-account-group">
           {user ? (
-            <NavLink to="/account" onClick={onNavigate} className="navbtn account-btn" title={name}>
+            <NavLink to="/account" onClick={() => { beginNavigation('/account'); onNavigate?.(); }} className="navbtn account-btn" title={name}>
               <Avatar user={user} avatarEmoji={profile.avatarEmoji} size={22} />
               <span className="account-name">{name}</span>
               <SettingsIcon size={14} />
             </NavLink>
           ) : (
-            <NavLink to="/account" onClick={onNavigate} className="navbtn account-btn">
+            <NavLink to="/account" onClick={() => { beginNavigation('/account'); onNavigate?.(); }} className="navbtn account-btn">
               <span className="avatar-circle" style={{ width: 22, height: 22 }} aria-hidden="true"><LogInIcon size={13} /></span>
               <span className="account-name">Not signed in — tap to sign in</span>
             </NavLink>
@@ -203,7 +208,7 @@ export function Sidebar({
 
         <div className="text-muted" style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>© {new Date().getFullYear()} WealthCrescent</span>
-          <NavLink to="/legal" style={{ color: 'inherit' }}>Legal</NavLink>
+          <NavLink to="/legal" onClick={() => beginNavigation('/legal')} style={{ color: 'inherit' }}>Legal</NavLink>
         </div>
       </div>
     </div>

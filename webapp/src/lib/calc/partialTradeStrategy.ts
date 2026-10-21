@@ -42,6 +42,10 @@ export interface LotAdvice {
   breakEven: number;
   /** Unrealized P/L for this lot alone, if sold in full at `currentPrice`. */
   unrealizedPL: number;
+  /** P/L at the sale price before deducting the estimated sell fee. */
+  grossPL: number;
+  /** Estimated fee deducted from the sale proceeds. */
+  sellFee: number;
   suggestion: 'sell' | 'hold';
 }
 
@@ -61,7 +65,9 @@ export function computeLotAdvice(
     const costPerShare = lot.buyPrice + lot.buyFeeTotal / lot.originalShares;
     const costBasis = lot.remainingShares * costPerShare;
     const breakEven = lot.remainingShares > 0 ? breakEvenPrice(costBasis, lot.remainingShares, feePct, tick, calcFee) : 0;
+    const grossPL = currentPrice > 0 ? lot.remainingShares * (currentPrice - costPerShare) : 0;
     const unrealizedPL = currentPrice > 0 ? whatIfExit(lot.remainingShares, costPerShare, currentPrice, calcFee).pl : 0;
+    const sellFee = grossPL - unrealizedPL;
     return {
       buyId: lot.buyId,
       buyDate: lot.buyDate,
@@ -70,6 +76,8 @@ export function computeLotAdvice(
       remainingShares: lot.remainingShares,
       breakEven,
       unrealizedPL,
+      grossPL,
+      sellFee,
       suggestion: unrealizedPL > 0 ? 'sell' : 'hold',
     };
   });
@@ -91,9 +99,11 @@ export function sellableShareSummary(advice: LotAdvice[]): { sellable: number; t
 export function profitableLotTotals(advice: LotAdvice[], currentPrice: number) {
   return advice.filter(lot => lot.suggestion === 'sell').reduce((sum, lot) => ({
     profit: sum.profit + lot.unrealizedPL,
+    grossProfit: sum.grossProfit + lot.grossPL,
+    sellFees: sum.sellFees + lot.sellFee,
     grossProceeds: sum.grossProceeds + lot.remainingShares * currentPrice,
     netProceeds: sum.netProceeds + lot.remainingShares * lot.costPerShare + lot.unrealizedPL,
-  }), { profit: 0, grossProceeds: 0, netProceeds: 0 });
+  }), { profit: 0, grossProfit: 0, sellFees: 0, grossProceeds: 0, netProceeds: 0 });
 }
 
 export interface MissedOpportunity {

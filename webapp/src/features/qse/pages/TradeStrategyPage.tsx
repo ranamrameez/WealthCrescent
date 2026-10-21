@@ -2,7 +2,7 @@ import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { SummaryChip } from '../../../components/StandardCard';
 import { useActivePageSection } from '../../../hooks/useActivePageSection';
-import { ProfitableStockAlert } from '../../../components/ProfitableStockAlert';
+import { PartialTradeAdviceTable } from '../../../components/PartialTradeAdviceTable';
 import { StarIcon, CalendarIcon, ChecklistIcon, ArchiveIcon, RestoreIcon } from '../../../components/icons';
 import { ProfitableLotAlerts } from '../../../components/ProfitableLotAlerts';
 import { PlanExecutionSummary } from '../../../components/PlanExecutionSummary';
@@ -39,8 +39,6 @@ import {
   computeLotAdvice,
   findMissedOpportunity,
   perShareCommission,
-  sellableShareSummary,
-  profitableLotTotals,
   type LotAdvice,
 } from '../../../lib/calc/partialTradeStrategy';
 import { fmt, fmtMoney, fmtQSEPrice } from '../../../lib/format';
@@ -48,7 +46,7 @@ import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { useAuthState } from '../../../lib/firebase/useAuthState';
 import { useWorkbookStore } from '../../../store/workbookStore';
 import type { Transaction, TradePlan, TradePlanLeg } from '../../../types/workbook';
-import { useQSEDerived } from '../hooks/useQSEDerived';
+import { useQSEDerived, useQSEPortfolioDerived } from '../hooks/useQSEDerived';
 import { useQSEStockData } from '../hooks/useQSEStockData';
 import { gridAutoStyle } from '../../../lib/gridStyle';
 
@@ -194,10 +192,6 @@ function PartialTradeAdvisor({ ticker, onSellLot, onSellLots }: { ticker: string
   const row = rows.find((r) => r.ticker === ticker.toUpperCase());
   const currentPrice = row?.marketPrice || 0;
   const advice = computeLotAdvice(lots, calcFee, currentPrice, feePct, tick);
-  type LotCol = 'buyDate' | 'buyPrice' | 'remainingShares' | 'costPerShare' | 'breakEven' | 'unrealizedPL' | 'suggestion';
-  const { sorted: sortedAdvice, Th: LotTh } = useSortableRows(advice, (lot: LotAdvice, col: LotCol) => lot[col], 'buyDate', 'desc');
-
-
   // User-reported (2026-09-16): a plan's ticker with zero matching
   // transactions at all (e.g. a mismatched/mistyped ticker string) used to
   // render nothing here, with no explanation — reading exactly like "the
@@ -224,39 +218,7 @@ function PartialTradeAdvisor({ ticker, onSellLot, onSellLots }: { ticker: string
   // shares (or no price data) has nothing to show at all.
   if (!lots.length || currentPrice <= 0) return null;
 
-  const { sellable, total } = sellableShareSummary(advice);
-  const profitableTotals = profitableLotTotals(advice, currentPrice);
-
-  return (
-    <div style={{ marginBottom: 16 }}>
-      {sellable > 0 ? (
-        <ProfitableStockAlert sellable={sellable} total={total} price={currentPrice} {...profitableTotals} currency={currency} exchange="qse" onSell={() => onSellLots(advice.filter(lot => lot.suggestion === 'sell'))} />
-      ) : (
-        <p className="text-muted mb-sm">No lot of {ticker.toUpperCase()} is profitable at the current price ({fmtQSEPrice(currentPrice)}) yet.</p>
-      )}
-      <div className="table-scroll">
-        <table>
-          <thead>
-            <tr><LotTh col="buyDate">Buy date</LotTh><LotTh col="buyPrice">Buy price</LotTh><LotTh col="remainingShares">Shares</LotTh><LotTh col="costPerShare">Cost/share</LotTh><LotTh col="breakEven">Break-even</LotTh><LotTh col="unrealizedPL">Unrealized P/L</LotTh><LotTh col="suggestion">Suggestion</LotTh><th></th></tr>
-          </thead>
-          <tbody>
-            {sortedAdvice.map((a, i) => (
-              <RecordRow market="qse" record={a} key={i}>
-                <td>{a.buyDate}</td>
-                <td>{fmtQSEPrice(a.buyPrice)}</td>
-                <td>{fmt(a.remainingShares, 0)}</td>
-                <td>{fmtQSEPrice(a.costPerShare)}</td>
-                <td>{fmtQSEPrice(a.breakEven)}</td>
-                <td className={a.unrealizedPL >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(a.unrealizedPL, currency)}</td>
-                <td><span className={a.suggestion === 'sell' ? 'pill-positive' : 'text-muted'}>{a.suggestion === 'sell' ? 'Sell' : 'Hold'}</span></td>
-                <td>{a.suggestion === 'sell' && <button className="btn secondary small" onClick={() => onSellLot(a)}>Sell this lot</button>}</td>
-              </RecordRow>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+  return <PartialTradeAdviceTable advice={advice} currentPrice={currentPrice} currency={currency} exchange="qse" ticker={ticker} onSellLot={onSellLot} onSellLots={onSellLots} />;
 }
 
 export function WhatIfExitCalculator({
@@ -436,7 +398,7 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
   const executeTradePlanLeg = useWorkbookStore((s) => s.executeTradePlanLeg);
   const setMarketPrice = useWorkbookStore((s) => s.setMarketPrice);
   const ensureSignedIn = useEnsureSignedIn();
-  const { workbook, calcFee, rows, positions } = useQSEDerived();
+  const { workbook, calcFee, rows, positions } = useQSEPortfolioDerived();
   const { tickerNames } = useQSEStockData();
   const currency = workbook.settings.currency;
 
@@ -1000,7 +962,8 @@ export function TradeStrategyPage() {
   const navigate = useNavigate();
   const exchange = "QSE";
   const [openPlans, setOpenPlans] = useState<Record<string, boolean>>({});
-  const planToggleHandlers = useMemo(() => Object.fromEntries(tradePlans.map(plan => [plan.id, (open: boolean) => setOpenPlans(current => ({ ...current, [plan.id]: open }))])), [tradePlans]);
+  const planIdsKey = tradePlans.map((plan) => plan.id).join('|');
+  const planToggleHandlers = useMemo(() => Object.fromEntries(planIdsKey.split('|').filter(Boolean).map(id => [id, (open: boolean) => setOpenPlans(current => ({ ...current, [id]: open }))])), [planIdsKey]);
   const { activeSection, setActiveSection } = useActivePageSection([
     { key: 'profitable-share-alerts', id: 'profitable-share-alerts' },
     ...sorted.map(plan => ({ key: plan.id, id: `trade-plan-${plan.id}` })),

@@ -6,8 +6,16 @@ import { Link, MemoryRouter, Route, useNavigate } from 'react-router-dom';
 import { LoadingSurface } from '../LoadingSurface';
 import { PageContent } from '../PageContent';
 import { StandardPageSections } from '../StandardPageSections';
+import { CategoryNav } from '../CategoryNav';
+import { TopBar } from '../TopBar';
+import { usePageTopBarStore } from '../../store/pageTopBarStore';
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+afterEach(() => {
+  cleanup();
+  usePageTopBarStore.setState({ loading: false, pendingPath: null, chips: [], rightSlot: null });
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 it('keeps the mask until async content and its paint are ready without remounting it', async () => {
   let mounts = 0;
@@ -72,6 +80,23 @@ it('keeps the page mask in place while the destination module is loading', async
   await act(async () => finish({ default: () => <p>Destination content</p> }));
   await waitFor(() => expect(container.querySelector('.page-loading-surface')).toHaveAttribute('aria-busy', 'false'));
   expect(screen.getByText('Destination content')).toBeVisible();
+});
+
+it('loads the top bar and highlights the destination sidebar item immediately', async () => {
+  let finish!: (value: { default: () => React.ReactNode }) => void;
+  const Banking = lazy(() => new Promise<{ default: () => React.ReactNode }>(resolve => { finish = resolve; }));
+  const { container } = render(<MemoryRouter useTransitions={false} initialEntries={['/qse']}>
+    <CategoryNav />
+    <TopBar />
+    <PageContent><Route path="/qse" element={<p>Stocks</p>} /><Route path="/bank" element={<Banking />} /></PageContent>
+  </MemoryRouter>);
+  await waitFor(() => expect(container.querySelector('.page-topbar')).toHaveAttribute('aria-busy', 'false'));
+  fireEvent.click(screen.getByRole('link', { name: 'Banking' }));
+  expect(screen.getByRole('link', { name: 'Banking' })).toHaveClass('active');
+  await waitFor(() => expect(container.querySelector('.page-topbar')).toHaveAttribute('aria-busy', 'true'));
+  expect(screen.getByRole('status', { name: 'Loading page' })).toBeVisible();
+  await act(async () => finish({ default: () => <p>Banking content</p> }));
+  await waitFor(() => expect(container.querySelector('.page-topbar')).toHaveAttribute('aria-busy', 'false'));
 });
 
 it('starts destination pages at the top but preserves scrolling for query changes', async () => {

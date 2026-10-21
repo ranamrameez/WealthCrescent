@@ -90,13 +90,13 @@ test('Failed refresh preserves loaded records and disables stale-preview deletio
   p.dom.window.close();
 });
 
-test('Outlier preview starts unselected and explicit deselection survives refresh', async () => {
+test('Outlier preview starts unselected, direct deletion stays available and explicit deselection survives refresh', async () => {
   const p = pageHarness(); await p.start();
   assert.equal(p.document.querySelectorAll('#outlierPreviewRows tr').length, 1);
   assert.equal(p.document.querySelector('#outlierPreviewRows input').checked, false);
   p.document.getElementById('selectPreviewOutliers').onclick(); assert.equal(p.document.getElementById('deleteOutliers').disabled, false);
   p.document.getElementById('clearPreviewOutliers').onclick(); await p.document.getElementById('refreshData').onclick();
-  assert.equal(p.document.getElementById('deleteOutliers').disabled, true);
+  assert.equal(p.document.getElementById('deleteOutliers').disabled, false);
   assert.equal(p.document.querySelector('#outlierPreviewRows input').checked, false);
   p.dom.window.close();
 });

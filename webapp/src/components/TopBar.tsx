@@ -42,9 +42,12 @@ export function TopBar() {
   const bar = useRef<HTMLDivElement>(null);
   const chips = useTopBarPageSections(bar, registered, location.pathname + location.search);
   const rightSlot = usePageTopBarStore((s) => s.rightSlot);
+  const loading = usePageTopBarStore((s) => s.loading);
+  const beginNavigation = usePageTopBarStore((s) => s.beginNavigation);
 
   return (
-    <div ref={bar} className="page-topbar">
+    <div ref={bar} className={`page-topbar${loading ? ' is-loading' : ''}`} aria-busy={loading}>
+      {loading && <div className="page-topbar-loading" role="status" aria-label="Loading page"><i /><i /><i /></div>}
       <div className="chip-tabs page-topbar-sections">
         {chips.map((c) => (
           <button key={c.key} type="button" className={`chip${c.active ? ' active' : ''}`} aria-current={c.active ? 'location' : undefined} onClick={c.onClick}>
@@ -52,7 +55,7 @@ export function TopBar() {
           </button>
         ))}
       </div>
-      <div className="page-topbar-right">{category==='stocks' && !stockDetail && !location.pathname.startsWith('/market-prices') && <TopBarSelect label="Stock" className="account-switch-select" value="" options={[{value:'',label:'All stocks'},...stockOptions.map(ticker=>({value:ticker,label:ticker}))]} onChange={event=>{if(event.target.value)navigate(`${exchange==='psx'?'/psx':''}/stock/${event.target.value}`);}} />}{rightSlot}</div>
+      <div className="page-topbar-right">{category==='stocks' && !stockDetail && !location.pathname.startsWith('/market-prices') && <TopBarSelect label="Stock" className="account-switch-select" value="" options={[{value:'',label:'All stocks'},...stockOptions.map(ticker=>({value:ticker,label:ticker}))]} onChange={event=>{if(event.target.value){const path=`${exchange==='psx'?'/psx':''}/stock/${event.target.value}`;beginNavigation(path);navigate(path);}}} />}{rightSlot}</div>
     </div>
   );
 }

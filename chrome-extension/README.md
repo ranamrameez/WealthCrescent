@@ -331,6 +331,12 @@ Sign-in and account creation clear stale authentication errors and immediately r
 
 Options and popup show a shared live action banner. Conflicting actions are disabled and rejected by the worker; manual scrape/push replies arrive after completion and surface failures. Stop waits for ongoing work before reporting Stopped. Pinned charts default to Table dates and inherit all table filters; explicit per-ticker timeframes override dates only. Combined view supports local source, strategy and accepted/rejected filtering. Source-level findings, automated evidence and remaining live checks are in [AUDIT.md](AUDIT.md).
 
+## Canonical Firebase data and compact writes
+
+Firebase is the source of truth for records, charts, outliers and derived values. The combined view adds only local rejected or pending records; synced and cloud-matching local copies are excluded and successfully pushed audit rows are removed. Every valid scraped observation is retained, including repeated prices. Ticker symbols are normalized and each observation's change is calculated independently against that ticker's preceding Firebase value.
+
+By default history writes contain the meaningful market fields only: ticker, price, Qatar date/time, min, max, change and compatibility fields used by existing readers. Enable **Send full scrape metadata** in Configurations to additionally retain parser keys, raw grid cells, diagnostics, the scraped name and the page-reported change.
+
 ## Nearby consensus outliers (v0.1.18)
 
 Price movement from a single previous quote is no longer classified as an outlier. For each ticker, observations within five minutes before or after a record are compared (up to 60 nearby positive samples). At least three peers must cluster within 10% of their median and represent at least two thirds of the comparison samples. A record is flagged only when it differs by more than 10% from that cluster median. Zero and negative observations can be flagged; they cannot act as reference prices. Sparse, undated or conflicting evidence produces no flag. Identical timestamp/price observations are deduplicated across sources. Classification runs before filters, so filtering does not redefine the baseline.

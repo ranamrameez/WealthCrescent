@@ -7,7 +7,7 @@ export async function mountConfig(container) {
     <div class="config-sections"><section class="config-section"><h3>Firebase pushes</h3><label>Minutes between Firebase pushes<input name="minPushIntervalMinutes" type="number" min="0" step="1" required></label>
     <label>Push timing<select name="pushTimingMode"><option value="random">Random (1-2x interval)</option><option value="constant">Constant interval</option></select></label>
     <p class="muted">Random push intervals vary between 1× and 2× this minimum. Constant timing uses the configured interval. Set 0 to sync after every automatic scrape.</p>
-    </section><section class="config-section"><h3>Automatic scraping</h3><label>Scrape interval (seconds)<input name="scrapeIntervalSeconds" type="number" min="0" step="0.1" required></label><label><input name="scrapeOnPriceChange" type="checkbox"> Scrape on every price change</label><label><input name="respectTimeWindows" type="checkbox"> Follow Qatar time windows</label><p class="muted">0 disables periodic scraping; enable price-change scraping to collect updates as they appear. Price changes trigger collection immediately. Set Firebase push interval to 0 to sync each scrape. Keep the market tab open.</p></section><section class="config-section"><h3>Scraping windows (Qatar time)</h3><div class="windows"></div><button type="button" class="add-window secondary">Add time pair</button>
+    </section><section class="config-section"><h3>Automatic scraping</h3><label>Scrape interval (seconds)<input name="scrapeIntervalSeconds" type="number" min="0" step="0.1" required></label><label><input name="scrapeOnPriceChange" type="checkbox"> Scrape on every price change</label><label><input name="sendMetadata" type="checkbox"> Send full scrape metadata</label><label><input name="respectTimeWindows" type="checkbox"> Follow Qatar time windows</label><p class="muted">By default Firebase receives only ticker, price, date/time, daily min/max and change. Enable metadata to also store parser keys, raw cells and diagnostics.</p></section><section class="config-section"><h3>Scraping windows (Qatar time)</h3><div class="windows"></div><button type="button" class="add-window secondary">Add time pair</button>
     <p class="muted">Automatic scraping runs within these windows. End times are exclusive; overnight pairs are supported. Manual scrape and push work outside these windows.</p>
     </section></div><section class="config-section"><h3>Market page</h3><div class="config-grid">${Object.keys(scrape).map(key => `<label>${({ targetUrl: 'Market-watch URL', rowSelector: 'Row selector', tickerSelector: 'Ticker selector', priceSelector: 'Price selector', changeSelector: 'Change % selector', nameSelector: 'Company name selector' })[key]}<input name="${key}" type="text" ${key === 'targetUrl' ? 'required' : ''}></label>`).join('')}</div>
     <p class="muted">Prices are detected automatically using named grid columns.</p>
@@ -20,6 +20,7 @@ export async function mountConfig(container) {
   form.elements.pushTimingMode.value = sync.pushTimingMode;
   form.elements.scrapeIntervalSeconds.value = sync.scrapeIntervalSeconds ?? 0;
   form.elements.scrapeOnPriceChange.checked = sync.scrapeOnPriceChange !== false;
+  form.elements.sendMetadata.checked = sync.sendMetadata === true;
   form.elements.respectTimeWindows.checked = sync.respectTimeWindows === true;
   const windows = container.querySelector('.windows');
   function addWindow(pair = { start: '09:30', end: '13:00' }) {
@@ -39,6 +40,7 @@ export async function mountConfig(container) {
     form.elements.pushTimingMode.value = sync.pushTimingMode;
   form.elements.scrapeIntervalSeconds.value = sync.scrapeIntervalSeconds ?? 0;
   form.elements.scrapeOnPriceChange.checked = sync.scrapeOnPriceChange !== false;
+  form.elements.sendMetadata.checked = sync.sendMetadata === true;
   form.elements.respectTimeWindows.checked = sync.respectTimeWindows === true;
     windows.replaceChildren(); sync.timeWindows.forEach(addWindow);
   });
@@ -51,7 +53,7 @@ export async function mountConfig(container) {
       if (targetUrl.origin !== 'https://webd.thegroup.com.qa') throw new Error('Use a market URL on https://webd.thegroup.com.qa.');
       const fields = Object.fromEntries(Object.keys(scrape).map(key => [key, form.elements[key].value.trim()]));
       for (const [key, value] of Object.entries(fields)) if (key.endsWith('Selector') && value) document.querySelector(value);
-      await sendWorkerMessage({ type: 'SAVE_CONFIGS', scrape: fields, sync: { scrapeIntervalSeconds: Number(form.elements.scrapeIntervalSeconds.value), scrapeOnPriceChange: form.elements.scrapeOnPriceChange.checked, respectTimeWindows: form.elements.respectTimeWindows.checked, pushTimingMode: form.elements.pushTimingMode.value, minPushIntervalMinutes: Number(form.elements.minPushIntervalMinutes.value), timeWindows: Array.from(windows.children).map(row => ({ start: row.querySelector('.start').value, end: row.querySelector('.end').value })) } });
+      await sendWorkerMessage({ type: 'SAVE_CONFIGS', scrape: fields, sync: { scrapeIntervalSeconds: Number(form.elements.scrapeIntervalSeconds.value), scrapeOnPriceChange: form.elements.scrapeOnPriceChange.checked, sendMetadata: form.elements.sendMetadata.checked, respectTimeWindows: form.elements.respectTimeWindows.checked, pushTimingMode: form.elements.pushTimingMode.value, minPushIntervalMinutes: Number(form.elements.minPushIntervalMinutes.value), timeWindows: Array.from(windows.children).map(row => ({ start: row.querySelector('.start').value, end: row.querySelector('.end').value })) } });
       dirty = false; message.textContent = ' Configurations saved.';
     } catch (error) { message.textContent = ` ${error.message}`; }
   };

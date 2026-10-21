@@ -16,6 +16,8 @@ it('totals only profitable shares, including buy and sell fees', () => {
   const totals = profitableLotTotals(computeLotAdvice(lotsByTicker.QFLS, calcFee, 12.1, 1, 0.01), 12.1);
   expect(totals.grossProceeds).toBeCloseTo(68 * 12.1);
   expect(totals.netProceeds).toBeCloseTo(68 * 12.1 * 0.99);
+  expect(totals.grossProfit).toBeCloseTo(68 * 12.1 - 68 * 10 * 1.01);
+  expect(totals.sellFees).toBeCloseTo(68 * 12.1 * 0.01);
   expect(totals.profit).toBeCloseTo(68 * 12.1 * 0.99 - 68 * 10 * 1.01);
 });
 
@@ -24,6 +26,8 @@ describe.each(['psx', 'qse'] as const)('%s profitable alerts', exchange => {
     const props = { transactions, calcFee, feePct: 1, tick: 0.01, currency: exchange === 'qse' ? 'QAR' : 'PKR', exchange };
     const { rerender } = render(<ProfitableLotAlerts {...props} marketPrices={{ QFLS: 12.1 }} />);
     expect(screen.getByLabelText('Profitable share alerts').textContent).toContain('68 of 388 shares profitable');
+    expect(screen.getByLabelText('Profitable share alerts').textContent).toContain('Gross P/L at sale price');
+    expect(screen.getByLabelText('Profitable share alerts').textContent).toContain('Net P/L after commission');
     expect(screen.getByLabelText('Profitable share alerts').textContent).toContain('127.77');
     expect(screen.getByLabelText('Profitable share alerts').textContent).toContain('814.57');
     rerender(<ProfitableLotAlerts {...props} marketPrices={{ QFLS: 16 }} />);

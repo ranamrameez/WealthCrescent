@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { usePageTopBarStore } from '../store/pageTopBarStore';
 import {
   BankIcon,
   CashIcon,
@@ -88,14 +89,16 @@ export function categoryForPath(pathname: string): CategoryKey | null {
  * instead of after the whole list. */
 export function CategoryNav({ onNavigate, stocksSubnav }: { onNavigate?: () => void; stocksSubnav?: ReactNode }) {
   const location = useLocation();
-  const active = categoryForPath(location.pathname);
+  const pendingPath = usePageTopBarStore((state) => state.pendingPath);
+  const beginNavigation = usePageTopBarStore((state) => state.beginNavigation);
+  const active = categoryForPath(pendingPath ?? location.pathname);
   return (
     <nav className="navlist category-list">
       {CATEGORIES.map((c) => (
         <Fragment key={c.key}>
           <NavLink
             to={c.to}
-            onClick={onNavigate}
+            onClick={() => { beginNavigation(c.to); onNavigate?.(); }}
             className={`navbtn category-item${c.key === active ? ' active' : ''}`}
           >
             <span className="category-item-icon" aria-hidden="true">{c.icon}</span>

@@ -1,5 +1,6 @@
 import type { PSXWorkbook } from '../../../types/psxWorkbook';
 import { useMemo } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { buildCashLedger, cashSummary, computePositions, computeRealizedPLTimeSeries, getMarketPrice } from '../../../lib/calc';
 import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
 import { makePSXFeeCalculator } from '../../../lib/calc/psxFees';
@@ -89,4 +90,22 @@ export function usePSXDerived(selectedTickers?: string[]) {
     }
     return calculateDerived(workbook, tickerKey.split('|'));
   }, [workbook, tickerKey]);
+}
+
+/** Portfolio-only subscription for heavy strategy cards. Trade-plan edits do
+ * not affect these inputs, so they must not make every card rebuild the full
+ * portfolio model. */
+export function usePSXPortfolioDerived() {
+  const inputs = usePSXWorkbookStore(useShallow((state) => ({
+    settings: state.workbook.settings,
+    transactions: state.workbook.transactions,
+    transfers: state.workbook.transfers,
+    adjustments: state.workbook.adjustments,
+    marketPrices: state.workbook.marketPrices,
+    priceHistory: state.workbook.priceHistory,
+  })));
+  return useMemo(() => {
+    const workbook = { ...usePSXWorkbookStore.getState().workbook, ...inputs };
+    return calculateDerived(workbook);
+  }, [inputs]);
 }

@@ -38,6 +38,7 @@ export const DEFAULT_SYNC_CONFIG = {
   scrapingEnabled: true,
   scrapeIntervalSeconds: 0,
   scrapeOnPriceChange: true,
+  sendMetadata: false,
   respectTimeWindows: false,
   timeWindows: [{ start: '09:30', end: '13:00' }, { start: '13:10', end: '13:15' }],
 };

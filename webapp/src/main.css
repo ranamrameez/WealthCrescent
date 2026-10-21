@@ -2289,6 +2289,32 @@ input.price-input[type="number"] {
 	flex-wrap: wrap;
 	flex-direction: row;
 }
+.page-topbar.is-loading {
+	position: sticky;
+	min-height: 50px;
+	overflow: hidden;
+}
+.page-topbar.is-loading > :not(.page-topbar-loading) {
+	visibility: hidden;
+}
+.page-topbar-loading {
+	position: absolute;
+	inset: 8px 10px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.page-topbar-loading i {
+	display: block;
+	height: 28px;
+	width: 92px;
+	border-radius: 999px;
+	background: linear-gradient(90deg, var(--panel-2) 25%, var(--accent-soft) 50%, var(--panel-2) 75%);
+	background-size: 200% 100%;
+	animation: content-load-shimmer 1.2s linear infinite;
+}
+.page-topbar-loading i:nth-child(2) { width: 118px; }
+.page-topbar-loading i:nth-child(3) { width: 72px; margin-left: auto; }
 .card.chart-card {
 	border: 0;
 	box-shadow: var(--shadow-card);

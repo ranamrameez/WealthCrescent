@@ -1,6 +1,7 @@
-import { Suspense, useDeferredValue, useLayoutEffect, type ReactNode } from 'react';
+import { Suspense, useCallback, useDeferredValue, useLayoutEffect, type ReactNode } from 'react';
 import { Routes, useLocation } from 'react-router-dom';
 import { LoadingSurface } from './LoadingSurface';
+import { usePageTopBarStore } from '../store/pageTopBarStore';
 
 export function PageContent({ children }: { children: ReactNode }) {
   const location = useLocation();
@@ -18,7 +19,8 @@ export function PageContent({ children }: { children: ReactNode }) {
   // Query changes select/filter sections in the same page. They must neither
   // remount the page nor cover it with a page-wide loading mask.
   const switchingPage = location.pathname !== displayedLocation.pathname;
-  return <LoadingSurface className="page-loading-surface" loadKey={displayedLocation.pathname} pending={switchingPage}>
+  const reportLoading = useCallback((loading: boolean) => usePageTopBarStore.getState().setLoading(loading), []);
+  return <LoadingSurface className="page-loading-surface" loadKey={displayedLocation.pathname} pending={switchingPage} onLoadingChange={reportLoading}>
     <Suspense fallback={<div data-content-pending="true" className="page-content-placeholder" />}>
       <Routes location={displayedLocation}>{children}</Routes>
     </Suspense>

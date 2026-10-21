@@ -1,7 +1,7 @@
 import { mergeBounds, tickerProjection } from './ticker-data.js';
 import { restoreExtensionConfigs, saveExtensionConfigs, CONFIG_KEYS } from './cloud-config.js';
 import { recordActivity, qatarDate } from './activity.js';
-import { saveAudit, queryAudit, markAuditSynced } from './audit.js';
+import { saveAudit, queryAudit, markAuditSynced, clearPushedAuditRows } from './audit.js';
 import { combineRecords } from './combined-data.js';
 import { pushedRecords, paginatePushed, priceDeviation, flagPriceOutliers } from './pushed-data.js';
 import { setSyncConfig, withinScrapingWindow, pushDelayMs } from './common.js';
@@ -313,14 +313,13 @@ async function syncTickerPoint(ticker, point, auth) {
     updateTickerBounds(root + '/dayToDayBounds/' + point.date, point, auth),
     updateTickerBounds(root + '/allTimeBounds', point, auth),
   ]);
-  const last = latest.value;
-  if (last && last.price === point.price && last.date === point.date && (last.dayHigh ?? null) === point.dayHigh && (last.dayLow ?? null) === point.dayLow) return;
   const key = String(Date.parse(point.time));
   const response = await networkRequest(RTDB_BASE_URL + '/QSE.json?auth=' + encodeURIComponent(auth.idToken), {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ['tickers/' + ticker + '/allPrices/' + key]: point, ['tickers/' + ticker + '/latest']: point, ['priceHistory/' + ticker + '/' + key]: point }),
   });
   if (!response.ok) throw new Error('Ticker price/history sync failed (' + response.status + ')');
+  return true;
 }
 
 async function rebuildTickerProjection(ticker, auth, clearLatest = false) {
@@ -336,19 +335,28 @@ async function pushRows(rows) {
   if (!auth) throw new Error('Sign in on the extension page to sync prices.');
   await ensureQseRoot(auth);
   await saveExtensionConfigs(getFreshAuth).then(() => patchStatus({ configSyncError:'' })).catch(error => patchStatus({ configSyncError:error.message }));
+  const syncConfig = typeof getSyncConfig === 'function' ? await getSyncConfig() : { sendMetadata: true };
   const nowIso = new Date().toISOString();
   const today = qatarDate(new Date(nowIso));
   let pushed = 0;
   const syncedTickers = [];
   let namesPushed = 0;
   const errors = [];
-  for (const row of rows) {
+  // Preserve every valid observation, including repeated prices. Tickers are
+  // normalized, but rows are never collapsed into a single sample.
+  const scrapedRows = rows.filter(row => row?.ticker && Number.isFinite(row.price)).map(row => ({ ...row, ticker: String(row.ticker).trim().toUpperCase() }));
+  for (const [rowIndex, row] of scrapedRows.entries()) {
     try {
       const previousResponse = await networkRequest(`${RTDB_BASE_URL}/${priceCachePath(row.ticker)}.json?auth=${encodeURIComponent(auth.idToken)}`);
       if (!previousResponse.ok) throw new Error(`Cannot read previous price (${previousResponse.status})`);
       const previousPrice = await previousResponse.json();
-      const point = { date: today, time: nowIso, price: row.price, priceKey: row.priceKey || null, dayHigh: row.dayHigh ?? null, dayLow: row.dayLow ?? null, highLowKey: row.highLowKey || null, highLowRaw: row.highLowRaw || [], rangeError: row.rangeError || '', raw: row.raw || [], ...priceDeviation(row.price, previousPrice) };
-      await putScalar(priceCachePath(row.ticker), row.price, auth.idToken);
+      const change = priceDeviation(row.price, previousPrice);
+      // Give every observation a stable unique history key even when multiple
+      // rows are collected in the same millisecond.
+      const observationTime = new Date(Date.parse(nowIso) + rowIndex).toISOString();
+      const point = { ticker: row.ticker, date: today, time: observationTime, price: row.price, min: row.dayLow ?? null, max: row.dayHigh ?? null, change: row.changePct ?? change.deltaPct, dayHigh: row.dayHigh ?? null, dayLow: row.dayLow ?? null, ...change,
+        ...(syncConfig.sendMetadata ? { priceKey: row.priceKey || null, highLowKey: row.highLowKey || null, highLowRaw: row.highLowRaw || [], rangeError: row.rangeError || '', raw: row.raw || [], name: row.name || null, scrapedChangePct: row.changePct ?? null } : {}) };
+      if (previousPrice !== row.price) await putScalar(priceCachePath(row.ticker), row.price, auth.idToken);
       pushedSnapshot = null;
       pushed++;
       syncedTickers.push(row.ticker);
@@ -376,7 +384,7 @@ async function pushRows(rows) {
   } catch (e) {
     // Non-critical — the per-ticker writes already landed.
   }
-  return { pushed, namesPushed, total: rows.length, errors, syncedTickers };
+  return { pushed, namesPushed, total: scrapedRows.length, errors, syncedTickers };
 }
 
 // ---------- Scraping (delegates to the content script) ----------
@@ -479,7 +487,7 @@ async function collectCycle({ forcePush = false, manual = false, scrapeOnly = fa
     return;
   }
 
-  await patchStatus({ scrapeState: 'Scraping' });
+  await patchStatus({ scrapeState: 'Scraping', syncState: scrapeOnly ? 'Not requested' : 'Waiting for scrape', actionStage: 'start' });
   const result = await scrapeTab(tab);
   if (!result.ok) {
     await recordActivity({ type: 'scrape', success: false });
@@ -494,6 +502,8 @@ async function collectCycle({ forcePush = false, manual = false, scrapeOnly = fa
   const rows = result.rows || [];
   await patchStatus({
     scrapeState: 'Watching prices',
+    syncState: scrapeOnly ? 'Not requested' : 'Preparing sync',
+    actionStage: 'mid',
     lastScrapeAt: Date.now(),
     lastScrapeCount: rows.length,
     lastStrategy: result.strategy,
@@ -526,8 +536,12 @@ async function collectCycle({ forcePush = false, manual = false, scrapeOnly = fa
     try {
       const { pushed, namesPushed, total, errors, syncedTickers } = await pushRows(rows);
       await recordActivity({ type: 'sync', count: pushed, success: pushed === total && !errors.length, error: errors.slice(0, 3).join(' ') });
-      try { await markAuditSynced(auditBatchAt, syncedTickers); }
-      catch (error) { errors.push(`Prices synced; local audit update failed: ${error.message}`); }
+      let clearedLocalRows = 0;
+      try {
+        await markAuditSynced(auditBatchAt, syncedTickers);
+        if (typeof clearPushedAuditRows === 'function') clearedLocalRows = await clearPushedAuditRows(auditBatchAt, syncedTickers);
+      }
+      catch (error) { errors.push(`Prices synced; local cleanup failed: ${error.message}`); }
       const retryAt = errors.length ? Date.now() + Math.max(5000, syncConfig.minPushIntervalMinutes * 60000) : null;
       if (retryAt) chrome.alarms.create(RETRY_ALARM, { when: retryAt });
       else await chrome.alarms.clear?.(RETRY_ALARM);
@@ -538,6 +552,8 @@ async function collectCycle({ forcePush = false, manual = false, scrapeOnly = fa
         lastPushCount: pushed,
         lastPushTotal: total,
         lastNamesCount: namesPushed,
+        lastLocalRowsCleared: clearedLocalRows,
+        actionStage: 'end',
         nextPushAt,
         lastError: errors.slice(0, 3).join(' '),
         lastSyncError: errors.slice(0, 3).join(' '),
@@ -555,6 +571,7 @@ async function collectCycle({ forcePush = false, manual = false, scrapeOnly = fa
     if (syncFailure) throw new Error(syncFailure);
   }
 
+  await patchStatus({ actionStage: 'end' });
   await scheduleNextCollect();
   return { scraped: rows.length, status: await getStatus() };
 }
@@ -590,6 +607,9 @@ chrome.runtime.onMessage.addListener((message, _sender, reply) => {
   const sendResponse = value => { response = value; };
   (async () => {
     const exclusive = ['START_SCRAPING', 'SCRAPE_NOW_MANUAL', 'PUSH_NOW', 'TEST_SCRAPE', 'MUTATE_PUSHED_DATA', 'SIGN_IN', 'SIGN_UP', 'SIGN_OUT', 'SAVE_CONFIGS'].includes(message?.type);
+    // Record edits are concurrency-safe (Firebase uses ETags), but should start
+    // after the current collection has finished instead of being rejected by it.
+    if (message?.type === 'MUTATE_PUSHED_DATA' && cycleRunning && cyclePromise) await cyclePromise.catch(() => {});
     if (stopRunning || (exclusive || message?.type === 'STOP_SCRAPING' && !cycleRunning) && (actionRunning || cycleRunning)) throw new Error('Another action is running. Wait for completion.');
     if (exclusive) actionRunning = true;
     try {
@@ -636,7 +656,7 @@ chrome.runtime.onMessage.addListener((message, _sender, reply) => {
           firebase = pushedSnapshot.rows;
         } catch (error) { warning = `Firebase unavailable: ${error.message} Showing local records; their sync state may be unverified.`; }
         const key = [local.auditVersion, pushedSnapshot?.uid, pushedSnapshot?.at, warning].join(':');
-        if (local.auditVersion === undefined || combinedSnapshot?.key !== key) combinedSnapshot = { key, rows: flagPriceOutliers(combineRecords(firebase, local.records)) };
+        if (local.auditVersion === undefined || combinedSnapshot?.key !== key) combinedSnapshot = { key, rows: flagPriceOutliers(combineRecords(firebase, local.records, { pendingOnly: true })) };
         const rows = combinedSnapshot.rows;
         sendResponse({ ok: true, ...paginatePushed(rows, message.filters || {}), warning });
         break;

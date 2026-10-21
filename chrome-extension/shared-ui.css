@@ -78,3 +78,7 @@ html[data-color="material-teal"] .config-section { background:transparent; box-s
 .action-group { display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:12px; border-left:2px solid var(--border); }
 .action-group > strong { flex-basis:100%; font-size:13px; }
 .batch-toolbar { align-items:flex-start; }
+.records-table-scroll { max-height:60vh; overflow:auto; border:1px solid var(--border); border-radius:var(--radius-md); }
+.records-table-scroll thead { position:sticky; top:0; z-index:2; }
+.records-table-scroll th,.records-table-scroll td { padding:5px 8px; line-height:1.2; font-size:12px; }
+.records-table-scroll input[type=checkbox] { margin:0; }

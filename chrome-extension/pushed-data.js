@@ -28,9 +28,9 @@ export function priceDeviation(price, previousPrice) {
 }
 
 const recordDateCache = new WeakMap();
-export function paginatePushed(rows, { from = '', to = '', ticker = '', outliers = '', strategy = '', accepted = '', source = '', page = 1, pageSize = 25 } = {}) {
+export function paginatePushed(rows, { from = '', to = '', ticker = '', outliers = '', strategy = '', accepted = '', source = '', page = 1, pageSize = 50 } = {}) {
   page = Math.max(1, Math.floor(Number(page) || 1));
-  pageSize = Math.min(100, Math.max(1, Math.floor(Number(pageSize) || 25)));
+  pageSize = Math.min(100, Math.max(1, Math.floor(Number(pageSize) || 50)));
   const dateFormatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Qatar', year: 'numeric', month: '2-digit', day: '2-digit' });
   const filtered = rows.filter(row => {
     const cached = recordDateCache.get(row);

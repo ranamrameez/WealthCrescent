@@ -1,13 +1,14 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 
 /** A paint-only mask: never resizes, translates, or remounts its content. */
-export function LoadingSurface({ children, className = '', loadKey = '', pending = false }: {
-  children: ReactNode; className?: string; loadKey?: string; pending?: boolean;
+export function LoadingSurface({ children, className = '', loadKey = '', pending = false, onLoadingChange }: {
+  children: ReactNode; className?: string; loadKey?: string; pending?: boolean; onLoadingChange?: (loading: boolean) => void;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const [readiness, setReadiness] = useState({ key: loadKey, ready: false });
   if (readiness.key !== loadKey) setReadiness({ key: loadKey, ready: false });
   const loading = pending || readiness.key !== loadKey || !readiness.ready;
+  useEffect(() => onLoadingChange?.(loading), [loading, onLoadingChange]);
   const sections = useRef<HTMLDivElement>(null);
   const [sectionCount, setSectionCount] = useState(1);
   useLayoutEffect(() => {
