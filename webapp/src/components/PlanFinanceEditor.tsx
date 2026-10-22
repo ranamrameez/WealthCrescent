@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { PlanEditorModal } from './PlanEditorModal';
 import { Field, Select } from './ui/Field';
+import { Notice } from './Notice';
 import { useBankWorkbookStore } from '../store/bankWorkbookStore';
 import { useCreditCardWorkbookStore } from '../store/creditCardWorkbookStore';
 import { useCashWorkbookStore } from '../store/cashWorkbookStore';
@@ -16,25 +17,41 @@ export function PlanFinanceEditor({ records, onClose }: { records: PlanRecord[];
   const [snapshot] = useState(() => structuredClone(records.filter(row => !row.plan.executed)));
   const accounts = useBankWorkbookStore(s => s.workbook.settings.accounts);
   const cards = useCreditCardWorkbookStore(s => s.workbook.cards);
+  const properties = useRentalsWorkbookStore(s => s.workbook.settings.properties);
   const defaultCurrency = useCashWorkbookStore(s => s.workbook.settings.defaultCurrency);
   const [module,setModule] = useState<'cash'|'bank'|'creditCard'>('bank');
   const [ref,setRef] = useState('');
   const [currency,setCurrency] = useState(defaultCurrency);
+  const [currencyAcknowledged,setCurrencyAcknowledged] = useState(false);
   const currencies = useEnabledCurrencies(currency);
   const [busy,setBusy] = useState(false);
   const ensureSignedIn = useEnsureSignedIn();
   const options = module === 'bank' ? accounts : cards;
   const selected = options.find(item => item.id === ref && item.isActive !== false);
+  const targetCurrency = module === 'cash' ? currency : selected?.currencyCode;
+  const sourceCurrency = (row: PlanRecord) => {
+    const plan = row.plan;
+    if ('currencyCode' in plan && typeof plan.currencyCode === 'string') return plan.currencyCode;
+    if ('accountId' in plan) return accounts.find(item => item.id === plan.accountId)?.currencyCode;
+    if ('cardId' in plan) return cards.find(item => item.id === plan.cardId)?.currencyCode;
+    if ('propertyId' in plan) return properties.find(item => item.id === plan.propertyId)?.currencyCode;
+    if ('finance' in plan && plan.finance && typeof plan.finance === 'object' && 'currencyCode' in plan.finance && typeof plan.finance.currencyCode === 'string') return plan.finance.currencyCode;
+    return undefined;
+  };
+  const currencyChanges = !!targetCurrency && snapshot.some(row => {
+    const source = sourceCurrency(row);
+    return !!source && source !== targetCurrency;
+  });
   const save = async () => {
     if (!snapshot.length) return toast('There are no unfulfilled items to relink.');
     if (module !== 'cash' && !selected) return toast('Choose an active finance.');
+    if (currencyChanges && !currencyAcknowledged) return toast('Confirm the currency change before saving.');
     setBusy(true);
     try {
       if (!(await ensureSignedIn('Sign in to link this plan.'))) return;
       const current = readFinancePlans();
       if (snapshot.some(row => JSON.stringify(current.find(item => item.module === row.module && item.plan.id === row.plan.id)?.plan) !== JSON.stringify(row.plan))) return toast('A plan item changed. Reopen the finance editor.');
       const target = {module,ref,currencyCode:module === 'cash' ? currency : selected!.currencyCode};
-      const properties=useRentalsWorkbookStore.getState().workbook.settings.properties;
       if (snapshot.some(({plan})=>'propertyId' in plan && (module==='creditCard' || properties.find(p=>p.id===plan.propertyId)?.currencyCode!==target.currencyCode))) return toast('Rent plans link to Cash or a bank account in the property currency.');
       const updated = snapshot.map(row => ({row,plan:assignPlanFinance(row.plan,target)}));
       updated.forEach(({row,plan}) => { const destination='propertyId' in plan ? 'rentals' : module; writeFinancePlan(destination,plan,row.module === destination); if (row.module !== destination) deleteFinancePlan({module:row.module,id:row.plan.id}); });
@@ -46,9 +63,11 @@ export function PlanFinanceEditor({ records, onClose }: { records: PlanRecord[];
     } finally { setBusy(false); }
   };
   return <PlanEditorModal title="Link plan to finance" onClose={onClose}>
-    <p className="text-muted">Choose one finance for all {snapshot.length} unfulfilled items. Dates, amounts, and fulfilled history are preserved. Amounts use the selected finance's currency.</p>
-    <div className="row gap-sm"><Field label="Finance module"><Select value={module} onChange={event => {setModule(event.target.value as typeof module);setRef('');}}><option value="bank">Bank account</option><option value="cash">Cash</option><option value="creditCard">Credit card</option></Select></Field>
-    {module === 'cash' ? <Field label="Currency"><Select value={currency} onChange={event=>setCurrency(event.target.value)}>{currencies.map(c=><option key={c.code} value={c.code}>{c.code}</option>)}</Select></Field> : <Field label="Finance"><Select value={ref} onChange={event=>setRef(event.target.value)}><option value="">Choose finance</option>{options.filter(item=>item.isActive!==false).map(item=><option key={item.id} value={item.id}>{item.name} ({item.currencyCode})</option>)}</Select></Field>}</div>
-    <div className="row gap-sm"><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" disabled={busy} onClick={()=>void save()}>Save finance link</button></div>
+    <p className="text-muted">Choose one finance for all {snapshot.length} unfulfilled items. Dates, amounts, and fulfilled history are preserved. No currency conversion is performed.</p>
+    <div className="row gap-sm"><Field label="Finance module"><Select value={module} onChange={event => {setModule(event.target.value as typeof module);setRef('');setCurrencyAcknowledged(false);}}><option value="bank">Bank account</option><option value="cash">Cash</option><option value="creditCard">Credit card</option></Select></Field>
+    {module === 'cash' ? <Field label="Currency"><Select value={currency} onChange={event=>{setCurrency(event.target.value);setCurrencyAcknowledged(false);}}>{currencies.map(c=><option key={c.code} value={c.code}>{c.code}</option>)}</Select></Field> : <Field label="Finance"><Select value={ref} onChange={event=>{setRef(event.target.value);setCurrencyAcknowledged(false);}}><option value="">Choose finance</option>{options.filter(item=>item.isActive!==false).map(item=><option key={item.id} value={item.id}>{item.name} ({item.currencyCode})</option>)}</Select></Field>}</div>
+    {currencyChanges && <Notice tone="warning">The selected currency differs from at least one payment. Amounts keep their current numbers and will be interpreted as {targetCurrency}; review them before continuing.</Notice>}
+    {currencyChanges && <label className="currency-change-confirm"><input type="checkbox" checked={currencyAcknowledged} onChange={event=>setCurrencyAcknowledged(event.target.checked)}/> I understand that amounts will not be converted.</label>}
+    <div className="row gap-sm"><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" disabled={busy || (currencyChanges && !currencyAcknowledged)} onClick={()=>void save()}>Save finance link</button></div>
   </PlanEditorModal>;
 }

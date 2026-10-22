@@ -16,6 +16,27 @@ import { computePositions } from '../positions';
 import { cashSummary } from '../cashSummary';
 import { DEFAULT_PSX_SETTINGS } from '../../../store/defaultPsxWorkbook';
 
+it('indexes same-day quantities once instead of rescanning history for every fee', () => {
+  const transactions: Transaction[] = Array.from({ length: 2000 }, (_, index) => ({ ticker: 'T' + Math.floor(index / 2) % 20, date: '2025-01-' + String(Math.floor(index / 40) % 28 + 1).padStart(2, '0'), action: index % 2 ? 'SELL' : 'BUY', shares: index % 2 ? 60 : 100, price: 100 }));
+  let historyReads = 0;
+  const tracked = transactions.map(tx => new Proxy(tx, { get(target, key, receiver) { historyReads++; return Reflect.get(target, key, receiver); } }));
+  const optimized = makePSXFeeCalculator(DEFAULT_PSX_SETTINGS, tracked);
+  expect(historyReads).toBeGreaterThan(0);
+  historyReads = 0;
+  const start = performance.now();
+  const actual = transactions.map(tx => optimized(tx.shares * tx.price, tx.action === 'BUY', { shares: tx.shares, tx }));
+  const indexedMs = performance.now() - start;
+  expect(historyReads).toBe(0);
+  const baselineStart = performance.now();
+  const expected = transactions.map(tx => {
+    const breakdown = calcFeeBreakdown(tx.shares * tx.price, tx.action === 'BUY', tx.shares, DEFAULT_PSX_SETTINGS);
+    return isNettedLeg(transactions, tx) ? Math.round((breakdown.psxFee + breakdown.nccplFee + breakdown.secpLevy + breakdown.cdc + breakdown.cvt) * 100) / 100 : breakdown.total;
+  });
+  const scannedMs = performance.now() - baselineStart;
+  expect(actual).toEqual(expected);
+  console.info(`PSX fee benchmark (2,000 trades): indexed ${indexedMs.toFixed(1)}ms; repeated scans ${scannedMs.toFixed(1)}ms.`);
+});
+
 // Mirrors calc.test.ts's structure: hand-traced synthetic examples for the
 // pure fee functions, plus a sanity pass over the real backup fixture
 // (same file used as the app's `psx/psx-workbook-backup.json`) to make sure

@@ -1,5 +1,7 @@
 import { StatCard2 } from '../../../components/StatCard2';
 import { RecordRow } from '../../../components/RecordRow';
+import { Pagination } from '../../../components/Pagination';
+import { usePagination } from '../../../hooks/usePagination';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { MarketPriceHistory } from './MarketPriceHistory';
 import { PriceInput } from "../../../components/ui/PriceInput";
@@ -116,8 +118,8 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
   // new calc logic. Empty for a ticker with no sells yet, which naturally
   // satisfies "skip Selling data" for a still-fully-open position.
   const closedTrades = useMemo(
-    () => computeClosedTrades(workbook.transactions.filter((t) => t.ticker === ticker), calcFee).filter(trade => (!fromDate || trade.sellDate >= fromDate) && (!toDate || trade.sellDate <= toDate)),
-    [workbook.transactions, ticker, calcFee, fromDate, toDate],
+    () => section === 'all' || section === 'closed' ? computeClosedTrades(workbook.transactions.filter((t) => t.ticker === ticker), calcFee).filter(trade => (!fromDate || trade.sellDate >= fromDate) && (!toDate || trade.sellDate <= toDate)) : [],
+    [workbook.transactions, ticker, calcFee, fromDate, toDate, section],
   );
   type CTCol = 'buyDate' | 'sellDate' | 'shares' | 'netPL' | 'holdingDays';
   const ctSortValue = (t: (typeof closedTrades)[number], col: CTCol): number | string =>
@@ -144,11 +146,14 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
     col === 'costPerShare' ? lot.buyPrice + lot.buyFeeTotal / lot.originalShares : lot[col];
   const { sorted: sortedOfficialLots, Th: LotTh } = useSortableRows(officialLots, lotSortValue, 'buyDate', 'asc');
   const reportOpenLots = useMemo(
-    () => (usingLots ? [] : computeFIFOPositions(workbook.transactions.filter((t) => t.ticker === ticker), calcFee).lotsByTicker[ticker] || []),
-    [workbook.transactions, ticker, calcFee, usingLots],
+    () => (usingLots || !['all','lots','current','position'].includes(section) ? [] : computeFIFOPositions(workbook.transactions.filter((t) => t.ticker === ticker), calcFee).lotsByTicker[ticker] || []),
+    [workbook.transactions, ticker, calcFee, usingLots, section],
   );
 
   const stats = computePriceStats(ticker, workbook.priceHistory);
+  const lotTotal = usingLots ? sortedOfficialLots.length : reportOpenLots.length;
+  const {page:safeLotPage,pageCount:lotPages,setPage:setLotPage}=usePagination(lotTotal,ticker);
+  const {page:safeClosedPage,pageCount:closedPages,setPage:setClosedPage}=usePagination(sortedClosedTrades.length,ticker+'|'+fromDate+'|'+toDate);
   // README item 2 of a 2026-08-27 feedback batch: the Dashboard/Portfolio
   // Holdings tables' Trend sparkline was the one column Done item 152
   // didn't actually bring over here — same data source those tables use.
@@ -236,7 +241,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
   const comparisonLabels=lastSellPrice>0?['Latest buy','Latest sell','Market price','Break-even (fees)']:['Latest buy','Market price','Break-even (fees)'];
   const comparisonTerms=lastSellPrice>0?['Latest executed buy price','Latest executed sell price','Current market price','Break-even price including fees']:['Latest executed buy price','Current market price','Break-even price including fees'];
   const comparisonLow=Math.min(...comparisonValues),comparisonHigh=Math.max(...comparisonValues),comparisonPadding=Math.max((comparisonHigh-comparisonLow)*.15,comparisonHigh*.02,workbook.settings.tick);
-  const profitableShares=mp>0?[...(usingLots?officialLots:reportOpenLots)].filter(lot=>mp>=breakEvenPrice(lot.remainingShares*(lot.buyPrice+lot.buyFeeTotal/lot.originalShares),lot.remainingShares,workbook.settings.feePct,workbook.settings.tick,calcFee)).reduce((sum,lot)=>sum+lot.remainingShares,0):0;
+  const profitableShares=mp>0&&['all','current','position'].includes(section)?[...(usingLots?officialLots:reportOpenLots)].filter(lot=>mp>=breakEvenPrice(lot.remainingShares*(lot.buyPrice+lot.buyFeeTotal/lot.originalShares),lot.remainingShares,workbook.settings.feePct,workbook.settings.tick,calcFee)).reduce((sum,lot)=>sum+lot.remainingShares,0):0;
   const netValue=mp>0?value-sellFee:NaN;
   const pendingPlans=workbook.transactions.filter(tx=>tx.ticker===ticker&&tx.isPending),openPlans=workbook.tradePlans.flatMap(plan=>plan.legs).filter(leg=>leg.ticker===ticker&&!leg.executed),plannedLegs=[...pendingPlans,...openPlans];
   const plannedBuyCost=plannedLegs.filter(leg=>leg.action==='BUY').reduce((sum,leg)=>sum+leg.shares*leg.price+calcFee(leg.shares*leg.price,true),0),plannedSellProceeds=plannedLegs.filter(leg=>leg.action==='SELL').reduce((sum,leg)=>sum+leg.shares*leg.price-calcFee(leg.shares*leg.price,false),0);
@@ -315,7 +320,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
               <table>
                 <thead><tr><LotTh col="buyDate">Buy date</LotTh><LotTh col="buyPrice">Buy price</LotTh><LotTh col="remainingShares">Remaining</LotTh><LotTh col="costPerShare">Cost/share</LotTh></tr></thead>
                 <tbody>
-                  {sortedOfficialLots.map((lot, i) => (
+                  {sortedOfficialLots.slice(safeLotPage * 50, (safeLotPage + 1) * 50).map((lot, i) => (
                     <RecordRow market="qse" record={lot} key={i}>
                       <td>{lot.buyDate}</td>
                       <td>{fmtQSEPrice(lot.buyPrice)}</td>
@@ -340,7 +345,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
                   <tr><dateSort.Th rows={reportOpenLots} column="date">Buy date</dateSort.Th><th>Buy price</th><th>Shares</th><th>Invested</th><th>Buy fee</th></tr>
                 </thead>
                 <tbody>
-                  {dateSort.rows(reportOpenLots, { date: row => row.buyDate }).map((l, i) => (
+                  {dateSort.rows(reportOpenLots, { date: row => row.buyDate }).slice(safeLotPage * 50, (safeLotPage + 1) * 50).map((l, i) => (
                     <RecordRow market="qse" record={l} key={i}>
                       <td>{l.buyDate}</td>
                       <td>{fmtQSEPrice(l.buyPrice)}</td>
@@ -362,6 +367,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
 
       {/* Daily price — the single most-asked-about number, so it leads
           instead of being buried under other sections. */}
+      {(section === 'all' || section === 'lots') && lotTotal > 0 && <Pagination page={safeLotPage} pageCount={lotPages} total={lotTotal} onChange={setLotPage}/>}
       {(section === 'all' || section === 'prices') && <DetailCard section={section} title={<span>Market Price</span>} className="mb-12">
       <MarketPriceHistory ticker={ticker} />
       </DetailCard>}
@@ -471,7 +477,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
                 </tr>
               </thead>
               <tbody>
-                {sortedClosedTrades.map((t, i) => {
+                {sortedClosedTrades.slice(safeClosedPage * 50, (safeClosedPage + 1) * 50).map((t, i) => {
                   const totalBuy = t.shares * t.buyPrice;
                   const totalSale = t.shares * t.sellPrice;
                   const costBasis = totalBuy + t.buyFee;
@@ -496,6 +502,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
         </DetailCard>
       )}
       
+      {(section === 'all' || section === 'closed') && sortedClosedTrades.length > 0 && <Pagination page={safeClosedPage} pageCount={closedPages} total={sortedClosedTrades.length} onChange={setClosedPage}/>}
     </div>
   );
 }

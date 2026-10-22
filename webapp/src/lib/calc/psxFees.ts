@@ -75,13 +75,32 @@ export function feeScenarios(amount: number, isBuy: boolean, shares: number, set
 }
 
 export function makePSXFeeCalculator(settings: PSXSettings, allTransactions: Transaction[]): FeeCalculator {
+  // Index once: every portfolio/FIFO/report pass asks for each trade's fee.
+  // Scanning the entire history for each request made those passes quadratic.
+  const quantities = new Map<string, { buy: number; sell: number }>();
+  const key = (tx: Transaction) => tx.ticker + '\u0000' + tx.date;
+  for (const tx of allTransactions) {
+    if (tx.isPending) continue;
+    const totals = quantities.get(key(tx)) ?? { buy: 0, sell: 0 };
+    if (tx.action === 'BUY') totals.buy += tx.shares;
+    else totals.sell += tx.shares;
+    quantities.set(key(tx), totals);
+  }
+  let clockMinute = -1, today = '';
+  const currentDay = () => {
+    const minute = Math.floor(Date.now() / 60_000);
+    if (clockMinute !== minute) { clockMinute = minute; today = todayISODate(defaultTimezoneForMarket('PSX')); }
+    return today;
+  };
   return (amount, isBuy, context) => {
     const shares = context?.shares ?? 0;
     const tx = context?.tx;
     if (tx?.feeOverride !== undefined) return tx.feeOverride;
     if (!tx) return calcFeeBreakdown(amount, isBuy, shares, settings).total;
-    if (!tx.manualSameDay && isProvisionalSameDayBuy(allTransactions, tx)) return 0;
-    if (!isNettedLeg(allTransactions, tx)) return calcFeeBreakdown(amount, isBuy, shares, settings).total;
+    const totals = quantities.get(key(tx));
+    const charged = totals && totals.buy > 0 && totals.sell > 0 ? totals.sell > totals.buy ? 'SELL' : 'BUY' : null;
+    if (!tx.manualSameDay && tx.action === 'BUY' && tx.date === currentDay() && charged === null) return 0;
+    if (!tx.manualSameDay && (charged === null || tx.action === charged)) return calcFeeBreakdown(amount, isBuy, shares, settings).total;
     const fb = calcFeeBreakdown(amount, isBuy, shares, settings);
     return round2(fb.psxFee + fb.nccplFee + fb.secpLevy + fb.cdc + fb.cvt);
   };

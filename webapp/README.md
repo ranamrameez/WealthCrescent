@@ -10213,6 +10213,23 @@ from the lot system."*
   grouped month cards; and analytics adds utilization/payment-coverage summaries while retaining
   the Bank Account balance, flow, category, and expected-balance chart family.
 
+- **Named multi-payment plans + stock-page responsiveness pass (2026-10-15).** Planning now
+  supports a named parent plan with multiple independently dated payments across Cash, Banking,
+  Credit Cards, and Rentals. Parent plans and individual payments can be created/edited; pending
+  payments can be deleted, and fulfilled history blocks destructive parent deletion. Existing
+  recurring and generated plans remain available alongside named groups. Stock detail pages
+  now paginate large trade/open-lot/closed-trade lists, defer cost-basis work outside the
+  relevant sections, memoize the QSE live-price overlay, and use indexed same-day PSX fee
+  pairing rather than repeatedly scanning the full history. The production build and 49 focused
+  Planning/performance tests pass. The current full suite reports 1,029 passing and 7 failing
+  tests. A focused run of the corresponding existing test files on clean `main` reproduced 8
+  failures (with one Bank navigation failure varying between runs); these are not introduced by
+  this change, and the full suite is not green. A browser smoke run with 2,000
+  transactions and 1,000 price points rendered the QSE stock page and paginated its trade
+  history; the measured navigation was about 1.4 seconds. This was not compared against the
+  pre-change implementation, so it does not quantify the improvement or prove the reported lag
+  is resolved on the user's device; see Pending item 147 for that follow-up.
+
 ## Pending
 
 - **Activate PSX market cache:** merge the PSX rules fragment into existing rules, deploy
@@ -11517,6 +11534,12 @@ or a design decision before more code, not guessed at further:**
      verifying Done item 337 but NOT fixed there.~~ **Done (2026-09-19) — see Done item 340.**
      Root cause was nearest-tick rounding landing one tick below the true continuous solution;
      fixed by rounding up to the ceiling tick with a small self-correcting bump-up loop.
+147. **Confirm the stock-page lag is resolved on representative real data.** Done item 247
+     adds pagination, defers section-specific lot calculations, memoizes QSE live prices, and
+     indexes PSX same-day fee pairing. The synthetic large-data browser smoke test rendered
+     successfully, but there is no pre-change timing baseline and no measurement on the user's
+     own device/data yet. Compare the same stock-page interactions before/after on representative
+     data before claiming the reported lag is fully resolved.
 
 **Also locked in 2026-08-23**: no bank account API / open-banking integration for now (SBP/
 QCB both require regulator licensing — a compliance process, not a coding task). When bank

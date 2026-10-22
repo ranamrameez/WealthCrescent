@@ -9,6 +9,7 @@ import type { RecurrenceRule } from './recurrence';
  * identical meaning here — `date` stays equal to `recurrence.startDate`
  * when set). */
 export interface PlannedBankTransaction {
+  groupId?: string;
   id: string;
   accountId: string;
   date: string;

@@ -4,6 +4,7 @@ import { Field, Select, TextInput } from './ui/Field';
 import { FormulaInput } from './ui/FormulaInput';
 import { RecurrenceFields } from './ui/RecurrenceFields';
 import { DirectionChips } from './ui/DirectionChips';
+import { Notice } from './Notice';
 import { resolveNumericInput } from '../lib/mathExpression';
 import { validBatchDate } from './batchEditModel';
 import { useEnsureSignedIn } from '../lib/firebase/useEnsureSignedIn';
@@ -13,17 +14,20 @@ import { useCreditCardWorkbookStore } from '../store/creditCardWorkbookStore';
 import { useRentalsWorkbookStore } from '../store/rentalsWorkbookStore';
 import { useCashWorkbookStore } from '../store/cashWorkbookStore';
 import { useEnabledCurrencies } from '../hooks/useEnabledCurrencies';
-import { deleteFinancePlan, planDescription, readFinancePlans, signedPlanAmount, writeFinancePlan, type PlanModule, type PlanReference, type FinancePlan } from '../lib/financePlans';
+import { deleteFinancePlan, planDescription, readFinancePlans, readPlanGroups, signedPlanAmount, writeFinancePlan, type PlanModule, type PlanReference, type FinancePlan } from '../lib/financePlans';
+import { usePlannedCashWorkbookStore } from '../store/plannedCashWorkbookStore';
 import type { CreditCardTransactionKind } from '../types/creditCard';
 import type { RecurrenceRule } from '../types/recurrence';
 import { occurrenceCompleted } from '../lib/calc/planOccurrences';
 
 export interface PlanFinance { module: PlanModule; ref?: string; currencyCode?: string }
-export function FinancePlanEditor({ reference, initialFinance, occurrenceDate, onClose }: {
-  reference?: PlanReference; initialFinance?: PlanFinance; occurrenceDate?: string; onClose: () => void;
+export function FinancePlanEditor({ reference, initialFinance, occurrenceDate, initialGroupId, onClose }: {
+  reference?: PlanReference; initialFinance?: PlanFinance; occurrenceDate?: string; initialGroupId?: string; onClose: () => void;
 }) {
   const [original] = useState(() => reference && readFinancePlans().find(row => row.module === reference.module && row.plan.id === reference.id)?.plan);
   const linkedFinance=original && 'finance' in original ? original.finance : undefined;
+  const groups = usePlannedCashWorkbookStore(s => s.workbook.planGroups);
+  const [groupId, setGroupId] = useState(original?.groupId ?? initialGroupId ?? '');
   const accounts = useBankWorkbookStore(s => s.workbook.settings.accounts);
   const cards = useCreditCardWorkbookStore(s => s.workbook.cards);
   const properties = useRentalsWorkbookStore(s => s.workbook.settings.properties);
@@ -34,7 +38,7 @@ export function FinancePlanEditor({ reference, initialFinance, occurrenceDate, o
   const currencies = useEnabledCurrencies(currency);
   const [date, setDate] = useState(occurrenceDate ?? original?.date ?? new Date().toISOString().slice(0, 10));
   const [amount, setAmount] = useState(original ? String(Math.abs(original.amount)) : '');
-  const [direction, setDirection] = useState<'in' | 'out'>(original && signedPlanAmount(original) < 0 ? 'out' : 'in');
+  const [direction, setDirection] = useState<'in' | 'out'>(original ? signedPlanAmount(original) < 0 ? 'out' : 'in' : initialGroupId ? 'out' : 'in');
   const [cardKind,setCardKind]=useState<CreditCardTransactionKind>(original && 'kind' in original ? original.kind : 'charge');
   const [description, setDescription] = useState(original ? planDescription(original) : '');
   const [category, setCategory] = useState(original?.category ?? '');
@@ -44,7 +48,16 @@ export function FinancePlanEditor({ reference, initialFinance, occurrenceDate, o
   const options = module === 'bank' ? accounts : module === 'creditCard' ? cards : module === 'rentals' ? properties : [];
   const selected = options.find(item => item.id === ref);
   const effectiveCurrency = selected?.currencyCode ?? currency;
-  const save = async () => {
+  const originalCurrency = original && ('currencyCode' in original && typeof original.currencyCode === 'string'
+    ? original.currencyCode
+    : 'accountId' in original ? accounts.find(item => item.id === original.accountId)?.currencyCode
+      : 'cardId' in original ? cards.find(item => item.id === original.cardId)?.currencyCode
+        : 'propertyId' in original ? properties.find(item => item.id === original.propertyId)?.currencyCode
+          : 'finance' in original && original.finance && typeof original.finance === 'object' && 'currencyCode' in original.finance && typeof original.finance.currencyCode === 'string'
+            ? original.finance.currencyCode
+            : undefined);
+  const currencyChanged = !!originalCurrency && originalCurrency !== effectiveCurrency;
+  const save = async (addAnother = false) => {
     const numeric = resolveNumericInput(amount);
     if (!validBatchDate(date) || numeric === null || numeric <= 0) return toast('Enter a valid date and a positive amount.');
     if (module !== 'cash' && (!selected || selected.isActive === false)) return toast('Choose an active finance.');
@@ -57,13 +70,14 @@ export function FinancePlanEditor({ reference, initialFinance, occurrenceDate, o
     setBusy(true);
     try {
       if (!(await ensureSignedIn('Sign in to save this plan.'))) return;
+      if (groupId && !readPlanGroups().some(group => group.id === groupId)) return toast('The parent plan no longer exists. Choose another plan.');
       const latest = reference && readFinancePlans().find(row => row.module === reference.module && row.plan.id === reference.id)?.plan;
       if (reference && JSON.stringify(latest) !== JSON.stringify(original)) return toast('This plan changed. Reopen its editor.');
       if (original && 'recurrence' in original && original.recurrence && !occurrenceDate && module !== reference?.module && (original.completedDates?.length || original.executedThrough)) return toast('Relink an individual occurrence to preserve this series\' completed history.');
       const id = occurrenceDate ? crypto.randomUUID() : original?.id ?? crypto.randomUUID();
-      const common = { ...original, id, date, amount: numeric, category, executed: false, recurrence: recurrence ? { ...recurrence, startDate: date } : undefined };
+      const common = { ...original, id, groupId: groupId || undefined, date, amount: numeric, category, executed: false, recurrence: recurrence ? { ...recurrence, startDate: date } : undefined };
       const destination = rental ? 'rentals' : module;
-      const draft: FinancePlan = rental && module !== 'rentals' ? { ...rental, date, amount:numeric, type:direction==='in'?'RENT_INCOME':'EXPENSE', note:description, category, finance:{module:module==='cash'?'cash':'bank',ref:module==='cash'?undefined:ref,currencyCode:effectiveCurrency} }
+      const draft: FinancePlan = rental && module !== 'rentals' ? { ...rental, groupId: groupId || undefined, date, amount:numeric, type:direction==='in'?'RENT_INCOME':'EXPENSE', note:description, category, finance:{module:module==='cash'?'cash':'bank',ref:module==='cash'?undefined:ref,currencyCode:effectiveCurrency} }
         : module === 'cash' ? { ...common, type: direction === 'in' ? 'IN' : 'OUT', currencyCode: effectiveCurrency, note: description }
         : module === 'bank' ? { ...common, accountId: ref, amount: direction === 'in' ? numeric : -numeric, description }
         : module === 'creditCard' ? { ...common, cardId: ref, kind: direction === 'in' ? 'payment' : cardKind==='payment'?'charge':cardKind, description }
@@ -80,12 +94,15 @@ export function FinancePlanEditor({ reference, initialFinance, occurrenceDate, o
         writeFinancePlan(destination, draft, !!reference && reference.module === destination);
         if (reference && reference.module !== destination) deleteFinancePlan(reference);
       }
-      onClose();
+      if (addAnother) { setAmount(''); setDescription(''); setRecurrence(undefined); toast('Payment added. Enter the next payment.'); }
+      else onClose();
+    } catch (error) { toast(error instanceof Error ? error.message : String(error));
     } finally { setBusy(false); }
   };
-  return <PlanEditorModal title={reference ? occurrenceDate ? 'Edit plan item' : 'Edit plan' : 'Add plan'} onClose={onClose}>
+  return <PlanEditorModal title={groupId ? reference ? 'Edit payment' : 'Add payment' : reference ? occurrenceDate ? 'Edit plan item' : 'Edit plan' : 'Add plan'} onClose={onClose}>
     <p className="text-muted mt-0">{occurrenceDate ? 'Choose the finance for this item. Other dates keep their existing finance.' : 'Choose one finance for the plan and its generated items.'}</p>
     <div className="row gap-sm">
+      {!!groups?.length && <Field label="Parent plan"><Select value={groupId} onChange={event => setGroupId(event.target.value)}><option value="">Standalone payment</option>{groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</Select></Field>}
       <Field label="Finance module"><Select value={module} onChange={event => { setModule(event.target.value as PlanModule); setRef(''); }}><option value="cash">Cash</option><option value="bank">Bank account</option><option value="creditCard">Credit card</option><option value="rentals">Rental property</option></Select></Field>
       {module === 'cash' ? <Field label="Currency"><Select value={currency} onChange={event => setCurrency(event.target.value)}>{currencies.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}</Select></Field> : <Field label="Finance"><Select value={ref} onChange={event => setRef(event.target.value)}><option value="">Choose finance</option>{options.filter(item => item.isActive !== false || item.id === ref).map(item => <option key={item.id} value={item.id}>{item.name} ({item.currencyCode})</option>)}</Select></Field>}
       <Field label="Expected date"><TextInput type="date" value={date} onChange={event => setDate(event.target.value)} /></Field>
@@ -96,6 +113,7 @@ export function FinancePlanEditor({ reference, initialFinance, occurrenceDate, o
       <Field label="Category"><TextInput value={category} onChange={event => setCategory(event.target.value)} /></Field>
       {!occurrenceDate && module !== 'rentals' && <RecurrenceFields startDate={date} value={recurrence} onChange={setRecurrence} />}
     </div>
-    <div className="row gap-sm"><button className="btn secondary" onClick={onClose}>Cancel</button><button className="btn" disabled={busy} onClick={() => void save()}>Save plan</button></div>
+    {currencyChanged && <Notice tone="warning">No currency conversion is applied. The amount keeps its current number and will be interpreted as {effectiveCurrency}; adjust it above if needed.</Notice>}
+    <div className="row gap-sm"><button className="btn secondary" onClick={onClose}>Cancel</button>{!reference && groupId && <button className="btn secondary" disabled={busy} onClick={() => void save(true)}>Save and add another</button>}<button className="btn" disabled={busy} onClick={() => void save()}>{groupId ? 'Save payment' : 'Save plan'}</button></div>
   </PlanEditorModal>;
 }

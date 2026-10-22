@@ -11,6 +11,7 @@ import { usePlannedBankWorkbookStore } from '../../store/plannedBankWorkbookStor
 import { usePlannedCreditCardWorkbookStore } from '../../store/plannedCreditCardWorkbookStore';
 import { usePlannedRentalsWorkbookStore } from '../../store/plannedRentalsWorkbookStore';
 import { useBankWorkbookStore } from '../../store/bankWorkbookStore';
+import { useCashWorkbookStore } from '../../store/cashWorkbookStore';
 import { planOccurrences } from '../../lib/calc/planOccurrences';
 import type { TransactionPageFilters } from '../../hooks/useUrlTransactionFilters';
 
@@ -18,7 +19,8 @@ vi.mock('../../lib/firebase/useEnsureSignedIn', () => ({ useEnsureSignedIn: () =
 const filters: TransactionPageFilters = { period:'custom',fromDate:'2026-10-01',toDate:'2026-12-31',direction:'all',source:'all',category:'all',accountId:'all' };
 beforeEach(() => {
   for (const store of [usePlannedCashWorkbookStore,usePlannedBankWorkbookStore,usePlannedCreditCardWorkbookStore,usePlannedRentalsWorkbookStore]) { const s=store.getState(); s.setWorkbook({...s.workbook,entries:[]} as never); }
-  const s=useBankWorkbookStore.getState();s.setWorkbook({...s.workbook,settings:{...s.workbook.settings,accounts:[{id:'a',name:'Account A',currencyCode:'QAR',openingBalance:0}]},transactions:[]});
+  const s=useBankWorkbookStore.getState();s.setWorkbook({...s.workbook,settings:{...s.workbook.settings,accounts:[{id:'a',name:'Account A',currencyCode:'QAR',openingBalance:0},{id:'usd',name:'USD Account',currencyCode:'USD',openingBalance:0}]},transactions:[]});
+  const cash=useCashWorkbookStore.getState();cash.setWorkbook({...cash.workbook,settings:{...cash.workbook.settings,defaultCurrency:'QAR'}});
 });
 afterEach(cleanup);
 describe('Shared plan editors',()=>{
@@ -48,6 +50,23 @@ describe('Shared plan editors',()=>{
     expect(usePlannedBankWorkbookStore.getState().workbook.entries).toEqual([stored[0]]);
     expect(usePlannedCashWorkbookStore.getState().workbook.entries[0]).toMatchObject({id:'next',date:'2026-10-01',amount:20,type:'OUT',sourceSubscriptionId:'s'});
     expect(usePlannedCashWorkbookStore.getState().workbook.entries[0]).not.toHaveProperty('accountId');
+  });
+  it('requires acknowledgement before bulk-reassigning amounts to a different currency',async()=>{
+    const plans=[{id:'usd-plan',date:'2026-10-01',description:'Rent',amount:-20,accountId:'usd'}];
+    usePlannedBankWorkbookStore.getState().setWorkbook({...usePlannedBankWorkbookStore.getState().workbook,entries:plans});
+    const stored=usePlannedBankWorkbookStore.getState().workbook.entries;
+    const onClose=vi.fn();
+    render(<PlanFinanceEditor records={stored.map(plan=>({module:'bank',plan}))} onClose={onClose}/>);
+    fireEvent.change(screen.getByLabelText('Finance module'),{target:{value:'cash'}});
+    expect(screen.getByText(/No currency conversion is performed/)).toBeTruthy();
+    expect(screen.getByRole('checkbox')).toBeTruthy();
+    const save=screen.getByRole('button',{name:'Save finance link'}) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.click(screen.getByRole('checkbox'));
+    expect(save.disabled).toBe(false);
+    fireEvent.click(save);
+    await waitFor(()=>expect(onClose).toHaveBeenCalled());
+    expect(usePlannedCashWorkbookStore.getState().workbook.entries[0]).toMatchObject({currencyCode:'QAR',amount:20,type:'OUT'});
   });
   it('keeps the Add plan FAB on the empty overview and opens parent detail with dated items',()=>{
     const rendered=render(<MemoryRouter initialEntries={['/planning']}><FinancePlansHierarchy filters={filters} controls={null} /><PageFabGroup /></MemoryRouter>);

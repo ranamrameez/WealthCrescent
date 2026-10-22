@@ -79,6 +79,13 @@ Funds, Banking, Cash, Personal Loans, EMI/Loans, Rentals, Subscriptions, Plannin
 one you're currently in highlighted. Click any entry to jump straight to it; there's no need
 to open anything first, it's just a normal list of links.
 
+**Planning** is the shared place to organize expected future activity. Choose **Create plan**
+to make a named plan, open it, then use **Add payment** to add several payments with their own
+dates, amounts, directions, categories, and paying finances. Use **Save and add another** to
+enter payments in sequence. Each pending payment can be edited or deleted independently.
+Fulfilled payments remain as history, and a parent plan with fulfilled history cannot be
+deleted.
+
 Inside **Stock Exchanges**, the list expands in place to show a **QSE / PSX** switcher (two
 chips) and a collapsible **▸ Pages** list of that exchange's own pages, nested directly under
 the "Stock Exchanges" entry — click **Pages** to expand or collapse it (this choice is
