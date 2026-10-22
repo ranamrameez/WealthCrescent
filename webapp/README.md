@@ -179,6 +179,21 @@ from the lot system."*
 
 ## Done
 
+- **PSX Market Prices API integration (2026-10-22, implemented locally).** All documented
+  PSX dataset families have lazy sections and paginated reusable tables. Sector cards
+  start closed; favourites start open and reuse the shared cloud/local favourites hook.
+  Shared summary controls retain ticker, search, group, index and date state in the URL;
+  PSX date presets use Pakistan time. A scheduled Firebase worker owns provider calls,
+  writes validated sector/ticker-group reference data and lossless dataset caches, and
+  preserves existing data on failed/rate-limited refreshes. Setup and schema:
+  `functions/PSX_SETUP.md`. Provider endpoint checks succeeded. Production activation is
+  pending authorized Firebase access; the bootstrap read returned HTTP 401 and made no write.
+  Build and targeted cache, date, valuation and favourites regressions pass. The scheduled
+  worker has four passing regression tests; the documented API endpoint families returned
+  HTTP 200. Desktop/mobile fixture checks cover default collapsed sectors, favourites,
+  cached quote/history rendering and page overflow. Targeted lint has one React Compiler
+  memoization warning and no errors.
+
 - 2026-10-15 correction: Removed layout-changing animations and keyed route remounts after layout distortion and section state resets. Restored standard card body markup. Added paint-only readiness masks: page changes and section openings wait for mounted content, eager images, fonts, and declared busy content, then fade the mask. Section query changes preserve the page instance. Clearing a section selection no longer reopens the default section. Readiness masks fill the loading area with a rounded heading, small stat cards, and 600px section-card placeholders containing three mini stat cards and a larger content panel with a few lines, sized to fill the loading area. Destination pages reset scrolling to the top after they commit; same-page section/filter changes retain scrolling. The all-ticker sections on Market Prices now start collapsed. Commit and push only when explicitly requested; automatic publishing remains disabled.
 
 - 2026-10-15: Row details respect links and custom cell navigation without opening a second popup. Shared `StatCard2` compact metrics now serve QSE/PSX ticker supporting stats, portfolio P/L, and record details, with independent label/value colors. Table headers are read only when details/editing opens instead of on every row render.
@@ -10199,6 +10214,12 @@ from the lot system."*
   the Bank Account balance, flow, category, and expected-balance chart family.
 
 ## Pending
+
+- **Activate PSX market cache:** merge the PSX rules fragment into existing rules, deploy
+  `fetchPsxMarketData`, run the first refresh and verify the shared reference/cache paths.
+  No Firebase administrator credentials are available in this workspace. The attempted
+  bootstrap was rejected with HTTP 401 before any mutation. Local UI uses bundled
+  references and any existing cached prices until deployment/population is completed.
 
 - **Verification baseline (2026-10-15):** the full suite previously had eight
   failures reproduced on unchanged HEAD: planControls accessible names,

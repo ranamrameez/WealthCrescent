@@ -7,7 +7,10 @@
   },
   "main": "index.js",
   "scripts": {
-    "deploy": "firebase deploy --only functions:fetchFxRates"
+    "deploy": "firebase deploy --only functions:fetchFxRates,functions:fetchPsxMarketData",
+    "check:psx": "node checkPsxApi.mjs",
+    "seed:psx": "node seedPsxReference.mjs --write",
+    "test": "node --test psxMarketData.test.mjs"
   },
   "dependencies": {
     "firebase-admin": "^12.0.0",

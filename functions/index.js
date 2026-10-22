@@ -54,3 +54,9 @@ async function fetchAndStoreRates() {
 exports.fetchFxRates = onSchedule('every 24 hours', async () => {
   await fetchAndStoreRates();
 });
+
+// One shared provider budget. Detail datasets requested by the UI join the next run.
+exports.fetchPsxMarketData = onSchedule({ schedule: 'every 15 minutes', timeoutSeconds: 540, maxInstances: 1, concurrency: 1 }, async () => {
+  const { refreshPsxMarketData } = require('./psxMarketData');
+  await refreshPsxMarketData(getDatabase());
+});

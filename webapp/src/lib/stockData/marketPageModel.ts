@@ -6,9 +6,9 @@ export const MARKET_PERIOD_LABELS:Record<string,string>={'1d':'Today','7d':'7 Da
 export function marketPeriodLabel(period:string,from='',to='') {
   return MARKET_PERIOD_LABELS[period] || `From ${from || 'earliest'} to ${to || 'latest'}`;
 }
-export function marketDateRange(period:string,now=new Date().toISOString()) {
+export function marketDateRange(period:string,now=new Date().toISOString(),dayForTime:(time:string)=>string=qatarDay) {
   if(period==='all')return {from:'',to:''};
-  const to=qatarDay(now), date=new Date(to+'T00:00:00Z');
+  const to=dayForTime(now), date=new Date(to+'T00:00:00Z');
   if(period==='1d')return {from:to,to};
   if(period==='7d')date.setUTCDate(date.getUTCDate()-6);
   else {const months=({'1M':1,'3M':3,'6M':6,'1Y':12} as Record<string,number>)[period];if(!months)throw new Error('Unknown timeframe');const day=date.getUTCDate();date.setUTCDate(1);date.setUTCMonth(date.getUTCMonth()-months);date.setUTCDate(Math.min(day,new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+1,0)).getUTCDate()));}

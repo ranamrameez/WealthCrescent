@@ -148,8 +148,12 @@ each remaining buy lot separately). Its stat cards are grouped and color-coded t
 related figures; if you've sold any of this ticker, "Sell price" shows both your average and
 most recent sell price. In "Price range," **Median (fair value)** is a simple fair-value
 estimate — the middle price across every price you've recorded for this ticker — useful as
-a sanity check when deciding whether to buy more or sell, since the app has no live market
-data of its own. Under "Recent updates," click **Export price history CSV** to download
+a sanity check when deciding whether to buy more or sell. PSX pages also overlay the latest
+public psxdata screener prices from the shared market cache automatically once market sync
+is enabled. The scheduled service refreshes that snapshot every 15 minutes; the browser
+keeps a fallback copy for reloads and outages and never writes those
+live observations into your private manual history. A newer manual observation continues to
+take priority. Under "Recent updates," click **Export price history CSV** to download
 every price update you've ever recorded for this ticker (not just the recent few shown on
 screen) as a spreadsheet file. On the stock page's **Transactions** tab, below the trade
 table, optionally set a from/to date range and click **Export CSV** to download that
@@ -989,6 +993,28 @@ EMI, Funds, brokers, and Subscriptions now use the same section navigation and f
 ### Row details and navigation
 Click a plain table cell to view the complete record. Ticker links and cells with their own actions open their destination directly. Supporting metrics use consistent compact cards in ticker pages, portfolios, and detail popups. New pages and newly opened sections show a subtle loading mask until their content is ready, then fade it away. The mask does not move or stretch the content. Reduced-motion preferences disable the shimmer and fade. Changing section selections preserves other sections' open/closed state.
 
-The All tickers section on QSE Market Prices and the Ticker prices section on PSX Market Prices start collapsed. Open the section header when you want to browse all ticker cards.
+The All tickers section on QSE Market Prices starts collapsed. PSX Market Prices groups
+tickers by sector, with every sector closed initially. Favourites stay open initially;
+use a ticker's star to keep it there. Signed-in favourites sync across devices, and
+signed-out favourites remain in the current browser. Search and the portfolio/all-tickers
+filter narrow sector cards. Symbols without sector membership appear under Unclassified.
+
+PSX Market Prices labels provider rows as **Snapshot · psxdata** and shows when the
+snapshot was checked in Pakistan time. This timestamp is not the time of the last trade.
+If fresh prices are unavailable, the last cached snapshot remains visible with a warning;
+manually saved and trade-derived prices remain available as fallback.
+
+Expand the supporting sections for quotes, historical daily open/high/low/close prices
+and volume, company disclosures, indices and their constituents, sector summaries,
+the market screener, debt instruments, eligible scrips and service status. The selected
+ticker and date range control ticker history; the index selection is retained in the URL.
+These tables show 50 records at a time. Company disclosures contain published documents;
+they are not a financial-ratio dataset.
+
+Data comes from a shared scheduled cache. If a requested dataset has not been cached,
+sign in to request it; it becomes available after a scheduled refresh, usually within
+15 minutes. Open sections check again automatically. **Market data sync** shows reference
+status and provides a refresh request action. A request confirmation means the refresh
+was queued; the saved timestamp changes only after the service writes fresh data.
 
 Loading masks use small rounded stat placeholders and large 600px section cards containing smaller stat cards and a content panel with a few lines across the loading area. Opening a different page starts at the top, including when using browser Back or Forward; section and filter changes on the same page retain your scroll position.

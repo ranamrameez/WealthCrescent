@@ -3,10 +3,18 @@ import { afterEach,beforeEach,expect,it,vi } from 'vitest';
 const state=vi.hoisted(()=>({uid:'alice',fail:false,configs:{alice:{chartFavourites:['QFLS'],syncConfig:{minPushIntervalMinutes:2}},bob:{chartFavourites:[],syncConfig:{minPushIntervalMinutes:5}}} as Record<string,{chartFavourites:string[];syncConfig:{minPushIntervalMinutes:number}}>,writes:[] as Array<{path:string;patch:{chartFavourites:string[]}}> }));
 vi.mock('../../../../lib/firebase/client',()=>({db:{}}));
 vi.mock('../../../../lib/firebase/useAuthState',()=>({useAuthState:()=>({user:state.uid?{uid:state.uid}:null,authResolved:true})}));
-vi.mock('firebase/database',()=>({ref:(_db:unknown,path:string)=>path,onValue:(path:string,success:(snap:{val:()=>unknown})=>void)=>{success({val:()=>state.configs[path.split('/')[1]]?.chartFavourites || null});return ()=>{};},update:async(path:string,patch:{chartFavourites:string[]})=>{state.writes.push({path,patch});if(state.fail)throw new Error('Denied');Object.assign(state.configs[path.split('/')[1]],patch);}}));
+vi.mock('firebase/database',()=>({ref:(_db:unknown,path:string)=>path,onValue:(path:string,success:(snap:{val:()=>unknown})=>void)=>{success({val:()=>Reflect.get(state.configs[path.split('/')[1]]||{},path.split('/').at(-1)!) || null});return ()=>{};},update:async(path:string,patch:{chartFavourites:string[]})=>{state.writes.push({path,patch});if(state.fail)throw new Error('Denied');Object.assign(state.configs[path.split('/')[1]],patch);}}));
 import { useMarketFavourites } from '../useMarketFavourites';
 beforeEach(()=>{localStorage.clear();state.uid='alice';state.fail=false;state.writes=[];state.configs.alice.chartFavourites=['QFLS'];state.configs.bob.chartFavourites=[];});
 afterEach(cleanup);
+it('keeps PSX cloud favourites separate from QSE and accepts longer PSX symbols',async()=>{
+ Reflect.deleteProperty(state.configs.alice,'psxChartFavourites');
+ const {result}=renderHook(()=>useMarketFavourites('psx'));
+ expect([...result.current.favourites]).toEqual([]);
+ await act(async()=>result.current.toggle('OGDC-DEC'));
+ expect(state.writes[0]).toEqual({path:'users/alice/extensionConfigs',patch:{psxChartFavourites:['OGDC-DEC']}});
+ expect(state.configs.alice.chartFavourites).toEqual(['QFLS']);
+});
 it('adds/removes QSE favourites in extension configs without changing sync settings',async()=>{
  const {result}=renderHook(()=>useMarketFavourites());
  expect([...result.current.favourites]).toEqual(['QFLS']);

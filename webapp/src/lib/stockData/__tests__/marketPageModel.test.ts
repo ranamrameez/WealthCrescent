@@ -2,6 +2,11 @@ import { expect,it } from 'vitest';
 import { filterMarketRows,lifetimeBounds,marketDateRange,marketPeriodLabel,marketRows,previousSessionClose,priceMedian } from '../marketPageModel';
 import type { MarketObservation } from '../qsePrices';
 import { marketChartData } from '../../../components/MarketPriceChart';
+import { pakistanDay } from '../livePsx';
+it('uses Pakistan session dates for PSX while retaining Qatar defaults',()=>{
+ expect(marketDateRange('1d','2026-10-11T20:01:00Z',pakistanDay)).toEqual({from:'2026-10-12',to:'2026-10-12'});
+ expect(marketDateRange('1d','2026-10-11T20:01:00Z')).toEqual({from:'2026-10-11',to:'2026-10-11'});
+});
 it('uses Qatar dates and clamps month/year presets',()=>{
  expect(marketDateRange('1d','2026-10-11T21:01:00Z')).toEqual({from:'2026-10-12',to:'2026-10-12'});
  expect(marketDateRange('7d','2026-10-12T12:00:00Z').from).toBe('2026-10-06');

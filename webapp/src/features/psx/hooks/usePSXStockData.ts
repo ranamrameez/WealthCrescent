@@ -1,10 +1,9 @@
 import { PSX_TICKER_NAMES, PSX_TICKER_SECTORS } from '../../../lib/stockData/psxSeed';
+import { useMemo } from 'react';
+import { usePsxReferenceStore } from './usePsxReference';
 
-/** PSX's equivalent of useQSEStockData. Unlike QSE, there's no shared
- * `stockData/PSX` Firebase node (yet) to read from — this just returns the
- * bundled seed directly. If PSX ever gets a shared/editable stock-data node
- * the way QSE does (see lib/stockData/reader.ts), swap this for the same
- * fetch-with-fallback pattern. */
+/** Database sector memberships augment the bundled company-name fallback. */
 export function usePSXStockData() {
-  return { tickerNames: PSX_TICKER_NAMES, sectors: PSX_TICKER_SECTORS };
+  const reference = usePsxReferenceStore(state => state.data);
+  return useMemo(() => ({ tickerNames: PSX_TICKER_NAMES, sectors: { ...PSX_TICKER_SECTORS, ...Object.fromEntries(Object.entries(reference?.tickerSectors || {}).filter(([, code]) => reference?.sectors[code]).map(([symbol, code]) => [symbol, reference!.sectors[code].sector_name])) } }), [reference]);
 }

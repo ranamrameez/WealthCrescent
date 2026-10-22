@@ -5,6 +5,8 @@ import { buildCashLedger, cashSummary, computePositions, computeRealizedPLTimeSe
 import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
 import { makePSXFeeCalculator } from '../../../lib/calc/psxFees';
 import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
+import { applyLivePsx } from '../../../lib/stockData/livePsx';
+import { useLivePsxWorkbook, usePsxFeed } from './useLivePsxWorkbook';
 
 export interface PSXRow {
   ticker: string;
@@ -78,7 +80,7 @@ function calculateDerived(workbook: PSXWorkbook, selectedTickers?: string[]) {
 const sharedDerived = new WeakMap<PSXWorkbook, ReturnType<typeof calculateDerived>>();
 
 export function usePSXDerived(selectedTickers?: string[]) {
-  const workbook = usePSXWorkbookStore((state) => state.workbook);
+  const workbook = useLivePsxWorkbook();
   const tickerKey = selectedTickers?.join('|') ?? '';
   return useMemo(() => {
     if (!tickerKey) {
@@ -104,8 +106,9 @@ export function usePSXPortfolioDerived() {
     marketPrices: state.workbook.marketPrices,
     priceHistory: state.workbook.priceHistory,
   })));
+  const points = usePsxFeed((state) => state.points);
   return useMemo(() => {
-    const workbook = { ...usePSXWorkbookStore.getState().workbook, ...inputs };
+    const workbook = applyLivePsx({ ...usePSXWorkbookStore.getState().workbook, ...inputs }, points);
     return calculateDerived(workbook);
-  }, [inputs]);
+  }, [inputs, points]);
 }
