@@ -10226,9 +10226,14 @@ from the lot system."*
   failures (with one Bank navigation failure varying between runs); these are not introduced by
   this change, and the full suite is not green. A browser smoke run with 2,000
   transactions and 1,000 price points rendered the QSE stock page and paginated its trade
-  history; the measured navigation was about 1.4 seconds. This was not compared against the
-  pre-change implementation, so it does not quantify the improvement or prove the reported lag
-  is resolved on the user's device; see Pending item 147 for that follow-up.
+  history; the measured navigation was about 1.4 seconds. A later localhost comparison seeded
+  the same currently-open workbook (2,000 transactions and 1,000 price points; provenance
+  unknown) into the pre-change build and this build. Initial measurements were 19,974 DOM
+  nodes/1,233 table rows on the old build and 1,814 nodes/8 rows on the current build;
+  navigation timings were about 1.14/1.17 seconds (DOMContentLoaded/load) and 1.10/1.14
+  seconds respectively. These counts are only indicative: the builds did not reach an
+  identical interactive state, and an attempted section-expansion timing did not complete.
+  This is not evidence that the user's own device/data is lag-free; see Pending item 147.
 
 ## Pending
 
@@ -11537,9 +11542,14 @@ or a design decision before more code, not guessed at further:**
 147. **Confirm the stock-page lag is resolved on representative real data.** Done item 247
      adds pagination, defers section-specific lot calculations, memoizes QSE live prices, and
      indexes PSX same-day fee pairing. The synthetic large-data browser smoke test rendered
-     successfully, but there is no pre-change timing baseline and no measurement on the user's
-     own device/data yet. Compare the same stock-page interactions before/after on representative
-     data before claiming the reported lag is fully resolved.
+     successfully. A localhost comparison seeded the same currently-open workbook
+     (2,000 transactions/1,000 price points) on the pre-change and current builds: initial DOM
+     counts were 19,974/1,233 table rows versus 1,814/8, and navigation timings were about
+     1.14/1.17s versus 1.10/1.14s. The pages did not reach a demonstrably identical interactive
+     state, so these counts are indicative rather than a controlled benchmark; section-expansion
+     timing did not complete. Workbook provenance is unknown, and this is not a measurement on
+     the user's device. Keep this item open until a comparable interaction is measured on
+     representative data or the user confirms the lag is resolved.
 
 **Also locked in 2026-08-23**: no bank account API / open-banking integration for now (SBP/
 QCB both require regulator licensing — a compliance process, not a coding task). When bank
