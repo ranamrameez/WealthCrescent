@@ -173,7 +173,7 @@ function emptyRow(
     linked: false,
     other,
     amount: 0,
-    direction: 'in',
+    direction: 'out',
     date: today(),
     time: nowTime(defaultTimezoneForCurrency(currencyCode)),
     timeTouched: false,
@@ -367,7 +367,7 @@ function TxRowFields({
             value={row.date}
             onChange={(e) => {
               const date = e.target.value;
-              onChange(row.timeTouched ? { ...row, date } : { ...row, date, time: defaultTimeForDate(date, row.timezone) });
+              onChange({ ...row, date });
             }}
           />
         </Field>

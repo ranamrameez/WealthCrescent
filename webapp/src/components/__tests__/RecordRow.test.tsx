@@ -95,3 +95,16 @@ it('edits the exchange fee through the same transfer form opened from the bank s
   expect(useBankWorkbookStore.getState().workbook.transactions[0].amount).toBe(-6100);
   expect(useInterEntityTransfersStore.getState().workbook.entries[0]).toMatchObject({ fromAmount: 6100, toAmount: 6100 });
 });
+it('keeps the entered time when the date changes and defaults new rows to outgoing', () => {
+  useBankWorkbookStore.getState().setWorkbook({
+    ...createEmptyBankWorkbook(),
+    settings: { accounts: [{ id: 'bank', name: 'QAR bank', currencyCode: 'QAR', openingBalance: 0 }] },
+  });
+  render(<MemoryRouter><TransactionEntryModal defaultFinance={{ module: 'bank', ref: 'bank', currencyCode: 'QAR' }} onClose={vi.fn()} /></MemoryRouter>);
+
+  const time = screen.getByLabelText('Time (optional)') as HTMLInputElement;
+  const originalTime = time.value;
+  expect(screen.getByRole('button', { name: 'Withdrawal' }).className).toContain('active');
+  fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-10-14' } });
+  expect(time.value).toBe(originalTime);
+});

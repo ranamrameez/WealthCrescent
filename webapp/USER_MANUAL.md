@@ -248,6 +248,8 @@ record, choose whether to update both sides or just the current entry. Same-curr
 amount changes applied to both sides stay aligned; cross-currency amounts remain
 independently entered. If either record changes while you edit, reopen the form to
 avoid overwriting the newer values.
+New transaction rows start with the outgoing action selected (such as Withdrawal or
+Charge). Changing the date does not alter the time you've entered.
 
 QSE Trade list and Cash ledger also offer **Import The Group statement** for the
 broker's Cash statement in XLSX or CSV format. The importer reads prices and share

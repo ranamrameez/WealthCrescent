@@ -10235,6 +10235,11 @@ from the lot system."*
   identical interactive state, and an attempted section-expansion timing did not complete.
   This is not evidence that the user's own device/data is lag-free; see Pending item 147.
 
+- **Central transaction popup defaults and date/time preservation.** New rows default to
+  outgoing (Withdrawal/Charge, or the equivalent module-specific direction). Changing a
+  row's date preserves its entered time instead of silently recalculating it; timezone and
+  time remain independently editable.
+
 ## Pending
 
 - **Activate PSX market cache:** merge the PSX rules fragment into existing rules, deploy
