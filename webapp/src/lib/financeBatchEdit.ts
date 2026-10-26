@@ -8,11 +8,13 @@ import { usePersonalLoansWorkbookStore } from '../store/personalLoansWorkbookSto
 import { usePlannedBankWorkbookStore } from '../store/plannedBankWorkbookStore';
 import { useInterEntityTransfersStore } from '../store/interEntityTransfersStore';
 import { useCategoryStore } from '../store/categoryStore';
+import { useCreditCardWorkbookStore } from '../store/creditCardWorkbookStore';
 import type { BankAccount, BankTransaction } from '../types/bankWorkbook';
+import type { CreditCard, CreditCardTransaction } from '../types/creditCard';
 import type { PersonalLoan, PersonalLoanPlan, PersonalLoanRepayment } from '../types/personalLoansWorkbook';
 import type { PlannedBankTransaction } from '../types/plannedBank';
 
-export function linkedBatchReason(module: 'bank' | 'personalLoans' | 'cash' | 'rentals', id: string): string | undefined {
+export function linkedBatchReason(module: 'bank' | 'personalLoans' | 'cash' | 'rentals' | 'creditCard', id: string): string | undefined {
   return useInterEntityTransfersStore.getState().workbook.entries.some(link =>
     (link.from.module === module && link.fromRecordId === id) || (link.to.module === module && link.toRecordId === id))
     ? 'Linked transfer: use single Edit to handle both sides.' : undefined;
@@ -88,6 +90,22 @@ export function saveLoanPaymentBatch(loan: PersonalLoan, changes: BatchChange<Pe
     row => validateFinanceBatch(row, false), row => row.loanId !== loan.id ? 'Loan cannot be changed.' : linkedBatchReason('personalLoans', row.id), mutations);
   state.setWorkbook({ ...state.workbook, repayments });
 }
+
+export function saveCreditCardBatch(card: CreditCard, changes: BatchChange<CreditCardTransaction>[], mutations?: BatchMutations<CreditCardTransaction>) {
+  const state = useCreditCardWorkbookStore.getState();
+  const currentCard = state.workbook.cards.find(row => row.id === card.id);
+  if (!currentCard || currentCard.currencyCode !== card.currencyCode) throw new Error('Credit card changed or was removed. Discard and reopen the editor.');
+  const transactions = prepareBatch(state.workbook.transactions, changes,
+    ['date', 'time', 'timezone', 'kind', 'description', 'amount', 'categoryID'],
+    row => {
+      const errors = validateFinanceBatch(row, true);
+      if (!Number.isFinite(row.amount) || row.amount <= 0) errors.amount = 'Enter an amount greater than zero.';
+      return errors;
+    },
+    row => row.cardId !== card.id ? 'Credit card cannot be changed.' : linkedBatchReason('creditCard', row.id), mutations);
+  state.setWorkbook({ ...state.workbook, transactions });
+}
+
 export function saveLoanPlanBatch(loan: PersonalLoan, changes: BatchChange<PersonalLoanPlan>[], mutations?: BatchMutations<PersonalLoanPlan>) {
   assertLoan(loan);
   const state = usePersonalLoansWorkbookStore.getState();

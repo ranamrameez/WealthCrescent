@@ -598,7 +598,7 @@ date belongs to the active cycle and does not rewrite the earlier bill. The
 Current Statement section shows the locked bill, how much post-cutoff payment was applied, and
 the separate open-cycle spending total.
 Card details are available from the card's action menu in a popup, keeping the page focused on
-the financial summary. Transactions support search, type/date filters, and pagination. Plans show
+the financial summary. Transactions support search, type/date filters, and pagination. Use **Modify** for individual row actions or **Batch edit** to update, add, or remove multiple transactions in one validated save. The batch editor respects the current transaction filters; linked transactions and their source/card identity are protected. Plans show
 Current balance and Expected final balance summary cards; Monthly history is grouped by month;
 Analytics includes utilization and payment coverage alongside balance, spending, category, and
 projection charts.

@@ -2,9 +2,11 @@ import { useCashWorkbookStore } from '../store/cashWorkbookStore';
 import { useRentalsWorkbookStore } from '../store/rentalsWorkbookStore';
 import { useBankWorkbookStore } from '../store/bankWorkbookStore';
 import { usePersonalLoansWorkbookStore } from '../store/personalLoansWorkbookStore';
+import { useCreditCardWorkbookStore } from '../store/creditCardWorkbookStore';
 import { nextSerialNumberForEntity } from '../lib/financeSerial';
 import { useState } from 'react';
-import { saveCashBatch, saveRentalBatch } from '../lib/financeBatchEdit';
+import { nextSeqForEntity } from '../lib/seq';
+import { saveCashBatch, saveCreditCardBatch, saveRentalBatch } from '../lib/financeBatchEdit';
 import type { Property, RentalEntry } from '../types/rentalsWorkbook';
 import type { CashEntry } from '../types/cashWorkbook';
 import { BatchEditGrid, type BatchColumn, type BatchChange, type BatchMutations } from './BatchEditGrid';
@@ -18,6 +20,7 @@ import { bankPlanBatchReason, linkedBatchReason, saveBankBatch, saveBankPlanBatc
 import type { BankAccount, BankTransaction } from '../types/bankWorkbook';
 import type { PlannedBankTransaction } from '../types/plannedBank';
 import type { PersonalLoan, PersonalLoanPlan, PersonalLoanRepayment } from '../types/personalLoansWorkbook';
+import type { CreditCard, CreditCardTransaction } from '../types/creditCard';
 
 function useBatchSave<T>(commit: (changes: BatchChange<T>[], mutations?: BatchMutations<T>) => void) {
   const ensureSignedIn = useEnsureSignedIn();
@@ -119,4 +122,56 @@ export function LoanPlansBatchEditor({ loan, rows, onClose }: { loan: PersonalLo
     { key: 'executed', label: 'Executed', editable: false, formatter: value => value ? 'Yes' : 'No', width: 100 },
   ];
   return <BatchEditGrid title={`Batch edit plans — ${entity.person}`} description={`Plans for this loan · ${entity.currencyCode}. Amounts must be positive. Executed plans are locked.`} rows={rows} columns={columns} getRowId={row => row.id} getRowDate={row => row.date} validateRow={row => validateFinanceBatch(row, false)} rowReadOnly={row => row.executed ? 'Executed plan: read-only.' : undefined} addLabel="Add plan" createRow={() => ({ id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), amount: 0, loanId: entity.id, description: '', executed: false })} onSave={save} onClose={onClose} />;
+}
+
+export function CreditCardTransactionsBatchEditor({ card, rows, onClose }: { card: CreditCard; rows: CreditCardTransaction[]; onClose: () => void }) {
+  const [entity] = useState(() => ({ ...card }));
+  const options = useCategoryOptions();
+  const dateFormat = useAppearanceStore(state => state.appearance.dateFormat ?? 'DD-MMM-YYYY');
+  useInterEntityTransfersStore(state => state.workbook.entries);
+  const save = useBatchSave<CreditCardTransaction>((changes, mutations) => saveCreditCardBatch(entity, changes, mutations));
+  const kinds = [
+    { value: 'charge', label: 'Charge' },
+    { value: 'payment', label: 'Payment' },
+    { value: 'fee', label: 'Fee' },
+    { value: 'markup', label: 'Markup' },
+    { value: 'cashAdvance', label: 'Cash advance' },
+  ];
+  const columns: BatchColumn<CreditCardTransaction>[] = [
+    { key: 'seq', label: '#', editable: false, width: 70 },
+    { ...dateColumn, formatter: value => formatDate(String(value), dateFormat) }, ...timeColumns,
+    { key: 'kind', label: 'Type', type: 'select', options: kinds, width: 160 },
+    { ...descriptionColumn, label: 'Description' },
+    { ...amountColumn, label: `Amount (${entity.currencyCode})` },
+    { key: 'categoryID', label: 'Category', type: 'category', options, width: 190 },
+    sourceColumn,
+  ];
+  return <BatchEditGrid
+    title={`Batch edit transactions — ${entity.name}`}
+    description={`Filtered transactions · ${entity.currencyCode}. Amounts must be positive; Type determines whether the balance is charged or paid. Linked transactions and source are locked.`}
+    rows={rows}
+    columns={columns}
+    getRowId={row => row.id}
+    getRowDate={row => row.date}
+    validateRow={row => {
+      const errors = validateFinanceBatch(row, true);
+      if (!Number.isFinite(row.amount) || row.amount <= 0) errors.amount = 'Enter an amount greater than zero.';
+      return errors;
+    }}
+    rowReadOnly={row => row.cardId !== entity.id ? 'Credit card cannot be changed.' : linkedBatchReason('creditCard', row.id)}
+    addLabel="Add transaction"
+    createRow={() => ({
+      id: crypto.randomUUID(),
+      cardId: entity.id,
+      date: new Date().toISOString().slice(0, 10),
+      kind: 'charge' as const,
+      amount: 0,
+      description: '',
+      seq: nextSeqForEntity(useCreditCardWorkbookStore.getState().workbook.transactions, row => row.cardId, entity.id),
+      source: 'manual' as const,
+    })}
+    orderKey="seq"
+    onSave={save}
+    onClose={onClose}
+  />;
 }

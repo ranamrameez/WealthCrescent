@@ -10239,6 +10239,11 @@ from the lot system."*
   outgoing (Withdrawal/Charge, or the equivalent module-specific direction). Changing a
   row's date preserves its entered time instead of silently recalculating it; timezone and
   time remain independently editable.
+- **Credit Card transaction batch editing.** The card's Transactions card now offers both
+  Modify and Batch edit actions. Batch editing uses the shared validated editor, honors the
+  active transaction filters, and commits the complete batch in one workbook update. Amounts
+  must remain positive, card identity and provenance are protected, stale edits are rejected,
+  and linked transactions remain read-only in this flow.
 
 ## Pending
 

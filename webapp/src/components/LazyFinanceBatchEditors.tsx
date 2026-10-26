@@ -7,6 +7,7 @@ const LoanPayments = lazy(() => import('./FinanceBatchEditors').then(module => (
 const LoanPlans = lazy(() => import('./FinanceBatchEditors').then(module => ({ default: module.LoanPlansBatchEditor })));
 const CashTransactions = lazy(() => import('./FinanceBatchEditors').then(module => ({ default: module.CashTransactionsBatchEditor })));
 const RentalTransactions = lazy(() => import('./FinanceBatchEditors').then(module => ({ default: module.RentalTransactionsBatchEditor })));
+const CreditCardTransactions = lazy(() => import('./FinanceBatchEditors').then(module => ({ default: module.CreditCardTransactionsBatchEditor })));
 
 export function RentalTransactionsBatchEditor(props: ComponentProps<typeof Editors.RentalTransactionsBatchEditor>) {
   return <Loading><RentalTransactions {...props} /></Loading>;
@@ -30,4 +31,7 @@ export function LoanPaymentsBatchEditor(props: ComponentProps<typeof Editors.Loa
 }
 export function LoanPlansBatchEditor(props: ComponentProps<typeof Editors.LoanPlansBatchEditor>) {
   return <Loading><LoanPlans {...props} /></Loading>;
+}
+export function CreditCardTransactionsBatchEditor(props: ComponentProps<typeof Editors.CreditCardTransactionsBatchEditor>) {
+  return <Loading><CreditCardTransactions {...props} /></Loading>;
 }

@@ -1,20 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { saveBankBatch, saveBankPlanBatch, saveLoanPaymentBatch, saveLoanPlanBatch, validateFinanceBatch } from '../financeBatchEdit';
+import { saveBankBatch, saveBankPlanBatch, saveCreditCardBatch, saveLoanPaymentBatch, saveLoanPlanBatch, validateFinanceBatch } from '../financeBatchEdit';
 import { useBankWorkbookStore as bank } from '../../store/bankWorkbookStore';
+import { useCreditCardWorkbookStore as creditCards } from '../../store/creditCardWorkbookStore';
 import { usePersonalLoansWorkbookStore as loans } from '../../store/personalLoansWorkbookStore';
 import { usePlannedBankWorkbookStore as plans } from '../../store/plannedBankWorkbookStore';
 import { useInterEntityTransfersStore as links } from '../../store/interEntityTransfersStore';
 import type { BankAccount, BankTransaction } from '../../types/bankWorkbook';
 import type { PersonalLoan } from '../../types/personalLoansWorkbook';
+import type { CreditCard, CreditCardTransaction } from '../../types/creditCard';
 
 const account: BankAccount = { id: 'account', name: 'Bank', currencyCode: 'QAR', openingBalance: 0, color: '#123456', isFavorite: true };
 const loan: PersonalLoan = { id: 'loan', person: 'Person', currencyCode: 'QAR', direction: 'i_owe', date: '2026-09-01', principal: 500 };
 const tx: BankTransaction = { id: 'tx', accountId: 'account', amount: -20, description: 'Original', date: '2026-09-01', time: '10:30', timezone: 'Asia/Qatar', source: 'statement-import', statementRef: 'sample.csv', serialNumber: 4, isDeposit: false };
+const card: CreditCard = { id: 'card', name: 'Card', currencyCode: 'QAR' };
+const cardTx: CreditCardTransaction = { id: 'card-tx', cardId: card.id, date: '2026-09-01', kind: 'charge', amount: 20, description: 'Original', source: 'statement-import', statementRef: 'sample.csv', seq: 4 };
 beforeEach(() => {
   bank.getState().setWorkbook({ settings: { accounts: [account] }, transactions: [tx, { ...tx, id: 'tx2', serialNumber: 5 }] });
   loans.getState().setWorkbook({ settings: { defaultCurrency: 'QAR' }, loans: [loan], repayments: [{ id: 'payment', loanId: loan.id, date: '2026-09-01', amount: 10, seq: 8 }], plans: [{ id: 'plan', loanId: loan.id, date: '2026-09-01', amount: 30 }] });
   plans.getState().setWorkbook({ settings: { showRealBalance: true, showPlannedBalance: true }, entries: [{ id: 'plan', accountId: account.id, date: '2026-09-01', amount: -10, description: 'Plan' }] });
   links.getState().setWorkbook({ settings: {}, entries: [] });
+  creditCards.getState().setWorkbook({ cards: [card], transactions: [cardTx, { ...cardTx, id: 'card-tx-2', seq: 5 }] });
 });
 describe('finance batch commits', () => {
   it('atomically creates, deletes and reorders records within an account', () => {
@@ -96,5 +101,28 @@ describe('finance batch commits', () => {
     bank.getState().updateAccount(account.id, { currencyCode: 'USD' });
     expect(() => saveBankBatch(account, [])).toThrow('Account changed');
     expect(validateFinanceBatch({ ...tx, amount: Infinity, time: '25:10', timezone: 'Invalid/Zone' }, true)).toMatchObject({ amount: expect.any(String), time: expect.any(String), timezone: expect.any(String) });
+  });
+  it('atomically edits, adds and deletes card transactions while preserving IDs and provenance', () => {
+    const [first, second] = structuredClone(creditCards.getState().workbook.transactions);
+    const added = { ...cardTx, id: 'card-new', source: 'manual' as const, seq: 6 };
+    const listener = vi.fn();
+    const stop = creditCards.subscribe(listener);
+    saveCreditCardBatch(card, [{ before: second, after: { ...second, amount: 35, kind: 'payment' } }], { added: [added], deleted: [first] });
+    stop();
+    expect(listener).toHaveBeenCalledOnce();
+    expect(creditCards.getState().workbook.transactions[0]).toEqual({ ...second, amount: 35, kind: 'payment' });
+    expect(creditCards.getState().workbook.transactions[1]).toMatchObject(added);
+    expect(creditCards.getState().workbook.transactions[1].timestamp).toEqual(expect.any(String));
+  });
+  it('rejects invalid card amounts, stale edits and linked-card changes', () => {
+    const before = structuredClone(creditCards.getState().workbook.transactions[0]);
+    expect(() => saveCreditCardBatch(card, [{ before, after: { ...before, amount: 0 } }])).toThrow('greater than zero');
+    expect(() => saveCreditCardBatch(card, [], { added: [{ ...cardTx, id: 'invalid', amount: -1 }], deleted: [] })).toThrow('greater than zero');
+    creditCards.getState().updateTransaction(before.id, { description: 'Cloud edit' });
+    expect(() => saveCreditCardBatch(card, [{ before, after: { ...before, amount: 25 } }])).toThrow('changed or was removed');
+    const current = creditCards.getState().workbook.transactions[0];
+    links.getState().addEntry({ id: 'card-link', from: { module: 'bank', ref: account.id }, to: { module: 'creditCard', ref: card.id }, fromRecordId: tx.id, toRecordId: current.id, fromAmount: 20, toAmount: 20, date: current.date });
+    expect(() => saveCreditCardBatch(card, [{ before: current, after: { ...current, amount: 25 } }])).toThrow('Linked transfer');
+    expect(creditCards.getState().workbook.transactions[0]).toEqual(current);
   });
 });

@@ -23,6 +23,7 @@ import { Modal } from '../../../components/Modal';
 import { StandardButton } from '../../../components/standard';
 import { FabPanel } from '../../../components/ui/Fab';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
+import { CreditCardTransactionsBatchEditor } from '../../../components/LazyFinanceBatchEditors';
 import { toast } from '../../../components/Toast';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
 import { AmountInput } from '../../../components/ui/AmountInput';
@@ -705,6 +706,7 @@ export function CreditCardDetailPage() {
   // projection and the plan list below.
   const [horizonDays, setHorizonDays] = useState<PlanningHorizonDays>(30);
   const [showTransactionActions, setShowTransactionActions] = useState(false);
+  const [batchEditOpen, setBatchEditOpen] = useState(false);
 
   usePageTopBarRightSlot(card ? (
     <TopBarControls>
@@ -856,10 +858,14 @@ export function CreditCardDetailPage() {
       </StandardCard></div>
 
       <div id="card-transactions"><StandardCard title="Transactions" hue={card.color} defaultOpen={false}
-        actions={[{ label: showTransactionActions ? 'Done modifying' : 'Modify', icon: <EditIcon size={14} />, onClick: () => setShowTransactionActions((value) => !value) }]}
+        actions={[
+          { label: showTransactionActions ? 'Done modifying' : 'Modify', icon: <EditIcon size={14} />, onClick: () => setShowTransactionActions((value) => !value) },
+          { label: 'Batch edit', icon: <ListIcon size={14} />, onClick: () => setBatchEditOpen(true) },
+        ]}
         headerEnd={showTransactionActions ? <IconButton label="Hide modification options" icon={<EditIcon size={13} />} align="right" onClick={() => setShowTransactionActions(false)} /> : undefined}>
         <TransactionsTable card={card} filters={filters} showActions={showTransactionActions} />
       </StandardCard></div>
+      {batchEditOpen && <CreditCardTransactionsBatchEditor card={card} rows={visibleTransactions} onClose={() => setBatchEditOpen(false)} />}
 
       <div id="card-history"><StandardCard title="Monthly history" hue={card.color} defaultOpen={false}>
         <div className="account-summary-grid">{monthlyHistory.map((month) => <SummaryGroupCard key={month.month} title={month.month} hue={month.spent - month.paid > 0 ? 'var(--loss)' : 'var(--profit)'} tooltip="Calendar-month spending, payments, net change, and closing card balance.">
