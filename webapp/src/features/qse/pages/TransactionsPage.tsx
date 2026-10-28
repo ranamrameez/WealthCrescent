@@ -323,7 +323,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
       case 'shares': return r.tx.shares;
       case 'price': return r.tx.price;
       case 'amount': return r.tx.shares * r.tx.price;
-      default: return `${toInstantMs(r.tx.date, r.tx.time, r.tx.timezone)} ${String(r.tx.seq ?? 0).padStart(12, '0')}`;
+      default: return `${r.tx.date} ${String(r.tx.transactionIndex ?? 0).padStart(12, '0')}`;
     }
   };
   const { sorted, Th, dateSort } = useSortableRows(filtered, sortValue, 'date', 'desc');
