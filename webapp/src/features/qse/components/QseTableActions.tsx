@@ -267,9 +267,12 @@ export function QseReorder({ kind, row, rows }: { kind: Kind; row: Transaction |
       const aIndex = (a as Transaction).transactionIndex;
       const bIndex = (b as Transaction).transactionIndex;
       if (!Number.isInteger(aIndex) || !Number.isInteger(bIndex)) return toast('Transaction order is missing. Reload the workbook and try again.');
+      const sameTicker = (a as Transaction).ticker === (b as Transaction).ticker;
+      const aSeq = (a as Transaction).seq;
+      const bSeq = (b as Transaction).seq;
       const transactions = records.map(candidate => {
-        if (candidate.id === a.id) return { ...candidate, transactionIndex: bIndex };
-        if (candidate.id === b.id) return { ...candidate, transactionIndex: aIndex };
+        if (candidate.id === a.id) return { ...candidate, transactionIndex: bIndex, ...(sameTicker ? { seq: bSeq } : {}) };
+        if (candidate.id === b.id) return { ...candidate, transactionIndex: aIndex, ...(sameTicker ? { seq: aSeq } : {}) };
         return candidate;
       }) as Transaction[];
       state.setWorkbook({ ...state.workbook, transactions });
