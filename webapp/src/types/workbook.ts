@@ -23,6 +23,8 @@ export interface Transaction {
    * (e.g. two same-day BUYs). Retrofitted onto existing data by
    * `createWorkbookStore.ts`'s `normalize()`, same pattern as `id`. */
   seq?: number;
+  /** Global, persisted lifetime ordering for accounting. Stable record identity remains `id`; this index is never derived from id and is the sole transaction-processing order. */
+  transactionIndex?: number;
   date: string;
   /** Pending item 41: optional time-of-day, "HH:MM" 24-hour, alongside
    * `date` — see `lib/datetime.ts`. Missing time backfills to noon for
