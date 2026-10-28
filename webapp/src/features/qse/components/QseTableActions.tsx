@@ -243,20 +243,40 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
   }} />}</>;
 }
 
-/** Reorder exact-time peers; trades also share ticker and action so lot rules remain intact. */
+/** Reorder trades within their trade-date cohort. Trade order is persisted
+ * in transactionIndex, a globally unique lifetime sequence; id remains stable. */
 export function QseReorder({ kind, row, rows }: { kind: Kind; row: Transaction | Transfer | Adjustment | Dividend | Row; rows: Array<Transaction | Transfer | Adjustment | Dividend | Row> }) {
   const ensureSignedIn = useEnsureSignedIn();
-  const peers = rows.filter(candidate => (kind !== 'ledger' || (candidate as Row).kind === (row as Row).kind) && (kind !== 'transactions' && (kind !== 'ledger' || (row as Row).kind !== 'trade') || ((candidate as Transaction).ticker === (row as Transaction).ticker && (candidate as Transaction).action === (row as Transaction).action)));
-  return <ReorderButtons rows={peers} index={peers.findIndex(candidate => candidate.id === row.id)} instantOf={candidate => toInstantMs(candidate.date, candidate.time, candidate.timezone)} idOf={candidate => candidate.id!} orderOf={candidate => candidate.seq} onMove={async pair => {
+  const isTrade = kind === 'transactions' || (kind === 'ledger' && (row as Row).kind === 'trade');
+  const peers = rows
+    .filter(candidate => isTrade
+      ? (candidate as Transaction).date === (row as Transaction).date && (kind !== 'ledger' || (candidate as Row).kind === 'trade')
+      : (kind !== 'ledger' || (candidate as Row).kind === (row as Row).kind))
+    .sort((a, b) => isTrade
+      ? ((a as Transaction).transactionIndex ?? Number.MAX_SAFE_INTEGER) - ((b as Transaction).transactionIndex ?? Number.MAX_SAFE_INTEGER)
+      : toInstantMs(a.date, a.time, a.timezone) - toInstantMs(b.date, b.time, b.timezone) || ((a as { seq?: number }).seq ?? 0) - ((b as { seq?: number }).seq ?? 0));
+  return <ReorderButtons rows={peers} index={peers.findIndex(candidate => candidate.id === row.id)} instantOf={candidate => isTrade ? Date.parse(`${candidate.date}T00:00:00Z`) : toInstantMs(candidate.date, candidate.time, candidate.timezone)} idOf={candidate => candidate.id!} orderOf={candidate => isTrade ? (candidate as Transaction).transactionIndex : (candidate as { seq?: number }).seq} onMove={async pair => {
     if (!(await ensureSignedIn('Sign in to reorder records.'))) return;
     const state = useWorkbookStore.getState();
     const sourceKind = kind === 'ledger' ? (row as Row).kind === 'trade' ? 'transactions' : (row as Row).kind === 'transfer' ? 'transfers' : 'adjustments' : kind;
     const records = state.workbook[sourceKind];
     const a = records.find(candidate => candidate.id === pair[0].id), b = records.find(candidate => candidate.id === pair[1].id);
-    if (!a || !b || toInstantMs(a.date, a.time, a.timezone) !== toInstantMs(b.date, b.time, b.timezone)) return toast('Records changed. Please try again.');
+    if (!a || !b) return toast('Records changed. Please try again.');
+    if (sourceKind === 'transactions') {
+      if ((a as Transaction).date !== (b as Transaction).date) return toast('Only trades on the same date can be reordered.');
+      const ordered = [...records].sort((x, y) => ((x as Transaction).transactionIndex ?? Number.MAX_SAFE_INTEGER) - ((y as Transaction).transactionIndex ?? Number.MAX_SAFE_INTEGER));
+      const from = ordered.findIndex(candidate => candidate.id === a.id);
+      const to = ordered.findIndex(candidate => candidate.id === b.id);
+      if (from < 0 || to < 0) return toast('Records changed. Please try again.');
+      const [moving] = ordered.splice(from, 1);
+      ordered.splice(to, 0, moving);
+      const transactions = ordered.map((candidate, index) => ({ ...candidate, transactionIndex: index + 1 })) as Transaction[];
+      state.setWorkbook({ ...state.workbook, transactions });
+      return;
+    }
+    if (toInstantMs(a.date, a.time, a.timezone) !== toInstantMs(b.date, b.time, b.timezone)) return toast('Records changed. Please try again.');
     const next = records.map(candidate => { const order = pair.find(item => item.id === candidate.id); return order ? { ...candidate, seq: order.order } : candidate; });
-    if (sourceKind === 'transactions') state.setWorkbook({ ...state.workbook, transactions: next as Transaction[] });
-    else if (sourceKind === 'transfers') state.setWorkbook({ ...state.workbook, transfers: next as Transfer[] });
+    if (sourceKind === 'transfers') state.setWorkbook({ ...state.workbook, transfers: next as Transfer[] });
     else if (sourceKind === 'adjustments') state.setWorkbook({ ...state.workbook, adjustments: next as Adjustment[] });
     else state.setWorkbook({ ...state.workbook, dividends: next as Dividend[] });
   }} />;
