@@ -26,7 +26,7 @@ export type QseRow = { id: string; kind?: 'trade' | 'transfer' | 'adjustment'; s
 type Row = QseRow;
 const column = (key: keyof Row, label: string, type: BatchColumn<Row>['type'] = 'text'): BatchColumn<Row> => ({ key, label, type });
 function qseColumns(kind: Kind): BatchColumn<Row>[] {
-  const common = [{ ...column('seq', '#', 'number'), editable: false }, column('date', 'Date', 'date'), column('time', 'Time', 'time'), column('timezone', 'Timezone')];
+  const common = [{ ...column('seq', 'Stock #', 'number'), editable: false }, column('date', 'Date', 'date'), column('time', 'Time', 'time'), column('timezone', 'Timezone')];
   if (kind === 'ledger') {
     const specific = (source: Exclude<Kind, 'ledger' | 'dividends'>, recordKind: Row['kind']) => qseColumns(source).filter(c => !common.some(shared => shared.key === c.key)).map(c => ({ ...c, label: c.key === 'type' ? 'Transfer type' : c.label, editable: (row: Row) => row.kind === recordKind }));
     return [...common, { ...column('kind', 'Type'), editable: false }, ...specific('transactions', 'trade'), ...specific('transfers', 'transfer'), ...specific('adjustments', 'adjustment')];
@@ -264,13 +264,14 @@ export function QseReorder({ kind, row, rows }: { kind: Kind; row: Transaction |
     if (!a || !b) return toast('Records changed. Please try again.');
     if (sourceKind === 'transactions') {
       if ((a as Transaction).date !== (b as Transaction).date) return toast('Only trades on the same date can be reordered.');
-      const ordered = [...records].sort((x, y) => ((x as Transaction).transactionIndex ?? Number.MAX_SAFE_INTEGER) - ((y as Transaction).transactionIndex ?? Number.MAX_SAFE_INTEGER));
-      const from = ordered.findIndex(candidate => candidate.id === a.id);
-      const to = ordered.findIndex(candidate => candidate.id === b.id);
-      if (from < 0 || to < 0) return toast('Records changed. Please try again.');
-      const [moving] = ordered.splice(from, 1);
-      ordered.splice(to, 0, moving);
-      const transactions = ordered.map((candidate, index) => ({ ...candidate, transactionIndex: index + 1 })) as Transaction[];
+      const aIndex = (a as Transaction).transactionIndex;
+      const bIndex = (b as Transaction).transactionIndex;
+      if (!Number.isInteger(aIndex) || !Number.isInteger(bIndex)) return toast('Transaction order is missing. Reload the workbook and try again.');
+      const transactions = records.map(candidate => {
+        if (candidate.id === a.id) return { ...candidate, transactionIndex: bIndex };
+        if (candidate.id === b.id) return { ...candidate, transactionIndex: aIndex };
+        return candidate;
+      }) as Transaction[];
       state.setWorkbook({ ...state.workbook, transactions });
       return;
     }
