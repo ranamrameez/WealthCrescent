@@ -416,6 +416,8 @@ export interface CashLedgerEvent {
    * `Transaction.seq`'s doc comment) — the tie-breaker `buildCashLedger`
    * falls back to for two events of the SAME `kind` at the same instant. */
   seq?: number;
+  /** Global lifetime trade order; only present for trade events. */
+  transactionIndex?: number;
   kind: 'trade' | 'transfer' | 'adjustment';
   action: string;
   label: string;
