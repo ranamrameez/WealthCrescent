@@ -7,37 +7,34 @@ function tx(partial: Partial<Transaction>): Transaction {
 }
 
 describe('sortTransactionsChronological', () => {
-  it('sorts by date first', () => {
+  it('uses lifetime transactionIndex as the sole ordering source, even across trade dates', () => {
     const sorted = sortTransactionsChronological([
-      tx({ date: '2026-01-03', seq: 1 }),
-      tx({ date: '2026-01-01', seq: 2 }),
-      tx({ date: '2026-01-02', seq: 3 }),
+      tx({ date: '2026-10-27', action: 'BUY', transactionIndex: 1 }),
+      tx({ date: '2026-10-18', action: 'SELL', transactionIndex: 2 }),
+      tx({ date: '2026-10-18', action: 'BUY', transactionIndex: 3 }),
     ]);
-    expect(sorted.map((t) => t.date)).toEqual(['2026-01-01', '2026-01-02', '2026-01-03']);
+    expect(sorted.map(t => [t.date, t.action])).toEqual([
+      ['2026-10-27', 'BUY'], ['2026-10-18', 'SELL'], ['2026-10-18', 'BUY'],
+    ]);
   });
 
-  it('puts BUY before SELL on an exact instant tie, regardless of seq', () => {
+  it('does not prioritize BUY over SELL when the explicit order says otherwise', () => {
     const sorted = sortTransactionsChronological([
-      tx({ action: 'SELL', seq: 1 }), // entered first, but a sell
-      tx({ action: 'BUY', seq: 2 }), // entered second, but a buy
+      tx({ action: 'BUY', transactionIndex: 2 }),
+      tx({ action: 'SELL', transactionIndex: 1 }),
     ]);
-    expect(sorted.map((t) => t.action)).toEqual(['BUY', 'SELL']);
+    expect(sorted.map(t => t.action)).toEqual(['SELL', 'BUY']);
   });
 
-  it('falls back to seq (not array position) when BUY-before-SELL does not disambiguate', () => {
-    // Two same-day BUYs, deliberately placed in the array in the OPPOSITE
-    // order their seq implies — a real reorder (edit/delete-and-re-add/
-    // import) that array-position-based tie-breaking would get wrong.
-    const first = tx({ action: 'BUY', shares: 5, seq: 1 });
-    const second = tx({ action: 'BUY', shares: 10, seq: 2 });
-    const sorted = sortTransactionsChronological([second, first]); // array order: second, first
-    expect(sorted.map((t) => t.shares)).toEqual([5, 10]); // seq order wins: first (seq 1), then second (seq 2)
+  it('sorts by transactionIndex, not array position or legacy seq', () => {
+    const first = tx({ shares: 5, seq: 9, transactionIndex: 1 });
+    const second = tx({ shares: 10, seq: 1, transactionIndex: 2 });
+    expect(sortTransactionsChronological([second, first]).map(t => t.shares)).toEqual([5, 10]);
   });
 
-  it('treats a missing seq as 0, so an un-seq-ed record sorts before any seq-ed one on a tie', () => {
-    const withSeq = tx({ action: 'SELL', shares: 10, seq: 5 });
-    const withoutSeq = tx({ action: 'SELL', shares: 20 });
-    const sorted = sortTransactionsChronological([withSeq, withoutSeq]);
-    expect(sorted.map((t) => t.shares)).toEqual([20, 10]);
+  it('places indexed rows before legacy rows that have not yet been normalized', () => {
+    const legacy = tx({ shares: 10 });
+    const indexed = tx({ shares: 5, transactionIndex: 4 });
+    expect(sortTransactionsChronological([legacy, indexed]).map(t => t.shares)).toEqual([5, 10]);
   });
 });
