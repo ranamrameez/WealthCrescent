@@ -5,6 +5,21 @@ import { sortTransactionsChronological } from '../lib/calc/sortTransactions';
 import type { Adjustment, Dividend, PricePoint, Transaction, TradePlan, Transfer, WatchlistItem } from '../types/workbook';
 import { scheduleLocalStorageWrite } from '../lib/localStoragePersistence';
 
+function backfillTransactionSeqByTicker(records: Transaction[], ordered: Transaction[]): Transaction[] {
+  const seqById = new Map<string | undefined, number>();
+  const maxByTicker = new Map<string, number>();
+  for (const record of records) {
+    maxByTicker.set(record.ticker, Math.max(maxByTicker.get(record.ticker) ?? 0, record.seq ?? 0));
+  }
+  for (const record of ordered) {
+    if (record.seq !== undefined) continue;
+    const next = (maxByTicker.get(record.ticker) ?? 0) + 1;
+    maxByTicker.set(record.ticker, next);
+    seqById.set(record.id, next);
+  }
+  return records.map(record => record.seq !== undefined ? record : { ...record, seq: seqById.get(record.id) });
+}
+
 function chronologicalByInstant<T extends { date: string; time?: string; timezone?: string }>(records: T[]): T[] {
   return [...records].sort((a, b) => toInstantMs(a.date, a.time, a.timezone) - toInstantMs(b.date, b.time, b.timezone));
 }
@@ -97,7 +112,7 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
     const plansWithId = wb.tradePlans.map((p) => ({ ...p, id: p.id || crypto.randomUUID(), legs: p.legs || [] }));
     return {
       ...wb,
-      transactions: backfillSeq(indexedTransactions, sortTransactionsChronological(indexedTransactions)),
+      transactions: backfillTransactionSeqByTicker(indexedTransactions, sortTransactionsChronological(indexedTransactions)),
       transfers: backfillSeq(transfersWithId, chronologicalByInstant(transfersWithId)),
       adjustments: backfillSeq(adjustmentsWithId, chronologicalByInstant(adjustmentsWithId)),
       dividends: backfillSeq(dividendsWithId, chronologicalByInstant(dividendsWithId)),
