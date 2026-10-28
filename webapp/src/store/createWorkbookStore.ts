@@ -68,13 +68,36 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
 ): UseBoundStore<StoreApi<WorkbookStoreState<TWorkbook>>> {
   function normalize(wb: TWorkbook): TWorkbook {
     const transactionsWithId = wb.transactions.map((t) => (t.id ? t : { ...t, id: crypto.randomUUID() }));
+    // One-time migration for legacy workbooks: when no lifetime indexes exist,
+    // seed them in entry-time order (timestamp), then effective date/time, then
+    // original array position. Once present, never rewrite an existing index.
+    const needsTransactionIndex = transactionsWithId.some(t => !Number.isInteger(t.transactionIndex));
+    const indexedTransactions = needsTransactionIndex
+      ? (() => {
+          const existingMax = Math.max(0, ...transactionsWithId.map(t => Number.isInteger(t.transactionIndex) ? t.transactionIndex! : 0));
+          const legacy = transactionsWithId.filter(t => !Number.isInteger(t.transactionIndex));
+          const orderedLegacy = [...legacy].sort((a, b) => {
+            const at = a.timestamp ? Date.parse(a.timestamp) : Number.POSITIVE_INFINITY;
+            const bt = b.timestamp ? Date.parse(b.timestamp) : Number.POSITIVE_INFINITY;
+            if (at !== bt) return at - bt;
+            const ad = a.date.localeCompare(b.date);
+            if (ad) return ad;
+            const atime = a.time ?? '';
+            const btime = b.time ?? '';
+            return atime.localeCompare(btime);
+          });
+          let next = existingMax;
+          const byId = new Map(orderedLegacy.map(t => [t.id, { ...t, transactionIndex: ++next }]));
+          return transactionsWithId.map(t => Number.isInteger(t.transactionIndex) ? t : byId.get(t.id)!);
+        })()
+      : transactionsWithId;
     const transfersWithId = wb.transfers.map((t) => (t.id ? t : { ...t, id: crypto.randomUUID() }));
     const adjustmentsWithId = wb.adjustments.map((a) => (a.id ? a : { ...a, id: crypto.randomUUID() }));
     const dividendsWithId = wb.dividends.map((d) => (d.id ? d : { ...d, id: crypto.randomUUID() }));
     const plansWithId = wb.tradePlans.map((p) => ({ ...p, id: p.id || crypto.randomUUID(), legs: p.legs || [] }));
     return {
       ...wb,
-      transactions: backfillSeq(transactionsWithId, sortTransactionsChronological(transactionsWithId)),
+      transactions: backfillSeq(indexedTransactions, sortTransactionsChronological(indexedTransactions)),
       transfers: backfillSeq(transfersWithId, chronologicalByInstant(transfersWithId)),
       adjustments: backfillSeq(adjustmentsWithId, chronologicalByInstant(adjustmentsWithId)),
       dividends: backfillSeq(dividendsWithId, chronologicalByInstant(dividendsWithId)),
@@ -114,14 +137,16 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
       },
       addTransaction: (tx) => mutate((wb) => {
         const seq = tx.seq !== undefined ? tx.seq : nextSeqForEntity(wb.transactions, (t) => t.ticker, tx.ticker);
+        const transactionIndex = Number.isInteger(tx.transactionIndex) ? tx.transactionIndex! : Math.max(0, ...wb.transactions.map(t => t.transactionIndex ?? 0)) + 1;
         const timestamp = tx.timestamp ?? new Date().toISOString();
         const id = tx.id ?? crypto.randomUUID();
-        return { ...wb, transactions: [...wb.transactions, { ...tx, id, seq, timestamp }] };
+        return { ...wb, transactions: [...wb.transactions, { ...tx, id, seq, transactionIndex, timestamp }] };
       }),
       addTransactions: (txs) => mutate((wb) => {
         const now = new Date().toISOString();
         const withSeq = assignSeqForEntities(wb.transactions, txs, (t) => t.ticker);
-        const withIdAndTimestamp = withSeq.map((t) => ({ ...t, id: t.id ?? crypto.randomUUID(), timestamp: t.timestamp ?? now }));
+        let transactionIndex = Math.max(0, ...wb.transactions.map(t => t.transactionIndex ?? 0));
+        const withIdAndTimestamp = withSeq.map((t) => ({ ...t, id: t.id ?? crypto.randomUUID(), transactionIndex: Number.isInteger(t.transactionIndex) ? t.transactionIndex! : ++transactionIndex, timestamp: t.timestamp ?? now }));
         return { ...wb, transactions: [...wb.transactions, ...withIdAndTimestamp] };
       }),
       updateTransaction: (index, patch) => mutate((wb) => ({ ...wb, transactions: wb.transactions.map((t, i) => (i === index ? { ...t, ...patch } : t)) })),
@@ -176,7 +201,7 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
         const plan = wb.tradePlans.find((p) => p.id === planId);
         const leg = plan?.legs[legIndex];
         if (!plan || !leg || leg.executed || leg.ignored) return wb;
-        const tx: Transaction = { id: crypto.randomUUID(), seq: nextSeqForEntity(wb.transactions, (t) => t.ticker, leg.ticker), timestamp: new Date().toISOString(), date: leg.date || new Date().toISOString().slice(0, 10), ticker: leg.ticker, action: leg.action, shares: leg.shares, price: leg.price, targetLotBuyId: leg.targetLotBuyId };
+        const tx: Transaction = { id: crypto.randomUUID(), seq: nextSeqForEntity(wb.transactions, (t) => t.ticker, leg.ticker), transactionIndex: Math.max(0, ...wb.transactions.map(t => t.transactionIndex ?? 0)) + 1, timestamp: new Date().toISOString(), date: leg.date || new Date().toISOString().slice(0, 10), ticker: leg.ticker, action: leg.action, shares: leg.shares, price: leg.price, targetLotBuyId: leg.targetLotBuyId };
         return { ...wb, transactions: [...wb.transactions, tx], tradePlans: wb.tradePlans.map((p) => p.id === planId ? { ...p, legs: p.legs.map((l, i) => i === legIndex ? { ...l, executed: true, executedTransactionId: tx.id } : l) } : p) };
       }),
     };
