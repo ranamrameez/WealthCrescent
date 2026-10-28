@@ -22,7 +22,7 @@ export function buildCashLedger(
     const amount = tx.shares * tx.price;
     const fee = calcFee(amount, isBuy, { shares: tx.shares, tx });
     const cashDelta = isBuy ? -(amount + fee) : amount - fee;
-    events.push({ sourceId: tx.id, ticker: tx.ticker, date: tx.date, time: tx.time, timezone: tx.timezone, seq: tx.seq, kind: 'trade', action: tx.action, label: `${tx.action} ${fmt(tx.shares, 0)} ${tx.ticker} @ ${fmt(tx.price, 3)}`, amount: cashDelta, fee });
+    events.push({ sourceId: tx.id, ticker: tx.ticker, date: tx.date, time: tx.time, timezone: tx.timezone, seq: tx.seq, transactionIndex: tx.transactionIndex, kind: 'trade', action: tx.action, label: `${tx.action} ${fmt(tx.shares, 0)} ${tx.ticker} @ ${fmt(tx.price, 3)}`, amount: cashDelta, fee });
     heldByTicker[tx.ticker] = (heldByTicker[tx.ticker] || 0) + (isBuy ? tx.shares : -tx.shares);
   });
 
@@ -36,6 +36,10 @@ export function buildCashLedger(
   });
 
   events.sort((a, b) => {
+    // Trades follow the user's persisted global sequence. Non-trade events keep
+    // their effective date/time order; when comparing a trade to a non-trade,
+    // use date/time first because non-trade records do not have transactionIndex.
+    if (a.kind === 'trade' && b.kind === 'trade' && a.transactionIndex !== undefined && b.transactionIndex !== undefined) return a.transactionIndex - b.transactionIndex;
     const byInstant = toInstantMs(a.date, a.time, a.timezone) - toInstantMs(b.date, b.time, b.timezone);
     if (byInstant !== 0) return byInstant;
     const byKind = (a.kind === 'transfer' ? -1 : 1) - (b.kind === 'transfer' ? -1 : 1);
