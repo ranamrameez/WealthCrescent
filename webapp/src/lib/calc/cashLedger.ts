@@ -36,12 +36,11 @@ export function buildCashLedger(
   });
 
   events.sort((a, b) => {
-    // Trades follow the user's persisted global sequence. Non-trade events keep
-    // their effective date/time order; when comparing a trade to a non-trade,
-    // use date/time first because non-trade records do not have transactionIndex.
-    if (a.kind === 'trade' && b.kind === 'trade' && a.transactionIndex !== undefined && b.transactionIndex !== undefined) return a.transactionIndex - b.transactionIndex;
+    // The cash ledger is a dated statement view. Keep event dates chronological;
+    // transactionIndex is the tie-breaker for trades at the same effective instant.
     const byInstant = toInstantMs(a.date, a.time, a.timezone) - toInstantMs(b.date, b.time, b.timezone);
     if (byInstant !== 0) return byInstant;
+    if (a.kind === 'trade' && b.kind === 'trade' && a.transactionIndex !== undefined && b.transactionIndex !== undefined) return a.transactionIndex - b.transactionIndex;
     const byKind = (a.kind === 'transfer' ? -1 : 1) - (b.kind === 'transfer' ? -1 : 1);
     if (byKind !== 0) return byKind;
     return (a.seq ?? 0) - (b.seq ?? 0);
