@@ -310,11 +310,12 @@ understanding:
   awareness — it isn't deducted from any number automatically.
 - **Cost basis method** (Settings → Fees & amounts): **Average cost** (default) blends
   every buy into one running average — a sell can't be tied to a specific lot. **FIFO**
-  tracks each buy as its own lot and sells the oldest one first, giving lot-accurate
-  realized P/L and CGT. Switching this recalculates your *entire* history under the new
-  method immediately (nothing here is stored per-transaction) — it's not the default
-  because that's a real change to your computed numbers, not a cosmetic one. Try it, compare,
-  switch back if you don't like it.
+  consumes the oldest buy lot first; **Lowest cost first** consumes the cheapest open lot
+  first. The selected method controls position calculations and per-SELL realized P/L.
+  When Average cost is selected, the transaction page does not show open/closed lot-attribution
+  tables because those individual-lot reports are not valid for weighted-average accounting.
+  Switching methods recalculates dependent results from the full history; it does not rewrite
+  your transactions. Compare the results before making any real-world trading decision.
 
 ---
 

@@ -17,6 +17,8 @@ beforeEach(() => {
 afterEach(cleanup);
 function Controls() { const control = usePageTopBarStore(state => state.rightSlot); return <>{control}</>; }
 it('filters the trade list without discarding the historical buys used for closed trades', () => {
+  const current = useWorkbookStore.getState().workbook;
+  useWorkbookStore.setState({ workbook: { ...current, settings: { ...current.settings, costBasisMethod: 'fifo' } } });
   const { container } = render(<MemoryRouter initialEntries={['/transactions?section=list&qse-from=2026-10-05']}><Controls /><TransactionsPage /></MemoryRouter>);
   expect(screen.getByRole('button', { name: 'Filters (1)' })).toBeVisible();
   const details = screen.getByRole('button', { name: /Closed trades \(realized round-trips\)/ }).closest('section')!;
@@ -28,6 +30,14 @@ it('filters the trade list without discarding the historical buys used for close
   expect(screen.getByText('Export filtered')).toBeVisible();
   expect(screen.getByText('Batch edit')).toBeVisible();
   expect(screen.getByText('Modify')).toBeVisible();
+});
+
+it('hides incompatible lot attribution when Average cost is configured', () => {
+  const current = useWorkbookStore.getState().workbook;
+  useWorkbookStore.setState({ workbook: { ...current, settings: { ...current.settings, costBasisMethod: 'average' } } });
+  render(<MemoryRouter initialEntries={['/transactions?section=list']}><Controls /><TransactionsPage /></MemoryRouter>);
+  expect(screen.getByText(/Average cost blends all buys into one running cost basis/)).toBeVisible();
+  expect(screen.queryByRole('button', { name: /Closed trades \(realized round-trips\)/ })).toBeNull();
 });
 it('batch edits dividend estimates while leaving share balances unchanged', async () => {
   render(<MemoryRouter><DividendsSection /></MemoryRouter>);
@@ -96,7 +106,8 @@ it('uses Bank Account pagination and batches all filtered rows across pages', ()
 it('shows the complete filter set only in the central popup', () => {
   ledgerPage();
   fireEvent.click(screen.getByRole('button', { name: /^Filters/ }));
-  for (const label of ['Trade action', 'Group trades', 'Transfer type', 'Ledger type', 'Lot matching']) expect(screen.getByLabelText(label)).toBeVisible();
+  for (const label of ['Trade action', 'Group trades', 'Transfer type', 'Ledger type']) expect(screen.getByLabelText(label)).toBeVisible();
+  expect(screen.queryByLabelText('Lot matching')).toBeNull();
   expect(screen.getByRole('button', { name: 'This month' })).toBeVisible();
   fireEvent.change(screen.getByLabelText('Ledger type'), { target: { value: 'trade' } });
   fireEvent.click(screen.getByRole('button', { name: 'Done' }));
