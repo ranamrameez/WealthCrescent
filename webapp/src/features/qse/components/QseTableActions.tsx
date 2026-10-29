@@ -182,7 +182,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
       });
       const signature = (row: Row) => {
         const nativeColumns = kind === 'ledger' ? qseColumns(row.kind === 'trade' ? 'transactions' : row.kind === 'transfer' ? 'transfers' : 'adjustments') : columns;
-        return JSON.stringify([kind === 'ledger' ? row.kind : '', ...nativeColumns.filter(c => c.key !== 'seq').map(c => c.type === 'boolean' ? !!row[c.key] : row[c.key] ?? '')]);
+        return JSON.stringify([kind === 'ledger' ? row.kind : '', ...nativeColumns.filter(c => c.key !== 'seq' && c.key !== 'perTickerIndex').map(c => c.type === 'boolean' ? !!row[c.key] : row[c.key] ?? '')]);
       };
       const importedIds = new Set<string>();
       const updates: Row[] = [];
