@@ -204,7 +204,9 @@ export function BrokersPage() {
               <div className="row" style={{ gap: 8, marginTop: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                 <span className="text-muted">Fee schedule:</span>
                 <strong>{isPSX
-                  ? `${profile.settings.feePct}% above PKR ${(profile.settings as PSXSettings).lowPriceThreshold}; PKR ${(profile.settings as PSXSettings).lowPriceFee}/share at or below threshold`
+                  ? (profile.settings as PSXSettings).feeMode === 'simple'
+                    ? `Simple all-in ${(profile.settings as PSXSettings).allInFeePct ?? 0}%`
+                    : `${profile.settings.feePct}% above PKR ${(profile.settings as PSXSettings).lowPriceThreshold}; PKR ${(profile.settings as PSXSettings).lowPriceFee}/share at or below threshold`
                   : `${profile.settings.feePct}% commission`}</strong>
                 {active && <button type="button" className="btn secondary" onClick={() => navigate(isPSX ? '/psx/settings' : '/settings')}>Configure fees</button>}
               </div>
