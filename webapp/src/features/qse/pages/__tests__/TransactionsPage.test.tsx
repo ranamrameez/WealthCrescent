@@ -106,7 +106,8 @@ it('uses Bank Account pagination and batches all filtered rows across pages', ()
 it('shows the complete filter set only in the central popup', () => {
   ledgerPage();
   fireEvent.click(screen.getByRole('button', { name: /^Filters/ }));
-  for (const label of ['Trade action', 'Group trades', 'Transfer type', 'Ledger type', 'Lot matching']) expect(screen.getByLabelText(label)).toBeVisible();
+  for (const label of ['Trade action', 'Group trades', 'Transfer type', 'Ledger type']) expect(screen.getByLabelText(label)).toBeVisible();
+  expect(screen.queryByLabelText('Lot matching')).toBeNull();
   expect(screen.getByRole('button', { name: 'This month' })).toBeVisible();
   fireEvent.change(screen.getByLabelText('Ledger type'), { target: { value: 'trade' } });
   fireEvent.click(screen.getByRole('button', { name: 'Done' }));
