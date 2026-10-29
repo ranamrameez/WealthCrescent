@@ -118,6 +118,19 @@ function FeeSettings() {
             <option value="simple">Simple (one all-in %)</option>
           </Select>
         </Field>
+        <Field
+          label="Same-day commission rule"
+          width={230}
+          title="Use the rule published by this broker. Higher-value side only is documented by JS Zindigi; choose separate charges when your broker's tariff does not confirm netting."
+        >
+          <Select
+            value={settings.sameDayNettingRule ?? 'higherValueSide'}
+            onChange={(e) => updateSettings({ sameDayNettingRule: e.target.value as 'higherValueSide' | 'none' })}
+          >
+            <option value="higherValueSide">Higher-value side only</option>
+            <option value="none">Charge each trade separately</option>
+          </Select>
+        </Field>
         {feeMode === 'simple' && (
           <Field label="All-in commission %" width={130} title="Your broker's total effective rate — commission, SST, and levies combined into one number, applied to the charged side of every trade. The netted side of a same-day pair pays nothing extra.">
             <TextInput type="number" step="0.001" value={settings.allInFeePct ?? 0} onChange={(e) => updateSettings({ allInFeePct: Number(e.target.value) })} />
