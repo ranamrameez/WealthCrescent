@@ -22,7 +22,7 @@ export function buildCashLedger(
     const amount = tx.shares * tx.price;
     const fee = calcFee(amount, isBuy, { shares: tx.shares, tx });
     const cashDelta = isBuy ? -(amount + fee) : amount - fee;
-    events.push({ sourceId: tx.id, ticker: tx.ticker, date: tx.date, time: tx.time, timezone: tx.timezone, seq: tx.seq, transactionIndex: tx.transactionIndex, kind: 'trade', action: tx.action, label: `${tx.action} ${fmt(tx.shares, 0)} ${tx.ticker} @ ${fmt(tx.price, 3)}`, amount: cashDelta, fee });
+    events.push({ sourceId: tx.id, ticker: tx.ticker, date: tx.date, time: tx.time, timezone: tx.timezone, seq: tx.perTickerIndex ?? tx.seq, perTickerIndex: tx.perTickerIndex, globalTransactionIndex: tx.globalTransactionIndex ?? tx.transactionIndex, transactionIndex: tx.globalTransactionIndex ?? tx.transactionIndex, kind: 'trade', action: tx.action, label: `${tx.action} ${fmt(tx.shares, 0)} ${tx.ticker} @ ${fmt(tx.price, 3)}`, amount: cashDelta, fee });
     heldByTicker[tx.ticker] = (heldByTicker[tx.ticker] || 0) + (isBuy ? tx.shares : -tx.shares);
   });
 
@@ -38,7 +38,7 @@ export function buildCashLedger(
   events.sort((a, b) => {
     const byInstant = toInstantMs(a.date, a.time, a.timezone) - toInstantMs(b.date, b.time, b.timezone);
     if (byInstant !== 0) return byInstant;
-    if (a.kind === 'trade' && b.kind === 'trade' && a.transactionIndex !== undefined && b.transactionIndex !== undefined) return a.transactionIndex - b.transactionIndex;
+    if (a.kind === 'trade' && b.kind === 'trade' && a.globalTransactionIndex !== undefined && b.globalTransactionIndex !== undefined) return a.globalTransactionIndex - b.globalTransactionIndex;
     const byKind = (a.kind === 'transfer' ? -1 : 1) - (b.kind === 'transfer' ? -1 : 1);
     if (byKind !== 0) return byKind;
     return (a.seq ?? 0) - (b.seq ?? 0);
