@@ -280,12 +280,12 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   const [editRow, setEditRow] = useState<Transaction | null>(null);
   const [detailTx, setDetailTx] = useState<Transaction | null>(null);
   const [sourceEditRequest, setSourceEditRequest] = useState<QseRow | null>(null);
-  // User-reported (2026-09-13): the flat 0.275% fee never depends on which
-  // lot a sale is later attributed to, so FIFO's "oldest lot first" is a
-  // pure reporting convention here, not a real constraint — offer the
-  // cheapest-lot-first alternative as a second, explicitly comparison-only
-  // view (see `closedTrades.ts`'s own `LotMatchOrder` doc comment).
-  const ctMatchOrder: LotMatchOrder = pageFilters.matchOrder === 'lowestCostFirst' ? 'lowestCostFirst' : 'fifo';
+  // Open lots, closed trades, and per-row realized P/L must use the same
+  // configured cost-basis method as the official position calculations.
+  // Do not let a page-local comparison filter silently override workbook
+  // accounting settings: changing the method must update every dependent view.
+  const ctMatchOrder: LotMatchOrder =
+    workbook.settings.costBasisMethod === 'lowestCostFirst' ? 'lowestCostFirst' : 'fifo';
 
   // Pending item 143: manual lot allocation for the inline edit-row SELL
   // form — same gate as `TransactionRows`' add-row copy above. Lots are
