@@ -10268,6 +10268,10 @@ from the lot system."*
 
 - **Stock-trade FAB save recovery (2026-10-29).** The shared Buy/sell stock popup closes only after the QSE/PSX transaction-store update succeeds. If the synchronous update throws, the form preserves entered values and shows a retryable error. Added a QSE regression test for saved trade data and the success callback. The original callback behavior was already present on current main; this slice ports the missing error recovery and regression test from PR #23.
 
+## Done
+
+- **Persisted QSE/PSX trade accounting order (2026-10-30, PR in review):** transactions now have a global persisted `transactionIndex` distinct from per-ticker `seq`. Legacy records are backfilled without changing trade fields; new trades receive the next index. Position/realized-P&L calculations consume this order, and QSE/PSX transaction tables expose cross-date move controls while preserving the recorded trade dates. This is a proposed slice pending CI and review; the combined mixed-event cash ledger still displays in date order, so do not describe the entire cash-ledger ordering requirement as complete.
+
 ## Pending
 
 - **Remaining cost-basis dependency audit (after PR #31):** continue beyond the QSE/PSX transaction pages. Verify Dashboard, Position Detail, analytics/time series, exports, charts, and strategy/advisory surfaces against the configured method. The global `transactionIndex` / cross-date reorder proposal from closed PR #22 is deferred, not implemented or validated. Do not merge its stale branch; resolve accounting-order versus date-ordered cash-ledger consistency on a fresh branch with regression tests before reconsidering. See `SESSION_HANDOFF.md` and `audit.md`.
