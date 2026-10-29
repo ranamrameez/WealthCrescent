@@ -22,7 +22,7 @@ export function buildCashLedger(
     const amount = tx.shares * tx.price;
     const fee = calcFee(amount, isBuy, { shares: tx.shares, tx });
     const cashDelta = isBuy ? -(amount + fee) : amount - fee;
-    events.push({ sourceId: tx.id, ticker: tx.ticker, date: tx.date, time: tx.time, timezone: tx.timezone, seq: tx.perTickerIndex ?? tx.seq, perTickerIndex: tx.perTickerIndex, globalTransactionIndex: tx.globalTransactionIndex ?? tx.transactionIndex, transactionIndex: tx.globalTransactionIndex ?? tx.transactionIndex, kind: 'trade', action: tx.action, label: `${tx.action} ${fmt(tx.shares, 0)} ${tx.ticker} @ ${fmt(tx.price, 3)}`, amount: cashDelta, fee });
+    events.push({ sourceId: tx.id, ticker: tx.ticker, date: tx.date, time: tx.time, timezone: tx.timezone, seq: tx.perTickerIndex ?? tx.seq, perTickerIndex: tx.perTickerIndex, globalTransactionIndex: tx.globalTransactionIndex ?? tx.transactionIndex, globalTransactionIndex: tx.globalTransactionIndex ?? tx.transactionIndex, perTickerIndex: tx.perTickerIndex ?? tx.seq, transactionIndex: tx.globalTransactionIndex ?? tx.transactionIndex, kind: 'trade', action: tx.action, label: `${tx.action} ${fmt(tx.shares, 0)} ${tx.ticker} @ ${fmt(tx.price, 3)}`, amount: cashDelta, fee });
     heldByTicker[tx.ticker] = (heldByTicker[tx.ticker] || 0) + (isBuy ? tx.shares : -tx.shares);
   });
 
