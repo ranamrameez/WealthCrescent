@@ -362,6 +362,14 @@ export interface Appearance {
   dateFormat?: 'DD-MMM-YYYY' | 'YYYY-MMM-DD' | 'DD-MM-YYYY' | 'MM-DD-YYYY' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'dddd, MMM DD, YYYY' | 'ddd, DD MMM, YYYY';
 }
 
+export interface BrokerPortfolioData {
+  transactions: Transaction[];
+  transfers: Transfer[];
+  adjustments: Adjustment[];
+  dividends: Dividend[];
+  tradePlans: TradePlan[];
+}
+
 export interface BrokerProfile<TSettings> {
   id: string;
   /** User-facing name, e.g. "The Group", "JS Zindagi", or "AL Habib Capital Markets". */
@@ -370,6 +378,8 @@ export interface BrokerProfile<TSettings> {
   accountLabel?: string;
   /** Fee/cost-basis settings are profile-specific, not exchange-global. */
   settings: TSettings;
+  /** Independent account history. Market prices/watchlists remain exchange-wide. */
+  data?: BrokerPortfolioData;
   /** Inactive profiles remain in the workbook so their historical trades are preserved. */
   archived?: boolean;
 }
