@@ -35,7 +35,7 @@ it('filters the trade list without discarding the historical buys used for close
 it('hides incompatible lot attribution when Average cost is configured', () => {
   const current = useWorkbookStore.getState().workbook;
   useWorkbookStore.setState({ workbook: { ...current, settings: { ...current.settings, costBasisMethod: 'average' } } });
-  render(<MemoryRouter><Controls /><TransactionsPage /></MemoryRouter>);
+  render(<MemoryRouter initialEntries={['/transactions?section=list']}><Controls /><TransactionsPage /></MemoryRouter>);
   expect(screen.getByText(/Average cost blends all buys into one running cost basis/)).toBeVisible();
   expect(screen.queryByRole('button', { name: /Closed trades \(realized round-trips\)/ })).toBeNull();
 });
