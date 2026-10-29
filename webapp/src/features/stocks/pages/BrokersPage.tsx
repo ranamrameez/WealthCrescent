@@ -11,6 +11,8 @@ import type { PSXSettings } from '../../../types/psxWorkbook';
 import { useWorkbookStore } from '../../../store/workbookStore';
 import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
 import { createDefaultPSXBrokerSettings } from '../../../store/defaultPsxWorkbook';
+import { DEFAULT_SETTINGS } from '../../../store/defaultWorkbook';
+import { APP_DEFAULTS_VERSION } from '../../../store/appDefaults';
 
 const emptyPortfolio = (): BrokerPortfolioData => ({
   transactions: [],
@@ -76,13 +78,13 @@ export function BrokersPage() {
     if (isPSX) {
       const profile: BrokerProfile<PSXSettings> = {
         id, name, accountLabel: newAccountLabel.trim() || undefined,
-        settings: createDefaultPSXBrokerSettings(name), data: emptyPortfolio(),
+        settings: createDefaultPSXBrokerSettings(name), settingsDefaultsVersion: APP_DEFAULTS_VERSION, data: emptyPortfolio(),
       };
       setPsxWorkbook({ ...psx, brokerProfiles: [...psx.brokerProfiles, profile] });
     } else {
       const profile: BrokerProfile<QSESettings> = {
         id, name, accountLabel: newAccountLabel.trim() || undefined,
-        settings: { ...qse.settings }, data: emptyPortfolio(),
+        settings: { ...DEFAULT_SETTINGS }, settingsDefaultsVersion: APP_DEFAULTS_VERSION, data: emptyPortfolio(),
       };
       setQseWorkbook({ ...qse, brokerProfiles: [...qse.brokerProfiles, profile] });
     }
@@ -147,6 +149,42 @@ export function BrokersPage() {
     toast('Profile restored.');
   };
 
+  const defaultsForProfile = (name: string): QSESettings | PSXSettings =>
+    isPSX ? createDefaultPSXBrokerSettings(name) : { ...DEFAULT_SETTINGS };
+
+  const needsDefaultsReview = (profile: (typeof profiles)[number]) => {
+    if ((profile.settingsDefaultsVersion ?? 0) >= APP_DEFAULTS_VERSION) return false;
+    const defaults = defaultsForProfile(profile.name) as unknown as Record<string, unknown>;
+    const current = profile.settings as unknown as Record<string, unknown>;
+    return Object.entries(defaults).some(([key, value]) => current[key] !== value);
+  };
+
+  const acknowledgeDefaults = (profileId: string, adoptDefaults: boolean) => {
+    const profile = profiles.find((p) => p.id === profileId);
+    if (!profile) return;
+    const settings = adoptDefaults ? defaultsForProfile(profile.name) : profile.settings;
+    if (isPSX) {
+      const nextProfiles = psx.brokerProfiles.map((p) => p.id === profileId
+        ? { ...p, settings: settings as PSXSettings, settingsDefaultsVersion: APP_DEFAULTS_VERSION }
+        : p);
+      setPsxWorkbook({
+        ...psx,
+        brokerProfiles: nextProfiles,
+        ...(profileId === activeId ? { settings: settings as PSXSettings } : {}),
+      });
+    } else {
+      const nextProfiles = qse.brokerProfiles.map((p) => p.id === profileId
+        ? { ...p, settings: settings as QSESettings, settingsDefaultsVersion: APP_DEFAULTS_VERSION }
+        : p);
+      setQseWorkbook({
+        ...qse,
+        brokerProfiles: nextProfiles,
+        ...(profileId === activeId ? { settings: settings as QSESettings } : {}),
+      });
+    }
+    toast(adoptDefaults ? 'Current application defaults applied to this broker profile.' : 'Your current broker settings have been kept.');
+  };
+
   return (
     <div className="page-stack">
       <PageHeading back={<BackButton to={isPSX ? '/psx' : '/qse'}>← {isPSX ? 'PSX' : 'QSE'}</BackButton>}>
@@ -180,8 +218,27 @@ export function BrokersPage() {
           const draft = drafts[profile.id] ?? { name: profile.name, accountLabel: profile.accountLabel ?? '' };
           const active = profile.id === activeId;
           const count = rowCounts[profile.id] ?? 0;
+          const reviewDefaults = needsDefaultsReview(profile);
           return (
             <Card key={profile.id}>
+              {reviewDefaults && (
+                <div style={{ padding: 12, marginBottom: 12, border: '1px solid var(--border)', borderRadius: 8 }}>
+                  <strong>Application defaults have changed</strong>
+                  <p className="text-muted" style={{ margin: '6px 0 10px' }}>
+                    This profile's fee/settings values differ from the current application defaults. Choose whether to adopt the latest defaults or keep your custom values. Nothing changes until you choose.
+                  </p>
+                  <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                    <button type="button" className="btn primary" onClick={() => void (async () => {
+                      const ok = await confirmDialog(
+                        'Replace this broker profile’s settings with the current application defaults? Your transactions and other portfolio history will be preserved.',
+                        'Apply application defaults?',
+                      );
+                      if (ok) acknowledgeDefaults(profile.id, true);
+                    })()}>Use app defaults</button>
+                    <button type="button" className="btn secondary" onClick={() => acknowledgeDefaults(profile.id, false)}>Keep my settings</button>
+                  </div>
+                </div>
+              )}
               <div className="row" style={{ alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                 <div>
                   <h3 className="mt-0 mb-xs">{profile.name}</h3>
