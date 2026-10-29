@@ -6,6 +6,7 @@ import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositi
 import { makePSXFeeCalculator } from '../../../lib/calc/psxFees';
 import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
 import { applyLivePsx } from '../../../lib/stockData/livePsx';
+import { scopeWorkbookToActiveBroker } from '../../../lib/brokerProfiles';
 import { useLivePsxWorkbook, usePsxFeed } from './useLivePsxWorkbook';
 
 export interface PSXRow {
@@ -35,7 +36,8 @@ export interface PSXRow {
  * it's empty under the weighted-average method, which has no discrete lots
  * to show. */
 function calculateDerived(workbook: PSXWorkbook, selectedTickers?: string[]) {
-    const scoped = selectedTickers?.length ? workbook.transactions.filter((tx) => selectedTickers.includes(tx.ticker)) : workbook.transactions;
+    const brokerWorkbook = scopeWorkbookToActiveBroker(workbook);
+    const scoped = selectedTickers?.length ? brokerWorkbook.transactions.filter((tx) => selectedTickers.includes(tx.ticker)) : brokerWorkbook.transactions;
     const calcFee = makePSXFeeCalculator(workbook.settings, scoped);
     const method = workbook.settings.costBasisMethod;
 
@@ -54,18 +56,18 @@ function calculateDerived(workbook: PSXWorkbook, selectedTickers?: string[]) {
 
     const summary = cashSummary(
       scoped,
-      workbook.transfers,
-      workbook.adjustments,
-      workbook.marketPrices,
+      brokerWorkbook.transfers,
+      brokerWorkbook.adjustments,
+      brokerWorkbook.marketPrices,
       calcFee,
       positions,
     );
-    const ledger = buildCashLedger(scoped, workbook.transfers, workbook.adjustments, calcFee);
+    const ledger = buildCashLedger(scoped, brokerWorkbook.transfers, brokerWorkbook.adjustments, calcFee);
 
     const rows: PSXRow[] = positions
       .filter((p) => p.shares > 0)
       .map((p) => {
-        const marketPrice = getMarketPrice(p.ticker, workbook.marketPrices, scoped);
+        const marketPrice = getMarketPrice(p.ticker, brokerWorkbook.marketPrices, scoped);
         const value = p.shares * marketPrice;
         const sellFee = marketPrice > 0 ? calcFee(value, false, { shares: p.shares }) : 0;
         const profit = value - sellFee - p.invested;
@@ -73,7 +75,7 @@ function calculateDerived(workbook: PSXWorkbook, selectedTickers?: string[]) {
         return { ticker: p.ticker, shares: p.shares, invested: p.invested, marketPrice, value, sellFee, profit, roiPct };
       });
 
-    return { workbook, calcFee, positions, summary, realizedSeries, ledger, rows, lots };
+    return { workbook: { ...brokerWorkbook, transactions: scoped }, calcFee, positions, summary, realizedSeries, ledger, rows, lots };
 
 }
 
