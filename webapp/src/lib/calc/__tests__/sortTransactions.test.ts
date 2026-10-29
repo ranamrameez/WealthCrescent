@@ -16,6 +16,30 @@ describe('sortTransactionsChronological', () => {
     expect(sorted.map((t) => t.date)).toEqual(['2026-01-01', '2026-01-02', '2026-01-03']);
   });
 
+  it('uses persisted accounting order across dates, even when it differs from chronology', () => {
+    const sorted = sortTransactionsChronological([
+      tx({ id: 'later-date', date: '2026-10-27', action: 'BUY', transactionIndex: 1 }),
+      tx({ id: 'earlier-date', date: '2026-10-18', action: 'SELL', transactionIndex: 2 }),
+    ]);
+    expect(sorted.map(t => t.id)).toEqual(['later-date', 'earlier-date']);
+  });
+
+  it('honors transactionIndex over same-instant BUY-before-SELL fallback', () => {
+    const sorted = sortTransactionsChronological([
+      tx({ action: 'BUY', transactionIndex: 2 }),
+      tx({ action: 'SELL', transactionIndex: 1 }),
+    ]);
+    expect(sorted.map(t => t.action)).toEqual(['SELL', 'BUY']);
+  });
+
+  it('places indexed rows before legacy rows pending migration', () => {
+    const sorted = sortTransactionsChronological([
+      tx({ id: 'legacy', date: '2026-01-01' }),
+      tx({ id: 'indexed', date: '2026-01-02', transactionIndex: 5 }),
+    ]);
+    expect(sorted.map(t => t.id)).toEqual(['indexed', 'legacy']);
+  });
+
   it('puts BUY before SELL on an exact instant tie, regardless of seq', () => {
     const sorted = sortTransactionsChronological([
       tx({ action: 'SELL', seq: 1 }), // entered first, but a sell
