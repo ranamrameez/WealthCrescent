@@ -41,9 +41,16 @@ export function BrokersPage() {
   const rowCounts = useMemo(() => {
     const result: Record<string, number> = {};
     for (const profile of profiles) {
-      const data = profile.id === activeId
+      const rawData = profile.id === activeId
         ? { transactions: workbook.transactions, transfers: workbook.transfers, adjustments: workbook.adjustments, dividends: workbook.dividends, tradePlans: workbook.tradePlans }
-        : { ...emptyPortfolio(), ...(profile.data ?? {}) };
+        : profile.data ?? {};
+      const data = {
+        transactions: rawData.transactions ?? [],
+        transfers: rawData.transfers ?? [],
+        adjustments: rawData.adjustments ?? [],
+        dividends: rawData.dividends ?? [],
+        tradePlans: rawData.tradePlans ?? [],
+      };
       result[profile.id] = data.transactions.length + data.transfers.length + data.adjustments.length + data.dividends.length + data.tradePlans.length;
     }
     return result;
