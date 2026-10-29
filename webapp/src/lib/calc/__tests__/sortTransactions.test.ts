@@ -41,10 +41,10 @@ describe('sortTransactionsChronological', () => {
     expect(sorted.map(t => t.id)).toEqual(['later-date', 'earlier-date']);
   });
 
-  it('honors transactionIndex over same-instant BUY-before-SELL fallback', () => {
+  it('honors globalTransactionIndex over same-instant BUY-before-SELL fallback', () => {
     const sorted = sortTransactionsChronological([
-      tx({ action: 'BUY', transactionIndex: 2 }),
-      tx({ action: 'SELL', transactionIndex: 1 }),
+      tx({ action: 'BUY', globalTransactionIndex: 2 }),
+      tx({ action: 'SELL', globalTransactionIndex: 1 }),
     ]);
     expect(sorted.map(t => t.action)).toEqual(['SELL', 'BUY']);
   });
