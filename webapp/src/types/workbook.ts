@@ -1,4 +1,8 @@
 export interface Transaction {
+  /** Broker/account profile that owns this trade. Missing on legacy imports;
+   * the workbook migration assigns those trades to the original default
+   * profile without changing their financial fields. */
+  brokerId?: string;
   /** Stable id, not the transaction's array position. Optional because
    * QSE/PSX transactions have historically been index-addressed (see
    * CLAUDE.md) — added specifically so a Trade Planner leg ("Mark as
@@ -350,8 +354,22 @@ export interface Appearance {
   dateFormat?: 'DD-MMM-YYYY' | 'YYYY-MMM-DD' | 'DD-MM-YYYY' | 'MM-DD-YYYY' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'dddd, MMM DD, YYYY' | 'ddd, DD MMM, YYYY';
 }
 
+export interface BrokerProfile<TSettings> {
+  id: string;
+  /** User-facing name, e.g. "The Group", "JS Zindagi", or "AL Habib Capital Markets". */
+  name: string;
+  /** Optional account label/last digits to distinguish multiple accounts at one broker. */
+  accountLabel?: string;
+  /** Fee/cost-basis settings are profile-specific, not exchange-global. */
+  settings: TSettings;
+  /** Inactive profiles remain in the workbook so their historical trades are preserved. */
+  archived?: boolean;
+}
+
 export interface Workbook {
   settings: QSESettings;
+  brokerProfiles: BrokerProfile<QSESettings>[];
+  activeBrokerId: string;
   /** @deprecated appearance is now a global preference (see
    * store/appearanceStore.ts), not per-workbook — kept optional here only
    * so old exported/synced JSON still parses. */
