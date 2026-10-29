@@ -208,6 +208,13 @@ export function BrokersPage() {
                     ? `Simple all-in ${(profile.settings as PSXSettings).allInFeePct ?? 0}%`
                     : `${profile.settings.feePct}% above PKR ${(profile.settings as PSXSettings).lowPriceThreshold}; PKR ${(profile.settings as PSXSettings).lowPriceFee}/share at or below threshold`
                   : `${profile.settings.feePct}% commission`}</strong>
+                {isPSX && (
+                  <span className="text-muted">
+                    {(profile.settings as PSXSettings).sameDayNettingRule === 'none'
+                      ? 'Same-day trades: charged separately'
+                      : 'Same-day trades: higher-value side pays commission'}
+                  </span>
+                )}
                 {active && <button type="button" className="btn secondary" onClick={() => navigate(isPSX ? '/psx/settings' : '/settings')}>Configure fees</button>}
               </div>
             </Card>
