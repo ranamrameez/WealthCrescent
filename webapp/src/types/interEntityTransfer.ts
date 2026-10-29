@@ -4,7 +4,9 @@
  * record instead of two independently-typed entries that can silently
  * drift apart (one side edited or deleted without the other).
  *
- * v1 scope: Cash <-> Bank, Bank <-> QSE, Bank <-> PSX. Extended
+ * v1 scope: Cash <-> Bank, Bank <-> QSE, Bank <-> PSX. QSE/PSX sides
+ * carry a broker-profile `ref` so transfers target an individual account,
+ * while exchange market data remains shared. Extended
  * 2026-08-23 to include Rentals (Bank/Cash <-> a specific property — a
  * rent payment in, or an expense paid out) since `RentalEntry` already had
  * a stable id and needed no retrofit, unlike Personal Loans (repayments
@@ -37,8 +39,8 @@ export const LINK_MODULES: LinkModule[] = ['cash', 'bank', 'qse', 'psx', 'rental
 export const LINK_MODULE_LABELS: Record<LinkModule, string> = {
   cash: 'Cash',
   bank: 'Banking',
-  qse: 'QSE (Stocks)',
-  psx: 'PSX (Stocks)',
+  qse: 'QSE broker account',
+  psx: 'PSX broker account',
   rentals: 'Rentals',
   personalLoans: 'Personal Loans',
   funds: 'Funds',
@@ -48,7 +50,7 @@ export const LINK_MODULE_LABELS: Record<LinkModule, string> = {
 
 export interface LinkSideConfig {
   module: LinkModule;
-  /** A `BankAccount.id` when `module === 'bank'`, a `Property.id` when
+  /** A broker profile id when `module === 'qse'` or `'psx'`, a `BankAccount.id` when `module === 'bank'`, a `Property.id` when
    * `module === 'rentals'`, a `PersonalLoan.id` when
    * `module === 'personalLoans'`, an `EMILoan.id` when `module === 'emi'`,
    * or a `CreditCard.id` when `module === 'creditCard'` — the sides with
