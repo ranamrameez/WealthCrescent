@@ -155,6 +155,8 @@ it('saves a trade from the shared FAB form and signals the modal to close only a
   fireEvent.change(screen.getByPlaceholderText('Ticker'), { target: { value: 'QNBK' } });
   fireEvent.change(screen.getByPlaceholderText('Shares'), { target: { value: '5' } });
   fireEvent.change(screen.getByPlaceholderText('Price'), { target: { value: '12.5' } });
+  fireEvent.blur(screen.getByPlaceholderText('Shares'));
+  fireEvent.blur(screen.getByPlaceholderText('Price'));
   fireEvent.click(screen.getByRole('button', { name: 'Save transaction' }));
   await waitFor(() => expect(useWorkbookStore.getState().workbook.transactions).toHaveLength(3));
   expect(useWorkbookStore.getState().workbook.transactions[2]).toMatchObject({
@@ -175,6 +177,8 @@ it('keeps the entered trade open for retry when the store save throws', async ()
     fireEvent.change(screen.getByPlaceholderText('Ticker'), { target: { value: 'QNBK' } });
     fireEvent.change(screen.getByPlaceholderText('Shares'), { target: { value: '5' } });
     fireEvent.change(screen.getByPlaceholderText('Price'), { target: { value: '12.5' } });
+    fireEvent.blur(screen.getByPlaceholderText('Shares'));
+    fireEvent.blur(screen.getByPlaceholderText('Price'));
     fireEvent.click(screen.getByRole('button', { name: 'Save transaction' }));
     await waitFor(() => expect(errorSpy).toHaveBeenCalledTimes(1));
     expect(screen.getByPlaceholderText('Ticker')).toHaveValue('QNBK');
