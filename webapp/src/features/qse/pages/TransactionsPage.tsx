@@ -53,7 +53,7 @@ function emptyRow(): Transaction {
   return { date: today(), ticker: '', action: 'BUY', shares: 0, price: 0, time: nowTime(defaultTimezoneForMarket('QSE')), timezone: defaultTimezoneForMarket('QSE') };
 }
 
-export function TransactionRows({ initial }: { initial?: Partial<Transaction> } = {}) {
+export function TransactionRows({ initial, onSaved }: { initial?: Partial<Transaction>; onSaved?: () => void } = {}) {
   const addTransactions = useWorkbookStore((s) => s.addTransactions);
   const workbook = useWorkbookStore((s) => s.workbook);
   const { calcFee } = useQSEDerived();
@@ -98,6 +98,7 @@ export function TransactionRows({ initial }: { initial?: Partial<Transaction> } 
     if (!(await ensureSignedIn('Sign in to save your transactions.'))) return;
     addTransactions(valid.map((r) => ({ ...r, ticker: r.ticker.toUpperCase() })));
     toast(`Added ${valid.length} transaction${valid.length > 1 ? 's' : ''}.`);
+    onSaved?.();
     setRows([emptyRow()]);
     setTimeTouched([false]);
   };
