@@ -1,6 +1,6 @@
 import { create, type UseBoundStore, type StoreApi } from 'zustand';
 import { toInstantMs } from '../lib/datetime';
-import { assignSeqForEntities, backfillSeq, nextSeq, nextSeqForEntity } from '../lib/seq';
+import { assignSeqForEntities, backfillSeq, nextSeq, nextSeqForEntity, syncTransactionIndexes } from '../lib/seq';
 import { sortTransactionsChronological } from '../lib/calc/sortTransactions';
 import type { Adjustment, BrokerPortfolioData, BrokerProfile, Dividend, PricePoint, Transaction, TradePlan, Transfer, WatchlistItem } from '../types/workbook';
 import { scheduleLocalStorageWrite } from '../lib/localStoragePersistence';
@@ -122,20 +122,7 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
       const byId = new Map(legacy.map(t => [t.id, { ...t, transactionIndex: ++nextIndex }]));
       return transactionsWithId.map(t => Number.isInteger(t.globalTransactionIndex) || Number.isInteger(t.transactionIndex) ? { ...t, globalTransactionIndex: t.globalTransactionIndex ?? t.transactionIndex, transactionIndex: t.globalTransactionIndex ?? t.transactionIndex } : byId.get(t.id)!);
     })();
-    // Global order is authoritative. Rebuild each ticker's local order from it on every normalization,
-    // and keep old field names mirrored only for backwards-compatible import/export paths.
-    const syncedTransactions = (() => {
-      const ordered = [...indexedTransactions].sort((a, b) => (a.globalTransactionIndex ?? a.transactionIndex ?? 0) - (b.globalTransactionIndex ?? b.transactionIndex ?? 0));
-      const perTicker = new Map<string, number>();
-      const byId = new Map<string | undefined, Transaction>();
-      ordered.forEach((tx, i) => {
-        const globalTransactionIndex = tx.globalTransactionIndex ?? tx.transactionIndex ?? i + 1;
-        const perTickerIndex = (perTicker.get(tx.ticker) ?? 0) + 1;
-        perTicker.set(tx.ticker, perTickerIndex);
-        byId.set(tx.id, { ...tx, globalTransactionIndex, perTickerIndex, transactionIndex: globalTransactionIndex, seq: perTickerIndex });
-      });
-      return indexedTransactions.map(tx => byId.get(tx.id)!);
-    })();
+    const syncedTransactions = syncTransactionIndexes(indexedTransactions);
     const transfersWithId = wb.transfers.map((t) => ({ ...t, ...(t.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), ...(t.id ? {} : { id: crypto.randomUUID() }) }));
     const adjustmentsWithId = wb.adjustments.map((a) => ({ ...a, ...(a.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), ...(a.id ? {} : { id: crypto.randomUUID() }) }));
     const dividendsWithId = wb.dividends.map((d) => ({ ...d, ...(d.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), ...(d.id ? {} : { id: crypto.randomUUID() }) }));
