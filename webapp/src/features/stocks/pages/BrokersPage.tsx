@@ -129,19 +129,20 @@ export function BrokersPage() {
     navigate(isPSX ? '/psx' : '/qse');
   };
 
-  const archiveOrDelete = async (profile: (typeof profiles)[number]) => {
+  const archiveProfile = async (profile: (typeof profiles)[number]) => {
     if (profile.id === activeId) return toast('Switch to another broker before changing the active profile status.');
-    const count = rowCounts[profile.id] ?? 0;
-    if (count > 0) {
-      const ok = await confirmDialog(
-        'Archived profiles are preserved for history and are view-only. They are excluded from new-activity pickers.',
-        `Archive ${profile.name}?`,
-      );
-      if (!ok) return;
-      updateStatus(profile.id, 'archived');
-      toast('Profile archived; its portfolio and history are preserved.');
-      return;
-    }
+    const ok = await confirmDialog(
+      'Archived profiles are preserved for history and are view-only. They are excluded from new-activity pickers.',
+      `Archive ${profile.name}?`,
+    );
+    if (!ok) return;
+    updateStatus(profile.id, 'archived');
+    toast('Profile archived; its portfolio and history are preserved.');
+  };
+
+  const deleteEmptyProfile = async (profile: (typeof profiles)[number]) => {
+    if (profile.id === activeId) return toast('Switch to another broker before deleting this profile.');
+    if ((rowCounts[profile.id] ?? 0) > 0) return toast('Only empty profiles can be deleted. Archive this profile to preserve its history.');
     const ok = await confirmDialog(
       'This profile has no transactions, transfers, adjustments, dividends, or plans. This action cannot be undone.',
       `Delete empty profile ${profile.name}?`,
@@ -238,7 +239,8 @@ export function BrokersPage() {
             const ok = await confirmDialog('This profile remains available in the profile list but is hidden from normal activity pickers. You can reactivate it later.', `Deactivate ${profile.name}?`);
             if (ok) { updateStatus(profile.id, 'deactivated'); toast('Profile deactivated.'); }
           })()}>Deactivate</button>}
-          {!active && status === 'active' && <button type="button" className="btn danger" onClick={() => void archiveOrDelete(profile)}>{count ? 'Archive profile' : 'Delete empty profile'}</button>}
+          {!active && status === 'active' && <button type="button" className="btn danger" onClick={() => void archiveProfile(profile)}>Archive profile</button>}
+          {!active && status === 'active' && count === 0 && <button type="button" className="btn secondary" onClick={() => void deleteEmptyProfile(profile)}>Delete empty profile</button>}
         </div>
 
         <details style={{ marginTop: 14 }} open={active}>
@@ -284,7 +286,7 @@ export function BrokersPage() {
   const deactivatedProfiles = profiles.filter((p) => p.deactivated);
   const sections: StandardPageSection[] = [
     {
-      key: 'add-profile', label: 'Add broker profile', defaultOpen: true,
+      key: 'add-profile', label: 'Add broker profile', defaultOpen: false,
       content: <div>
         <p className="text-muted mt-0">Each profile owns its trades, transfers, rewards/dividends, adjustments, plans, calculations, accounting indexes and fee settings. Market prices and price history remain shared at exchange level.</p>
         <div className="row" style={{ gap: 12, alignItems: 'end', flexWrap: 'wrap' }}>
