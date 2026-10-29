@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { TransactionsPage } from '../TransactionsPage';
+import { TransactionRows, TransactionsPage } from '../TransactionsPage';
 import { DividendsSection } from '../../components/DividendsSection';
 import { useWorkbookStore } from '../../../../store/workbookStore';
 import { createEmptyWorkbook } from '../../../../store/defaultWorkbook';
@@ -146,4 +146,47 @@ it('preserves user-entered descriptions in cash ledger details', () => {
   fireEvent.click(within(row).getByRole('button', { name: 'Expand details' }));
   expect(within(section).getByText('Description:')).toBeVisible();
   expect(within(section).getAllByText('SWIFT TR. FROM')).toHaveLength(2);
+});
+
+
+it('saves a trade from the shared FAB form and signals the modal to close only after success', async () => {
+  const onSaved = vi.fn();
+  render(<MemoryRouter><TransactionRows onSaved={onSaved} /></MemoryRouter>);
+  fireEvent.change(screen.getByPlaceholderText('Ticker'), { target: { value: 'QNBK' } });
+  fireEvent.change(screen.getByPlaceholderText('Shares'), { target: { value: '5' } });
+  fireEvent.change(screen.getByPlaceholderText('Price'), { target: { value: '12.5' } });
+  fireEvent.blur(screen.getByPlaceholderText('Shares'));
+  fireEvent.blur(screen.getByPlaceholderText('Price'));
+  fireEvent.click(screen.getByRole('button', { name: 'Save transaction' }));
+  await waitFor(() => expect(useWorkbookStore.getState().workbook.transactions).toHaveLength(3));
+  expect(useWorkbookStore.getState().workbook.transactions[2]).toMatchObject({
+    ticker: 'QNBK', action: 'BUY', shares: 5, price: 12.5,
+  });
+  expect(onSaved).toHaveBeenCalledTimes(1);
+});
+
+it('keeps the entered trade open for retry when the store save throws', async () => {
+  const onSaved = vi.fn();
+  const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const originalAddTransactions = useWorkbookStore.getState().addTransactions;
+  useWorkbookStore.setState({
+    addTransactions: (() => { throw new Error('simulated store failure'); }) as typeof originalAddTransactions,
+  });
+  try {
+    render(<MemoryRouter><TransactionRows onSaved={onSaved} /></MemoryRouter>);
+    fireEvent.change(screen.getByPlaceholderText('Ticker'), { target: { value: 'QNBK' } });
+    fireEvent.change(screen.getByPlaceholderText('Shares'), { target: { value: '5' } });
+    fireEvent.change(screen.getByPlaceholderText('Price'), { target: { value: '12.5' } });
+    fireEvent.blur(screen.getByPlaceholderText('Shares'));
+    fireEvent.blur(screen.getByPlaceholderText('Price'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save transaction' }));
+    await waitFor(() => expect(errorSpy).toHaveBeenCalledTimes(1));
+    expect(screen.getByPlaceholderText('Ticker')).toHaveValue('QNBK');
+    expect(screen.getByPlaceholderText('Shares')).toHaveValue('5');
+    expect(screen.getByPlaceholderText('Price')).toHaveValue('12.50');
+    expect(onSaved).not.toHaveBeenCalled();
+  } finally {
+    useWorkbookStore.setState({ addTransactions: originalAddTransactions });
+    errorSpy.mockRestore();
+  }
 });
