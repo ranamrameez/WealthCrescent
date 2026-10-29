@@ -6,7 +6,10 @@ export function PriceInput({ exchange, value, defaultValue, onChange, onFocus, o
   InputHTMLAttributes<HTMLInputElement> & { exchange: 'qse' | 'psx'; width?: number }) {
   const [focused, setFocused] = useState(false);
   const [draft, setDraft] = useState(defaultValue);
-  useEffect(() => { if (!focused && value === undefined) setDraft(defaultValue); }, [defaultValue, focused, value]);
+  // Sync only when the supplied default changes. Including `focused` here
+  // resets an uncontrolled input to its original default on blur, discarding
+  // the value the user just edited.
+  useEffect(() => { if (value === undefined) setDraft(defaultValue); }, [defaultValue, value]);
   const current = value === undefined ? draft : value;
   const empty = current === '' || current === undefined || current === null;
   const numeric = Number(current);
