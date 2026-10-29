@@ -179,6 +179,8 @@ from the lot system."*
 
 ## Done
 
+- **Cost-basis consistency fixes in QSE/PSX Transactions (2026-10-29, audit branch; verification pending):** Removed the separate page-local match-order override/state so open-lot and closed-trade attribution follows the workbook's configured FIFO vs. lowest-cost-first setting. This fixes a concrete mismatch where the visible report could remain FIFO after selecting lowest-cost-first. It is only the first slice of the audit: Average-cost behavior in lot-oriented reports and other app-wide calculations still require review; do not treat the overall consistency audit as complete.
+
 - **PSX Market Prices API integration (2026-10-22, implemented locally).** All documented
   PSX dataset families have lazy sections and paginated reusable tables. Sector cards
   start closed; favourites start open and reuse the shared cloud/local favourites hook.
@@ -10246,6 +10248,9 @@ from the lot system."*
   and linked transactions remain read-only in this flow.
 
 ## Pending
+
+- **HIGH — App-wide cost-basis consistency audit (2026-10-29):** A selected cost-basis method must be applied consistently across all dependent QSE and PSX calculations and insights, not only the main position totals. Audit and align open/closed lots, per-SELL realized P/L, dashboards, analytics/time series, position details, exports, and strategy/insight surfaces. Explicitly advisory views must be unmistakably labelled and must not be presented as the configured accounting result. Define valid Average-cost behavior for lot-oriented reports instead of silently showing FIFO attribution. Add method-switch regression tests and QSE/PSX parity coverage; verify build/tests before marking complete. Work tracked in webapp/audit.md.
+
 
 - **Activate PSX market cache:** merge the PSX rules fragment into existing rules, deploy
   `fetchPsxMarketData`, run the first refresh and verify the shared reference/cache paths.
