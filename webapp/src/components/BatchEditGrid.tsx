@@ -59,7 +59,7 @@ export function BatchEditGrid<T>({ title, description, rows, columns, getRowId, 
       const rawOrder = Number(cells[orderKey]);
       if (!Number.isFinite(rawOrder)) parseErrors[orderKey] = 'Enter a valid order index.';
       else {
-        (after as Record<string, unknown>)[orderKey] = rawOrder;
+        (after as unknown as Record<string, unknown>)[orderKey] = rawOrder;
         if (rawOrder !== Number(before[orderKey])) dirtyKeys.push(orderKey);
       }
     }
