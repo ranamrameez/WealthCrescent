@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Transaction } from '../../../types/workbook';
 import { sortTransactionsChronological } from '../sortTransactions';
+import { syncTransactionIndexes } from '../../seq';
 
 function tx(partial: Partial<Transaction>): Transaction {
   return { date: '2026-01-01', ticker: 'ABC', action: 'BUY', shares: 1, price: 100, ...partial };
@@ -16,10 +17,26 @@ describe('sortTransactionsChronological', () => {
     expect(sorted.map((t) => t.date)).toEqual(['2026-01-01', '2026-01-02', '2026-01-03']);
   });
 
+  it('keeps global and per-ticker indexes synchronized after a cross-ticker reorder', () => {
+    const synced = syncTransactionIndexes([
+      tx({ id: 'a1', ticker: 'AAA', globalTransactionIndex: 2 }),
+      tx({ id: 'b1', ticker: 'BBB', globalTransactionIndex: 1 }),
+      tx({ id: 'a2', ticker: 'AAA', globalTransactionIndex: 3 }),
+    ]);
+    const byId = Object.fromEntries(synced.map(row => [row.id, row]));
+    expect(byId.b1.globalTransactionIndex).toBe(1);
+    expect(byId.b1.perTickerIndex).toBe(1);
+    expect(byId.a1.globalTransactionIndex).toBe(2);
+    expect(byId.a1.perTickerIndex).toBe(1);
+    expect(byId.a2.globalTransactionIndex).toBe(3);
+    expect(byId.a2.perTickerIndex).toBe(2);
+    expect(synced.every(row => row.transactionIndex === row.globalTransactionIndex && row.seq === row.perTickerIndex)).toBe(true);
+  });
+
   it('uses persisted accounting order across dates, even when it differs from chronology', () => {
     const sorted = sortTransactionsChronological([
-      tx({ id: 'later-date', date: '2026-10-27', action: 'BUY', transactionIndex: 1 }),
-      tx({ id: 'earlier-date', date: '2026-10-18', action: 'SELL', transactionIndex: 2 }),
+      tx({ id: 'later-date', date: '2026-10-27', action: 'BUY', globalTransactionIndex: 1 }),
+      tx({ id: 'earlier-date', date: '2026-10-18', action: 'SELL', globalTransactionIndex: 2 }),
     ]);
     expect(sorted.map(t => t.id)).toEqual(['later-date', 'earlier-date']);
   });
@@ -35,7 +52,7 @@ describe('sortTransactionsChronological', () => {
   it('places indexed rows before legacy rows pending migration', () => {
     const sorted = sortTransactionsChronological([
       tx({ id: 'legacy', date: '2026-01-01' }),
-      tx({ id: 'indexed', date: '2026-01-02', transactionIndex: 5 }),
+      tx({ id: 'indexed', date: '2026-01-02', globalTransactionIndex: 5 }),
     ]);
     expect(sorted.map(t => t.id)).toEqual(['indexed', 'legacy']);
   });
