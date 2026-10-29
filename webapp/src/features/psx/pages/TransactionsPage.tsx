@@ -42,6 +42,7 @@ import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
 import { useInterEntityTransfersStore } from '../../../store/interEntityTransfersStore';
 import { linkTargetPath, useLinkSideLabel } from '../../transfers/pages/TransferLinksPage';
 import type { Adjustment, Transaction, Transfer } from '../../../types/workbook';
+import { syncTransactionIndexes } from '../../../lib/seq';
 import { DividendsSection } from '../components/DividendsSection';
 import { usePSXDerived } from '../hooks/usePSXDerived';
 
@@ -491,15 +492,7 @@ function TransactionList() {
       : tx.id === b.id
         ? { ...tx, globalTransactionIndex: aIndex, transactionIndex: aIndex }
         : tx);
-    const ordered = [...swapped].sort((x, y) => (x.globalTransactionIndex ?? x.transactionIndex ?? 0) - (y.globalTransactionIndex ?? y.transactionIndex ?? 0));
-    const tickerCounts = new Map<string, number>();
-    const syncedById = new Map<string | undefined, Transaction>();
-    ordered.forEach(tx => {
-      const perTickerIndex = (tickerCounts.get(tx.ticker) ?? 0) + 1;
-      tickerCounts.set(tx.ticker, perTickerIndex);
-      syncedById.set(tx.id, { ...tx, perTickerIndex, seq: perTickerIndex });
-    });
-    const transactions = swapped.map(tx => syncedById.get(tx.id)!);
+    const transactions = syncTransactionIndexes(swapped);
     usePSXWorkbookStore.getState().setWorkbook({ ...current, transactions });
     toast('Transaction accounting order updated.');
   };
