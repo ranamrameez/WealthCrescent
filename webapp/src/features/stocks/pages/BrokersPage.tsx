@@ -43,7 +43,7 @@ export function BrokersPage() {
     for (const profile of profiles) {
       const data = profile.id === activeId
         ? { transactions: workbook.transactions, transfers: workbook.transfers, adjustments: workbook.adjustments, dividends: workbook.dividends, tradePlans: workbook.tradePlans }
-        : profile.data ?? emptyPortfolio();
+        : { ...emptyPortfolio(), ...(profile.data ?? {}) };
       result[profile.id] = data.transactions.length + data.transfers.length + data.adjustments.length + data.dividends.length + data.tradePlans.length;
     }
     return result;
