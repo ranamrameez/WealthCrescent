@@ -50,8 +50,8 @@ export function BrokersPage() {
   }, [profiles, activeId, workbook]);
 
   const saveProfileList = (nextProfiles: typeof profiles) => {
-    if (isPSX) setPsxWorkbook({ ...psx, brokerProfiles: nextProfiles });
-    else setQseWorkbook({ ...qse, brokerProfiles: nextProfiles });
+    if (isPSX) setPsxWorkbook({ ...psx, brokerProfiles: nextProfiles as BrokerProfile<PSXSettings>[] });
+    else setQseWorkbook({ ...qse, brokerProfiles: nextProfiles as BrokerProfile<QSESettings>[] });
   };
 
   const addProfile = () => {
