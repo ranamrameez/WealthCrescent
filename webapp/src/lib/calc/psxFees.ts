@@ -51,10 +51,15 @@ export function calcCGT(gain: number, settings: PSXSettings): number {
  * transaction merely by being present in the workbook. */
 export function sameDayChargedSide(transactions: Transaction[], ticker: string, date: string): 'BUY' | 'SELL' | null {
   const dayTxs = transactions.filter((t) => !t.isPending && t.ticker === ticker && t.date === date);
-  const buyQty = dayTxs.filter((t) => t.action === 'BUY').reduce((s, t) => s + t.shares, 0);
-  const sellQty = dayTxs.filter((t) => t.action === 'SELL').reduce((s, t) => s + t.shares, 0);
-  if (buyQty <= 0 || sellQty <= 0) return null;
-  return sellQty > buyQty ? 'SELL' : 'BUY';
+  const buys = dayTxs.filter((t) => t.action === 'BUY');
+  const sells = dayTxs.filter((t) => t.action === 'SELL');
+  if (!buys.length || !sells.length) return null;
+  // Zindigi's published stock-fee terms charge commission on the single
+  // same-day side with the higher transaction value, not simply the side
+  // with more shares. Ties are deterministic and charged on BUY.
+  const buyValue = buys.reduce((sum, t) => sum + t.shares * t.price, 0);
+  const sellValue = sells.reduce((sum, t) => sum + t.shares * t.price, 0);
+  return sellValue > buyValue ? 'SELL' : 'BUY';
 }
 
 export function isNettedLeg(transactions: Transaction[], tx: Transaction): boolean {
@@ -77,14 +82,14 @@ export function feeScenarios(amount: number, isBuy: boolean, shares: number, set
 export function makePSXFeeCalculator(settings: PSXSettings, allTransactions: Transaction[]): FeeCalculator {
   // Index once: every portfolio/FIFO/report pass asks for each trade's fee.
   // Scanning the entire history for each request made those passes quadratic.
-  const quantities = new Map<string, { buy: number; sell: number }>();
+  const values = new Map<string, { buy: number; sell: number }>();
   const key = (tx: Transaction) => tx.ticker + '\u0000' + tx.date;
   for (const tx of allTransactions) {
     if (tx.isPending) continue;
-    const totals = quantities.get(key(tx)) ?? { buy: 0, sell: 0 };
-    if (tx.action === 'BUY') totals.buy += tx.shares;
-    else totals.sell += tx.shares;
-    quantities.set(key(tx), totals);
+    const totals = values.get(key(tx)) ?? { buy: 0, sell: 0 };
+    if (tx.action === 'BUY') totals.buy += tx.shares * tx.price;
+    else totals.sell += tx.shares * tx.price;
+    values.set(key(tx), totals);
   }
   let clockMinute = -1, today = '';
   const currentDay = () => {
@@ -97,7 +102,7 @@ export function makePSXFeeCalculator(settings: PSXSettings, allTransactions: Tra
     const tx = context?.tx;
     if (tx?.feeOverride !== undefined) return tx.feeOverride;
     if (!tx) return calcFeeBreakdown(amount, isBuy, shares, settings).total;
-    const totals = quantities.get(key(tx));
+    const totals = values.get(key(tx));
     const charged = totals && totals.buy > 0 && totals.sell > 0 ? totals.sell > totals.buy ? 'SELL' : 'BUY' : null;
     if (!tx.manualSameDay && tx.action === 'BUY' && tx.date === currentDay() && charged === null) return 0;
     if (!tx.manualSameDay && (charged === null || tx.action === charged)) return calcFeeBreakdown(amount, isBuy, shares, settings).total;
