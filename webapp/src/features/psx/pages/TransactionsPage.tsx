@@ -493,7 +493,7 @@ function TransactionList() {
             <Th col="amount">Amount</Th>
             <Th col="fee">Fee</Th>
             <th>
-              <Tooltip text="Realized profit/loss for a SELL row, matched against your still-open buy lot(s) for this ticker — follows whichever Match order (FIFO or cheapest-lot-first) is picked in the Closed trades section below, since it's the same figure shown per-row here. Blank on a BUY row (nothing realized yet).">
+              <Tooltip text="Realized profit/loss for a SELL row using the configured cost-basis method: weighted-average cost under Average cost, or the configured lot-matching method under FIFO/Lowest cost first. Blank on a BUY row (nothing realized yet).">
                 P/L
               </Tooltip>
             </th>
@@ -688,7 +688,7 @@ function TransactionList() {
 
       <details open>
         <summary className="summary-heading">
-          <Tooltip text="Each buy lot that hasn't been fully sold yet, matched against your real sells per the Match order picked above — the mirror image of Closed trades below, so it's always clear which shares are still open vs. already sold.">
+          <Tooltip text="Each buy lot that hasn't been fully sold yet, matched against your real sells using the configured cost-basis method. This is the open-lot side of the Closed trades report.">
             Open trades (not yet sold)
           </Tooltip>{' '}
           — {sortedOpenLots.length}
