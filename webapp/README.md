@@ -21,7 +21,7 @@ FinanceManager live link:
 
 ## Current session handoff
 
-For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) before continuing. It records the latest validated state and remaining work. PR #22 (global transaction-order proposal) and PR #23 (stock-trade save recovery) are closed as superseded; recovered code from #23 is merged via #30, and transaction-page cost-basis fixes are merged via #31. Global transactionIndex/cross-date reorder remains deferred. Refresh the handoff after each meaningful task and re-check live GitHub state.
+For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) before continuing. It records the latest validated state and remaining work. PR #22 (global transaction-order proposal) and PR #23 (stock-trade save recovery) are closed as superseded; recovered code from #23 is merged via #30, and transaction-page cost-basis fixes are merged via #31. Persisted global/per-ticker transaction ordering is being ported in PR #36; it is not merged or validated yet. Refresh the handoff after each meaningful task and re-check live GitHub state.
 
 ## Cost-basis worked examples (canonical — keep in sync with tests)
 
@@ -10270,7 +10270,7 @@ from the lot system."*
 
 ## Done
 
-- **Persisted QSE/PSX trade accounting order (2026-10-30, PR in review):** transactions now have a global persisted `transactionIndex` distinct from per-ticker `seq`. Legacy records are backfilled without changing trade fields; new trades receive the next index. Position/realized-P&L calculations consume this order, and QSE/PSX transaction tables expose cross-date move controls while preserving the recorded trade dates. This is a proposed slice pending CI and review; the combined mixed-event cash ledger still displays in date order, so do not describe the entire cash-ledger ordering requirement as complete.
+- **Persisted QSE/PSX transaction ordering (2026-10-30, PR #36 open; CI/review pending):** `globalTransactionIndex` is the canonical accounting order across all trades; `perTickerIndex` is derived from that same order for each ticker. Reordering trades swaps global positions and recalculates per-ticker positions in one shared helper, so the two indexes cannot drift. Legacy `transactionIndex` and `seq` are compatibility mirrors only. Legacy workbooks are migrated and all store add/edit/delete/plan-execution paths keep indexes synchronized. QSE/PSX tables expose cross-date move controls without changing effective trade dates. The combined cash ledger still displays mixed trade/transfer/adjustment events chronologically; see the PR's explicit limitation and do not claim the full mixed-event ledger ordering is solved.
 
 ## Pending
 
