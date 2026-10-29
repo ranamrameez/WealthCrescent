@@ -581,7 +581,7 @@ function TransactionList() {
                           <span className="text-muted clickable">{' '}(override)</span>
                         </Tooltip>
                       ) : (
-                        isNettedLeg(workbook.transactions, tx) && (
+                        isNettedLeg(workbook.transactions, tx, workbook.settings.sameDayNettingRule) && (
                           <Tooltip
                             text={tx.manualSameDay ? 'Manually marked as a same-day netted leg — government levies only.' : 'Same-day round trip — netted, government levies only.'}
                           >
@@ -785,7 +785,7 @@ function TransactionList() {
               value: fmtMoney(calcFee(detailTx.shares * detailTx.price, detailTx.action === 'BUY', { shares: detailTx.shares, tx: detailTx }), currency)
                 + (detailTx.feeOverride !== undefined
                   ? ' (manually overridden)'
-                  : isNettedLeg(workbook.transactions, detailTx)
+                  : isNettedLeg(workbook.transactions, detailTx, workbook.settings.sameDayNettingRule)
                     ? ` (netted${detailTx.manualSameDay ? ', manual' : ''} — same-day round trip)`
                     : ''),
             },
