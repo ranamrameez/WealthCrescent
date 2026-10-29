@@ -616,6 +616,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
         {closedPage.controls}
       </details>
 
+      {(workbook.settings.costBasisMethod === 'fifo' || workbook.settings.costBasisMethod === 'lowestCostFirst') ? <>
       <QseRecordCard dateSort={openDateSort} title="Open trades (not yet sold)" kind="transactions" rows={workbook.transactions.filter(tx => sortedOpenLots.some(row => row.buyId === tx.id))} allRecords={workbook.transactions.filter(tx => openLots.some(row => row.buyId === tx.id))} modifying={modifying} onModify={() => setModifying(value => !value)} exportData={{ rows: sortedOpenLots, allRows: openLots }}>
         <div className="table-scroll">
           <table>
@@ -693,6 +694,9 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
         </div>
         {closedTradesPage.controls}
       </QseRecordCard>
+      </> : <p className="text-muted mt-md">
+        Average cost blends all buys into one running cost basis, so individual open/closed lot attribution is not applicable. The transaction rows and portfolio calculations use weighted-average cost.
+      </p>}
 
       {detailTx && (
         <RecordDetailModal
