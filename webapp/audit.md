@@ -55,13 +55,15 @@ User-reported defect: after changing the configured cost-basis method, some port
 
 ### Small fixes committed
 
-- QSE Transactions: removed the page-local match-order override from open-lot/closed-trade reporting; lot attribution now follows `workbook.settings.costBasisMethod` for FIFO vs. lowest-cost-first.
+- QSE Transactions: removed the page-local match-order override from open-lot/closed-trade reporting; lot attribution now follows `workbook.settings.costBasisMethod` for FIFO vs. lowest-cost-first. Removed the now-misleading Lot matching page filter.
 - PSX Transactions: removed the independent local FIFO-by-default match-order state; open-lot/closed-trade reporting now follows `workbook.settings.costBasisMethod` for FIFO vs. lowest-cost-first.
+- Added weighted-average realized P/L attribution keyed by SELL transaction ID; both exchange transaction rows use it when Average cost is selected. FIFO/lowest-cost-first row P/L uses the same lot match order as the visible lot-based reports.
+- When Average cost is selected, the per-lot Open/Closed trades reports are replaced with an explanation rather than displaying FIFO lot attribution under an Average-cost label. Added regression tests for average-cost SELL attribution and unmatched oversells (not yet executed in this environment).
 
 ### Still required before this audit is complete
 
 - Trace every cost-basis-dependent calculation and insight across both exchanges, including Dashboard's alternate "Strategic Trades" view, Position Detail, open/closed trade summaries, P/L series, charts, break-even/cost figures, and any exports.
-- Define correct behavior for Average cost in lot-oriented reports. Average cost does not preserve individual buy-lot attribution; do not label FIFO lot reports as though they were Average-cost results.
+- Continue tracing method-dependent calculations beyond Transactions, especially Dashboard's separately labelled advisory view, position detail, exports, and any derived metrics not using the shared exchange hooks.
 - Ensure manual lot allocations and targeted sells remain authoritative where specified, without causing other analytics to use a different fallback method.
 - Add regression tests proving a method change recalculates all dependent results, and prove QSE/PSX parity where fee models differ.
 - Validate the build and targeted test suite, then report actual CI results. No build/test success is claimed yet.
