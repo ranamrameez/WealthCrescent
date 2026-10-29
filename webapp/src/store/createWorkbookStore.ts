@@ -268,7 +268,7 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
           : p);
         const target = profiles?.find((p) => p.id === brokerId && !p.archived);
         if (!target) return wb;
-        const targetData = target.data ?? {};
+        const targetData: Partial<BrokerPortfolioData> = target.data ?? {};
         const data: BrokerPortfolioData = {
           transactions: targetData.transactions ?? [],
           transfers: targetData.transfers ?? [],
