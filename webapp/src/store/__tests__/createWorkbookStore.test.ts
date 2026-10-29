@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createWorkbookStore, type BaseWorkbook } from '../createWorkbookStore';
+import { createEmptyPSXWorkbook } from '../defaultPsxWorkbook';
 
 interface TestSettings {
   currency: string;
@@ -32,6 +33,7 @@ function createEmptyBrokerTestWorkbook(): TestWorkbook {
       { id: 'broker-b', name: 'Broker B', settings: { currency: 'GBP' }, data: { transactions: [], transfers: [], adjustments: [], dividends: [], tradePlans: [] } },
     ],
     activeBrokerId: 'broker-a',
+    brokerMigrationVersion: 1,
   };
 }
 
@@ -57,6 +59,42 @@ describe('broker profile isolation', () => {
     localStorage.removeItem('test_broker_profile_switch');
   });
 
+  it('stores and edits a transfer against a non-active broker profile without switching portfolios', () => {
+    const useStore = createWorkbookStore('test_broker_profile_transfer', createEmptyBrokerTestWorkbook);
+    useStore.getState().addTransfer({
+      id: 'broker-b-transfer',
+      brokerId: 'broker-b',
+      date: '2026-10-03',
+      type: 'DEPOSIT',
+      gross: 500,
+      fee: 2,
+    });
+    expect(useStore.getState().workbook.transfers).toHaveLength(0);
+    expect(useStore.getState().workbook.brokerProfiles?.[1].data?.transfers).toMatchObject([
+      { id: 'broker-b-transfer', brokerId: 'broker-b', gross: 500 },
+    ]);
+
+    useStore.getState().updateTransfer('broker-b-transfer', { gross: 650 });
+    expect(useStore.getState().workbook.brokerProfiles?.[1].data?.transfers[0].gross).toBe(650);
+
+    useStore.getState().setActiveBroker('broker-b');
+    expect(useStore.getState().workbook.transfers[0].gross).toBe(650);
+    useStore.getState().deleteTransfer('broker-b-transfer');
+    expect(useStore.getState().workbook.transfers).toHaveLength(0);
+    localStorage.removeItem('test_broker_profile_transfer');
+  });
+
+  it('does not allow switching to a deactivated broker profile', () => {
+    const useStore = createWorkbookStore('test_broker_profile_deactivated', () => ({
+      ...createEmptyBrokerTestWorkbook(),
+      brokerProfiles: createEmptyBrokerTestWorkbook().brokerProfiles!.map((p) =>
+        p.id === 'broker-b' ? { ...p, deactivated: true } : p),
+    }));
+    useStore.getState().setActiveBroker('broker-b');
+    expect(useStore.getState().workbook.activeBrokerId).toBe('broker-a');
+    localStorage.removeItem('test_broker_profile_deactivated');
+  });
+
   it('migrates legacy exchange-wide trades and settings into the default broker profile', () => {
     localStorage.setItem('test_broker_profile_migration', JSON.stringify({
       ...createEmptyBrokerTestWorkbook(),
@@ -68,6 +106,37 @@ describe('broker profile isolation', () => {
     expect(useStore.getState().workbook.brokerProfiles?.[0].settings.currency).toBe('QAR');
     expect(useStore.getState().workbook.brokerProfiles?.[0].data?.transactions).toHaveLength(1);
     localStorage.removeItem('test_broker_profile_migration');
+  });
+});
+
+describe('PSX legacy broker migration', () => {
+  it('attaches legacy PSX trades and cash records to JS Zindagi even if another profile was selected', () => {
+    const legacy = createEmptyPSXWorkbook();
+    localStorage.setItem('test_psx_zindigi_migration', JSON.stringify({
+      ...legacy,
+      activeBrokerId: 'psx-al-habib-capital-markets',
+      brokerMigrationVersion: 0,
+      settings: { ...legacy.settings, feePct: 0.123 },
+      transactions: [{
+        id: 'old-psx-trade', date: '2026-09-01', ticker: 'ABC', action: 'BUY',
+        shares: 10, price: 12.34, transactionIndex: 7, feeOverride: 1.25,
+      }],
+      transfers: [{ id: 'old-psx-cash', date: '2026-09-02', type: 'DEPOSIT', gross: 1000, fee: 5 }],
+      marketPrices: { ABC: 12.5 },
+      priceHistory: { ABC: [{ date: '2026-09-02', price: 12.5 }] },
+    }));
+    const useStore = createWorkbookStore('test_psx_zindigi_migration', createEmptyPSXWorkbook);
+    const wb = useStore.getState().workbook;
+    expect(wb.activeBrokerId).toBe('psx-js-zindigi');
+    expect(wb.transactions[0]).toMatchObject({
+      id: 'old-psx-trade', brokerId: 'psx-js-zindigi', shares: 10,
+      price: 12.34, transactionIndex: 7, feeOverride: 1.25,
+    });
+    expect(wb.transfers[0]).toMatchObject({ id: 'old-psx-cash', brokerId: 'psx-js-zindigi', gross: 1000, fee: 5 });
+    expect(wb.marketPrices).toEqual({ ABC: 12.5 });
+    expect(wb.priceHistory.ABC).toEqual([{ date: '2026-09-02', price: 12.5 }]);
+    expect(wb.brokerProfiles.find((p) => p.id === 'psx-js-zindigi')?.data?.transactions).toHaveLength(1);
+    localStorage.removeItem('test_psx_zindigi_migration');
   });
 });
 
