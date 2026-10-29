@@ -71,7 +71,7 @@ describe('broker-specific PSX commission defaults', () => {
     const ah = workbook.brokerProfiles.find((profile) => profile.id === 'psx-al-habib-capital-markets');
     expect(workbook.activeBrokerId).toBe('psx-js-zindigi');
     expect(js?.settings).toMatchObject({ lowPriceThreshold: 25, lowPriceFee: 0.05, feePct: 0.2 });
-    expect(ah?.settings).toMatchObject({ lowPriceThreshold: 20, lowPriceFee: 0.03, feePct: 0.15 });
+    expect(ah?.settings).toMatchObject({ lowPriceThreshold: 20, lowPriceFee: 0.03, feePct: 0.15, sameDayNettingRule: 'none' });
     expect(calcFeeBreakdown(100 * 20, true, 100, ah!.settings).commission).toBe(3);
     expect(calcFeeBreakdown(100 * 21, true, 100, ah!.settings).commission).toBeCloseTo(3.15, 2);
   });
