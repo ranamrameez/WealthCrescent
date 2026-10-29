@@ -179,7 +179,7 @@ from the lot system."*
 
 ## Done
 
-- **Cost-basis consistency fixes in QSE/PSX Transactions (2026-10-29, audit branch; verification pending):** Removed the separate page-local match-order override/state so open-lot and closed-trade attribution follows the workbook's configured FIFO vs. lowest-cost-first setting. Per-SELL row P/L now uses a weighted-average calculation when Average cost is selected, and the lot-oriented Open/Closed reports are hidden in that mode rather than falsely presenting FIFO lots as Average-cost results. Regression tests were added but have not yet been executed. Other app-wide calculations still require review; do not treat the overall consistency audit as complete.
+- **Cost-basis consistency fixes in QSE/PSX Transactions (2026-10-29, audit branch; verification pending):** QSE and PSX transaction tables now default to persisted global accounting order, with across-date reorder controls in both exchanges; QSE reorder peers use the full ledger rather than only the current filtered/split view. The separate page-local match-order override/state was removed so open-lot and closed-trade attribution follows the workbook's configured FIFO vs. lowest-cost-first setting. Per-SELL row P/L now uses a weighted-average calculation when Average cost is selected, and the lot-oriented Open/Closed reports are hidden in that mode rather than falsely presenting FIFO lots as Average-cost results. Regression tests were added but have not yet been executed. Other app-wide calculations still require review; do not treat the overall consistency audit as complete.
 
 - **PSX Market Prices API integration (2026-10-22, implemented locally).** All documented
   PSX dataset families have lazy sections and paginated reusable tables. Sector cards
