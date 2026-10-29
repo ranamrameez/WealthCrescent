@@ -490,7 +490,7 @@ function TransactionList() {
             <Th col="amount">Amount</Th>
             <Th col="fee">Fee</Th>
             <th>
-              <Tooltip text="Realized profit/loss for a SELL row, matched against your still-open buy lot(s) for this ticker — follows whichever Match order (FIFO or cheapest-lot-first) is picked in the Closed trades section below, since it's the same figure shown per-row here. Blank on a BUY row (nothing realized yet).">
+              <Tooltip text="Realized profit/loss for a SELL row using the configured cost-basis method: weighted-average cost under Average cost, or the selected lot-matching method under FIFO/Lowest cost first. Blank on a BUY row (nothing realized yet).">
                 P/L
               </Tooltip>
             </th>
