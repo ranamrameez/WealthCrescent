@@ -64,8 +64,19 @@ export function dispatchRemove(module: LinkModule, id: string) {
 export function resolveTransferSide(cfg: LinkSideConfig, direction: 'in' | 'out', recordId?: string): LinkSideConfig {
   if (!['qse', 'psx', 'funds'].includes(cfg.module)) return cfg;
   const workbook = cfg.module === 'qse' ? useWorkbookStore.getState().workbook : cfg.module === 'psx' ? usePSXWorkbookStore.getState().workbook : useFundsWorkbookStore.getState().workbook;
-  const existing = recordId ? workbook.transfers.find(row => row.id === recordId) : undefined;
-  const defaultFee = direction === 'in' && 'depositFee' in workbook.settings ? Number(workbook.settings.depositFee) || 0 : 0;
+  const profileSettings = cfg.module === 'qse'
+    ? useWorkbookStore.getState().workbook.brokerProfiles?.find((item) => item.id === cfg.ref)?.settings
+    : cfg.module === 'psx'
+      ? usePSXWorkbookStore.getState().workbook.brokerProfiles?.find((item) => item.id === cfg.ref)?.settings
+      : undefined;
+  const profileTransfer = recordId && cfg.module === 'qse'
+    ? useWorkbookStore.getState().workbook.brokerProfiles?.flatMap((item) => item.data?.transfers ?? []).find((row) => row.id === recordId)
+    : recordId && cfg.module === 'psx'
+      ? usePSXWorkbookStore.getState().workbook.brokerProfiles?.flatMap((item) => item.data?.transfers ?? []).find((row) => row.id === recordId)
+      : undefined;
+  const existing = recordId ? workbook.transfers.find(row => row.id === recordId) ?? profileTransfer : undefined;
+  const settings = profileSettings ?? workbook.settings;
+  const defaultFee = direction === 'in' && 'depositFee' in settings ? Number(settings.depositFee) || 0 : 0;
   return { ...cfg, fee: existing?.fee ?? cfg.fee ?? defaultFee };
 }
 function resolveTransferInput(input: InterEntityTransferInput, link?: InterEntityTransfer): InterEntityTransferInput {
@@ -76,8 +87,8 @@ export function getLinkedSideRecord(cfg: LinkSideConfig, id: string): LinkSideRe
   switch (cfg.module) {
     case 'bank': return useBankWorkbookStore.getState().workbook.transactions.find(row => row.id === id);
     case 'cash': return useCashWorkbookStore.getState().workbook.entries.find(row => row.id === id);
-    case 'qse': return useWorkbookStore.getState().workbook.transfers.find(row => row.id === id);
-    case 'psx': return usePSXWorkbookStore.getState().workbook.transfers.find(row => row.id === id);
+    case 'qse': { const wb = useWorkbookStore.getState().workbook; return wb.transfers.find(row => row.id === id) ?? wb.brokerProfiles?.flatMap((p) => p.data?.transfers ?? []).find(row => row.id === id); }
+    case 'psx': { const wb = usePSXWorkbookStore.getState().workbook; return wb.transfers.find(row => row.id === id) ?? wb.brokerProfiles?.flatMap((p) => p.data?.transfers ?? []).find(row => row.id === id); }
     case 'funds': return useFundsWorkbookStore.getState().workbook.transfers.find(row => row.id === id);
     case 'rentals': return useRentalsWorkbookStore.getState().workbook.entries.find(row => row.id === id);
     case 'personalLoans': return usePersonalLoansWorkbookStore.getState().workbook.repayments.find(row => row.id === id);
