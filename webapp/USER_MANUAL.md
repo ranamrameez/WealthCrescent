@@ -104,7 +104,7 @@ The **✦ Appearance** button (sidebar) controls font, text size, color theme, d
 dark mode, and **Number display** — choose "shortened" (large stat-card numbers show as
 "10k"/"1.23M", with the exact figure available as a hover tooltip) or "full" (every stat card
 always shows the complete, un-abbreviated number). This is a global, app-wide preference, not
-per-module — change it once and it applies everywhere.
+per-module — change it once and it applies everywhere. Use **Reset appearance to app defaults** in the same panel to restore the current built-in appearance defaults; this does not delete your financial records.
 
 ---
 
@@ -339,7 +339,7 @@ Use the **Broker** selector in the stock top bar or the stock-exchange side menu
 
 - **QSE** starts with **The Group**.
 - **PSX** starts with **JS Zindagi** selected and **AL Habib Capital Markets** available as a second profile. The latter is the securities broker subsidiary of Bank AL Habib.
-- Initial PSX commission rates are prefilled from the brokers' published material: [Zindigi stock charges](https://zindigi.pk/features/stocks/) and [AL Habib Capital Markets' account-opening tariff](https://ahcml.com/assets/uploads/Normal_AOF.pdf). Zindigi's documented same-day rule charges commission on the higher-value side only. AL Habib's accessible tariff does not specify same-day netting, so the app does not assume Zindigi's rule for that profile. You can change the active profile's **Same-day commission rule** in Settings → Fees & amounts if your contract note confirms a different policy. Other levies/taxes are estimates or configurable fields; check your current broker contract note and update the active profile's Settings → Fees & amounts before relying on net P/L or break-even estimates.
+- Initial PSX commission rates are prefilled from the brokers' published material: [Zindigi stock charges](https://zindigi.pk/features/stocks/) and [AL Habib Capital Markets' account-opening tariff](https://ahcml.com/assets/uploads/Normal_AOF.pdf). Both JS Zindigi and AL Habib Capital Markets default to the higher-value-side commission rule for same-day buy/sell pairs, based on the user's broker-specific clarification. You can change the active profile's **Same-day commission rule** in Settings → Fees & amounts if your contract note confirms a different policy. New PSX profiles use defaults for the recognized broker name instead of copying whichever profile is active; unknown brokers start from generic defaults with same-day netting off. Other levies/taxes are estimates or configurable fields; check your current broker contract note and update the active profile's Settings → Fees & amounts before relying on net P/L or break-even estimates.
 
 ---
 

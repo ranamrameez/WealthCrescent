@@ -179,6 +179,9 @@ from the lot system."*
 
 ## Done
 
+- Appearance preferences now include an explicit **Reset appearance to app defaults** action. The reset is persisted locally and restores all appearance fields to `DEFAULT_APPEARANCE`; regression coverage added. This is the first small slice of the broader app-defaults/user-overrides work, not the global settings reset.
+
+
 - **PSX Market Prices API integration (2026-10-22, implemented locally).** All documented
   PSX dataset families have lazy sections and paginated reusable tables. Sector cards
   start closed; favourites start open and reuse the shared cloud/local favourites hook.
@@ -10249,6 +10252,9 @@ from the lot system."*
 - **Broker profiles per exchange (2026-10-29; implementation in progress).** Added a broker-profile data model with separate transaction, transfer, adjustment, dividend, and trade-plan histories plus per-profile settings; old exchange-wide records migrate into the original default profile. QSE starts with **The Group**. PSX starts with **JS Zindagi** active and **AL Habib Capital Markets** as a second profile. The shared broker selector is exposed in the stock top bar and side menu, and a Brokers page supports adding, renaming, switching, archiving history-bearing profiles, and deleting empty profiles. PSX commission defaults are sourced from [Zindigi's stock-fee page](https://zindigi.pk/features/stocks/) (PKR 0.05/share up to PKR 25; 0.20% above PKR 25; same-day paired trades commission only on the higher-value side) and [AHCML's published account-opening tariff](https://ahcml.com/assets/uploads/Normal_AOF.pdf) (PKR 0.03/share up to PKR 20; 0.15% above PKR 20.01). AHCML's accessible tariff is not a complete, clearly current itemization of every levy; levy settings remain editable and must be reconciled against current contract notes. **Validation (2026-10-29):** the Node 24 production type-check/build and focused broker-profile/PSX-fee regression tests pass. The full suite still fails 7 tests across 5 existing test files (`categoryMerge`, `resetLocalData`, `planControls`, `PriceInput`, `bankNavigation`); these test files are not changed by this feature, but the failures need separate baseline review. Browser/Firebase round-trip verification remains outstanding; do not claim the full suite is green.
 
 ## Pending
+
+- **App defaults / user overrides (in progress):** appearance can now be reset to built-in defaults; PSX broker profile creation uses broker-specific defaults and both JS Zindigi and AHL default to same-day higher-value-leg commission netting. Remaining: administrator-managed, versioned app defaults; per-user override tracking; notifying users when defaults change; reset-all-settings (including appearance) without deleting financial data; test/build and browser validation.
+
 
 - **Activate PSX market cache:** merge the PSX rules fragment into existing rules, deploy
   `fetchPsxMarketData`, run the first refresh and verify the shared reference/cache paths.

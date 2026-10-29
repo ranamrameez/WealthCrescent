@@ -10,6 +10,7 @@ import type { BrokerPortfolioData, BrokerProfile, QSESettings } from '../../../t
 import type { PSXSettings } from '../../../types/psxWorkbook';
 import { useWorkbookStore } from '../../../store/workbookStore';
 import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
+import { createDefaultPSXBrokerSettings } from '../../../store/defaultPsxWorkbook';
 
 const emptyPortfolio = (): BrokerPortfolioData => ({
   transactions: [],
@@ -75,7 +76,7 @@ export function BrokersPage() {
     if (isPSX) {
       const profile: BrokerProfile<PSXSettings> = {
         id, name, accountLabel: newAccountLabel.trim() || undefined,
-        settings: { ...psx.settings }, data: emptyPortfolio(),
+        settings: createDefaultPSXBrokerSettings(name), data: emptyPortfolio(),
       };
       setPsxWorkbook({ ...psx, brokerProfiles: [...psx.brokerProfiles, profile] });
     } else {
@@ -170,7 +171,7 @@ export function BrokersPage() {
           <button type="button" className="btn primary" onClick={addProfile}>Add profile</button>
         </div>
         <p className="text-muted" style={{ margin: '10px 0 0' }}>
-          A new profile copies the active profile's fee and cost-basis settings. If it belongs to a different broker, update its fees in that profile's Settings before relying on P/L or break-even estimates.
+          New profiles start from application defaults for the named broker, rather than inheriting another active broker's fee schedule. Review the fee settings before relying on P/L or break-even estimates.
         </p>
       </Card>
 

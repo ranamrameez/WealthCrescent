@@ -45,6 +45,28 @@ export const DEFAULT_PSX_SETTINGS: PSXSettings = {
 const JS_ZINDIGI_PROFILE_ID = 'psx-js-zindigi';
 const AL_HABIB_PROFILE_ID = 'psx-al-habib-capital-markets';
 
+/** Build a new PSX broker profile from application defaults, never by copying
+ * whichever broker the user happens to have active. Recognized broker defaults
+ * are name-matched for seed/new profiles; every field remains user-editable. */
+export function createDefaultPSXBrokerSettings(brokerName: string): PSXSettings {
+  const normalized = brokerName.trim().toLocaleLowerCase();
+  if (normalized.includes('habib') || normalized === 'ahl') {
+    return {
+      ...DEFAULT_PSX_SETTINGS,
+      feePct: 0.15,
+      sameDayNettingRule: 'higherValueSide',
+      lowPriceThreshold: 20,
+      lowPriceFee: 0.03,
+    };
+  }
+  if (normalized.includes('zindigi') || normalized.includes('zindagi')) {
+    return { ...DEFAULT_PSX_SETTINGS, sameDayNettingRule: 'higherValueSide' };
+  }
+  // Unknown brokers start from generic app defaults but do not inherit a
+  // broker-specific intraday concession without confirmation.
+  return { ...DEFAULT_PSX_SETTINGS, sameDayNettingRule: 'none' };
+}
+
 export function createEmptyPSXWorkbook(): PSXWorkbook {
   return {
     settings: { ...DEFAULT_PSX_SETTINGS },
@@ -59,7 +81,7 @@ export function createEmptyPSXWorkbook(): PSXWorkbook {
           // PKR 20, then 0.15% of traded value above PKR 20. See README
           // sources; other regulatory levies remain separately configurable.
           feePct: 0.15,
-          sameDayNettingRule: 'none',
+          sameDayNettingRule: 'higherValueSide',
           lowPriceThreshold: 20,
           lowPriceFee: 0.03,
         },
