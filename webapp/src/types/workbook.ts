@@ -27,7 +27,11 @@ export interface Transaction {
    * (e.g. two same-day BUYs). Retrofitted onto existing data by
    * `createWorkbookStore.ts`'s `normalize()`, same pattern as `id`. */
   seq?: number;
-  /** Persisted lifetime accounting order. Unlike seq (per ticker), this is global across the exchange workbook and may intentionally differ from trade-date order. */
+  /** Canonical global accounting position across all transactions in this exchange workbook. Reordering the global sequence must also recalculate perTickerIndex. */
+  globalTransactionIndex?: number;
+  /** Canonical position within this ticker's own transaction sequence, derived from globalTransactionIndex order. */
+  perTickerIndex?: number;
+  /** @deprecated Compatibility alias for globalTransactionIndex while older exports/imports migrate. Never use as the ordering source. */
   transactionIndex?: number;
   date: string;
   /** Pending item 41: optional time-of-day, "HH:MM" 24-hour, alongside
@@ -454,7 +458,11 @@ export interface CashLedgerEvent {
    * `Transaction.seq`'s doc comment) — the tie-breaker `buildCashLedger`
    * falls back to for two events of the SAME `kind` at the same instant. */
   seq?: number;
-  /** Global accounting order when this event is a stock trade; mixed cash-ledger display remains date-ordered. */
+  /** Canonical global accounting position for trade events. */
+  globalTransactionIndex?: number;
+  /** Canonical per-ticker accounting position for trade events. */
+  perTickerIndex?: number;
+  /** @deprecated Compatibility alias for older ledger consumers. */
   transactionIndex?: number;
   kind: 'trade' | 'transfer' | 'adjustment';
   action: string;
