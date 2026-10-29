@@ -71,8 +71,8 @@ export async function resetAllSettingsToAppDefaults(uid?: string): Promise<void>
     settings: {
       ...DEFAULT_BANK_SETTINGS,
       // Accounts and banks are user-owned entities, not preferences.
-      accounts: bank.settings.accounts,
-      banks: bank.settings.banks,
+      accounts: bank.settings.accounts ?? [],
+      banks: bank.settings.banks ?? [],
     },
   });
 
@@ -107,7 +107,7 @@ export async function resetAllSettingsToAppDefaults(uid?: string): Promise<void>
     settings: {
       ...DEFAULT_RENTAL_SETTINGS,
       // Property definitions are financial entities and must survive reset.
-      properties: rentals.settings.properties,
+      properties: rentals.settings.properties ?? [],
     },
   });
 
