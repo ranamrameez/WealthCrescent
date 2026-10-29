@@ -38,14 +38,15 @@ function createEmptyBrokerTestWorkbook(): TestWorkbook {
 describe('broker profile isolation', () => {
   it('keeps trades and settings isolated when switching broker profiles', () => {
     const useStore = createWorkbookStore('test_broker_profile_switch', createEmptyBrokerTestWorkbook);
-    useStore.getState().addTransaction({ date: '2026-10-01', ticker: 'AAA', action: 'BUY', shares: 10, price: 5 });
+    // The FAB's Add Trade form uses the bulk-add path, so exercise that path here.
+    useStore.getState().addTransactions([{ date: '2026-10-01', ticker: 'AAA', action: 'BUY', shares: 10, price: 5 }]);
     useStore.getState().updateSettings({ currency: 'EUR' });
     expect(useStore.getState().workbook.transactions[0].brokerId).toBe('broker-a');
 
     useStore.getState().setActiveBroker('broker-b');
     expect(useStore.getState().workbook.transactions).toEqual([]);
     expect(useStore.getState().workbook.settings.currency).toBe('GBP');
-    useStore.getState().addTransaction({ date: '2026-10-02', ticker: 'BBB', action: 'BUY', shares: 2, price: 8 });
+    useStore.getState().addTransactions([{ date: '2026-10-02', ticker: 'BBB', action: 'BUY', shares: 2, price: 8 }]);
     expect(useStore.getState().workbook.transactions[0].brokerId).toBe('broker-b');
 
     useStore.getState().setActiveBroker('broker-a');
