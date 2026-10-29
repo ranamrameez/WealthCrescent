@@ -53,7 +53,7 @@ function emptyRow(): Transaction {
   return { date: today(), ticker: '', action: 'BUY', shares: 0, price: 0, time: nowTime(defaultTimezoneForMarket('QSE')), timezone: defaultTimezoneForMarket('QSE') };
 }
 
-export function TransactionRows({ initial }: { initial?: Partial<Transaction> } = {}) {
+export function TransactionRows({ initial, onSaved }: { initial?: Partial<Transaction>; onSaved?: () => void } = {}) {
   const addTransactions = useWorkbookStore((s) => s.addTransactions);
   const workbook = useWorkbookStore((s) => s.workbook);
   const { calcFee } = useQSEDerived();
@@ -96,10 +96,18 @@ export function TransactionRows({ initial }: { initial?: Partial<Transaction> } 
       return;
     }
     if (!(await ensureSignedIn('Sign in to save your transactions.'))) return;
-    addTransactions(valid.map((r) => ({ ...r, ticker: r.ticker.toUpperCase() })));
-    toast(`Added ${valid.length} transaction${valid.length > 1 ? 's' : ''}.`);
-    setRows([emptyRow()]);
-    setTimeTouched([false]);
+    try {
+      addTransactions(valid.map((r) => ({ ...r, ticker: r.ticker.toUpperCase() })));
+      toast(`Added ${valid.length} transaction${valid.length > 1 ? 's' : ''}.`);
+      setRows([emptyRow()]);
+      setTimeTouched([false]);
+      // The shared FAB hosts this form in a modal. Close only after the
+      // store mutation succeeds; otherwise preserve the user's entered row.
+      onSaved?.();
+    } catch (error) {
+      console.error('Failed to add QSE trade from the transaction form.', error);
+      toast('Could not save the trade. Your entries are still here; please try again.');
+    }
   };
 
   return (
