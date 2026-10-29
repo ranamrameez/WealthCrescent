@@ -2,6 +2,7 @@ import type { PSXSettings, PSXWorkbook } from '../types/psxWorkbook';
 
 export const DEFAULT_PSX_SETTINGS: PSXSettings = {
   feePct: 0.20,
+  sameDayNettingRule: 'higherValueSide',
   lowPriceThreshold: 25,
   lowPriceFee: 0.05,
   sstPct: 15,
@@ -58,6 +59,7 @@ export function createEmptyPSXWorkbook(): PSXWorkbook {
           // PKR 20, then 0.15% of traded value above PKR 20. See README
           // sources; other regulatory levies remain separately configurable.
           feePct: 0.15,
+          sameDayNettingRule: 'none',
           lowPriceThreshold: 20,
           lowPriceFee: 0.03,
         },
