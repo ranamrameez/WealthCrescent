@@ -199,7 +199,7 @@ export function BrokersPage() {
                   <TextInput value={draft.accountLabel} onChange={(e) => setDrafts((prev) => ({ ...prev, [profile.id]: { ...draft, accountLabel: e.target.value } }))} placeholder="Optional" />
                 </Field>
                 <button type="button" className="btn secondary" onClick={() => saveDraft(profile.id)}>Save details</button>
-                {!active && <button type="button" className="btn danger" onClick={() => void archiveOrDelete(profile)}>{count > 0 ? 'Archive profile' : 'Delete profile'}</button>}
+                {!active && !profile.archived && <button type="button" className="btn danger" onClick={() => void archiveOrDelete(profile)}>{count > 0 ? 'Archive profile' : 'Delete profile'}</button>}
               </div>
               <div className="row" style={{ gap: 8, marginTop: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                 <span className="text-muted">Fee schedule:</span>
