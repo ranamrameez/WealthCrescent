@@ -7,6 +7,7 @@ import { useLiveQseWorkbook } from './useLiveQseWorkbook';
 import { useQseFeed } from './useLiveQseWorkbook';
 import { useWorkbookStore } from '../../../store/workbookStore';
 import { applyLiveQse } from '../../../lib/stockData/liveQse';
+import { scopeWorkbookToActiveBroker } from '../../../lib/brokerProfiles';
 
 export interface QSERow {
   ticker: string;
@@ -26,7 +27,8 @@ export interface QSERow {
  * mirrors `usePSXDerived`'s own branch exactly. Default ('average' /
  * undefined) is byte-for-byte unchanged from before this existed. */
 function calculateDerived(workbook: Workbook, selectedTickers?: string[]) {
-    const scoped = selectedTickers?.length ? workbook.transactions.filter((tx) => selectedTickers.includes(tx.ticker)) : workbook.transactions;
+    const brokerWorkbook = scopeWorkbookToActiveBroker(workbook);
+    const scoped = selectedTickers?.length ? brokerWorkbook.transactions.filter((tx) => selectedTickers.includes(tx.ticker)) : brokerWorkbook.transactions;
     const calcFee = makeQSEFeeCalculator(workbook.settings);
     const method = workbook.settings.costBasisMethod ?? 'average';
 
@@ -45,20 +47,20 @@ function calculateDerived(workbook: Workbook, selectedTickers?: string[]) {
 
     const summary = cashSummary(
       scoped,
-      workbook.transfers,
-      workbook.adjustments,
-      workbook.marketPrices,
+      brokerWorkbook.transfers,
+      brokerWorkbook.adjustments,
+      brokerWorkbook.marketPrices,
       calcFee,
       positions,
     );
-    const ledger = buildCashLedger(scoped, workbook.transfers, workbook.adjustments, calcFee);
+    const ledger = buildCashLedger(scoped, brokerWorkbook.transfers, brokerWorkbook.adjustments, calcFee);
 
     // Shared per-open-position rollup (mirrors the legacy dashboard's
     // `rows` variable) — feeds most of the ticker-level charts.
     const rows: QSERow[] = positions
       .filter((p) => p.shares > 0)
       .map((p) => {
-        const marketPrice = getMarketPrice(p.ticker, workbook.marketPrices, scoped);
+        const marketPrice = getMarketPrice(p.ticker, brokerWorkbook.marketPrices, scoped);
         const value = p.shares * marketPrice;
         const sellFee = marketPrice > 0 ? calcFee(value, false) : 0;
         const profit = value - sellFee - p.invested;
@@ -66,7 +68,7 @@ function calculateDerived(workbook: Workbook, selectedTickers?: string[]) {
         return { ticker: p.ticker, shares: p.shares, invested: p.invested, marketPrice, value, sellFee, profit, roiPct };
       });
 
-    return { workbook, calcFee, positions, summary, realizedSeries, ledger, rows, lots };
+    return { workbook: { ...brokerWorkbook, transactions: scoped }, calcFee, positions, summary, realizedSeries, ledger, rows, lots };
 
 }
 
