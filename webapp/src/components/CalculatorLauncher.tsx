@@ -93,7 +93,9 @@ export function CalculatorLauncher() {
       )}
       {tradeOpen && (
         <Modal title="Add a trade" onClose={() => setTradeOpen(false)}>
-          {isPSX ? <PSXTransactionRows /> : <QSETransactionRows />}
+          {isPSX
+            ? <PSXTransactionRows onSaved={() => setTradeOpen(false)} />
+            : <QSETransactionRows onSaved={() => setTradeOpen(false)} />}
         </Modal>
       )}
     </>
