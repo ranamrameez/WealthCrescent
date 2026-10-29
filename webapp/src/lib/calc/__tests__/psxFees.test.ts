@@ -229,6 +229,21 @@ describe('sameDayChargedSide', () => {
   });
 });
 
+describe('broker-specific same-day netting', () => {
+  it('does not apply Zindigi netting to AL Habib when no netting rule is published', () => {
+    const settings = { ...DEFAULT_PSX_SETTINGS, sameDayNettingRule: 'none' as const };
+    const buy = { ...tx('BUY', 100), date: day, shares: 100, price: 10 };
+    const sell = { ...tx('SELL', 100), date: day, shares: 100, price: 12 };
+    const all = [buy, sell];
+    const calc = makePSXFeeCalculator(settings, all);
+    expect(sameDayChargedSide(all, 'TEST', day, settings.sameDayNettingRule)).toBeNull();
+    expect(isNettedLeg(all, buy, settings.sameDayNettingRule)).toBe(false);
+    expect(isNettedLeg(all, sell, settings.sameDayNettingRule)).toBe(false);
+    expect(calc(1000, true, { shares: 100, tx: buy })).toBe(calcFeeBreakdown(1000, true, 100, settings).total);
+    expect(calc(1200, false, { shares: 100, tx: sell })).toBe(calcFeeBreakdown(1200, false, 100, settings).total);
+  });
+});
+
 describe('makePSXFeeCalculator — same-day netting (README items 6/7)', () => {
   const day = '2026-08-21';
   const netSettings: PSXSettings = { ...BASE_SETTINGS, psxFeePct: 0.005, nccplFeePct: 0.011 };
