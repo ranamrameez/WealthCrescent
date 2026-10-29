@@ -183,7 +183,7 @@ from the lot system."*
 
 ## Done
 
-- **Transaction-page cost-basis consistency slice (2026-10-29, in review):** QSE/PSX inline SELL P/L now uses the weighted-average engine when Average cost is selected; FIFO/Lowest cost first uses the configured lot method. Open/Closed lot-attribution reports are hidden under Average cost rather than presenting incompatible lot math. The independent page-local lot-match selector was removed. Regression coverage includes weighted-average SELL P/L and unmatched oversells. CI pending in PR.
+- **Transaction-page cost-basis consistency slice (2026-10-29, merged in PR #31; full CI green):** QSE/PSX inline SELL P/L now uses the weighted-average engine when Average cost is selected; FIFO/Lowest cost first uses the configured lot method. Open/Closed lot-attribution reports are hidden under Average cost rather than presenting incompatible lot math. The independent page-local lot-match selector was removed. Regression coverage includes weighted-average SELL P/L and unmatched oversells. The production build and full test suite passed in [PR #31](https://github.com/ranamrameez/WealthCrescent/pull/31).
 
 - **CI regression fixes (2026-10-29):** fixed uncontrolled PriceInput resetting to its original default on blur; flushed queued local workbook writes after account-switch/logout resets; preserved intentionally merged-away bundled categories through category normalization; aligned bank navigation tests with the current behavior of showing pending transactions in the ledger. Full validation is in PR #28.
 
@@ -10270,6 +10270,8 @@ from the lot system."*
 
 ## Pending
 
+- **Remaining cost-basis dependency audit (after PR #31):** continue beyond the QSE/PSX transaction pages. Verify Dashboard, Position Detail, analytics/time series, exports, charts, and strategy/advisory surfaces against the configured method. The global `transactionIndex` / cross-date reorder work from draft PR #22 is still unmerged; resolve the potential mismatch between accounting order and date-ordered cash-ledger balances before porting it. See `SESSION_HANDOFF.md` and `audit.md`.
+
 - **App defaults / user overrides (partially implemented; 2026-10-29):** PRs #25–#27 are merged. Appearance reset and Account-page reset-all-settings restore settings/UI preferences to current built-in defaults while preserving financial records. Broker profiles carry an app-default version and users with differing settings can choose to apply the newer broker defaults or keep custom values. Remaining: decide/build a maintainable admin-facing source of truth/editor and broaden versioned default-change suggestions beyond broker profiles if required; browser/live-account verification is still outstanding. Do not describe the entire admin-managed defaults system as complete. See [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md).
 
 - **Activate PSX market cache:** merge the PSX rules fragment into existing rules, deploy
@@ -10278,22 +10280,8 @@ from the lot system."*
   bootstrap was rejected with HTTP 401 before any mutation. Local UI uses bundled
   references and any existing cached prices until deployment/population is completed.
 
-- **Verification baseline (2026-10-15):** the full suite previously had eight
-  failures reproduced on unchanged HEAD: planControls accessible names,
-  sharedExchangeDerived identity, two categoryMerge cases, resetLocalData timing,
-  PriceInput PSX rounding, and two bankNavigation visibility cases. These remain
-  separate from the table-card changes. Production build and the focused table/QSE
-  checks pass; the final ledger layout has ten passing page tests.
-
-- Explicit application type-check (`tsc -p tsconfig.app.json --noEmit`, 2026-10-04)
-  still reports errors in CashPage, PlanningPage, and RentalsPage. The current build
-  command checks the root references file, so a successful production build alone
-  does not establish that every application TypeScript file passes.
-
-- Verification follow-up (2026-09-29): the full suite currently has eight failures across
-  resetLocalData, categoryMerge, planControls, useUrlTransactionFilters, and bankNavigation.
-  Dashboard regression tests pass. Repository lint also reports existing hook-rule errors
-  in TransactionEntryModal; these broader checks need a separate cleanup.
+- **Verification baseline (updated 2026-10-29):** PR #28 fixed the tracked full-suite regressions. Its final CI passed the production build and all 134 test files; the post-merge Pages workflow succeeded. PR #30 and PR #31 also passed their production-build and full-test-suite checks. This supersedes the stale 2026-10-15 and 2026-09-29 failure counts above. It does not establish that every app-wide calculation surface or live Firebase/browser workflow has been audited.
+- Explicit application type-check (`tsc -p tsconfig.app.json --noEmit`) and lint remain separate checks; do not infer their status from the production build alone.
 
 - Batch editing follow-ups: extend the shared grid to other modules; design explicit
   linked-side and recurring/generated-plan editing; add clipboard range paste and
