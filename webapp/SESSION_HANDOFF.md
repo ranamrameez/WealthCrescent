@@ -54,3 +54,13 @@ PR #31 merged the transaction-page cost-basis consistency slice. PR #32 merged t
 ## Latest CI regression fixes now on main
 
 PR #28 fixed the `PriceInput` draft/default interaction, flushes queued local-storage writes during local-data reset, preserves merged-away bundled default categories, and aligns two brittle/current-behavior tests. Full test suite: 134/134 test files passed; production build passed. This does not validate the deferred global transaction-order proposal or live Firebase/browser behavior.
+
+## 2026-10-30 — Mutual Funds defects (separate branch)
+
+A separate investigation/fix branch `fix/mutual-funds-ledger-sync` was created from current `main` (`2cc7bcd274dc26e77f5a7a295f5b90cded144251`) so these defects do not mix with broker-profile isolation work:
+
+- Funds balance updates are currently separate from Invest/Withdraw transactions and the inherited transfer ledger. A transfer may not reconcile the displayed fund/account balance until the user manually updates balance. Before changing calculations, distinguish uninvested cash held in Funds from units purchased; do not double-count a deposit after it is used for a BUY.
+- Balance-history edit changes `date`, but the existing `time` timestamp is retained and the display prefers that timestamp. Correct date edits must reconcile timestamp and ordering.
+- Invest/Withdraw edit mode exposes Units and NAV but not an editable Amount, unlike the add flow. Make amount/units/NAV consistently editable and mathematically linked.
+
+Source inspection has confirmed the timestamp/display mismatch and read-only amount cell. The transfer/balance issue needs a defined cash-versus-holdings accounting treatment. Add regression tests for all three; no implementation or test success is claimed yet. Keep this branch separate from `feat/broker-profile-isolation-ui`.
