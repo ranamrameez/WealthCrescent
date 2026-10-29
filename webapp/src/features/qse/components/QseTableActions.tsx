@@ -243,19 +243,19 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
   }} />}</>;
 }
 
-/** Reorder trades within their trade-date cohort. Trade order is persisted
- * in transactionIndex, a globally unique lifetime sequence; id remains stable. */
+/** Reorder trades across the full exchange ledger. transactionIndex is the global
+ * accounting sequence; seq remains the per-ticker sequence; id remains stable. */
 export function QseReorder({ kind, row, rows }: { kind: Kind; row: Transaction | Transfer | Adjustment | Dividend | Row; rows: Array<Transaction | Transfer | Adjustment | Dividend | Row> }) {
   const ensureSignedIn = useEnsureSignedIn();
   const isTrade = kind === 'transactions' || (kind === 'ledger' && (row as Row).kind === 'trade');
   const peers = rows
     .filter(candidate => isTrade
-      ? (candidate as Transaction).date === (row as Transaction).date && (kind !== 'ledger' || (candidate as Row).kind === 'trade')
+      ? (kind !== 'ledger' || (candidate as Row).kind === 'trade')
       : (kind !== 'ledger' || (candidate as Row).kind === (row as Row).kind))
     .sort((a, b) => isTrade
       ? ((a as Transaction).transactionIndex ?? Number.MAX_SAFE_INTEGER) - ((b as Transaction).transactionIndex ?? Number.MAX_SAFE_INTEGER)
       : toInstantMs(a.date, a.time, a.timezone) - toInstantMs(b.date, b.time, b.timezone) || ((a as { seq?: number }).seq ?? 0) - ((b as { seq?: number }).seq ?? 0));
-  return <ReorderButtons rows={peers} index={peers.findIndex(candidate => candidate.id === row.id)} instantOf={candidate => isTrade ? Date.parse(`${candidate.date}T00:00:00Z`) : toInstantMs(candidate.date, candidate.time, candidate.timezone)} idOf={candidate => candidate.id!} orderOf={candidate => isTrade ? (candidate as Transaction).transactionIndex : (candidate as { seq?: number }).seq} onMove={async pair => {
+  return <ReorderButtons rows={peers} index={peers.findIndex(candidate => candidate.id === row.id)} instantOf={candidate => isTrade ? Date.parse(`${candidate.date}T00:00:00Z`) : toInstantMs(candidate.date, candidate.time, candidate.timezone)} idOf={candidate => candidate.id!} orderOf={candidate => isTrade ? (candidate as Transaction).transactionIndex : (candidate as { seq?: number }).seq} allowAcrossInstants={isTrade} onMove={async pair => {
     if (!(await ensureSignedIn('Sign in to reorder records.'))) return;
     const state = useWorkbookStore.getState();
     const sourceKind = kind === 'ledger' ? (row as Row).kind === 'trade' ? 'transactions' : (row as Row).kind === 'transfer' ? 'transfers' : 'adjustments' : kind;
@@ -263,7 +263,6 @@ export function QseReorder({ kind, row, rows }: { kind: Kind; row: Transaction |
     const a = records.find(candidate => candidate.id === pair[0].id), b = records.find(candidate => candidate.id === pair[1].id);
     if (!a || !b) return toast('Records changed. Please try again.');
     if (sourceKind === 'transactions') {
-      if ((a as Transaction).date !== (b as Transaction).date) return toast('Only trades on the same date can be reordered.');
       const aIndex = (a as Transaction).transactionIndex;
       const bIndex = (b as Transaction).transactionIndex;
       if (!Number.isInteger(aIndex) || !Number.isInteger(bIndex)) return toast('Transaction order is missing. Reload the workbook and try again.');
