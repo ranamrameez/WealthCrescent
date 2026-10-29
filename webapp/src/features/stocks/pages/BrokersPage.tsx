@@ -148,13 +148,14 @@ export function BrokersPage() {
 
   return (
     <div className="page-stack">
-      <BackButton />
-      <PageHeading
-        title="Broker profiles"
-        subtitle={isPSX
-          ? 'Manage separate PSX accounts, commission schedules, and portfolio histories.'
-          : 'Manage separate QSE broker/account profiles and their portfolio histories.'}
-      />
+      <PageHeading back={<BackButton to={isPSX ? '/psx' : '/qse'}>← {isPSX ? 'PSX' : 'QSE'}</BackButton>}>
+        <h1 className="pagetitle">Broker profiles</h1>
+        <p className="text-muted" style={{ marginTop: 4 }}>
+          {isPSX
+            ? 'Manage separate PSX accounts, commission schedules, and portfolio histories.'
+            : 'Manage separate QSE broker/account profiles and their portfolio histories.'}
+        </p>
+      </PageHeading>
 
       <Card>
         <h3 className="mt-0">Add broker profile</h3>
