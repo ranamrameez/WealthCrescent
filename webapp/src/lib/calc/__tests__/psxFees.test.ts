@@ -71,7 +71,7 @@ describe('broker-specific PSX commission defaults', () => {
     const ah = workbook.brokerProfiles.find((profile) => profile.id === 'psx-al-habib-capital-markets');
     expect(workbook.activeBrokerId).toBe('psx-js-zindigi');
     expect(js?.settings).toMatchObject({ lowPriceThreshold: 25, lowPriceFee: 0.05, feePct: 0.2 });
-    expect(ah?.settings).toMatchObject({ lowPriceThreshold: 20, lowPriceFee: 0.03, feePct: 0.15, sameDayNettingRule: 'none' });
+    expect(ah?.settings).toMatchObject({ lowPriceThreshold: 20, lowPriceFee: 0.03, feePct: 0.15, sameDayNettingRule: 'higherValueSide' });
     expect(calcFeeBreakdown(100 * 20, true, 100, ah!.settings).commission).toBe(3);
     expect(calcFeeBreakdown(100 * 21, true, 100, ah!.settings).commission).toBeCloseTo(3.15, 2);
   });
@@ -230,17 +230,17 @@ describe('sameDayChargedSide', () => {
 });
 
 describe('broker-specific same-day netting', () => {
-  it('does not apply Zindigi netting to AL Habib when no netting rule is published', () => {
+  it('applies the configured higher-value-side intraday commission rule to AL Habib', () => {
     const settings = createEmptyPSXWorkbook().brokerProfiles.find((profile) => profile.id === 'psx-al-habib-capital-markets')!.settings;
     const day = '2026-08-21';
     const buy: Transaction = { date: day, ticker: 'TEST', action: 'BUY', shares: 100, price: 10 };
     const sell: Transaction = { date: day, ticker: 'TEST', action: 'SELL', shares: 100, price: 12 };
     const all = [buy, sell];
     const calc = makePSXFeeCalculator(settings, all);
-    expect(sameDayChargedSide(all, 'TEST', day, settings.sameDayNettingRule)).toBeNull();
-    expect(isNettedLeg(all, buy, settings.sameDayNettingRule)).toBe(false);
+    expect(sameDayChargedSide(all, 'TEST', day, settings.sameDayNettingRule)).toBe('SELL');
+    expect(isNettedLeg(all, buy, settings.sameDayNettingRule)).toBe(true);
     expect(isNettedLeg(all, sell, settings.sameDayNettingRule)).toBe(false);
-    expect(calc(1000, true, { shares: 100, tx: buy })).toBe(calcFeeBreakdown(1000, true, 100, settings).total);
+    expect(calc(1000, true, { shares: 100, tx: buy })).toBeLessThan(calcFeeBreakdown(1000, true, 100, settings).total);
     expect(calc(1200, false, { shares: 100, tx: sell })).toBe(calcFeeBreakdown(1200, false, 100, settings).total);
   });
 });
