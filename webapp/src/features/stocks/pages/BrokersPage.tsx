@@ -56,7 +56,7 @@ export function BrokersPage() {
     return result;
   }, [profiles, activeId, workbook]);
 
-  const saveProfileList = (nextProfiles: typeof profiles) => {
+  const saveProfileList = (nextProfiles: Array<BrokerProfile<QSESettings> | BrokerProfile<PSXSettings>>) => {
     if (isPSX) setPsxWorkbook({ ...psx, brokerProfiles: nextProfiles as BrokerProfile<PSXSettings>[] });
     else setQseWorkbook({ ...qse, brokerProfiles: nextProfiles as BrokerProfile<QSESettings>[] });
   };
