@@ -316,9 +316,10 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
     .filter((r) => filterTicker === 'ALL' || r.tx.ticker === filterTicker)
     .filter((r) => filterAction === 'ALL' || r.tx.action === filterAction)
     .filter(r => matchesQseFilters(r.tx, pageFilters));
-  type TxCol = 'date' | 'ticker' | 'action' | 'shares' | 'price' | 'amount';
+  type TxCol = 'order' | 'date' | 'ticker' | 'action' | 'shares' | 'price' | 'amount';
   const sortValue = (r: (typeof filtered)[number], col: TxCol): number | string => {
     switch (col) {
+      case 'order': return r.tx.transactionIndex ?? 0;
       case 'ticker': return r.tx.ticker;
       case 'action': return r.tx.action;
       case 'shares': return r.tx.shares;
@@ -327,7 +328,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
       default: return `${r.tx.date} ${String(r.tx.transactionIndex ?? 0).padStart(12, '0')}`;
     }
   };
-  const { sorted, Th, dateSort } = useSortableRows(filtered, sortValue, 'date', 'desc');
+  const { sorted, Th, dateSort } = useSortableRows(filtered, sortValue, 'order', 'asc');
 
   const openSorted = useMemo(() => sorted.filter((r) => openTickers.has(r.tx.ticker)), [sorted, openTickers]);
   const closedSorted = useMemo(() => sorted.filter((r) => !openTickers.has(r.tx.ticker)), [sorted, openTickers]);
