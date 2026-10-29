@@ -266,6 +266,10 @@ export function BrokersPage() {
               {settingField('Filer CGT %', 'cgtFilerPct', ps.cgtFilerPct, '0.1')}
               {settingField('Non-filer CGT %', 'cgtNonFilerPct', ps.cgtNonFilerPct, '0.1')}
               {settingField('Tick size', 'tick', ps.tick)}
+              <Field label="SST included in commission" as="div" width={220}><label><input type="checkbox" checked={!!ps.sstIncludedInCommission} disabled={status !== 'active' || profile.archived} onChange={(e) => updateProfileSettings(profile.id, { sstIncludedInCommission: e.target.checked })} /> Yes</label></Field>
+              <Field label="Include in Net Worth" as="div" width={180}><label><input type="checkbox" checked={ps.includeInNetWorth !== false} disabled={status !== 'active' || profile.archived} onChange={(e) => updateProfileSettings(profile.id, { includeInNetWorth: e.target.checked })} /> Include</label></Field>
+              <Field label="Partial trade alerts" as="div" width={180}><label><input type="checkbox" checked={!!ps.partialTradeAlertsEnabled} disabled={status !== 'active' || profile.archived} onChange={(e) => updateProfileSettings(profile.id, { partialTradeAlertsEnabled: e.target.checked })} /> Enable</label></Field>
+              <Field label="Desktop profit alerts" as="div" width={180}><label><input type="checkbox" checked={!!ps.desktopProfitAlertsEnabled} disabled={status !== 'active' || profile.archived} onChange={(e) => updateProfileSettings(profile.id, { desktopProfitAlertsEnabled: e.target.checked })} /> Enable</label></Field>
             </> : <>
               <p className="text-muted" style={{ width: '100%', margin: 0 }}>All settings below belong only to this QSE broker profile.</p>
               <Field label="Commission %" width={150}><TextInput type="number" step="0.001" value={qs.feePct} disabled={status !== 'active'} onChange={(e) => updateProfileSettings(profile.id, { feePct: Number(e.target.value) })} /></Field>
@@ -274,6 +278,9 @@ export function BrokersPage() {
               <Field label="Currency" width={120}><TextInput value={qs.currency} disabled={status !== 'active'} onChange={(e) => updateProfileSettings(profile.id, { currency: e.target.value })} /></Field>
               <Field label="Deposit fee" width={150}><TextInput type="number" step="0.01" value={qs.depositFee} disabled={status !== 'active'} onChange={(e) => updateProfileSettings(profile.id, { depositFee: Number(e.target.value) })} /></Field>
               <Field label="Cost basis" width={190}><Select value={qs.costBasisMethod ?? 'average'} disabled={status !== 'active'} onChange={(e) => updateProfileSettings(profile.id, { costBasisMethod: e.target.value as QSESettings['costBasisMethod'] })}><option value="average">Average</option><option value="fifo">FIFO</option><option value="lowestCostFirst">Lowest cost first</option></Select></Field>
+              <Field label="Include in Net Worth" as="div" width={180}><label><input type="checkbox" checked={qs.includeInNetWorth !== false} disabled={status !== 'active'} onChange={(e) => updateProfileSettings(profile.id, { includeInNetWorth: e.target.checked })} /> Include</label></Field>
+              <Field label="Partial trade alerts" as="div" width={180}><label><input type="checkbox" checked={!!qs.partialTradeAlertsEnabled} disabled={status !== 'active'} onChange={(e) => updateProfileSettings(profile.id, { partialTradeAlertsEnabled: e.target.checked })} /> Enable</label></Field>
+              <Field label="Desktop profit alerts" as="div" width={180}><label><input type="checkbox" checked={!!qs.desktopProfitAlertsEnabled} disabled={status !== 'active'} onChange={(e) => updateProfileSettings(profile.id, { desktopProfitAlertsEnabled: e.target.checked })} /> Enable</label></Field>
             </>}
           </div>
         </details>
