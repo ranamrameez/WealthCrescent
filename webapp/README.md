@@ -11619,3 +11619,5 @@ Done: Cash and Rentals transaction batch editors reuse formula entry, dirty-colu
 Done: EMI, Funds/brokers, and Subscriptions detail sections now use the shared Banking-based template. Cash and Rentals expose separate Summary sections. Personal Loans no longer renders its section stack twice when batch editors close. See MODULE_TEMPLATE.md for migration coverage.
 
 Pending: extend batch editing to the remaining ledgers and audit their date/filter behavior independently of the section-layout migration. Stock Exchanges are excluded.
+
+PR #36 follow-up: QSE batch editor validation/reorder fixes were committed on `feat/persisted-trade-accounting-order` after the prior CI run. See audit/handoff. Fresh CI is still required.
