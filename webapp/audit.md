@@ -121,3 +121,7 @@ Design locked by user:
 - Existing legacy PSX portfolio: assign to JS Zindagi in a one-time versioned migration without changing financial trade fields.
 
 Initial implementation adds profile-specific transfer routing for inactive profiles, broker pickers and settings within the broker page, status sections, and migration/regression tests. **Not verified yet:** CI, browser behavior, historical data migration against a real export, and linked transfer edit/delete across all combinations. Treat as in-progress; no merge recommendation until these pass.
+
+### PR #38 rebase status (2026-10-30)
+
+Broker-profile changes have been rebased onto the latest PR #36 head after fixing the QSE batch/import and live-price date-boundary regressions. PR #38 remains stacked on PR #36 and is now 17 files ahead with no base-behind commits. The branch is ready for a fresh PR CI run; browser verification and real-export migration checks are still required.
