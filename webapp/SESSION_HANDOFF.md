@@ -12,8 +12,8 @@ Read this before continuing work in a new session. This is a concise, dated hand
 
 ## Main branch / validation checkpoint
 
-- `main` is at `8d791749164b7da17e310a7aadeaceb18f3b396d` as of this handoff (after merging documentation PR #29).
-- PR #29 merged: [Document current session state and safe porting plan](https://github.com/ranamrameez/WealthCrescent/pull/29); `webapp/SESSION_HANDOFF.md` is now part of `main` and linked from `CLAUDE.md`/`webapp/README.md`.\n- PR #28 merged: [Fix existing CI regressions in finance UI and persistence](https://github.com/ranamrameez/WealthCrescent/pull/28). Post-merge Pages workflow [run 40931354687](https://github.com/ranamrameez/WealthCrescent/actions/runs/40931354687) completed successfully. The PR's final CI run passed production build and all 134 test files.
+- `main` is at `c3636c440cfba2585177fa62960b43b7298f208e` as of this handoff (after merging documentation PR #29 and stock-trade save recovery PR #30).
+- PR #30 merged: [Preserve stock-trade entry when save fails](https://github.com/ranamrameez/WealthCrescent/pull/30). Current main preserves QSE/PSX entry values and shows a retryable error if the synchronous transaction-store mutation throws; its QSE success/failure tests, full test suite, and production build passed CI.\n- PR #29 merged: [Document current session state and safe porting plan](https://github.com/ranamrameez/WealthCrescent/pull/29); `webapp/SESSION_HANDOFF.md` is now part of `main` and linked from `CLAUDE.md`/`webapp/README.md`.\n- PR #28 merged: [Fix existing CI regressions in finance UI and persistence](https://github.com/ranamrameez/WealthCrescent/pull/28). Post-merge Pages workflow [run 40931354687](https://github.com/ranamrameez/WealthCrescent/actions/runs/40931354687) completed successfully. The PR's final CI run passed production build and all 134 test files.
 - PRs #25, #26, #27 are merged:
   - [#25 appearance reset and initial defaults](https://github.com/ranamrameez/WealthCrescent/pull/25)
   - [#26 versioned broker defaults](https://github.com/ranamrameez/WealthCrescent/pull/26)
