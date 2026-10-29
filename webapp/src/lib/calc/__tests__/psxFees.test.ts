@@ -14,7 +14,7 @@ import {
 import { defaultTimezoneForMarket, todayISODate } from '../../datetime';
 import { computePositions } from '../positions';
 import { cashSummary } from '../cashSummary';
-import { DEFAULT_PSX_SETTINGS } from '../../../store/defaultPsxWorkbook';
+import { createEmptyPSXWorkbook, DEFAULT_PSX_SETTINGS } from '../../../store/defaultPsxWorkbook';
 
 it('indexes same-day quantities once instead of rescanning history for every fee', () => {
   const transactions: Transaction[] = Array.from({ length: 2000 }, (_, index) => ({ ticker: 'T' + Math.floor(index / 2) % 20, date: '2025-01-' + String(Math.floor(index / 40) % 28 + 1).padStart(2, '0'), action: index % 2 ? 'SELL' : 'BUY', shares: index % 2 ? 60 : 100, price: 100 }));
@@ -63,6 +63,19 @@ const BASE_SETTINGS: PSXSettings = {
   filerStatus: 'filer',
   costBasisMethod: 'average',
 };
+
+describe('broker-specific PSX commission defaults', () => {
+  it('seeds JS Zindagi and AL Habib Capital Markets with their published commission tiers', () => {
+    const workbook = createEmptyPSXWorkbook();
+    const js = workbook.brokerProfiles.find((profile) => profile.id === 'psx-js-zindigi');
+    const ah = workbook.brokerProfiles.find((profile) => profile.id === 'psx-al-habib-capital-markets');
+    expect(workbook.activeBrokerId).toBe('psx-js-zindigi');
+    expect(js?.settings).toMatchObject({ lowPriceThreshold: 25, lowPriceFee: 0.05, feePct: 0.2 });
+    expect(ah?.settings).toMatchObject({ lowPriceThreshold: 20, lowPriceFee: 0.03, feePct: 0.15 });
+    expect(calcFeeBreakdown(100 * 20, true, 100, ah!.settings).commission).toBe(3);
+    expect(calcFeeBreakdown(100 * 21, true, 100, ah!.settings).commission).toBeCloseTo(3.15, 2);
+  });
+});
 
 describe('calcFeeBreakdown', () => {
   it('uses the percentage commission tier above the low-price threshold', () => {
