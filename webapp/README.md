@@ -21,7 +21,7 @@ FinanceManager live link:
 
 ## Current session handoff
 
-For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) before continuing. It records the current main SHA, verified CI state, merged defaults work, and the safe porting plan for unmerged PRs #22 and #23. Refresh it after each meaningful task; do not treat its dated branch/check status as live without rechecking GitHub.
+For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) before continuing. It records the latest validated state and remaining work. PR #22 (global transaction-order proposal) and PR #23 (stock-trade save recovery) are closed as superseded; recovered code from #23 is merged via #30, and transaction-page cost-basis fixes are merged via #31. Global transactionIndex/cross-date reorder remains deferred. Refresh the handoff after each meaningful task and re-check live GitHub state.
 
 ## Cost-basis worked examples (canonical — keep in sync with tests)
 
@@ -10270,7 +10270,7 @@ from the lot system."*
 
 ## Pending
 
-- **Remaining cost-basis dependency audit (after PR #31):** continue beyond the QSE/PSX transaction pages. Verify Dashboard, Position Detail, analytics/time series, exports, charts, and strategy/advisory surfaces against the configured method. The global `transactionIndex` / cross-date reorder work from draft PR #22 is still unmerged; resolve the potential mismatch between accounting order and date-ordered cash-ledger balances before porting it. See `SESSION_HANDOFF.md` and `audit.md`.
+- **Remaining cost-basis dependency audit (after PR #31):** continue beyond the QSE/PSX transaction pages. Verify Dashboard, Position Detail, analytics/time series, exports, charts, and strategy/advisory surfaces against the configured method. The global `transactionIndex` / cross-date reorder proposal from closed PR #22 is deferred, not implemented or validated. Do not merge its stale branch; resolve accounting-order versus date-ordered cash-ledger consistency on a fresh branch with regression tests before reconsidering. See `SESSION_HANDOFF.md` and `audit.md`.
 
 - **App defaults / user overrides (partially implemented; 2026-10-29):** PRs #25–#27 are merged. Appearance reset and Account-page reset-all-settings restore settings/UI preferences to current built-in defaults while preserving financial records. Broker profiles carry an app-default version and users with differing settings can choose to apply the newer broker defaults or keep custom values. Remaining: decide/build a maintainable admin-facing source of truth/editor and broaden versioned default-change suggestions beyond broker profiles if required; browser/live-account verification is still outstanding. Do not describe the entire admin-managed defaults system as complete. See [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md).
 

@@ -53,4 +53,4 @@ PR #31 merged the transaction-page cost-basis consistency slice. PR #32 merged t
 
 ## Latest CI regression fixes now on main
 
-PR #28 fixed the `PriceInput` draft/default interaction, flushes queued local-storage writes during local-data reset, preserves merged-away bundled default categories, and aligns two brittle/current-behavior tests. Full test suite: 134/134 test files passed; production build passed. This does not validate the unmerged transaction-order branches or live Firebase/browser behavior.
+PR #28 fixed the `PriceInput` draft/default interaction, flushes queued local-storage writes during local-data reset, preserves merged-away bundled default categories, and aligns two brittle/current-behavior tests. Full test suite: 134/134 test files passed; production build passed. This does not validate the deferred global transaction-order proposal or live Firebase/browser behavior.
