@@ -10245,6 +10245,9 @@ from the lot system."*
   must remain positive, card identity and provenance are protected, stale edits are rejected,
   and linked transactions remain read-only in this flow.
 
+
+- **Stock-trade FAB save completion (2026-10-29).** The shared Buy/sell stock popup now closes after its QSE/PSX transaction store update succeeds. If the synchronous save throws, the form keeps the entered values and shows an actionable error instead of clearing the row. Added a regression test for QSE trade creation and the success callback. Test/build execution is not available in this connected GitHub-only workspace; do not treat this change as runtime-verified.
+
 ## Pending
 
 - **Activate PSX market cache:** merge the PSX rules fragment into existing rules, deploy
