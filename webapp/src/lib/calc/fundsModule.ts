@@ -288,6 +288,11 @@ export function organicPLByPeriod(
   return [...periods.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([period, total]) => ({ period, total }));
 }
 
+/** Convert a known cash amount into units at a positive NAV. */
+export function unitsFromAmount(amount: number, nav: number): number {
+  return nav > 0 && Number.isFinite(amount) ? amount / nav : 0;
+}
+
 export interface BalanceUpdateRow {
   /** 1-based position in this fund's OWN chronological update history —
    * a stable ordinal ("this was my Nth balance update"), independent of
@@ -324,7 +329,10 @@ export function balanceUpdateHistory(
   transactions: Transaction[],
   priceHistory: Record<string, PricePoint[]>,
 ): BalanceUpdateRow[] {
-  const raw = [...getPriceHistory(fundId, priceHistory)].sort((a, b) => (a.time || a.date).localeCompare(b.time || b.date));
+  // `date` is the effective valuation date; `time` is audit/intraday metadata.
+  // Editing a historical date must therefore move the point chronologically,
+  // even though its original timestamp remains unchanged.
+  const raw = [...getPriceHistory(fundId, priceHistory)].sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''));
   const txs = transactions.filter((t) => t.ticker === fundId);
 
   let prevBalance = 0;
