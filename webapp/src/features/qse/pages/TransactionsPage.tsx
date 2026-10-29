@@ -27,6 +27,7 @@ import { useSortableRows } from '../../../hooks/useSortableRows';
 import { usePageFabActions } from '../../../hooks/usePageFabActions';
 import { fmt, fmtMoney, fmtQSEPrice } from '../../../lib/format';
 import { closedPLBySellTxId, computeClosedTrades, type LotMatchOrder } from '../../../lib/calc/closedTrades';
+import { computeAveragePLBySellTxId } from '../../../lib/calc/realizedPL';
 import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
 import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
 import { transferRunningBalance } from '../../../lib/calc/transferBalance';
@@ -393,8 +394,10 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   // number, or this row's own pill and the table below could show two
   // contradicting figures for the identical sell.
   const sellPLById = useMemo(
-    () => closedPLBySellTxId(computeClosedTrades(workbook.transactions, calcFee, ctMatchOrder)),
-    [workbook.transactions, calcFee, ctMatchOrder],
+    () => (workbook.settings.costBasisMethod === 'average' || !workbook.settings.costBasisMethod)
+      ? computeAveragePLBySellTxId(workbook.transactions, calcFee)
+      : closedPLBySellTxId(computeClosedTrades(workbook.transactions, calcFee, ctMatchOrder)),
+    [workbook.transactions, workbook.settings.costBasisMethod, calcFee, ctMatchOrder],
   );
 
   // User's own words: "make separate sections for open and closed trades...
