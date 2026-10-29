@@ -298,7 +298,11 @@ function TransactionList() {
   // lot first" is a pure reporting convention in this ledger too, not a
   // real constraint. Offer cheapest-lot-first as a second, explicitly
   // comparison-only view (see `closedTrades.ts`'s `LotMatchOrder` comment).
-  const [ctMatchOrder, setCtMatchOrder] = useState<LotMatchOrder>('fifo');
+  // Lot reports and per-row realized P/L follow the configured workbook
+  // method. A page-local FIFO default caused PSX reports to disagree with
+  // official positions after the user selected lowest-cost-first.
+  const ctMatchOrder: LotMatchOrder =
+    workbook.settings.costBasisMethod === 'lowestCostFirst' ? 'lowestCostFirst' : 'fifo';
 
   // Pending item 143 PSX fast-follow: manual lot allocation for the inline
   // edit-row SELL form — same gate/derivation as QSE's identical file. Lots
@@ -664,17 +668,10 @@ function TransactionList() {
         {renderTable(closedGroups, 'No transactions for a fully closed position yet.')}
       </details>
 
-      <div className="row gap-sm mb-sm mt-md" style={{ alignItems: 'center' }}>
-        <Tooltip text="Same-day netting decides a whole transaction's fee from that day's total buy vs. sell quantity — never from which lot a sale is later credited to here, so this is purely which STORY the Open trades and Closed trades sections below tell, not a real amount. FIFO (oldest lot first) is what most brokers default to. Cheapest-lot-first re-tells the same history against your lowest-cost lots instead — it never changes your real position, fees, or total P/L, only which lots count as still open vs. already sold.">
-          Match order
-        </Tooltip>
-        <button type="button" className={`chip${ctMatchOrder === 'fifo' ? ' active' : ''}`} onClick={() => setCtMatchOrder('fifo')}>
-          {ctMatchOrder === 'fifo' && <CheckIcon size={11} />}FIFO (oldest first)
-        </button>
-        <button type="button" className={`chip${ctMatchOrder === 'lowestCostFirst' ? ' active' : ''}`} onClick={() => setCtMatchOrder('lowestCostFirst')}>
-          {ctMatchOrder === 'lowestCostFirst' && <CheckIcon size={11} />}Cheapest lot first
-        </button>
-      </div>
+      <p className="text-muted mb-sm mt-md">
+        Lot attribution follows the configured cost-basis method: {ctMatchOrder === 'lowestCostFirst' ? 'Lowest cost first' : 'FIFO'}.
+        Change it in the exchange settings to recalculate these reports consistently with the portfolio.
+      </p>
 
       <details open>
         <summary className="summary-heading">
