@@ -169,6 +169,9 @@ export function BrokersPage() {
           </Field>
           <button type="button" className="btn primary" onClick={addProfile}>Add profile</button>
         </div>
+        <p className="text-muted" style={{ margin: '10px 0 0' }}>
+          A new profile copies the active profile's fee and cost-basis settings. If it belongs to a different broker, update its fees in that profile's Settings before relying on P/L or break-even estimates.
+        </p>
       </Card>
 
       <div className="page-stack">
