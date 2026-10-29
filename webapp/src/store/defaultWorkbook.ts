@@ -17,6 +17,8 @@ export const DEFAULT_SETTINGS: Workbook['settings'] = {
 export function createEmptyWorkbook(): Workbook {
   return {
     settings: { ...DEFAULT_SETTINGS },
+    brokerProfiles: [{ id: 'qse-the-group', name: 'The Group', settings: { ...DEFAULT_SETTINGS } }],
+    activeBrokerId: 'qse-the-group',
     transactions: [],
     transfers: [],
     adjustments: [],
