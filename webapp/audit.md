@@ -48,3 +48,20 @@ Source inspection and commits were performed through the repository connector. A
 **Financial/data calculation audit and fix pass complete for the reviewed application surface.**
 
 All fixes are on `chatgpt-audit-20260916-v2`. No PR was opened and no merge was performed.
+
+## 2026-10-29 — Cost-basis consistency audit (in progress)
+
+User-reported defect: after changing the configured cost-basis method, some portfolio insights continued to use the previous method. The selected method must govern all dependent calculations across QSE and PSX, including open-lot attribution, closed-trade attribution, per-SELL realized P/L, portfolio totals, time-series calculations, and analytics. Explicitly advisory tools may remain separate only when clearly labelled as advisory and must not be presented as the configured accounting result.
+
+### Small fixes committed
+
+- QSE Transactions: removed the page-local match-order override from open-lot/closed-trade reporting; lot attribution now follows `workbook.settings.costBasisMethod` for FIFO vs. lowest-cost-first.
+- PSX Transactions: removed the independent local FIFO-by-default match-order state; open-lot/closed-trade reporting now follows `workbook.settings.costBasisMethod` for FIFO vs. lowest-cost-first.
+
+### Still required before this audit is complete
+
+- Trace every cost-basis-dependent calculation and insight across both exchanges, including Dashboard's alternate "Strategic Trades" view, Position Detail, open/closed trade summaries, P/L series, charts, break-even/cost figures, and any exports.
+- Define correct behavior for Average cost in lot-oriented reports. Average cost does not preserve individual buy-lot attribution; do not label FIFO lot reports as though they were Average-cost results.
+- Ensure manual lot allocations and targeted sells remain authoritative where specified, without causing other analytics to use a different fallback method.
+- Add regression tests proving a method change recalculates all dependent results, and prove QSE/PSX parity where fee models differ.
+- Validate the build and targeted test suite, then report actual CI results. No build/test success is claimed yet.
