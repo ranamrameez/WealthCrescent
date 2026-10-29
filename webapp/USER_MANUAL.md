@@ -339,7 +339,7 @@ Use the **Broker** selector in the stock top bar or the stock-exchange side menu
 
 - **QSE** starts with **The Group**.
 - **PSX** starts with **JS Zindagi** selected and **AL Habib Capital Markets** available as a second profile. The latter is the securities broker subsidiary of Bank AL Habib.
-- Initial PSX commission rates are prefilled from the brokers' published material: [Zindigi stock charges](https://zindigi.pk/features/stocks/) and [AL Habib Capital Markets' account-opening tariff](https://ahcml.com/assets/uploads/Normal_AOF.pdf). Other levies/taxes are estimates or configurable fields; check your current broker contract note and update the active profile's Settings → Fees & amounts before relying on net P/L or break-even estimates.
+- Initial PSX commission rates are prefilled from the brokers' published material: [Zindigi stock charges](https://zindigi.pk/features/stocks/) and [AL Habib Capital Markets' account-opening tariff](https://ahcml.com/assets/uploads/Normal_AOF.pdf). Zindigi's documented same-day rule charges commission on the higher-value side only. AL Habib's accessible tariff does not specify same-day netting, so the app does not assume Zindigi's rule for that profile. Other levies/taxes are estimates or configurable fields; check your current broker contract note and update the active profile's Settings → Fees & amounts before relying on net P/L or break-even estimates.
 
 ---
 
