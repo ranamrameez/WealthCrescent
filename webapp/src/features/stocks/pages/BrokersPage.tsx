@@ -41,7 +41,7 @@ export function BrokersPage() {
   const rowCounts = useMemo(() => {
     const result: Record<string, number> = {};
     for (const profile of profiles) {
-      const rawData = profile.id === activeId
+      const rawData: Partial<BrokerPortfolioData> = profile.id === activeId
         ? { transactions: workbook.transactions, transfers: workbook.transfers, adjustments: workbook.adjustments, dividends: workbook.dividends, tradePlans: workbook.tradePlans }
         : profile.data ?? {};
       const data = {
