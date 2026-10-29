@@ -10253,6 +10253,9 @@ from the lot system."*
 
 ## Pending
 
+- **App defaults / user overrides (in progress):** appearance can now be reset to built-in defaults; PSX broker profile creation uses broker-specific defaults and both JS Zindigi and AHL default to same-day higher-value-leg commission netting. Remaining: administrator-managed, versioned app defaults; per-user override tracking; notifying users when defaults change; reset-all-settings (including appearance) without deleting financial data; test/build and browser validation.
+
+
 - **Activate PSX market cache:** merge the PSX rules fragment into existing rules, deploy
   `fetchPsxMarketData`, run the first refresh and verify the shared reference/cache paths.
   No Firebase administrator credentials are available in this workspace. The attempted
