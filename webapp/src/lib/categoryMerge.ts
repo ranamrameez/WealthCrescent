@@ -8,7 +8,7 @@ import { useFundsWorkbookStore } from '../store/fundsWorkbookStore';
 import { useSubscriptionsWorkbookStore } from '../store/subscriptionsWorkbookStore';
 import { useCreditCardWorkbookStore } from '../store/creditCardWorkbookStore';
 import { useCategoryStore } from '../store/categoryStore';
-import { categoryName } from './categories';
+import { categoryName, DEFAULT_CATEGORY_IDS } from './categories';
 
 /** Repoints every real (id-based) and planned (name-based, see the
  * `Finance` doc comment in `types/finance.ts` for why those two shapes
@@ -102,7 +102,13 @@ export function mergeCategoriesEverywhere(fromId: string, toId: string): number 
   }
 
   const catStore = useCategoryStore.getState();
-  catStore.setWorkbook({ ...catStore.workbook, categories: catStore.workbook.categories.filter((c) => c.id !== fromId) });
+  const removedDefaultIds = new Set(catStore.workbook.removedDefaultIds ?? []);
+  if (DEFAULT_CATEGORY_IDS.has(fromId)) removedDefaultIds.add(fromId);
+  catStore.setWorkbook({
+    ...catStore.workbook,
+    categories: catStore.workbook.categories.filter((c) => c.id !== fromId),
+    removedDefaultIds: [...removedDefaultIds],
+  });
 
   return touched;
 }

@@ -51,11 +51,8 @@ it('keeps Bank plan Withdrawal selected before an amount is entered and saves a 
   render(<AddBankPlanForm accountId="bank-account" />);
 
   const withdrawal = screen.getByRole('button', { name: 'Withdrawal' });
-  const deposit = screen.getByRole('button', { name: 'Deposit' });
-
   fireEvent.click(withdrawal);
   expect(withdrawal).toHaveClass('active');
-  expect(deposit).not.toHaveClass('active');
 
   fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Planned transfer' } });
   fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '250' } });

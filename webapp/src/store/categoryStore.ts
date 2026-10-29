@@ -19,10 +19,11 @@ const STORAGE_KEY = 'WealthCrescent_categories_v1';
  * existed — `createEmptyCategoriesWorkbook()` seeds with them); anything
  * else is a real user addition, tagged `'custom'`. */
 function normalize(wb: CategoriesWorkbook): CategoriesWorkbook {
+  const removedDefaultIds = new Set(wb.removedDefaultIds ?? []);
   const existingIds = new Set(wb.categories.map((category) => category.id));
   const withMissingDefaults = [
-    ...wb.categories,
-    ...DEFAULT_CATEGORIES.filter((category) => !existingIds.has(category.id)).map((category) => ({ ...category })),
+    ...wb.categories.filter((category) => !removedDefaultIds.has(category.id)),
+    ...DEFAULT_CATEGORIES.filter((category) => !existingIds.has(category.id) && !removedDefaultIds.has(category.id)).map((category) => ({ ...category })),
   ];
   let max = withMissingDefaults.reduce((m, c) => Math.max(m, c.serialNumber ?? 0), 0);
   const categories = withMissingDefaults.map((c) => {

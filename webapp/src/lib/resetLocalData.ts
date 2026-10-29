@@ -37,6 +37,7 @@ import { usePSXWorkbookStore } from '../store/psxWorkbookStore';
 import { useRentalsWorkbookStore } from '../store/rentalsWorkbookStore';
 import { useSubscriptionsWorkbookStore } from '../store/subscriptionsWorkbookStore';
 import { useWorkbookStore } from '../store/workbookStore';
+import { flushLocalStorageWrites } from './localStoragePersistence';
 
 /** Critical fix: signing out used to leave every module's data sitting in
  * memory and in localStorage — the next person to use the browser (or the
@@ -94,4 +95,7 @@ export function resetAllLocalWorkbooks() {
   // account's own real cloud value right after this reset fires.
   useEnabledCurrenciesStore.getState().setEnabledCodes(null);
   useCurrencyOnboardingStore.getState().reset();
+  // Logout/account-switch resets must be durable before the caller proceeds;
+  // queued idle writes from the old account must not repopulate cleared data.
+  flushLocalStorageWrites();
 }

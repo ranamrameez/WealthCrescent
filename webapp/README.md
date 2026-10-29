@@ -179,6 +179,10 @@ from the lot system."*
 
 ## Done
 
+- **CI regression fixes (2026-10-29):** fixed uncontrolled PriceInput resetting to its original default on blur; flushed queued local workbook writes after account-switch/logout resets; preserved intentionally merged-away bundled categories through category normalization; aligned bank navigation tests with the current behavior of showing pending transactions in the ledger. Full validation is in PR #28.
+
+
+
 - Added a data-preserving **Reset all settings to app defaults** action on Account. It resets QSE/PSX broker settings, module preference settings, enabled-currency filters, module visibility, and appearance while preserving financial records and user-created entities; regression test added.
 
 

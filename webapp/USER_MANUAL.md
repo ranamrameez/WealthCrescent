@@ -463,6 +463,8 @@ holdings aren't a function of which window you're looking at).
 
 ---
 
+When two categories are merged, the source category is removed from the registry even if it originally came from the bundled app defaults. Its records are reassigned to the destination category.
+
 ## 14. Cash
 
 The first non-stock-exchange module (pick **Cash** from the sidebar's category list).
