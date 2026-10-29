@@ -231,7 +231,7 @@ describe('sameDayChargedSide', () => {
 
 describe('broker-specific same-day netting', () => {
   it('does not apply Zindigi netting to AL Habib when no netting rule is published', () => {
-    const settings = { ...DEFAULT_PSX_SETTINGS, sameDayNettingRule: 'none' as const };
+    const settings = createEmptyPSXWorkbook().brokerProfiles.find((profile) => profile.id === 'psx-al-habib-capital-markets')!.settings;
     const day = '2026-08-21';
     const buy: Transaction = { date: day, ticker: 'TEST', action: 'BUY', shares: 100, price: 10 };
     const sell: Transaction = { date: day, ticker: 'TEST', action: 'SELL', shares: 100, price: 12 };
