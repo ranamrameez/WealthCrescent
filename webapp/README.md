@@ -11621,7 +11621,7 @@ Pending: extend batch editing to the remaining ledgers and audit their date/filt
 Tracked on `fix/mutual-funds-ledger-sync`, separate from broker-profile work:
 
 - **Pending — transfer/balance reconciliation:** a Funds transfer does not currently reconcile the separately maintained balance/NAV update state. Design cash-on-hand versus invested holdings before implementing; avoid double-counting cash after a BUY.
-- **Pending — balance-history date edit:** editing the date leaves the old `time` timestamp, while the table displays the timestamp instead of the edited date.
-- **Pending — Invest/Withdraw amount edit:** edit mode allows Units and NAV but not direct Amount editing. Amount, units and NAV should stay synchronized.
+- **Implemented on branch (CI pending) — balance-history date edit:** the table now displays the canonical date, and history/latest-price ordering prioritizes that effective date over the retained timestamp.
+- **Implemented on branch (CI pending) — Invest/Withdraw amount edit:** edit mode now accepts Amount and recalculates units from NAV. Regression coverage added for the conversion.
 
 Regression tests must cover transfer → cash balance, BUY/SELL cash-to-holdings movement without double counting, effective-date display/order, and amount/units/NAV edits. No fixes are marked done until verified.
