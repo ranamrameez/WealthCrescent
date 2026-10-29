@@ -248,19 +248,31 @@ export function QseReorder({ kind, row, rows }: { kind: Kind; row: Transaction |
   const ensureSignedIn = useEnsureSignedIn();
   const isTradeList = kind === 'transactions';
   const peers = isTradeList ? rows as Transaction[] : rows.filter(candidate => (kind !== 'ledger' || (candidate as Row).kind === (row as Row).kind) && (kind !== 'transactions' && (kind !== 'ledger' || (row as Row).kind !== 'trade') || ((candidate as Transaction).ticker === (row as Transaction).ticker && (candidate as Transaction).action === (row as Transaction).action)));
-  return <ReorderButtons rows={peers} index={peers.findIndex(candidate => candidate.id === row.id)} instantOf={candidate => toInstantMs(candidate.date, candidate.time, candidate.timezone)} idOf={candidate => candidate.id!} orderOf={candidate => isTradeList ? (candidate as Transaction).transactionIndex : candidate.seq} allowAcrossInstants={isTradeList} onMove={async pair => {
+  return <ReorderButtons rows={peers} index={peers.findIndex(candidate => candidate.id === row.id)} instantOf={candidate => toInstantMs(candidate.date, candidate.time, candidate.timezone)} idOf={candidate => candidate.id!} orderOf={candidate => isTradeList ? (candidate as Transaction).globalTransactionIndex ?? (candidate as Transaction).transactionIndex : candidate.seq} allowAcrossInstants={isTradeList} onMove={async pair => {
     if (!(await ensureSignedIn('Sign in to reorder records.'))) return;
     const state = useWorkbookStore.getState();
     if (isTradeList) {
       const transactions = state.workbook.transactions;
       const a = transactions.find(candidate => candidate.id === pair[0].id), b = transactions.find(candidate => candidate.id === pair[1].id);
-      if (!a || !b || !Number.isInteger(a.transactionIndex) || !Number.isInteger(b.transactionIndex)) return toast('Transactions changed or accounting order is missing. Reload and try again.');
-      const sameTicker = a.ticker === b.ticker;
-      const next = transactions.map(candidate => candidate.id === a.id
-        ? { ...candidate, transactionIndex: b.transactionIndex, ...(sameTicker ? { seq: b.seq } : {}) }
+      const aIndex = a?.globalTransactionIndex ?? a?.transactionIndex;
+      const bIndex = b?.globalTransactionIndex ?? b?.transactionIndex;
+      if (!a || !b || !Number.isInteger(aIndex) || !Number.isInteger(bIndex)) return toast('Transactions changed or accounting order is missing. Reload and try again.');
+      // Swap global order, then derive every per-ticker index from that same order.
+      // This keeps both canonical indexes synchronized even when crossing tickers.
+      const swapped = transactions.map(candidate => candidate.id === a.id
+        ? { ...candidate, globalTransactionIndex: bIndex, transactionIndex: bIndex }
         : candidate.id === b.id
-          ? { ...candidate, transactionIndex: a.transactionIndex, ...(sameTicker ? { seq: a.seq } : {}) }
+          ? { ...candidate, globalTransactionIndex: aIndex, transactionIndex: aIndex }
           : candidate);
+      const ordered = [...swapped].sort((x, y) => (x.globalTransactionIndex ?? x.transactionIndex ?? 0) - (y.globalTransactionIndex ?? y.transactionIndex ?? 0));
+      const tickerCounts = new Map<string, number>();
+      const syncedById = new Map<string | undefined, Transaction>();
+      ordered.forEach(tx => {
+        const perTickerIndex = (tickerCounts.get(tx.ticker) ?? 0) + 1;
+        tickerCounts.set(tx.ticker, perTickerIndex);
+        syncedById.set(tx.id, { ...tx, perTickerIndex, seq: perTickerIndex });
+      });
+      const next = swapped.map(tx => syncedById.get(tx.id)!);
       state.setWorkbook({ ...state.workbook, transactions: next });
       toast('Transaction accounting order updated.');
       return;
