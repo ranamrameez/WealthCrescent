@@ -544,7 +544,16 @@ export function TransactionEntryModal({
     ? { module: 'personalLoans', ref: editPersonalLoanPayment.loanId, currencyCode: editingLoan?.currencyCode }
     : undefined;
   const linkIsFrom = editLink?.recordId === editLink?.link.fromRecordId;
-  const linkFinance = editLink ? linkIsFrom ? editLink.link.from : editLink.link.to : undefined;
+  const enrichBrokerRef = (side: LinkSideConfig, recordId: string): LinkSideConfig => {
+    if ((side.module !== 'qse' && side.module !== 'psx') || side.ref) return side;
+    const record = getLinkedSideRecord(side, recordId);
+    return record && 'brokerId' in record && record.brokerId ? { ...side, ref: record.brokerId } : side;
+  };
+  const rawLinkFinance = editLink ? linkIsFrom ? editLink.link.from : editLink.link.to : undefined;
+  // Older linked transfers were exchange-wide and stored no broker ref on
+  // the link. Recover the owning broker from the linked transfer record before
+  // rendering the locked edit form, rather than relying on a disabled picker.
+  const linkFinance = rawLinkFinance && editLink ? enrichBrokerRef(rawLinkFinance, editLink.recordId) : rawLinkFinance;
   const [linkSnapshot] = useState(() => editLink ? [structuredClone(getLinkedSideRecord(editLink.link.from, editLink.link.fromRecordId)), structuredClone(getLinkedSideRecord(editLink.link.to, editLink.link.toRecordId))] : []);
   const baseFinance = linkFinance ?? (editTransfer ? { module: editTransfer.module, ref: editTransfer.record.brokerId, fee: editTransfer.record.fee } : editFinance ?? defaultFinance);
   const resolvedDefaultFinance: LinkSideConfig = baseFinance
@@ -568,7 +577,11 @@ export function TransactionEntryModal({
       const link = editLink.link, own = linkSnapshot[linkIsFrom ? 0 : 1];
       const direction = linkIsFrom ? 'out' : 'in';
       return [{ ...base, finance: resolveTransferSide(linkFinance, direction, editLink.recordId), linked: true,
-        other: resolveTransferSide(linkIsFrom ? link.to : link.from, linkIsFrom ? 'in' : 'out', linkIsFrom ? link.toRecordId : link.fromRecordId),
+        other: resolveTransferSide(
+          enrichBrokerRef(linkIsFrom ? link.to : link.from, linkIsFrom ? link.toRecordId : link.fromRecordId),
+          linkIsFrom ? 'in' : 'out',
+          linkIsFrom ? link.toRecordId : link.fromRecordId,
+        ),
         direction, amount: own && 'gross' in own ? own.gross : own && 'amount' in own ? Math.abs(own.amount) : linkIsFrom ? link.fromAmount : link.toAmount,
         toAmount: linkIsFrom ? link.toAmount : link.fromAmount, toAmountTouched: true,
         date: own?.date ?? link.date, time: own && 'time' in own ? own.time : link.time ?? base.time,
