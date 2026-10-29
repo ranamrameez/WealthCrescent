@@ -1,7 +1,6 @@
 import { create, type UseBoundStore, type StoreApi } from 'zustand';
 import { toInstantMs } from '../lib/datetime';
-import { assignSeqForEntities, backfillSeq, nextSeq, nextSeqForEntity, syncTransactionIndexes } from '../lib/seq';
-import { sortTransactionsChronological } from '../lib/calc/sortTransactions';
+import { backfillSeq, nextSeq, nextSeqForEntity, syncTransactionIndexes } from '../lib/seq';
 import type { Adjustment, BrokerPortfolioData, BrokerProfile, Dividend, PricePoint, Transaction, TradePlan, Transfer, WatchlistItem } from '../types/workbook';
 import { scheduleLocalStorageWrite } from '../lib/localStoragePersistence';
 
