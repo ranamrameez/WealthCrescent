@@ -41,15 +41,16 @@ Status: draft, no verified checks on its current head. It is 43 commits ahead an
 ### PR #23 — stock-trade FAB save completion
 [Open PR #23](https://github.com/ranamrameez/WealthCrescent/pull/23), branch `fix/fab-trade-save`, head `979ac79e9d6a4c775580131550f17992ec21f73d`.
 
-It closes the shared Buy/sell stock modal only after the QSE/PSX store mutation succeeds, preserves entered values on synchronous failure, and adds a QSE regression test. It overlaps with the same callback change already present in PR #22. It is also 6 commits ahead / 82 behind main and has no verified checks. Do not merge it separately or close it until its unique work is ported and verified. Prefer porting the small FAB change and test into a fresh current-main branch, unless a validated PR #22 port already includes the same behavior.
+It closes the shared Buy/sell stock modal only after the QSE/PSX store mutation succeeds, preserves entered values on synchronous failure, and adds a QSE regression test. It overlaps with the same callback change already present in PR #22. It was 6 commits ahead / 85 behind main and had no verified checks. Its unique failure-recovery behavior and regression coverage are now merged in PR #30, which passed the production build and full test suite. PR #23 was closed as superseded on 2026-10-29; do not reopen unless new unique work is discovered.
 
 ## Recommended next actions
 
-1. Inspect current PR and branch state before each action; these notes are a 2026-10-29 snapshot.
-2. Create a fresh branch from current `main`; port PR #23's FAB save fix + regression test as a small independent PR, unless the exact behavior is already present on current main. Run CI and merge only when green.
-3. Port PR #22 by focused slices, not by merging its stale branch wholesale. Start with transaction-order semantics and tests; separately handle cost-basis reporting. Review the cash-ledger ordering concern before calling the accounting behavior correct.
-4. Update this handoff, `webapp/README.md`, `webapp/audit.md`, and the user manual with actual results after each slice. Never label the broader audit complete until every dependent surface is reviewed and tested.
-5. Keep the PSX market-cache activation pending until rules deployment, scheduled function deployment, and cache population are actually verified; the prior Firebase admin attempt returned HTTP 401 before mutation.
+1. Re-check current GitHub branch/PR/CI state before acting; these notes are a dated snapshot.
+2. PR #30 and PR #31 are merged with green CI. PR #23 is closed as superseded.
+3. Continue PR #22's remaining global transaction-order work on a fresh branch based on current main. Do not merge the stale branch wholesale. The transaction-page cost-basis consistency slice is already merged in PR #31.
+4. Before adopting cross-date `transactionIndex` accounting order, resolve the known `cashLedger.ts` concern: trades may validate in accounting order while displayed cash events remain sorted by date/time. Add tests proving running cash balances and accounting validation remain consistent after cross-date reordering.
+5. Continue the cost-basis dependency audit outside Transactions: Dashboard, Position Detail, analytics/time series, exports, charts, and strategy/advisory views. Update this handoff, `webapp/README.md`, `webapp/audit.md`, and `webapp/USER_MANUAL.md` after each independently verified slice.
+6. Keep PSX market-cache activation pending until rules deployment, scheduled function deployment, and cache population are actually verified; the prior Firebase admin attempt returned HTTP 401 before mutation.
 
 ## Latest CI regression fixes now on main
 
