@@ -144,13 +144,13 @@ describe('calcFeeBreakdown — Simple (all-in %) fee mode, user-requested 2026-0
     expect(scenarios.netted).toBe(0);
   });
 
-  it('makePSXFeeCalculator charges the full all-in rate on a charged leg and nothing on a netted one', () => {
+  it('charges the higher-value leg in Simple mode and nets the other leg', () => {
     const buy: Transaction = { date: '2026-08-27', ticker: 'OGDC', action: 'BUY', shares: 1, price: 327.8 };
     const sell: Transaction = { date: '2026-08-27', ticker: 'OGDC', action: 'SELL', shares: 1, price: 328.5 };
     const calc = makePSXFeeCalculator(SIMPLE_SETTINGS, [buy, sell]);
-    // Equal traded values — ties go to BUY being the charged side (README item 79).
-    expect(calc(327.8, true, { shares: 1, tx: buy })).toBeCloseTo(327.8 * 0.00021, 2);
-    expect(calc(328.5, false, { shares: 1, tx: sell })).toBe(0);
+    // The sell has the higher traded value, so only it pays the all-in fee.
+    expect(calc(327.8, true, { shares: 1, tx: buy })).toBe(0);
+    expect(calc(328.5, false, { shares: 1, tx: sell })).toBeCloseTo(328.5 * 0.00021, 2);
   });
 
   it('an undefined feeMode behaves exactly like itemized — no existing account is silently switched', () => {
