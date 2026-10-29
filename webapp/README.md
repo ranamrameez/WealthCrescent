@@ -11625,3 +11625,5 @@ Tracked on `fix/mutual-funds-ledger-sync`, separate from broker-profile work:
 - **Implemented on branch (CI pending) — Invest/Withdraw amount edit:** edit mode now accepts Amount and recalculates units from NAV. Regression coverage added for the conversion.
 
 Regression tests must cover transfer → cash balance, BUY/SELL cash-to-holdings movement without double counting, effective-date display/order, and amount/units/NAV edits. No fixes are marked done until verified.
+
+Draft PR: [#37 — Fix Mutual Funds date and amount editing](https://github.com/ranamrameez/WealthCrescent/pull/37). It includes the date and amount edit fixes; CI has not reported yet. Transfer/cash-balance reconciliation remains an open accounting-design task.
