@@ -49,7 +49,8 @@ export function calcCGT(gain: number, settings: PSXSettings): number {
 /** Only filled/completed transactions participate in actual fee pairing.
  * Pending orders are hypothetical and must never change the fee of a filled
  * transaction merely by being present in the workbook. */
-export function sameDayChargedSide(transactions: Transaction[], ticker: string, date: string): 'BUY' | 'SELL' | null {
+export function sameDayChargedSide(transactions: Transaction[], ticker: string, date: string, rule: PSXSettings['sameDayNettingRule'] = 'higherValueSide'): 'BUY' | 'SELL' | null {
+  if (rule === 'none') return null;
   const dayTxs = transactions.filter((t) => !t.isPending && t.ticker === ticker && t.date === date);
   const buys = dayTxs.filter((t) => t.action === 'BUY');
   const sells = dayTxs.filter((t) => t.action === 'SELL');
@@ -62,16 +63,17 @@ export function sameDayChargedSide(transactions: Transaction[], ticker: string, 
   return sellValue > buyValue ? 'SELL' : 'BUY';
 }
 
-export function isNettedLeg(transactions: Transaction[], tx: Transaction): boolean {
+export function isNettedLeg(transactions: Transaction[], tx: Transaction, rule: PSXSettings['sameDayNettingRule'] = 'higherValueSide'): boolean {
   if (tx.manualSameDay) return true;
-  const charged = sameDayChargedSide(transactions, tx.ticker, tx.date);
+  if (rule === 'none') return false;
+  const charged = sameDayChargedSide(transactions, tx.ticker, tx.date, rule);
   return charged !== null && tx.action !== charged;
 }
 
-export function isProvisionalSameDayBuy(transactions: Transaction[], tx: Transaction): boolean {
-  if (tx.action !== 'BUY') return false;
+export function isProvisionalSameDayBuy(transactions: Transaction[], tx: Transaction, rule: PSXSettings['sameDayNettingRule'] = 'higherValueSide'): boolean {
+  if (rule === 'none' || tx.action !== 'BUY') return false;
   if (tx.date !== todayISODate(defaultTimezoneForMarket('PSX'))) return false;
-  return sameDayChargedSide(transactions, tx.ticker, tx.date) === null;
+  return sameDayChargedSide(transactions, tx.ticker, tx.date, rule) === null;
 }
 
 export function feeScenarios(amount: number, isBuy: boolean, shares: number, settings: PSXSettings): { full: number; netted: number } {
@@ -103,8 +105,9 @@ export function makePSXFeeCalculator(settings: PSXSettings, allTransactions: Tra
     if (tx?.feeOverride !== undefined) return tx.feeOverride;
     if (!tx) return calcFeeBreakdown(amount, isBuy, shares, settings).total;
     const totals = values.get(key(tx));
+    if (settings.sameDayNettingRule === 'none' && !tx.manualSameDay) return calcFeeBreakdown(amount, isBuy, shares, settings).total;
     const charged = totals && totals.buy > 0 && totals.sell > 0 ? totals.sell > totals.buy ? 'SELL' : 'BUY' : null;
-    if (!tx.manualSameDay && tx.action === 'BUY' && tx.date === currentDay() && charged === null) return 0;
+    if (settings.sameDayNettingRule !== 'none' && !tx.manualSameDay && tx.action === 'BUY' && tx.date === currentDay() && charged === null) return 0;
     if (!tx.manualSameDay && (charged === null || tx.action === charged)) return calcFeeBreakdown(amount, isBuy, shares, settings).total;
     const fb = calcFeeBreakdown(amount, isBuy, shares, settings);
     return round2(fb.psxFee + fb.nccplFee + fb.secpLevy + fb.cdc + fb.cvt);
