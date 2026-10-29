@@ -179,6 +179,9 @@ from the lot system."*
 
 ## Done
 
+- Appearance preferences now include an explicit **Reset appearance to app defaults** action. The reset is persisted locally and restores all appearance fields to `DEFAULT_APPEARANCE`; regression coverage added. This is the first small slice of the broader app-defaults/user-overrides work, not the global settings reset.
+
+
 - **PSX Market Prices API integration (2026-10-22, implemented locally).** All documented
   PSX dataset families have lazy sections and paginated reusable tables. Sector cards
   start closed; favourites start open and reuse the shared cloud/local favourites hook.
