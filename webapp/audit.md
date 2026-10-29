@@ -61,11 +61,11 @@ All fixes are on `chatgpt-audit-20260916-v2`. No PR was opened and no merge was 
 
 ## 2026-10-29 — Follow-up status after CI baseline repair
 
-PR #28 merged the existing CI regression fixes and the final PR CI passed the production build plus all 134 test files. Do not keep reporting the earlier `categoryMerge`, `resetLocalData`, `planControls`, `PriceInput`, and `bankNavigation` baseline failures as current main failures. This does not validate the separate in-flight transaction-order/cost-basis changes in PR #22; that work remains unmerged, diverged from main, and unverified. See `webapp/SESSION_HANDOFF.md` for the porting plan and the known cash-ledger order consistency concern.
+PR #28 merged the existing CI regression fixes and the final PR CI passed the production build plus all 134 test files. Do not keep reporting the earlier `categoryMerge`, `resetLocalData`, `planControls`, `PriceInput`, and `bankNavigation` baseline failures as current main failures. This does not validate the separate global transaction-order proposal formerly in PR #22. That stale PR is now closed; global transactionIndex/cross-date reordering remains deferred and unverified. See `webapp/SESSION_HANDOFF.md` for the preserved source SHA and the cash-ledger order consistency concern.
 
 ## 2026-10-29 — Transaction-page cost-basis consistency slice (merged in PR #31; CI green)
 
-Porting the relevant parts of draft PR #22 onto a fresh branch based on current main; the old branch was 85 commits behind and must not be merged wholesale.
+The relevant transaction-page cost-basis parts of PR #22 were ported to fresh work and merged in PR #31. The remaining global transaction-order proposal was not ported and must not be merged wholesale.
 
 - QSE/PSX transaction-row SELL P/L now uses the weighted-average per-SELL calculator when `costBasisMethod` is `average`; FIFO and lowest-cost-first use the configured lot match method.
 - Open/Closed lot-attribution tables are shown only for FIFO/lowest-cost-first. Average cost shows an explanation because lot-by-lot attribution is not mathematically applicable to weighted-average accounting.
@@ -73,3 +73,11 @@ Porting the relevant parts of draft PR #22 onto a fresh branch based on current 
 - Added tests for weighted-average per-SELL P/L and unmatched oversells. The production build and full test suite passed in PR #31.
 
 Still pending: audit Dashboard, Position Detail, analytics/time series, exports, charts, strategy/advisory surfaces, and the transaction-index/cash-ledger ordering design. See `webapp/SESSION_HANDOFF.md`.
+
+
+## 2026-10-29 — stale PR cleanup
+
+- PR #22 was closed and retitled as superseded after its transaction-page cost-basis slice landed in PR #31. Original head `d962a49f03b170d7a6ff7bc6c141c366809b5804` is retained for recovery; do not merge or branch new work from it.
+- Global transactionIndex/cross-date reorder remains deferred until accounting order and the date-ordered cash ledger are reconciled and regression-tested. This is not complete and no claim is made that cross-date reorder is safe.
+- PR #23 was already closed as superseded; its unique save-failure recovery is on main via PR #30.
+- PR #32 refreshed the session handoff and corrected status records. Old PR branches are retained because the connected GitHub tools available here do not expose branch deletion. Retaining a recovery reference is safer than destroying potentially useful unported work; closed PRs cannot be accidentally merged through the normal open-PR workflow.
