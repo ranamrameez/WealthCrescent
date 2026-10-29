@@ -2,6 +2,8 @@ import type { Adjustment, Appearance, BrokerProfile, Dividend, PricePoint, Trans
 
 export interface PSXSettings {
   feePct: number;
+  /** Broker-specific same-day buy/sell commission policy. Unknown broker rules must not inherit Zindigi netting. */
+  sameDayNettingRule?: 'higherValueSide' | 'none';
   lowPriceThreshold: number;
   lowPriceFee: number;
   sstPct: number;
