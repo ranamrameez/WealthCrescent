@@ -27,6 +27,7 @@ import { useSortableRows } from '../../../hooks/useSortableRows';
 import { usePageFabActions } from '../../../hooks/usePageFabActions';
 import { fmt, fmtMoney, fmtQSEPrice } from '../../../lib/format';
 import { closedPLBySellTxId, computeClosedTrades, type LotMatchOrder } from '../../../lib/calc/closedTrades';
+import { computeAveragePLBySellTxId } from '../../../lib/calc/realizedPL';
 import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
 import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
 import { transferRunningBalance } from '../../../lib/calc/transferBalance';
@@ -294,7 +295,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   // pure reporting convention here, not a real constraint — offer the
   // cheapest-lot-first alternative as a second, explicitly comparison-only
   // view (see `closedTrades.ts`'s own `LotMatchOrder` doc comment).
-  const ctMatchOrder: LotMatchOrder = pageFilters.matchOrder === 'lowestCostFirst' ? 'lowestCostFirst' : 'fifo';
+  const ctMatchOrder: LotMatchOrder = workbook.settings.costBasisMethod === 'lowestCostFirst' ? 'lowestCostFirst' : 'fifo';
 
   // Pending item 143: manual lot allocation for the inline edit-row SELL
   // form — same gate as `TransactionRows`' add-row copy above. Lots are
@@ -402,8 +403,10 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   // number, or this row's own pill and the table below could show two
   // contradicting figures for the identical sell.
   const sellPLById = useMemo(
-    () => closedPLBySellTxId(computeClosedTrades(workbook.transactions, calcFee, ctMatchOrder)),
-    [workbook.transactions, calcFee, ctMatchOrder],
+    () => (workbook.settings.costBasisMethod === 'average' || !workbook.settings.costBasisMethod)
+      ? computeAveragePLBySellTxId(workbook.transactions, calcFee)
+      : closedPLBySellTxId(computeClosedTrades(workbook.transactions, calcFee, ctMatchOrder)),
+    [workbook.transactions, workbook.settings.costBasisMethod, calcFee, ctMatchOrder],
   );
 
   // User's own words: "make separate sections for open and closed trades...
@@ -622,6 +625,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
         {closedPage.controls}
       </details>
 
+      {(workbook.settings.costBasisMethod === 'fifo' || workbook.settings.costBasisMethod === 'lowestCostFirst') ? <>
       <QseRecordCard dateSort={openDateSort} title="Open trades (not yet sold)" kind="transactions" rows={workbook.transactions.filter(tx => sortedOpenLots.some(row => row.buyId === tx.id))} allRecords={workbook.transactions.filter(tx => openLots.some(row => row.buyId === tx.id))} modifying={modifying} onModify={() => setModifying(value => !value)} exportData={{ rows: sortedOpenLots, allRows: openLots }}>
         <div className="table-scroll">
           <table>
@@ -699,6 +703,10 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
         </div>
         {closedTradesPage.controls}
       </QseRecordCard>
+      </> : <p className="text-muted mt-md">
+        Average cost blends all buys into one running cost basis, so individual open/closed lot attribution is not applicable. The transaction rows and portfolio calculations use weighted-average cost.
+      </p>}
+
 
       {detailTx && (
         <RecordDetailModal
