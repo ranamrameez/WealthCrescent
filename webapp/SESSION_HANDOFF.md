@@ -41,14 +41,15 @@ Its unique retry-preserving failure behavior and regression coverage were ported
 
 PR #31 merged the transaction-page cost-basis consistency slice. PR #32 merged the status/handoff refresh. Current open-PR search returned no open PRs at the time of this update.
 
-## Recommended next actions
+## Remaining work and safe next actions
 
-1. Re-check current GitHub branch/PR/CI state before acting; these notes are a dated snapshot.
-2. PR #30 and PR #31 are merged with green CI. PR #23 is closed as superseded.
-3. Continue PR #22's remaining global transaction-order work on a fresh branch based on current main. Do not merge the stale branch wholesale. The transaction-page cost-basis consistency slice is already merged in PR #31.
-4. Before adopting cross-date `transactionIndex` accounting order, resolve the known `cashLedger.ts` concern: trades may validate in accounting order while displayed cash events remain sorted by date/time. Add tests proving running cash balances and accounting validation remain consistent after cross-date reordering.
-5. Continue the cost-basis dependency audit outside Transactions: Dashboard, Position Detail, analytics/time series, exports, charts, and strategy/advisory views. Update this handoff, `webapp/README.md`, `webapp/audit.md`, and `webapp/USER_MANUAL.md` after each independently verified slice.
+1. Re-check live GitHub PR/branch/CI state before each task; this handoff is a dated snapshot.
+2. PR #22 and PR #23 are closed as superseded. Do not reopen or merge their stale branches. PR #30 and PR #31 are merged with green CI; PR #32 and PR #33 are documentation-only merges.
+3. **Global transaction ordering is deferred, not implemented.** Do not resume it by merging the old PR #22 branch. If pursued, create a new branch from current main, re-evaluate the data model, and first resolve the relationship between accounting sequence and date-ordered cash-ledger presentation.
+4. Before shipping any cross-date reordering, add regression tests proving transaction validation, visible running cash, balances, and derived reports remain consistent after reordering. Do not claim it is safe until those tests and full CI pass.
+5. Continue the broader cost-basis dependency audit outside Transactions: Dashboard, Position Detail, analytics/time series, exports, charts, and strategy/advisory views. Update this handoff, `webapp/README.md`, `webapp/audit.md`, and `webapp/USER_MANUAL.md` after each independently verified slice.
 6. Keep PSX market-cache activation pending until rules deployment, scheduled function deployment, and cache population are actually verified; the prior Firebase admin attempt returned HTTP 401 before mutation.
+7. Old source branches are retained for recovery because the connected GitHub tools available in this session do not expose branch deletion. The stale PRs are closed and cannot be accidentally merged through the normal open-PR workflow.
 
 ## Latest CI regression fixes now on main
 
