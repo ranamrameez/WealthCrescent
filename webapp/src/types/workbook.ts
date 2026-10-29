@@ -454,6 +454,8 @@ export interface CashLedgerEvent {
    * `Transaction.seq`'s doc comment) — the tie-breaker `buildCashLedger`
    * falls back to for two events of the SAME `kind` at the same instant. */
   seq?: number;
+  /** Global accounting order when this event is a stock trade; mixed cash-ledger display remains date-ordered. */
+  transactionIndex?: number;
   kind: 'trade' | 'transfer' | 'adjustment';
   action: string;
   label: string;
