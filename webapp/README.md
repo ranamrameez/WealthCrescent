@@ -183,6 +183,8 @@ from the lot system."*
 
 ## Done
 
+- **Transaction-page cost-basis consistency slice (2026-10-29, in review):** QSE/PSX inline SELL P/L now uses the weighted-average engine when Average cost is selected; FIFO/Lowest cost first uses the configured lot method. Open/Closed lot-attribution reports are hidden under Average cost rather than presenting incompatible lot math. The independent page-local lot-match selector was removed. Regression coverage includes weighted-average SELL P/L and unmatched oversells. CI pending in PR.
+
 - **CI regression fixes (2026-10-29):** fixed uncontrolled PriceInput resetting to its original default on blur; flushed queued local workbook writes after account-switch/logout resets; preserved intentionally merged-away bundled categories through category normalization; aligned bank navigation tests with the current behavior of showing pending transactions in the ledger. Full validation is in PR #28.
 
 
