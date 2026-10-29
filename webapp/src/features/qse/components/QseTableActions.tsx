@@ -246,10 +246,25 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
 /** Reorder exact-time peers; trades also share ticker and action so lot rules remain intact. */
 export function QseReorder({ kind, row, rows }: { kind: Kind; row: Transaction | Transfer | Adjustment | Dividend | Row; rows: Array<Transaction | Transfer | Adjustment | Dividend | Row> }) {
   const ensureSignedIn = useEnsureSignedIn();
-  const peers = rows.filter(candidate => (kind !== 'ledger' || (candidate as Row).kind === (row as Row).kind) && (kind !== 'transactions' && (kind !== 'ledger' || (row as Row).kind !== 'trade') || ((candidate as Transaction).ticker === (row as Transaction).ticker && (candidate as Transaction).action === (row as Transaction).action)));
-  return <ReorderButtons rows={peers} index={peers.findIndex(candidate => candidate.id === row.id)} instantOf={candidate => toInstantMs(candidate.date, candidate.time, candidate.timezone)} idOf={candidate => candidate.id!} orderOf={candidate => candidate.seq} onMove={async pair => {
+  const isTradeList = kind === 'transactions';
+  const peers = isTradeList ? rows as Transaction[] : rows.filter(candidate => (kind !== 'ledger' || (candidate as Row).kind === (row as Row).kind) && (kind !== 'transactions' && (kind !== 'ledger' || (row as Row).kind !== 'trade') || ((candidate as Transaction).ticker === (row as Transaction).ticker && (candidate as Transaction).action === (row as Transaction).action)));
+  return <ReorderButtons rows={peers} index={peers.findIndex(candidate => candidate.id === row.id)} instantOf={candidate => toInstantMs(candidate.date, candidate.time, candidate.timezone)} idOf={candidate => candidate.id!} orderOf={candidate => isTradeList ? (candidate as Transaction).transactionIndex : candidate.seq} allowAcrossInstants={isTradeList} onMove={async pair => {
     if (!(await ensureSignedIn('Sign in to reorder records.'))) return;
     const state = useWorkbookStore.getState();
+    if (isTradeList) {
+      const transactions = state.workbook.transactions;
+      const a = transactions.find(candidate => candidate.id === pair[0].id), b = transactions.find(candidate => candidate.id === pair[1].id);
+      if (!a || !b || !Number.isInteger(a.transactionIndex) || !Number.isInteger(b.transactionIndex)) return toast('Transactions changed or accounting order is missing. Reload and try again.');
+      const sameTicker = a.ticker === b.ticker;
+      const next = transactions.map(candidate => candidate.id === a.id
+        ? { ...candidate, transactionIndex: b.transactionIndex, ...(sameTicker ? { seq: b.seq } : {}) }
+        : candidate.id === b.id
+          ? { ...candidate, transactionIndex: a.transactionIndex, ...(sameTicker ? { seq: a.seq } : {}) }
+          : candidate);
+      state.setWorkbook({ ...state.workbook, transactions: next });
+      toast('Transaction accounting order updated.');
+      return;
+    }
     const sourceKind = kind === 'ledger' ? (row as Row).kind === 'trade' ? 'transactions' : (row as Row).kind === 'transfer' ? 'transfers' : 'adjustments' : kind;
     const records = state.workbook[sourceKind];
     const a = records.find(candidate => candidate.id === pair[0].id), b = records.find(candidate => candidate.id === pair[1].id);
