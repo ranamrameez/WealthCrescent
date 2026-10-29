@@ -68,7 +68,7 @@ function calculateDerived(workbook: Workbook, selectedTickers?: string[]) {
         return { ticker: p.ticker, shares: p.shares, invested: p.invested, marketPrice, value, sellFee, profit, roiPct };
       });
 
-    return { workbook: { ...brokerWorkbook, transactions: scoped }, calcFee, positions, summary, realizedSeries, ledger, rows, lots };
+    return { workbook: brokerWorkbook, calcFee, positions, summary, realizedSeries, ledger, rows, lots };
 
 }
 
