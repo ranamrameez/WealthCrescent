@@ -23,6 +23,7 @@ import { usePageFabActions } from '../../../hooks/usePageFabActions';
 import { fmt, fmtMoney, fmtPSXPrice } from '../../../lib/format';
 import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
 import { closedPLBySellTxId, computeClosedTrades, type LotMatchOrder } from '../../../lib/calc/closedTrades';
+import { computeAveragePLBySellTxId } from '../../../lib/calc/realizedPL';
 import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
 import { isNettedLeg } from '../../../lib/calc/psxFees';
 import { transferRunningBalance } from '../../../lib/calc/transferBalance';
@@ -308,7 +309,7 @@ function TransactionList() {
   // lot first" is a pure reporting convention in this ledger too, not a
   // real constraint. Offer cheapest-lot-first as a second, explicitly
   // comparison-only view (see `closedTrades.ts`'s `LotMatchOrder` comment).
-  const [ctMatchOrder, setCtMatchOrder] = useState<LotMatchOrder>('fifo');
+  const ctMatchOrder: LotMatchOrder = workbook.settings.costBasisMethod === 'lowestCostFirst' ? 'lowestCostFirst' : 'fifo';
 
   // Pending item 143 PSX fast-follow: manual lot allocation for the inline
   // edit-row SELL form — same gate/derivation as QSE's identical file. Lots
@@ -413,8 +414,10 @@ function TransactionList() {
   // number, or this row's own pill and the table below could show two
   // contradicting figures for the identical sell.
   const sellPLById = useMemo(
-    () => closedPLBySellTxId(computeClosedTrades(workbook.transactions, calcFee, ctMatchOrder)),
-    [workbook.transactions, calcFee, ctMatchOrder],
+    () => (workbook.settings.costBasisMethod === 'average' || !workbook.settings.costBasisMethod)
+      ? computeAveragePLBySellTxId(workbook.transactions, calcFee)
+      : closedPLBySellTxId(computeClosedTrades(workbook.transactions, calcFee, ctMatchOrder)),
+    [workbook.transactions, workbook.settings.costBasisMethod, calcFee, ctMatchOrder],
   );
 
   // User's own words: "make separate sections for open and closed trades...
@@ -674,18 +677,12 @@ function TransactionList() {
         {renderTable(closedGroups, 'No transactions for a fully closed position yet.')}
       </details>
 
-      <div className="row gap-sm mb-sm mt-md" style={{ alignItems: 'center' }}>
-        <Tooltip text="Same-day netting decides a whole transaction's fee from that day's total buy vs. sell quantity — never from which lot a sale is later credited to here, so this is purely which STORY the Open trades and Closed trades sections below tell, not a real amount. FIFO (oldest lot first) is what most brokers default to. Cheapest-lot-first re-tells the same history against your lowest-cost lots instead — it never changes your real position, fees, or total P/L, only which lots count as still open vs. already sold.">
-          Match order
-        </Tooltip>
-        <button type="button" className={`chip${ctMatchOrder === 'fifo' ? ' active' : ''}`} onClick={() => setCtMatchOrder('fifo')}>
-          {ctMatchOrder === 'fifo' && <CheckIcon size={11} />}FIFO (oldest first)
-        </button>
-        <button type="button" className={`chip${ctMatchOrder === 'lowestCostFirst' ? ' active' : ''}`} onClick={() => setCtMatchOrder('lowestCostFirst')}>
-          {ctMatchOrder === 'lowestCostFirst' && <CheckIcon size={11} />}Cheapest lot first
-        </button>
-      </div>
 
+
+      {(workbook.settings.costBasisMethod === 'fifo' || workbook.settings.costBasisMethod === 'lowestCostFirst') ? <>
+      <p className="text-muted mb-sm mt-md">
+        Lot attribution follows the configured cost-basis method: {ctMatchOrder === 'lowestCostFirst' ? 'Lowest cost first' : 'FIFO'}.
+      </p>
       <details open>
         <summary className="summary-heading">
           <Tooltip text="Each buy lot that hasn't been fully sold yet, matched against your real sells using the configured cost-basis method. This is the open-lot side of the Closed trades report.">
@@ -775,6 +772,10 @@ function TransactionList() {
           </table>
         </div>
       </details>
+      </> : <p className="text-muted mb-sm mt-md">
+        Average cost blends all buys into one running cost basis, so individual open/closed lot attribution is not applicable. The transaction rows and portfolio calculations use weighted-average cost.
+      </p>}
+
 
       {detailTx && (
         <RecordDetailModal
