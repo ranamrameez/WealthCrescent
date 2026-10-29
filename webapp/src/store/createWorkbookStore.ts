@@ -195,7 +195,7 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
       addAdjustment: (a) => mutate((wb) => {
         const withId = a.id ? a : { ...a, id: crypto.randomUUID() };
         const seq = withId.seq !== undefined ? withId.seq : nextSeq(wb.adjustments);
-        return { ...wb, adjustments: [...wb.adjustments, { ...withId, seq, timestamp: withId.timestamp ?? new Date().toISOString() }] };
+        return { ...wb, adjustments: [...wb.adjustments, { ...withId, ...(withId.brokerId || !wb.activeBrokerId ? {} : { brokerId: wb.activeBrokerId }), seq, timestamp: withId.timestamp ?? new Date().toISOString() }] };
       }),
       updateAdjustment: (index, patch) => mutate((wb) => ({ ...wb, adjustments: wb.adjustments.map((a, i) => (i === index ? { ...a, ...patch } : a)) })),
       deleteAdjustment: (index) => mutate((wb) => ({ ...wb, adjustments: wb.adjustments.filter((_, i) => i !== index) })),
@@ -223,7 +223,7 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
       addDividend: (d) => mutate((wb) => {
         const withId = d.id ? d : { ...d, id: crypto.randomUUID() };
         const seq = withId.seq !== undefined ? withId.seq : nextSeqForEntity(wb.dividends, (x) => x.ticker, withId.ticker);
-        return { ...wb, dividends: [...wb.dividends, { ...withId, seq, timestamp: withId.timestamp ?? new Date().toISOString() }] };
+        return { ...wb, dividends: [...wb.dividends, { ...withId, ...(withId.brokerId || !wb.activeBrokerId ? {} : { brokerId: wb.activeBrokerId }), seq, timestamp: withId.timestamp ?? new Date().toISOString() }] };
       }),
       updateDividend: (index, patch) => mutate((wb) => ({ ...wb, dividends: wb.dividends.map((d, i) => (i === index ? { ...d, ...patch } : d)) })),
       removeDividend: (index) => mutate((wb) => ({ ...wb, dividends: wb.dividends.filter((_, i) => i !== index) })),
@@ -266,14 +266,14 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
           tradePlans: data.tradePlans,
         };
       }),
-      addTradePlan: (plan) => mutate((wb) => ({ ...wb, tradePlans: [...wb.tradePlans, { ...plan, id: plan.id || crypto.randomUUID(), legs: plan.legs || [] }] })),
+      addTradePlan: (plan) => mutate((wb) => ({ ...wb, tradePlans: [...wb.tradePlans, { ...plan, ...(plan.brokerId || !wb.activeBrokerId ? {} : { brokerId: wb.activeBrokerId }), id: plan.id || crypto.randomUUID(), legs: plan.legs || [] }] })),
       updateTradePlan: (id, patch) => mutate((wb) => ({ ...wb, tradePlans: wb.tradePlans.map((p) => (p.id === id ? { ...p, ...patch } : p)) })),
       deleteTradePlan: (id) => mutate((wb) => ({ ...wb, tradePlans: wb.tradePlans.filter((p) => p.id !== id) })),
       executeTradePlanLeg: (planId, legIndex) => mutate((wb) => {
         const plan = wb.tradePlans.find((p) => p.id === planId);
         const leg = plan?.legs[legIndex];
         if (!plan || !leg || leg.executed || leg.ignored) return wb;
-        const tx: Transaction = { id: crypto.randomUUID(), seq: nextSeqForEntity(wb.transactions, (t) => t.ticker, leg.ticker), timestamp: new Date().toISOString(), date: leg.date || new Date().toISOString().slice(0, 10), ticker: leg.ticker, action: leg.action, shares: leg.shares, price: leg.price, targetLotBuyId: leg.targetLotBuyId };
+        const tx: Transaction = { id: crypto.randomUUID(), brokerId: wb.activeBrokerId, seq: nextSeqForEntity(wb.transactions, (t) => t.ticker, leg.ticker), timestamp: new Date().toISOString(), date: leg.date || new Date().toISOString().slice(0, 10), ticker: leg.ticker, action: leg.action, shares: leg.shares, price: leg.price, targetLotBuyId: leg.targetLotBuyId };
         return { ...wb, transactions: [...wb.transactions, tx], tradePlans: wb.tradePlans.map((p) => p.id === planId ? { ...p, legs: p.legs.map((l, i) => i === legIndex ? { ...l, executed: true, executedTransactionId: tx.id } : l) } : p) };
       }),
     };
