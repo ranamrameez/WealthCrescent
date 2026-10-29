@@ -16,7 +16,7 @@ import { computePositions } from '../positions';
 import { cashSummary } from '../cashSummary';
 import { createEmptyPSXWorkbook, DEFAULT_PSX_SETTINGS } from '../../../store/defaultPsxWorkbook';
 
-it('indexes same-day quantities once instead of rescanning history for every fee', () => {
+it('indexes same-day traded values once instead of rescanning history for every fee', () => {
   const transactions: Transaction[] = Array.from({ length: 2000 }, (_, index) => ({ ticker: 'T' + Math.floor(index / 2) % 20, date: '2025-01-' + String(Math.floor(index / 40) % 28 + 1).padStart(2, '0'), action: index % 2 ? 'SELL' : 'BUY', shares: index % 2 ? 60 : 100, price: 100 }));
   let historyReads = 0;
   const tracked = transactions.map(tx => new Proxy(tx, { get(target, key, receiver) { historyReads++; return Reflect.get(target, key, receiver); } }));
@@ -204,12 +204,12 @@ describe('sameDayChargedSide', () => {
     expect(sameDayChargedSide([tx('BUY', 10)], 'TEST', day)).toBeNull();
   });
 
-  it('charges the larger side when sell volume exceeds buy volume', () => {
+  it('charges the higher-value side when sell volume exceeds buy volume', () => {
     const txs = [tx('BUY', 14), tx('SELL', 47)];
     expect(sameDayChargedSide(txs, 'TEST', day)).toBe('SELL');
   });
 
-  it('charges the larger side when buy volume exceeds sell volume', () => {
+  it('charges the higher-value side when buy volume exceeds sell volume', () => {
     const txs = [tx('BUY', 50), tx('SELL', 10)];
     expect(sameDayChargedSide(txs, 'TEST', day)).toBe('BUY');
   });
@@ -218,13 +218,22 @@ describe('sameDayChargedSide', () => {
     const txs = [tx('BUY', 20), tx('SELL', 20)];
     expect(sameDayChargedSide(txs, 'TEST', day)).toBe('BUY');
   });
+
+  it('uses traded value rather than share count when prices differ', () => {
+    const txs: Transaction[] = [
+      { date: day, ticker: 'TEST', action: 'BUY', shares: 100, price: 5 },
+      { date: day, ticker: 'TEST', action: 'SELL', shares: 60, price: 10 },
+    ];
+    // BUY has more shares, but SELL has the higher value (600 vs 500).
+    expect(sameDayChargedSide(txs, 'TEST', day)).toBe('SELL');
+  });
 });
 
 describe('makePSXFeeCalculator — same-day netting (README items 6/7)', () => {
   const day = '2026-08-21';
   const netSettings: PSXSettings = { ...BASE_SETTINGS, psxFeePct: 0.005, nccplFeePct: 0.011 };
 
-  it('charges full commission+SST on the larger (charged) side, levies-only on the netted side', () => {
+  it('charges full commission+SST on the higher-value side, levies-only on the netted side', () => {
     const buyTx: Transaction = { date: day, ticker: 'TEST', action: 'BUY', shares: 14, price: 100 };
     const sellTx: Transaction = { date: day, ticker: 'TEST', action: 'SELL', shares: 47, price: 100 };
     const all = [buyTx, sellTx];
