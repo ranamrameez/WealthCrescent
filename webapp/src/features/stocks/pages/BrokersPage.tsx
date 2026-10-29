@@ -186,7 +186,7 @@ export function BrokersPage() {
                   </p>
                 </div>
                 <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-                  {active && <span className="pill pill-success">Active</span>}
+                  {active && <span className="pill pill-positive">Active</span>}
                   {!active && !profile.archived && <button type="button" className="btn primary" onClick={() => switchProfile(profile.id)}>Switch to profile</button>}
                   {profile.archived && <button type="button" className="btn secondary" onClick={() => restoreProfile(profile.id)}>Restore</button>}
                 </div>
