@@ -328,7 +328,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   type TxCol = 'order' | 'date' | 'ticker' | 'action' | 'shares' | 'price' | 'amount';
   const sortValue = (r: (typeof filtered)[number], col: TxCol): number | string => {
     switch (col) {
-      case 'order': return r.tx.transactionIndex ?? Number.MAX_SAFE_INTEGER;
+      case 'order': return r.tx.globalTransactionIndex ?? r.tx.transactionIndex ?? Number.MAX_SAFE_INTEGER;
       case 'ticker': return r.tx.ticker;
       case 'action': return r.tx.action;
       case 'shares': return r.tx.shares;
@@ -470,7 +470,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   };
 
   const setWorkbook = useWorkbookStore((s) => s.setWorkbook);
-  const transactionOrderRows = useMemo(() => [...workbook.transactions].sort((a, b) => (a.transactionIndex ?? Number.MAX_SAFE_INTEGER) - (b.transactionIndex ?? Number.MAX_SAFE_INTEGER)), [workbook.transactions]);
+  const transactionOrderRows = useMemo(() => [...workbook.transactions].sort((a, b) => (a.globalTransactionIndex ?? a.transactionIndex ?? Number.MAX_SAFE_INTEGER) - (b.globalTransactionIndex ?? b.transactionIndex ?? Number.MAX_SAFE_INTEGER)), [workbook.transactions]);
   const clearAll = async () => {
     const ok = await confirmDialog(
       'This clears all transactions, prices and watchlist entries in this browser.',
