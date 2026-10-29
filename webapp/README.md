@@ -179,6 +179,9 @@ from the lot system."*
 
 ## Done
 
+- Added a data-preserving **Reset all settings to app defaults** action on Account. It resets QSE/PSX broker settings, module preference settings, enabled-currency filters, module visibility, and appearance while preserving financial records and user-created entities; regression test added.
+
+
 - Appearance preferences now include an explicit **Reset appearance to app defaults** action. The reset is persisted locally and restores all appearance fields to `DEFAULT_APPEARANCE`; regression coverage added. This is the first small slice of the broader app-defaults/user-overrides work, not the global settings reset.
 
 
@@ -10254,7 +10257,7 @@ from the lot system."*
 - Added version tracking for application defaults on broker profiles. When a newer app-default version is introduced, profiles with differing values offer an explicit choice to apply current defaults or keep the user's custom settings; applying defaults preserves transaction history.
 ## Pending
 
-- **Settings defaults follow-up:** build the administrator-facing editor/source-of-truth for all default settings; persist default snapshots/versioning for every settings category; implement a single **Reset all customized settings** action that restores every module's settings plus appearance without deleting financial data; sync and validate reset behavior across devices; complete UI/browser verification.
+- **Settings defaults follow-up:** build the administrator-facing editor/source-of-truth for all default settings and extend default-change versioning/suggestions beyond broker profiles. Reset-all-settings has been implemented in this branch but still needs CI and browser validation before it can be marked Done.
 
 
 - **App defaults / user overrides (in progress):** appearance can now be reset to built-in defaults; PSX broker profile creation uses broker-specific defaults and both JS Zindigi and AHL default to same-day higher-value-leg commission netting. Remaining: administrator-managed, versioned app defaults; per-user override tracking; notifying users when defaults change; reset-all-settings (including appearance) without deleting financial data; test/build and browser validation.
