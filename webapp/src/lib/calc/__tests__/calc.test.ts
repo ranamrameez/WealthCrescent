@@ -184,3 +184,24 @@ describe('cashSummary', () => {
     expect(Number.isFinite(summary.netWorth)).toBe(true);
   });
 });
+
+describe('computeAveragePLBySellTxId', () => {
+  it('uses weighted-average basis for the matching SELL row', async () => {
+    const { computeAveragePLBySellTxId } = await import('../realizedPL');
+    const rows: Transaction[] = [
+      { id: 'buy-1', transactionIndex: 1, date: '2026-01-01', ticker: 'TEST', action: 'BUY', shares: 10, price: 10 },
+      { id: 'buy-2', transactionIndex: 2, date: '2026-01-02', ticker: 'TEST', action: 'BUY', shares: 10, price: 20 },
+      { id: 'sell-1', transactionIndex: 3, date: '2026-01-03', ticker: 'TEST', action: 'SELL', shares: 10, price: 30 },
+    ];
+    const bySell = computeAveragePLBySellTxId(rows, () => 0);
+    expect(bySell['sell-1']).toEqual({ netPL: 150, shares: 10 });
+  });
+
+  it('does not create realized P/L for an unmatched oversell', async () => {
+    const { computeAveragePLBySellTxId } = await import('../realizedPL');
+    const rows: Transaction[] = [
+      { id: 'oversell', transactionIndex: 1, date: '2026-01-01', ticker: 'TEST', action: 'SELL', shares: 10, price: 30 },
+    ];
+    expect(computeAveragePLBySellTxId(rows, () => 0)).toEqual({});
+  });
+});
