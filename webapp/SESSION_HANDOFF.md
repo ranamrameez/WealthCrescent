@@ -31,7 +31,7 @@ Read this before continuing work in a new session. This is a concise, dated hand
 
 - The transaction-view cost-basis slice was ported to fresh work and merged in PR #31.
 - PR #22 was closed on 2026-10-29 and retitled `[Superseded] Align QSE/PSX accounting order and cost basis` to prevent accidental merging of a stale, diverged branch.
-- **Not implemented / deferred:** persisted global `transactionIndex` and cross-date transaction reordering. Do not treat this as complete. The design must first reconcile accounting sequence with the date-ordered cash ledger and prove displayed running balances stay consistent after reordering.
+- The stale branch is still closed and must not be merged. Its useful ordering idea is being ported in fresh PR #36. The intended canonical fields are `globalTransactionIndex` (workbook-wide accounting order) and `perTickerIndex` (derived order within each ticker); reordering swaps global positions and recomputes per-ticker indexes through a shared helper. Legacy `transactionIndex`/`seq` are mirrors only. PR #36 remains open pending CI/review, and does not solve unified ordering for mixed cash-ledger events.
 - The source branch was intentionally retained for recovery. Do not build new work on it; if the idea is resumed, create a fresh branch from current `main` and port only reviewed changes. The connected GitHub tools available in this session do not expose branch deletion, so the old branch has not been deleted.
 
 ### PR #23 — superseded and closed
@@ -39,14 +39,14 @@ Read this before continuing work in a new session. This is a concise, dated hand
 
 Its unique retry-preserving failure behavior and regression coverage were ported into PR #30, which is merged and passed CI. Do not reopen or merge this stale branch. Its source branch is retained for recovery; it is not the source of truth for future development.
 
-PR #31 merged the transaction-page cost-basis consistency slice. PR #32 merged the status/handoff refresh. Current open-PR search returned no open PRs at the time of this update.
+PR #31 merged the transaction-page cost-basis consistency slice. PR #32 merged the status/handoff refresh. PR #36 is the current fresh transaction-order implementation; check its live state and CI before proceeding.
 
 ## Remaining work and safe next actions
 
 1. Re-check live GitHub PR/branch/CI state before each task; this handoff is a dated snapshot.
 2. PR #22 and PR #23 are closed as superseded. Do not reopen or merge their stale branches. PR #30 and PR #31 are merged with green CI; PR #32 and PR #33 are documentation-only merges.
-3. **Global transaction ordering is deferred, not implemented.** Do not resume it by merging the old PR #22 branch. If pursued, create a new branch from current main, re-evaluate the data model, and first resolve the relationship between accounting sequence and date-ordered cash-ledger presentation.
-4. Before shipping any cross-date reordering, add regression tests proving transaction validation, visible running cash, balances, and derived reports remain consistent after reordering. Do not claim it is safe until those tests and full CI pass.
+3. **Canonical global/per-ticker transaction ordering is in PR #36, not merged.** Never merge stale PR #22. Review the fresh PR and its CI. `globalTransactionIndex` is canonical total order; `perTickerIndex` is recalculated from it for each ticker; `transactionIndex` and `seq` are compatibility mirrors.
+4. Before shipping cross-date reordering, ensure tests cover synchronized indexes, positions, realized P/L, and cash-ledger behavior. The mixed cash ledger still sorts combined trades/transfers/adjustments by effective date, so do not claim a unified mixed-event ledger order is solved until separately designed and tested.
 5. Continue the broader cost-basis dependency audit outside Transactions: Dashboard, Position Detail, analytics/time series, exports, charts, and strategy/advisory views. Update this handoff, `webapp/README.md`, `webapp/audit.md`, and `webapp/USER_MANUAL.md` after each independently verified slice.
 6. Keep PSX market-cache activation pending until rules deployment, scheduled function deployment, and cache population are actually verified; the prior Firebase admin attempt returned HTTP 401 before mutation.
 7. Old source branches are retained for recovery because the connected GitHub tools available in this session do not expose branch deletion. The stale PRs are closed and cannot be accidentally merged through the normal open-PR workflow.
