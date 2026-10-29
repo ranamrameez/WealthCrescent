@@ -8010,3 +8010,13 @@ RTDB security rules, not by hiding the config).
 
 ## Batch editing update (2026-09-27)
 Bank Account Transactions/Plans and Personal Loan Payments/Plans use the shared BatchEditGrid. See webapp/BATCH_EDIT.md for the assessed editing/link architecture and safety boundaries. Single-record forms remain unchanged. Linked rows and executed plans are locked; recurring/generated Bank plans use their existing workflows. New batch saves validate and check stale records before one workbook update. Future integrations should reuse this contract rather than add inline editing to normal rows.
+
+## Broker-profile isolation (2026-10-30)
+
+- Keep each QSE/PSX broker's trades, transfers, adjustments, dividends/rewards, trade plans, settings, calculations and accounting indexes isolated by broker ID.
+- Market prices, price history, watchlists and exchange-wide data belong to the exchange, not to a broker profile.
+- Central Transfers and Cash Transfer pickers must show individual broker profiles and persist the broker ID on each stock transfer side.
+- Archived profiles are read-only and hidden from new-activity pickers. Deactivated profiles are hidden from normal activity lists and active switching, but remain visible in their dedicated status section.
+- Existing legacy PSX history belongs to JS Zindagi; migrate it once, version the migration, and preserve financial fields.
+- Broker UI must follow Portfolio Item detail (one summary card with light-bordered inline subsections; avoid nested cards), then Bank Account detail. Use `StandardPageSections` for top-bar section shortcuts and keep profile settings inside their profile row.
+- Keep broker work on `feat/broker-profile-isolation-ui`; do not mix it with Mutual Funds or transaction-order branches. Never push directly to `main`. Update README, audit, USER_MANUAL and SESSION_HANDOFF as implementation changes.
