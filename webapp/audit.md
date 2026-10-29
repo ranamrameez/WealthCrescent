@@ -103,3 +103,7 @@ The previous PR #36 CI run passed the production build but failed full tests. In
 ### QSE duplicate-import signature correction (2026-10-30)
 
 The fresh CI run confirmed the previous batch-editor fixes: the remaining QSE failures were duplicate detection still including derived `perTickerIndex` in the import signature, plus the live-price input test's feed update timing. Import signatures now ignore both legacy `seq` and derived `perTickerIndex`, so an otherwise identical trade is not re-imported merely because its sequence differs. The live-price test now applies the feed update after mount inside React `act()`. Fresh CI remains pending.
+
+### QSE local-date/live-price comparison correction (2026-10-30)
+
+The remaining live-price input failure exposed a timezone edge case, not just an async test issue: Qatar's local calendar day can already be the next date while the UTC timestamp is still on the previous day. Comparing a date-only manual point via `Date.parse(date)` incorrectly treats it as midnight UTC and can make it appear newer than a live quote from the same local day. `applyLiveQse` now compares calendar dates first and timestamps only within the same date; timestamped points sort after date-only points on that same date. Added regression coverage for the Qatar local-day/previous-UTC-day boundary and for preserving a manual point from a later calendar day. Fresh CI is pending.
