@@ -341,7 +341,7 @@ function TransactionList() {
   type TxCol = 'order' | 'date' | 'ticker' | 'action' | 'shares' | 'price' | 'amount' | 'fee';
   const sortValue = (r: (typeof filtered)[number], col: TxCol): number | string => {
     switch (col) {
-      case 'order': return r.tx.transactionIndex ?? Number.MAX_SAFE_INTEGER;
+      case 'order': return r.tx.globalTransactionIndex ?? r.tx.transactionIndex ?? Number.MAX_SAFE_INTEGER;
       case 'ticker': return r.tx.ticker;
       case 'action': return r.tx.action;
       case 'shares': return r.tx.shares;
