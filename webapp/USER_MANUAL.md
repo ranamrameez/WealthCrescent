@@ -106,6 +106,8 @@ dark mode, and **Number display** — choose "shortened" (large stat-card number
 always shows the complete, un-abbreviated number). This is a global, app-wide preference, not
 per-module — change it once and it applies everywhere. Use **Reset appearance to app defaults** in the same panel to restore the current built-in appearance defaults; this does not delete your financial records.
 
+On the **Account** page, **Reset all settings to app defaults** restores broker fee schedules, module settings, currency filters, module visibility, and appearance to the current app defaults. It preserves transactions, balances, accounts, properties, categories, plans, and other financial records. You can customize settings again afterward.
+
 ---
 
 ## 4. Dashboard
