@@ -125,3 +125,7 @@ Initial implementation adds profile-specific transfer routing for inactive profi
 ### PR #38 rebase status (2026-10-30)
 
 Broker-profile changes have been rebased onto the latest PR #36 head after fixing the QSE batch/import and live-price date-boundary regressions. PR #38 remains stacked on PR #36 and is now 17 files ahead with no base-behind commits. The branch is ready for a fresh PR CI run; browser verification and real-export migration checks are still required.
+
+### Broker branch CI trigger after stacked rebase (2026-10-30)
+
+The broker-profile branch was rebased onto the now-green PR #36 head (run #94: build and full test suite passed). A full combined PR validation is being triggered against main because this repository's checks are configured for main-targeted pull requests. The intended review relationship remains stacked: PR #36 first, then PR #38. Restore PR #38's base to `feat/persisted-trade-accounting-order` after the combined CI run.
