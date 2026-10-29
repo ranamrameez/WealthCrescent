@@ -99,3 +99,7 @@ Known separate issue: the mixed cash ledger includes transfers and adjustments, 
 ### QSE batch editor regression repair (2026-10-30)
 
 The previous PR #36 CI run passed the production build but failed full tests. Investigation found two actual batch-editor defects: QSE validation treated the derived `perTickerIndex` as a required editable numeric input (breaking CSV/ledger imports and new batch rows), and `BatchEditGrid` did not count/apply hidden canonical `globalTransactionIndex` drafts created by reorder buttons (leaving Save disabled). The QSE validator now skips the derived per-ticker index, and BatchEditGrid applies hidden `orderKey` drafts as changes. The live-price input test now waits for the effect that syncs the input after a scraped price arrives. Regression rerun is pending; do not mark CI green until a fresh PR run completes.
+
+### QSE duplicate-import signature correction (2026-10-30)
+
+The fresh CI run confirmed the previous batch-editor fixes: the remaining QSE failures were duplicate detection still including derived `perTickerIndex` in the import signature, plus the live-price input test's feed update timing. Import signatures now ignore both legacy `seq` and derived `perTickerIndex`, so an otherwise identical trade is not re-imported merely because its sequence differs. The live-price test now applies the feed update after mount inside React `act()`. Fresh CI remains pending.
