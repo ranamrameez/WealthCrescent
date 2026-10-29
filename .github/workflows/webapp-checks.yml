@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 jobs:
-  test-and-build:
+  tests:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -30,5 +30,22 @@ jobs:
         run: npm ci
       - name: Run tests
         run: npm test
+
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: webapp
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: webapp/package-lock.json
+      - name: Install dependencies
+        run: npm ci
       - name: Type-check and production build
         run: npm run build
