@@ -87,10 +87,10 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
       ...(t.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }),
     }));
     const transactionsWithId = transactionsWithBroker.map((t) => (t.id ? t : { ...t, id: crypto.randomUUID() }));
-    const transfersWithId = wb.transfers.map((t) => (t.id ? t : { ...t, id: crypto.randomUUID() }));
-    const adjustmentsWithId = wb.adjustments.map((a) => (a.id ? a : { ...a, id: crypto.randomUUID() }));
-    const dividendsWithId = wb.dividends.map((d) => (d.id ? d : { ...d, id: crypto.randomUUID() }));
-    const plansWithId = wb.tradePlans.map((p) => ({ ...p, id: p.id || crypto.randomUUID(), legs: p.legs || [] }));
+    const transfersWithId = wb.transfers.map((t) => ({ ...t, ...(t.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), ...(t.id ? {} : { id: crypto.randomUUID() }) }));
+    const adjustmentsWithId = wb.adjustments.map((a) => ({ ...a, ...(a.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), ...(a.id ? {} : { id: crypto.randomUUID() }) }));
+    const dividendsWithId = wb.dividends.map((d) => ({ ...d, ...(d.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), ...(d.id ? {} : { id: crypto.randomUUID() }) }));
+    const plansWithId = wb.tradePlans.map((p) => ({ ...p, ...(p.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), id: p.id || crypto.randomUUID(), legs: p.legs || [] }));
     return {
       ...wb,
       ...(profiles.length ? { brokerProfiles, activeBrokerId } : {}),
@@ -148,7 +148,7 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
       deleteTransaction: (index) => mutate((wb) => ({ ...wb, transactions: wb.transactions.filter((_, i) => i !== index) })),
       addTransfer: (t) => mutate((wb) => {
         const withId = t.id ? t : { ...t, id: crypto.randomUUID() };
-        return { ...wb, transfers: [...wb.transfers, { ...withId, seq: withId.seq !== undefined ? withId.seq : nextSeq(wb.transfers), timestamp: withId.timestamp ?? new Date().toISOString() }] };
+        return { ...wb, transfers: [...wb.transfers, { ...withId, ...(withId.brokerId || !wb.activeBrokerId ? {} : { brokerId: wb.activeBrokerId }), seq: withId.seq !== undefined ? withId.seq : nextSeq(wb.transfers), timestamp: withId.timestamp ?? new Date().toISOString() }] };
       }),
       updateTransfer: (id, patch) => mutate((wb) => ({ ...wb, transfers: wb.transfers.map((t) => (t.id === id ? { ...t, ...patch } : t)) })),
       deleteTransfer: (id) => mutate((wb) => ({ ...wb, transfers: wb.transfers.filter((t) => t.id !== id) })),
