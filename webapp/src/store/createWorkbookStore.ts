@@ -2,7 +2,7 @@ import { create, type UseBoundStore, type StoreApi } from 'zustand';
 import { toInstantMs } from '../lib/datetime';
 import { assignSeqForEntities, backfillSeq, nextSeq, nextSeqForEntity } from '../lib/seq';
 import { sortTransactionsChronological } from '../lib/calc/sortTransactions';
-import type { Adjustment, BrokerProfile, Dividend, PricePoint, Transaction, TradePlan, Transfer, WatchlistItem } from '../types/workbook';
+import type { Adjustment, BrokerPortfolioData, BrokerProfile, Dividend, PricePoint, Transaction, TradePlan, Transfer, WatchlistItem } from '../types/workbook';
 import { scheduleLocalStorageWrite } from '../lib/localStoragePersistence';
 
 function chronologicalByInstant<T extends { date: string; time?: string; timezone?: string }>(records: T[]): T[] {
@@ -91,7 +91,7 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
     const adjustmentsWithId = wb.adjustments.map((a) => ({ ...a, ...(a.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), ...(a.id ? {} : { id: crypto.randomUUID() }) }));
     const dividendsWithId = wb.dividends.map((d) => ({ ...d, ...(d.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), ...(d.id ? {} : { id: crypto.randomUUID() }) }));
     const plansWithId = wb.tradePlans.map((p) => ({ ...p, ...(p.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), id: p.id || crypto.randomUUID(), legs: p.legs || [] }));
-    return {
+    const normalized = {
       ...wb,
       ...(profiles.length ? { brokerProfiles, activeBrokerId } : {}),
       transactions: backfillSeq(transactionsWithId, sortTransactionsChronological(transactionsWithId)),
@@ -99,6 +99,24 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
       adjustments: backfillSeq(adjustmentsWithId, chronologicalByInstant(adjustmentsWithId)),
       dividends: backfillSeq(dividendsWithId, chronologicalByInstant(dividendsWithId)),
       tradePlans: plansWithId,
+    } as TWorkbook;
+    // Legacy workbooks store one exchange-wide portfolio. The migration above
+    // assigns its existing records to the default profile; snapshot that full
+    // history into the active profile so future broker switches are isolated.
+    const active = normalized.brokerProfiles?.find((p) => p.id === normalized.activeBrokerId);
+    if (!active) return normalized;
+    const data: BrokerPortfolioData = {
+      transactions: normalized.transactions,
+      transfers: normalized.transfers,
+      adjustments: normalized.adjustments,
+      dividends: normalized.dividends,
+      tradePlans: normalized.tradePlans,
+    };
+    return {
+      ...normalized,
+      brokerProfiles: normalized.brokerProfiles!.map((p) => p.id === active.id
+        ? { ...p, settings: normalized.settings, data }
+        : p),
     };
   }
 
@@ -119,8 +137,26 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
   }
 
   return create<WorkbookStoreState<TWorkbook>>((set, get) => {
+    const snapshotActiveProfile = (wb: TWorkbook): TWorkbook => {
+      const profiles = wb.brokerProfiles;
+      const activeId = wb.activeBrokerId;
+      if (!profiles?.length || !activeId) return wb;
+      const data: BrokerPortfolioData = {
+        transactions: wb.transactions,
+        transfers: wb.transfers,
+        adjustments: wb.adjustments,
+        dividends: wb.dividends,
+        tradePlans: wb.tradePlans,
+      };
+      return {
+        ...wb,
+        brokerProfiles: profiles.map((profile) => profile.id === activeId
+          ? { ...profile, settings: wb.settings, data }
+          : profile),
+      };
+    };
     const mutate = (updater: (wb: TWorkbook) => TWorkbook) => {
-      const next = updater(get().workbook);
+      const next = snapshotActiveProfile(updater(get().workbook));
       set({ workbook: next });
       persist(next);
     };
@@ -200,9 +236,31 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
         };
       }),
       setActiveBroker: (brokerId) => mutate((wb) => {
-        const profile = wb.brokerProfiles?.find((p) => p.id === brokerId && !p.archived);
-        if (!profile || brokerId === wb.activeBrokerId) return wb;
-        return { ...wb, activeBrokerId: profile.id, settings: profile.settings as TWorkbook['settings'] };
+        if (brokerId === wb.activeBrokerId) return wb;
+        const currentData: BrokerPortfolioData = {
+          transactions: wb.transactions,
+          transfers: wb.transfers,
+          adjustments: wb.adjustments,
+          dividends: wb.dividends,
+          tradePlans: wb.tradePlans,
+        };
+        const profiles = wb.brokerProfiles?.map((p) => p.id === wb.activeBrokerId
+          ? { ...p, settings: wb.settings, data: currentData }
+          : p);
+        const target = profiles?.find((p) => p.id === brokerId && !p.archived);
+        if (!target) return wb;
+        const data = target.data ?? { transactions: [], transfers: [], adjustments: [], dividends: [], tradePlans: [] };
+        return {
+          ...wb,
+          brokerProfiles: profiles,
+          activeBrokerId: target.id,
+          settings: target.settings as TWorkbook['settings'],
+          transactions: data.transactions,
+          transfers: data.transfers,
+          adjustments: data.adjustments,
+          dividends: data.dividends,
+          tradePlans: data.tradePlans,
+        };
       }),
       addTradePlan: (plan) => mutate((wb) => ({ ...wb, tradePlans: [...wb.tradePlans, { ...plan, id: plan.id || crypto.randomUUID(), legs: plan.legs || [] }] })),
       updateTradePlan: (id, patch) => mutate((wb) => ({ ...wb, tradePlans: wb.tradePlans.map((p) => (p.id === id ? { ...p, ...patch } : p)) })),
