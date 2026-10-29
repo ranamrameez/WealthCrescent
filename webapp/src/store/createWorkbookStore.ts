@@ -71,7 +71,22 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
   createEmpty: () => TWorkbook,
 ): UseBoundStore<StoreApi<WorkbookStoreState<TWorkbook>>> {
   function normalize(wb: TWorkbook): TWorkbook {
-    const profiles = Array.isArray(wb.brokerProfiles) ? wb.brokerProfiles : [];
+    const asArray = <T,>(value: unknown): T[] => Array.isArray(value)
+      ? value as T[]
+      : value && typeof value === 'object'
+        ? Object.values(value as Record<string, T>)
+        : [];
+    const rawProfiles = asArray<BrokerProfile<TWorkbook['settings']>>(wb.brokerProfiles);
+    const profiles = rawProfiles.map((profile) => profile.data ? {
+      ...profile,
+      data: {
+        transactions: asArray<Transaction>(profile.data.transactions),
+        transfers: asArray<Transfer>(profile.data.transfers),
+        adjustments: asArray<Adjustment>(profile.data.adjustments),
+        dividends: asArray<Dividend>(profile.data.dividends),
+        tradePlans: asArray<TradePlan>(profile.data.tradePlans),
+      },
+    } : profile);
     const activeProfile = profiles.find((p) => p.id === wb.activeBrokerId && !p.archived)
       ?? profiles.find((p) => !p.archived);
     const activeBrokerId = activeProfile?.id ?? wb.activeBrokerId;
