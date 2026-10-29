@@ -248,7 +248,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
 export function QseReorder({ kind, row, rows }: { kind: Kind; row: Transaction | Transfer | Adjustment | Dividend | Row; rows: Array<Transaction | Transfer | Adjustment | Dividend | Row> }) {
   const ensureSignedIn = useEnsureSignedIn();
   const isTradeList = kind === 'transactions';
-  const peers = isTradeList ? rows as Transaction[] : rows.filter(candidate => (kind !== 'ledger' || (candidate as Row).kind === (row as Row).kind) && (kind !== 'transactions' && (kind !== 'ledger' || (row as Row).kind !== 'trade') || ((candidate as Transaction).ticker === (row as Transaction).ticker && (candidate as Transaction).action === (row as Transaction).action)));
+  const peers = isTradeList ? rows as Transaction[] : rows.filter(candidate => (kind !== 'ledger' || (candidate as Row).kind === (row as Row).kind) && (kind !== 'ledger' || (row as Row).kind !== 'trade' || ((candidate as Transaction).ticker === (row as Transaction).ticker && (candidate as Transaction).action === (row as Transaction).action)));
   return <ReorderButtons rows={peers} index={peers.findIndex(candidate => candidate.id === row.id)} instantOf={candidate => toInstantMs(candidate.date, candidate.time, candidate.timezone)} idOf={candidate => candidate.id!} orderOf={candidate => isTradeList ? (candidate as Transaction).globalTransactionIndex ?? (candidate as Transaction).transactionIndex : candidate.seq} allowAcrossInstants={isTradeList} onMove={async pair => {
     if (!(await ensureSignedIn('Sign in to reorder records.'))) return;
     const state = useWorkbookStore.getState();
