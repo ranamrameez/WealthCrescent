@@ -545,7 +545,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
                   </Fragment>
                 ) : (
                   <RecordRow market="qse" onEdit={() => startEdit(i, tx)}    record={{ tx, i }}  key={i}  className="clickable">
-                    <td><DateValue value={tx.date} />{modifying && <span onClick={event => event.stopPropagation()}><QseReorder kind="transactions" row={tx} rows={sorted.map(row => row.tx)} /></span>}</td>
+                    <td><DateValue value={tx.date} />{modifying && <span onClick={event => event.stopPropagation()}><QseReorder kind="transactions" row={tx} rows={workbook.transactions} /></span>}</td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <TickerLogo ticker={tx.ticker} size="sm" exchange="qse" /><Link to={`/stock/${tx.ticker}`}>{tx.ticker}</Link>
                       {tx.isPending && (
