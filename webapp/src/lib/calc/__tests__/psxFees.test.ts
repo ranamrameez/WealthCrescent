@@ -259,6 +259,18 @@ describe('makePSXFeeCalculator — same-day netting (README items 6/7)', () => {
     expect(sellFee).toBeGreaterThan(expectedBuyFee); // charged side pays commission, netted side doesn't
   });
 
+  it('uses traded value, not share count, when deciding which same-day side pays commission', () => {
+    const buyTx: Transaction = { date: day, ticker: 'TEST', action: 'BUY', shares: 100, price: 5 };
+    const sellTx: Transaction = { date: day, ticker: 'TEST', action: 'SELL', shares: 60, price: 10 };
+    const calcFee = makePSXFeeCalculator(netSettings, [buyTx, sellTx]);
+    const buyFee = calcFee(500, true, { shares: 100, tx: buyTx });
+    const sellFee = calcFee(600, false, { shares: 60, tx: sellTx });
+    const buyBreakdown = calcFeeBreakdown(500, true, 100, netSettings);
+    const sellBreakdown = calcFeeBreakdown(600, false, 60, netSettings);
+    expect(buyFee).toBeCloseTo(Math.round((buyBreakdown.psxFee + buyBreakdown.nccplFee + buyBreakdown.secpLevy + buyBreakdown.cdc + buyBreakdown.cvt) * 100) / 100, 2);
+    expect(sellFee).toBeCloseTo(sellBreakdown.total, 2);
+  });
+
   it('falls back to a full single-leg breakdown when there is no real tx context (hypothetical calculators)', () => {
     const calcFee = makePSXFeeCalculator(netSettings, []);
     const fee = calcFee(10000, false, { shares: 100 });
