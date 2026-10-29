@@ -182,8 +182,8 @@ it('keeps the entered trade open for retry when the store save throws', async ()
     fireEvent.click(screen.getByRole('button', { name: 'Save transaction' }));
     await waitFor(() => expect(errorSpy).toHaveBeenCalledTimes(1));
     expect(screen.getByPlaceholderText('Ticker')).toHaveValue('QNBK');
-    expect(screen.getByPlaceholderText('Shares')).toHaveValue(5);
-    expect(screen.getByPlaceholderText('Price')).toHaveValue(12.5);
+    expect(screen.getByPlaceholderText('Shares')).toHaveValue('5');
+    expect(screen.getByPlaceholderText('Price')).toHaveValue('12.5');
     expect(onSaved).not.toHaveBeenCalled();
   } finally {
     useWorkbookStore.setState({ addTransactions: originalAddTransactions });
