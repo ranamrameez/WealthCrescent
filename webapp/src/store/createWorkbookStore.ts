@@ -78,8 +78,12 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
     // One-time, non-destructive migration: historical trades without a broker
     // are assigned to the original/default active profile. Preserve all trade
     // fields and seed that profile's settings from the legacy workbook settings.
-    const hasUnassignedTrades = wb.transactions.some((t) => !t.brokerId);
-    const brokerProfiles = hasUnassignedTrades && activeProfile
+    const hasUnassignedRecords = wb.transactions.some((t) => !t.brokerId)
+      || wb.transfers.some((t) => !t.brokerId)
+      || wb.adjustments.some((a) => !a.brokerId)
+      || wb.dividends.some((d) => !d.brokerId)
+      || wb.tradePlans.some((p) => !p.brokerId);
+    const brokerProfiles = hasUnassignedRecords && activeProfile
       ? profiles.map((p) => p.id === activeProfile.id ? { ...p, settings: wb.settings } : p)
       : profiles;
     const transactionsWithBroker = wb.transactions.map((t) => ({
