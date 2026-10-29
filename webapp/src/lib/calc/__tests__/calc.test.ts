@@ -3,7 +3,7 @@ import fixture from './fixtures/qse-workbook-backup.json';
 import type { Transaction, Transfer, Adjustment } from '../../../types/workbook';
 import { makeQSEFeeCalculator, breakEvenPrice, roundTick } from '../fees';
 import { computePositions } from '../positions';
-import { computeRealizedPLTimeSeries } from '../realizedPL';
+import { computeAveragePLBySellTxId, computeRealizedPLTimeSeries } from '../realizedPL';
 import { buildCashLedger, totalTransferFees } from '../cashLedger';
 import { cashSummary } from '../cashSummary';
 
@@ -182,5 +182,24 @@ describe('cashSummary', () => {
     expect(summary.totalRewards).toBeCloseTo(0.34 + 0.21 + 0.34 + 2.54 + 1.1, 2);
     expect(summary.transferFees).toBeCloseTo(40, 5);
     expect(Number.isFinite(summary.netWorth)).toBe(true);
+  });
+});
+
+describe('computeAveragePLBySellTxId', () => {
+  it('uses weighted-average basis for the matching SELL row', () => {
+    const rows: Transaction[] = [
+      { id: 'buy-1', date: '2026-01-01', ticker: 'TEST', action: 'BUY', shares: 10, price: 10 },
+      { id: 'buy-2', date: '2026-01-02', ticker: 'TEST', action: 'BUY', shares: 10, price: 20 },
+      { id: 'sell-1', date: '2026-01-03', ticker: 'TEST', action: 'SELL', shares: 10, price: 30 },
+    ];
+    const bySell = computeAveragePLBySellTxId(rows, () => 0);
+    expect(bySell['sell-1']).toEqual({ netPL: 150, shares: 10 });
+  });
+
+  it('does not create realized P/L for an unmatched oversell', () => {
+    const rows: Transaction[] = [
+      { id: 'oversell', date: '2026-01-01', ticker: 'TEST', action: 'SELL', shares: 10, price: 30 },
+    ];
+    expect(computeAveragePLBySellTxId(rows, () => 0)).toEqual({});
   });
 });
