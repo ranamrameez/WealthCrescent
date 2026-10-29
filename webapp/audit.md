@@ -57,6 +57,7 @@ User-reported defect: after changing the configured cost-basis method, some port
 
 - QSE Transactions: removed the page-local match-order override from open-lot/closed-trade reporting; lot attribution now follows `workbook.settings.costBasisMethod` for FIFO vs. lowest-cost-first. Removed the now-misleading Lot matching page filter.
 - PSX Transactions: removed the independent local FIFO-by-default match-order state; open-lot/closed-trade reporting now follows `workbook.settings.costBasisMethod` for FIFO vs. lowest-cost-first.
+- Global trade ordering: QSE reorder arrows now receive the full exchange transaction collection rather than only the current filtered/split view. QSE and PSX transaction tables default to persisted global `transactionIndex` order, and PSX now has the same across-date reorder controls that swap global indexes and per-ticker `seq` when applicable.
 - Added weighted-average realized P/L attribution keyed by SELL transaction ID; both exchange transaction rows use it when Average cost is selected. FIFO/lowest-cost-first row P/L uses the same lot match order as the visible lot-based reports.
 - When Average cost is selected, the per-lot Open/Closed trades reports are replaced with an explanation rather than displaying FIFO lot attribution under an Average-cost label. Added regression tests for average-cost SELL attribution and unmatched oversells (not yet executed in this environment).
 
