@@ -100,12 +100,13 @@ function ExchangeSwitcher({ exchange }: { exchange: 'qse' | 'psx' }) {
         PSX
       </button>
       </div>
-      <label className="sidebar-broker-switch">
+      <label className="sidebar-broker-switch" style={{ display: 'grid', gap: 4, marginBottom: 12, fontSize: 12, color: 'var(--muted)' }}>
         <span>Active broker</span>
         <select
           aria-label="Active broker profile"
           value={workbook.activeBrokerId ?? ''}
           onChange={(event) => setActiveBroker(event.target.value)}
+          style={{ width: '100%', minWidth: 0, padding: '7px 8px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }}
         >
           {(workbook.brokerProfiles ?? []).filter((p) => !p.archived).map((profile) => (
             <option key={profile.id} value={profile.id}>{profile.name}{profile.accountLabel ? ` · ${profile.accountLabel}` : ''}</option>
