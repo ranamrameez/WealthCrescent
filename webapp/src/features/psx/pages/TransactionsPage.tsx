@@ -475,7 +475,7 @@ function TransactionList() {
 
   const setWorkbook = usePSXWorkbookStore((s) => s.setWorkbook);
   const transactionOrderRows = useMemo(
-    () => [...workbook.transactions].sort((a, b) => (a.transactionIndex ?? Number.MAX_SAFE_INTEGER) - (b.transactionIndex ?? Number.MAX_SAFE_INTEGER)),
+    () => [...workbook.transactions].sort((a, b) => (a.globalTransactionIndex ?? a.transactionIndex ?? Number.MAX_SAFE_INTEGER) - (b.globalTransactionIndex ?? b.transactionIndex ?? Number.MAX_SAFE_INTEGER)),
     [workbook.transactions],
   );
   const reorderTransaction = async (pair: [{ id: string; order: number }, { id: string; order: number }]) => {
@@ -483,13 +483,23 @@ function TransactionList() {
     const current = usePSXWorkbookStore.getState().workbook;
     const a = current.transactions.find(tx => tx.id === pair[0].id);
     const b = current.transactions.find(tx => tx.id === pair[1].id);
-    if (!a || !b || !Number.isInteger(a.transactionIndex) || !Number.isInteger(b.transactionIndex)) return toast('Transactions changed or accounting order is missing. Reload and try again.');
-    const sameTicker = a.ticker === b.ticker;
-    const transactions = current.transactions.map(tx => tx.id === a.id
-      ? { ...tx, transactionIndex: b.transactionIndex, ...(sameTicker ? { seq: b.seq } : {}) }
+    const aIndex = a?.globalTransactionIndex ?? a?.transactionIndex;
+    const bIndex = b?.globalTransactionIndex ?? b?.transactionIndex;
+    if (!a || !b || !Number.isInteger(aIndex) || !Number.isInteger(bIndex)) return toast('Transactions changed or accounting order is missing. Reload and try again.');
+    const swapped = current.transactions.map(tx => tx.id === a.id
+      ? { ...tx, globalTransactionIndex: bIndex, transactionIndex: bIndex }
       : tx.id === b.id
-        ? { ...tx, transactionIndex: a.transactionIndex, ...(sameTicker ? { seq: a.seq } : {}) }
+        ? { ...tx, globalTransactionIndex: aIndex, transactionIndex: aIndex }
         : tx);
+    const ordered = [...swapped].sort((x, y) => (x.globalTransactionIndex ?? x.transactionIndex ?? 0) - (y.globalTransactionIndex ?? y.transactionIndex ?? 0));
+    const tickerCounts = new Map<string, number>();
+    const syncedById = new Map<string | undefined, Transaction>();
+    ordered.forEach(tx => {
+      const perTickerIndex = (tickerCounts.get(tx.ticker) ?? 0) + 1;
+      tickerCounts.set(tx.ticker, perTickerIndex);
+      syncedById.set(tx.id, { ...tx, perTickerIndex, seq: perTickerIndex });
+    });
+    const transactions = swapped.map(tx => syncedById.get(tx.id)!);
     usePSXWorkbookStore.getState().setWorkbook({ ...current, transactions });
     toast('Transaction accounting order updated.');
   };
@@ -593,7 +603,7 @@ function TransactionList() {
                   </Fragment>
                 ) : (
                   <RecordRow market="psx" onEdit={() => startEdit(i, tx)}    record={{ tx, i }}  key={i}  className="clickable">
-                    <td><DateValue value={tx.date} />{' '}<ReorderButtons rows={transactionOrderRows} index={transactionOrderRows.findIndex(row => row.id === tx.id)} instantOf={row => dateOnlyMs(row.date)} idOf={row => row.id!} orderOf={row => row.transactionIndex} allowAcrossInstants onMove={reorderTransaction} /></td>
+                    <td><DateValue value={tx.date} />{' '}<ReorderButtons rows={transactionOrderRows} index={transactionOrderRows.findIndex(row => row.id === tx.id)} instantOf={row => dateOnlyMs(row.date)} idOf={row => row.id!} orderOf={row => row.globalTransactionIndex ?? row.transactionIndex} allowAcrossInstants onMove={reorderTransaction} /></td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <TickerLogo ticker={tx.ticker} size="sm" exchange="psx" /><Link to={`/psx/stock/${tx.ticker}`}>{tx.ticker}</Link>
                       {tx.isPending && (
