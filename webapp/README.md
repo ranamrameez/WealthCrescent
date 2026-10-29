@@ -11615,3 +11615,13 @@ Done: Cash and Rentals transaction batch editors reuse formula entry, dirty-colu
 Done: EMI, Funds/brokers, and Subscriptions detail sections now use the shared Banking-based template. Cash and Rentals expose separate Summary sections. Personal Loans no longer renders its section stack twice when batch editors close. See MODULE_TEMPLATE.md for migration coverage.
 
 Pending: extend batch editing to the remaining ledgers and audit their date/filter behavior independently of the section-layout migration. Stock Exchanges are excluded.
+
+## Mutual Funds — newly reported defects (2026-10-30; separate branch)
+
+Tracked on `fix/mutual-funds-ledger-sync`, separate from broker-profile work:
+
+- **Pending — transfer/balance reconciliation:** a Funds transfer does not currently reconcile the separately maintained balance/NAV update state. Design cash-on-hand versus invested holdings before implementing; avoid double-counting cash after a BUY.
+- **Pending — balance-history date edit:** editing the date leaves the old `time` timestamp, while the table displays the timestamp instead of the edited date.
+- **Pending — Invest/Withdraw amount edit:** edit mode allows Units and NAV but not direct Amount editing. Amount, units and NAV should stay synchronized.
+
+Regression tests must cover transfer → cash balance, BUY/SELL cash-to-holdings movement without double counting, effective-date display/order, and amount/units/NAV edits. No fixes are marked done until verified.
