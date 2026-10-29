@@ -17,6 +17,8 @@ beforeEach(() => {
 afterEach(cleanup);
 function Controls() { const control = usePageTopBarStore(state => state.rightSlot); return <>{control}</>; }
 it('filters the trade list without discarding the historical buys used for closed trades', () => {
+  const current = useWorkbookStore.getState().workbook;
+  useWorkbookStore.setState({ workbook: { ...current, settings: { ...current.settings, costBasisMethod: 'fifo' } } });
   const { container } = render(<MemoryRouter initialEntries={['/transactions?section=list&qse-from=2026-10-05']}><Controls /><TransactionsPage /></MemoryRouter>);
   expect(screen.getByRole('button', { name: 'Filters (1)' })).toBeVisible();
   const details = screen.getByRole('button', { name: /Closed trades \(realized round-trips\)/ }).closest('section')!;
@@ -28,6 +30,14 @@ it('filters the trade list without discarding the historical buys used for close
   expect(screen.getByText('Export filtered')).toBeVisible();
   expect(screen.getByText('Batch edit')).toBeVisible();
   expect(screen.getByText('Modify')).toBeVisible();
+});
+
+it('hides incompatible lot attribution when Average cost is configured', () => {
+  const current = useWorkbookStore.getState().workbook;
+  useWorkbookStore.setState({ workbook: { ...current, settings: { ...current.settings, costBasisMethod: 'average' } } });
+  render(<MemoryRouter><Controls /><TransactionsPage /></MemoryRouter>);
+  expect(screen.getByText(/Average cost blends all buys into one running cost basis/)).toBeVisible();
+  expect(screen.queryByRole('button', { name: /Closed trades \(realized round-trips\)/ })).toBeNull();
 });
 it('batch edits dividend estimates while leaving share balances unchanged', async () => {
   render(<MemoryRouter><DividendsSection /></MemoryRouter>);
