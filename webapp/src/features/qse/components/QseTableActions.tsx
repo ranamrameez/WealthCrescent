@@ -258,7 +258,12 @@ export function QseReorder({ kind, row, rows }: { kind: Kind; row: Transaction |
       const aIndex = a?.globalTransactionIndex ?? a?.transactionIndex;
       const bIndex = b?.globalTransactionIndex ?? b?.transactionIndex;
       if (!a || !b || !Number.isInteger(aIndex) || !Number.isInteger(bIndex)) return toast('Transactions changed or accounting order is missing. Reload and try again.');
-      // Global order is authoritative; the shared helper derives and syncs per-ticker order.
+      // Swap the canonical global positions, then derive per-ticker indexes from that same order.
+      const swapped = transactions.map(candidate => candidate.id === a.id
+        ? { ...candidate, globalTransactionIndex: bIndex, transactionIndex: bIndex }
+        : candidate.id === b.id
+          ? { ...candidate, globalTransactionIndex: aIndex, transactionIndex: aIndex }
+          : candidate);
       const next = syncTransactionIndexes(swapped);
       state.setWorkbook({ ...state.workbook, transactions: next });
       toast('Transaction accounting order updated.');
