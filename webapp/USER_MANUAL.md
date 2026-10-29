@@ -104,7 +104,7 @@ The **✦ Appearance** button (sidebar) controls font, text size, color theme, d
 dark mode, and **Number display** — choose "shortened" (large stat-card numbers show as
 "10k"/"1.23M", with the exact figure available as a hover tooltip) or "full" (every stat card
 always shows the complete, un-abbreviated number). This is a global, app-wide preference, not
-per-module — change it once and it applies everywhere.
+per-module — change it once and it applies everywhere. Use **Reset appearance to app defaults** in the same panel to restore the current built-in appearance defaults; this does not delete your financial records.
 
 ---
 
