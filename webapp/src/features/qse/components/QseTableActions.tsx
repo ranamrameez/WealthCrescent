@@ -20,9 +20,10 @@ import { getCurrentUser } from '../../../lib/firebase/useAuthState';
 import { useWorkbookStore } from '../../../store/workbookStore';
 import { useInterEntityTransfersStore } from '../../../store/interEntityTransfersStore';
 import type { Transaction, Transfer, Adjustment, Dividend } from '../../../types/workbook';
+import { syncTransactionIndexes } from '../../../lib/seq';
 
 type Kind = 'ledger' | 'transactions' | 'transfers' | 'adjustments' | 'dividends';
-export type QseRow = { id: string; kind?: 'trade' | 'transfer' | 'adjustment'; seq?: number; date: string; time?: string; timezone?: string; ticker?: string; action?: string; shares?: number; price?: number; gross?: number; fee?: number; type?: string; description?: string; amount?: number; note?: string; perShare?: number; isPending?: boolean; targetLotBuyId?: string; feeOverride?: number };
+export type QseRow = { id: string; globalTransactionIndex?: number; perTickerIndex?: number; transactionIndex?: number; kind?: 'trade' | 'transfer' | 'adjustment'; seq?: number; date: string; time?: string; timezone?: string; ticker?: string; action?: string; shares?: number; price?: number; gross?: number; fee?: number; type?: string; description?: string; amount?: number; note?: string; perShare?: number; isPending?: boolean; targetLotBuyId?: string; feeOverride?: number };
 type Row = QseRow;
 const column = (key: keyof Row, label: string, type: BatchColumn<Row>['type'] = 'text'): BatchColumn<Row> => ({ key, label, type });
 function qseColumns(kind: Kind): BatchColumn<Row>[] {
@@ -257,22 +258,8 @@ export function QseReorder({ kind, row, rows }: { kind: Kind; row: Transaction |
       const aIndex = a?.globalTransactionIndex ?? a?.transactionIndex;
       const bIndex = b?.globalTransactionIndex ?? b?.transactionIndex;
       if (!a || !b || !Number.isInteger(aIndex) || !Number.isInteger(bIndex)) return toast('Transactions changed or accounting order is missing. Reload and try again.');
-      // Swap global order, then derive every per-ticker index from that same order.
-      // This keeps both canonical indexes synchronized even when crossing tickers.
-      const swapped = transactions.map(candidate => candidate.id === a.id
-        ? { ...candidate, globalTransactionIndex: bIndex, transactionIndex: bIndex }
-        : candidate.id === b.id
-          ? { ...candidate, globalTransactionIndex: aIndex, transactionIndex: aIndex }
-          : candidate);
-      const ordered = [...swapped].sort((x, y) => (x.globalTransactionIndex ?? x.transactionIndex ?? 0) - (y.globalTransactionIndex ?? y.transactionIndex ?? 0));
-      const tickerCounts = new Map<string, number>();
-      const syncedById = new Map<string | undefined, Transaction>();
-      ordered.forEach(tx => {
-        const perTickerIndex = (tickerCounts.get(tx.ticker) ?? 0) + 1;
-        tickerCounts.set(tx.ticker, perTickerIndex);
-        syncedById.set(tx.id, { ...tx, perTickerIndex, seq: perTickerIndex });
-      });
-      const next = swapped.map(tx => syncedById.get(tx.id)!);
+      // Global order is authoritative; the shared helper derives and syncs per-ticker order.
+      const next = syncTransactionIndexes(swapped);
       state.setWorkbook({ ...state.workbook, transactions: next });
       toast('Transaction accounting order updated.');
       return;
