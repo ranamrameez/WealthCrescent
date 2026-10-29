@@ -27,6 +27,8 @@ export interface Transaction {
    * (e.g. two same-day BUYs). Retrofitted onto existing data by
    * `createWorkbookStore.ts`'s `normalize()`, same pattern as `id`. */
   seq?: number;
+  /** Persisted lifetime accounting order. Unlike seq (per ticker), this is global across the exchange workbook and may intentionally differ from trade-date order. */
+  transactionIndex?: number;
   date: string;
   /** Pending item 41: optional time-of-day, "HH:MM" 24-hour, alongside
    * `date` — see `lib/datetime.ts`. Missing time backfills to noon for
