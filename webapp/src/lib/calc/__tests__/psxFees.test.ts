@@ -148,7 +148,7 @@ describe('calcFeeBreakdown — Simple (all-in %) fee mode, user-requested 2026-0
     const buy: Transaction = { date: '2026-08-27', ticker: 'OGDC', action: 'BUY', shares: 1, price: 327.8 };
     const sell: Transaction = { date: '2026-08-27', ticker: 'OGDC', action: 'SELL', shares: 1, price: 328.5 };
     const calc = makePSXFeeCalculator(SIMPLE_SETTINGS, [buy, sell]);
-    // Tie on quantity (1 vs 1) — ties go to BUY being the charged side (README item 79).
+    // Equal traded values — ties go to BUY being the charged side (README item 79).
     expect(calc(327.8, true, { shares: 1, tx: buy })).toBeCloseTo(327.8 * 0.00021, 2);
     expect(calc(328.5, false, { shares: 1, tx: sell })).toBe(0);
   });
