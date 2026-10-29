@@ -209,7 +209,8 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
         const timestamp = tx.timestamp ?? new Date().toISOString();
         const id = tx.id ?? crypto.randomUUID();
         const globalTransactionIndex = Number.isInteger(tx.globalTransactionIndex) ? tx.globalTransactionIndex! : Number.isInteger(tx.transactionIndex) ? tx.transactionIndex! : Math.max(0, ...wb.transactions.map(t => t.globalTransactionIndex ?? t.transactionIndex ?? 0)) + 1;
-        return { ...wb, transactions: [...wb.transactions, { ...tx, ...(tx.brokerId || !wb.activeBrokerId ? {} : { brokerId: wb.activeBrokerId }), id, seq: perTickerIndex, perTickerIndex, globalTransactionIndex, transactionIndex: globalTransactionIndex, timestamp }] };
+        const transactions = syncTransactionIndexes([...wb.transactions, { ...tx, ...(tx.brokerId || !wb.activeBrokerId ? {} : { brokerId: wb.activeBrokerId }), id, seq: perTickerIndex, perTickerIndex, globalTransactionIndex, transactionIndex: globalTransactionIndex, timestamp }]);
+        return { ...wb, transactions };
       }),
       addTransactions: (txs) => mutate((wb) => {
         const now = new Date().toISOString();
@@ -222,10 +223,10 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
           perTickerCounters.set(t.ticker, Math.max(perTickerCounters.get(t.ticker) ?? 0, perTickerIndex));
           return { ...t, ...(t.brokerId || !wb.activeBrokerId ? {} : { brokerId: wb.activeBrokerId }), id: t.id ?? crypto.randomUUID(), globalTransactionIndex, perTickerIndex, transactionIndex: globalTransactionIndex, seq: perTickerIndex, timestamp: t.timestamp ?? now };
         });
-        return { ...wb, transactions: [...wb.transactions, ...withIdAndTimestamp] };
+        return { ...wb, transactions: syncTransactionIndexes([...wb.transactions, ...withIdAndTimestamp]) };
       }),
-      updateTransaction: (index, patch) => mutate((wb) => ({ ...wb, transactions: wb.transactions.map((t, i) => (i === index ? { ...t, ...patch } : t)) })),
-      deleteTransaction: (index) => mutate((wb) => ({ ...wb, transactions: wb.transactions.filter((_, i) => i !== index) })),
+      updateTransaction: (index, patch) => mutate((wb) => ({ ...wb, transactions: syncTransactionIndexes(wb.transactions.map((t, i) => (i === index ? { ...t, ...patch } : t))) })),
+      deleteTransaction: (index) => mutate((wb) => ({ ...wb, transactions: syncTransactionIndexes(wb.transactions.filter((_, i) => i !== index)) })),
       addTransfer: (t) => mutate((wb) => {
         const withId = t.id ? t : { ...t, id: crypto.randomUUID() };
         return { ...wb, transfers: [...wb.transfers, { ...withId, ...(withId.brokerId || !wb.activeBrokerId ? {} : { brokerId: wb.activeBrokerId }), seq: withId.seq !== undefined ? withId.seq : nextSeq(wb.transfers), timestamp: withId.timestamp ?? new Date().toISOString() }] };
@@ -323,7 +324,7 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
         const globalTransactionIndex = Math.max(0, ...wb.transactions.map(t => t.globalTransactionIndex ?? t.transactionIndex ?? 0)) + 1;
         const perTickerIndex = nextSeqForEntity(wb.transactions, (t) => t.ticker, leg.ticker);
         const tx: Transaction = { id: crypto.randomUUID(), brokerId: wb.activeBrokerId, globalTransactionIndex, perTickerIndex, transactionIndex: globalTransactionIndex, seq: perTickerIndex, timestamp: new Date().toISOString(), date: leg.date || new Date().toISOString().slice(0, 10), ticker: leg.ticker, action: leg.action, shares: leg.shares, price: leg.price, targetLotBuyId: leg.targetLotBuyId };
-        return { ...wb, transactions: [...wb.transactions, tx], tradePlans: wb.tradePlans.map((p) => p.id === planId ? { ...p, legs: p.legs.map((l, i) => i === legIndex ? { ...l, executed: true, executedTransactionId: tx.id } : l) } : p) };
+        return { ...wb, transactions: syncTransactionIndexes([...wb.transactions, tx]), tradePlans: wb.tradePlans.map((p) => p.id === planId ? { ...p, legs: p.legs.map((l, i) => i === legIndex ? { ...l, executed: true, executedTransactionId: tx.id } : l) } : p) };
       }),
     };
   });
