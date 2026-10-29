@@ -337,9 +337,10 @@ function TransactionList() {
   const filtered = indexed
     .filter((r) => filterTicker === 'ALL' || r.tx.ticker === filterTicker)
     .filter((r) => filterAction === 'ALL' || r.tx.action === filterAction);
-  type TxCol = 'date' | 'ticker' | 'action' | 'shares' | 'price' | 'amount' | 'fee';
+  type TxCol = 'order' | 'date' | 'ticker' | 'action' | 'shares' | 'price' | 'amount' | 'fee';
   const sortValue = (r: (typeof filtered)[number], col: TxCol): number | string => {
     switch (col) {
+      case 'order': return r.tx.transactionIndex ?? Number.MAX_SAFE_INTEGER;
       case 'ticker': return r.tx.ticker;
       case 'action': return r.tx.action;
       case 'shares': return r.tx.shares;
@@ -349,7 +350,7 @@ function TransactionList() {
       default: return r.tx.date;
     }
   };
-  const { sorted, Th } = useSortableRows(filtered, sortValue, 'date', 'desc');
+  const { sorted, Th } = useSortableRows(filtered, sortValue, 'order', 'asc');
 
   const openSorted = useMemo(() => sorted.filter((r) => openTickers.has(r.tx.ticker)), [sorted, openTickers]);
   const closedSorted = useMemo(() => sorted.filter((r) => !openTickers.has(r.tx.ticker)), [sorted, openTickers]);
@@ -473,6 +474,25 @@ function TransactionList() {
   };
 
   const setWorkbook = usePSXWorkbookStore((s) => s.setWorkbook);
+  const transactionOrderRows = useMemo(
+    () => [...workbook.transactions].sort((a, b) => (a.transactionIndex ?? Number.MAX_SAFE_INTEGER) - (b.transactionIndex ?? Number.MAX_SAFE_INTEGER)),
+    [workbook.transactions],
+  );
+  const reorderTransaction = async (pair: [{ id: string; order: number }, { id: string; order: number }]) => {
+    if (!(await ensureSignedIn('Sign in to reorder transactions.'))) return;
+    const current = usePSXWorkbookStore.getState().workbook;
+    const a = current.transactions.find(tx => tx.id === pair[0].id);
+    const b = current.transactions.find(tx => tx.id === pair[1].id);
+    if (!a || !b || !Number.isInteger(a.transactionIndex) || !Number.isInteger(b.transactionIndex)) return toast('Transactions changed or accounting order is missing. Reload and try again.');
+    const sameTicker = a.ticker === b.ticker;
+    const transactions = current.transactions.map(tx => tx.id === a.id
+      ? { ...tx, transactionIndex: b.transactionIndex, ...(sameTicker ? { seq: b.seq } : {}) }
+      : tx.id === b.id
+        ? { ...tx, transactionIndex: a.transactionIndex, ...(sameTicker ? { seq: a.seq } : {}) }
+        : tx);
+    usePSXWorkbookStore.getState().setWorkbook({ ...current, transactions });
+    toast('Transaction accounting order updated.');
+  };
   const clearAll = async () => {
     const ok = await confirmDialog(
       'This clears all transactions, prices and watchlist entries in this browser.',
@@ -573,7 +593,7 @@ function TransactionList() {
                   </Fragment>
                 ) : (
                   <RecordRow market="psx" onEdit={() => startEdit(i, tx)}    record={{ tx, i }}  key={i}  className="clickable">
-                    <td><DateValue value={tx.date} /></td>
+                    <td><DateValue value={tx.date} />{' '}<ReorderButtons rows={transactionOrderRows} index={transactionOrderRows.findIndex(row => row.id === tx.id)} instantOf={row => dateOnlyMs(row.date)} idOf={row => row.id!} orderOf={row => row.transactionIndex} allowAcrossInstants onMove={reorderTransaction} /></td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <TickerLogo ticker={tx.ticker} size="sm" exchange="psx" /><Link to={`/psx/stock/${tx.ticker}`}>{tx.ticker}</Link>
                       {tx.isPending && (
