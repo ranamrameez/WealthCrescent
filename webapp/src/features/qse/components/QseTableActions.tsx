@@ -29,7 +29,7 @@ const column = (key: keyof Row, label: string, type: BatchColumn<Row>['type'] = 
 function qseColumns(kind: Kind): BatchColumn<Row>[] {
   const common = [{ ...column(kind === 'transactions' ? 'perTickerIndex' : 'seq', '#', 'number'), editable: false }, column('date', 'Date', 'date'), column('time', 'Time', 'time'), column('timezone', 'Timezone')];
   if (kind === 'ledger') {
-    const specific = (source: Exclude<Kind, 'ledger' | 'dividends'>, recordKind: Row['kind']) => qseColumns(source).filter(c => !common.some(shared => shared.key === c.key)).map(c => ({ ...c, label: c.key === 'type' ? 'Transfer type' : c.label, editable: (row: Row) => row.kind === recordKind }));
+    const specific = (source: Exclude<Kind, 'ledger' | 'dividends'>, recordKind: Row['kind']) => qseColumns(source).filter(c => !common.some(shared => shared.key === c.key) && c.key !== 'perTickerIndex').map(c => ({ ...c, label: c.key === 'type' ? 'Transfer type' : c.label, editable: (row: Row) => row.kind === recordKind }));
     return [...common, { ...column('kind', 'Type'), editable: false }, ...specific('transactions', 'trade'), ...specific('transfers', 'transfer'), ...specific('adjustments', 'adjustment')];
   }
   if (kind === 'transactions') return [...common, { ...column('ticker', 'Ticker'), parser: value => String(value).trim().toUpperCase() }, { ...column('action', 'Action', 'select'), options: ['BUY', 'SELL'].map(value => ({ value, label: value })) }, column('shares', 'Shares', 'number'), column('price', 'Price', 'number'), column('isPending', 'Pending', 'boolean')];
@@ -148,7 +148,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
         const importedId = idColumn < 0 ? '' : cells[idColumn]?.trim();
         if (importedId) explicitIds.add(importedId);
         const row: Row = { id: importedId || crypto.randomUUID(), date: '' };
-        for (const c of columns.filter(c => c.key !== 'seq')) {
+        for (const c of columns.filter(c => c.key !== 'seq' && c.key !== 'perTickerIndex')) {
           const normalizedHeaders = headers.map(header => header.trim().toLowerCase());
           let position = normalizedHeaders.indexOf(c.key.toLowerCase());
           if (kind === 'ledger' && c.key === 'type') {
