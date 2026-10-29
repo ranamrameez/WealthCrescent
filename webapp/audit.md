@@ -62,3 +62,14 @@ All fixes are on `chatgpt-audit-20260916-v2`. No PR was opened and no merge was 
 ## 2026-10-29 — Follow-up status after CI baseline repair
 
 PR #28 merged the existing CI regression fixes and the final PR CI passed the production build plus all 134 test files. Do not keep reporting the earlier `categoryMerge`, `resetLocalData`, `planControls`, `PriceInput`, and `bankNavigation` baseline failures as current main failures. This does not validate the separate in-flight transaction-order/cost-basis changes in PR #22; that work remains unmerged, diverged from main, and unverified. See `webapp/SESSION_HANDOFF.md` for the porting plan and the known cash-ledger order consistency concern.
+
+## 2026-10-29 — Transaction-page cost-basis consistency slice (in progress)
+
+Porting the relevant parts of draft PR #22 onto a fresh branch based on current main; the old branch is 82 commits behind and must not be merged wholesale.
+
+- QSE/PSX transaction-row SELL P/L now uses the weighted-average per-SELL calculator when `costBasisMethod` is `average`; FIFO and lowest-cost-first use the configured lot match method.
+- Open/Closed lot-attribution tables are shown only for FIFO/lowest-cost-first. Average cost shows an explanation because lot-by-lot attribution is not mathematically applicable to weighted-average accounting.
+- Removed the QSE page-filter lot-matching override and the PSX page-local match-order selector so they cannot contradict configured settings.
+- Added tests for weighted-average per-SELL P/L and unmatched oversells. Build/full CI and UI regression validation are pending for this branch.
+
+Still pending: audit Dashboard, Position Detail, analytics/time series, exports, charts, strategy/advisory surfaces, and the transaction-index/cash-ledger ordering design. See `webapp/SESSION_HANDOFF.md`.
