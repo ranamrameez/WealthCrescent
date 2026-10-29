@@ -13,19 +13,7 @@ export interface Transaction {
    * by `createWorkbookStore.ts`'s `normalize()`, same pattern as
    * `Transfer.id`. */
   id?: string;
-  /** User-reported (2026-08-27): "auto generate unique int ids for each
-   * single item so that even matching dates cannot stop us from loosing
-   * the correct order of the data." A monotonically increasing per-array
-   * counter assigned once at creation (`lib/seq.ts`'s `nextSeq`) — the
-   * definitive tie-breaker for two records at the exact same instant,
-   * used instead of implicitly relying on array position (which doesn't
-   * survive an edit, a delete-and-re-add, or an import reordering the
-   * array). `sortTransactionsChronological` still checks BUY-before-SELL
-   * first on a tied instant (a real financial-correctness rule, not an
-   * ordering preference — see that function's own comment), falling back
-   * to `seq` only when that domain rule doesn't fully resolve the tie
-   * (e.g. two same-day BUYs). Retrofitted onto existing data by
-   * `createWorkbookStore.ts`'s `normalize()`, same pattern as `id`. */
+  /** Legacy compatibility alias. For transactions this mirrors perTickerIndex; globalTransactionIndex now controls accounting order. Other record types still use seq as their own sequence. */
   seq?: number;
   /** Canonical global accounting position across all transactions in this exchange workbook. Reordering the global sequence must also recalculate perTickerIndex. */
   globalTransactionIndex?: number;
