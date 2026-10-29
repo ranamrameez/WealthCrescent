@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react';
-export interface QseFilters { from: string; to: string; ticker: string; status: string; search: string; action: string; group: string; transferType: string; kind: string; matchOrder: string; period: string }
-export const empty: QseFilters = { from: '', to: '', ticker: '', status: '', search: '', action: '', group: '', transferType: '', kind: '', matchOrder: '', period: '' };
+export interface QseFilters { from: string; to: string; ticker: string; status: string; search: string; action: string; group: string; transferType: string; kind: string; period: string }
+export const empty: QseFilters = { from: '', to: '', ticker: '', status: '', search: '', action: '', group: '', transferType: '', kind: '', period: '' };
 export const QseFilterContext = createContext(empty);
 export function useQseFilters() { return useContext(QseFilterContext); }
 export function matchesQseFilters(row: { date: string; ticker?: string; isPending?: boolean; note?: string; description?: string; action?: string; type?: string }, filters: QseFilters) {
