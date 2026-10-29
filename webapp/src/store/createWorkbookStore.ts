@@ -106,6 +106,22 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
       ...(t.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }),
     }));
     const transactionsWithId = transactionsWithBroker.map((t) => (t.id ? t : { ...t, id: crypto.randomUUID() }));
+    // Backfill a stable global order once for legacy records. Existing indexes are
+    // preserved; only missing indexes are appended after the current maximum.
+    const indexedTransactions = (() => {
+      const maxIndex = Math.max(0, ...transactionsWithId.map(t => Number.isInteger(t.transactionIndex) ? t.transactionIndex! : 0));
+      let nextIndex = maxIndex;
+      const legacy = [...transactionsWithId.filter(t => !Number.isInteger(t.transactionIndex))].sort((a, b) => {
+        const at = a.timestamp ? Date.parse(a.timestamp) : Number.POSITIVE_INFINITY;
+        const bt = b.timestamp ? Date.parse(b.timestamp) : Number.POSITIVE_INFINITY;
+        if (at !== bt) return at - bt;
+        const byDate = a.date.localeCompare(b.date);
+        if (byDate) return byDate;
+        return (a.time ?? '').localeCompare(b.time ?? '');
+      });
+      const byId = new Map(legacy.map(t => [t.id, { ...t, transactionIndex: ++nextIndex }]));
+      return transactionsWithId.map(t => Number.isInteger(t.transactionIndex) ? t : byId.get(t.id)!);
+    })();
     const transfersWithId = wb.transfers.map((t) => ({ ...t, ...(t.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), ...(t.id ? {} : { id: crypto.randomUUID() }) }));
     const adjustmentsWithId = wb.adjustments.map((a) => ({ ...a, ...(a.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), ...(a.id ? {} : { id: crypto.randomUUID() }) }));
     const dividendsWithId = wb.dividends.map((d) => ({ ...d, ...(d.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), ...(d.id ? {} : { id: crypto.randomUUID() }) }));
@@ -113,7 +129,7 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
     const normalized = {
       ...wb,
       ...(profiles.length ? { brokerProfiles, activeBrokerId } : {}),
-      transactions: backfillSeq(transactionsWithId, sortTransactionsChronological(transactionsWithId)),
+      transactions: backfillSeq(indexedTransactions, sortTransactionsChronological(indexedTransactions)),
       transfers: backfillSeq(transfersWithId, chronologicalByInstant(transfersWithId)),
       adjustments: backfillSeq(adjustmentsWithId, chronologicalByInstant(adjustmentsWithId)),
       dividends: backfillSeq(dividendsWithId, chronologicalByInstant(dividendsWithId)),
@@ -191,12 +207,14 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
         const seq = tx.seq !== undefined ? tx.seq : nextSeqForEntity(wb.transactions, (t) => t.ticker, tx.ticker);
         const timestamp = tx.timestamp ?? new Date().toISOString();
         const id = tx.id ?? crypto.randomUUID();
-        return { ...wb, transactions: [...wb.transactions, { ...tx, ...(tx.brokerId || !wb.activeBrokerId ? {} : { brokerId: wb.activeBrokerId }), id, seq, timestamp }] };
+        const transactionIndex = Number.isInteger(tx.transactionIndex) ? tx.transactionIndex! : Math.max(0, ...wb.transactions.map(t => t.transactionIndex ?? 0)) + 1;
+        return { ...wb, transactions: [...wb.transactions, { ...tx, ...(tx.brokerId || !wb.activeBrokerId ? {} : { brokerId: wb.activeBrokerId }), id, seq, transactionIndex, timestamp }] };
       }),
       addTransactions: (txs) => mutate((wb) => {
         const now = new Date().toISOString();
         const withSeq = assignSeqForEntities(wb.transactions, txs, (t) => t.ticker);
-        const withIdAndTimestamp = withSeq.map((t) => ({ ...t, ...(t.brokerId || !wb.activeBrokerId ? {} : { brokerId: wb.activeBrokerId }), id: t.id ?? crypto.randomUUID(), timestamp: t.timestamp ?? now }));
+        let nextTransactionIndex = Math.max(0, ...wb.transactions.map(t => t.transactionIndex ?? 0));
+        const withIdAndTimestamp = withSeq.map((t) => ({ ...t, ...(t.brokerId || !wb.activeBrokerId ? {} : { brokerId: wb.activeBrokerId }), id: t.id ?? crypto.randomUUID(), transactionIndex: Number.isInteger(t.transactionIndex) ? t.transactionIndex! : ++nextTransactionIndex, timestamp: t.timestamp ?? now }));
         return { ...wb, transactions: [...wb.transactions, ...withIdAndTimestamp] };
       }),
       updateTransaction: (index, patch) => mutate((wb) => ({ ...wb, transactions: wb.transactions.map((t, i) => (i === index ? { ...t, ...patch } : t)) })),
