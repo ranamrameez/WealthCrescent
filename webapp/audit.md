@@ -95,3 +95,7 @@ Clarification from the user: `globalTransactionIndex` and `perTickerIndex` are t
 The store normalizes legacy records, assigns both indexes for newly added transactions and executed trade-plan legs, and re-synchronizes indexes after add/edit/delete. QSE and PSX cross-date reorder controls use the same helper. Regression coverage checks that global and per-ticker indexes plus their compatibility aliases remain aligned after a cross-ticker reorder. CI/build is still required before merge.
 
 Known separate issue: the mixed cash ledger includes transfers and adjustments, which do not have these transaction indexes, and continues to display by effective date. This PR synchronizes transaction indexes but does not define a global order shared by all mixed cash-ledger event types.
+
+### QSE batch editor regression repair (2026-10-30)
+
+The previous PR #36 CI run passed the production build but failed full tests. Investigation found two actual batch-editor defects: QSE validation treated the derived `perTickerIndex` as a required editable numeric input (breaking CSV/ledger imports and new batch rows), and `BatchEditGrid` did not count/apply hidden canonical `globalTransactionIndex` drafts created by reorder buttons (leaving Save disabled). The QSE validator now skips the derived per-ticker index, and BatchEditGrid applies hidden `orderKey` drafts as changes. The live-price input test now waits for the effect that syncs the input after a scraped price arrives. Regression rerun is pending; do not mark CI green until a fresh PR run completes.
