@@ -340,7 +340,7 @@ mistype a ticker, remove it and re-add it correctly.
 A floating 🧮 button, available on Stock Exchanges pages (QSE and PSX). Model a hypothetical
 BUY, SELL, or (PSX "Cycle" mode) a buy-then-planned-sell — see break-even price, current P/L,
 estimated fees, and (PSX) estimated CGT — before you actually commit to a trade. You can log
-the modeled trade straight from here once you're ready. It doesn't appear on other modules
+the modeled trade straight from here once you're ready. The separate **Buy/sell stock** action opens the trade-entry popup; after a successful save it closes automatically. If saving fails, your entered values remain in the popup so you can retry. It doesn't appear on other modules
 (Cash, Banking, etc.) since a stock trade calculator wouldn't mean anything there.
 
 Opening it from a specific stock's own page pre-selects that ticker automatically — you don't
