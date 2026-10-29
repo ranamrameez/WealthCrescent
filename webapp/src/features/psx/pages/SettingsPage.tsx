@@ -131,8 +131,9 @@ function FeeSettings() {
         </p>
       ) : (
         <p className="text-muted" style={{ marginTop: -4 }}>
-          Government levies (PSX/NCCPL/SECP/CVT) default to 0 since they vary by broker — check your
-          account statement and fill in what your broker actually charges.
+          Levies and taxes are stored per broker profile. JS Zindagi's initial levy estimate is calibrated
+          against prior statements; AL Habib's published form does not provide every levy amount clearly.
+          Reconcile these fields with that broker's latest contract note and edit them if needed.
         </p>
       )}
       <div className="row" style={{ gap: 12, opacity: feeMode === 'simple' ? 0.5 : 1 }}>
