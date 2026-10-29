@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Category } from '../../../types/finance';
 import type { Fund } from '../../../types/fundsWorkbook';
 import type { PricePoint, Transaction } from '../../../types/workbook';
-import { allocationByCategory, balanceUpdateHistory, contributionVsValueSeries, expectedPLRate, fundCategoryLabel, fundNetProfit, fundsValueByCurrency, organicPLByPeriod, projectInvestmentReturn } from '../fundsModule';
+import { allocationByCategory, balanceUpdateHistory, contributionVsValueSeries, expectedPLRate, fundCategoryLabel, fundNetProfit, fundsValueByCurrency, organicPLByPeriod, projectInvestmentReturn, unitsFromAmount } from '../fundsModule';
 import { computePositions } from '../positions';
 
 const funds: Fund[] = [
@@ -201,9 +201,31 @@ describe('projectInvestmentReturn', () => {
   });
 });
 
+describe('unitsFromAmount', () => {
+  it('converts an editable transaction amount to units using the current NAV', () => {
+    expect(unitsFromAmount(1250, 25)).toBe(50);
+    expect(unitsFromAmount(1250, 0)).toBe(0);
+    expect(unitsFromAmount(1250, -1)).toBe(0);
+  });
+});
+
 describe('balanceUpdateHistory', () => {
   it('returns nothing for a fund with no price-history updates', () => {
     expect(balanceUpdateHistory('f1', [], {})).toEqual([]);
+  });
+
+  it('uses the edited effective date rather than the stale timestamp for history order', () => {
+    const txs: Transaction[] = [{ date: '2026-01-01', ticker: 'f1', action: 'BUY', shares: 100, price: 10 }];
+    const priceHistory: Record<string, PricePoint[]> = {
+      f1: [
+        { date: '2026-02-10', time: '2026-02-10T12:00:00.000Z', price: 12 },
+        // Simulates changing this point's date while its original timestamp remains.
+        { date: '2026-01-10', time: '2026-03-01T12:00:00.000Z', price: 11 },
+      ],
+    };
+    const rows = balanceUpdateHistory('f1', txs, priceHistory);
+    expect(rows.map(row => row.date)).toEqual(['2026-01-10', '2026-02-10']);
+    expect(rows.map(row => row.newBalance)).toEqual([1100, 1200]);
   });
 
   it('hand-traced: 100 units bought at NAV 10, two later NAV updates, no further cash flow', () => {
