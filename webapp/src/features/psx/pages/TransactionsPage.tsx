@@ -50,7 +50,7 @@ function emptyRow(): Transaction {
   return { date: today(), ticker: '', action: 'BUY', shares: 0, price: 0, time: nowTime(defaultTimezoneForMarket('PSX')), timezone: defaultTimezoneForMarket('PSX') };
 }
 
-export function TransactionRows({ initial }: { initial?: Partial<Transaction> } = {}) {
+export function TransactionRows({ initial, onSaved }: { initial?: Partial<Transaction>; onSaved?: () => void } = {}) {
   const addTransactions = usePSXWorkbookStore((s) => s.addTransactions);
   const workbook = usePSXWorkbookStore((s) => s.workbook);
   const { calcFee } = usePSXDerived();
@@ -87,6 +87,7 @@ export function TransactionRows({ initial }: { initial?: Partial<Transaction> } 
     if (!(await ensureSignedIn('Sign in to save your transactions.'))) return;
     addTransactions(valid.map((r) => ({ ...r, ticker: r.ticker.toUpperCase() })));
     toast(`Added ${valid.length} transaction${valid.length > 1 ? 's' : ''}.`);
+    onSaved?.();
     setRows([emptyRow()]);
     setTimeTouched([false]);
   };
