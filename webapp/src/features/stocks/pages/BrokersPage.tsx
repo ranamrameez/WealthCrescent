@@ -6,7 +6,7 @@ import { PageHeading } from '../../../components/PageHeading';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { toast } from '../../../components/Toast';
 import { Field, TextInput } from '../../../components/ui/Field';
-import type { BrokerPortfolioData, BrokerProfile } from '../../../types/workbook';
+import type { BrokerPortfolioData, BrokerProfile, QSESettings } from '../../../types/workbook';
 import type { PSXSettings } from '../../../types/psxWorkbook';
 import { useWorkbookStore } from '../../../store/workbookStore';
 import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
@@ -65,14 +65,19 @@ export function BrokersPage() {
       return;
     }
     const id = `${isPSX ? 'psx' : 'qse'}-${crypto.randomUUID()}`;
-    const profile: BrokerProfile<typeof workbook.settings> = {
-      id,
-      name,
-      accountLabel: newAccountLabel.trim() || undefined,
-      settings: { ...workbook.settings },
-      data: emptyPortfolio(),
-    };
-    saveProfileList([...profiles, profile]);
+    if (isPSX) {
+      const profile: BrokerProfile<PSXSettings> = {
+        id, name, accountLabel: newAccountLabel.trim() || undefined,
+        settings: { ...psx.settings }, data: emptyPortfolio(),
+      };
+      setPsxWorkbook({ ...psx, brokerProfiles: [...psx.brokerProfiles, profile] });
+    } else {
+      const profile: BrokerProfile<QSESettings> = {
+        id, name, accountLabel: newAccountLabel.trim() || undefined,
+        settings: { ...qse.settings }, data: emptyPortfolio(),
+      };
+      setQseWorkbook({ ...qse, brokerProfiles: [...qse.brokerProfiles, profile] });
+    }
     setNewName('');
     setNewAccountLabel('');
     toast(`${name} profile created. Select it to begin a separate portfolio.`);
@@ -191,7 +196,7 @@ export function BrokersPage() {
               <div className="row" style={{ gap: 8, marginTop: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                 <span className="text-muted">Fee schedule:</span>
                 <strong>{isPSX
-                  ? `${profile.settings.feePct}% above PKR ${profile.settings.lowPriceThreshold}; PKR ${profile.settings.lowPriceFee}/share at or below threshold`
+                  ? `${profile.settings.feePct}% above PKR ${(profile.settings as PSXSettings).lowPriceThreshold}; PKR ${(profile.settings as PSXSettings).lowPriceFee}/share at or below threshold`
                   : `${profile.settings.feePct}% commission`}</strong>
                 {active && <button type="button" className="btn secondary" onClick={() => navigate(isPSX ? '/psx/settings' : '/settings')}>Configure fees</button>}
               </div>
