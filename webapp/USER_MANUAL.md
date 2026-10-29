@@ -333,6 +333,14 @@ mistype a ticker, remove it and re-add it correctly.
   CGT rates and filer status, cost-basis method, tick size, currency, and default deposit
   fee. Change these to match your actual broker's schedule.
 
+### Broker profiles
+
+Use the **Broker** selector in the stock top bar or the stock-exchange side menu to switch the active account. Open **Brokers** in the exchange's side menu to add a profile, edit its name/account label, or archive it. A profile owns its own trades, transfers, adjustments, dividends, trade plans, and fee/cost-basis settings. Switching profiles loads that account's history; it does not transfer trades between accounts. Profiles with history are archived rather than permanently deleted; empty profiles can be deleted.
+
+- **QSE** starts with **The Group**.
+- **PSX** starts with **JS Zindagi** selected and **AL Habib Capital Markets** available as a second profile. The latter is the securities broker subsidiary of Bank AL Habib.
+- Initial PSX commission rates are prefilled from the brokers' published material: [Zindigi stock charges](https://zindigi.pk/features/stocks/) and [AL Habib Capital Markets' account-opening tariff](https://ahcml.com/assets/uploads/Normal_AOF.pdf). Zindigi's documented same-day rule charges commission on the higher-value side only. AL Habib's accessible tariff does not specify same-day netting, so the app does not assume Zindigi's rule for that profile. You can change the active profile's **Same-day commission rule** in Settings → Fees & amounts if your contract note confirms a different policy. Other levies/taxes are estimates or configurable fields; check your current broker contract note and update the active profile's Settings → Fees & amounts before relying on net P/L or break-even estimates.
+
 ---
 
 ## 10. Trade Calculator

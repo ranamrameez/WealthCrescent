@@ -1,4 +1,8 @@
 export interface Transaction {
+  /** Broker/account profile that owns this trade. Missing on legacy imports;
+   * the workbook migration assigns those trades to the original default
+   * profile without changing their financial fields. */
+  brokerId?: string;
   /** Stable id, not the transaction's array position. Optional because
    * QSE/PSX transactions have historically been index-addressed (see
    * CLAUDE.md) — added specifically so a Trade Planner leg ("Mark as
@@ -145,6 +149,8 @@ export interface Transaction {
 }
 
 export interface Transfer {
+  /** Broker/account profile that owns this cash movement. */
+  brokerId?: string;
   /** Stable id, not the transfer's array position — needed so cross-entity
    * transfer links (README item 19) can reference a specific transfer that
    * survives other transfers being added/edited/deleted around it. */
@@ -166,6 +172,8 @@ export interface Transfer {
 }
 
 export interface Adjustment {
+  /** Broker/account profile that owns this adjustment. */
+  brokerId?: string;
   /** Stable id, not the adjustment's array position — added for the same
    * reason as `Transaction.id` (README item 51): every record type should
    * carry one, not just the ones a specific feature happened to need first.
@@ -234,6 +242,8 @@ export interface TradePlanLeg {
  * ahead of time, edit them, and convert individual legs into real
  * transactions ("Mark as done") without re-typing the same data. */
 export interface TradePlan {
+  /** Broker/account profile whose holdings this plan references. */
+  brokerId?: string;
   id: string;
   name: string;
   createdAt: string;
@@ -262,6 +272,8 @@ export interface WatchlistItem {
 }
 
 export interface Dividend {
+  /** Broker/account profile that owns this dividend record. */
+  brokerId?: string;
   /** Stable id — same reasoning as `Adjustment.id` above (README item 51). */
   id?: string;
   /** Same reasoning and retrofit pattern as `Transaction.seq` above. */
@@ -350,8 +362,32 @@ export interface Appearance {
   dateFormat?: 'DD-MMM-YYYY' | 'YYYY-MMM-DD' | 'DD-MM-YYYY' | 'MM-DD-YYYY' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'dddd, MMM DD, YYYY' | 'ddd, DD MMM, YYYY';
 }
 
+export interface BrokerPortfolioData {
+  transactions: Transaction[];
+  transfers: Transfer[];
+  adjustments: Adjustment[];
+  dividends: Dividend[];
+  tradePlans: TradePlan[];
+}
+
+export interface BrokerProfile<TSettings> {
+  id: string;
+  /** User-facing name, e.g. "The Group", "JS Zindagi", or "AL Habib Capital Markets". */
+  name: string;
+  /** Optional account label/last digits to distinguish multiple accounts at one broker. */
+  accountLabel?: string;
+  /** Fee/cost-basis settings are profile-specific, not exchange-global. */
+  settings: TSettings;
+  /** Independent account history. Market prices/watchlists remain exchange-wide. */
+  data?: BrokerPortfolioData;
+  /** Inactive profiles remain in the workbook so their historical trades are preserved. */
+  archived?: boolean;
+}
+
 export interface Workbook {
   settings: QSESettings;
+  brokerProfiles: BrokerProfile<QSESettings>[];
+  activeBrokerId: string;
   /** @deprecated appearance is now a global preference (see
    * store/appearanceStore.ts), not per-workbook — kept optional here only
    * so old exported/synced JSON still parses. */

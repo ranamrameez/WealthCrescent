@@ -67,6 +67,7 @@ import { LegalPage } from './pages/LegalPage';
 import { NetWorthPage } from './features/netWorth/pages/NetWorthPage';
 import { AppDataPage } from './features/appData/pages/AppDataPage';
 import { AccountPage } from './features/account/pages/AccountPage';
+import { BrokersPage } from './features/stocks/pages/BrokersPage';
 
 function useApplyAppearance() {
   const appearance = useAppearanceStore((s) => s.appearance);
@@ -175,6 +176,7 @@ function App() {
             <PageContent>
               <Route path="/" element={<Navigate to="/net-worth" replace />} />
               <Route path="/qse" element={<DashboardPage />} />
+              <Route path="/brokers" element={<BrokersPage />} />
               <Route path="/portfolio" element={<PortfolioPage />} />
               <Route path="/transactions" element={<TransactionsPage />} />
               <Route path="/watchlist" element={<WatchlistPage />} />
@@ -195,6 +197,7 @@ function App() {
                 }
               />
               <Route path="/psx" element={<PSXDashboardPage />} />
+              <Route path="/psx/brokers" element={<BrokersPage />} />
               <Route path="/psx/portfolio" element={<PSXPortfolioPage />} />
               <Route path="/psx/transactions" element={<PSXTransactionsPage />} />
               <Route path="/psx/watchlist" element={<PSXWatchlistPage />} />

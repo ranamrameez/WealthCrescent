@@ -24,6 +24,53 @@ function createEmptyTestWorkbook(): TestWorkbook {
 
 const STORAGE_KEY = 'test_workbook_normalize_v1';
 
+function createEmptyBrokerTestWorkbook(): TestWorkbook {
+  return {
+    ...createEmptyTestWorkbook(),
+    brokerProfiles: [
+      { id: 'broker-a', name: 'Broker A', settings: { currency: 'USD' }, data: { transactions: [], transfers: [], adjustments: [], dividends: [], tradePlans: [] } },
+      { id: 'broker-b', name: 'Broker B', settings: { currency: 'GBP' }, data: { transactions: [], transfers: [], adjustments: [], dividends: [], tradePlans: [] } },
+    ],
+    activeBrokerId: 'broker-a',
+  };
+}
+
+describe('broker profile isolation', () => {
+  it('keeps trades and settings isolated when switching broker profiles', () => {
+    const useStore = createWorkbookStore('test_broker_profile_switch', createEmptyBrokerTestWorkbook);
+    // The FAB's Add Trade form uses the bulk-add path, so exercise that path here.
+    useStore.getState().addTransactions([{ date: '2026-10-01', ticker: 'AAA', action: 'BUY', shares: 10, price: 5 }]);
+    useStore.getState().updateSettings({ currency: 'EUR' });
+    expect(useStore.getState().workbook.transactions[0].brokerId).toBe('broker-a');
+
+    useStore.getState().setActiveBroker('broker-b');
+    expect(useStore.getState().workbook.transactions).toEqual([]);
+    expect(useStore.getState().workbook.settings.currency).toBe('GBP');
+    useStore.getState().addTransactions([{ date: '2026-10-02', ticker: 'BBB', action: 'BUY', shares: 2, price: 8 }]);
+    expect(useStore.getState().workbook.transactions[0].brokerId).toBe('broker-b');
+
+    useStore.getState().setActiveBroker('broker-a');
+    expect(useStore.getState().workbook.transactions.map((tx) => tx.ticker)).toEqual(['AAA']);
+    expect(useStore.getState().workbook.settings.currency).toBe('EUR');
+    useStore.getState().setActiveBroker('broker-b');
+    expect(useStore.getState().workbook.transactions.map((tx) => tx.ticker)).toEqual(['BBB']);
+    localStorage.removeItem('test_broker_profile_switch');
+  });
+
+  it('migrates legacy exchange-wide trades and settings into the default broker profile', () => {
+    localStorage.setItem('test_broker_profile_migration', JSON.stringify({
+      ...createEmptyBrokerTestWorkbook(),
+      settings: { currency: 'QAR' },
+      transactions: [{ id: 'legacy', date: '2026-10-01', ticker: 'OLD', action: 'BUY', shares: 3, price: 7 }],
+    }));
+    const useStore = createWorkbookStore('test_broker_profile_migration', createEmptyBrokerTestWorkbook);
+    expect(useStore.getState().workbook.transactions[0]).toMatchObject({ id: 'legacy', brokerId: 'broker-a' });
+    expect(useStore.getState().workbook.brokerProfiles?.[0].settings.currency).toBe('QAR');
+    expect(useStore.getState().workbook.brokerProfiles?.[0].data?.transactions).toHaveLength(1);
+    localStorage.removeItem('test_broker_profile_migration');
+  });
+});
+
 describe('createWorkbookStore normalize', () => {
   it('retains ignored legs and prevents execution until they are restored', () => {
     const useStore = createWorkbookStore('test_ignored_plan', createEmptyTestWorkbook);

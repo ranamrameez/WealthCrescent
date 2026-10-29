@@ -48,3 +48,13 @@ Source inspection and commits were performed through the repository connector. A
 **Financial/data calculation audit and fix pass complete for the reviewed application surface.**
 
 All fixes are on `chatgpt-audit-20260916-v2`. No PR was opened and no merge was performed.
+
+
+## Broker-profile implementation audit — 2026-10-29 (in progress)
+
+- Added broker-owned transaction, transfer, adjustment, dividend, and trade-plan data with profile-specific settings. The store snapshots the active profile before each mutation and restores that profile on switch; profile histories are persisted inside the existing exchange workbook/cloud path, so this does not introduce a second cloud path.
+- Legacy QSE data migrates to **The Group**; legacy PSX data migrates to **JS Zindagi**. No trade fields are intentionally recalculated by migration. Active profile settings are seeded from the legacy workbook settings to preserve existing fee/cost-basis behavior.
+- Initial PSX profiles: JS Zindagi uses the existing settings calibrated against the user's historical JS statement; AL Habib Capital Markets is prefilled from its published account-opening commission schedule (PKR 0.03/share up to PKR 20, 0.15% above PKR 20.01). Other levies require contract-note reconciliation.
+- Added broker management route, profile selector in top bar and side menu, and regression tests for broker switching, legacy migration, and commission defaults. PSX same-day netting is now profile-specific: JS Zindigi uses its published higher-value-side rule; AL Habib does not inherit that rule because its accessible tariff does not document it. The Add Trade FAB now closes its modal only after the existing transaction submit handler succeeds, on both exchanges.
+- **Validation results (2026-10-29):** Node 24 production type-check/build passes; focused `createWorkbookStore.test.ts` and `psxFees.test.ts` pass. Full suite currently reports 7 failures across 5 untouched test files (`categoryMerge.test.ts`, `resetLocalData.test.ts`, `planControls.test.tsx`, `PriceInput.test.tsx`, `bankNavigation.test.tsx`); they are outside the feature's direct diff, but the baseline status should be confirmed. The initial Node 20 test run failed before executing tests because current jsdom dependencies require Node 22.22.2+; CI now uses Node 24.
+- **Still required:** browser verification of FAB save + broker switching/CRUD, Firebase round-trip with empty profile arrays and legacy cloud documents, and contract-note reconciliation of AL Habib's remaining levies. Do not describe the full suite as green.

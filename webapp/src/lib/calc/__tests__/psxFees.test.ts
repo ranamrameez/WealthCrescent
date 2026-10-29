@@ -14,9 +14,9 @@ import {
 import { defaultTimezoneForMarket, todayISODate } from '../../datetime';
 import { computePositions } from '../positions';
 import { cashSummary } from '../cashSummary';
-import { DEFAULT_PSX_SETTINGS } from '../../../store/defaultPsxWorkbook';
+import { createEmptyPSXWorkbook, DEFAULT_PSX_SETTINGS } from '../../../store/defaultPsxWorkbook';
 
-it('indexes same-day quantities once instead of rescanning history for every fee', () => {
+it('indexes same-day traded values once instead of rescanning history for every fee', () => {
   const transactions: Transaction[] = Array.from({ length: 2000 }, (_, index) => ({ ticker: 'T' + Math.floor(index / 2) % 20, date: '2025-01-' + String(Math.floor(index / 40) % 28 + 1).padStart(2, '0'), action: index % 2 ? 'SELL' : 'BUY', shares: index % 2 ? 60 : 100, price: 100 }));
   let historyReads = 0;
   const tracked = transactions.map(tx => new Proxy(tx, { get(target, key, receiver) { historyReads++; return Reflect.get(target, key, receiver); } }));
@@ -63,6 +63,19 @@ const BASE_SETTINGS: PSXSettings = {
   filerStatus: 'filer',
   costBasisMethod: 'average',
 };
+
+describe('broker-specific PSX commission defaults', () => {
+  it('seeds JS Zindagi and AL Habib Capital Markets with their published commission tiers', () => {
+    const workbook = createEmptyPSXWorkbook();
+    const js = workbook.brokerProfiles.find((profile) => profile.id === 'psx-js-zindigi');
+    const ah = workbook.brokerProfiles.find((profile) => profile.id === 'psx-al-habib-capital-markets');
+    expect(workbook.activeBrokerId).toBe('psx-js-zindigi');
+    expect(js?.settings).toMatchObject({ lowPriceThreshold: 25, lowPriceFee: 0.05, feePct: 0.2 });
+    expect(ah?.settings).toMatchObject({ lowPriceThreshold: 20, lowPriceFee: 0.03, feePct: 0.15, sameDayNettingRule: 'none' });
+    expect(calcFeeBreakdown(100 * 20, true, 100, ah!.settings).commission).toBe(3);
+    expect(calcFeeBreakdown(100 * 21, true, 100, ah!.settings).commission).toBeCloseTo(3.15, 2);
+  });
+});
 
 describe('calcFeeBreakdown', () => {
   it('uses the percentage commission tier above the low-price threshold', () => {
@@ -131,13 +144,13 @@ describe('calcFeeBreakdown — Simple (all-in %) fee mode, user-requested 2026-0
     expect(scenarios.netted).toBe(0);
   });
 
-  it('makePSXFeeCalculator charges the full all-in rate on a charged leg and nothing on a netted one', () => {
+  it('charges the higher-value leg in Simple mode and nets the other leg', () => {
     const buy: Transaction = { date: '2026-08-27', ticker: 'OGDC', action: 'BUY', shares: 1, price: 327.8 };
     const sell: Transaction = { date: '2026-08-27', ticker: 'OGDC', action: 'SELL', shares: 1, price: 328.5 };
     const calc = makePSXFeeCalculator(SIMPLE_SETTINGS, [buy, sell]);
-    // Tie on quantity (1 vs 1) — ties go to BUY being the charged side (README item 79).
-    expect(calc(327.8, true, { shares: 1, tx: buy })).toBeCloseTo(327.8 * 0.00021, 2);
-    expect(calc(328.5, false, { shares: 1, tx: sell })).toBe(0);
+    // The sell has the higher traded value, so only it pays the all-in fee.
+    expect(calc(327.8, true, { shares: 1, tx: buy })).toBe(0);
+    expect(calc(328.5, false, { shares: 1, tx: sell })).toBeCloseTo(328.5 * 0.00021, 2);
   });
 
   it('an undefined feeMode behaves exactly like itemized — no existing account is silently switched', () => {
@@ -191,12 +204,12 @@ describe('sameDayChargedSide', () => {
     expect(sameDayChargedSide([tx('BUY', 10)], 'TEST', day)).toBeNull();
   });
 
-  it('charges the larger side when sell volume exceeds buy volume', () => {
+  it('charges the higher-value side when sell volume exceeds buy volume', () => {
     const txs = [tx('BUY', 14), tx('SELL', 47)];
     expect(sameDayChargedSide(txs, 'TEST', day)).toBe('SELL');
   });
 
-  it('charges the larger side when buy volume exceeds sell volume', () => {
+  it('charges the higher-value side when buy volume exceeds sell volume', () => {
     const txs = [tx('BUY', 50), tx('SELL', 10)];
     expect(sameDayChargedSide(txs, 'TEST', day)).toBe('BUY');
   });
@@ -205,13 +218,38 @@ describe('sameDayChargedSide', () => {
     const txs = [tx('BUY', 20), tx('SELL', 20)];
     expect(sameDayChargedSide(txs, 'TEST', day)).toBe('BUY');
   });
+
+  it('uses traded value rather than share count when prices differ', () => {
+    const txs: Transaction[] = [
+      { date: day, ticker: 'TEST', action: 'BUY', shares: 100, price: 5 },
+      { date: day, ticker: 'TEST', action: 'SELL', shares: 60, price: 10 },
+    ];
+    // BUY has more shares, but SELL has the higher value (600 vs 500).
+    expect(sameDayChargedSide(txs, 'TEST', day)).toBe('SELL');
+  });
+});
+
+describe('broker-specific same-day netting', () => {
+  it('does not apply Zindigi netting to AL Habib when no netting rule is published', () => {
+    const settings = createEmptyPSXWorkbook().brokerProfiles.find((profile) => profile.id === 'psx-al-habib-capital-markets')!.settings;
+    const day = '2026-08-21';
+    const buy: Transaction = { date: day, ticker: 'TEST', action: 'BUY', shares: 100, price: 10 };
+    const sell: Transaction = { date: day, ticker: 'TEST', action: 'SELL', shares: 100, price: 12 };
+    const all = [buy, sell];
+    const calc = makePSXFeeCalculator(settings, all);
+    expect(sameDayChargedSide(all, 'TEST', day, settings.sameDayNettingRule)).toBeNull();
+    expect(isNettedLeg(all, buy, settings.sameDayNettingRule)).toBe(false);
+    expect(isNettedLeg(all, sell, settings.sameDayNettingRule)).toBe(false);
+    expect(calc(1000, true, { shares: 100, tx: buy })).toBe(calcFeeBreakdown(1000, true, 100, settings).total);
+    expect(calc(1200, false, { shares: 100, tx: sell })).toBe(calcFeeBreakdown(1200, false, 100, settings).total);
+  });
 });
 
 describe('makePSXFeeCalculator — same-day netting (README items 6/7)', () => {
   const day = '2026-08-21';
   const netSettings: PSXSettings = { ...BASE_SETTINGS, psxFeePct: 0.005, nccplFeePct: 0.011 };
 
-  it('charges full commission+SST on the larger (charged) side, levies-only on the netted side', () => {
+  it('charges full commission+SST on the higher-value side, levies-only on the netted side', () => {
     const buyTx: Transaction = { date: day, ticker: 'TEST', action: 'BUY', shares: 14, price: 100 };
     const sellTx: Transaction = { date: day, ticker: 'TEST', action: 'SELL', shares: 47, price: 100 };
     const all = [buyTx, sellTx];
@@ -235,6 +273,18 @@ describe('makePSXFeeCalculator — same-day netting (README items 6/7)', () => {
     const fullBreakdownOnSell = calcFeeBreakdown(sellAmount, false, sellTx.shares, netSettings).total;
     expect(sellFee).toBeCloseTo(fullBreakdownOnSell, 5);
     expect(sellFee).toBeGreaterThan(expectedBuyFee); // charged side pays commission, netted side doesn't
+  });
+
+  it('uses traded value, not share count, when deciding which same-day side pays commission', () => {
+    const buyTx: Transaction = { date: day, ticker: 'TEST', action: 'BUY', shares: 100, price: 5 };
+    const sellTx: Transaction = { date: day, ticker: 'TEST', action: 'SELL', shares: 60, price: 10 };
+    const calcFee = makePSXFeeCalculator(netSettings, [buyTx, sellTx]);
+    const buyFee = calcFee(500, true, { shares: 100, tx: buyTx });
+    const sellFee = calcFee(600, false, { shares: 60, tx: sellTx });
+    const buyBreakdown = calcFeeBreakdown(500, true, 100, netSettings);
+    const sellBreakdown = calcFeeBreakdown(600, false, 60, netSettings);
+    expect(buyFee).toBeCloseTo(Math.round((buyBreakdown.psxFee + buyBreakdown.nccplFee + buyBreakdown.secpLevy + buyBreakdown.cdc + buyBreakdown.cvt) * 100) / 100, 2);
+    expect(sellFee).toBeCloseTo(sellBreakdown.total, 2);
   });
 
   it('falls back to a full single-leg breakdown when there is no real tx context (hypothetical calculators)', () => {

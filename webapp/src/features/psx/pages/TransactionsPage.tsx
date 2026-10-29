@@ -50,7 +50,7 @@ function emptyRow(): Transaction {
   return { date: today(), ticker: '', action: 'BUY', shares: 0, price: 0, time: nowTime(defaultTimezoneForMarket('PSX')), timezone: defaultTimezoneForMarket('PSX') };
 }
 
-export function TransactionRows({ initial }: { initial?: Partial<Transaction> } = {}) {
+export function TransactionRows({ initial, onSaved }: { initial?: Partial<Transaction>; onSaved?: () => void } = {}) {
   const addTransactions = usePSXWorkbookStore((s) => s.addTransactions);
   const workbook = usePSXWorkbookStore((s) => s.workbook);
   const { calcFee } = usePSXDerived();
@@ -87,6 +87,7 @@ export function TransactionRows({ initial }: { initial?: Partial<Transaction> } 
     if (!(await ensureSignedIn('Sign in to save your transactions.'))) return;
     addTransactions(valid.map((r) => ({ ...r, ticker: r.ticker.toUpperCase() })));
     toast(`Added ${valid.length} transaction${valid.length > 1 ? 's' : ''}.`);
+    onSaved?.();
     setRows([emptyRow()]);
     setTimeTouched([false]);
   };
@@ -186,8 +187,9 @@ export function TransactionRows({ initial }: { initial?: Partial<Transaction> } 
         </button>
       </div>
       <p className="text-muted" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
-        Same-day round trips net automatically — the larger side pays full commission, the
-        smaller side pays levies only.
+        {workbook.settings.sameDayNettingRule === 'none'
+          ? 'This broker profile has no published same-day commission netting rule configured, so each trade is charged separately.'
+          : 'Same-day round trips net automatically — the higher-value side pays full commission, the other side pays applicable levies only.'}
         {/* Tooltip itself now renders an info-icon affordance (README item 89,
            2026-08-26), so this no longer needs its own manually-wrapped
            InfoIcon as children — that would now show two icons back to back. */}
@@ -580,7 +582,7 @@ function TransactionList() {
                           <span className="text-muted clickable">{' '}(override)</span>
                         </Tooltip>
                       ) : (
-                        isNettedLeg(workbook.transactions, tx) && (
+                        isNettedLeg(workbook.transactions, tx, workbook.settings.sameDayNettingRule) && (
                           <Tooltip
                             text={tx.manualSameDay ? 'Manually marked as a same-day netted leg — government levies only.' : 'Same-day round trip — netted, government levies only.'}
                           >
@@ -784,7 +786,7 @@ function TransactionList() {
               value: fmtMoney(calcFee(detailTx.shares * detailTx.price, detailTx.action === 'BUY', { shares: detailTx.shares, tx: detailTx }), currency)
                 + (detailTx.feeOverride !== undefined
                   ? ' (manually overridden)'
-                  : isNettedLeg(workbook.transactions, detailTx)
+                  : isNettedLeg(workbook.transactions, detailTx, workbook.settings.sameDayNettingRule)
                     ? ` (netted${detailTx.manualSameDay ? ', manual' : ''} — same-day round trip)`
                     : ''),
             },

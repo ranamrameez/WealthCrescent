@@ -10245,6 +10245,9 @@ from the lot system."*
   must remain positive, card identity and provenance are protected, stale edits are rejected,
   and linked transactions remain read-only in this flow.
 
+
+- **Broker profiles per exchange (2026-10-29; implementation in progress).** Added a broker-profile data model with separate transaction, transfer, adjustment, dividend, and trade-plan histories plus per-profile settings; old exchange-wide records migrate into the original default profile. QSE starts with **The Group**. PSX starts with **JS Zindagi** active and **AL Habib Capital Markets** as a second profile. The shared broker selector is exposed in the stock top bar and side menu, and a Brokers page supports adding, renaming, switching, archiving history-bearing profiles, and deleting empty profiles. PSX commission defaults are sourced from [Zindigi's stock-fee page](https://zindigi.pk/features/stocks/) (PKR 0.05/share up to PKR 25; 0.20% above PKR 25; same-day paired trades commission only on the higher-value side) and [AHCML's published account-opening tariff](https://ahcml.com/assets/uploads/Normal_AOF.pdf) (PKR 0.03/share up to PKR 20; 0.15% above PKR 20.01). AHCML's accessible tariff is not a complete, clearly current itemization of every levy; levy settings remain editable and must be reconciled against current contract notes. **Validation (2026-10-29):** the Node 24 production type-check/build and focused broker-profile/PSX-fee regression tests pass. The full suite still fails 7 tests across 5 existing test files (`categoryMerge`, `resetLocalData`, `planControls`, `PriceInput`, `bankNavigation`); these test files are not changed by this feature, but the failures need separate baseline review. Browser/Firebase round-trip verification remains outstanding; do not claim the full suite is green.
+
 ## Pending
 
 - **Activate PSX market cache:** merge the PSX rules fragment into existing rules, deploy

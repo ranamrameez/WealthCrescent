@@ -7,6 +7,8 @@ import { Avatar } from './Avatar';
 import { CategoryNav } from './CategoryNav';
 import { LogInIcon, LogoMark, SettingsIcon } from './icons';
 import { usePageTopBarStore } from '../store/pageTopBarStore';
+import { useWorkbookStore } from '../store/workbookStore';
+import { usePSXWorkbookStore } from '../store/psxWorkbookStore';
 
 const QSE_NAV_ITEMS = [
   { num: '01', label: 'Dashboard', to: '/qse' },
@@ -16,7 +18,8 @@ const QSE_NAV_ITEMS = [
   { num: '05', label: 'Risk Calculator', to: '/risk-analysis' },
   { num: '06', label: 'Trade Transactions', to: '/transactions' },
   { num: '07', label: 'Analytics', to: '/analytics' },
-  { num: '08', label: 'Settings', to: '/settings' },
+  { num: '08', label: 'Brokers', to: '/brokers' },
+  { num: '09', label: 'Settings', to: '/settings' },
 ];
 
 const PSX_NAV_ITEMS = [
@@ -27,7 +30,8 @@ const PSX_NAV_ITEMS = [
   { num: '05', label: 'Risk Calculator', to: '/psx/risk-analysis' },
   { num: '06', label: 'Trade Transactions', to: '/psx/transactions' },
   { num: '07', label: 'Analytics', to: '/psx/analytics' },
-  { num: '08', label: 'Settings', to: '/psx/settings' },
+  { num: '08', label: 'Brokers', to: '/psx/brokers' },
+  { num: '09', label: 'Settings', to: '/psx/settings' },
 ];
 
 const PAGES_OPEN_KEY = 'WealthCrescent_stock_pages_open_v1';
@@ -80,14 +84,35 @@ function usePagesOpen() {
 function ExchangeSwitcher({ exchange }: { exchange: 'qse' | 'psx' }) {
   const navigate = useNavigate();
   const beginNavigation = usePageTopBarStore((state) => state.beginNavigation);
+  const qse = useWorkbookStore((s) => s.workbook);
+  const psx = usePSXWorkbookStore((s) => s.workbook);
+  const setQseBroker = useWorkbookStore((s) => s.setActiveBroker);
+  const setPsxBroker = usePSXWorkbookStore((s) => s.setActiveBroker);
+  const workbook = exchange === 'psx' ? psx : qse;
+  const setActiveBroker = exchange === 'psx' ? setPsxBroker : setQseBroker;
   return (
-    <div className="chip-tabs mb-sm">
+    <div>
+      <div className="chip-tabs mb-sm">
       <button type="button" className={`chip${exchange === 'qse' ? ' active' : ''}`} onClick={() => { beginNavigation('/qse'); navigate('/qse'); }}>
         QSE
       </button>
       <button type="button" className={`chip${exchange === 'psx' ? ' active' : ''}`} onClick={() => { beginNavigation('/psx'); navigate('/psx'); }}>
         PSX
       </button>
+      </div>
+      <label className="sidebar-broker-switch" style={{ display: 'grid', gap: 4, marginBottom: 12, fontSize: 12, color: 'var(--muted)' }}>
+        <span>Active broker</span>
+        <select
+          aria-label="Active broker profile"
+          value={workbook.activeBrokerId ?? ''}
+          onChange={(event) => setActiveBroker(event.target.value)}
+          style={{ width: '100%', minWidth: 0, padding: '7px 8px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }}
+        >
+          {(workbook.brokerProfiles ?? []).filter((p) => !p.archived).map((profile) => (
+            <option key={profile.id} value={profile.id}>{profile.name}{profile.accountLabel ? ` · ${profile.accountLabel}` : ''}</option>
+          ))}
+        </select>
+      </label>
     </div>
   );
 }

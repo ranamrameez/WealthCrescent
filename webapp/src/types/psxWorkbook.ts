@@ -1,7 +1,9 @@
-import type { Adjustment, Appearance, Dividend, PricePoint, Transaction, TradePlan, Transfer, WatchlistItem } from './workbook';
+import type { Adjustment, Appearance, BrokerProfile, Dividend, PricePoint, Transaction, TradePlan, Transfer, WatchlistItem } from './workbook';
 
 export interface PSXSettings {
   feePct: number;
+  /** Broker-specific same-day buy/sell commission policy. Unknown broker rules must not inherit Zindigi netting. */
+  sameDayNettingRule?: 'higherValueSide' | 'none';
   lowPriceThreshold: number;
   lowPriceFee: number;
   sstPct: number;
@@ -87,6 +89,8 @@ export interface PSXSettings {
 
 export interface PSXWorkbook {
   settings: PSXSettings;
+  brokerProfiles: BrokerProfile<PSXSettings>[];
+  activeBrokerId: string;
   /** @deprecated appearance is now a global preference, not per-exchange —
    * kept optional here only so old exported/synced JSON still parses. */
   appearance?: Appearance;
