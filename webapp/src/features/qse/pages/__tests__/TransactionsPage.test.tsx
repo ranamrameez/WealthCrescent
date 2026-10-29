@@ -162,3 +162,24 @@ it('saves a trade from the shared FAB form and signals the modal to close only a
   });
   expect(onSaved).toHaveBeenCalledTimes(1);
 });
+
+it('keeps the entered trade open for retry when the store save throws', async () => {
+  const onSaved = vi.fn();
+  const originalAddTransactions = useWorkbookStore.getState().addTransactions;
+  useWorkbookStore.setState({
+    addTransactions: (() => { throw new Error('simulated store failure'); }) as typeof originalAddTransactions,
+  });
+  try {
+    render(<MemoryRouter><TransactionRows onSaved={onSaved} /></MemoryRouter>);
+    fireEvent.change(screen.getByPlaceholderText('Ticker'), { target: { value: 'QNBK' } });
+    fireEvent.change(screen.getByPlaceholderText('Shares'), { target: { value: '5' } });
+    fireEvent.change(screen.getByPlaceholderText('Price'), { target: { value: '12.5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save transaction' }));
+    await waitFor(() => expect(screen.getByPlaceholderText('Ticker')).toHaveValue('QNBK'));
+    expect(screen.getByPlaceholderText('Shares')).toHaveValue(5);
+    expect(screen.getByPlaceholderText('Price')).toHaveValue(12.5);
+    expect(onSaved).not.toHaveBeenCalled();
+  } finally {
+    useWorkbookStore.setState({ addTransactions: originalAddTransactions });
+  }
+});
