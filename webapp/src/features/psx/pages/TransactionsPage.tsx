@@ -671,9 +671,9 @@ function TransactionList() {
         {renderTable(closedGroups, 'No transactions for a fully closed position yet.')}
       </details>
 
+      {(workbook.settings.costBasisMethod === 'fifo' || workbook.settings.costBasisMethod === 'lowestCostFirst') ? <>
       <p className="text-muted mb-sm mt-md">
         Lot attribution follows the configured cost-basis method: {ctMatchOrder === 'lowestCostFirst' ? 'Lowest cost first' : 'FIFO'}.
-        Change it in the exchange settings to recalculate these reports consistently with the portfolio.
       </p>
 
       <details open>
@@ -765,6 +765,9 @@ function TransactionList() {
           </table>
         </div>
       </details>
+      </> : <p className="text-muted mb-sm mt-md">
+        Average cost blends all buys into one running cost basis, so individual open/closed lot attribution is not applicable. The transaction rows and portfolio calculations use weighted-average cost.
+      </p>}
 
       {detailTx && (
         <RecordDetailModal
