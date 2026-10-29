@@ -48,3 +48,12 @@ Source inspection and commits were performed through the repository connector. A
 **Financial/data calculation audit and fix pass complete for the reviewed application surface.**
 
 All fixes are on `chatgpt-audit-20260916-v2`. No PR was opened and no merge was performed.
+
+
+## Broker-profile implementation audit — 2026-10-29 (in progress)
+
+- Added broker-owned transaction, transfer, adjustment, dividend, and trade-plan data with profile-specific settings. The store snapshots the active profile before each mutation and restores that profile on switch; profile histories are persisted inside the existing exchange workbook/cloud path, so this does not introduce a second cloud path.
+- Legacy QSE data migrates to **The Group**; legacy PSX data migrates to **JS Zindagi**. No trade fields are intentionally recalculated by migration. Active profile settings are seeded from the legacy workbook settings to preserve existing fee/cost-basis behavior.
+- Initial PSX profiles: JS Zindagi uses the existing settings calibrated against the user's historical JS statement; AL Habib Capital Markets is prefilled from its published account-opening commission schedule (PKR 0.03/share up to PKR 20, 0.15% above PKR 20.01). Other levies require contract-note reconciliation.
+- Added broker management route, profile selector in top bar and side menu, and regression tests for broker switching, legacy migration, and commission defaults.
+- **Still required before merge:** run focused tests and full build/type-check; verify QSE/PSX profile CRUD and active profile switch in browser; inspect all direct store mutations/import/export paths and ensure no profile history leaks; validate Firebase round-trip with empty profile arrays and old cloud documents; verify the full fee model against current broker contract notes. Do not merge until these checks pass.
