@@ -378,6 +378,8 @@ export interface BrokerProfile<TSettings> {
   accountLabel?: string;
   /** Fee/cost-basis settings are profile-specific, not exchange-global. */
   settings: TSettings;
+  /** Application-default version last acknowledged by this user. Missing means a legacy profile. */
+  settingsDefaultsVersion?: number;
   /** Independent account history. Market prices/watchlists remain exchange-wide. */
   data?: BrokerPortfolioData;
   /** Inactive profiles remain in the workbook so their historical trades are preserved. */

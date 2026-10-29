@@ -335,6 +335,9 @@ mistype a ticker, remove it and re-add it correctly.
 
 ### Broker profiles
 
+Application defaults are versioned by the app. If a later app release updates a default and this profile still differs from it, the page offers **Use app defaults** or **Keep my settings**. The app never silently replaces a custom broker fee schedule. Applying defaults changes that profile's settings only; transaction and portfolio history are preserved.
+
+
 Use the **Broker** selector in the stock top bar or the stock-exchange side menu to switch the active account. Open **Brokers** in the exchange's side menu to add a profile, edit its name/account label, or archive it. A profile owns its own trades, transfers, adjustments, dividends, trade plans, and fee/cost-basis settings. Switching profiles loads that account's history; it does not transfer trades between accounts. Profiles with history are archived rather than permanently deleted; empty profiles can be deleted.
 
 - **QSE** starts with **The Group**.

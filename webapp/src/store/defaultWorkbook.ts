@@ -1,4 +1,5 @@
 import type { Workbook } from '../types/workbook';
+import { APP_DEFAULTS_VERSION } from './appDefaults';
 
 export const DEFAULT_SETTINGS: Workbook['settings'] = {
   feePct: 0.275,
@@ -17,7 +18,7 @@ export const DEFAULT_SETTINGS: Workbook['settings'] = {
 export function createEmptyWorkbook(): Workbook {
   return {
     settings: { ...DEFAULT_SETTINGS },
-    brokerProfiles: [{ id: 'qse-the-group', name: 'The Group', settings: { ...DEFAULT_SETTINGS } }],
+    brokerProfiles: [{ id: 'qse-the-group', name: 'The Group', settings: { ...DEFAULT_SETTINGS }, settingsDefaultsVersion: APP_DEFAULTS_VERSION }],
     activeBrokerId: 'qse-the-group',
     transactions: [],
     transfers: [],

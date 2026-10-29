@@ -1,4 +1,5 @@
 import type { PSXSettings, PSXWorkbook } from '../types/psxWorkbook';
+import { APP_DEFAULTS_VERSION } from './appDefaults';
 
 export const DEFAULT_PSX_SETTINGS: PSXSettings = {
   feePct: 0.20,
@@ -71,10 +72,11 @@ export function createEmptyPSXWorkbook(): PSXWorkbook {
   return {
     settings: { ...DEFAULT_PSX_SETTINGS },
     brokerProfiles: [
-      { id: JS_ZINDIGI_PROFILE_ID, name: 'JS Zindagi', settings: { ...DEFAULT_PSX_SETTINGS } },
+      { id: JS_ZINDIGI_PROFILE_ID, name: 'JS Zindagi', settings: { ...DEFAULT_PSX_SETTINGS }, settingsDefaultsVersion: APP_DEFAULTS_VERSION },
       {
         id: AL_HABIB_PROFILE_ID,
         name: 'AL Habib Capital Markets',
+        settingsDefaultsVersion: APP_DEFAULTS_VERSION,
         settings: {
           ...DEFAULT_PSX_SETTINGS,
           // Published AHCML account-opening tariff: PKR 0.03/share up to
