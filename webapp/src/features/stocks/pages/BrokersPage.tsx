@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { BackButton } from '../../../components/BackButton';
-import { Card } from '../../../components/Card';
 import { PageHeading } from '../../../components/PageHeading';
+import { StandardPageSections, type StandardPageSection } from '../../../components/StandardPageSections';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { toast } from '../../../components/Toast';
-import { Field, TextInput } from '../../../components/ui/Field';
+import { Field, TextInput, Select } from '../../../components/ui/Field';
 import type { BrokerPortfolioData, BrokerProfile, QSESettings } from '../../../types/workbook';
 import type { PSXSettings } from '../../../types/psxWorkbook';
 import { useWorkbookStore } from '../../../store/workbookStore';
@@ -15,11 +15,7 @@ import { DEFAULT_SETTINGS } from '../../../store/defaultWorkbook';
 import { APP_DEFAULTS_VERSION } from '../../../store/appDefaults';
 
 const emptyPortfolio = (): BrokerPortfolioData => ({
-  transactions: [],
-  transfers: [],
-  adjustments: [],
-  dividends: [],
-  tradePlans: [],
+  transactions: [], transfers: [], adjustments: [], dividends: [], tradePlans: [],
 });
 
 type BrokerDraft = { name: string; accountLabel: string };
@@ -44,17 +40,11 @@ export function BrokersPage() {
   const rowCounts = useMemo(() => {
     const result: Record<string, number> = {};
     for (const profile of profiles) {
-      const rawData: Partial<BrokerPortfolioData> = profile.id === activeId
+      const raw: Partial<BrokerPortfolioData> = profile.id === activeId
         ? { transactions: workbook.transactions, transfers: workbook.transfers, adjustments: workbook.adjustments, dividends: workbook.dividends, tradePlans: workbook.tradePlans }
         : profile.data ?? {};
-      const data = {
-        transactions: rawData.transactions ?? [],
-        transfers: rawData.transfers ?? [],
-        adjustments: rawData.adjustments ?? [],
-        dividends: rawData.dividends ?? [],
-        tradePlans: rawData.tradePlans ?? [],
-      };
-      result[profile.id] = data.transactions.length + data.transfers.length + data.adjustments.length + data.dividends.length + data.tradePlans.length;
+      result[profile.id] = (raw.transactions?.length ?? 0) + (raw.transfers?.length ?? 0)
+        + (raw.adjustments?.length ?? 0) + (raw.dividends?.length ?? 0) + (raw.tradePlans?.length ?? 0);
     }
     return result;
   }, [profiles, activeId, workbook]);
@@ -64,15 +54,39 @@ export function BrokersPage() {
     else setQseWorkbook({ ...qse, brokerProfiles: nextProfiles as BrokerProfile<QSESettings>[] });
   };
 
+  const updateProfileSettings = (profileId: string, patch: Partial<QSESettings> | Partial<PSXSettings>) => {
+    if (isPSX) {
+      const profile = psx.brokerProfiles.find((p) => p.id === profileId);
+      if (!profile) return;
+      const settings = { ...profile.settings, ...patch } as PSXSettings;
+      setPsxWorkbook({
+        ...psx,
+        settings: profileId === activeId ? settings : psx.settings,
+        brokerProfiles: psx.brokerProfiles.map((p) => p.id === profileId ? { ...p, settings } : p),
+      });
+    } else {
+      const profile = qse.brokerProfiles.find((p) => p.id === profileId);
+      if (!profile) return;
+      const settings = { ...profile.settings, ...patch } as QSESettings;
+      setQseWorkbook({
+        ...qse,
+        settings: profileId === activeId ? settings : qse.settings,
+        brokerProfiles: qse.brokerProfiles.map((p) => p.id === profileId ? { ...p, settings } : p),
+      });
+    }
+  };
+
+  const updateStatus = (profileId: string, status: 'active' | 'archived' | 'deactivated') => {
+    saveProfileList(profiles.map((p) => p.id === profileId
+      ? { ...p, archived: status === 'archived', deactivated: status === 'deactivated' }
+      : p));
+  };
+
   const addProfile = () => {
     const name = newName.trim();
-    if (!name) {
-      toast('Enter a broker or account profile name.');
-      return;
-    }
+    if (!name) return toast('Enter a broker or account profile name.');
     if (profiles.some((p) => p.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase())) {
-      toast('A profile with that name already exists for this exchange.');
-      return;
+      return toast('A profile with that name already exists for this exchange.');
     }
     const id = `${isPSX ? 'psx' : 'qse'}-${crypto.randomUUID()}`;
     if (isPSX) {
@@ -90,20 +104,16 @@ export function BrokersPage() {
     }
     setNewName('');
     setNewAccountLabel('');
-    toast(`${name} profile created. Select it to begin a separate portfolio.`);
+    toast(`${name} profile created.`);
   };
 
   const saveDraft = (profileId: string) => {
     const draft = drafts[profileId];
     if (!draft) return;
     const name = draft.name.trim();
-    if (!name) {
-      toast('Profile name cannot be empty.');
-      return;
-    }
+    if (!name) return toast('Profile name cannot be empty.');
     if (profiles.some((p) => p.id !== profileId && p.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase())) {
-      toast('Another profile already uses that name.');
-      return;
+      return toast('Another profile already uses that name.');
     }
     saveProfileList(profiles.map((p) => p.id === profileId
       ? { ...p, name, accountLabel: draft.accountLabel.trim() || undefined }
@@ -115,38 +125,30 @@ export function BrokersPage() {
   const switchProfile = (profileId: string) => {
     if (isPSX) setPsxActiveBroker(profileId);
     else setQseActiveBroker(profileId);
-    toast('Active broker profile switched. Its portfolio and fee settings are now active.');
+    toast('Active broker profile switched. Exchange market data remains shared.');
     navigate(isPSX ? '/psx' : '/qse');
   };
 
   const archiveOrDelete = async (profile: (typeof profiles)[number]) => {
-    if (profile.id === activeId) {
-      toast('Switch to another broker before archiving the active profile.');
-      return;
-    }
+    if (profile.id === activeId) return toast('Switch to another broker before changing the active profile status.');
     const count = rowCounts[profile.id] ?? 0;
     if (count > 0) {
       const ok = await confirmDialog(
-        'This profile contains historical records. Archiving hides it from the active broker switcher but preserves its portfolio and history.',
+        'Archived profiles are preserved for history and are view-only. They are excluded from new-activity pickers.',
         `Archive ${profile.name}?`,
       );
       if (!ok) return;
-      saveProfileList(profiles.map((p) => p.id === profile.id ? { ...p, archived: true } : p));
-      toast('Profile archived; its data is preserved.');
+      updateStatus(profile.id, 'archived');
+      toast('Profile archived; its portfolio and history are preserved.');
       return;
     }
     const ok = await confirmDialog(
-      'This profile has no recorded transactions, transfers, adjustments, dividends, or plans. This action cannot be undone.',
+      'This profile has no transactions, transfers, adjustments, dividends, or plans. This action cannot be undone.',
       `Delete empty profile ${profile.name}?`,
     );
     if (!ok) return;
     saveProfileList(profiles.filter((p) => p.id !== profile.id));
     toast('Empty broker profile deleted.');
-  };
-
-  const restoreProfile = (profileId: string) => {
-    saveProfileList(profiles.map((p) => p.id === profileId ? { ...p, archived: false } : p));
-    toast('Profile restored.');
   };
 
   const defaultsForProfile = (name: string): QSESettings | PSXSettings =>
@@ -164,131 +166,147 @@ export function BrokersPage() {
     if (!profile) return;
     const settings = adoptDefaults ? defaultsForProfile(profile.name) : profile.settings;
     if (isPSX) {
-      const nextProfiles = psx.brokerProfiles.map((p) => p.id === profileId
-        ? { ...p, settings: settings as PSXSettings, settingsDefaultsVersion: APP_DEFAULTS_VERSION }
-        : p);
       setPsxWorkbook({
         ...psx,
-        brokerProfiles: nextProfiles,
+        brokerProfiles: psx.brokerProfiles.map((p) => p.id === profileId
+          ? { ...p, settings: settings as PSXSettings, settingsDefaultsVersion: APP_DEFAULTS_VERSION }
+          : p),
         ...(profileId === activeId ? { settings: settings as PSXSettings } : {}),
       });
     } else {
-      const nextProfiles = qse.brokerProfiles.map((p) => p.id === profileId
-        ? { ...p, settings: settings as QSESettings, settingsDefaultsVersion: APP_DEFAULTS_VERSION }
-        : p);
       setQseWorkbook({
         ...qse,
-        brokerProfiles: nextProfiles,
+        brokerProfiles: qse.brokerProfiles.map((p) => p.id === profileId
+          ? { ...p, settings: settings as QSESettings, settingsDefaultsVersion: APP_DEFAULTS_VERSION }
+          : p),
         ...(profileId === activeId ? { settings: settings as QSESettings } : {}),
       });
     }
-    toast(adoptDefaults ? 'Current application defaults applied to this broker profile.' : 'Your current broker settings have been kept.');
+    toast(adoptDefaults ? 'Current application defaults applied to this broker profile.' : 'Your current settings have been kept.');
   };
 
-  return (
-    <div className="page-stack">
-      <PageHeading back={<BackButton to={isPSX ? '/psx' : '/qse'}>← {isPSX ? 'PSX' : 'QSE'}</BackButton>}>
-        <h1 className="pagetitle">Broker profiles</h1>
-        <p className="text-muted" style={{ marginTop: 4 }}>
-          {isPSX
-            ? 'Manage separate PSX accounts, commission schedules, and portfolio histories.'
-            : 'Manage separate QSE broker/account profiles and their portfolio histories.'}
-        </p>
-      </PageHeading>
+  const renderProfile = (profile: (typeof profiles)[number], status: 'active' | 'archived' | 'deactivated') => {
+    const draft = drafts[profile.id] ?? { name: profile.name, accountLabel: profile.accountLabel ?? '' };
+    const active = profile.id === activeId;
+    const count = rowCounts[profile.id] ?? 0;
+    const reviewDefaults = needsDefaultsReview(profile);
+    const ps = profile.settings as PSXSettings;
+    const qs = profile.settings as QSESettings;
+    const settingField = (label: string, key: keyof PSXSettings, value: number, step = '0.01') => (
+      <Field label={label} width={150} key={String(key)}>
+        <TextInput type="number" step={step} value={value} disabled={status !== 'active' || profile.archived} onChange={(e) => updateProfileSettings(profile.id, { [key]: Number(e.target.value) } as Partial<PSXSettings>)} />
+      </Field>
+    );
+    return (
+      <div key={profile.id} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 14, marginBottom: 12 }}>
+        {reviewDefaults && (
+          <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 10, marginBottom: 12 }}>
+            <strong>Application defaults have changed</strong>
+            <p className="text-muted" style={{ margin: '6px 0 10px' }}>Choose whether to apply the latest app defaults or keep this profile's custom settings.</p>
+            <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn primary" type="button" onClick={() => void (async () => {
+                const ok = await confirmDialog('Replace this profile settings with current application defaults? Portfolio history will be preserved.', 'Apply application defaults?');
+                if (ok) acknowledgeDefaults(profile.id, true);
+              })()}>Use app defaults</button>
+              <button className="btn secondary" type="button" onClick={() => acknowledgeDefaults(profile.id, false)}>Keep my settings</button>
+            </div>
+          </div>
+        )}
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div>
+            <h3 className="mt-0 mb-xs">{profile.name}</h3>
+            <p className="text-muted" style={{ margin: 0 }}>{active ? 'Active profile' : status === 'archived' ? 'Archived · view only' : status === 'deactivated' ? 'Deactivated · hidden from normal lists' : 'Available'} · {count} saved record(s)</p>
+            {profile.accountLabel && <small className="text-muted">{profile.accountLabel}</small>}
+          </div>
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            {active && <span className="pill pill-positive">Active</span>}
+            {!active && status === 'active' && <button className="btn primary" type="button" onClick={() => switchProfile(profile.id)}>Switch to profile</button>}
+            {status === 'archived' && <button className="btn secondary" type="button" onClick={() => updateStatus(profile.id, 'active')}>Restore as active</button>}
+            {status === 'deactivated' && <button className="btn secondary" type="button" onClick={() => updateStatus(profile.id, 'active')}>Reactivate</button>}
+          </div>
+        </div>
 
-      <Card>
-        <h3 className="mt-0">Add broker profile</h3>
-        <p className="text-muted">Each profile has its own transactions, cash movements, dividends, trade plans, cost basis, and fee settings. Market prices remain shared for the exchange.</p>
+        <div className="row" style={{ gap: 12, alignItems: 'end', flexWrap: 'wrap', marginTop: 14 }}>
+          <Field label="Profile name" width={240}>
+            <TextInput value={draft.name} disabled={status !== 'active'} onChange={(e) => setDrafts((prev) => ({ ...prev, [profile.id]: { ...draft, name: e.target.value } }))} />
+          </Field>
+          <Field label="Account label" width={220}>
+            <TextInput value={draft.accountLabel} disabled={status !== 'active'} onChange={(e) => setDrafts((prev) => ({ ...prev, [profile.id]: { ...draft, accountLabel: e.target.value } }))} placeholder="Optional" />
+          </Field>
+          {status === 'active' && <button type="button" className="btn secondary" onClick={() => saveDraft(profile.id)}>Save details</button>}
+          {!active && status === 'active' && <button type="button" className="btn secondary" onClick={() => void (async () => {
+            const ok = await confirmDialog('This profile remains available in the profile list but is hidden from normal activity pickers. You can reactivate it later.', `Deactivate ${profile.name}?`);
+            if (ok) { updateStatus(profile.id, 'deactivated'); toast('Profile deactivated.'); }
+          })()}>Deactivate</button>}
+          {!active && status === 'active' && <button type="button" className="btn danger" onClick={() => void archiveOrDelete(profile)}>{count ? 'Archive profile' : 'Delete empty profile'}</button>}
+        </div>
+
+        <details style={{ marginTop: 14 }} open={active}>
+          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Profile settings</summary>
+          <div className="row" style={{ gap: 12, alignItems: 'end', flexWrap: 'wrap', paddingTop: 12 }}>
+            {isPSX ? <>
+              <Field label="Fee mode" width={190}><Select value={ps.feeMode ?? 'itemized'} disabled={status !== 'active' || profile.archived} onChange={(e) => updateProfileSettings(profile.id, { feeMode: e.target.value as PSXSettings['feeMode'] })}><option value="itemized">Itemized</option><option value="simple">Simple all-in</option></Select></Field>
+              {settingField('Commission %', 'feePct', ps.feePct, '0.001')}
+              {settingField('Low-price threshold', 'lowPriceThreshold', ps.lowPriceThreshold)}
+              {settingField('Low-price fee / share', 'lowPriceFee', ps.lowPriceFee)}
+              {settingField('SST %', 'sstPct', ps.sstPct)}
+              {settingField('PSX fee %', 'psxFeePct', ps.psxFeePct, '0.0001')}
+              {settingField('NCCPL fee %', 'nccplFeePct', ps.nccplFeePct, '0.0001')}
+              {settingField('SECP levy %', 'secpLevyPct', ps.secpLevyPct, '0.0001')}
+              {settingField('CDC / share', 'cdcPerShare', ps.cdcPerShare, '0.0001')}
+              {settingField('CVT %', 'cvtPct', ps.cvtPct, '0.0001')}
+              {settingField('Min fee', 'minFee', ps.minFee)}
+              {settingField('Deposit fee', 'depositFee', ps.depositFee)}
+              {settingField('All-in fee %', 'allInFeePct', ps.allInFeePct ?? 0, '0.001')}
+              <Field label="Same-day rule" width={200}><Select value={ps.sameDayNettingRule ?? 'none'} disabled={status !== 'active' || profile.archived} onChange={(e) => updateProfileSettings(profile.id, { sameDayNettingRule: e.target.value as PSXSettings['sameDayNettingRule'] })}><option value="none">Charge separately</option><option value="higherValueSide">Higher-value side only</option></Select></Field>
+              <Field label="Cost basis" width={190}><Select value={ps.costBasisMethod} disabled={status !== 'active' || profile.archived} onChange={(e) => updateProfileSettings(profile.id, { costBasisMethod: e.target.value as PSXSettings['costBasisMethod'] })}><option value="average">Average</option><option value="fifo">FIFO</option><option value="lowestCostFirst">Lowest cost first</option></Select></Field>
+              <Field label="Filer status" width={140}><Select value={ps.filerStatus} disabled={status !== 'active' || profile.archived} onChange={(e) => updateProfileSettings(profile.id, { filerStatus: e.target.value as PSXSettings['filerStatus'] })}><option value="filer">Filer</option><option value="nonfiler">Non-filer</option></Select></Field>
+              {settingField('Filer CGT %', 'cgtFilerPct', ps.cgtFilerPct, '0.1')}
+              {settingField('Non-filer CGT %', 'cgtNonFilerPct', ps.cgtNonFilerPct, '0.1')}
+              {settingField('Tick size', 'tick', ps.tick)}
+            </> : <>
+              <p className="text-muted" style={{ width: '100%', margin: 0 }}>All settings below belong only to this QSE broker profile.</p>
+              <Field label="Commission %" width={150}><TextInput type="number" step="0.001" value={qs.feePct} disabled={status !== 'active'} onChange={(e) => updateProfileSettings(profile.id, { feePct: Number(e.target.value) })} /></Field>
+              <Field label="Minimum fee" width={150}><TextInput type="number" step="0.01" value={qs.minFee} disabled={status !== 'active'} onChange={(e) => updateProfileSettings(profile.id, { minFee: Number(e.target.value) })} /></Field>
+              <Field label="Tick size" width={150}><TextInput type="number" step="0.01" value={qs.tick} disabled={status !== 'active'} onChange={(e) => updateProfileSettings(profile.id, { tick: Number(e.target.value) })} /></Field>
+              <Field label="Currency" width={120}><TextInput value={qs.currency} disabled={status !== 'active'} onChange={(e) => updateProfileSettings(profile.id, { currency: e.target.value })} /></Field>
+              <Field label="Deposit fee" width={150}><TextInput type="number" step="0.01" value={qs.depositFee} disabled={status !== 'active'} onChange={(e) => updateProfileSettings(profile.id, { depositFee: Number(e.target.value) })} /></Field>
+              <Field label="Cost basis" width={190}><Select value={qs.costBasisMethod ?? 'average'} disabled={status !== 'active'} onChange={(e) => updateProfileSettings(profile.id, { costBasisMethod: e.target.value as QSESettings['costBasisMethod'] })}><option value="average">Average</option><option value="fifo">FIFO</option><option value="lowestCostFirst">Lowest cost first</option></Select></Field>
+            </>}
+          </div>
+        </details>
+      </div>
+    );
+  };
+
+  const activeProfiles = profiles.filter((p) => !p.archived && !p.deactivated);
+  const archivedProfiles = profiles.filter((p) => p.archived);
+  const deactivatedProfiles = profiles.filter((p) => p.deactivated);
+  const sections: StandardPageSection[] = [
+    {
+      key: 'add-profile', label: 'Add broker profile', defaultOpen: true,
+      content: <div>
+        <p className="text-muted mt-0">Each profile owns its trades, transfers, rewards/dividends, adjustments, plans, calculations, accounting indexes and fee settings. Market prices and price history remain shared at exchange level.</p>
         <div className="row" style={{ gap: 12, alignItems: 'end', flexWrap: 'wrap' }}>
-          <Field label="Broker / profile name" width={260}>
-            <TextInput value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={isPSX ? 'e.g. Another PSX broker' : 'e.g. The Group'} />
-          </Field>
-          <Field label="Account label (optional)" width={220}>
-            <TextInput value={newAccountLabel} onChange={(e) => setNewAccountLabel(e.target.value)} placeholder="e.g. Cash account · 1234" />
-          </Field>
+          <Field label="Broker / profile name" width={260}><TextInput value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={isPSX ? 'e.g. Another PSX broker' : 'e.g. The Group'} /></Field>
+          <Field label="Account label (optional)" width={220}><TextInput value={newAccountLabel} onChange={(e) => setNewAccountLabel(e.target.value)} placeholder="e.g. Cash account · 1234" /></Field>
           <button type="button" className="btn primary" onClick={addProfile}>Add profile</button>
         </div>
-        <p className="text-muted" style={{ margin: '10px 0 0' }}>
-          New profiles start from application defaults for the named broker, rather than inheriting another active broker's fee schedule. Review the fee settings before relying on P/L or break-even estimates.
-        </p>
-      </Card>
+      </div>,
+    },
+    { key: 'active-profiles', label: 'Active profiles', summary: <span>{activeProfiles.length} profile(s) · available for normal activity</span>, content: <>{activeProfiles.map((p) => renderProfile(p, 'active'))}</> },
+    { key: 'archived-profiles', label: 'Archived profiles', summary: <span>{archivedProfiles.length} profile(s) · view only</span>, content: archivedProfiles.length ? <>{archivedProfiles.map((p) => renderProfile(p, 'archived'))}</> : <p className="text-muted">No archived profiles.</p> },
+    { key: 'deactivated-profiles', label: 'Deactivated profiles', summary: <span>{deactivatedProfiles.length} profile(s) · hidden from normal lists</span>, content: deactivatedProfiles.length ? <>{deactivatedProfiles.map((p) => renderProfile(p, 'deactivated'))}</> : <p className="text-muted">No deactivated profiles.</p> },
+  ];
 
-      <div className="page-stack">
-        {profiles.map((profile) => {
-          const draft = drafts[profile.id] ?? { name: profile.name, accountLabel: profile.accountLabel ?? '' };
-          const active = profile.id === activeId;
-          const count = rowCounts[profile.id] ?? 0;
-          const reviewDefaults = needsDefaultsReview(profile);
-          return (
-            <Card key={profile.id}>
-              {reviewDefaults && (
-                <div style={{ padding: 12, marginBottom: 12, border: '1px solid var(--border)', borderRadius: 8 }}>
-                  <strong>Application defaults have changed</strong>
-                  <p className="text-muted" style={{ margin: '6px 0 10px' }}>
-                    This profile's fee/settings values differ from the current application defaults. Choose whether to adopt the latest defaults or keep your custom values. Nothing changes until you choose.
-                  </p>
-                  <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-                    <button type="button" className="btn primary" onClick={() => void (async () => {
-                      const ok = await confirmDialog(
-                        'Replace this broker profile’s settings with the current application defaults? Your transactions and other portfolio history will be preserved.',
-                        'Apply application defaults?',
-                      );
-                      if (ok) acknowledgeDefaults(profile.id, true);
-                    })()}>Use app defaults</button>
-                    <button type="button" className="btn secondary" onClick={() => acknowledgeDefaults(profile.id, false)}>Keep my settings</button>
-                  </div>
-                </div>
-              )}
-              <div className="row" style={{ alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                <div>
-                  <h3 className="mt-0 mb-xs">{profile.name}</h3>
-                  <p className="text-muted" style={{ margin: 0 }}>
-                    {active ? 'Active profile' : profile.archived ? 'Archived' : 'Inactive'} · {count} saved record(s)
-                  </p>
-                </div>
-                <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-                  {active && <span className="pill pill-positive">Active</span>}
-                  {!active && !profile.archived && <button type="button" className="btn primary" onClick={() => switchProfile(profile.id)}>Switch to profile</button>}
-                  {profile.archived && <button type="button" className="btn secondary" onClick={() => restoreProfile(profile.id)}>Restore</button>}
-                </div>
-              </div>
-              <div className="row" style={{ gap: 12, alignItems: 'end', flexWrap: 'wrap', marginTop: 14 }}>
-                <Field label="Profile name" width={260}>
-                  <TextInput value={draft.name} onChange={(e) => setDrafts((prev) => ({ ...prev, [profile.id]: { ...draft, name: e.target.value } }))} />
-                </Field>
-                <Field label="Account label" width={220}>
-                  <TextInput value={draft.accountLabel} onChange={(e) => setDrafts((prev) => ({ ...prev, [profile.id]: { ...draft, accountLabel: e.target.value } }))} placeholder="Optional" />
-                </Field>
-                <button type="button" className="btn secondary" onClick={() => saveDraft(profile.id)}>Save details</button>
-                {!active && !profile.archived && <button type="button" className="btn danger" onClick={() => void archiveOrDelete(profile)}>{count > 0 ? 'Archive profile' : 'Delete profile'}</button>}
-              </div>
-              <div className="row" style={{ gap: 8, marginTop: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span className="text-muted">Fee schedule:</span>
-                <strong>{isPSX
-                  ? (profile.settings as PSXSettings).feeMode === 'simple'
-                    ? `Simple all-in ${(profile.settings as PSXSettings).allInFeePct ?? 0}%`
-                    : `${profile.settings.feePct}% above PKR ${(profile.settings as PSXSettings).lowPriceThreshold}; PKR ${(profile.settings as PSXSettings).lowPriceFee}/share at or below threshold`
-                  : `${profile.settings.feePct}% commission`}</strong>
-                {isPSX && (
-                  <span className="text-muted">
-                    {(profile.settings as PSXSettings).sameDayNettingRule === 'none'
-                      ? 'Same-day trades: charged separately'
-                      : 'Same-day trades: higher-value side pays commission'}
-                  </span>
-                )}
-                {active && <button type="button" className="btn secondary" onClick={() => navigate(isPSX ? '/psx/settings' : '/settings')}>Configure fees</button>}
-              </div>
-            </Card>
-          );
-        })}
-      </div>
-      {isPSX && (
-        <Card>
-          <h3 className="mt-0">PSX commission sources</h3>
-          <p className="text-muted">JS Zindagi's published stock page states PKR 0.05/share for shares priced up to PKR 25, or 0.20% of traded value above PKR 25, with only the higher-value side charged for same-day buy/sell pairs. AL Habib Capital Markets' published account-opening tariff lists PKR 0.03/share up to PKR 20 and 0.15% above PKR 20.01. Other levies are configurable and should be reconciled with your own contract notes.</p>
-          <p><a href="https://zindigi.pk/features/stocks/" target="_blank" rel="noreferrer">JS Zindagi stock charges</a> · <a href="https://ahcml.com/assets/uploads/Normal_AOF.pdf" target="_blank" rel="noreferrer">AL Habib Capital Markets account-opening tariff (PDF)</a></p>
-        </Card>
-      )}
+  return (
+    <div className="standard-page">
+      <PageHeading back={<BackButton to={isPSX ? '/psx' : '/qse'}>← {isPSX ? 'PSX' : 'QSE'}</BackButton>}>
+        <h1 className="pagetitle">Broker profiles</h1>
+        <p className="text-muted" style={{ marginTop: 4 }}>{isPSX ? 'Manage separate PSX accounts and broker-specific portfolio histories.' : 'Manage separate QSE broker/account profiles and portfolio histories.'}</p>
+      </PageHeading>
+      <StandardPageSections sections={sections} defaultKey="active-profiles" preserveOrder />
+      {isPSX && <p className="text-muted">Market prices, price history and exchange-wide information are shared across all PSX broker profiles. Historical trades already in the legacy PSX workbook are assigned to JS Zindagi without changing their trade fields.</p>}
     </div>
   );
 }
