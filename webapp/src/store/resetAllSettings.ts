@@ -11,7 +11,6 @@ import { DEFAULT_PLANNED_BANK_SETTINGS } from './defaultPlannedBankWorkbook';
 import { DEFAULT_PLANNED_CASH_SETTINGS } from './defaultPlannedCashWorkbook';
 import { DEFAULT_PLANNED_CREDIT_CARD_SETTINGS } from './defaultPlannedCreditCardWorkbook';
 import { DEFAULT_RENTAL_SETTINGS } from './defaultRentalsWorkbook';
-import { DEFAULT_PLANNED_RENTALS_SETTINGS } from './defaultPlannedRentalsWorkbook';
 import { DEFAULT_SUBSCRIPTIONS_SETTINGS } from './defaultSubscriptionsWorkbook';
 import { DEFAULT_SETTINGS } from './defaultWorkbook';
 import { createDefaultPSXBrokerSettings, DEFAULT_PSX_SETTINGS } from './defaultPsxWorkbook';
@@ -99,7 +98,7 @@ export async function resetAllSettingsToAppDefaults(uid?: string): Promise<void>
   plannedCardStore.setWorkbook({ ...plannedCardStore.workbook, settings: { ...DEFAULT_PLANNED_CREDIT_CARD_SETTINGS } });
 
   const plannedRentalsStore = usePlannedRentalsWorkbookStore.getState();
-  plannedRentalsStore.setWorkbook({ ...plannedRentalsStore.workbook, settings: { ...DEFAULT_PLANNED_RENTALS_SETTINGS } });
+  plannedRentalsStore.setWorkbook({ ...plannedRentalsStore.workbook, settings: {} });
 
   const rentalsStore = useRentalsWorkbookStore.getState();
   const rentals = rentalsStore.workbook;
