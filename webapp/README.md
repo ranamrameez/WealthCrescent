@@ -19,6 +19,10 @@ FinanceManager live link:
 > for per-step confirmation** — both by explicit user instruction. See `USER_MANUAL.md` for
 > end-user-facing docs (kept up to date alongside this file).
 
+## Current session handoff
+
+For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) before continuing. It records the current main SHA, verified CI state, merged defaults work, and the safe porting plan for unmerged PRs #22 and #23. Refresh it after each meaningful task; do not treat its dated branch/check status as live without rechecking GitHub.
+
 ## Cost-basis worked examples (canonical — keep in sync with tests)
 
 **Why this section exists.** The user gave several real worked examples across multiple
@@ -10261,11 +10265,7 @@ from the lot system."*
 - Added version tracking for application defaults on broker profiles. When a newer app-default version is introduced, profiles with differing values offer an explicit choice to apply current defaults or keep the user's custom settings; applying defaults preserves transaction history.
 ## Pending
 
-- **Settings defaults follow-up:** build the administrator-facing editor/source-of-truth for all default settings and extend default-change versioning/suggestions beyond broker profiles. Reset-all-settings has been implemented in this branch but still needs CI and browser validation before it can be marked Done.
-
-
-- **App defaults / user overrides (in progress):** appearance can now be reset to built-in defaults; PSX broker profile creation uses broker-specific defaults and both JS Zindigi and AHL default to same-day higher-value-leg commission netting. Remaining: administrator-managed, versioned app defaults; per-user override tracking; notifying users when defaults change; reset-all-settings (including appearance) without deleting financial data; test/build and browser validation.
-
+- **App defaults / user overrides (partially implemented; 2026-10-29):** PRs #25–#27 are merged. Appearance reset and Account-page reset-all-settings restore settings/UI preferences to current built-in defaults while preserving financial records. Broker profiles carry an app-default version and users with differing settings can choose to apply the newer broker defaults or keep custom values. Remaining: decide/build a maintainable admin-facing source of truth/editor and broaden versioned default-change suggestions beyond broker profiles if required; browser/live-account verification is still outstanding. Do not describe the entire admin-managed defaults system as complete. See [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md).
 
 - **Activate PSX market cache:** merge the PSX rules fragment into existing rules, deploy
   `fetchPsxMarketData`, run the first refresh and verify the shared reference/cache paths.

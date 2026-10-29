@@ -100,6 +100,12 @@ off-canvas menu opened via the **☰ Menu** button, unaffected by this setting.
 Each exchange's pages, data, and settings are completely separate — QSE holdings don't mix
 with PSX holdings, and each has its own fee model (see §7).
 
+### Broker profiles and changing defaults
+
+Stock Exchanges supports separate broker profiles so trades and related history can be kept with the appropriate broker. QSE starts with The Group; PSX includes JS Zindigi and AL Habib Capital Markets profiles. The published fee schedules used as initial defaults may not list every levy or remain current, so compare the editable fee settings with your actual broker contract notes. When a newer broker-default version is available and your profile differs, choose whether to **apply the current defaults** or **keep your custom settings**; accepting new defaults must not delete your transaction history.
+
+Use **Reset appearance to app defaults** to restore only UI/appearance preferences. Use **Reset all settings to app defaults** on the Account page to restore settings across modules, including appearance, while retaining financial records and user-created financial entities. These are reset actions, not a way to delete your transaction history.
+
 The **✦ Appearance** button (sidebar) controls font, text size, color theme, density, light/
 dark mode, and **Number display** — choose "shortened" (large stat-card numbers show as
 "10k"/"1.23M", with the exact figure available as a hover tooltip) or "full" (every stat card

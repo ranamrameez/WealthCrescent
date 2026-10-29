@@ -43,6 +43,8 @@ app, not developer notes) continuously as features ship.
 
 **Latest user instruction (2026-10-15): Do not automatically push code. Keep changes local for review unless the user explicitly requests a commit or push. This supersedes the earlier auto-commit/push standing instruction.**
 
+**Latest session continuity (2026-10-29):** read [`webapp/SESSION_HANDOFF.md`](webapp/SESSION_HANDOFF.md) for the current main SHA, confirmed CI state, merged app-defaults scope, and exact safe plan for porting unmerged PRs #22/#23. Treat it as a dated snapshot; re-check GitHub state before acting. Continue updating `webapp/README.md` Done/Pending and `webapp/USER_MANUAL.md` with each meaningful change. The user's latest instruction allows incremental merges of independently working tasks after checks pass; it does not authorize direct pushes to `main`.
+
 ## Current status (as of 2026-08-23)
 
 Continuation update (2026-09-29): home now redirects to the cross-module Dashboard;
