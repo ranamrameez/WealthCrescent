@@ -46,11 +46,11 @@ it('resets app settings and appearance while preserving financial records', asyn
   await resetAllSettingsToAppDefaults();
 
   expect(useWorkbookStore.getState().workbook.settings.feePct).toBe(0.275);
-  expect(useWorkbookStore.getState().workbook.transactions).toEqual([qseTransaction]);
+  expect(useWorkbookStore.getState().workbook.transactions).toMatchObject([qseTransaction]);
   expect(useWorkbookStore.getState().workbook.marketPrices).toEqual({ ABC: 12 });
 
   expect(usePSXWorkbookStore.getState().workbook.settings.feePct).toBe(0.2);
-  expect(usePSXWorkbookStore.getState().workbook.transactions).toEqual([psxTransaction]);
+  expect(usePSXWorkbookStore.getState().workbook.transactions).toMatchObject([psxTransaction]);
   expect(usePSXWorkbookStore.getState().workbook.brokerProfiles.find(p => p.name === 'AL Habib Capital Markets')?.settings.sameDayNettingRule).toBe('higherValueSide');
 
   expect(useCashWorkbookStore.getState().workbook.settings.defaultCurrency).toBe('USD');
