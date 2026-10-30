@@ -137,3 +137,10 @@ PR #36 was merged into `main` as `e4aef0bcd2ccf20e2cd7c73a3fe98cc293943be8` afte
 The old broker PR #38/#39 path was stacked on the pre-squash branch and diverged from current `main`. Its broker-specific changes were ported onto a clean main-based branch for PR #41. Require fresh CI on PR #41 and retain the manual backup/export migration and browser checks as pre-merge requirements.
 
 The old Mutual Funds PR #37 was likewise based before #36 merged. Its scoped date/amount fixes were ported onto clean branch PR #40; the unrelated QSE live-price test was stabilized against the current main version. Require fresh CI on PR #40. Transfer-to-Funds cash reconciliation remains a separate design task because the current Funds model does not track uninvested cash per fund.
+
+
+## 2026-10-30 — validation results
+
+- PR #40 Mutual Funds date/amount patch merged to `main`; Actions run #104 passed full tests and production build.
+- PR #41 broker-profile isolation: clean main-based branch; Actions run #105 passed full tests and production build. Still pending manual review against a backup/export and browser verification of migration, profile switching, linked transfer add/edit/delete across active/inactive profiles, and Archived/Deactivated restrictions. CI success is not evidence that a user's real legacy data migrates correctly.
+- Funds cash-on-hand reconciliation is separately tracked in issue #42. PRs #37 and #39 are closed as superseded; PR #36 and #40 are merged.
