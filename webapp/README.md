@@ -11621,3 +11621,10 @@ Done: EMI, Funds/brokers, and Subscriptions detail sections now use the shared B
 Pending: extend batch editing to the remaining ledgers and audit their date/filter behavior independently of the section-layout migration. Stock Exchanges are excluded.
 
 PR #36 follow-up: QSE batch editor validation/reorder fixes were committed on `feat/persisted-trade-accounting-order` after the prior CI run. See audit/handoff. Fresh CI is still required.
+
+## 2026-10-30 — Current branch/CI checkpoint
+
+- PR #36 is merged to `main`; its exact source head passed Actions run #94 (full tests + production build). Mixed-event cash-ledger order remains unresolved.
+- Broker-profile isolation has been ported to a clean branch from post-#36 `main` for PR #41. The earlier PR #38/39 path was stacked/diverged; do not merge that stale main-targeted branch. Latest-head CI for #41 is required.
+- Mutual Funds effective-date/amount corrections are on clean post-#36 branch PR #40. Its CI must pass before merge. Transfer-to-Funds cash-on-hand is separate accounting work, not included.
+- Never merge based on an older successful run. Check the current PR head SHA and both Actions jobs (tests and production build).
