@@ -220,6 +220,32 @@ describe('createWorkbookStore normalize', () => {
     expect(updatedTx?.price).toBe(12);
   });
 
+  it('uses the edited effective date when re-syncing the latest market price', () => {
+    const useStore = createWorkbookStore(STORAGE_KEY, createEmptyTestWorkbook);
+    useStore.getState().setWorkbook({
+      ...createEmptyTestWorkbook(),
+      priceHistory: {
+        FUND: [
+          { date: '2026-08-01', time: '2026-08-01T09:00:00.000Z', price: 10 },
+          { date: '2026-08-02', time: '2026-08-02T09:00:00.000Z', price: 11 },
+        ],
+      },
+      marketPrices: { FUND: 11 },
+    });
+
+    // The first point is moved to a later effective date. Its original
+    // timestamp is retained as audit metadata and must not win over date.
+    useStore.getState().updatePricePoint('FUND', 0, { date: '2026-08-03' });
+    const state = useStore.getState();
+    expect(state.workbook.priceHistory.FUND[0]).toMatchObject({
+      date: '2026-08-03',
+      time: '2026-08-01T09:00:00.000Z',
+      price: 10,
+    });
+    expect(state.workbook.marketPrices.FUND).toBe(10);
+    localStorage.removeItem(STORAGE_KEY);
+  });
+
   it('updatePricePoint corrects a past entry and re-syncs marketPrices when it was the latest', () => {
     const useStore = createWorkbookStore(STORAGE_KEY, createEmptyTestWorkbook);
     useStore.getState().setWorkbook({
