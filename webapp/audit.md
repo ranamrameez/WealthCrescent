@@ -81,3 +81,29 @@ Still pending: audit Dashboard, Position Detail, analytics/time series, exports,
 - Global transactionIndex/cross-date reorder remains deferred until accounting order and the date-ordered cash ledger are reconciled and regression-tested. This is not complete and no claim is made that cross-date reorder is safe.
 - PR #23 was already closed as superseded; its unique save-failure recovery is on main via PR #30.
 - PR #32 refreshed the session handoff and corrected status records; PR #33 documented closure of the stale accounting PR and its deferred scope. Old PR branches are retained because the connected GitHub tools available here do not expose branch deletion. Retaining a recovery reference is safer than destroying potentially useful unported work; closed PRs cannot be accidentally merged through the normal open-PR workflow.
+
+## 2026-10-30 — Persisted trade accounting order (fresh branch; pending CI)
+
+Reviewed the stale PR #22 source against current main and ported the transaction-order slice to a fresh branch from main rather than merging the diverged branch. The implementation adds a global persisted `transactionIndex`, preserves existing indexes, backfills legacy records deterministically, assigns indexes to new transactions, and makes shared transaction calculations consume that order. QSE and PSX transaction lists default to accounting order and expose cross-date reorder controls. Per-ticker `seq` remains separate and is swapped when moving between two trades of the same ticker.
+
+Regression coverage now asserts that an explicitly indexed SELL can be processed after a BUY even when its recorded date is earlier. The mixed cash ledger remains date-ordered because it combines trades with transfers and adjustments that do not yet share a single global event index. Same-instant trade events use `transactionIndex` as their tie-breaker, but **cross-date trade reordering is not yet reflected as a unified mixed-event cash-ledger order**. That remaining design gap must be resolved before claiming the full ordering requirement is complete. No test/build success is claimed until CI runs.
+
+## 2026-10-30 — Canonical synchronized transaction indexes (PR #36 open)
+
+Clarification from the user: `globalTransactionIndex` and `perTickerIndex` are the only canonical transaction-order fields and must remain synchronized. Global order is the total accounting sequence across the workbook. Per-ticker order is derived from that same total sequence for each ticker. Every reorder changes the global ordering, then a shared `syncTransactionIndexes()` helper recalculates all per-ticker indexes. The old `transactionIndex` and transaction `seq` fields are compatibility mirrors only, not independent sources of truth.
+
+The store normalizes legacy records, assigns both indexes for newly added transactions and executed trade-plan legs, and re-synchronizes indexes after add/edit/delete. QSE and PSX cross-date reorder controls use the same helper. Regression coverage checks that global and per-ticker indexes plus their compatibility aliases remain aligned after a cross-ticker reorder. CI/build is still required before merge.
+
+Known separate issue: the mixed cash ledger includes transfers and adjustments, which do not have these transaction indexes, and continues to display by effective date. This PR synchronizes transaction indexes but does not define a global order shared by all mixed cash-ledger event types.
+
+### QSE batch editor regression repair (2026-10-30)
+
+The previous PR #36 CI run passed the production build but failed full tests. Investigation found two actual batch-editor defects: QSE validation treated the derived `perTickerIndex` as a required editable numeric input (breaking CSV/ledger imports and new batch rows), and `BatchEditGrid` did not count/apply hidden canonical `globalTransactionIndex` drafts created by reorder buttons (leaving Save disabled). The QSE validator now skips the derived per-ticker index, and BatchEditGrid applies hidden `orderKey` drafts as changes. The live-price input test now waits for the effect that syncs the input after a scraped price arrives. Regression rerun is pending; do not mark CI green until a fresh PR run completes.
+
+### QSE duplicate-import signature correction (2026-10-30)
+
+The fresh CI run confirmed the previous batch-editor fixes: the remaining QSE failures were duplicate detection still including derived `perTickerIndex` in the import signature, plus the live-price input test's feed update timing. Import signatures now ignore both legacy `seq` and derived `perTickerIndex`, so an otherwise identical trade is not re-imported merely because its sequence differs. The live-price test now applies the feed update after mount inside React `act()`. Fresh CI remains pending.
+
+### QSE local-date/live-price comparison correction (2026-10-30)
+
+The remaining live-price input failure exposed a timezone edge case, not just an async test issue: Qatar's local calendar day can already be the next date while the UTC timestamp is still on the previous day. Comparing a date-only manual point via `Date.parse(date)` incorrectly treats it as midnight UTC and can make it appear newer than a live quote from the same local day. `applyLiveQse` now compares calendar dates first and timestamps only within the same date; timestamped points sort after date-only points on that same date. Added regression coverage for the Qatar local-day/previous-UTC-day boundary and for preserving a manual point from a later calendar day. Fresh CI is pending.

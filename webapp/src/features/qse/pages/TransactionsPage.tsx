@@ -325,18 +325,19 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
     .filter((r) => filterTicker === 'ALL' || r.tx.ticker === filterTicker)
     .filter((r) => filterAction === 'ALL' || r.tx.action === filterAction)
     .filter(r => matchesQseFilters(r.tx, pageFilters));
-  type TxCol = 'date' | 'ticker' | 'action' | 'shares' | 'price' | 'amount';
+  type TxCol = 'order' | 'date' | 'ticker' | 'action' | 'shares' | 'price' | 'amount';
   const sortValue = (r: (typeof filtered)[number], col: TxCol): number | string => {
     switch (col) {
+      case 'order': return r.tx.globalTransactionIndex ?? r.tx.transactionIndex ?? Number.MAX_SAFE_INTEGER;
       case 'ticker': return r.tx.ticker;
       case 'action': return r.tx.action;
       case 'shares': return r.tx.shares;
       case 'price': return r.tx.price;
       case 'amount': return r.tx.shares * r.tx.price;
-      default: return `${toInstantMs(r.tx.date, r.tx.time, r.tx.timezone)} ${String(r.tx.seq ?? 0).padStart(12, '0')}`;
+      default: return r.tx.date;
     }
   };
-  const { sorted, Th, dateSort } = useSortableRows(filtered, sortValue, 'date', 'desc');
+  const { sorted, Th, dateSort } = useSortableRows(filtered, sortValue, 'order', 'asc');
 
   const openSorted = useMemo(() => sorted.filter((r) => openTickers.has(r.tx.ticker)), [sorted, openTickers]);
   const closedSorted = useMemo(() => sorted.filter((r) => !openTickers.has(r.tx.ticker)), [sorted, openTickers]);
@@ -469,6 +470,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   };
 
   const setWorkbook = useWorkbookStore((s) => s.setWorkbook);
+  const transactionOrderRows = useMemo(() => [...workbook.transactions].sort((a, b) => (a.globalTransactionIndex ?? a.transactionIndex ?? Number.MAX_SAFE_INTEGER) - (b.globalTransactionIndex ?? b.transactionIndex ?? Number.MAX_SAFE_INTEGER)), [workbook.transactions]);
   const clearAll = async () => {
     const ok = await confirmDialog(
       'This clears all transactions, prices and watchlist entries in this browser.',
@@ -554,7 +556,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
                   </Fragment>
                 ) : (
                   <RecordRow market="qse" onEdit={() => startEdit(i, tx)}    record={{ tx, i }}  key={i}  className="clickable">
-                    <td><DateValue value={tx.date} />{modifying && <span onClick={event => event.stopPropagation()}><QseReorder kind="transactions" row={tx} rows={sorted.map(row => row.tx)} /></span>}</td>
+                    <td><DateValue value={tx.date} />{modifying && <span onClick={event => event.stopPropagation()}><QseReorder kind="transactions" row={tx} rows={transactionOrderRows} /></span>}</td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <TickerLogo ticker={tx.ticker} size="sm" exchange="qse" /><Link to={`/stock/${tx.ticker}`}>{tx.ticker}</Link>
                       {tx.isPending && (

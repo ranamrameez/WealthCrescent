@@ -21,7 +21,7 @@ FinanceManager live link:
 
 ## Current session handoff
 
-For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) before continuing. It records the latest validated state and remaining work. PR #22 (global transaction-order proposal) and PR #23 (stock-trade save recovery) are closed as superseded; recovered code from #23 is merged via #30, and transaction-page cost-basis fixes are merged via #31. Global transactionIndex/cross-date reorder remains deferred. Refresh the handoff after each meaningful task and re-check live GitHub state.
+For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) before continuing. It records the latest validated state and remaining work. PR #22 (global transaction-order proposal) and PR #23 (stock-trade save recovery) are closed as superseded; recovered code from #23 is merged via #30, and transaction-page cost-basis fixes are merged via #31. Persisted global/per-ticker transaction ordering is being ported in PR #36; it is not merged or validated yet. Refresh the handoff after each meaningful task and re-check live GitHub state.
 
 ## Cost-basis worked examples (canonical — keep in sync with tests)
 
@@ -10268,9 +10268,13 @@ from the lot system."*
 
 - **Stock-trade FAB save recovery (2026-10-29).** The shared Buy/sell stock popup closes only after the QSE/PSX transaction-store update succeeds. If the synchronous update throws, the form preserves entered values and shows a retryable error. Added a QSE regression test for saved trade data and the success callback. The original callback behavior was already present on current main; this slice ports the missing error recovery and regression test from PR #23.
 
+## Done
+
+- **Persisted QSE/PSX transaction ordering (2026-10-30, PR #36 open; CI/review pending):** `globalTransactionIndex` is the canonical accounting order across all trades; `perTickerIndex` is derived from that same order for each ticker. Reordering trades swaps global positions and recalculates per-ticker positions in one shared helper, so the two indexes cannot drift. Legacy `transactionIndex` and `seq` are compatibility mirrors only. Legacy workbooks are migrated and all store add/edit/delete/plan-execution paths keep indexes synchronized. QSE/PSX tables expose cross-date move controls without changing effective trade dates. The combined cash ledger still displays mixed trade/transfer/adjustment events chronologically; see the PR's explicit limitation and do not claim the full mixed-event ledger ordering is solved.
+
 ## Pending
 
-- **Remaining cost-basis dependency audit (after PR #31):** continue beyond the QSE/PSX transaction pages. Verify Dashboard, Position Detail, analytics/time series, exports, charts, and strategy/advisory surfaces against the configured method. The global `transactionIndex` / cross-date reorder proposal from closed PR #22 is deferred, not implemented or validated. Do not merge its stale branch; resolve accounting-order versus date-ordered cash-ledger consistency on a fresh branch with regression tests before reconsidering. See `SESSION_HANDOFF.md` and `audit.md`.
+- **Remaining cost-basis dependency audit (after PR #31):** continue beyond the QSE/PSX transaction pages. Verify Dashboard, Position Detail, analytics/time series, exports, charts, and strategy/advisory surfaces against the configured method. Canonical synchronized global/per-ticker transaction ordering is implemented in fresh PR #36 but is not yet merged or CI-validated. The separate mixed-event cash ledger still displays by effective date and needs its own design/tests if it must follow global accounting order. Do not merge stale PR #22. See `SESSION_HANDOFF.md` and `audit.md`.
 
 - **App defaults / user overrides (partially implemented; 2026-10-29):** PRs #25–#27 are merged. Appearance reset and Account-page reset-all-settings restore settings/UI preferences to current built-in defaults while preserving financial records. Broker profiles carry an app-default version and users with differing settings can choose to apply the newer broker defaults or keep custom values. Remaining: decide/build a maintainable admin-facing source of truth/editor and broaden versioned default-change suggestions beyond broker profiles if required; browser/live-account verification is still outstanding. Do not describe the entire admin-managed defaults system as complete. See [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md).
 
@@ -11615,3 +11619,5 @@ Done: Cash and Rentals transaction batch editors reuse formula entry, dirty-colu
 Done: EMI, Funds/brokers, and Subscriptions detail sections now use the shared Banking-based template. Cash and Rentals expose separate Summary sections. Personal Loans no longer renders its section stack twice when batch editors close. See MODULE_TEMPLATE.md for migration coverage.
 
 Pending: extend batch editing to the remaining ledgers and audit their date/filter behavior independently of the section-layout migration. Stock Exchanges are excluded.
+
+PR #36 follow-up: QSE batch editor validation/reorder fixes were committed on `feat/persisted-trade-accounting-order` after the prior CI run. See audit/handoff. Fresh CI is still required.

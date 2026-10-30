@@ -20,15 +20,16 @@ import { getCurrentUser } from '../../../lib/firebase/useAuthState';
 import { useWorkbookStore } from '../../../store/workbookStore';
 import { useInterEntityTransfersStore } from '../../../store/interEntityTransfersStore';
 import type { Transaction, Transfer, Adjustment, Dividend } from '../../../types/workbook';
+import { syncTransactionIndexes } from '../../../lib/seq';
 
 type Kind = 'ledger' | 'transactions' | 'transfers' | 'adjustments' | 'dividends';
-export type QseRow = { id: string; kind?: 'trade' | 'transfer' | 'adjustment'; seq?: number; date: string; time?: string; timezone?: string; ticker?: string; action?: string; shares?: number; price?: number; gross?: number; fee?: number; type?: string; description?: string; amount?: number; note?: string; perShare?: number; isPending?: boolean; targetLotBuyId?: string; feeOverride?: number };
+export type QseRow = { id: string; globalTransactionIndex?: number; perTickerIndex?: number; transactionIndex?: number; kind?: 'trade' | 'transfer' | 'adjustment'; seq?: number; date: string; time?: string; timezone?: string; ticker?: string; action?: string; shares?: number; price?: number; gross?: number; fee?: number; type?: string; description?: string; amount?: number; note?: string; perShare?: number; isPending?: boolean; targetLotBuyId?: string; feeOverride?: number };
 type Row = QseRow;
 const column = (key: keyof Row, label: string, type: BatchColumn<Row>['type'] = 'text'): BatchColumn<Row> => ({ key, label, type });
 function qseColumns(kind: Kind): BatchColumn<Row>[] {
-  const common = [{ ...column('seq', '#', 'number'), editable: false }, column('date', 'Date', 'date'), column('time', 'Time', 'time'), column('timezone', 'Timezone')];
+  const common = [{ ...column(kind === 'transactions' ? 'perTickerIndex' : 'seq', '#', 'number'), editable: false }, column('date', 'Date', 'date'), column('time', 'Time', 'time'), column('timezone', 'Timezone')];
   if (kind === 'ledger') {
-    const specific = (source: Exclude<Kind, 'ledger' | 'dividends'>, recordKind: Row['kind']) => qseColumns(source).filter(c => !common.some(shared => shared.key === c.key)).map(c => ({ ...c, label: c.key === 'type' ? 'Transfer type' : c.label, editable: (row: Row) => row.kind === recordKind }));
+    const specific = (source: Exclude<Kind, 'ledger' | 'dividends'>, recordKind: Row['kind']) => qseColumns(source).filter(c => !common.some(shared => shared.key === c.key) && c.key !== 'perTickerIndex').map(c => ({ ...c, label: c.key === 'type' ? 'Transfer type' : c.label, editable: (row: Row) => row.kind === recordKind }));
     return [...common, { ...column('kind', 'Type'), editable: false }, ...specific('transactions', 'trade'), ...specific('transfers', 'transfer'), ...specific('adjustments', 'adjustment')];
   }
   if (kind === 'transactions') return [...common, { ...column('ticker', 'Ticker'), parser: value => String(value).trim().toUpperCase() }, { ...column('action', 'Action', 'select'), options: ['BUY', 'SELL'].map(value => ({ value, label: value })) }, column('shares', 'Shares', 'number'), column('price', 'Price', 'number'), column('isPending', 'Pending', 'boolean')];
@@ -45,7 +46,7 @@ function validateQseRow(kind: Kind, row: Row): Record<string, string> {
   if (!validBatchDate(row.date)) errors.date = 'Enter a valid date.';
   if (row.time && !/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(row.time)) errors.time = 'Enter a valid time.';
   if (row.timezone) { try { new Intl.DateTimeFormat('en', { timeZone: row.timezone }); } catch { errors.timezone = 'Enter a valid IANA timezone.'; } }
-  for (const c of qseColumns(kind)) if (c.type === 'number' && c.key !== 'seq' && (!Number.isFinite(row[c.key]) || Number(row[c.key]) < 0 && !(kind === 'adjustments' && c.key === 'amount'))) errors[c.key] = 'Enter a valid amount.';
+  for (const c of qseColumns(kind)) if (c.type === 'number' && c.key !== 'seq' && c.key !== 'perTickerIndex' && (!Number.isFinite(row[c.key]) || Number(row[c.key]) < 0 && !(kind === 'adjustments' && c.key === 'amount'))) errors[c.key] = 'Enter a valid amount.';
   if ((kind === 'transactions' || kind === 'dividends') && !row.ticker?.trim()) errors.ticker = 'Ticker is required.';
   if (kind === 'transactions') { if (!['BUY', 'SELL'].includes(row.action || '')) errors.action = 'Choose BUY or SELL.'; if (!(row.shares! > 0)) errors.shares = 'Shares must be positive.'; if (!(row.price! > 0)) errors.price = 'Price must be positive.'; }
   if (kind === 'transfers') { if (!['DEPOSIT', 'WITHDRAWAL'].includes(row.type || '')) errors.type = 'Choose DEPOSIT or WITHDRAWAL.'; if (!(row.gross! > 0)) errors.gross = 'Gross must be positive.'; }
@@ -91,7 +92,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
   const columns = qseColumns(kind === 'ledger' && editing?.single ? editing.rows[0].kind === 'trade' ? 'transactions' : editing.rows[0].kind === 'transfer' ? 'transfers' : 'adjustments' : kind);
   const allRows = (allRecords ?? (kind === 'ledger' ? recordsFor(kind) : workbook[kind])) as Row[];
   const createRow = (): Row => {
-    const base = { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), seq: Math.max(0, ...recordsFor(kind).map(row => row.seq || 0)) + 1, timestamp: new Date().toISOString() };
+    const base = { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), seq: Math.max(0, ...recordsFor(kind).map(row => row.seq || 0)) + 1, ...(kind === 'transactions' || kind === 'ledger' ? { globalTransactionIndex: Math.max(0, ...recordsFor('transactions').map(row => row.globalTransactionIndex ?? row.transactionIndex ?? 0)) + 1 } : {}), timestamp: new Date().toISOString() };
     if (kind === 'transactions' || kind === 'ledger') return { ...base, ...(kind === 'ledger' ? { kind: 'trade' as const } : {}), ticker: '', action: 'BUY', shares: 0, price: 0 };
     if (kind === 'transfers') return { ...base, type: 'DEPOSIT', gross: 0, fee: 0 };
     if (kind === 'dividends') return { ...base, ticker: '', shares: 0, perShare: 0, amount: 0 };
@@ -147,7 +148,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
         const importedId = idColumn < 0 ? '' : cells[idColumn]?.trim();
         if (importedId) explicitIds.add(importedId);
         const row: Row = { id: importedId || crypto.randomUUID(), date: '' };
-        for (const c of columns.filter(c => c.key !== 'seq')) {
+        for (const c of columns.filter(c => c.key !== 'seq' && c.key !== 'perTickerIndex')) {
           const normalizedHeaders = headers.map(header => header.trim().toLowerCase());
           let position = normalizedHeaders.indexOf(c.key.toLowerCase());
           if (kind === 'ledger' && c.key === 'type') {
@@ -181,7 +182,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
       });
       const signature = (row: Row) => {
         const nativeColumns = kind === 'ledger' ? qseColumns(row.kind === 'trade' ? 'transactions' : row.kind === 'transfer' ? 'transfers' : 'adjustments') : columns;
-        return JSON.stringify([kind === 'ledger' ? row.kind : '', ...nativeColumns.filter(c => c.key !== 'seq').map(c => c.type === 'boolean' ? !!row[c.key] : row[c.key] ?? '')]);
+        return JSON.stringify([kind === 'ledger' ? row.kind : '', ...nativeColumns.filter(c => c.key !== 'seq' && c.key !== 'perTickerIndex').map(c => c.type === 'boolean' ? !!row[c.key] : row[c.key] ?? '')]);
       };
       const importedIds = new Set<string>();
       const updates: Row[] = [];
@@ -223,7 +224,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
   return <>{render ? render(header) : <div className="section-toolbar">{header.summary}<CardActionMenu actions={actions} /></div>}
   <input id={inputId} type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void importFile(file); }} />
   {editing && transferEdit && <TransactionEntryModal editTransfer={{ module: 'qse', record: Object.fromEntries(Object.entries(editing.rows[0]).filter(([key]) => key !== 'kind')) as unknown as Transfer }} onClose={closeEditor} />}
-  {editing && !transferEdit && <BatchEditGrid title={`${editing.single ? 'Edit' : 'Batch edit'} QSE ${kind}`} description="Reorder records sharing an effective time with the move buttons. Linked transfers must be edited individually." rows={editing.rows} columns={columns} getRowId={row => row.id} getRowDate={row => row.date} getReorderGroup={row => `${row.date} ${toInstantMs(row.date, row.time, row.timezone)}${kind === 'transactions' ? ` ${row.ticker} ${row.action}` : kind === 'ledger' ? ` ${row.kind} ${row.kind === 'trade' ? `${row.ticker} ${row.action}` : ''}` : ''}`} orderKey="seq" createRow={editing.single ? undefined : createRow} validateRow={row => validateQseRow(kind, row)} rowReadOnly={editing.single ? undefined : locked} onClose={closeEditor} onSave={async (changes, mutations) => {
+  {editing && !transferEdit && <BatchEditGrid title={`${editing.single ? 'Edit' : 'Batch edit'} QSE ${kind}`} description="Reorder records sharing an effective time with the move buttons. Linked transfers must be edited individually." rows={editing.rows} columns={columns} getRowId={row => row.id} getRowDate={row => row.date} getReorderGroup={row => `${row.date} ${toInstantMs(row.date, row.time, row.timezone)}${kind === 'transactions' ? ` ${row.ticker} ${row.action}` : kind === 'ledger' ? ` ${row.kind} ${row.kind === 'trade' ? `${row.ticker} ${row.action}` : ''}` : ''}`} orderKey={kind === 'transactions' ? 'globalTransactionIndex' : 'seq'} createRow={editing.single ? undefined : createRow} validateRow={row => validateQseRow(kind, row)} rowReadOnly={editing.single ? undefined : locked} onClose={closeEditor} onSave={async (changes, mutations) => {
     if (!(await ensureSignedIn('Sign in to save changes.'))) throw new Error('Sign in is required.');
     if (editing.owner && editing.owner !== getCurrentUser()?.uid) throw new Error('Signed-in account changed. Reopen the editor.');
     let linkChoice: 'both' | 'this' | 'cancel' | undefined;
@@ -233,7 +234,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
       if (choice === 'cancel') throw new Error('Edit cancelled.');
       linkChoice = choice === 'both' ? 'both' : 'this';
     }
-    commit(prepareBatch(recordsFor(kind), changes, [...columns.map(c => c.key), 'seq'], row => validateQseRow(kind, row), editing.single ? () => undefined : locked, mutations));
+    commit(prepareBatch(recordsFor(kind), changes, [...columns.map(c => c.key), kind === 'transactions' ? 'globalTransactionIndex' : 'seq'], row => validateQseRow(kind, row), editing.single ? () => undefined : locked, mutations));
     if (linked && linkChoice === 'both') {
       const row = linked.after;
       const result = propagateLinkedEdit('qse', row.id, { date: row.date, amount: row.gross!, direction: row.type === 'DEPOSIT' ? 'in' : 'out' });
@@ -246,10 +247,28 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
 /** Reorder exact-time peers; trades also share ticker and action so lot rules remain intact. */
 export function QseReorder({ kind, row, rows }: { kind: Kind; row: Transaction | Transfer | Adjustment | Dividend | Row; rows: Array<Transaction | Transfer | Adjustment | Dividend | Row> }) {
   const ensureSignedIn = useEnsureSignedIn();
-  const peers = rows.filter(candidate => (kind !== 'ledger' || (candidate as Row).kind === (row as Row).kind) && (kind !== 'transactions' && (kind !== 'ledger' || (row as Row).kind !== 'trade') || ((candidate as Transaction).ticker === (row as Transaction).ticker && (candidate as Transaction).action === (row as Transaction).action)));
-  return <ReorderButtons rows={peers} index={peers.findIndex(candidate => candidate.id === row.id)} instantOf={candidate => toInstantMs(candidate.date, candidate.time, candidate.timezone)} idOf={candidate => candidate.id!} orderOf={candidate => candidate.seq} onMove={async pair => {
+  const isTradeList = kind === 'transactions';
+  const peers = isTradeList ? rows as Transaction[] : rows.filter(candidate => (kind !== 'ledger' || (candidate as Row).kind === (row as Row).kind) && (kind !== 'ledger' || (row as Row).kind !== 'trade' || ((candidate as Transaction).ticker === (row as Transaction).ticker && (candidate as Transaction).action === (row as Transaction).action)));
+  return <ReorderButtons rows={peers} index={peers.findIndex(candidate => candidate.id === row.id)} instantOf={candidate => toInstantMs(candidate.date, candidate.time, candidate.timezone)} idOf={candidate => candidate.id!} orderOf={candidate => isTradeList ? (candidate as Transaction).globalTransactionIndex ?? (candidate as Transaction).transactionIndex : candidate.seq} allowAcrossInstants={isTradeList} onMove={async pair => {
     if (!(await ensureSignedIn('Sign in to reorder records.'))) return;
     const state = useWorkbookStore.getState();
+    if (isTradeList) {
+      const transactions = state.workbook.transactions;
+      const a = transactions.find(candidate => candidate.id === pair[0].id), b = transactions.find(candidate => candidate.id === pair[1].id);
+      const aIndex = a?.globalTransactionIndex ?? a?.transactionIndex;
+      const bIndex = b?.globalTransactionIndex ?? b?.transactionIndex;
+      if (!a || !b || !Number.isInteger(aIndex) || !Number.isInteger(bIndex)) return toast('Transactions changed or accounting order is missing. Reload and try again.');
+      // Swap the canonical global positions, then derive per-ticker indexes from that same order.
+      const swapped = transactions.map(candidate => candidate.id === a.id
+        ? { ...candidate, globalTransactionIndex: bIndex, transactionIndex: bIndex }
+        : candidate.id === b.id
+          ? { ...candidate, globalTransactionIndex: aIndex, transactionIndex: aIndex }
+          : candidate);
+      const next = syncTransactionIndexes(swapped);
+      state.setWorkbook({ ...state.workbook, transactions: next });
+      toast('Transaction accounting order updated.');
+      return;
+    }
     const sourceKind = kind === 'ledger' ? (row as Row).kind === 'trade' ? 'transactions' : (row as Row).kind === 'transfer' ? 'transfers' : 'adjustments' : kind;
     const records = state.workbook[sourceKind];
     const a = records.find(candidate => candidate.id === pair[0].id), b = records.find(candidate => candidate.id === pair[1].id);

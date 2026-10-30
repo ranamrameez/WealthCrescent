@@ -96,3 +96,26 @@ export function backfillSeq<T extends { seq?: number }>(records: T[], chronologi
   }
   return records.map((r) => (r.seq !== undefined ? r : { ...r, seq: seqByRecord.get(r) }));
 }
+
+/**
+ * Canonical synchronization for exchange transactions. Global order is the source
+ * of truth; perTickerIndex is re-derived from it for each ticker. seq and
+ * transactionIndex are mirrored only as compatibility aliases for old code/data.
+ * Missing global indexes are appended after the current maximum in input order.
+ */
+export function syncTransactionIndexes<T extends { id?: string; ticker: string; globalTransactionIndex?: number; perTickerIndex?: number; transactionIndex?: number; seq?: number }>(records: T[]): T[] {
+  let nextGlobal = Math.max(0, ...records.map(r => r.globalTransactionIndex ?? r.transactionIndex ?? 0));
+  const withGlobal = records.map(record => {
+    const globalTransactionIndex = record.globalTransactionIndex ?? record.transactionIndex ?? ++nextGlobal;
+    return { ...record, globalTransactionIndex, transactionIndex: globalTransactionIndex };
+  });
+  const ordered = [...withGlobal].sort((a, b) => a.globalTransactionIndex! - b.globalTransactionIndex!);
+  const perTicker = new Map<string, number>();
+  const byId = new Map<string | undefined, T>();
+  ordered.forEach(record => {
+    const perTickerIndex = (perTicker.get(record.ticker) ?? 0) + 1;
+    perTicker.set(record.ticker, perTickerIndex);
+    byId.set(record.id, { ...record, perTickerIndex, seq: perTickerIndex });
+  });
+  return withGlobal.map(record => byId.get(record.id)!);
+}

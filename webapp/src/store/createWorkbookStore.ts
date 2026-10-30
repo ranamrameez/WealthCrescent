@@ -1,7 +1,6 @@
 import { create, type UseBoundStore, type StoreApi } from 'zustand';
 import { toInstantMs } from '../lib/datetime';
-import { assignSeqForEntities, backfillSeq, nextSeq, nextSeqForEntity } from '../lib/seq';
-import { sortTransactionsChronological } from '../lib/calc/sortTransactions';
+import { backfillSeq, nextSeq, nextSeqForEntity, syncTransactionIndexes } from '../lib/seq';
 import type { Adjustment, BrokerPortfolioData, BrokerProfile, Dividend, PricePoint, Transaction, TradePlan, Transfer, WatchlistItem } from '../types/workbook';
 import { scheduleLocalStorageWrite } from '../lib/localStoragePersistence';
 
@@ -106,6 +105,23 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
       ...(t.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }),
     }));
     const transactionsWithId = transactionsWithBroker.map((t) => (t.id ? t : { ...t, id: crypto.randomUUID() }));
+    // Backfill a stable global order once for legacy records. Existing indexes are
+    // preserved; only missing indexes are appended after the current maximum.
+    const indexedTransactions = (() => {
+      const maxIndex = Math.max(0, ...transactionsWithId.map(t => Number.isInteger(t.globalTransactionIndex) ? t.globalTransactionIndex! : Number.isInteger(t.transactionIndex) ? t.transactionIndex! : 0));
+      let nextIndex = maxIndex;
+      const legacy = [...transactionsWithId.filter(t => !Number.isInteger(t.globalTransactionIndex) && !Number.isInteger(t.transactionIndex))].sort((a, b) => {
+        const at = a.timestamp ? Date.parse(a.timestamp) : Number.POSITIVE_INFINITY;
+        const bt = b.timestamp ? Date.parse(b.timestamp) : Number.POSITIVE_INFINITY;
+        if (at !== bt) return at - bt;
+        const byDate = a.date.localeCompare(b.date);
+        if (byDate) return byDate;
+        return (a.time ?? '').localeCompare(b.time ?? '');
+      });
+      const byId = new Map(legacy.map(t => [t.id, { ...t, transactionIndex: ++nextIndex }]));
+      return transactionsWithId.map(t => Number.isInteger(t.globalTransactionIndex) || Number.isInteger(t.transactionIndex) ? { ...t, globalTransactionIndex: t.globalTransactionIndex ?? t.transactionIndex, transactionIndex: t.globalTransactionIndex ?? t.transactionIndex } : byId.get(t.id)!);
+    })();
+    const syncedTransactions = syncTransactionIndexes(indexedTransactions);
     const transfersWithId = wb.transfers.map((t) => ({ ...t, ...(t.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), ...(t.id ? {} : { id: crypto.randomUUID() }) }));
     const adjustmentsWithId = wb.adjustments.map((a) => ({ ...a, ...(a.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), ...(a.id ? {} : { id: crypto.randomUUID() }) }));
     const dividendsWithId = wb.dividends.map((d) => ({ ...d, ...(d.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), ...(d.id ? {} : { id: crypto.randomUUID() }) }));
@@ -113,7 +129,7 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
     const normalized = {
       ...wb,
       ...(profiles.length ? { brokerProfiles, activeBrokerId } : {}),
-      transactions: backfillSeq(transactionsWithId, sortTransactionsChronological(transactionsWithId)),
+      transactions: syncedTransactions,
       transfers: backfillSeq(transfersWithId, chronologicalByInstant(transfersWithId)),
       adjustments: backfillSeq(adjustmentsWithId, chronologicalByInstant(adjustmentsWithId)),
       dividends: backfillSeq(dividendsWithId, chronologicalByInstant(dividendsWithId)),
@@ -188,19 +204,28 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
         if (!opts?.skipPersist) persist(next);
       },
       addTransaction: (tx) => mutate((wb) => {
-        const seq = tx.seq !== undefined ? tx.seq : nextSeqForEntity(wb.transactions, (t) => t.ticker, tx.ticker);
+        const perTickerIndex = Number.isInteger(tx.perTickerIndex) ? tx.perTickerIndex! : nextSeqForEntity(wb.transactions, (t) => t.ticker, tx.ticker);
         const timestamp = tx.timestamp ?? new Date().toISOString();
         const id = tx.id ?? crypto.randomUUID();
-        return { ...wb, transactions: [...wb.transactions, { ...tx, ...(tx.brokerId || !wb.activeBrokerId ? {} : { brokerId: wb.activeBrokerId }), id, seq, timestamp }] };
+        const globalTransactionIndex = Number.isInteger(tx.globalTransactionIndex) ? tx.globalTransactionIndex! : Number.isInteger(tx.transactionIndex) ? tx.transactionIndex! : Math.max(0, ...wb.transactions.map(t => t.globalTransactionIndex ?? t.transactionIndex ?? 0)) + 1;
+        const transactions = syncTransactionIndexes([...wb.transactions, { ...tx, ...(tx.brokerId || !wb.activeBrokerId ? {} : { brokerId: wb.activeBrokerId }), id, seq: perTickerIndex, perTickerIndex, globalTransactionIndex, transactionIndex: globalTransactionIndex, timestamp }]);
+        return { ...wb, transactions };
       }),
       addTransactions: (txs) => mutate((wb) => {
         const now = new Date().toISOString();
-        const withSeq = assignSeqForEntities(wb.transactions, txs, (t) => t.ticker);
-        const withIdAndTimestamp = withSeq.map((t) => ({ ...t, ...(t.brokerId || !wb.activeBrokerId ? {} : { brokerId: wb.activeBrokerId }), id: t.id ?? crypto.randomUUID(), timestamp: t.timestamp ?? now }));
-        return { ...wb, transactions: [...wb.transactions, ...withIdAndTimestamp] };
+        let nextGlobalTransactionIndex = Math.max(0, ...wb.transactions.map(t => t.globalTransactionIndex ?? t.transactionIndex ?? 0));
+        const perTickerCounters = new Map<string, number>();
+        for (const existing of wb.transactions) perTickerCounters.set(existing.ticker, Math.max(perTickerCounters.get(existing.ticker) ?? 0, existing.perTickerIndex ?? existing.seq ?? 0));
+        const withIdAndTimestamp = txs.map((t) => {
+          const globalTransactionIndex = Number.isInteger(t.globalTransactionIndex) ? t.globalTransactionIndex! : Number.isInteger(t.transactionIndex) ? t.transactionIndex! : ++nextGlobalTransactionIndex;
+          const perTickerIndex = Number.isInteger(t.perTickerIndex) ? t.perTickerIndex! : Number.isInteger(t.seq) ? t.seq! : (perTickerCounters.get(t.ticker) ?? 0) + 1;
+          perTickerCounters.set(t.ticker, Math.max(perTickerCounters.get(t.ticker) ?? 0, perTickerIndex));
+          return { ...t, ...(t.brokerId || !wb.activeBrokerId ? {} : { brokerId: wb.activeBrokerId }), id: t.id ?? crypto.randomUUID(), globalTransactionIndex, perTickerIndex, transactionIndex: globalTransactionIndex, seq: perTickerIndex, timestamp: t.timestamp ?? now };
+        });
+        return { ...wb, transactions: syncTransactionIndexes([...wb.transactions, ...withIdAndTimestamp]) };
       }),
-      updateTransaction: (index, patch) => mutate((wb) => ({ ...wb, transactions: wb.transactions.map((t, i) => (i === index ? { ...t, ...patch } : t)) })),
-      deleteTransaction: (index) => mutate((wb) => ({ ...wb, transactions: wb.transactions.filter((_, i) => i !== index) })),
+      updateTransaction: (index, patch) => mutate((wb) => ({ ...wb, transactions: syncTransactionIndexes(wb.transactions.map((t, i) => (i === index ? { ...t, ...patch } : t))) })),
+      deleteTransaction: (index) => mutate((wb) => ({ ...wb, transactions: syncTransactionIndexes(wb.transactions.filter((_, i) => i !== index)) })),
       addTransfer: (t) => mutate((wb) => {
         const withId = t.id ? t : { ...t, id: crypto.randomUUID() };
         return { ...wb, transfers: [...wb.transfers, { ...withId, ...(withId.brokerId || !wb.activeBrokerId ? {} : { brokerId: wb.activeBrokerId }), seq: withId.seq !== undefined ? withId.seq : nextSeq(wb.transfers), timestamp: withId.timestamp ?? new Date().toISOString() }] };
@@ -295,8 +320,10 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
         const plan = wb.tradePlans.find((p) => p.id === planId);
         const leg = plan?.legs[legIndex];
         if (!plan || !leg || leg.executed || leg.ignored) return wb;
-        const tx: Transaction = { id: crypto.randomUUID(), brokerId: wb.activeBrokerId, seq: nextSeqForEntity(wb.transactions, (t) => t.ticker, leg.ticker), timestamp: new Date().toISOString(), date: leg.date || new Date().toISOString().slice(0, 10), ticker: leg.ticker, action: leg.action, shares: leg.shares, price: leg.price, targetLotBuyId: leg.targetLotBuyId };
-        return { ...wb, transactions: [...wb.transactions, tx], tradePlans: wb.tradePlans.map((p) => p.id === planId ? { ...p, legs: p.legs.map((l, i) => i === legIndex ? { ...l, executed: true, executedTransactionId: tx.id } : l) } : p) };
+        const globalTransactionIndex = Math.max(0, ...wb.transactions.map(t => t.globalTransactionIndex ?? t.transactionIndex ?? 0)) + 1;
+        const perTickerIndex = nextSeqForEntity(wb.transactions, (t) => t.ticker, leg.ticker);
+        const tx: Transaction = { id: crypto.randomUUID(), brokerId: wb.activeBrokerId, globalTransactionIndex, perTickerIndex, transactionIndex: globalTransactionIndex, seq: perTickerIndex, timestamp: new Date().toISOString(), date: leg.date || new Date().toISOString().slice(0, 10), ticker: leg.ticker, action: leg.action, shares: leg.shares, price: leg.price, targetLotBuyId: leg.targetLotBuyId };
+        return { ...wb, transactions: syncTransactionIndexes([...wb.transactions, tx]), tradePlans: wb.tradePlans.map((p) => p.id === planId ? { ...p, legs: p.legs.map((l, i) => i === legIndex ? { ...l, executed: true, executedTransactionId: tx.id } : l) } : p) };
       }),
     };
   });

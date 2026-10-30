@@ -178,6 +178,9 @@ ticker's own trade history separately.
 
 ## 6. Transactions
 
+> **Upcoming behavior — PR #36 is still under review:** QSE and PSX trades use a global accounting order that can differ from their recorded trade dates. Moving a trade changes its accounting position, not the trade date. Each ticker's `perTickerIndex` is synchronized from the global order. This will be available only after the PR passes CI and is merged.
+
+
 The Transactions page has several sections. Each one is a collapsible card, and the chip row
 at the top is a *jump-to* nav, not a switch — clicking a chip scrolls to that section and opens
 it if it was collapsed, but it doesn't hide any of the others. Only the first section starts
