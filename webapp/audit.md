@@ -120,3 +120,10 @@ A fresh main-based branch ports the scoped Mutual Funds corrections after PR #36
 **Not fixed in this slice:** transfer-to-Funds reconciliation. The current Funds workbook has no explicit uninvested cash-on-hand account per fund. Adding transfer amounts to invested portfolio value would double-count after cash is converted into units by a BUY. A separate design must model cash held at the fund/broker, then move value between cash and units on BUY/SELL, and cover linked transfer edits/deletes and cash/holdings totals. Keep this out of the date/amount patch until that model and tests exist.
 
 PR #36 is merged and passed run #94. Broker-profile isolation is being re-targeted through PR #39; the Funds date/amount patch is being re-targeted through PR #40. Only merge each after its own latest-head full test suite and production build pass.
+
+
+## Broker-profile isolation — PR #41 current checkpoint (2026-10-30)
+
+The broker-profile implementation is on clean branch `feat/broker-profile-isolation-main` and main-targeted PR #41. It scopes QSE/PSX transactions, transfers, adjustments, dividends, trade plans, settings and calculations by broker ID while keeping market prices, price history and watchlists exchange-wide. Linked transfer add/edit/delete resolves inactive profile records by broker ID. Legacy PSX migration assigns unscoped records to the JS Zindigi/JS Zindagi default profile and preserves financial fields. Archived profiles are view-only; deactivated profiles cannot be selected as active.
+
+The original stacked implementation passed run #99. Clean PR #41 passed run #105 (full tests + production build) before incorporating the merged PR #40 NAV-ordering regression and latest documentation. Re-run Actions on the latest head before merge. Manual backup/export migration review and browser verification remain required; automated tests alone do not certify the user's real legacy data.
