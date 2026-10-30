@@ -11627,3 +11627,7 @@ Tracked on `fix/mutual-funds-ledger-sync`, separate from broker-profile work:
 Regression tests must cover transfer → cash balance, BUY/SELL cash-to-holdings movement without double counting, effective-date display/order, and amount/units/NAV edits. No fixes are marked done until verified.
 
 Draft PR: [#37 — Fix Mutual Funds date and amount editing](https://github.com/ranamrameez/WealthCrescent/pull/37). It includes the date and amount edit fixes; CI has not reported yet. Transfer/cash-balance reconciliation remains an open accounting-design task.
+
+## CI follow-up — 2026-10-30
+
+PR #36 (canonical global/per-ticker transaction ordering) has been merged after GitHub Actions run #94 passed both the full test suite and production build. PR #37 remains open: its initial run exposed an unrelated QSE live-price test that needed asynchronous React synchronization; the test was corrected to await the mounted component update. The first rerun was started before the follow-up syntax correction and therefore does not validate the latest commit. A fresh run against the corrected branch head is required before merge. Funds transfer/cash-on-hand reconciliation remains deliberately separate because the current model has no explicit uninvested-cash balance per fund; do not fold transfers into invested NAV/holdings without that accounting model.
