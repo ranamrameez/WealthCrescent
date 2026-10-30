@@ -1052,3 +1052,16 @@ status and provides a refresh request action. A request confirmation means the r
 was queued; the saved timestamp changes only after the service writes fresh data.
 
 Loading masks use small rounded stat placeholders and large 600px section cards containing smaller stat cards and a content panel with a few lines across the loading area. Opening a different page starts at the top, including when using browser Back or Forward; section and filter changes on the same page retain your scroll position.
+
+## Broker profiles (QSE and PSX)
+
+Each broker profile is a separate portfolio account. Trades, transfers, adjustments, dividends/rewards, trade plans, fee settings, calculations and accounting indexes belong to the selected broker. Market prices, price history, watchlists and other exchange-wide information remain shared for the exchange.
+
+Use the Broker Profiles page to add accounts, switch the active account, or manage status:
+- **Active:** available for normal portfolio activity.
+- **Archived:** preserved for historical viewing and excluded from new-activity pickers.
+- **Deactivated:** hidden from normal activity lists and switching; visible in the Deactivated section so it can be reactivated.
+
+The central Transfers popup lists individual QSE/PSX broker accounts, not just the exchange. Select the correct broker account on each side of a transfer.
+
+For PSX legacy history, the initial migration assigns existing records to JS Zindagi. Review a backup/export before relying on migrated data. This workflow is still under validation until its implementation PR passes CI and real-data checks.
