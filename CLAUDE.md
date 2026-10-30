@@ -8015,3 +8015,6 @@ Bank Account Transactions/Plans and Personal Loan Payments/Plans use the shared 
 ## Broker-profile isolation (2026-10-30)
 
 PR #41 carries the clean main-based broker-profile implementation. Keep QSE/PSX trades, transfers, adjustments, dividends, plans, fee settings and calculations isolated per broker profile; keep exchange market prices, price history and watchlists shared. Legacy PSX history migrates to JS Zindagi with financial fields preserved. Archived profiles are view-only; deactivated profiles cannot become active. See `webapp/SESSION_HANDOFF.md` and `webapp/audit.md`. Run #105 passed tests/build on the pre-documentation head; the latest head must pass CI again after the post-PR40 reconciliation. Backup/export migration review and browser checks remain required before merge. Never push directly to `main`.
+
+
+**Latest broker-profile validation (2026-10-30):** PR #43 is the clean main-based branch. Its exact latest head `b31bbd264d105c0445abc655abe2f083017e9407` passed GitHub Actions run #107 (full test suite + type-check/production build). Do not merge until a real backup/export migration review and browser verification are completed.
