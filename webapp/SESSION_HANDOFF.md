@@ -58,3 +58,18 @@ PR #28 fixed the `PriceInput` draft/default interaction, flushes queued local-st
 ### PR #36 CI repair update (2026-10-30)
 
 The prior full suite had failures in QSE batch CSV imports, hidden-order reorder saving, and the live price-input synchronization test. Fixes are now committed on `feat/persisted-trade-accounting-order`: exclude derived `perTickerIndex` from numeric input validation; teach `BatchEditGrid` to include hidden `orderKey` drafts in dirty state and onSave (QSE's `globalTransactionIndex` is not a visible column); and await the live-price effect in the asynchronous test. Production build passed in the previous run; the new test run has not yet completed.
+
+## 2026-10-30 — Broker-profile isolation work in progress
+
+Branch: `feat/broker-profile-isolation-ui` (separate from `fix/mutual-funds-ledger-sync` and PR #36).
+
+User's UI references: Portfolio Item detail is the primary standard — one summary card with light-border inline flexible subsections, no nested cards. Bank Account detail is second-best. Broker page now uses `StandardPageSections` so sections appear in the top bar, and each profile's settings are inside its own profile row.
+
+Architecture:
+- Broker profile data: transactions, transfers, adjustments, dividends/rewards, trade plans, settings, calculations and accounting indexes.
+- Exchange-shared data: market prices, price history, watchlists and exchange-wide information; never duplicate/filter by broker.
+- Cash Transfer and central Transfers popup: QSE/PSX are selectable by individual broker profile; each side stores the broker ID. Store transfer actions route to inactive profiles for linked add/edit/delete.
+- Archived = view-only, hidden from new-activity pickers. Deactivated = hidden from ordinary lists/pickers and cannot be selected as active; shown in its own status section.
+- One-time versioned migration assigns the legacy PSX portfolio to JS Zindagi, preserving financial trade fields and shared market data.
+
+Implementation has started across BrokersPage, TransferLinksPage, TransactionEntryModal, interEntityLink/linkCascade, createWorkbookStore, and related tests. CI/browser validation has not yet been completed. Before merge, verify the migration against a backup/export, profile switch isolation, all transfer operations across inactive profiles, and status restrictions. Do not merge if CI fails.
