@@ -76,6 +76,25 @@ describe('buildLinkedRecords', () => {
     if (to.module === 'qse') expect(to.record).toMatchObject({ type: 'DEPOSIT', gross: 5000, fee: 0 });
   });
 
+  it('targets an individual broker profile for PSX transfers', () => {
+    const input: InterEntityTransferInput = {
+      date: '2026-02-02',
+      fromAmount: 1000,
+      toAmount: 1000,
+      from: { module: 'bank', ref: 'acct-1' },
+      to: { module: 'psx', ref: 'psx-js-zindigi' },
+    };
+    const { to, link } = buildLinkedRecords(input, ids);
+    expect(to.module).toBe('psx');
+    if (to.module === 'psx') expect(to.record).toMatchObject({
+      brokerId: 'psx-js-zindigi',
+      type: 'DEPOSIT',
+      gross: 1000,
+    });
+    expect(link.to).toMatchObject({ module: 'psx', ref: 'psx-js-zindigi' });
+    expect(linkSideRequiresRef({ module: 'psx' })).toBe(true);
+  });
+
   it('maps QSE -> Bank to a WITHDRAWAL on the QSE side', () => {
     const input: InterEntityTransferInput = {
       date: '2026-02-01',
