@@ -8010,3 +8010,8 @@ RTDB security rules, not by hiding the config).
 
 ## Batch editing update (2026-09-27)
 Bank Account Transactions/Plans and Personal Loan Payments/Plans use the shared BatchEditGrid. See webapp/BATCH_EDIT.md for the assessed editing/link architecture and safety boundaries. Single-record forms remain unchanged. Linked rows and executed plans are locked; recurring/generated Bank plans use their existing workflows. New batch saves validate and check stale records before one workbook update. Future integrations should reuse this contract rather than add inline editing to normal rows.
+
+
+## Broker-profile isolation (2026-10-30)
+
+PR #41 carries the clean main-based broker-profile implementation. Keep QSE/PSX trades, transfers, adjustments, dividends, plans, fee settings and calculations isolated per broker profile; keep exchange market prices, price history and watchlists shared. Legacy PSX history migrates to JS Zindagi with financial fields preserved. Archived profiles are view-only; deactivated profiles cannot become active. See `webapp/SESSION_HANDOFF.md` and `webapp/audit.md`. Run #105 passed tests/build on the pre-documentation head; the latest head must pass CI again after the post-PR40 reconciliation. Backup/export migration review and browser checks remain required before merge. Never push directly to `main`.
