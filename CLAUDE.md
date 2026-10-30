@@ -8018,3 +8018,6 @@ PR #41 carries the clean main-based broker-profile implementation. Keep QSE/PSX 
 
 
 **Latest broker-profile validation (2026-10-30):** PR #43 is the clean main-based branch. Its exact latest head `b31bbd264d105c0445abc655abe2f083017e9407` passed GitHub Actions run #107 (full test suite + type-check/production build). Do not merge until a real backup/export migration review and browser verification are completed.
+
+
+**PR #43 latest-head check (2026-10-30):** the restored README/docs head `dcf3181a0a8955417c4049089f4735685c25a8ec` passed Actions run #112 (full tests + production build). The broker PR remains open pending real backup/export migration review and browser verification.
