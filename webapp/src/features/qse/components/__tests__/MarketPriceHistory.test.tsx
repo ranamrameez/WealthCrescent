@@ -11,7 +11,7 @@ vi.mock('firebase/database',()=>({
   onValue:(path:string,success:(snapshot:{val:()=>unknown})=>void,error:(error:Error)=>void)=>{
     state.paths.push(path);
     if(state.denied)error(new Error('Denied'));
-    else success({val:()=>path.endsWith('allTimeBounds')?{low:9,high:13}:{one:{date:qatarDay(),time:new Date().toISOString(),price:12,dayHigh:13,dayLow:9}});
+    else success({val:()=>path.endsWith('allTimeBounds')?{low:9,high:13}:{one:{date:qatarDay(),time:new Date().toISOString(),price:12,dayHigh:13,dayLow:9}}});
     return ()=>{};
   },
 }));
