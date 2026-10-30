@@ -107,3 +107,16 @@ The fresh CI run confirmed the previous batch-editor fixes: the remaining QSE fa
 ### QSE local-date/live-price comparison correction (2026-10-30)
 
 The remaining live-price input failure exposed a timezone edge case, not just an async test issue: Qatar's local calendar day can already be the next date while the UTC timestamp is still on the previous day. Comparing a date-only manual point via `Date.parse(date)` incorrectly treats it as midnight UTC and can make it appear newer than a live quote from the same local day. `applyLiveQse` now compares calendar dates first and timestamps only within the same date; timestamped points sort after date-only points on that same date. Added regression coverage for the Qatar local-day/previous-UTC-day boundary and for preserving a manual point from a later calendar day. Fresh CI is pending.
+
+## 2026-10-30 — Mutual Funds effective-date and amount-edit fix
+
+A fresh main-based branch ports the scoped Mutual Funds corrections after PR #36 merged:
+
+- Balance-history rows display the canonical effective `date`; history order uses `date`, then `time` only for same-day ties.
+- Editing a historical NAV point now re-synchronizes `marketPrices` by effective date rather than allowing its retained audit timestamp to override the user's date correction.
+- Invest/Withdraw edit mode accepts Amount and derives units using the transaction NAV (`unitsFromAmount`).
+- Regression tests cover amount-to-units conversion, effective-date ordering with a stale timestamp, and latest market-price synchronization.
+
+**Not fixed in this slice:** transfer-to-Funds reconciliation. The current Funds workbook has no explicit uninvested cash-on-hand account per fund. Adding transfer amounts to invested portfolio value would double-count after cash is converted into units by a BUY. A separate design must model cash held at the fund/broker, then move value between cash and units on BUY/SELL, and cover linked transfer edits/deletes and cash/holdings totals. Keep this out of the date/amount patch until that model and tests exist.
+
+PR #36 is merged and passed run #94. Broker-profile isolation is being re-targeted through PR #39; the Funds date/amount patch is being re-targeted through PR #40. Only merge each after its own latest-head full test suite and production build pass.
