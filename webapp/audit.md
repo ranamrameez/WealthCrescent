@@ -108,39 +108,22 @@ The fresh CI run confirmed the previous batch-editor fixes: the remaining QSE fa
 
 The remaining live-price input failure exposed a timezone edge case, not just an async test issue: Qatar's local calendar day can already be the next date while the UTC timestamp is still on the previous day. Comparing a date-only manual point via `Date.parse(date)` incorrectly treats it as midnight UTC and can make it appear newer than a live quote from the same local day. `applyLiveQse` now compares calendar dates first and timestamps only within the same date; timestamped points sort after date-only points on that same date. Added regression coverage for the Qatar local-day/previous-UTC-day boundary and for preserving a manual point from a later calendar day. Fresh CI is pending.
 
-## 2026-10-30 — Broker-profile isolation (implementation in progress)
+## 2026-10-30 — Mutual Funds effective-date and amount-edit fix
 
-Tracked on `feat/broker-profile-isolation-ui`. The UI should follow Portfolio Item detail first (summary card with inline, light-bordered flexible subsections; no nested cards), then Bank Account detail. Broker sections are top-bar navigable via `StandardPageSections`, and profile settings belong within their own profile row.
+A fresh main-based branch ports the scoped Mutual Funds corrections after PR #36 merged:
 
-Design locked by user:
-- Per broker: trades, transfers, adjustments, dividends/rewards, plans, settings, calculations and accounting indexes.
-- Per exchange: market prices, price history, watchlists and market-wide data; shared, not duplicated.
-- Transfers: central Transfers popup and Cash Transfer picker identify each broker profile separately and persist its profile ID.
-- Archived profiles: preserved and view-only; not offered for new activity.
-- Deactivated profiles: excluded from normal activity lists and active-profile switching; shown in a dedicated status section.
-- Existing legacy PSX portfolio: assign to JS Zindagi in a one-time versioned migration without changing financial trade fields.
+- Balance-history rows display the canonical effective `date`; history order uses `date`, then `time` only for same-day ties.
+- Editing a historical NAV point now re-synchronizes `marketPrices` by effective date rather than allowing its retained audit timestamp to override the user's date correction.
+- Invest/Withdraw edit mode accepts Amount and derives units using the transaction NAV (`unitsFromAmount`).
+- Regression tests cover amount-to-units conversion, effective-date ordering with a stale timestamp, and latest market-price synchronization.
 
-Initial implementation adds profile-specific transfer routing for inactive profiles, broker pickers and settings within the broker page, status sections, and migration/regression tests. **Not verified yet:** CI, browser behavior, historical data migration against a real export, and linked transfer edit/delete across all combinations. Treat as in-progress; no merge recommendation until these pass.
+**Not fixed in this slice:** transfer-to-Funds reconciliation. The current Funds workbook has no explicit uninvested cash-on-hand account per fund. Adding transfer amounts to invested portfolio value would double-count after cash is converted into units by a BUY. A separate design must model cash held at the fund/broker, then move value between cash and units on BUY/SELL, and cover linked transfer edits/deletes and cash/holdings totals. Keep this out of the date/amount patch until that model and tests exist.
 
-### PR #38 rebase status (2026-10-30)
-
-Broker-profile changes have been rebased onto the latest PR #36 head after fixing the QSE batch/import and live-price date-boundary regressions. PR #38 remains stacked on PR #36 and is now 17 files ahead with no base-behind commits. The branch is ready for a fresh PR CI run; browser verification and real-export migration checks are still required.
-
-### Broker branch CI trigger after stacked rebase (2026-10-30)
-
-The broker-profile branch was rebased onto the now-green PR #36 head (run #94: build and full test suite passed). A full combined PR validation is being triggered against main because this repository's checks are configured for main-targeted pull requests. The intended review relationship remains stacked: PR #36 first, then PR #38. Restore PR #38's base to `feat/persisted-trade-accounting-order` after the combined CI run.
-
-## 2026-10-30 — Post-#36 main reconciliation
-
-PR #36 was merged into `main` as `e4aef0bcd2ccf20e2cd7c73a3fe98cc293943be8` after its exact source head passed Actions run #94 (full tests and production build). The mixed-event cash ledger still has no shared global order across trades, transfers and adjustments.
-
-The old broker PR #38/#39 path was stacked on the pre-squash branch and diverged from current `main`. Its broker-specific changes were ported onto a clean main-based branch for PR #41. Require fresh CI on PR #41 and retain the manual backup/export migration and browser checks as pre-merge requirements.
-
-The old Mutual Funds PR #37 was likewise based before #36 merged. Its scoped date/amount fixes were ported onto clean branch PR #40; the unrelated QSE live-price test was stabilized against the current main version. Require fresh CI on PR #40. Transfer-to-Funds cash reconciliation remains a separate design task because the current Funds model does not track uninvested cash per fund.
+PR #36 is merged and passed run #94. Broker-profile isolation is being re-targeted through PR #39; the Funds date/amount patch is being re-targeted through PR #40. Only merge each after its own latest-head full test suite and production build pass.
 
 
-## 2026-10-30 — validation results
+## Broker-profile isolation — PR #41 current checkpoint (2026-10-30)
 
-- PR #40 Mutual Funds date/amount patch merged to `main`; Actions run #104 passed full tests and production build.
-- PR #41 broker-profile isolation: clean main-based branch; Actions run #105 passed full tests and production build. Still pending manual review against a backup/export and browser verification of migration, profile switching, linked transfer add/edit/delete across active/inactive profiles, and Archived/Deactivated restrictions. CI success is not evidence that a user's real legacy data migrates correctly.
-- Funds cash-on-hand reconciliation is separately tracked in issue #42. PRs #37 and #39 are closed as superseded; PR #36 and #40 are merged.
+The broker-profile implementation is on clean branch `feat/broker-profile-isolation-main` and main-targeted PR #41. It scopes QSE/PSX transactions, transfers, adjustments, dividends, trade plans, settings and calculations by broker ID while keeping market prices, price history and watchlists exchange-wide. Linked transfer add/edit/delete resolves inactive profile records by broker ID. Legacy PSX migration assigns unscoped records to the JS Zindigi/JS Zindagi default profile and preserves financial fields. Archived profiles are view-only; deactivated profiles cannot be selected as active.
+
+The original stacked implementation passed run #99. Clean PR #41 passed run #105 (full tests + production build) before incorporating the merged PR #40 NAV-ordering regression and latest documentation. Re-run Actions on the latest head before merge. Manual backup/export migration review and browser verification remain required; automated tests alone do not certify the user's real legacy data.
