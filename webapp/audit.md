@@ -129,3 +129,11 @@ Broker-profile changes have been rebased onto the latest PR #36 head after fixin
 ### Broker branch CI trigger after stacked rebase (2026-10-30)
 
 The broker-profile branch was rebased onto the now-green PR #36 head (run #94: build and full test suite passed). A full combined PR validation is being triggered against main because this repository's checks are configured for main-targeted pull requests. The intended review relationship remains stacked: PR #36 first, then PR #38. Restore PR #38's base to `feat/persisted-trade-accounting-order` after the combined CI run.
+
+## 2026-10-30 — Post-#36 main reconciliation
+
+PR #36 was merged into `main` as `e4aef0bcd2ccf20e2cd7c73a3fe98cc293943be8` after its exact source head passed Actions run #94 (full tests and production build). The mixed-event cash ledger still has no shared global order across trades, transfers and adjustments.
+
+The old broker PR #38/#39 path was stacked on the pre-squash branch and diverged from current `main`. Its broker-specific changes were ported onto a clean main-based branch for PR #41. Require fresh CI on PR #41 and retain the manual backup/export migration and browser checks as pre-merge requirements.
+
+The old Mutual Funds PR #37 was likewise based before #36 merged. Its scoped date/amount fixes were ported onto clean branch PR #40; the unrelated QSE live-price test was stabilized against the current main version. Require fresh CI on PR #40. Transfer-to-Funds cash reconciliation remains a separate design task because the current Funds model does not track uninvested cash per fund.
