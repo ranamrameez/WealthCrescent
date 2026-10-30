@@ -76,7 +76,7 @@ function buildSideRecord(
     case 'funds':
       return {
         module: cfg.module,
-        record: { id, date, type: direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: amount, fee: cfg.fee ?? 0, description: note },
+        record: { id, brokerId: cfg.ref, date, type: direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: amount, fee: cfg.fee ?? 0, description: note },
       };
     case 'rentals':
       // Unlike Bank/Cash/QSE/PSX/Funds, Rentals has no real balance of its
@@ -184,6 +184,8 @@ export function buildLinkedRecords(
 
 export function linkSideRequiresRef(side: LinkSideConfig): boolean {
   return side.module === 'bank'
+    || side.module === 'qse'
+    || side.module === 'psx'
     || side.module === 'rentals'
     || side.module === 'personalLoans'
     || side.module === 'emi'
