@@ -127,3 +127,8 @@ PR #36 is merged and passed run #94. Broker-profile isolation is being re-target
 The broker-profile implementation is on clean branch `feat/broker-profile-isolation-main` and main-targeted PR #41. It scopes QSE/PSX transactions, transfers, adjustments, dividends, trade plans, settings and calculations by broker ID while keeping market prices, price history and watchlists exchange-wide. Linked transfer add/edit/delete resolves inactive profile records by broker ID. Legacy PSX migration assigns unscoped records to the JS Zindigi/JS Zindagi default profile and preserves financial fields. Archived profiles are view-only; deactivated profiles cannot be selected as active.
 
 The original stacked implementation passed run #99. Clean PR #41 passed run #105 (full tests + production build) before incorporating the merged PR #40 NAV-ordering regression and latest documentation. Re-run Actions on the latest head before merge. Manual backup/export migration review and browser verification remain required; automated tests alone do not certify the user's real legacy data.
+
+
+## 2026-10-30 — PR #43 latest CI result
+
+Clean main-based broker-profile PR #43 passed GitHub Actions run #107 on exact head `b31bbd264d105c0445abc655abe2f083017e9407`: full tests and type-check/production build succeeded. Remaining pre-merge validation is manual: inspect a real legacy PSX backup/export after migration and verify broker switching, linked transfer add/edit/delete (including inactive profiles), and Archived/Deactivated UI behavior. The connected browser session was unavailable, so this manual verification remains outstanding.
