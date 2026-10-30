@@ -11621,3 +11621,10 @@ Done: EMI, Funds/brokers, and Subscriptions detail sections now use the shared B
 Pending: extend batch editing to the remaining ledgers and audit their date/filter behavior independently of the section-layout migration. Stock Exchanges are excluded.
 
 PR #36 follow-up: QSE batch editor validation/reorder fixes were committed on `feat/persisted-trade-accounting-order` after the prior CI run. See audit/handoff. Fresh CI is still required.
+
+## Mutual Funds date and amount correction (2026-10-30)
+
+- **Implemented on `fix/mutual-funds-ledger-sync-main`; validation pending:** Balance History displays the effective date and sorts by that date (time is only a same-day tie-breaker). Editing an Invest/Withdraw transaction's Amount recalculates units from its NAV. Regression tests cover stale timestamp ordering, latest NAV synchronization after an effective-date edit, and amount-to-units conversion.
+- Keep Invest and Withdraw as separate transaction actions (BUY/SELL); P&L remains derived from contributed/withdrawn capital and NAV performance. Do not add a separate P&L transaction type.
+- **Not included:** transfer-to-Funds cash-on-hand reconciliation. The existing Funds transfer model has no per-fund uninvested-cash account, so counting transfers as invested value would risk double-counting after a BUY. Track that as a separate accounting-model task; do not silently fold transfers into holdings/NAV.
+- PR #36 is merged into `main` after Actions run #94 passed tests and production build. Broker-profile work is now in main-targeted PR #39; Mutual Funds work is being rebased onto current `main` in PR #40. Merge only after the latest head SHA has a green full-test and production-build run.

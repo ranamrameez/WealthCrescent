@@ -1052,3 +1052,10 @@ status and provides a refresh request action. A request confirmation means the r
 was queued; the saved timestamp changes only after the service writes fresh data.
 
 Loading masks use small rounded stat placeholders and large 600px section cards containing smaller stat cards and a content panel with a few lines across the loading area. Opening a different page starts at the top, including when using browser Back or Forward; section and filter changes on the same page retain your scroll position.
+
+
+## Mutual Funds — editing transactions and balance history
+
+- Invest and Withdraw remain separate transaction actions. Editing an Invest/Withdraw row lets you edit Amount; units are recalculated from the row's NAV. Editing the units or NAV retains the same transaction model.
+- Balance History shows the effective valuation date. When a historical date is changed, the history and latest NAV are ordered by that date; the original timestamp is retained only as audit/intraday metadata and as a same-day tie-breaker.
+- Profit/Loss is derived performance, not a separate transaction row. Transfer-to-Funds cash-on-hand reconciliation is not yet included; do not treat a transfer as invested holdings until a future cash ledger explicitly models uninvested cash.

@@ -61,7 +61,8 @@ function syncLatestMarketPrice(marketPrices: Record<string, number>, ticker: str
     delete next[ticker];
     return next;
   }
-  const latest = [...history].sort((a, b) => (a.time || a.date).localeCompare(b.time || b.date)).pop()!;
+  // Effective date is authoritative; time only breaks same-day ties.
+  const latest = [...history].sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? '')).pop()!;
   return { ...marketPrices, [ticker]: latest.price };
 }
 
