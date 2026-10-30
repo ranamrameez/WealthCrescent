@@ -43,7 +43,7 @@ app, not developer notes) continuously as features ship.
 
 **Latest user instruction (2026-10-15): Do not automatically push code. Keep changes local for review unless the user explicitly requests a commit or push. This supersedes the earlier auto-commit/push standing instruction.**
 
-**Latest session continuity (2026-10-30):** read [`webapp/SESSION_HANDOFF.md`](webapp/SESSION_HANDOFF.md) for the current state. PR #22 (stale global/per-ticker transaction-order proposal in PR #36) and PR #23 (superseded save-recovery work) are closed; PR #30 and #31 contain the recovered code changes. Canonical `globalTransactionIndex` / `perTickerIndex` synchronization is implemented in fresh PR #36 but remains open pending CI/review; the separate mixed-event cash ledger still needs its own ordering design. Re-check live GitHub state before acting. Continue updating `webapp/README.md` Done/Pending and `webapp/USER_MANUAL.md` with each meaningful change. Never push directly to `main`; use focused PRs and merge only after relevant checks pass.
+**Latest session continuity (2026-10-30):** read [`webapp/SESSION_HANDOFF.md`](webapp/SESSION_HANDOFF.md) for the current state. PR #22 and PR #23 are closed as superseded. PR #36's canonical `globalTransactionIndex` / `perTickerIndex` work is merged to `main` (run #94 passed tests and build); mixed-event cash-ledger ordering remains a separate unresolved design. Broker-profile isolation is being re-targeted in main-based PR #41; Mutual Funds effective-date/amount fixes are in PR #40. Check each latest head's Actions before merge; broker migration still needs backup/export and browser verification. Continue updating README, audit, handoff and USER_MANUAL. Never push directly to `main`.
 
 ## Current status (as of 2026-08-23)
 
