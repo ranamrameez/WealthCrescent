@@ -11622,16 +11622,14 @@ Pending: extend batch editing to the remaining ledgers and audit their date/filt
 
 PR #36 follow-up: QSE batch editor validation/reorder fixes were committed on `feat/persisted-trade-accounting-order` after the prior CI run. See audit/handoff. Fresh CI is still required.
 
-## 2026-10-30 — Current branch/CI checkpoint
+## Mutual Funds date and amount correction (2026-10-30)
 
-- PR #36 is merged to `main`; its exact source head passed Actions run #94 (full tests + production build). Mixed-event cash-ledger order remains unresolved.
-- Broker-profile isolation has been ported to a clean branch from post-#36 `main` for PR #41. The earlier PR #38/39 path was stacked/diverged; do not merge that stale main-targeted branch. Latest-head CI for #41 is required.
-- Mutual Funds effective-date/amount corrections are on clean post-#36 branch PR #40. Its CI must pass before merge. Transfer-to-Funds cash-on-hand is separate accounting work, not included.
-- Never merge based on an older successful run. Check the current PR head SHA and both Actions jobs (tests and production build).
+- **Implemented on `fix/mutual-funds-ledger-sync-main`; validation pending:** Balance History displays the effective date and sorts by that date (time is only a same-day tie-breaker). Editing an Invest/Withdraw transaction's Amount recalculates units from its NAV. Regression tests cover stale timestamp ordering, latest NAV synchronization after an effective-date edit, and amount-to-units conversion.
+- Keep Invest and Withdraw as separate transaction actions (BUY/SELL); P&L remains derived from contributed/withdrawn capital and NAV performance. Do not add a separate P&L transaction type.
+- **Not included:** transfer-to-Funds cash-on-hand reconciliation. The existing Funds transfer model has no per-fund uninvested-cash account, so counting transfers as invested value would risk double-counting after a BUY. Track that as a separate accounting-model task; do not silently fold transfers into holdings/NAV.
+- PR #36 is merged into `main` after Actions run #94 passed tests and production build. Broker-profile work is now in main-targeted PR #39; Mutual Funds work is being rebased onto current `main` in PR #40. Merge only after the latest head SHA has a green full-test and production-build run.
 
 
-## 2026-10-30 — post-merge verification
+## Broker-profile isolation — PR #41
 
-- **Done:** PR #40 Mutual Funds effective-date/amount corrections merged as `d2b1e41a552a9b0e013ee41c20a8f0cabf654719`; latest-head Actions run #104 passed the full test suite and production build.
-- **In review:** PR #41 broker-profile isolation is on a clean branch from current `main`; latest-head run #105 passed the full test suite and production build. Do not merge until a backup/export migration review and browser verification confirm legacy PSX data is preserved and profile/transfer flows work.
-- **Tracked follow-up:** issue #42 covers Funds cash-on-hand reconciliation without double-counting deposits and invested holdings. Original PRs #37 and #39 are closed as superseded.
+Broker-profile work is on clean branch `feat/broker-profile-isolation-main`. Per broker: trades, transfers, adjustments, dividends/rewards, trade plans, fee/cost-basis settings and calculations. Per exchange: market prices, price history and watchlists remain shared. Legacy PSX history migrates to JS Zindigi/JS Zindagi without changing financial fields. Archived profiles are read-only; deactivated profiles cannot be activated. Run #105 passed full tests/build before the post-PR40 merge reconciliation; the latest PR #41 head needs a fresh green run. Backup/export migration review and browser verification remain pre-merge requirements.
