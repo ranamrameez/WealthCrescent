@@ -73,3 +73,11 @@ Architecture:
 - One-time versioned migration assigns the legacy PSX portfolio to JS Zindagi, preserving financial trade fields and shared market data.
 
 Implementation has started across BrokersPage, TransferLinksPage, TransactionEntryModal, interEntityLink/linkCascade, createWorkbookStore, and related tests. CI/browser validation has not yet been completed. Before merge, verify the migration against a backup/export, profile switch isolation, all transfer operations across inactive profiles, and status restrictions. Do not merge if CI fails.
+
+## 2026-10-30 — Rebased follow-ups after PR #36 merge
+
+- `main` includes PR #36 as merge commit `e4aef0bcd2ccf20e2cd7c73a3fe98cc293943be8`; its exact PR head passed run #94 (full test suite and production build). The mixed-event cash ledger still sorts trades/transfers/adjustments by effective date and needs a separate shared-order design.
+- Broker-profile isolation was originally stacked in PR #38 and temporarily merged into the old feature branch. That branch diverged from the squash-merged `main`, so the code was ported onto clean branch `feat/broker-profile-isolation-main` and opened as PR #41. Do not merge old PR #39. PR #41 requires a fresh green Actions run; real-export migration and browser verification remain manual prerequisites.
+- Mutual Funds date/amount corrections were ported onto clean branch `fix/mutual-funds-ledger-sync-main` and opened as PR #40. Original PR #37 is superseded and should not be merged. PR #40 requires green tests/build.
+- Funds transfer reconciliation remains deliberately out of scope: there is no explicit per-fund cash-on-hand account. A future design must model transfer cash separately and move it into/out of holdings on BUY/SELL to avoid double counting.
+- Current PRs: #40 Mutual Funds effective dates/amount editing; #41 broker-profile isolation. Require latest-head full tests + production build before merge. Never push directly to `main`.
