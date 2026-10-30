@@ -8020,3 +8020,5 @@ Bank Account Transactions/Plans and Personal Loan Payments/Plans use the shared 
 - Existing legacy PSX history belongs to JS Zindagi; migrate it once, version the migration, and preserve financial fields.
 - Broker UI must follow Portfolio Item detail (one summary card with light-bordered inline subsections; avoid nested cards), then Bank Account detail. Use `StandardPageSections` for top-bar section shortcuts and keep profile settings inside their profile row.
 - Keep broker work on `feat/broker-profile-isolation-ui`; do not mix it with Mutual Funds or transaction-order branches. Never push directly to `main`. Update README, audit, USER_MANUAL and SESSION_HANDOFF as implementation changes.
+
+**2026-10-30 follow-up:** PR #36 is merged to `main` (run #94 green). Mutual Funds PR #40 is merged (run #104 green); Funds cash-on-hand reconciliation is tracked in issue #42. Broker-profile isolation is in clean main-based PR #41; run #105 passed tests and production build. Do not merge #41 until backup/export migration review and browser verification are completed. Original divergent PRs #37 and #39 are closed as superseded.
