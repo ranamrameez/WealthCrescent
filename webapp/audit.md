@@ -132,3 +132,8 @@ The original stacked implementation passed run #99. Clean PR #41 passed run #105
 ## 2026-10-30 — PR #43 latest CI result
 
 Clean main-based broker-profile PR #43 passed GitHub Actions run #107 on exact head `b31bbd264d105c0445abc655abe2f083017e9407`: full tests and type-check/production build succeeded. Remaining pre-merge validation is manual: inspect a real legacy PSX backup/export after migration and verify broker switching, linked transfer add/edit/delete (including inactive profiles), and Archived/Deactivated UI behavior. The connected browser session was unavailable, so this manual verification remains outstanding.
+
+
+## PR #43 latest-head CI (2026-10-30)
+
+Latest head `dcf3181a0a8955417c4049089f4735685c25a8ec` passed Actions run #112 (full tests + production build). Manual migration validation against a real backup/export and browser verification are still outstanding; no merge until completed.
