@@ -40,7 +40,7 @@ import { useLastCurrency } from '../../../hooks/useLastCurrency';
 import { usePrimaryCurrency } from '../../../hooks/usePrimaryCurrency';
 import { getMarketPrice } from '../../../lib/calc';
 import { pendingShareDeltaByTicker } from '../../../lib/calc/positions';
-import { balanceUpdateHistory, brokerTotalsByCurrency, contributionVsValueSeries, expectedPLRate, fundCategoryLabel, fundNetProfit, projectInvestmentReturn } from '../../../lib/calc/fundsModule';
+import { balanceUpdateHistory, brokerTotalsByCurrency, contributionVsValueSeries, expectedPLRate, fundCategoryLabel, fundNetProfit, projectInvestmentReturn, unitsFromAmount } from '../../../lib/calc/fundsModule';
 import { CategorySelect } from '../../../components/CategorySelect';
 import { useCategoryStore } from '../../../store/categoryStore';
 import { UNCATEGORIZED_ID } from '../../../lib/categories';
@@ -1306,7 +1306,19 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
                   </td>
                   <td><input type="number" value={editRow.shares} onChange={(e) => setEditRow({ ...editRow, shares: Number(e.target.value) })} className="w-90" /></td>
                   <td><input type="number" step="0.0001" value={editRow.price} onChange={(e) => setEditRow({ ...editRow, price: Number(e.target.value) })} className="w-90" /></td>
-                  <td>{fmtMoney(editRow.shares * editRow.price, fund.currencyCode)}</td>
+                  <td>
+                    <input
+                      type="number"
+                      step="0.01"
+                      aria-label="Amount"
+                      value={(editRow.shares * editRow.price).toFixed(2)}
+                      className="w-110"
+                      onChange={(e) => {
+                        const amount = Number(e.target.value);
+                        setEditRow({ ...editRow, shares: unitsFromAmount(amount, editRow.price) });
+                      }}
+                    />
+                  </td>
                   <td>
                     <PendingToggle
                       checked={!!editRow.isPending}
@@ -1405,7 +1417,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
                     ) : (
                       <RecordRow market="funds" onEdit={() => startEditUpdate(rawIndex, r.point)}    record={r}  key={rawIndex}>
                         <td className="text-muted">{r.index}</td>
-                        <td>{r.time ? new Date(r.time).toLocaleString() : r.date}</td>
+                        <td>{r.date}</td>
                         <td>{fmtMoney(r.prevBalance, fund.currencyCode)}</td>
                         <td>{fmtPrice(r.prevNav)}</td>
                         <td>{fmtMoney(r.newBalance, fund.currencyCode)}</td>
