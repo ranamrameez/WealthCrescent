@@ -59,33 +59,22 @@ PR #28 fixed the `PriceInput` draft/default interaction, flushes queued local-st
 
 The prior full suite had failures in QSE batch CSV imports, hidden-order reorder saving, and the live price-input synchronization test. Fixes are now committed on `feat/persisted-trade-accounting-order`: exclude derived `perTickerIndex` from numeric input validation; teach `BatchEditGrid` to include hidden `orderKey` drafts in dirty state and onSave (QSE's `globalTransactionIndex` is not a visible column); and await the live-price effect in the asynchronous test. Production build passed in the previous run; the new test run has not yet completed.
 
-## 2026-10-30 — Broker-profile isolation work in progress
+## 2026-10-30 — verified stock-order merge and current follow-ups
 
-Branch: `feat/broker-profile-isolation-ui` (separate from `fix/mutual-funds-ledger-sync` and PR #36).
-
-User's UI references: Portfolio Item detail is the primary standard — one summary card with light-border inline flexible subsections, no nested cards. Bank Account detail is second-best. Broker page now uses `StandardPageSections` so sections appear in the top bar, and each profile's settings are inside its own profile row.
-
-Architecture:
-- Broker profile data: transactions, transfers, adjustments, dividends/rewards, trade plans, settings, calculations and accounting indexes.
-- Exchange-shared data: market prices, price history, watchlists and exchange-wide information; never duplicate/filter by broker.
-- Cash Transfer and central Transfers popup: QSE/PSX are selectable by individual broker profile; each side stores the broker ID. Store transfer actions route to inactive profiles for linked add/edit/delete.
-- Archived = view-only, hidden from new-activity pickers. Deactivated = hidden from ordinary lists/pickers and cannot be selected as active; shown in its own status section.
-- One-time versioned migration assigns the legacy PSX portfolio to JS Zindagi, preserving financial trade fields and shared market data.
-
-Implementation has started across BrokersPage, TransferLinksPage, TransactionEntryModal, interEntityLink/linkCascade, createWorkbookStore, and related tests. CI/browser validation has not yet been completed. Before merge, verify the migration against a backup/export, profile switch isolation, all transfer operations across inactive profiles, and status restrictions. Do not merge if CI fails.
-
-## 2026-10-30 — Rebased follow-ups after PR #36 merge
-
-- `main` includes PR #36 as merge commit `e4aef0bcd2ccf20e2cd7c73a3fe98cc293943be8`; its exact PR head passed run #94 (full test suite and production build). The mixed-event cash ledger still sorts trades/transfers/adjustments by effective date and needs a separate shared-order design.
-- Broker-profile isolation was originally stacked in PR #38 and temporarily merged into the old feature branch. That branch diverged from the squash-merged `main`, so the code was ported onto clean branch `feat/broker-profile-isolation-main` and opened as PR #41. Do not merge old PR #39. PR #41 requires a fresh green Actions run; real-export migration and browser verification remain manual prerequisites.
-- Mutual Funds date/amount corrections were ported onto clean branch `fix/mutual-funds-ledger-sync-main` and opened as PR #40. Original PR #37 is superseded and should not be merged. PR #40 requires green tests/build.
-- Funds transfer reconciliation remains deliberately out of scope: there is no explicit per-fund cash-on-hand account. A future design must model transfer cash separately and move it into/out of holdings on BUY/SELL to avoid double counting.
-- Current PRs: #40 Mutual Funds effective dates/amount editing; #41 broker-profile isolation. Require latest-head full tests + production build before merge. Never push directly to `main`.
+- PR #36, `Synchronize global and per-ticker trade accounting order`, was merged to `main` as `e4aef0bcd2ccf20e2cd7c73a3fe98cc293943be8`. Its exact source head passed GitHub Actions run #94: full test suite and production build both succeeded. The mixed-event cash ledger (trades + transfers + adjustments) still uses effective-date ordering; do not claim that separate ledger problem is solved.
+- Broker-profile isolation from PR #38 was merged into its original feature branch only after its exact source head passed run #99. A main-targeted PR #39 now carries that implementation; its own CI must pass before merge. The migration still requires a backup/export review and browser verification; CI alone does not validate a user's financial data migration.
+- Mutual Funds date/amount fixes are being ported to a fresh branch from the post-#36 `main` because the original PR #37 branch diverged when #36 merged. Main-targeted PR #40 is the intended replacement; PR #37 should be closed as superseded only after #40 is opened and CI starts.
+- Mutual Funds changes: Balance History uses effective `date` (same-day `time` tie-break only); Invest/Withdraw Amount is editable and derives units from NAV; tests cover amount conversion and date-driven history/latest-price ordering. Invest and Withdraw remain separate actions; P&L is derived.
+- Funds transfer/cash reconciliation is intentionally separate. `FundsWorkbook` inherits generic transfers but has no per-fund cash-on-hand account. A correct solution needs an explicit cash ledger/account model so a deposit is cash until a BUY moves it into units; otherwise the same deposit could be counted once as cash and again as holdings. Do not merge a shortcut that double-counts it.
+- For every PR, validate the latest head SHA, not a previous run. Require both full tests and production build green before merge. Never push directly to `main`.
 
 
-## 2026-10-30 — latest validation checkpoint
+## Broker-profile isolation — current PR #41 checkpoint (2026-10-30)
 
-- PR #40 merged to `main` as `d2b1e41a552a9b0e013ee41c20a8f0cabf654719`. Its latest-head GitHub Actions run #104 passed both the full test suite and production build.
-- Broker-profile isolation is in clean main-based PR #41 (`feat/broker-profile-isolation-main`). Its latest-head run #105 passed both full tests and production build. It remains open pending a backup/export migration review and browser verification; do not merge until those manual checks are completed.
-- Funds transfer/cash-on-hand work is tracked in issue #42; don't shortcut by adding transfer amounts to invested holdings.
-- Old PR #37 and #39 are closed as superseded. Current active PR: #41. PR #36 and #40 are merged. Never push directly to `main`.
+- Clean main-based branch: `feat/broker-profile-isolation-main`; PR #41.
+- Per-broker data: trades, transfers, adjustments, dividends/rewards, trade plans, fee/cost-basis settings and calculations. Shared exchange data: market prices, price history, watchlists and exchange-wide information.
+- Central Transfers/Cash Transfer pickers store the individual broker profile ID. Add/edit/delete must route to the correct profile even when it is inactive; legacy linked transfers recover their broker reference.
+- Archived profiles remain view-only; deactivated profiles are hidden from normal activity and cannot become active.
+- Legacy PSX history migrates to JS Zindigi/JS Zindagi, preserving transaction IDs, dates, tickers, actions, quantities, prices, fee overrides, transfer amounts/fees, and shared market data.
+- The original stacked implementation passed run #99; clean main-based PR #41 passed run #105 (tests/build) before post-PR40 reconciliation. The latest head needs a fresh Actions run. Do not merge until a backup/export review and browser checks confirm migration, profile switching, linked transfer routing, and status restrictions.
+- PR #36 and PR #40 are merged; PR #37 and #39 are closed as superseded. Funds cash reconciliation is tracked in issue #42.
