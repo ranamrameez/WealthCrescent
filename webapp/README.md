@@ -11632,4 +11632,4 @@ PR #36 follow-up: QSE batch editor validation/reorder fixes were committed on `f
 
 ## Broker-profile isolation — PR #43 latest validation (2026-10-30)
 
-PR #43 is the clean main-based broker-profile branch. Its exact latest head `b31bbd264d105c0445abc655abe2f083017e9407` passed GitHub Actions run #107: full tests and production build. Still do not merge until a real backup/export migration review and browser verification confirm data preservation, profile switching, linked transfer routing, and Archived/Deactivated behavior.
+PR #43 latest head `dcf3181a0a8955417c4049089f4735685c25a8ec` passed Actions run #112 (full tests + production build). Manual backup/export migration review and browser verification remain required before merge.
