@@ -81,3 +81,11 @@ Implementation has started across BrokersPage, TransferLinksPage, TransactionEnt
 - Mutual Funds date/amount corrections were ported onto clean branch `fix/mutual-funds-ledger-sync-main` and opened as PR #40. Original PR #37 is superseded and should not be merged. PR #40 requires green tests/build.
 - Funds transfer reconciliation remains deliberately out of scope: there is no explicit per-fund cash-on-hand account. A future design must model transfer cash separately and move it into/out of holdings on BUY/SELL to avoid double counting.
 - Current PRs: #40 Mutual Funds effective dates/amount editing; #41 broker-profile isolation. Require latest-head full tests + production build before merge. Never push directly to `main`.
+
+
+## 2026-10-30 — latest validation checkpoint
+
+- PR #40 merged to `main` as `d2b1e41a552a9b0e013ee41c20a8f0cabf654719`. Its latest-head GitHub Actions run #104 passed both the full test suite and production build.
+- Broker-profile isolation is in clean main-based PR #41 (`feat/broker-profile-isolation-main`). Its latest-head run #105 passed both full tests and production build. It remains open pending a backup/export migration review and browser verification; do not merge until those manual checks are completed.
+- Funds transfer/cash-on-hand work is tracked in issue #42; don't shortcut by adding transfer amounts to invested holdings.
+- Old PR #37 and #39 are closed as superseded. Current active PR: #41. PR #36 and #40 are merged. Never push directly to `main`.
