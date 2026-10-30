@@ -1053,15 +1053,14 @@ was queued; the saved timestamp changes only after the service writes fresh data
 
 Loading masks use small rounded stat placeholders and large 600px section cards containing smaller stat cards and a content panel with a few lines across the loading area. Opening a different page starts at the top, including when using browser Back or Forward; section and filter changes on the same page retain your scroll position.
 
-## Broker profiles (QSE and PSX)
 
-Each broker profile is a separate portfolio account. Trades, transfers, adjustments, dividends/rewards, trade plans, fee settings, calculations and accounting indexes belong to the selected broker. Market prices, price history, watchlists and other exchange-wide information remain shared for the exchange.
+## Mutual Funds — editing transactions and balance history
 
-Use the Broker Profiles page to add accounts, switch the active account, or manage status:
-- **Active:** available for normal portfolio activity.
-- **Archived:** preserved for historical viewing and excluded from new-activity pickers.
-- **Deactivated:** hidden from normal activity lists and switching; visible in the Deactivated section so it can be reactivated.
+- Invest and Withdraw remain separate transaction actions. Editing an Invest/Withdraw row lets you edit Amount; units are recalculated from the row's NAV. Editing the units or NAV retains the same transaction model.
+- Balance History shows the effective valuation date. When a historical date is changed, the history and latest NAV are ordered by that date; the original timestamp is retained only as audit/intraday metadata and as a same-day tie-breaker.
+- Profit/Loss is derived performance, not a separate transaction row. Transfer-to-Funds cash-on-hand reconciliation is not yet included; do not treat a transfer as invested holdings until a future cash ledger explicitly models uninvested cash.
 
-The central Transfers popup lists individual QSE/PSX broker accounts, not just the exchange. Select the correct broker account on each side of a transfer.
 
-For PSX legacy history, the initial migration assigns existing records to JS Zindagi. Review a backup/export before relying on migrated data. This workflow is still under validation until its implementation PR passes CI and real-data checks.
+## Stock broker profiles
+
+QSE and PSX portfolios can be separated by broker profile. Select the broker profile before adding trades, transfers, adjustments, dividends or trade plans; fee and cost-basis settings are stored per profile. Market prices, price history and watchlists remain shared for the exchange. Archived profiles remain available as read-only history; deactivated profiles are hidden from normal activity and cannot be selected for new activity. Legacy PSX records are assigned to the default JS Zindigi/JS Zindagi profile during the versioned migration. Review your backup/export after migration before relying on the new profile separation.
