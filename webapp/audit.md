@@ -107,3 +107,25 @@ The fresh CI run confirmed the previous batch-editor fixes: the remaining QSE fa
 ### QSE local-date/live-price comparison correction (2026-10-30)
 
 The remaining live-price input failure exposed a timezone edge case, not just an async test issue: Qatar's local calendar day can already be the next date while the UTC timestamp is still on the previous day. Comparing a date-only manual point via `Date.parse(date)` incorrectly treats it as midnight UTC and can make it appear newer than a live quote from the same local day. `applyLiveQse` now compares calendar dates first and timestamps only within the same date; timestamped points sort after date-only points on that same date. Added regression coverage for the Qatar local-day/previous-UTC-day boundary and for preserving a manual point from a later calendar day. Fresh CI is pending.
+
+## 2026-10-30 — Broker-profile isolation (implementation in progress)
+
+Tracked on `feat/broker-profile-isolation-ui`. The UI should follow Portfolio Item detail first (summary card with inline, light-bordered flexible subsections; no nested cards), then Bank Account detail. Broker sections are top-bar navigable via `StandardPageSections`, and profile settings belong within their own profile row.
+
+Design locked by user:
+- Per broker: trades, transfers, adjustments, dividends/rewards, plans, settings, calculations and accounting indexes.
+- Per exchange: market prices, price history, watchlists and market-wide data; shared, not duplicated.
+- Transfers: central Transfers popup and Cash Transfer picker identify each broker profile separately and persist its profile ID.
+- Archived profiles: preserved and view-only; not offered for new activity.
+- Deactivated profiles: excluded from normal activity lists and active-profile switching; shown in a dedicated status section.
+- Existing legacy PSX portfolio: assign to JS Zindagi in a one-time versioned migration without changing financial trade fields.
+
+Initial implementation adds profile-specific transfer routing for inactive profiles, broker pickers and settings within the broker page, status sections, and migration/regression tests. **Not verified yet:** CI, browser behavior, historical data migration against a real export, and linked transfer edit/delete across all combinations. Treat as in-progress; no merge recommendation until these pass.
+
+### PR #38 rebase status (2026-10-30)
+
+Broker-profile changes have been rebased onto the latest PR #36 head after fixing the QSE batch/import and live-price date-boundary regressions. PR #38 remains stacked on PR #36 and is now 17 files ahead with no base-behind commits. The branch is ready for a fresh PR CI run; browser verification and real-export migration checks are still required.
+
+### Broker branch CI trigger after stacked rebase (2026-10-30)
+
+The broker-profile branch was rebased onto the now-green PR #36 head (run #94: build and full test suite passed). A full combined PR validation is being triggered against main because this repository's checks are configured for main-targeted pull requests. The intended review relationship remains stacked: PR #36 first, then PR #38. Restore PR #38's base to `feat/persisted-trade-accounting-order` after the combined CI run.
