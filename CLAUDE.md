@@ -43,7 +43,7 @@ app, not developer notes) continuously as features ship.
 
 **Latest user instruction (2026-10-15): Do not automatically push code. Keep changes local for review unless the user explicitly requests a commit or push. This supersedes the earlier auto-commit/push standing instruction.**
 
-**Latest session continuity (2026-10-30):** read [`webapp/SESSION_HANDOFF.md`](webapp/SESSION_HANDOFF.md) for the current state. PR #22 and PR #23 are closed as superseded. PR #36's canonical `globalTransactionIndex` / `perTickerIndex` work is merged to `main` (run #94 passed tests and build); mixed-event cash-ledger ordering remains a separate unresolved design. Broker-profile isolation is being re-targeted in main-based PR #41; Mutual Funds effective-date/amount fixes are in PR #40. Check each latest head's Actions before merge; broker migration still needs backup/export and browser verification. Continue updating README, audit, handoff and USER_MANUAL. Never push directly to `main`.
+**Latest session continuity (2026-10-30):** read [`webapp/SESSION_HANDOFF.md`](webapp/SESSION_HANDOFF.md) for the current state. PR #22 (stale global/per-ticker transaction-order proposal in PR #36) and PR #23 (superseded save-recovery work) are closed; PR #30 and #31 contain the recovered code changes. Canonical `globalTransactionIndex` / `perTickerIndex` synchronization is implemented in fresh PR #36 but remains open pending CI/review; the separate mixed-event cash ledger still needs its own ordering design. Re-check live GitHub state before acting. Continue updating `webapp/README.md` Done/Pending and `webapp/USER_MANUAL.md` with each meaningful change. Never push directly to `main`; use focused PRs and merge only after relevant checks pass.
 
 ## Current status (as of 2026-08-23)
 
@@ -8011,14 +8011,7 @@ RTDB security rules, not by hiding the config).
 ## Batch editing update (2026-09-27)
 Bank Account Transactions/Plans and Personal Loan Payments/Plans use the shared BatchEditGrid. See webapp/BATCH_EDIT.md for the assessed editing/link architecture and safety boundaries. Single-record forms remain unchanged. Linked rows and executed plans are locked; recurring/generated Bank plans use their existing workflows. New batch saves validate and check stale records before one workbook update. Future integrations should reuse this contract rather than add inline editing to normal rows.
 
+
 ## Broker-profile isolation (2026-10-30)
 
-- Keep each QSE/PSX broker's trades, transfers, adjustments, dividends/rewards, trade plans, settings, calculations and accounting indexes isolated by broker ID.
-- Market prices, price history, watchlists and exchange-wide data belong to the exchange, not to a broker profile.
-- Central Transfers and Cash Transfer pickers must show individual broker profiles and persist the broker ID on each stock transfer side.
-- Archived profiles are read-only and hidden from new-activity pickers. Deactivated profiles are hidden from normal activity lists and active switching, but remain visible in their dedicated status section.
-- Existing legacy PSX history belongs to JS Zindagi; migrate it once, version the migration, and preserve financial fields.
-- Broker UI must follow Portfolio Item detail (one summary card with light-bordered inline subsections; avoid nested cards), then Bank Account detail. Use `StandardPageSections` for top-bar section shortcuts and keep profile settings inside their profile row.
-- Keep broker work on `feat/broker-profile-isolation-ui`; do not mix it with Mutual Funds or transaction-order branches. Never push directly to `main`. Update README, audit, USER_MANUAL and SESSION_HANDOFF as implementation changes.
-
-**2026-10-30 follow-up:** PR #36 is merged to `main` (run #94 green). Mutual Funds PR #40 is merged (run #104 green); Funds cash-on-hand reconciliation is tracked in issue #42. Broker-profile isolation is in clean main-based PR #41; run #105 passed tests and production build. Do not merge #41 until backup/export migration review and browser verification are completed. Original divergent PRs #37 and #39 are closed as superseded.
+PR #41 carries the clean main-based broker-profile implementation. Keep QSE/PSX trades, transfers, adjustments, dividends, plans, fee settings and calculations isolated per broker profile; keep exchange market prices, price history and watchlists shared. Legacy PSX history migrates to JS Zindagi with financial fields preserved. Archived profiles are view-only; deactivated profiles cannot become active. See `webapp/SESSION_HANDOFF.md` and `webapp/audit.md`. Run #105 passed tests/build on the pre-documentation head; the latest head must pass CI again after the post-PR40 reconciliation. Backup/export migration review and browser checks remain required before merge. Never push directly to `main`.
