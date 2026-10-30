@@ -11628,3 +11628,10 @@ PR #36 follow-up: QSE batch editor validation/reorder fixes were committed on `f
 - Broker-profile isolation has been ported to a clean branch from post-#36 `main` for PR #41. The earlier PR #38/39 path was stacked/diverged; do not merge that stale main-targeted branch. Latest-head CI for #41 is required.
 - Mutual Funds effective-date/amount corrections are on clean post-#36 branch PR #40. Its CI must pass before merge. Transfer-to-Funds cash-on-hand is separate accounting work, not included.
 - Never merge based on an older successful run. Check the current PR head SHA and both Actions jobs (tests and production build).
+
+
+## 2026-10-30 — post-merge verification
+
+- **Done:** PR #40 Mutual Funds effective-date/amount corrections merged as `d2b1e41a552a9b0e013ee41c20a8f0cabf654719`; latest-head Actions run #104 passed the full test suite and production build.
+- **In review:** PR #41 broker-profile isolation is on a clean branch from current `main`; latest-head run #105 passed the full test suite and production build. Do not merge until a backup/export migration review and browser verification confirm legacy PSX data is preserved and profile/transfer flows work.
+- **Tracked follow-up:** issue #42 covers Funds cash-on-hand reconciliation without double-counting deposits and invested holdings. Original PRs #37 and #39 are closed as superseded.
