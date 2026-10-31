@@ -20,6 +20,7 @@ export function cashSummary(
   const transferFees = totalTransferFees(transfers);
   const totalRewards = (adjustments || []).reduce((s, a) => s + a.amount, 0);
   const totalDividends = dividends.reduce((sum, dividend) => sum + dividend.amount, 0);
+  const unmatchedSellFees = positions.reduce((sum, position) => sum + (position.unmatchedSellFees ?? 0), 0);
   const tradingFees = positions.reduce((s, p) => s + p.buyFees + p.sellFees, 0);
   const realizedPL = positions.reduce((s, p) => s + p.realized, 0);
 
@@ -38,7 +39,7 @@ export function cashSummary(
   const cashBalance = ledger.length ? ledger[ledger.length - 1].balance : 0;
   const netWorth = cashBalance + portfolioValue;
   const totalCharges = transferFees + tradingFees;
-  const netPL = realizedPL + unrealizedPL - transferFees + totalRewards + totalDividends;
+  const netPL = realizedPL + unrealizedPL - transferFees + totalRewards + totalDividends - unmatchedSellFees;
 
   const pendingCashImpact = transactions.filter((t) => t.isPending).reduce((sum, t) => {
     const amount = t.shares * t.price;
@@ -46,5 +47,5 @@ export function cashSummary(
     return sum + (t.action === 'BUY' ? -(amount + fee) : amount - fee);
   }, 0);
 
-  return { totalInward, totalOutward, transferFees, tradingFees, totalCharges, totalRewards, totalDividends, realizedPL, unrealizedPL, netPL, cashBalance, portfolioValue, netWorth, ledger, pendingCashImpact };
+  return { totalInward, totalOutward, transferFees, tradingFees, totalCharges, totalRewards, totalDividends, unmatchedSellFees, realizedPL, unrealizedPL, netPL, cashBalance, portfolioValue, netWorth, ledger, pendingCashImpact };
 }

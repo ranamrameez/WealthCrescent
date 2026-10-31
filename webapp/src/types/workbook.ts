@@ -495,6 +495,8 @@ export interface CashSummary {
   totalCharges: number;
   totalRewards: number;
   totalDividends: number;
+  /** Sell fees allocated to unmatched shares; excluded from matched realized P/L but still an expense. */
+  unmatchedSellFees: number;
   realizedPL: number;
   unrealizedPL: number;
   netPL: number;

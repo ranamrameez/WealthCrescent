@@ -293,7 +293,7 @@ function groupKey(tx: Transaction, groupBy: GroupBy): string {
 function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } = {}) {
   const pageFilters = useQseFilters();
   const [modifying, setModifying] = useState(false);
-  const { workbook, calcFee, positions, closedTrades, realizedBySellTxId: sellPLById, lots } = useQSEDerived();
+  const { workbook, calcFee, positions, closedTrades, realizedBySellTxId: sellPLById, sellReconciliationByTxId, lots } = useQSEDerived();
   const deleteTransaction = useWorkbookStore((s) => s.deleteTransaction);
   const updateTransaction = useWorkbookStore((s) => s.updateTransaction);
   const ensureSignedIn = useEnsureSignedIn();
@@ -574,6 +574,11 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
                     <td>{fmtMoney(tx.shares * tx.price, currency)}</td>
                     <td className={tx.id && sellPLById[tx.id] ? (sellPLById[tx.id].netPL >= 0 ? 'pill-positive' : 'pill-negative') : undefined}>
                       {tx.id && sellPLById[tx.id] ? fmtMoney(sellPLById[tx.id].netPL, currency) : '—'}
+                      {tx.id && (sellReconciliationByTxId[tx.id]?.unmatchedShares ?? 0) > 0 && (
+                        <div className="text-warning small" title="Unmatched shares have no buy cost in this workbook. Their proceeds are excluded from realized profit; the unmatched sell fee is still expensed.">
+                          Unmatched {fmt(sellReconciliationByTxId[tx.id].unmatchedShares, 0)} shares · fee {fmtMoney(sellReconciliationByTxId[tx.id].unmatchedFee, currency)}
+                        </div>
+                      )}
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
                       {modifying && <>{tx.isPending && (
@@ -728,6 +733,9 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
             { label: 'Amount', value: fmtMoney(detailTx.shares * detailTx.price, currency) },
             ...(detailTx.id && sellPLById[detailTx.id]
               ? [{ label: 'Realized P/L', value: fmtMoney(sellPLById[detailTx.id].netPL, currency) }]
+              : []),
+            ...(detailTx.id && (sellReconciliationByTxId[detailTx.id]?.unmatchedShares ?? 0) > 0
+              ? [{ label: 'Unmatched shares', value: fmt(sellReconciliationByTxId[detailTx.id].unmatchedShares, 0) }, { label: 'Unmatched sell fee', value: fmtMoney(sellReconciliationByTxId[detailTx.id].unmatchedFee, currency) }]
               : []),
             { label: 'Status', value: detailTx.isPending ? 'Pending (not yet cleared)' : 'Cleared' },
           ]}

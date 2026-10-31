@@ -12,3 +12,16 @@ describe('cashSummary dividend cash treatment', () => {
     expect(result.ledger[0]).toMatchObject({ kind: 'dividend', sourceId: 'dividend', amount: 5, balance: 5 });
   });
 });
+
+
+it('deducts fees allocated to unmatched oversell shares without treating their proceeds as realized profit', () => {
+  const transactions = [
+    { id: 'buy', date: '2026-01-01', ticker: 'AAA', action: 'BUY' as const, shares: 10, price: 10 },
+    { id: 'oversell', date: '2026-01-02', ticker: 'AAA', action: 'SELL' as const, shares: 15, price: 10 },
+  ];
+  const calcFee = (tx: { action: string }) => tx.action === 'SELL' ? 10 : 0;
+  const result = cashSummary(transactions, [], [], {}, calcFee);
+  expect(result.unmatchedSellFees).toBeCloseTo(10 / 3, 8);
+  expect(result.netPL).toBeCloseTo(-10 / 3, 8);
+  expect(result.cashBalance).toBeCloseTo(40, 8);
+});
