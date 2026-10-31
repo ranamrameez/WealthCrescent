@@ -15,7 +15,9 @@ export interface Transaction {
   id?: string;
   /** Legacy compatibility alias. For transactions this mirrors perTickerIndex; globalTransactionIndex now controls accounting order. Other record types still use seq as their own sequence. */
   seq?: number;
-  /** Canonical global accounting position across all transactions in this exchange workbook. Reordering the global sequence must also recalculate perTickerIndex. */
+  /** Shared same-day accounting sequence across trades, transfers, adjustments and dividends. */
+  accountingOrder?: number;
+  /** Canonical trade-only global accounting position. Retained for cross-date trade ordering compatibility. */
   globalTransactionIndex?: number;
   /** Canonical position within this ticker's own transaction sequence, derived from globalTransactionIndex order. */
   perTickerIndex?: number;
@@ -149,8 +151,10 @@ export interface Transfer {
    * transfer links (README item 19) can reference a specific transfer that
    * survives other transfers being added/edited/deleted around it. */
   id: string;
-  /** Same reasoning and retrofit pattern as `Transaction.seq` above. */
+  /** Legacy per-record-type sequence. */
   seq?: number;
+  /** Shared same-day accounting sequence across all event types. */
+  accountingOrder?: number;
   date: string;
   /** Pending item 41 — see `Transaction.time`/`timezone` above for the
    * shared reasoning; same optional, backfill-to-noon fields here. */
@@ -181,8 +185,10 @@ export interface Adjustment {
    * needs to reference a specific adjustment the way linking needs
    * `Transfer.id`, so this is the groundwork, not a full addressing switch. */
   id?: string;
-  /** Same reasoning and retrofit pattern as `Transaction.seq` above. */
+  /** Legacy per-record-type sequence. */
   seq?: number;
+  /** Shared same-day accounting sequence across all event types. */
+  accountingOrder?: number;
   date: string;
   /** Pending item 41 — same optional time/timezone fields as `Transaction`. */
   time?: string;
@@ -274,8 +280,10 @@ export interface Dividend {
   brokerId?: string;
   /** Stable id — same reasoning as `Adjustment.id` above (README item 51). */
   id?: string;
-  /** Same reasoning and retrofit pattern as `Transaction.seq` above. */
+  /** Legacy per-record-type sequence. */
   seq?: number;
+  /** Shared same-day accounting sequence across all event types. */
+  accountingOrder?: number;
   date: string;
   /** Pending item 41 — same optional time/timezone fields as `Transaction`. */
   time?: string;
