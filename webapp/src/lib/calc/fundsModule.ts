@@ -59,8 +59,8 @@ export function fundsValueByCurrency(
  * uninvested cash separate from NAV-valued units without blending currencies.
  *
  * Legacy transfers without currencyCode remain in the workbook unchanged and
- * are read using the historical Funds default currency. New transfers always
- * persist their selected currency. */
+ * are read using the one-time legacyTransferCurrency snapshot. New transfers
+ * always persist their selected currency. */
 export type FundsCashLedgerEvent = ReturnType<typeof buildCashLedger>[number] & {
   currencyCode: string;
 };
