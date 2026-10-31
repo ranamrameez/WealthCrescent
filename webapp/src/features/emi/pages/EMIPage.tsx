@@ -941,6 +941,7 @@ function RepaymentLog({ loan, repayments }: { loan: EMILoan; repayments: EMIRepa
   const [editAmount, setEditAmount] = useState(0);
   const dateSortInput = [...repayments].sort((a, b) => a.month - b.month);
   const sorted = dateSort.rows(dateSortInput, { date: row => installmentDueDate(loan, row.month), month: row => row.month });
+  const { rows: pageRows, controls } = useTablePagination(sorted);
 
   const linkByRecordId = useMemo(() => {
     const map = new Map<string, (typeof links)[number]>();
@@ -979,7 +980,7 @@ function RepaymentLog({ loan, repayments }: { loan: EMILoan; repayments: EMIRepa
         <table>
           <thead><tr><dateSort.Th rows={dateSortInput} column="month">Month</dateSort.Th><dateSort.Th rows={dateSortInput} column="date">Due date</dateSort.Th><th>Amount</th><th>Source</th><th></th></tr></thead>
           <tbody>
-            {sorted.map((r) => {
+            {pageRows.map((r) => {
               const link = linkByRecordId.get(r.id);
               const otherSide = link ? (link.from.module === 'emi' && link.fromRecordId === r.id ? link.to : link.from) : undefined;
               return (
@@ -1020,29 +1021,51 @@ function RepaymentLog({ loan, repayments }: { loan: EMILoan; repayments: EMIRepa
           </tbody>
         </table>
       </div>
+      {controls}
+    </TableCard>
+  );
+}
+
+function HomepagePlansForLoan({ loan, filters, repayments }: { loan: EMILoan; filters: TransactionPageFilters; repayments: EMIRepayment[] }) {
+  const dateSort = useDateTableSort();
+  const loanRepayments = repayments.filter((repayment) => repayment.loanId === loan.id);
+  const summary = emiSummary(loan);
+  const rows = summary.rows.slice(summary.elapsed).filter((row) => {
+    const dueDate = resolvedDueDate(loan, row.month, loanRepayments);
+    return (!filters.fromDate || dueDate >= filters.fromDate) && (!filters.toDate || dueDate <= filters.toDate);
+  });
+  const sortedRows = dateSort.rows(rows, { date: row => resolvedDueDate(loan, row.month, loanRepayments), month: row => row.month });
+  const { rows: pageRows, controls } = useTablePagination(sortedRows);
+
+  return (
+    <TableCard title={<>{loan.name}<span className="text-muted">({loan.currencyCode})</span></>} dateSort={dateSort}>
+      <div className="table-scroll">
+        <table>
+          <thead><tr><dateSort.Th rows={rows} column="month">Month</dateSort.Th><dateSort.Th column="date">Due date</dateSort.Th><th>Installment</th><th>Balance</th></tr></thead>
+          <tbody>
+            {pageRows.map((row) => (
+              <RecordRow record={row} key={row.month}>
+                <td>#{row.month}</td>
+                <td><DateValue value={resolvedDueDate(loan, row.month, loanRepayments)} /></td>
+                <td>{fmtMoney(row.emi, loan.currencyCode)}</td>
+                <td>{fmtMoney(row.balance, loan.currencyCode)}</td>
+              </RecordRow>
+            ))}
+            {!rows.length && <tr><td colSpan={4} className="text-muted">No installments match the page filters.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {controls}
     </TableCard>
   );
 }
 
 function HomepagePlans({ loans, filters }: { loans: EMILoan[]; filters: TransactionPageFilters }) {
-  const dateSort = useDateTableSort();
   const repayments = useEMIWorkbookStore((state) => state.workbook.repayments);
   if (filters.direction === 'in' || filters.source === 'statement-import') return <p className="text-muted">No planned installments match the page filters.</p>;
-  return <div className="stack-lg">{loans.map((loan) => {
-    const loanRepayments = repayments.filter((repayment) => repayment.loanId === loan.id);
-    const summary = emiSummary(loan);
-    const rows = summary.rows.slice(summary.elapsed).filter((row) => {
-      const dueDate = resolvedDueDate(loan, row.month, loanRepayments);
-      return (!filters.fromDate || dueDate >= filters.fromDate) && (!filters.toDate || dueDate <= filters.toDate);
-    });
-    return <TableCard title={<>{loan.name}<span className="text-muted">({loan.currencyCode})</span></>} dateSort={dateSort} key={loan.id}>
-
-      <div className="table-scroll"><table><thead><RecordRow record={loan}><dateSort.Th rows={rows} column="month">Month</dateSort.Th><dateSort.Th column="date">Due date</dateSort.Th><th>Installment</th><th>Balance</th></RecordRow></thead><tbody>
-        {dateSort.rows(rows, { date: row => resolvedDueDate(loan, row.month, loanRepayments), month: row => row.month }).map((row) => <RecordRow record={row} key={row.month}><td>#{row.month}</td><td><DateValue value={resolvedDueDate(loan, row.month, loanRepayments)} /></td><td>{fmtMoney(row.emi, loan.currencyCode)}</td><td>{fmtMoney(row.balance, loan.currencyCode)}</td></RecordRow>)}
-        {!rows.length && <tr><td colSpan={4} className="text-muted">No installments match the page filters.</td></tr>}
-      </tbody></table></div>
-    </TableCard>;
-  })}</div>;
+  return <div className="stack-lg">{loans.map((loan) => (
+    <HomepagePlansForLoan key={loan.id} loan={loan} filters={filters} repayments={repayments} />
+  ))}</div>;
 }
 
 function HomepagePayments({ loans, filters }: { loans: EMILoan[]; filters: TransactionPageFilters }) {
