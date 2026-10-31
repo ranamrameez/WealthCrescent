@@ -1031,6 +1031,7 @@ function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: Pl
   );
   const dateSortInput = useMemo(() => [...plans].sort((a, b) => a.date.localeCompare(b.date)), [plans]);
   const sorted = dateSort.rows(dateSortInput, { date: row => row });
+  const { rows: pageRows, controls: paginationControls } = useTablePagination(sorted);
 
   const markDone = async (p: PlannedCreditCardTransaction & { planId?: string }) => {
     const occurrenceDate = p.date;
@@ -1061,7 +1062,7 @@ function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: Pl
         <table>
           <thead><tr><dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th><th>Type</th><th>Description</th><th>Amount</th><th>Repeats / status</th><th></th></tr></thead>
           <tbody>
-            {sorted.map((p) => (
+            {pageRows.map((p) => (
               <RecordRow onEdit={() => setEditingPlan(allPlans.find((plan) => plan.id === (p.planId ?? p.id)) ?? p)}    record={p}  key={p.id}>
                 <td><DateValue value={p.date} /></td>
                 <td className={p.kind === 'payment' ? 'pill pill-positive' : 'pill pill-negative'} style={{ display: 'inline-block' }}>{KIND_LABELS[p.kind]}</td>
@@ -1088,6 +1089,7 @@ function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: Pl
           </tbody>
         </table>
       </div>
+      {paginationControls}
       {editingPlan && (
         <Modal title="Edit plan" onClose={() => setEditingPlan(null)}>
           <AddCardPlanForm cardId={card.id} plan={editingPlan} onSaved={() => setEditingPlan(null)} />
