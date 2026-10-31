@@ -1,4 +1,5 @@
 import { StatCard2 } from '../../../components/StatCard2';
+import { SummarySection, SummarySections, SummaryValue } from '../../../components/SummaryGroupCard';
 import { RecordRow } from '../../../components/RecordRow';
 import { Pagination } from '../../../components/Pagination';
 import { usePagination } from '../../../hooks/usePagination';
@@ -281,33 +282,19 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
 
         {(section === 'all' || section === 'all-time') && position && (position.buyCount > 0 || position.sellCount > 0) && (
           <DetailCard section={section} title={<span>All-time stats <StatSourceBadge source="official" /></span>} className="mb-12">
-            <div className="grid-auto" style={gridAutoStyle(100, 8)}>
-              <div className="stat-card card" style={hueStyle(HUES[0])}>
-                <div className="label">Bought / Sold</div>
-                <div className="value">{fmt(position.totalBoughtShares, 0)} / {fmt(position.totalSoldShares, 0)}</div>
-                <div className="sub">{position.buyCount} buys · {position.sellCount} sells</div>
-              </div>
-              {position.sellCount > 0 && (
-                <div className="stat-card card" style={hueStyle(HUES[7])}>
-                  <div className="label">Sell price</div>
-                  <Tooltip text="Weighted average, and most recent, sell price for this ticker.">
-                    <div className="value">{fmtPSXPrice(avgSellPrice)}</div>
-                  </Tooltip>
-                  <div className="sub">avg · last {fmtPSXPrice(lastSellPrice)}</div>
-                </div>
-              )}
-              <div className="stat-card card" style={hueStyle(position.realized >= 0 ? 'var(--profit)' : 'var(--loss)')}>
-                <div className="label">Realized P/L</div>
-                <div className="value">{fmtMoney(position.realized, currency)}</div>
-              </div>
-              <div className="stat-card card" style={hueStyle(HUES[4])}><div className="label">Fees paid</div><div className="value">{fmtMoney(position.buyFees + position.sellFees, currency)}</div></div>
-              <div className="stat-card card" style={hueStyle(HUES[3])}>
-                <div className="label">Trade dates</div>
-                <div className="value fs-14">{position.firstDate}</div>
-                <div className="sub">to {position.lastDate}</div>
-              </div>
-              {!isOpen && <div className="stat-card card" style={hueStyle(HUES[6])}><div className="label">Held</div><div className="value">{holdingDays}d</div></div>}
-            </div>
+            <SummarySections className="stock-all-time-summary">
+              <SummarySection title="Trading activity">
+                <SummaryValue label="Bought / sold" value={`${fmt(position.totalBoughtShares, 0)} / ${fmt(position.totalSoldShares, 0)}`} primary detail={`${position.buyCount} buys · ${position.sellCount} sells`} />
+                {position.sellCount > 0 && <SummaryValue label={<Tooltip text="Weighted average, and most recent, sell price for this ticker.">Sell price</Tooltip>} value={fmtPSXPrice(avgSellPrice)} detail={`Latest ${fmtPSXPrice(lastSellPrice)}`} />}
+                <SummaryValue label="Trade dates" value={position.firstDate} detail={`to ${position.lastDate}`} />
+                {!isOpen && <SummaryValue label="Holding period" value={`${holdingDays} days`} />}
+              </SummarySection>
+              <SummarySection title="Returns & fees">
+                <SummaryValue label="Realized P/L" value={fmtMoney(position.realized, currency)} tone={position.realized >= 0 ? 'positive' : 'negative'} primary />
+                <SummaryValue label="Fees paid" value={fmtMoney(position.buyFees + position.sellFees, currency)} />
+                {(position.unmatchedSellShares ?? 0) > 0 && <SummaryValue label="Unmatched sells" value={fmt(position.unmatchedSellShares ?? 0, 0)} detail={`${position.unmatchedSellTransactions ?? 1} transaction(s) require reconciliation`} tone="negative" />}
+              </SummarySection>
+            </SummarySections>
           </DetailCard>
         )}
 
