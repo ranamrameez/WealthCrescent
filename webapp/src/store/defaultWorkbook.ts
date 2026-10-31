@@ -20,6 +20,7 @@ export function createEmptyWorkbook(): Workbook {
     settings: { ...DEFAULT_SETTINGS },
     brokerProfiles: [{ id: 'qse-the-group', name: 'The Group', settings: { ...DEFAULT_SETTINGS }, settingsDefaultsVersion: APP_DEFAULTS_VERSION }],
     activeBrokerId: 'qse-the-group',
+    brokerMigrationVersion: 1,
     transactions: [],
     transfers: [],
     adjustments: [],

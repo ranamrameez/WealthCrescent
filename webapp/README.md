@@ -11628,3 +11628,8 @@ PR #36 follow-up: QSE batch editor validation/reorder fixes were committed on `f
 - Keep Invest and Withdraw as separate transaction actions (BUY/SELL); P&L remains derived from contributed/withdrawn capital and NAV performance. Do not add a separate P&L transaction type.
 - **Not included:** transfer-to-Funds cash-on-hand reconciliation. The existing Funds transfer model has no per-fund uninvested-cash account, so counting transfers as invested value would risk double-counting after a BUY. Track that as a separate accounting-model task; do not silently fold transfers into holdings/NAV.
 - PR #36 is merged into `main` after Actions run #94 passed tests and production build. Broker-profile work is now in main-targeted PR #39; Mutual Funds work is being rebased onto current `main` in PR #40. Merge only after the latest head SHA has a green full-test and production-build run.
+
+
+## Broker-profile isolation — PR #43 latest validation (2026-10-30)
+
+PR #43 latest head `dcf3181a0a8955417c4049089f4735685c25a8ec` passed Actions run #112 (full tests + production build). Manual backup/export migration review and browser verification remain required before merge.

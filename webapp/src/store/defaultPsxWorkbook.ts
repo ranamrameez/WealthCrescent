@@ -90,6 +90,7 @@ export function createEmptyPSXWorkbook(): PSXWorkbook {
       },
     ],
     activeBrokerId: JS_ZINDIGI_PROFILE_ID,
+    brokerMigrationVersion: 1,
     transactions: [],
     transfers: [],
     adjustments: [],

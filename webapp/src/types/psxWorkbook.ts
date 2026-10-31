@@ -91,6 +91,8 @@ export interface PSXWorkbook {
   settings: PSXSettings;
   brokerProfiles: BrokerProfile<PSXSettings>[];
   activeBrokerId: string;
+  /** Versioned one-time migration marker for legacy PSX rows assigned to JS Zindagi. */
+  brokerMigrationVersion?: number;
   /** @deprecated appearance is now a global preference, not per-exchange —
    * kept optional here only so old exported/synced JSON still parses. */
   appearance?: Appearance;

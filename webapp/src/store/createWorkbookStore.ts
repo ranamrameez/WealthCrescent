@@ -22,6 +22,8 @@ export interface BaseWorkbook<TSettings> {
   /** Optional profile fields: present in QSE/PSX workbooks, absent in other modules. */
   brokerProfiles?: BrokerProfile<TSettings>[];
   activeBrokerId?: string;
+  /** Versioned one-time migration marker for exchange-wide legacy rows into broker profiles. */
+  brokerMigrationVersion?: number;
 }
 
 export interface WorkbookStoreState<TWorkbook extends BaseWorkbook<unknown>> {
@@ -87,23 +89,27 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
         tradePlans: asArray<TradePlan>(profile.data.tradePlans),
       },
     } : profile);
-    const activeProfile = profiles.find((p) => p.id === wb.activeBrokerId && !p.archived)
-      ?? profiles.find((p) => !p.archived);
+    // One-time, non-destructive migration: the first version of broker
+    // profiles treats the legacy top-level portfolio as the original account.
+    // For PSX that original account is explicitly JS Zindagi, regardless of
+    // which profile happened to be selected. Later writes carry version 1 and
+    // are never reassigned.
+    const shouldMigrateLegacy = (wb.brokerMigrationVersion ?? 0) < 1;
+    const hasLegacyRecords = shouldMigrateLegacy && (
+      wb.transactions.length + wb.transfers.length + wb.adjustments.length + wb.dividends.length + wb.tradePlans.length > 0
+    );
+    const zindigiProfile = profiles.find((p) => p.id === 'psx-js-zindigi' || /zindagi|zindigi/i.test(p.name));
+    const migrationProfile = hasLegacyRecords ? (zindigiProfile ?? profiles.find((p) => p.id === wb.activeBrokerId && !p.archived && !p.deactivated) ?? profiles.find((p) => !p.archived && !p.deactivated)) : undefined;
+    const activeProfile = migrationProfile
+      ?? profiles.find((p) => p.id === wb.activeBrokerId && !p.archived && !p.deactivated)
+      ?? profiles.find((p) => !p.archived && !p.deactivated);
     const activeBrokerId = activeProfile?.id ?? wb.activeBrokerId;
-    // One-time, non-destructive migration: historical trades without a broker
-    // are assigned to the original/default active profile. Preserve all trade
-    // fields and seed that profile's settings from the legacy workbook settings.
-    const hasUnassignedRecords = wb.transactions.some((t) => !t.brokerId)
-      || wb.transfers.some((t) => !t.brokerId)
-      || wb.adjustments.some((a) => !a.brokerId)
-      || wb.dividends.some((d) => !d.brokerId)
-      || wb.tradePlans.some((p) => !p.brokerId);
-    const brokerProfiles = hasUnassignedRecords && activeProfile
-      ? profiles.map((p) => p.id === activeProfile.id ? { ...p, settings: wb.settings } : p)
+    const brokerProfiles = hasLegacyRecords && migrationProfile
+      ? profiles.map((p) => p.id === migrationProfile.id ? { ...p, settings: wb.settings } : p)
       : profiles;
     const transactionsWithBroker = wb.transactions.map((t) => ({
       ...t,
-      ...(t.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }),
+      ...(shouldMigrateLegacy && migrationProfile?.id ? { brokerId: migrationProfile.id } : t.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }),
     }));
     const transactionsWithId = transactionsWithBroker.map((t) => (t.id ? t : { ...t, id: crypto.randomUUID() }));
     // Backfill a stable global order once for legacy records. Existing indexes are
@@ -123,43 +129,80 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
       return transactionsWithId.map(t => Number.isInteger(t.globalTransactionIndex) || Number.isInteger(t.transactionIndex) ? { ...t, globalTransactionIndex: t.globalTransactionIndex ?? t.transactionIndex, transactionIndex: t.globalTransactionIndex ?? t.transactionIndex } : byId.get(t.id)!);
     })();
     const syncedTransactions = syncTransactionIndexes(indexedTransactions);
-    const transfersWithId = wb.transfers.map((t) => ({ ...t, ...(t.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), ...(t.id ? {} : { id: crypto.randomUUID() }) }));
-    const adjustmentsWithId = wb.adjustments.map((a) => ({ ...a, ...(a.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), ...(a.id ? {} : { id: crypto.randomUUID() }) }));
-    const dividendsWithId = wb.dividends.map((d) => ({ ...d, ...(d.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), ...(d.id ? {} : { id: crypto.randomUUID() }) }));
-    const plansWithId = wb.tradePlans.map((p) => ({ ...p, ...(p.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), id: p.id || crypto.randomUUID(), legs: p.legs || [] }));
+    const transfersWithId = wb.transfers.map((t) => ({ ...t, ...(shouldMigrateLegacy && migrationProfile?.id ? { brokerId: migrationProfile.id } : t.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), ...(t.id ? {} : { id: crypto.randomUUID() }) }));
+    const adjustmentsWithId = wb.adjustments.map((a) => ({ ...a, ...(shouldMigrateLegacy && migrationProfile?.id ? { brokerId: migrationProfile.id } : a.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), ...(a.id ? {} : { id: crypto.randomUUID() }) }));
+    const dividendsWithId = wb.dividends.map((d) => ({ ...d, ...(shouldMigrateLegacy && migrationProfile?.id ? { brokerId: migrationProfile.id } : d.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), ...(d.id ? {} : { id: crypto.randomUUID() }) }));
+    const plansWithId = wb.tradePlans.map((p) => ({ ...p, ...(shouldMigrateLegacy && migrationProfile?.id ? { brokerId: migrationProfile.id } : p.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), id: p.id || crypto.randomUUID(), legs: p.legs || [] }));
     const normalized = {
       ...wb,
       ...(profiles.length ? { brokerProfiles, activeBrokerId } : {}),
+      ...(profiles.length ? { brokerMigrationVersion: 1 } : {}),
       transactions: syncedTransactions,
       transfers: backfillSeq(transfersWithId, chronologicalByInstant(transfersWithId)),
       adjustments: backfillSeq(adjustmentsWithId, chronologicalByInstant(adjustmentsWithId)),
       dividends: backfillSeq(dividendsWithId, chronologicalByInstant(dividendsWithId)),
       tradePlans: plansWithId,
     } as TWorkbook;
-    // Legacy workbooks store one exchange-wide portfolio. The migration above
-    // assigns its existing records to the default profile; snapshot that full
-    // history into the active profile so future broker switches are isolated.
-    const active = normalized.brokerProfiles?.find((p) => p.id === normalized.activeBrokerId);
-    if (!active) return normalized;
-    const data: BrokerPortfolioData = {
-      transactions: normalized.transactions,
-      transfers: normalized.transfers,
-      adjustments: normalized.adjustments,
-      dividends: normalized.dividends,
-      tradePlans: normalized.tradePlans,
+    // Route every record into the profile named by its brokerId. This is
+    // deliberately done before exposing the active arrays: a workbook can
+    // contain legacy unassigned rows alongside already-profiled rows, and
+    // copying the whole top-level array into one profile would cross-contaminate
+    // accounts. Exchange market data/watchlists are intentionally untouched.
+    if (!normalized.brokerProfiles?.length) return normalized;
+    const mergeById = <T extends { id?: string }>(existing: T[], incoming: T[]): T[] => {
+      const merged = new Map<string, T>();
+      existing.forEach((item, index) => merged.set(item.id ?? `legacy-existing-${index}`, item));
+      incoming.forEach((item, index) => merged.set(item.id ?? `legacy-incoming-${index}`, item));
+      return [...merged.values()];
     };
+    const profilesWithData = normalized.brokerProfiles.map((profile) => {
+      const existing = profile.data ?? { transactions: [], transfers: [], adjustments: [], dividends: [], tradePlans: [] };
+      const transactions = mergeById(
+        existing.transactions.map((item) => ({ ...item, brokerId: item.brokerId ?? profile.id })),
+        normalized.transactions.filter((item) => item.brokerId === profile.id),
+      );
+      const transfers = mergeById(
+        existing.transfers.map((item) => ({ ...item, brokerId: item.brokerId ?? profile.id })),
+        normalized.transfers.filter((item) => item.brokerId === profile.id),
+      );
+      const adjustments = mergeById(
+        existing.adjustments.map((item) => ({ ...item, brokerId: item.brokerId ?? profile.id })),
+        normalized.adjustments.filter((item) => item.brokerId === profile.id),
+      );
+      const dividends = mergeById(
+        existing.dividends.map((item) => ({ ...item, brokerId: item.brokerId ?? profile.id })),
+        normalized.dividends.filter((item) => item.brokerId === profile.id),
+      );
+      const tradePlans = mergeById(
+        existing.tradePlans.map((item) => ({ ...item, brokerId: item.brokerId ?? profile.id })),
+        normalized.tradePlans.filter((item) => item.brokerId === profile.id),
+      );
+      return {
+        ...profile,
+        ...(profile.id === normalized.activeBrokerId ? { settings: normalized.settings } : {}),
+        data: { transactions, transfers, adjustments, dividends, tradePlans },
+      };
+    });
+    const active = profilesWithData.find((profile) => profile.id === normalized.activeBrokerId);
+    if (!active) return { ...normalized, brokerProfiles: profilesWithData };
     return {
       ...normalized,
-      brokerProfiles: normalized.brokerProfiles!.map((p) => p.id === active.id
-        ? { ...p, settings: normalized.settings, data }
-        : p),
+      transactions: active.data!.transactions,
+      transfers: active.data!.transfers,
+      adjustments: active.data!.adjustments,
+      dividends: active.data!.dividends,
+      tradePlans: active.data!.tradePlans,
+      brokerProfiles: profilesWithData,
     };
   }
 
   function loadFromLocalStorage(): TWorkbook {
     try {
       const raw = localStorage.getItem(storageKey);
-      if (raw) return normalize({ ...createEmpty(), ...JSON.parse(raw) });
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return normalize({ ...createEmpty(), ...parsed, brokerMigrationVersion: parsed.brokerMigrationVersion ?? 0 });
+      }
     } catch (e) {
       console.warn(`Failed to load workbook from localStorage (${storageKey})`, e);
     }
@@ -229,10 +272,31 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
       deleteTransaction: (index) => mutate((wb) => ({ ...wb, transactions: syncTransactionIndexes(wb.transactions.filter((_, i) => i !== index)) })),
       addTransfer: (t) => mutate((wb) => {
         const withId = t.id ? t : { ...t, id: crypto.randomUUID() };
-        return { ...wb, transfers: [...wb.transfers, { ...withId, ...(withId.brokerId || !wb.activeBrokerId ? {} : { brokerId: wb.activeBrokerId }), seq: withId.seq !== undefined ? withId.seq : nextSeq(wb.transfers), timestamp: withId.timestamp ?? new Date().toISOString() }] };
+        const brokerId = withId.brokerId ?? wb.activeBrokerId;
+        const targetTransfers = wb.brokerProfiles?.find((profile) => profile.id === brokerId)?.data?.transfers ?? (brokerId === wb.activeBrokerId ? wb.transfers : []);
+        const record = { ...withId, ...(brokerId ? { brokerId } : {}), seq: withId.seq !== undefined ? withId.seq : nextSeq(targetTransfers), timestamp: withId.timestamp ?? new Date().toISOString() };
+        if (wb.brokerProfiles?.length && brokerId && brokerId !== wb.activeBrokerId) {
+          return {
+            ...wb,
+            brokerProfiles: wb.brokerProfiles.map((profile) => profile.id === brokerId
+              ? { ...profile, data: { ...profile.data, transactions: profile.data?.transactions ?? [], transfers: [...(profile.data?.transfers ?? []), record], adjustments: profile.data?.adjustments ?? [], dividends: profile.data?.dividends ?? [], tradePlans: profile.data?.tradePlans ?? [] } }
+              : profile),
+          };
+        }
+        return { ...wb, transfers: [...wb.transfers, record] };
       }),
-      updateTransfer: (id, patch) => mutate((wb) => ({ ...wb, transfers: wb.transfers.map((t) => (t.id === id ? { ...t, ...patch } : t)) })),
-      deleteTransfer: (id) => mutate((wb) => ({ ...wb, transfers: wb.transfers.filter((t) => t.id !== id) })),
+      updateTransfer: (id, patch) => mutate((wb) => {
+        if (wb.transfers.some((t) => t.id === id)) return { ...wb, transfers: wb.transfers.map((t) => (t.id === id ? { ...t, ...patch } : t)) };
+        return { ...wb, brokerProfiles: wb.brokerProfiles?.map((profile) => profile.data?.transfers.some((t) => t.id === id)
+          ? { ...profile, data: { ...profile.data!, transfers: profile.data!.transfers.map((t) => t.id === id ? { ...t, ...patch } : t) } }
+          : profile) };
+      }),
+      deleteTransfer: (id) => mutate((wb) => {
+        if (wb.transfers.some((t) => t.id === id)) return { ...wb, transfers: wb.transfers.filter((t) => t.id !== id) };
+        return { ...wb, brokerProfiles: wb.brokerProfiles?.map((profile) => profile.data?.transfers.some((t) => t.id === id)
+          ? { ...profile, data: { ...profile.data!, transfers: profile.data!.transfers.filter((t) => t.id !== id) } }
+          : profile) };
+      }),
       addAdjustment: (a) => mutate((wb) => {
         const withId = a.id ? a : { ...a, id: crypto.randomUUID() };
         const seq = withId.seq !== undefined ? withId.seq : nextSeq(wb.adjustments);
@@ -292,7 +356,7 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
         const profiles = wb.brokerProfiles?.map((p) => p.id === wb.activeBrokerId
           ? { ...p, settings: wb.settings, data: currentData }
           : p);
-        const target = profiles?.find((p) => p.id === brokerId && !p.archived);
+        const target = profiles?.find((p) => p.id === brokerId && !p.archived && !p.deactivated);
         if (!target) return wb;
         const targetData: Partial<BrokerPortfolioData> = target.data ?? {};
         const data: BrokerPortfolioData = {

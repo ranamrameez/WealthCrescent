@@ -376,14 +376,18 @@ export interface BrokerProfile<TSettings> {
   settingsDefaultsVersion?: number;
   /** Independent account history. Market prices/watchlists remain exchange-wide. */
   data?: BrokerPortfolioData;
-  /** Inactive profiles remain in the workbook so their historical trades are preserved. */
+  /** Archived profiles are retained for history and remain view-only. */
   archived?: boolean;
+  /** Deactivated profiles are hidden from normal activity pickers and only shown in the profile status section. */
+  deactivated?: boolean;
 }
 
 export interface Workbook {
   settings: QSESettings;
   brokerProfiles: BrokerProfile<QSESettings>[];
   activeBrokerId: string;
+  /** One-time legacy broker-profile migration marker. */
+  brokerMigrationVersion?: number;
   /** @deprecated appearance is now a global preference (see
    * store/appearanceStore.ts), not per-workbook — kept optional here only
    * so old exported/synced JSON still parses. */
