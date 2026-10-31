@@ -141,6 +141,15 @@ describe('netWorthAsOfDate', () => {
     expect(usd?.breakdown).toContainEqual({ module: 'Funds', amount: 1120 });
   });
 
+  it('respects the independent Funds cash inclusion setting', () => {
+    const inputs = {
+      ...emptyInputs(),
+      fundsTransfers: [{ id: 'd1', date: '2026-01-01', type: 'DEPOSIT' as const, gross: 1000, fee: 0, currencyCode: 'USD' }],
+      fundsIncludeCashInNetWorth: false,
+    };
+    expect(netWorthAsOfDate('2026-01-31', inputs as never)).toEqual([]);
+  });
+
   it('values a QSE position using the price known AS OF that date, not a later one', () => {
     const base = {
       ...emptyInputs(),
