@@ -36,8 +36,8 @@ import { LINK_MODULES, LINK_MODULE_LABELS, type LinkModule, type LinkSideConfig 
 interface CurrencyContext {
   cashCurrency: string;
   bankAccounts: { id: string; currencyCode: string }[];
-  qseCurrency: string;
-  psxCurrency: string;
+  qseBrokers: { id: string; settings: { currency: string } }[];
+  psxBrokers: { id: string; settings: { currency: string } }[];
   fundsCurrency: string;
   properties: { id: string; currencyCode: string }[];
   loans: { id: string; currencyCode: string }[];
@@ -59,12 +59,12 @@ export function nextUnpaidEmiMonth(loan: EMILoan): number {
  * hook) so it can be called per-row inside a `.map()`, e.g. in a batch
  * transaction list, where the store selectors are read once at the top of
  * the component instead of once per row. */
-function resolveCurrency(cfg: LinkSideConfig, ctx: CurrencyContext): string | null {
+export function resolveCurrency(cfg: LinkSideConfig, ctx: CurrencyContext): string | null {
   switch (cfg.module) {
     case 'cash': return cfg.currencyCode || ctx.cashCurrency;
     case 'bank': return ctx.bankAccounts.find((a) => a.id === cfg.ref)?.currencyCode ?? null;
-    case 'qse': return ctx.qseCurrency;
-    case 'psx': return ctx.psxCurrency;
+    case 'qse': return ctx.qseBrokers.find((broker) => broker.id === cfg.ref)?.settings.currency ?? null;
+    case 'psx': return ctx.psxBrokers.find((broker) => broker.id === cfg.ref)?.settings.currency ?? null;
     // Unlike QSE/PSX, Funds has no single portfolio currency (funds can be
     // added in different currencies) — `defaultCurrency` is a pragmatic
     // stand-in, same simplification the unused `cashSummary`/
@@ -86,14 +86,14 @@ function resolveCurrency(cfg: LinkSideConfig, ctx: CurrencyContext): string | nu
 export function useSideCurrency(cfg: LinkSideConfig): string | null {
   const cashCurrency = useCashWorkbookStore((s) => s.workbook.settings.defaultCurrency);
   const bankAccounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
-  const qseCurrency = useWorkbookStore((s) => s.workbook.settings.currency);
-  const psxCurrency = usePSXWorkbookStore((s) => s.workbook.settings.currency);
+  const qseBrokers = useWorkbookStore((s) => s.workbook.brokerProfiles ?? []);
+  const psxBrokers = usePSXWorkbookStore((s) => s.workbook.brokerProfiles ?? []);
   const fundsCurrency = useFundsWorkbookStore((s) => s.workbook.settings.defaultCurrency);
   const properties = useRentalsWorkbookStore((s) => s.workbook.settings.properties);
   const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const emiLoans = useEMIWorkbookStore((s) => s.workbook.entries);
   const creditCards = useCreditCardWorkbookStore((s) => s.workbook.cards);
-  return resolveCurrency(cfg, { cashCurrency, bankAccounts, qseCurrency, psxCurrency, fundsCurrency, properties, loans, emiLoans, creditCards });
+  return resolveCurrency(cfg, { cashCurrency, bankAccounts, qseBrokers, psxBrokers, fundsCurrency, properties, loans, emiLoans, creditCards });
 }
 
 interface NameContext {
@@ -269,8 +269,8 @@ export function SideFields({
       // transaction goes" list (2026-09-03) — same "hide from pickers for
       // new activity, never from totals" rule as `AccountsList`'s own
       // filter; see `BankAccount.isActive`'s own doc comment.
-      case 'qse': return qseBrokers.filter((p) => !p.archived && !p.deactivated).map((p) => ({ id: p.id, label: p.name, currencyCode: useWorkbookStore.getState().workbook.settings.currency }));
-      case 'psx': return psxBrokers.filter((p) => !p.archived && !p.deactivated).map((p) => ({ id: p.id, label: p.name, currencyCode: usePSXWorkbookStore.getState().workbook.settings.currency }));
+      case 'qse': return qseBrokers.filter((p) => !p.archived && !p.deactivated).map((p) => ({ id: p.id, label: p.name, currencyCode: p.settings.currency }));
+      case 'psx': return psxBrokers.filter((p) => !p.archived && !p.deactivated).map((p) => ({ id: p.id, label: p.name, currencyCode: p.settings.currency }));
       case 'bank': return bankAccounts.filter((a) => a.isActive !== false).map((a) => ({ id: a.id, label: `${a.name} (${a.currencyCode})`, currencyCode: a.currencyCode }));
       // Same archived-hiding rule extended to every other linkable entity
       // list with its own `isActive` flag (2026-09-03) — see each type's
@@ -289,11 +289,11 @@ export function SideFields({
     switch (cfg.module) {
       case 'qse': {
         const profile = qseBrokers.find((item) => item.id === cfg.ref);
-        return profile ? { id: profile.id, label: profile.name, currencyCode: useWorkbookStore.getState().workbook.settings.currency } : undefined;
+        return profile ? { id: profile.id, label: profile.name, currencyCode: profile.settings.currency } : undefined;
       }
       case 'psx': {
         const profile = psxBrokers.find((item) => item.id === cfg.ref);
-        return profile ? { id: profile.id, label: profile.name, currencyCode: usePSXWorkbookStore.getState().workbook.settings.currency } : undefined;
+        return profile ? { id: profile.id, label: profile.name, currencyCode: profile.settings.currency } : undefined;
       }
       case 'bank': {
         const account = bankAccounts.find((item) => item.id === cfg.ref);
