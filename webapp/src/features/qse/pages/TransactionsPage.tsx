@@ -29,7 +29,7 @@ import { fmt, fmtMoney, fmtQSEPrice } from '../../../lib/format';
 import { closedPLBySellTxId, computeClosedTrades, type LotMatchOrder } from '../../../lib/calc/closedTrades';
 import { computeAveragePLBySellTxId } from '../../../lib/calc/realizedPL';
 import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
-import { tradePriceDeviationPct, validateSellQuantities } from '../../../lib/calc/tradeValidation';
+import { tradePriceDeviationPct, validateTransactionEdit, validateSellQuantities } from '../../../lib/calc/tradeValidation';
 import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
 import { transferRunningBalance } from '../../../lib/calc/transferBalance';
 import { Field } from '../../../components/ui/Field';
@@ -471,10 +471,9 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   };
   const saveEdit = async () => {
     if (editIndex === null || !editRow) return;
-    if (editRow.action === 'SELL' && !editRow.isPending) {
-      const available = computeFIFOPositions(workbook.transactions.filter((_, index) => index !== editIndex), calcFee).positions.find(position => position.ticker === editRow.ticker.toUpperCase())?.shares ?? 0;
-      if (editRow.shares > available + 1e-7) return toast(`Cannot save this sell: only ${fmt(available, 0)} ${editRow.ticker.toUpperCase()} shares are available.`);
-    }
+    const candidateTransactions = workbook.transactions.map((transaction, index) => index === editIndex ? editRow : transaction);
+    const quantityError = validateTransactionEdit(workbook.transactions, candidateTransactions);
+    if (quantityError) return toast(`Cannot save this edit: it would create ${fmt(quantityError.additionalUnmatchedShares, 0)} unmatched SELL shares for ${quantityError.ticker}.`);
     const marketPrice = workbook.marketPrices[editRow.ticker.toUpperCase()] ?? 0;
     const deviation = tradePriceDeviationPct(editRow.price, marketPrice);
     const threshold = workbook.settings.tradePriceDeviationPct ?? 10;
