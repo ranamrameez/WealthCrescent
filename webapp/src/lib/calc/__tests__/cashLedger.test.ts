@@ -56,3 +56,12 @@ it('keeps the full cash proceeds from an executed oversell while stock accountin
   expect(accounting.positions[0].unmatchedSellShares).toBe(1);
   expect(accounting.realizedBySellTxId.sell).toEqual({ netPL: 4, shares: 2 });
 });
+
+
+it('uses the shared same-day sequence across trades and transfers instead of their separate seq values', () => {
+  const buy = tx({ id: 'trade', date: '2026-01-02', time: '12:00', action: 'BUY', shares: 1, price: 10, seq: 1, accountingOrder: 2 });
+  const deposit = transfer({ id: 'deposit', date: '2026-01-02', time: '09:00', type: 'DEPOSIT', gross: 20, fee: 0, seq: 99, accountingOrder: 1 });
+  const ledger = buildCashLedger([buy], [deposit], [], flatFee);
+  expect(ledger.map(event => event.sourceId)).toEqual(['deposit', 'trade']);
+  expect(ledger.map(event => event.accountingOrder)).toEqual([1, 2]);
+});

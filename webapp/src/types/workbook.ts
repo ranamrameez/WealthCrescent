@@ -469,6 +469,8 @@ export interface CashLedgerEvent {
    * `Transaction.seq`'s doc comment) — the tie-breaker `buildCashLedger`
    * falls back to for two events of the SAME `kind` at the same instant. */
   seq?: number;
+  /** Shared same-day accounting sequence across every event type. */
+  accountingOrder?: number;
   /** Canonical global accounting position for trade events. */
   globalTransactionIndex?: number;
   /** Canonical per-ticker accounting position for trade events. */

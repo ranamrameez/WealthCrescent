@@ -20,19 +20,25 @@ export function buildCashLedger(
     const amount = tx.shares * tx.price;
     const fee = calcFee(amount, isBuy, { shares: tx.shares, tx });
     const cashDelta = isBuy ? -(amount + fee) : amount - fee;
-    events.push({ sourceId: tx.id, ticker: tx.ticker, date: tx.date, time: tx.time, timezone: tx.timezone, seq: tx.perTickerIndex ?? tx.seq, globalTransactionIndex: tx.globalTransactionIndex ?? tx.transactionIndex, perTickerIndex: tx.perTickerIndex ?? tx.seq, transactionIndex: tx.globalTransactionIndex ?? tx.transactionIndex, kind: 'trade', action: tx.action, label: `${tx.action} ${fmt(tx.shares, 0)} ${tx.ticker} @ ${fmt(tx.price, 3)}`, amount: cashDelta, fee });
+    events.push({ sourceId: tx.id, ticker: tx.ticker, date: tx.date, time: tx.time, timezone: tx.timezone, seq: tx.perTickerIndex ?? tx.seq, accountingOrder: tx.accountingOrder, globalTransactionIndex: tx.globalTransactionIndex ?? tx.transactionIndex, perTickerIndex: tx.perTickerIndex ?? tx.seq, transactionIndex: tx.globalTransactionIndex ?? tx.transactionIndex, kind: 'trade', action: tx.action, label: `${tx.action} ${fmt(tx.shares, 0)} ${tx.ticker} @ ${fmt(tx.price, 3)}`, amount: cashDelta, fee });
   });
 
   transfers.forEach((t) => {
     const cashDelta = t.type === 'DEPOSIT' ? t.gross - t.fee : -(t.gross + t.fee);
-    events.push({ sourceId: t.id, date: t.date, time: t.time, timezone: t.timezone, seq: t.seq, kind: 'transfer', action: t.type, label: t.type === 'DEPOSIT' ? 'Deposit' : 'Withdrawal', amount: cashDelta, fee: t.fee });
+    events.push({ sourceId: t.id, date: t.date, time: t.time, timezone: t.timezone, seq: t.seq, accountingOrder: t.accountingOrder, kind: 'transfer', action: t.type, label: t.type === 'DEPOSIT' ? 'Deposit' : 'Withdrawal', amount: cashDelta, fee: t.fee });
   });
 
   (adjustments || []).forEach((a) => {
-    events.push({ sourceId: a.id, date: a.date, time: a.time, timezone: a.timezone, seq: a.seq, kind: 'adjustment', action: a.amount >= 0 ? 'REWARD' : 'CORRECTION', label: a.note || (a.amount >= 0 ? 'Trading reward' : 'Adjustment'), amount: a.amount, fee: 0 });
+    events.push({ sourceId: a.id, date: a.date, time: a.time, timezone: a.timezone, seq: a.seq, accountingOrder: a.accountingOrder, kind: 'adjustment', action: a.amount >= 0 ? 'REWARD' : 'CORRECTION', label: a.note || (a.amount >= 0 ? 'Trading reward' : 'Adjustment'), amount: a.amount, fee: 0 });
   });
 
   events.sort((a, b) => {
+    const byDate = a.date.localeCompare(b.date);
+    if (byDate) return byDate;
+    const aHasOrder = Number.isInteger(a.accountingOrder);
+    const bHasOrder = Number.isInteger(b.accountingOrder);
+    if (aHasOrder && bHasOrder && a.accountingOrder !== b.accountingOrder) return a.accountingOrder! - b.accountingOrder!;
+    if (aHasOrder !== bHasOrder) return aHasOrder ? -1 : 1;
     const byInstant = toInstantMs(a.date, a.time, a.timezone) - toInstantMs(b.date, b.time, b.timezone);
     if (byInstant !== 0) return byInstant;
     if (a.kind === 'trade' && b.kind === 'trade' && a.globalTransactionIndex !== undefined && b.globalTransactionIndex !== undefined) return a.globalTransactionIndex - b.globalTransactionIndex;
