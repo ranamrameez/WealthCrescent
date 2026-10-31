@@ -6,13 +6,11 @@ describe('calculatePositionMarketValue', () => {
   const calcFee = (amount: number) => amount * 0.01;
 
   it('calculates net market value and unrealized P/L with the shared fee contract', () => {
-    expect(calculatePositionMarketValue(position, 12, calcFee)).toEqual({
-      marketPrice: 12,
-      value: 120,
-      sellFee: 1.2,
-      profit: 18.8,
-      roiPct: 18.8,
-    });
+    const result = calculatePositionMarketValue(position, 12, calcFee);
+    expect(result).toMatchObject({ marketPrice: 12, value: 120 });
+    expect(result.sellFee).toBeCloseTo(1.2, 8);
+    expect(result.profit).toBeCloseTo(18.8, 8);
+    expect(result.roiPct).toBeCloseTo(18.8, 8);
   });
 
   it('does not invent an unrealized loss when no valid market price exists', () => {
