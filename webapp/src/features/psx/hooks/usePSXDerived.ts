@@ -48,8 +48,9 @@ function calculateDerived(workbook: PSXWorkbook, selectedTickers?: string[]) {
       workbook.marketPrices,
       calcFee,
       positions,
+      workbook.dividends,
     );
-    const ledger = buildCashLedger(scoped, workbook.transfers, workbook.adjustments, calcFee);
+    const ledger = buildCashLedger(scoped, workbook.transfers, workbook.adjustments, calcFee, workbook.dividends);
 
     const rows: PSXRow[] = positions
       .filter((p) => p.shares > 0)

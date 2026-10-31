@@ -477,7 +477,7 @@ export interface CashLedgerEvent {
   perTickerIndex?: number;
   /** @deprecated Compatibility alias for older ledger consumers. */
   transactionIndex?: number;
-  kind: 'trade' | 'transfer' | 'adjustment';
+  kind: 'trade' | 'transfer' | 'adjustment' | 'dividend';
   action: string;
   label: string;
   amount: number;
@@ -492,6 +492,7 @@ export interface CashSummary {
   tradingFees: number;
   totalCharges: number;
   totalRewards: number;
+  totalDividends: number;
   realizedPL: number;
   unrealizedPL: number;
   netPL: number;

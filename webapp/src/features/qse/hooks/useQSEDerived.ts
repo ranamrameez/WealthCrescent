@@ -39,8 +39,9 @@ function calculateDerived(workbook: Workbook, selectedTickers?: string[]) {
       workbook.marketPrices,
       calcFee,
       positions,
+      workbook.dividends,
     );
-    const ledger = buildCashLedger(scoped, workbook.transfers, workbook.adjustments, calcFee);
+    const ledger = buildCashLedger(scoped, workbook.transfers, workbook.adjustments, calcFee, workbook.dividends);
 
     // Shared per-open-position rollup (mirrors the legacy dashboard's
     // `rows` variable) — feeds most of the ticker-level charts.

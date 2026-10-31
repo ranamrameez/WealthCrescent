@@ -1,4 +1,4 @@
-import type { Adjustment, CashLedgerEvent, FeeCalculator, Transaction, Transfer } from '../../types/workbook';
+import type { Adjustment, CashLedgerEvent, Dividend, FeeCalculator, Transaction, Transfer } from '../../types/workbook';
 import { fmt } from '../format';
 import { toInstantMs } from '../datetime';
 import { sortTransactionsChronological } from './sortTransactions';
@@ -12,6 +12,7 @@ export function buildCashLedger(
   transfers: Transfer[],
   adjustments: Adjustment[],
   calcFee: FeeCalculator,
+  dividends: Dividend[] = [],
 ): CashLedgerEvent[] {
   const events: Omit<CashLedgerEvent, 'balance'>[] = [];
 
@@ -30,6 +31,15 @@ export function buildCashLedger(
 
   (adjustments || []).forEach((a) => {
     events.push({ sourceId: a.id, date: a.date, time: a.time, timezone: a.timezone, seq: a.seq, accountingOrder: a.accountingOrder, kind: 'adjustment', action: a.amount >= 0 ? 'REWARD' : 'CORRECTION', label: a.note || (a.amount >= 0 ? 'Trading reward' : 'Adjustment'), amount: a.amount, fee: 0 });
+  });
+
+  dividends.forEach((d) => {
+    events.push({
+      sourceId: d.id, date: d.date, time: d.time, timezone: d.timezone,
+      seq: d.seq, accountingOrder: d.accountingOrder, kind: 'dividend',
+      ticker: d.ticker, shares: d.shares, price: d.perShare,
+      action: 'DIVIDEND', label: `Dividend ${d.ticker}`, amount: d.amount, fee: 0,
+    });
   });
 
   events.sort((a, b) => {
