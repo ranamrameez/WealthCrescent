@@ -546,16 +546,21 @@ export function TransactionEntryModal({
     ? { module: 'personalLoans', ref: editPersonalLoanPayment.loanId, currencyCode: editingLoan?.currencyCode }
     : undefined;
   const linkIsFrom = editLink?.recordId === editLink?.link.fromRecordId;
-  const enrichBrokerRef = (side: LinkSideConfig, recordId: string): LinkSideConfig => {
-    if ((side.module !== 'qse' && side.module !== 'psx') || side.ref) return side;
+  const enrichLinkSide = (side: LinkSideConfig, recordId: string): LinkSideConfig => {
     const record = getLinkedSideRecord(side, recordId);
-    return record && 'brokerId' in record && record.brokerId ? { ...side, ref: record.brokerId } : side;
+    if ((side.module === 'qse' || side.module === 'psx') && !side.ref) {
+      return record && 'brokerId' in record && record.brokerId ? { ...side, ref: record.brokerId } : side;
+    }
+    if (side.module === 'funds' && !side.currencyCode) {
+      const recordCurrency = record && 'currencyCode' in record ? record.currencyCode : undefined;
+      return { ...side, currencyCode: recordCurrency || fundsLegacyTransferCurrency };
+    }
+    return side;
   };
   const rawLinkFinance = editLink ? linkIsFrom ? editLink.link.from : editLink.link.to : undefined;
-  // Older linked transfers were exchange-wide and stored no broker ref on
-  // the link. Recover the owning broker from the linked transfer record before
-  // rendering the locked edit form, rather than relying on a disabled picker.
-  const linkFinance = rawLinkFinance && editLink ? enrichBrokerRef(rawLinkFinance, editLink.recordId) : rawLinkFinance;
+  // Recover legacy exchange broker refs and Funds transfer currencies from
+  // the linked side record before rendering the locked edit form.
+  const linkFinance = rawLinkFinance && editLink ? enrichLinkSide(rawLinkFinance, editLink.recordId) : rawLinkFinance;
   const [linkSnapshot] = useState(() => editLink ? [structuredClone(getLinkedSideRecord(editLink.link.from, editLink.link.fromRecordId)), structuredClone(getLinkedSideRecord(editLink.link.to, editLink.link.toRecordId))] : []);
   const baseFinance = linkFinance ?? (editTransfer ? { module: editTransfer.module, ref: editTransfer.record.brokerId, fee: editTransfer.record.fee, ...(editTransfer.module === 'funds' ? { currencyCode: editTransfer.record.currencyCode ?? fundsLegacyTransferCurrency } : {}) } : editFinance ?? defaultFinance);
   const resolvedDefaultFinance: LinkSideConfig = baseFinance
@@ -580,7 +585,7 @@ export function TransactionEntryModal({
       const direction = linkIsFrom ? 'out' : 'in';
       return [{ ...base, finance: resolveTransferSide(linkFinance, direction, editLink.recordId), linked: true,
         other: resolveTransferSide(
-          enrichBrokerRef(linkIsFrom ? link.to : link.from, linkIsFrom ? link.toRecordId : link.fromRecordId),
+          enrichLinkSide(linkIsFrom ? link.to : link.from, linkIsFrom ? link.toRecordId : link.fromRecordId),
           linkIsFrom ? 'in' : 'out',
           linkIsFrom ? link.toRecordId : link.fromRecordId,
         ),
