@@ -519,6 +519,7 @@ export function TransactionEntryModal({
   const addPSXTransfer = usePSXWorkbookStore((s) => s.addTransfer);
   const addFundsTransfer = useFundsWorkbookStore((s) => s.addTransfer);
   const fundsDefaultCurrency = useFundsWorkbookStore((s) => s.workbook.settings.defaultCurrency);
+  const fundsLegacyTransferCurrency = useFundsWorkbookStore((s) => s.workbook.settings.legacyTransferCurrency ?? s.workbook.settings.defaultCurrency);
   const addCreditCardTransaction = useCreditCardWorkbookStore((s) => s.addTransaction);
   const updateSubscription = useSubscriptionsWorkbookStore((s) => s.updateEntry);
   const bankAccounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
@@ -556,7 +557,7 @@ export function TransactionEntryModal({
   // rendering the locked edit form, rather than relying on a disabled picker.
   const linkFinance = rawLinkFinance && editLink ? enrichBrokerRef(rawLinkFinance, editLink.recordId) : rawLinkFinance;
   const [linkSnapshot] = useState(() => editLink ? [structuredClone(getLinkedSideRecord(editLink.link.from, editLink.link.fromRecordId)), structuredClone(getLinkedSideRecord(editLink.link.to, editLink.link.toRecordId))] : []);
-  const baseFinance = linkFinance ?? (editTransfer ? { module: editTransfer.module, ref: editTransfer.record.brokerId, fee: editTransfer.record.fee, ...(editTransfer.module === 'funds' ? { currencyCode: editTransfer.record.currencyCode ?? fundsDefaultCurrency } : {}) } : editFinance ?? defaultFinance);
+  const baseFinance = linkFinance ?? (editTransfer ? { module: editTransfer.module, ref: editTransfer.record.brokerId, fee: editTransfer.record.fee, ...(editTransfer.module === 'funds' ? { currencyCode: editTransfer.record.currencyCode ?? fundsLegacyTransferCurrency } : {}) } : editFinance ?? defaultFinance);
   const resolvedDefaultFinance: LinkSideConfig = baseFinance
     ? (baseFinance.module === 'cash' && !baseFinance.currencyCode ? { ...baseFinance, currencyCode: cashDefaultCurrency } : baseFinance)
     : { module: 'cash', currencyCode: cashDefaultCurrency };
