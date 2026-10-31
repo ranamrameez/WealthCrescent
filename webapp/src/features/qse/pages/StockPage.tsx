@@ -30,7 +30,7 @@ import { defaultTimeForDate, defaultTimezoneForMarket, nowTime } from '../../../
 import { toCSV } from '../../../lib/csv';
 import { fmt, fmtMoney, fmtQSEPrice } from '../../../lib/format';
 import { computeFIFOPositions } from '../../../lib/calc/fifoPositions';
-import { tradePriceDeviationPct } from '../../../lib/calc/tradeValidation';
+import { tradePriceDeviationPct, validateTransactionEdit } from '../../../lib/calc/tradeValidation';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { shortenCompanyName } from '../../../lib/shortenName';
 import { useWorkbookStore } from '../../../store/workbookStore';
@@ -125,11 +125,9 @@ function TickerTransactions({ ticker, filters }: { ticker: string; filters: Tran
   };
   const saveEdit = async () => {
     if (editIndex === null || !editRow) return;
-    if (editRow.action === 'SELL' && !editRow.isPending) {
-      const otherTransactions = workbook.transactions.filter((_, index) => index !== editIndex);
-      const available = computeFIFOPositions(otherTransactions, calcFee).positions.find(position => position.ticker === editRow.ticker.toUpperCase())?.shares ?? 0;
-      if (editRow.shares > available + 1e-7) return toast(`Cannot save this sell: only ${fmt(available, 0)} ${editRow.ticker.toUpperCase()} shares are available.`);
-    }
+    const candidateTransactions = workbook.transactions.map((transaction, index) => index === editIndex ? editRow : transaction);
+    const quantityError = validateTransactionEdit(workbook.transactions, candidateTransactions);
+    if (quantityError) return toast(`Cannot save this edit: it would create ${fmt(quantityError.additionalUnmatchedShares, 0)} unmatched SELL shares for ${quantityError.ticker}.`);
     const marketPrice = workbook.marketPrices[editRow.ticker.toUpperCase()] ?? 0;
     const deviation = tradePriceDeviationPct(editRow.price, marketPrice);
     const threshold = workbook.settings.tradePriceDeviationPct ?? 10;
