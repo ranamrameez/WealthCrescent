@@ -1,8 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { QseRecordActions } from '../QseTableActions';
-import { QseReorder } from '../QseReorder';
+import { QseRecordActions, QseReorder } from '../QseTableActions';
 import { useWorkbookStore } from '../../../../store/workbookStore';
 import { createEmptyWorkbook } from '../../../../store/defaultWorkbook';
 import { useInterEntityTransfersStore } from '../../../../store/interEntityTransfersStore';
