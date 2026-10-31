@@ -432,6 +432,11 @@ export interface Position {
   realized: number;
   totalBoughtShares: number;
   totalSoldShares: number;
+  /** Historical SELL quantity that exceeded the shares tracked by this workbook.
+   * It is reported separately and never treated as zero-cost realized profit. */
+  unmatchedSellShares?: number;
+  unmatchedSellFees?: number;
+  unmatchedSellTransactions?: number;
   buyCount: number;
   sellCount: number;
   firstDate: string;
