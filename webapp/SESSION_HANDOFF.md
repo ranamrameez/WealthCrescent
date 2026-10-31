@@ -6,10 +6,10 @@
 
 - PR: **#44**, open, draft, base `main`.
 - Branch: `fix/trade-entry-validation-and-transactions-ui`.
-- Current PR head after the latest status update: `91650673f4f7bc0c17793a0a8759961a62a0d2ee`.
+- Current PR head after the latest status update: `8de0690c678b9fbaa254c64868294fb71af62c80`.
 - Base SHA reported by PR: `49cb2a40810619fa075cd422703ab4a6900adce2`.
-- PR currently contains 129 commits and 52 changed files. Review the diff and commit history carefully; do not assume the PR description's validation refers to the current head.
-- GitHub Actions run `41199236906` for code head `0901cfc9` completed successfully (build and full tests). Code head `79c017fd` passed the production build; its full test suite was still running at the last check. Current PR head `91650673` is a README-only status-pointer commit on top of that code head, and its own CI run is in progress. Re-check the exact latest head before marking ready or merging.
+- PR currently contains 131 commits and 52 changed files. Review the diff and commit history carefully; do not assume the PR description's validation refers to the current head.
+- GitHub Actions run `41199236906` for code head `0901cfc9` completed successfully (build and full tests). The later application-code head `79c017fd` passed both the production build and full test suite in run `41199370800`. Current PR head `8de0690c` contains only README/handoff documentation commits on top of that validated code head; CI run `41199512451` was in progress at the last check. Re-check the exact latest head before marking ready or merging.
 - Nothing from this work has been merged into `main`. Keep the PR as a draft until current-head tests/build, full diff review, and any required manual checks are complete.
 
 ### Scope already represented in PR #44 — verify rather than re-implement
@@ -51,7 +51,7 @@ The next context continued on the same branch and preserved the handoff/docs com
 - Corrected the PSO regression fixture: removed an unsupported 10-share BUY. The supplied history is 122 BUY / 132 SELL; the final 80-share SELL matches 70 and leaves 10 unmatched. No synthetic BUY is introduced and no profit is recognized on those 10 shares.
 - Updated PR #44's description to reflect these changes and the correct PSO totals.
 
-The latest code head in the branch is currently `79c017fd` with README-only commit `91650673` on top. Build passed at `79c017fd`; full tests for that code head and CI for the current PR head were still in progress at the last check. Do not claim the latest full suite passed until the exact current head's run completes.
+The latest application-code head in the branch is `79c017fd`; it passed build and full tests in run `41199370800`. Current PR head `8de0690c` adds only README/handoff documentation commits on top, with CI run `41199512451` in progress at the last check. Do not claim the current PR-head run completed until it does.
 
 ### Tool/session limitation
 
