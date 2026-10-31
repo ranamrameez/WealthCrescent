@@ -901,6 +901,7 @@ function PlanCurrencyTable({
     }
   };
   const { sorted, Th } = useSortableRows(plans, sortValue, 'date', 'asc');
+  const { rows: pageRows, controls } = useTablePagination(sorted);
 
   const startEdit = (p: PlannedCashEntry & { planId?: string }) => {
     const { planId, ...plan } = p;
@@ -919,7 +920,7 @@ function PlanCurrencyTable({
             </tr>
           </thead>
           <tbody>
-            {sorted.map((p) =>
+            {pageRows.map((p) =>
               (
                 <RecordRow financeModule="cash" onEdit={() => startEdit(p)}    record={p}  key={p.id}>
                   <td><DateValue value={p.date} /></td>
@@ -949,6 +950,7 @@ function PlanCurrencyTable({
           </tbody>
         </table>
       </div>
+      {controls}
       {editRow && <FinancePlanEditor reference={{ module: "cash", id: editRow.id }} occurrenceDate={plans.find(p => p.id === editId)?.recurrence ? plans.find(p => p.id === editId)?.date : undefined} onClose={() => { setEditId(null); setEditRow(null); }} />}
     </TableCard>
   );
