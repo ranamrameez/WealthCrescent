@@ -1299,7 +1299,7 @@ function TransactionsList({ account, ledger, allLedgerCount, showActions }: { ac
           const link = linkByRecordId.get(tx.id);
           const otherSide = link ? (link.from.module === 'bank' && link.fromRecordId === tx.id ? link.to : link.from) : undefined;
           return <RecordRow financeModule="bank" onEdit={() => setEditingTx(tx)}    record={{ tx, balance }}  key={tx.id}  className="clickable">
-            <td className="text-muted">{tx.serialNumber ?? '—'}{showActions && <> {' '}<span onClick={(event) => event.stopPropagation()}><ReorderButtons rows={sorted} index={(safePage - 1) * pageSize + index} instantOf={instantOf} idOf={(row) => row.tx.id} orderOf={(row) => row.tx.serialNumber} onMove={reorder} /></span></>}</td>
+            <td className="text-muted">{tx.serialNumber ?? '—'}{showActions && <> {' '}<span onClick={(event) => event.stopPropagation()}><ReorderButtons rows={sorted} index={(page - 1) * pageSize + index} instantOf={instantOf} idOf={(row) => row.tx.id} orderOf={(row) => row.tx.serialNumber} onMove={reorder} /></span></>}</td>
             <td>{formatDate(tx.date, dateFormat)}</td>
             <td className="cell-clip" title={tx.description} onClick={(event) => event.stopPropagation()}>{tx.description}{tx.isPending && <span className="pill-warn ml-6">Pending</span>}{link && <Link to={linkTargetPath(otherSide!)} className="pill-info ml-6">🔗 {sideLabel(link.from)} → {sideLabel(link.to)}</Link>}</td>
             <td><span className="pill-info">{categoryName(tx.categoryID, categories)}</span></td>
