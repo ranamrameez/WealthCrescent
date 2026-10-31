@@ -1,3 +1,4 @@
+import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
@@ -910,6 +911,8 @@ function NetWorthPlanningReality({ activities, selectedModules, currencies, curr
   }, [todayISODate, horizonDays]);
   const scopedActivities = useMemo(() => activities.filter((activity) => selectedModules.includes(activity.module)), [activities, selectedModules]);
   const planned = useMemo(() => scopedActivities.filter((activity) => !activity.executed && activity.date >= todayISODate && activity.date <= endDate), [scopedActivities, todayISODate, endDate]);
+  const sortedPlanned = dateSort.rows(planned.slice().sort((a, b) => a.date.localeCompare(b.date)), { date: row => row });
+  const { rows: pagePlannedRows, controls: plannedPaginationControls } = useTablePagination(sortedPlanned);
   const projectionMonths = useMemo(() => monthRange(0, Math.max(0, monthsBetween(currentMonthOf(), endDate.slice(0, 7)))), [endDate]);
   const projection = useMemo(() => projectedNetWorthTrend({
     months: projectionMonths, currentMonth: currentMonthOf(), todayISODate, currentRows, activities: scopedActivities,
@@ -940,10 +943,11 @@ function NetWorthPlanningReality({ activities, selectedModules, currencies, curr
         </Card>;
       })}
     </div>
-    <div className="table-scroll"><table><thead><tr><dateSort.Th rows={planned.slice().sort((a, b) => a.date.localeCompare(b.date))} column="date">Date</dateSort.Th><th>Source</th><th>Description</th><th>Category</th><th>Amount</th></tr></thead><tbody>
-      {dateSort.rows(planned.slice().sort((a, b) => a.date.localeCompare(b.date)), { date: row => row }).map((activity) => <RecordRow record={activity} key={`${activity.module}:${activity.id}`}><td><DateValue value={activity.date} /></td><td>{activity.sourceLabel}</td><td>{activity.description}</td><td>{activity.category || 'Uncategorized'}</td><td className={activity.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(activity.amount, activity.currencyCode)}</td></RecordRow>)}
+    <div className="table-scroll"><table><thead><tr><dateSort.Th rows={sortedPlanned} column="date">Date</dateSort.Th><th>Source</th><th>Description</th><th>Category</th><th>Amount</th></tr></thead><tbody>
+      {pagePlannedRows.map((activity) => <RecordRow record={activity} key={`${activity.module}:${activity.id}`}><td><DateValue value={activity.date} /></td><td>{activity.sourceLabel}</td><td>{activity.description}</td><td>{activity.category || 'Uncategorized'}</td><td className={activity.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(activity.amount, activity.currencyCode)}</td></RecordRow>)}
       {!planned.length && <tr><td colSpan={5} className="text-muted">No plans fall within this horizon and source scope.</td></tr>}
     </tbody></table></div>
+    {plannedPaginationControls}
     <p className="text-muted mb-0">Projection includes EMI liability reduction without counting a linked bank installment twice.</p>
   </div>;
 }
