@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Category } from '../../../types/finance';
 import type { Fund, FundsWorkbook } from '../../../types/fundsWorkbook';
-import { createEmptyFundsWorkbook } from '../../../store/defaultFundsWorkbook';
+import { createEmptyFundsWorkbook, migrateLegacyFundsCashSettings } from '../../../store/defaultFundsWorkbook';
 import type { PricePoint, Transaction, Transfer } from '../../../types/workbook';
-import { allocationByCategory, balanceUpdateHistory, contributionVsValueSeries, expectedPLRate, fundCategoryLabel, fundNetProfit, fundsCashBalanceByCurrency, fundsCashLedgerByCurrency, fundsValueByCurrency, migrateLegacyFundsCashSettings, organicPLByPeriod, projectInvestmentReturn, unitsFromAmount } from '../fundsModule';
+import { allocationByCategory, balanceUpdateHistory, contributionVsValueSeries, expectedPLRate, fundCategoryLabel, fundNetProfit, fundsCashBalanceByCurrency, fundsCashLedgerByCurrency, fundsValueByCurrency, organicPLByPeriod, projectInvestmentReturn, unitsFromAmount } from '../fundsModule';
 import { computePositions } from '../positions';
 
 const funds: Fund[] = [
