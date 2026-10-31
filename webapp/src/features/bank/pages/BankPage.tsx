@@ -1271,16 +1271,9 @@ function TransactionsList({ account, ledger, allLedgerCount, showActions }: { ac
   const sideLabel = useLinkSideLabel();
   const [editingTx, setEditingTx] = useState<BankTransaction | null>(null);
   const [detailTx, setDetailTx] = useState<BankTransaction | null>(null);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
-
   const dateSortInput = useMemo(() => [...ledger].reverse(), [ledger]);
   const sorted = dateSort.rows(dateSortInput, { date: row => row.tx });
-  const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
-  const safePage = Math.min(page, pageCount);
-  const pageRows = useMemo(() => sorted.slice((safePage - 1) * pageSize, safePage * pageSize), [sorted, safePage, pageSize]);
-  useEffect(() => setPage(1), [ledger, pageSize]);
-  useEffect(() => { if (page > pageCount) setPage(pageCount); }, [page, pageCount]);
+  const { rows: pageRows, controls: paginationControls, page, pageSize } = useTablePagination(sorted);
 
   const linkByRecordId = useMemo(() => {
     const map = new Map<string, (typeof links)[number]>();
@@ -1323,17 +1316,7 @@ function TransactionsList({ account, ledger, allLedgerCount, showActions }: { ac
         {!sorted.length && <tr><td colSpan={showActions ? 8 : 7} className="text-muted">{allLedgerCount ? 'No transactions match the page filters.' : 'No transactions for this account yet.'}</td></tr>}
       </tbody>
     </table></div>
-    <div className="pagination-bar">
-      <div className="text-muted">{sorted.length ? `Showing ${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, sorted.length)} of ${sorted.length}` : 'No rows'}</div>
-      <div className="pagination-actions">
-          <span className="text-muted">Page {safePage} of {pageCount}</span>
-        <Field label="Rows" width={78}><Select value={String(pageSize)} onChange={(event)=>setPageSize(Number(event.target.value))}><option value="25">25</option><option value="50">50</option><option value="100">100</option></Select></Field>
-        <div className="d-flex justify-content-center" >
-          <StandardButton tone="secondary" size="small" icon={<ArrowLeftIcon />} disabled={safePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</StandardButton>
-          <StandardButton tone="secondary" size="small" icon={<ArrowRightIcon />} disabled={safePage >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Next</StandardButton>
-        </div>
-      </div>
-    </div>
+    {paginationControls}
     {editingTx && <EditTransactionModal tx={editingTx} onClose={() => setEditingTx(null)} />}
     {detailTx && <RecordDetailModal title={detailTx.amount >= 0 ? 'Deposit' : 'Withdrawal'} onClose={() => setDetailTx(null)} fields={[
       { label: '#', value: detailTx.serialNumber ?? '—' }, { label: 'Date', value: formatDate(detailTx.date, dateFormat) }, { label: 'Time', value: detailTx.time ?? '— (defaults to noon)' },
@@ -1553,31 +1536,25 @@ function bankingTransactionActions(
 
 function BankingScopeTransactions({ accounts, filters }: { accounts: BankAccount[]; filters: BankingFilters }) {
   const dateSort = useDateTableSort();
-  useEffect(() => setPage(1), [dateSort.selection]);
   const navigate = useNavigate();
   const transactions = useBankWorkbookStore((state) => state.workbook.transactions);
   const categories = useCategoryStore((state) => state.workbook.categories);
   const dateFormat = useAppearanceStore((state) => state.appearance.dateFormat ?? 'DD-MMM-YYYY');
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+
   const accountById = useMemo(() => new Map(accounts.map((account) => [account.id, account])), [accounts]);
   const { rows } = useMemo(
     () => bankingTransactionRows(accounts, transactions, filters, categories),
     [accounts, transactions, filters, categories],
   );
-  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
-  const safePage = Math.min(page, pageCount);
-  const pageRows = dateSort.rows(rows, { date: row => row }).slice((safePage - 1) * pageSize, safePage * pageSize);
-  useEffect(() => {
-    setPage(1);
-  }, [filters.period, filters.fromDate, filters.toDate, filters.direction, filters.category, filters.source, filters.accountId, pageSize]);
+  const sortedRows = dateSort.rows(rows, { date: row => row });
+  const { rows: pageRows, controls: paginationControls } = useTablePagination(sortedRows);
   return <><div className="table-responsive"><table>
     <thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Account</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th></tr></thead>
     <tbody>{pageRows.map((tx) => { const account = accountById.get(tx.accountId)!; return <RecordRow financeModule="bank" record={tx} onOpen={() => navigate(`/bank/account/${account.id}`)} key={tx.id} className="clickable" >
       <td>{formatDate(tx.date, dateFormat)}</td><td>{accountDisplayName(account)}</td><td>{tx.description}</td><td><span className="pill-info">{categoryName(tx.categoryID, categories)}</span></td>
       <td className={tx.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(tx.amount, account.currencyCode)}</td><td>{tx.isPending ? <span className="pill-warn">Pending</span> : 'Cleared'}</td>
     </RecordRow>;})}{!rows.length && <tr><td colSpan={6} className="text-muted">No transactions match the selected filters.</td></tr>}</tbody>
-  </table></div><div className="pagination-bar"><span className="text-muted">{rows.length ? `Showing ${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, rows.length)} of ${rows.length}` : 'No rows'}</span><div className="pagination-actions"><Field label="Rows" width={78}><Select value={String(pageSize)} onChange={(event) => setPageSize(Number(event.target.value))}><option value="25">25</option><option value="50">50</option><option value="100">100</option></Select></Field><StandardButton tone="secondary" size="small" icon={<ArrowLeftIcon />} disabled={safePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</StandardButton><StandardButton tone="secondary" size="small" icon={<ArrowRightIcon />} disabled={safePage >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Next</StandardButton></div></div></>;
+  </table></div>{paginationControls}</>;
 }
 
 /* ============================== Statement import ============================== */
