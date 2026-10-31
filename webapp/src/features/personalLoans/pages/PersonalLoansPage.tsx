@@ -1,3 +1,4 @@
+import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { PlanEditorModal } from '../../../components/PlanEditorModal';
@@ -365,6 +366,7 @@ function RepaymentsSection({
     [filteredRepayments],
   );
   const sorted = dateSort.rows(dateSortInput, { date: row => row });
+  const { rows: pageRows, controls: paginationControls, page, pageSize } = useTablePagination(sorted);
   const reorder = async (pair: [{ id: string; order: number }, { id: string; order: number }]) => {
     if (!(await ensureSignedIn('Sign in to reorder payments.'))) return;
     for (const p of pair) updateRepayment(p.id, { seq: p.order });
@@ -376,7 +378,7 @@ function RepaymentsSection({
           <table>
             <thead><tr><dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th><th>Description</th><th>Amount</th><th>Category</th><th>Remaining</th><th>Source</th><th></th></tr></thead>
             <tbody>
-              {sorted.map((r, i) => {
+              {pageRows.map((r, i) => {
                 const link = linkByRecordId.get(r.id);
                 const otherSide = link ? (link.from.module === 'personalLoans' && link.fromRecordId === r.id ? link.to : link.from) : undefined;
                 return (
@@ -386,7 +388,7 @@ function RepaymentsSection({
                       {showActions && <span onClick={(e) => e.stopPropagation()}>
                         <ReorderButtons
                           rows={sorted}
-                          index={i}
+                          index={(page - 1) * pageSize + i}
                           instantOf={instantOf}
                           idOf={(row) => row.id}
                           orderOf={(row) => row.seq}
@@ -451,6 +453,7 @@ function RepaymentsSection({
             </tbody>
           </table>
         </div>
+        {paginationControls}
       {detailRow && (
         <RecordDetailModal
           title="Payment"
