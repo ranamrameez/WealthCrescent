@@ -1,5 +1,6 @@
 import { createWorkbookStore } from './createWorkbookStore';
 import { createEmptyFundsWorkbook } from './defaultFundsWorkbook';
+import { migrateLegacyFundsCashSettings } from '../lib/calc/fundsModule';
 
 /** Funds reuses the exact same factory QSE/PSX use — see FundsWorkbook's
  * own doc comment for why. Fund CRUD (add/update/delete a Fund, as opposed
@@ -15,15 +16,8 @@ const fundsStore = createWorkbookStore('WealthCrescent_funds_workbook_v1', creat
 // between currencies. The transfer records themselves are left untouched.
 function ensureCashLedgerMigration() {
   const workbook = fundsStore.getState().workbook;
-  if ((workbook.settings.cashLedgerMigrationVersion ?? 0) >= 1) return;
-  fundsStore.getState().setWorkbook({
-    ...workbook,
-    settings: {
-      ...workbook.settings,
-      legacyTransferCurrency: workbook.settings.legacyTransferCurrency || workbook.settings.defaultCurrency || 'USD',
-      cashLedgerMigrationVersion: 1,
-    },
-  });
+  const migrated = migrateLegacyFundsCashSettings(workbook);
+  if (migrated !== workbook) fundsStore.getState().setWorkbook(migrated);
 }
 
 // Run for local data immediately and subscribe for a cloud workbook that may
