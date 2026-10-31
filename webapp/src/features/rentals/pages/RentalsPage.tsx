@@ -1,3 +1,4 @@
+import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
@@ -781,6 +782,7 @@ function EntriesList({ property, filters }: { property: Property; filters: Trans
     }
   };
   const { sorted, Th } = useSortableRows(entries, sortValue, 'date', 'desc');
+  const { rows: pageRows, controls: paginationControls } = useTablePagination(sorted);
   const exportStatement = () => {
     const header = ['Date', 'Type', 'Amount', 'Category', 'Note'];
     const body = sorted.map((entry) => [entry.date, entry.isDeposit ? 'Rent income' : 'Expense', entry.isDeposit ? entry.amount : -entry.amount, categoryName(entry.categoryID, categories), entry.note ?? '']);
@@ -810,7 +812,7 @@ function EntriesList({ property, filters }: { property: Property; filters: Trans
           </tr>
         </thead>
         <tbody>
-          {sorted.map((e) => {
+          {pageRows.map((e) => {
             const link = linkByRecordId.get(e.id);
             const otherSide = link ? (link.from.module === 'rentals' && link.fromRecordId === e.id ? link.to : link.from) : undefined;
             return (
@@ -867,6 +869,7 @@ function EntriesList({ property, filters }: { property: Property; filters: Trans
         </tbody>
       </table>
       </div>
+      {paginationControls}
       {editingEntry && <EditEntryModal entry={editingEntry} onClose={() => setEditingEntry(null)} />}
       {detailEntry && (
         <RecordDetailModal
