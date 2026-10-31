@@ -1,3 +1,4 @@
+import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
@@ -1916,6 +1917,7 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
   );
   const dateSortInput = useMemo(() => [...plans].sort((a, b) => a.date.localeCompare(b.date)), [plans]);
   const sorted = dateSort.rows(dateSortInput, { date: row => row });
+  const { rows: pageRows, controls: paginationControls } = useTablePagination(sorted);
 
   const markDone = async (p: PlannedBankTransaction & { planId?: string }) => {
     const occurrenceDate = p.date;
@@ -1954,7 +1956,7 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
             <tr><dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th><th>Description</th><th>Amount</th><th>Category</th><th>Repeats / status</th><th></th></tr>
           </thead>
           <tbody>
-            {sorted.map((p) => (
+            {pageRows.map((p) => (
               <RecordRow financeModule="bank" onEdit={() => setEditingPlan(allPlans.find((plan) => plan.id === (p.planId ?? p.id)) ?? p)}    record={p}  key={p.id}>
                 <td>{formatDate(p.date, dateFormat)}</td>
                 <td><Link to={`/planning?plan=${encodeURIComponent(p.planId ?? p.id)}`} className="plan-link">{p.description}</Link></td>
@@ -1981,6 +1983,7 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
           </tbody>
         </table>
       </div>
+      {paginationControls}
       {editingPlan && (
         <FinancePlanEditor reference={{ module: "bank", id: editingPlan.id }} onClose={() => setEditingPlan(null)} />
       )}
