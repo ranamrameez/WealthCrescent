@@ -131,10 +131,11 @@ export function syncTransactionIndexes<T extends {
     const bHasOrder = Number.isInteger(b.accountingOrder);
     if (aHasOrder && bHasOrder && a.accountingOrder !== b.accountingOrder) return a.accountingOrder! - b.accountingOrder!;
     if (aHasOrder !== bHasOrder) return aHasOrder ? -1 : 1;
+    const byInstant = toInstantMs(a.date, a.time, a.timezone) - toInstantMs(b.date, b.time, b.timezone);
+    if ((a.time || b.time) && byInstant) return byInstant;
     const aIndex = a.globalTransactionIndex ?? a.transactionIndex;
     const bIndex = b.globalTransactionIndex ?? b.transactionIndex;
     if (aIndex !== undefined && bIndex !== undefined && aIndex !== bIndex) return aIndex - bIndex;
-    const byInstant = toInstantMs(a.date, a.time, a.timezone) - toInstantMs(b.date, b.time, b.timezone);
     if (byInstant) return byInstant;
     if (a.action !== b.action) return a.action === 'BUY' ? -1 : 1;
     return (a.seq ?? 0) - (b.seq ?? 0);
@@ -263,6 +264,8 @@ export function syncAccountingEventCollections<
       ordered = [...saved, ...missing];
     } else {
       const trades = dayEvents.filter(event => event.kind === 'trade').sort((a, b) => {
+        const byInstant = accountingEventInstant(a.record) - accountingEventInstant(b.record);
+        if (byInstant) return byInstant;
         const aIndex = a.record.globalTransactionIndex ?? a.record.transactionIndex;
         const bIndex = b.record.globalTransactionIndex ?? b.record.transactionIndex;
         if (aIndex !== undefined && bIndex !== undefined && aIndex !== bIndex) return aIndex - bIndex;

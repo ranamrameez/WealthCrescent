@@ -107,6 +107,22 @@ describe('syncAccountingEventCollections', () => {
     expect(result.dividends[0].accountingOrder).toBe(4);
   });
 
+  it('backfills legacy trade sequence from recorded time before old global indexes', () => {
+    const result = syncAccountingEventCollections({
+      transactions: [
+        { id: 'later-time', date: '2026-01-01', time: '11:00', action: 'BUY', globalTransactionIndex: 1 },
+        { id: 'earlier-time', date: '2026-01-01', time: '09:00', action: 'SELL', globalTransactionIndex: 2 },
+      ],
+      transfers: [],
+      adjustments: [],
+      dividends: [],
+    });
+    expect(result.transactions.map(row => [row.id, row.accountingOrder])).toEqual([
+      ['later-time', 2],
+      ['earlier-time', 1],
+    ]);
+  });
+
   it('preserves saved same-day ordering and appends newly added rows without changing dates', () => {
     const result = syncAccountingEventCollections({
       transactions: [{ id: 'trade', date: '2026-01-01', accountingOrder: 2, action: 'BUY', globalTransactionIndex: 1 }],

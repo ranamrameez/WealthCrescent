@@ -49,6 +49,14 @@ describe('sortTransactionsChronological', () => {
     expect(sorted.map(t => t.id)).toEqual(['second-in-old-index', 'first-in-old-index']);
   });
 
+  it('uses recorded same-day time before legacy global indexes when no shared order exists', () => {
+    const sorted = sortTransactionsChronological([
+      tx({ id: 'later-time', date: '2026-01-01', time: '11:00', action: 'BUY', globalTransactionIndex: 1 }),
+      tx({ id: 'earlier-time', date: '2026-01-01', time: '09:00', action: 'SELL', globalTransactionIndex: 2 }),
+    ]);
+    expect(sorted.map(row => row.id)).toEqual(['earlier-time', 'later-time']);
+  });
+
   it('honors globalTransactionIndex over same-instant BUY-before-SELL fallback', () => {
     const sorted = sortTransactionsChronological([
       tx({ action: 'BUY', globalTransactionIndex: 2 }),
