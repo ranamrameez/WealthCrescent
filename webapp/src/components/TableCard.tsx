@@ -1,6 +1,6 @@
 ﻿import { useCallback, useMemo, useState, type ComponentProps, type CSSProperties, type ReactNode } from 'react';
 import { StandardCard, SummaryChip, type StandardCardAction } from './StandardCard';
-import { ExportIcon, SortIcon } from './icons';
+import { ExportIcon, PlusIcon, SortIcon } from './icons';
 import { TableSortContext, type TableCardDateSort, type DateSortSelection } from './tableSortContext';
 import { toCSV } from '../lib/csv';
 
@@ -37,7 +37,7 @@ export function TableCard({ title = 'Records', children, actions = [], rows, all
   };
   const menu: StandardCardAction[] = [];
   const importAction = take(label => label.includes('import'));
-  if (importAction || onImport) menu.push(importAction ?? { label: 'Import', icon: <ExportIcon />, onClick: onImport! });
+  if (importAction || onImport) menu.push(importAction ?? { label: 'Import', icon: <PlusIcon />, onClick: onImport! });
 
   const filteredExport = take(label => label.includes('export') && !label.includes('all') && !label.includes('backup'));
   if (filteredExport || onExportFiltered || data?.length) {
