@@ -74,7 +74,7 @@ export function calculatePortfolio(input: PortfolioCalculationInput): PortfolioC
         target1Pct: targetPrice(1),
         target2Pct: targetPrice(2),
         target5Pct: targetPrice(5),
-        perShareCommission: hasMarketPrice ? perShareCommission(marketPrice, calcFee) : null,
+        perShareCommission: marketPrice > 0 ? perShareCommission(marketPrice, calcFee) : null,
       };
     });
 
