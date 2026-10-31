@@ -199,12 +199,12 @@ export function TradeCalculator({ initialTicker }: { initialTicker?: string } = 
       return toast('The trade could not be saved. Please try again.');
     }
     if (action === 'SELL') {
-      toast(`Logged SELL ${sharesToSave} ${ticker} @ ${fmtPSXPrice(priceToSave)}}`);
+      toast(`Logged SELL ${sharesToSave} ${ticker} @ ${fmtPSXPrice(priceToSave)}`);
     } else {
       toast(
         mode === 'CYCLE'
-          ? `Logged the BUY leg: ${sharesToSave} ${ticker} @ fmtPSXPrice(priceToSave)}. The planned sell is not auto-logged — add it when you actually sell.`
-          : `Logged BUY ${sharesToSave} ${ticker} @ fmtPSXPrice(priceToSave)}`,
+          ? `Logged the BUY leg: ${sharesToSave} ${ticker} @ ${fmtPSXPrice(priceToSave)}. The planned sell is not auto-logged — add it when you actually sell.`
+          : `Logged BUY ${sharesToSave} ${ticker} @ ${fmtPSXPrice(priceToSave)}`,
       );
       setNewShares(0);
       setAmountInput('');
