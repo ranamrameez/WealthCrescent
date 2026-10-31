@@ -172,6 +172,26 @@ describe('updateLinkedTransfer', () => {
   });
 });
 
+describe('Funds linked transfer currency fallback', () => {
+  it('preserves the existing Funds currency when an edit payload omits it', () => {
+    const created = createLinkedTransfer(bankToFundsInput);
+    if (!('link' in created)) throw new Error('expected success');
+
+    const updated = updateLinkedTransfer({
+      ...bankToFundsInput,
+      fromAmount: 2100,
+      toAmount: 2100,
+      to: { module: 'funds' },
+    }, created.link);
+    if (!('link' in updated)) throw new Error('expected update success');
+
+    expect(useFundsWorkbookStore.getState().workbook.transfers[0]).toMatchObject({
+      gross: 2100, currencyCode: 'QAR',
+    });
+    expect(updated.link.to).toMatchObject({ module: 'funds', currencyCode: 'QAR' });
+  });
+});
+
 describe('deleteLinkCascade', () => {
   it('removes both side records and the link record', () => {
     const created = createLinkedTransfer(cashToBankInput);
