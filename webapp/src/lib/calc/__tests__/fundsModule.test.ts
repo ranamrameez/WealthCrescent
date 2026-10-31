@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Category } from '../../../types/finance';
-import type { Fund } from '../../../types/fundsWorkbook';
+import type { Fund, FundsWorkbook } from '../../../types/fundsWorkbook';
+import { createEmptyFundsWorkbook } from '../../../store/defaultFundsWorkbook';
 import type { PricePoint, Transaction, Transfer } from '../../../types/workbook';
-import { allocationByCategory, balanceUpdateHistory, contributionVsValueSeries, expectedPLRate, fundCategoryLabel, fundNetProfit, fundsCashBalanceByCurrency, fundsCashLedgerByCurrency, fundsValueByCurrency, organicPLByPeriod, projectInvestmentReturn, unitsFromAmount } from '../fundsModule';
+import { allocationByCategory, balanceUpdateHistory, contributionVsValueSeries, expectedPLRate, fundCategoryLabel, fundNetProfit, fundsCashBalanceByCurrency, fundsCashLedgerByCurrency, fundsValueByCurrency, migrateLegacyFundsCashSettings, organicPLByPeriod, projectInvestmentReturn, unitsFromAmount } from '../fundsModule';
 import { computePositions } from '../positions';
 
 const funds: Fund[] = [
@@ -351,6 +352,27 @@ describe('Funds cash ledger', () => {
     ]);
     expect(ledger.USD.filter((event) => event.kind === 'trade')).toHaveLength(1);
     expect(ledger.USD.at(-1)?.balance).toBe(50);
+  });
+
+  it('snapshots the legacy currency without rewriting transfer records and survives a JSON backup round-trip', () => {
+    const originalTransfers: Transfer[] = [
+      { id: 'legacy-1', date: '2025-01-01', type: 'DEPOSIT', gross: 500, fee: 5 },
+      { id: 'legacy-2', date: '2025-02-01', type: 'WITHDRAWAL', gross: 100, fee: 2 },
+    ];
+    const empty = createEmptyFundsWorkbook();
+    const legacy = {
+      ...empty,
+      settings: { ...empty.settings, defaultCurrency: 'QAR', legacyTransferCurrency: undefined, cashLedgerMigrationVersion: undefined },
+      transfers: originalTransfers,
+    } as FundsWorkbook;
+    const migrated = migrateLegacyFundsCashSettings(legacy);
+    expect(migrated.settings.legacyTransferCurrency).toBe('QAR');
+    expect(migrated.settings.cashLedgerMigrationVersion).toBe(1);
+    expect(migrated.transfers).toEqual(originalTransfers);
+
+    const backupRoundTrip = JSON.parse(JSON.stringify(migrated)) as FundsWorkbook;
+    expect(backupRoundTrip).toEqual(migrated);
+    expect(migrateLegacyFundsCashSettings(backupRoundTrip)).toBe(backupRoundTrip);
   });
 
   it('keeps legacy transfers without a currency in the workbook default currency', () => {
