@@ -1,8 +1,7 @@
 import type { Workbook } from '../../../types/workbook';
 import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { buildCashLedger, cashSummary, getMarketPrice, makeQSEFeeCalculator } from '../../../lib/calc';
-import { calculateStockPortfolio } from '../../../lib/calc/stockCalculationEngine';
+import { calculatePortfolio, makeQSEFeeCalculator } from '../../../lib/calc';
 import { useLiveQseWorkbook } from './useLiveQseWorkbook';
 import { useQseFeed } from './useLiveQseWorkbook';
 import { useWorkbookStore } from '../../../store/workbookStore';
@@ -28,38 +27,40 @@ export interface QSERow {
 function calculateDerived(workbook: Workbook, selectedTickers?: string[]) {
     const scoped = selectedTickers?.length ? workbook.transactions.filter((tx) => selectedTickers.includes(tx.ticker)) : workbook.transactions;
     const calcFee = makeQSEFeeCalculator(workbook.settings);
-    const method = workbook.settings.costBasisMethod ?? 'average';
-    const calculation = calculateStockPortfolio(scoped, calcFee, method);
-    const { positions, realizedSeries, lotsByTicker: lots } = calculation;
+    const calculation = calculatePortfolio({
+      transactions: scoped,
+      transfers: workbook.transfers,
+      adjustments: workbook.adjustments,
+      dividends: workbook.dividends,
+      marketPrices: workbook.marketPrices,
+      calcFee,
+      costBasisMethod: workbook.settings.costBasisMethod ?? 'average',
+    });
+    const {
+      positions,
+      realizedSeries,
+      lotsByTicker: lots,
+      cashSummary: summary,
+      cashLedger: ledger,
+      positionRows: rows,
+    } = calculation;
 
-    const summary = cashSummary(
-      scoped,
-      workbook.transfers,
-      workbook.adjustments,
-      workbook.marketPrices,
+    return {
+      workbook,
       calcFee,
       positions,
-      workbook.dividends,
-    );
-    const ledger = buildCashLedger(scoped, workbook.transfers, workbook.adjustments, calcFee, workbook.dividends);
-
-    // Shared per-open-position rollup (mirrors the legacy dashboard's
-    // `rows` variable) — feeds most of the ticker-level charts.
-    const rows: QSERow[] = positions
-      .filter((p) => p.shares > 0)
-      .map((p) => {
-        const marketPrice = getMarketPrice(p.ticker, workbook.marketPrices, scoped);
-        const value = p.shares * marketPrice;
-        const sellFee = marketPrice > 0 ? calcFee(value, false) : 0;
-        const profit = value - sellFee - p.invested;
-        const roiPct = p.invested > 0 ? (profit / p.invested) * 100 : 0;
-        return { ticker: p.ticker, shares: p.shares, invested: p.invested, marketPrice, value, sellFee, profit, roiPct };
-      });
-
-    return { workbook, calcFee, positions, summary, realizedSeries, ledger, rows, lots, calculation, closedTrades: calculation.closedTrades, realizedBySellTxId: calculation.realizedBySellTxId, lifecycles: calculation.lifecycles, sellReconciliationByTxId: calculation.sellReconciliationByTxId };
-
+      summary,
+      realizedSeries,
+      ledger,
+      rows,
+      lots,
+      calculation,
+      closedTrades: calculation.closedTrades,
+      realizedBySellTxId: calculation.realizedBySellTxId,
+      lifecycles: calculation.lifecycles,
+      sellReconciliationByTxId: calculation.sellReconciliationByTxId,
+    };
 }
-
 const sharedDerived = new WeakMap<Workbook, ReturnType<typeof calculateDerived>>();
 
 export function useQSEDerived(selectedTickers?: string[]) {
@@ -84,6 +85,7 @@ export function useQSEPortfolioDerived() {
     transactions: state.workbook.transactions,
     transfers: state.workbook.transfers,
     adjustments: state.workbook.adjustments,
+    dividends: state.workbook.dividends,
     marketPrices: state.workbook.marketPrices,
     priceHistory: state.workbook.priceHistory,
   })));

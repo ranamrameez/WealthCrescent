@@ -1,4 +1,4 @@
-import type { Adjustment, CashSummary, Dividend, FeeCalculator, Position, Transaction, Transfer } from '../../types/workbook';
+import type { Adjustment, CashLedgerEvent, CashSummary, Dividend, FeeCalculator, Position, Transaction, Transfer } from '../../types/workbook';
 import { buildCashLedger, totalTransferFees } from './cashLedger';
 import { computePositions } from './positions';
 import { getMarketPrice } from './priceHistory';
@@ -14,6 +14,7 @@ export function cashSummary(
   calcFee: FeeCalculator,
   positions: Position[] = computePositions(transactions, calcFee),
   dividends: Dividend[] = [],
+  precomputedLedger?: CashLedgerEvent[],
 ): CashSummary {
   const totalInward = transfers.filter((t) => t.type === 'DEPOSIT').reduce((s, t) => s + t.gross, 0);
   const totalOutward = transfers.filter((t) => t.type === 'WITHDRAWAL').reduce((s, t) => s + t.gross, 0);
@@ -35,7 +36,7 @@ export function cashSummary(
     portfolioValue += netValue;
   });
 
-  const ledger = buildCashLedger(transactions, transfers, adjustments, calcFee, dividends);
+  const ledger = precomputedLedger ?? buildCashLedger(transactions, transfers, adjustments, calcFee, dividends);
   const cashBalance = ledger.length ? ledger[ledger.length - 1].balance : 0;
   const netWorth = cashBalance + portfolioValue;
   const totalCharges = transferFees + tradingFees;
