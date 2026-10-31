@@ -18,6 +18,12 @@ export interface PSXRow {
    * same-day pairing exists, the netted-side fee — see makePSXFeeCalculator). */
   profit: number;
   roiPct: number;
+  avgCost: number;
+  breakEvenPrice: number;
+  target1Pct: number;
+  target2Pct: number;
+  target5Pct: number;
+  perShareCommission: { buy: number; sell: number } | null;
 }
 
 /** PSX's equivalent of useQSEDerived — same shape, different store + fee
@@ -44,6 +50,8 @@ function calculateDerived(workbook: PSXWorkbook, selectedTickers?: string[]) {
       marketPrices: workbook.marketPrices,
       calcFee,
       costBasisMethod: workbook.settings.costBasisMethod ?? 'average',
+      feePct: workbook.settings.feePct,
+      tick: workbook.settings.tick,
     });
     const {
       positions,

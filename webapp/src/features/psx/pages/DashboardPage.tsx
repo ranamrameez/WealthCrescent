@@ -20,9 +20,8 @@ import { RoundTripCostModal } from '../../../components/RoundTripCostModal';
 import { StatSourceBadge } from '../../../components/StatSourceBadge';
 import { Tabs } from '../../../components/Tabs';
 import { toast } from '../../../components/Toast';
-import { breakEvenPrice, getDailyPriceHistory } from '../../../lib/calc';
+import { getDailyPriceHistory } from '../../../lib/calc';
 import { pendingShareDeltaByTicker } from '../../../lib/calc/positions';
-import { perShareCommission } from '../../../lib/calc/partialTradeStrategy';
 import { dimColor, dlBarV, dlDoughnut, dlLine, profitColor } from '../../../lib/chartLabels';
 import { applyChartTheme } from '../../../lib/chartSetup';
 import { fmt, fmtMoney, fmtPSXPrice } from '../../../lib/format';
@@ -57,27 +56,19 @@ function DashboardPositionsView({ workbook, calcFee, positions, rows, summary, r
   const ensureSignedIn = useEnsureSignedIn();
   const { money } = useAmountFormat();
   const currency = workbook.settings.currency;
-  const { feePct, tick } = workbook.settings;
 
   const totalInvestment = rows.reduce((s, r) => s + r.invested, 0);
   const portfolioROIPct = totalInvestment > 0 ? (summary.unrealizedPL / totalInvestment) * 100 : 0;
 
   const heldRaw = useMemo(
     () =>
-      positions
-        .filter((p) => p.shares > 0)
-        .map((p) => {
-          const mp = workbook.marketPrices[p.ticker] || 0;
-          const avgCost = p.invested / p.shares;
-          const value = p.shares * mp;
-          const sellFee = mp > 0 ? calcFee(value, false, { shares: p.shares }) : 0;
-          const profit = mp > 0 ? value - sellFee - p.invested : NaN;
-          const profitPct = mp > 0 && p.invested > 0 ? (profit / p.invested) * 100 : NaN;
-          const be = breakEvenPrice(p.invested, p.shares, feePct, tick, calcFee);
-          const target = (pct: number) => breakEvenPrice(p.invested * (1 + pct / 100), p.shares, feePct, tick, calcFee);
-          const sparkData = getDailyPriceHistory(p.ticker, workbook.priceHistory).map((pt) => pt.price);
-          const rt = mp > 0 ? perShareCommission(mp, calcFee) : null;
-
+      rows
+        .filter((row) => row.shares > 0)
+        .map((row) => {
+          const mp = row.marketPrice;
+          const profit = row.profit;
+          const profitPct = row.roiPct;
+          const sparkData = getDailyPriceHistory(row.ticker, workbook.priceHistory).map((pt) => pt.price);
           let statusRank: number;
           let statusLabel: string;
           let statusClass: string;
@@ -85,18 +76,33 @@ function DashboardPositionsView({ workbook, calcFee, positions, rows, summary, r
             statusRank = 3; statusLabel = 'PRICE NEEDED'; statusClass = '';
           } else if (profit >= 0) {
             statusRank = 0; statusLabel = 'EXIT READY'; statusClass = 'pill-positive';
-          } else if ((profit / p.invested) * 100 > -3) {
+          } else if ((profit / row.invested) * 100 > -3) {
             statusRank = 1; statusLabel = 'WATCH'; statusClass = '';
           } else {
             statusRank = 2; statusLabel = 'HOLD / REVIEW'; statusClass = 'pill-negative';
           }
 
           return {
-            ticker: p.ticker, shares: p.shares, avgCost, mp, value, invested: p.invested, profit, profitPct, be, sparkData, rt,
-            t1: target(1), t2: target(2), t3: target(5), statusRank, statusLabel, statusClass,
+            ticker: row.ticker,
+            shares: row.shares,
+            avgCost: row.avgCost,
+            mp,
+            value: row.value,
+            invested: row.invested,
+            profit,
+            profitPct,
+            be: row.breakEvenPrice,
+            sparkData,
+            rt: row.perShareCommission,
+            t1: row.target1Pct,
+            t2: row.target2Pct,
+            t3: row.target5Pct,
+            statusRank,
+            statusLabel,
+            statusClass,
           };
         }),
-    [positions, workbook.marketPrices, workbook.priceHistory, calcFee, feePct, tick],
+    [rows, workbook.priceHistory],
   );
 
   type Col = 'ticker' | 'shares' | 'avgCost' | 'mp' | 'value' | 'profit' | 'status';

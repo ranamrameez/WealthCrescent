@@ -17,6 +17,12 @@ export interface QSERow {
   /** Unrealized P/L net of an estimated sell commission. */
   profit: number;
   roiPct: number;
+  avgCost: number;
+  breakEvenPrice: number;
+  target1Pct: number;
+  target2Pct: number;
+  target5Pct: number;
+  perShareCommission: { buy: number; sell: number } | null;
 }
 
 /** Added 2026-09-17: see `QSESettings.costBasisMethod`'s own doc comment
@@ -35,6 +41,8 @@ function calculateDerived(workbook: Workbook, selectedTickers?: string[]) {
       marketPrices: workbook.marketPrices,
       calcFee,
       costBasisMethod: workbook.settings.costBasisMethod ?? 'average',
+      feePct: workbook.settings.feePct,
+      tick: workbook.settings.tick,
     });
     const {
       positions,
