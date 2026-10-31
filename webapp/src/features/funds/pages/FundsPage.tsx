@@ -1723,20 +1723,20 @@ export function FundsPage({
         />
       ) : (
         <StandardPageSections sections={[
-            { key: 'summary', label: 'Summary', content: <div className="stack-lg"><FundsScopeSummary ids={selectedIds} filters={filters} /><OverallSummary selectedIds={selectedIds} /></div> },
+            { key: 'summary', label: 'Summary', defaultOpen: true, content: <div className="stack-lg"><FundsScopeSummary ids={selectedIds} filters={filters} /><OverallSummary selectedIds={selectedIds} /></div> },
             { table: true, key: 'plans', label: 'Plans', content: <FundsScopePlans ids={selectedIds} filters={filters} /> },
             { table: true, key: 'transactions', label: 'Transactions', content: <FundsScopeTransactions ids={selectedIds} filters={filters} onSelect={id => setSelected(funds.find(fund => fund.id === id) ?? null)} /> },
             {
               key: 'funds',
               label: 'Funds',
-              content: (
-                <div>
-
-                  <BrokersList onSelect={setSelectedBroker} />
-                  <FundList onSelect={setSelected} selectedIds={selectedIds} />
-
-                </div>
-              ),
+              defaultOpen: true,
+              content: <FundList onSelect={setSelected} selectedIds={selectedIds} />,
+            },
+            {
+              key: 'brokers',
+              label: 'Brokers',
+              defaultOpen: true,
+              content: <BrokersList onSelect={setSelectedBroker} />,
             },
             { table: true, key: 'transfers', label: 'Transfers', content: <FundsTransfersSection /> },
             { table: true, key: 'import', label: 'Import', content: <SnapshotImportSection /> },
