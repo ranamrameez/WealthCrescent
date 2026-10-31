@@ -700,6 +700,7 @@ function TransactionList() {
     </div>
     {controls}
   );
+  };
 
   return (
     <div>
