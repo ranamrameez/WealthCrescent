@@ -1,3 +1,4 @@
+import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
 import { DateValue } from '../../../components/DateValue';
@@ -149,6 +150,7 @@ function ActivityList({ activities, filters }: { activities: BudgetActivity[]; f
     }
   };
   const { sorted, Th } = useSortableRows(filtered, sortValue, 'date', 'desc');
+  const { rows: pageRows, controls: paginationControls } = useTablePagination(sorted);
 
   return (
     <TableCard rows={sorted} title={<h3 className="m-0">All planned financial activity</h3>} className="mb-md">
@@ -162,7 +164,7 @@ function ActivityList({ activities, filters }: { activities: BudgetActivity[]; f
             </tr>
           </thead>
           <tbody>
-            {sorted.map((a) => (
+            {pageRows.map((a) => (
               <RecordRow record={a} key={`${a.module}:${a.id}`}>
                 <td><DateValue value={a.date} /></td>
                 <td>{moduleLabel[a.module]}</td>
@@ -183,6 +185,7 @@ function ActivityList({ activities, filters }: { activities: BudgetActivity[]; f
           </tbody>
         </table>
       </div>
+      {paginationControls}
     </TableCard>
   );
 }
