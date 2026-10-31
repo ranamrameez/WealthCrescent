@@ -1,3 +1,49 @@
+# WealthCrescent — Session Handoff (refreshed 2026-10-31)
+
+## 2026-10-31 — PR #44 continuation handoff (latest)
+
+**Current work is already in draft PR #44** — [Standardize section actions, pagination, and finance summaries](https://github.com/ranamrameez/WealthCrescent/pull/44). Do not start a duplicate branch or duplicate implementation. Live GitHub check at handoff time:
+
+- PR: **#44**, open, draft, base `main`.
+- Branch: `fix/trade-entry-validation-and-transactions-ui`.
+- Current PR head before this handoff update: `0901cfc9c8704c470e0fb954fb049390e6d8d4e4`.
+- Base SHA reported by PR: `49cb2a40810619fa075cd422703ab4a6900adce2`.
+- PR currently contains 122 commits and 50 changed files. Review the diff and commit history carefully; do not assume the PR description's validation refers to the current head.
+- PR description says type-check and production build passed at older head `7e58b931`; the full suite was still running at that point, with the preceding completed suite at `50917bf1`. **No validation result for head `0901cfc9` was established in this session.** Re-run/check CI for the exact current head before marking ready or merging.
+- Nothing from this work has been merged into `main`. Keep the PR as a draft until current-head tests/build, full diff review, and any required manual checks are complete.
+
+### Scope already represented in PR #44 — verify rather than re-implement
+
+The PR description reports implementation of: functional-only StandardCard/TableCard actions and legacy Tabs forwarding; shared pagination across finance and QSE/PSX tables; credit-card chronological running consumed/allowed/available limits; Funds and Brokers as peer navigation sections with Summary/Funds/Brokers expanded by default; Portfolio Item-style inline summary subsections; All Time defaults for QSE/PSX stock-detail history/exports; daily/latest-recorded-day and lifetime low/high bounds on both price-comparison charts; sell-quantity guards and configurable ±10% market-price deviation confirmations; stock-detail FAB ticker preselection; robust FAB save success/failure handling; and legacy oversell reconciliation with proportional fee allocation and no fictitious P&L on unmatched shares.
+
+### Critical financial-data correction to the PR description / PSO regression
+
+The transaction table supplied by the user totals **122 BUY shares and 132 SELL shares**, not 132 BUY and 132 SELL. The correct accounting expectation is:
+
+- Match/close the 122 genuinely purchased shares against 122 sold shares.
+- Leave **0 matched/open shares** after all valid lots are consumed.
+- Flag **10 excess SELL shares as unmatched/reconciliation quantity**.
+- Do not invent 10 BUY shares, silently discard the excess, or count unmatched shares/fees as realized profit.
+- Allocate the SELL fee proportionally to the matched quantity; separately surface the unmatched portion/fee for reconciliation.
+
+Before merge, inspect the PSO regression test and implementation to ensure it encodes those exact totals and outcomes. The PR body currently says “132 bought / 132 sold”; correct that statement if the code/test is actually based on the user's supplied 122/132 ledger.
+
+### Next-session execution order
+
+1. Re-read root `CLAUDE.md`, this handoff, `webapp/README.md`, `webapp/USER_MANUAL.md`, and `webapp/audit.md`; then refresh live PR #44, branch head, main head, and Actions state.
+2. Confirm the PR head is still the expected handoff base; if it moved, use the new exact SHA for every validation decision.
+3. Inspect PR #44's full diff and all commits for accidental unrelated changes, duplicate implementations, data migrations, and shared-component regressions. Preserve existing URL-backed filters, full filtered datasets for calculations/exports, and QSE/PSX parity.
+4. Run/check current-head type-check, production build, and full test suite. Fix failures on this branch, then re-run all required checks against the final head.
+5. Specifically verify: credit-card opening debt and chronological running limits; Funds/Brokers route and navigation hierarchy; default-open behavior; All Time filter behavior and URL persistence; summary groups on each affected entity page; daily/lifetime chart bounds; QSE and PSX sell guards including sequential/multi-row entries; ±10% warning/cancel path; FAB ticker preselection and correct broker-profile persistence; and PSO 122/132 reconciliation math.
+6. Finish the cross-page audit for remaining inert section actions and unpaginated tables. Do not add fake menu actions or paginate a dataset before calculations/exports consume it.
+7. Update `webapp/README.md` Done/Pending, `webapp/USER_MANUAL.md`, and this handoff only for behavior actually verified. Keep PR #44 draft until ready; never push directly to `main`. The user explicitly requested this handoff be pushed, but did not authorize merging PR #44.
+
+### Tool/session limitation
+
+This handoff update is documentation-only. No application code was changed in this session, and no build, tests, or browser verification were run here. The handoff was committed to the existing PR branch so the next session can resume from the current draft PR.
+
+---
+
 # WealthCrescent — Session Handoff (2026-10-29)
 
 Read this before continuing work in a new session. This is a concise, dated handoff, not a replacement for the canonical project documents.
