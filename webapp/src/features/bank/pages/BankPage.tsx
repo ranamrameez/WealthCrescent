@@ -6,6 +6,7 @@ import { FinancePlanEditor } from '../../../components/FinancePlanEditor';
 import { EntityEditorModal } from '../../../components/EntityEditorModal';
 import { PageHeading } from '../../../components/PageHeading';
 import { BalanceSummaryCards } from '../../../components/BalanceSummaryCards';
+import { SummarySection, SummarySections, SummaryValue } from '../../../components/SummaryGroupCard';
 import { planOccurrences, occurrenceCompleted } from '../../../lib/calc/planOccurrences';
 import { BackButton } from '../../../components/BackButton';
 import type { User } from 'firebase/auth';
@@ -659,18 +660,15 @@ export function BankDetailPage() {
             { label: 'Full bank name', value: bank.name },
             { label: 'Notes', value: bank.notes },
           ]} />
-          <div className="row mt-md" style={{ gap: 16 }}>
-            {Object.keys(totals).length ? (
-              Object.entries(totals).map(([currency, total]) => (
-                <div key={currency} className="stat-card card" style={hueStyle(bank.color ?? 'var(--accent)')}>
-                  <div className="label">Total ({currency})</div>
-                  <MoneyValue n={total} currency={currency} />
-                </div>
-              ))
-            ) : (
-              <p className="text-muted">No accounts linked yet.</p>
-            )}
-          </div>
+          {Object.keys(totals).length ? (
+            <SummarySections className="bank-detail-summary">
+              <SummarySection title="Balances by currency">
+                {Object.entries(totals).map(([currency, total]) => (
+                  <SummaryValue key={currency} label={currency} value={<MoneyValue n={total} currency={currency} />} primary tone={total >= 0 ? 'positive' : 'negative'} />
+                ))}
+              </SummarySection>
+            </SummarySections>
+          ) : <p className="text-muted">No accounts linked yet.</p>}
           <div className="mt-md">
             <BankingScopeSummary accounts={linkedAccounts} filters={filters} />
           </div>
