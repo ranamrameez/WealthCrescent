@@ -15,6 +15,8 @@ const emptyInputs = () => ({
   emiLoans: [],
   fundsFunds: [],
   fundsTransactions: [],
+  fundsTransfers: [],
+  fundsDefaultCurrency: 'USD',
   fundsPriceHistory: {},
   qseTransactions: [],
   qseTransfers: [],
