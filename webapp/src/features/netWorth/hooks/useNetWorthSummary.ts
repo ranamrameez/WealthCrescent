@@ -3,7 +3,7 @@ import { assetBalanceByCurrency, creditCardLiabilityByCurrency as legacyCreditCa
 import { creditCardLiabilityByCurrency } from '../../../lib/calc/creditCardModule';
 import { netPositionByCurrency } from '../../../lib/calc/personalLoansModule';
 import { totalsByCurrency as emiTotalsByCurrency } from '../../../lib/calc/emiModule';
-import { fundsValueByCurrency } from '../../../lib/calc/fundsModule';
+import { fundsCashBalanceByCurrency, fundsValueByCurrency } from '../../../lib/calc/fundsModule';
 import { computeNetWorthByCurrency, mergeCurrencyTotals, type CurrencyNetWorth } from '../../../lib/calc/netWorth';
 import { includedBankAccounts, includedCreditCards, includedEmiLoans, includedFunds, includedPersonalLoans } from '../../../lib/calc/netWorthInclusion';
 import { useCashWorkbookStore } from '../../../store/cashWorkbookStore';
@@ -69,7 +69,13 @@ export function useNetWorthSummary(selectedModules?: string[]): NetWorthSummary 
   const personalLoansNet = enabled('personalLoans') ? netPositionByCurrency(includedPersonalLoans(personalLoans.loans), personalLoans.repayments) : {};
   const emiOutstanding: Record<string, number> = {};
   if (enabled('emi')) Object.entries(emiTotalsByCurrency(includedEmiLoans(emiLoans))).forEach(([code, t]) => { emiOutstanding[code] = t.outstanding; });
-  const fundsValues = enabled('funds') ? fundsValueByCurrency(includedFunds(funds.funds), funds.transactions, funds.marketPrices) : {};
+  const fundsIncluded = includedFunds(funds.funds);
+  const fundsValues = enabled('funds')
+    ? mergeCurrencyTotals(
+        fundsValueByCurrency(fundsIncluded, funds.transactions, funds.marketPrices),
+        fundsCashBalanceByCurrency(fundsIncluded, funds.transactions, funds.transfers, funds.settings.defaultCurrency),
+      )
+    : {};
 
   // Skip an exchange entirely if it's never been touched — otherwise an
   // unused QSE/PSX account always contributes a spurious "0" row in its
