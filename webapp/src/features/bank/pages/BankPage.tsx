@@ -11,7 +11,6 @@ import { planOccurrences, occurrenceCompleted } from '../../../lib/calc/planOccu
 import { BackButton } from '../../../components/BackButton';
 import type { User } from 'firebase/auth';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { EntityCard, MoneyValue } from '../../../components/Card';
@@ -937,14 +936,11 @@ export function AccountDetailPage() {
     return before.length ? before[before.length - 1].balance : account.openingBalance;
   }, [account, allLedger, filters.fromDate]);
   const periodCurrentBalance = allLedger.filter(row => !row.tx.isPending && (!filters.toDate || row.tx.date <= filters.toDate)).at(-1)?.balance ?? account?.openingBalance ?? 0;
-  const pendingNet = filteredLedger.filter(({ tx }) => tx.isPending).reduce((sum, row) => sum + row.tx.amount, 0);
   const pendingInflow = filteredLedger.filter(({ tx }) => tx.isPending && tx.amount >= 0).reduce((sum, row) => sum + row.tx.amount, 0);
   const pendingOutflow = filteredLedger.filter(({ tx }) => tx.isPending && tx.amount < 0).reduce((sum, row) => sum + row.tx.amount, 0);
-  const plannedNet = planOccurrences(plannedEntries, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters)).filter((plan) => plan.accountId === account?.id && !plan.executed && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
   const plannedInflow = planOccurrences(plannedEntries, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters)).filter((plan) => plan.accountId === account?.id && !plan.executed && plan.amount >= 0 && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
   const plannedOutflow = planOccurrences(plannedEntries, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters)).filter((plan) => plan.accountId === account?.id && !plan.executed && plan.amount < 0 && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
   const balanceChange = periodCurrentBalance - periodStartBalance;
-  const balanceChangePercent = periodStartBalance === 0 ? null : (balanceChange / Math.abs(periodStartBalance)) * 100;
   const upcoming = useMemo(
     () => account
       ? planOccurrences(plannedEntries, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters))
