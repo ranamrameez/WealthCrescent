@@ -73,7 +73,7 @@ it('uses the shared same-day sequence across trades and transfers instead of the
 
 it('records dividend receipts as cash events in the shared same-day sequence', () => {
   const dividend = { id: 'dividend', date: '2026-01-02', ticker: 'AAA', perShare: 0.5, shares: 10, amount: 5, accountingOrder: 3 };
-  const deposit = transfer({ id: 'deposit', date: '2026-01-02', type: 'DEPOSIT', gross: 20, fee: 0, accountingOrder: 1 });
+  const deposit = xfer({ id: 'deposit', date: '2026-01-02', type: 'DEPOSIT', gross: 20, fee: 0, accountingOrder: 1 });
   const buy = tx({ id: 'buy', date: '2026-01-02', action: 'BUY', shares: 1, price: 10, accountingOrder: 2 });
   const ledger = buildCashLedger([buy], [deposit], [], flatFee, [dividend]);
   expect(ledger.map(event => event.kind)).toEqual(['transfer', 'trade', 'dividend']);

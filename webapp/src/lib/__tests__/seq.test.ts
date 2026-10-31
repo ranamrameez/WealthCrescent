@@ -96,10 +96,10 @@ describe('assignSeqForEntities', () => {
 describe('syncAccountingEventCollections', () => {
   it('backfills one same-day sequence across trades, transfers, adjustments and dividends', () => {
     const result = syncAccountingEventCollections({
-      transactions: [{ id: 'trade-a', date: '2026-01-01', time: '10:00', action: 'BUY', globalTransactionIndex: 1 }],
-      transfers: [{ id: 'transfer', date: '2026-01-01', time: '09:00', seq: 1 }],
-      adjustments: [{ id: 'reward', date: '2026-01-01', time: '11:00', seq: 1 }],
-      dividends: [{ id: 'dividend', date: '2026-01-01', time: '12:00', seq: 1 }],
+      transactions: [{ id: 'trade-a', date: '2026-01-01', time: '10:00', action: 'BUY', globalTransactionIndex: 1, accountingOrder: 0 }],
+      transfers: [{ id: 'transfer', date: '2026-01-01', time: '09:00', seq: 1, accountingOrder: 0 }],
+      adjustments: [{ id: 'reward', date: '2026-01-01', time: '11:00', seq: 1, accountingOrder: 0 }],
+      dividends: [{ id: 'dividend', date: '2026-01-01', time: '12:00', seq: 1, accountingOrder: 0 }],
     });
     expect(result.transfers[0].accountingOrder).toBe(1);
     expect(result.transactions[0].accountingOrder).toBe(2);
@@ -111,7 +111,7 @@ describe('syncAccountingEventCollections', () => {
     const result = syncAccountingEventCollections({
       transactions: [{ id: 'trade', date: '2026-01-01', accountingOrder: 2, action: 'BUY', globalTransactionIndex: 1 }],
       transfers: [{ id: 'transfer', date: '2026-01-01', accountingOrder: 1, seq: 1 }],
-      adjustments: [{ id: 'new-reward', date: '2026-01-01', seq: 2 }],
+      adjustments: [{ id: 'new-reward', date: '2026-01-01', seq: 2, accountingOrder: 0 }],
       dividends: [],
     });
     expect(result.transfers[0].accountingOrder).toBe(1);

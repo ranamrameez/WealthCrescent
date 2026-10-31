@@ -246,13 +246,14 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
         brokerProfiles: wb.brokerProfiles.map(profile => {
           if (!profile.data) return profile;
           const ordered = syncAccountingEventCollections(profile.data);
-          return { ...profile, data: { ...ordered, transactions: syncTransactionIndexes(ordered.transactions) } };
+          return { ...profile, data: { ...profile.data, ...ordered, transactions: syncTransactionIndexes(ordered.transactions) } };
         }),
       } : {}),
     });
     const mutate = (updater: (wb: TWorkbook) => TWorkbook) => {
-      const updated = syncAccountingEventCollections(updater(get().workbook));
-      const withTradeIndexes = { ...updated, transactions: syncTransactionIndexes(updated.transactions) };
+      const mutated = updater(get().workbook);
+      const ordered = syncAccountingEventCollections(mutated);
+      const withTradeIndexes = { ...mutated, ...ordered, transactions: syncTransactionIndexes(ordered.transactions) };
       const next = syncProfileEventOrders(snapshotActiveProfile(withTradeIndexes));
       set({ workbook: next });
       persist(next);
