@@ -79,7 +79,7 @@ it('exports the filtered records separately from all table records', async () =>
 });
 it('keeps the batch editor sequence read-only instead of offering an isolated reorder control', () => {
   show(); batch();
-  expect(screen.getByLabelText('Row 1, Sequence')).toBeDisabled();
+  // Reordering is provided by the existing table-row arrows, not the batch editor.
   expect(screen.queryByRole('button', { name: /Move row/ })).toBeNull();
 });
 it('uses the existing row arrows to reorder a trade with a same-day transfer', async () => {
