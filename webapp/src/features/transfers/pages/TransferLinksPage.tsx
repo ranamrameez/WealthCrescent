@@ -36,6 +36,8 @@ import { LINK_MODULES, LINK_MODULE_LABELS, type LinkModule, type LinkSideConfig 
 interface CurrencyContext {
   cashCurrency: string;
   bankAccounts: { id: string; currencyCode: string }[];
+  qseCurrency: string;
+  psxCurrency: string;
   qseBrokers: { id: string; settings: { currency: string } }[];
   psxBrokers: { id: string; settings: { currency: string } }[];
   fundsCurrency: string;
@@ -63,8 +65,8 @@ export function resolveCurrency(cfg: LinkSideConfig, ctx: CurrencyContext): stri
   switch (cfg.module) {
     case 'cash': return cfg.currencyCode || ctx.cashCurrency;
     case 'bank': return ctx.bankAccounts.find((a) => a.id === cfg.ref)?.currencyCode ?? null;
-    case 'qse': return ctx.qseBrokers.find((broker) => broker.id === cfg.ref)?.settings.currency ?? null;
-    case 'psx': return ctx.psxBrokers.find((broker) => broker.id === cfg.ref)?.settings.currency ?? null;
+    case 'qse': return ctx.qseBrokers.find((broker) => broker.id === cfg.ref)?.settings.currency ?? ctx.qseCurrency;
+    case 'psx': return ctx.psxBrokers.find((broker) => broker.id === cfg.ref)?.settings.currency ?? ctx.psxCurrency;
     // Unlike QSE/PSX, Funds has no single portfolio currency (funds can be
     // added in different currencies) — `defaultCurrency` is a pragmatic
     // stand-in, same simplification the unused `cashSummary`/
@@ -86,6 +88,8 @@ export function resolveCurrency(cfg: LinkSideConfig, ctx: CurrencyContext): stri
 export function useSideCurrency(cfg: LinkSideConfig): string | null {
   const cashCurrency = useCashWorkbookStore((s) => s.workbook.settings.defaultCurrency);
   const bankAccounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
+  const qseCurrency = useWorkbookStore((s) => s.workbook.settings.currency);
+  const psxCurrency = usePSXWorkbookStore((s) => s.workbook.settings.currency);
   const qseBrokers = useWorkbookStore((s) => s.workbook.brokerProfiles ?? []);
   const psxBrokers = usePSXWorkbookStore((s) => s.workbook.brokerProfiles ?? []);
   const fundsCurrency = useFundsWorkbookStore((s) => s.workbook.settings.defaultCurrency);
@@ -93,7 +97,7 @@ export function useSideCurrency(cfg: LinkSideConfig): string | null {
   const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const emiLoans = useEMIWorkbookStore((s) => s.workbook.entries);
   const creditCards = useCreditCardWorkbookStore((s) => s.workbook.cards);
-  return resolveCurrency(cfg, { cashCurrency, bankAccounts, qseBrokers, psxBrokers, fundsCurrency, properties, loans, emiLoans, creditCards });
+  return resolveCurrency(cfg, { cashCurrency, bankAccounts, qseCurrency, psxCurrency, qseBrokers, psxBrokers, fundsCurrency, properties, loans, emiLoans, creditCards });
 }
 
 interface NameContext {
