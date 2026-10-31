@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { fmtMoney } from '../lib/format';
 import { SummarySection, SummarySections, SummaryValue } from './SummaryGroupCard';
 
@@ -24,7 +25,7 @@ const summaryLabels: Record<SummaryKind, { actual: string; current: string; star
  * subsection layout stays consistent across the app. */
 export function BalanceSummaryCards({ currency, summary: s, kind = 'balance' }: { currency: string; summary: BalanceSummary; kind?: SummaryKind }) {
   const labels = summaryLabels[kind];
-  const metric = (label: string, amount: number, primary = false, detail?: React.ReactNode) => (
+  const metric = (label: string, amount: number, primary = false, detail?: ReactNode) => (
     <SummaryValue
       label={label}
       value={fmtMoney(amount, currency)}
