@@ -1,3 +1,8 @@
+import type { Transaction } from '../../types/workbook';
+import { sortTransactionsChronological } from './sortTransactions';
+
+const EPSILON = 1e-7;
+
 export interface TradeQuantityEntry {
   ticker: string;
   action: 'BUY' | 'SELL';
@@ -39,4 +44,49 @@ export function validateSellQuantities(
 export function tradePriceDeviationPct(enteredPrice: number, marketPrice: number): number | null {
   if (!Number.isFinite(enteredPrice) || enteredPrice <= 0 || !Number.isFinite(marketPrice) || marketPrice <= 0) return null;
   return ((enteredPrice - marketPrice) / marketPrice) * 100;
+}
+
+export interface TransactionEditSellError {
+  ticker: string;
+  additionalUnmatchedShares: number;
+}
+
+/** Compare the full chronological ledgers before and after an edit. This
+ * catches historical edits that would create a new oversell (including
+ * reducing an earlier BUY), without rejecting legacy discrepancies that
+ * already existed before the edit. Pending orders remain excluded exactly
+ * as they are from official position accounting. */
+export function validateTransactionEdit(
+  existingTransactions: Transaction[],
+  candidateTransactions: Transaction[],
+): TransactionEditSellError | null {
+  const unmatchedByTicker = (transactions: Transaction[]) => {
+    const balances = new Map<string, number>();
+    const unmatched = new Map<string, number>();
+    for (const transaction of sortTransactionsChronological(transactions.filter(item => !item.isPending))) {
+      const ticker = transaction.ticker.trim().toUpperCase();
+      if (!ticker || !Number.isFinite(transaction.shares) || transaction.shares <= 0) continue;
+      const held = balances.get(ticker) ?? 0;
+      if (transaction.action === 'BUY') {
+        balances.set(ticker, held + transaction.shares);
+      } else {
+        const matched = Math.min(held, transaction.shares);
+        balances.set(ticker, Math.max(0, held - matched));
+        if (transaction.shares > matched) {
+          unmatched.set(ticker, (unmatched.get(ticker) ?? 0) + transaction.shares - matched);
+        }
+      }
+    }
+    return unmatched;
+  };
+
+  const before = unmatchedByTicker(existingTransactions);
+  const after = unmatchedByTicker(candidateTransactions);
+  for (const [ticker, totalUnmatched] of after) {
+    const previousUnmatched = before.get(ticker) ?? 0;
+    if (totalUnmatched > previousUnmatched + EPSILON) {
+      return { ticker, additionalUnmatchedShares: totalUnmatched - previousUnmatched };
+    }
+  }
+  return null;
 }
