@@ -8017,7 +8017,16 @@ Bank Account Transactions/Plans and Personal Loan Payments/Plans use the shared 
 PR #41 carries the clean main-based broker-profile implementation. Keep QSE/PSX trades, transfers, adjustments, dividends, plans, fee settings and calculations isolated per broker profile; keep exchange market prices, price history and watchlists shared. Legacy PSX history migrates to JS Zindagi with financial fields preserved. Archived profiles are view-only; deactivated profiles cannot become active. See `webapp/SESSION_HANDOFF.md` and `webapp/audit.md`. Run #105 passed tests/build on the pre-documentation head; the latest head must pass CI again after the post-PR40 reconciliation. Backup/export migration review and browser checks remain required before merge. Never push directly to `main`.
 
 
-**Latest broker-profile validation (2026-10-30):** PR #43 is the clean main-based branch. Its exact latest head `b31bbd264d105c0445abc655abe2f083017e9407` passed GitHub Actions run #107 (full test suite + type-check/production build). Do not merge until a real backup/export migration review and browser verification are completed.
+**Broker-profile delivery update (2026-10-31):** PR #43 is merged into `main`. The implementation is already delivered. Real legacy backup/export review and interactive browser verification remain manual follow-ups; do not claim they were completed.
 
 
-**PR #43 latest-head check (2026-10-30):** the restored README/docs head `dcf3181a0a8955417c4049089f4735685c25a8ec` passed Actions run #112 (full tests + production build). The broker PR remains open pending real backup/export migration review and browser verification.
+**Stale branch note (2026-10-31):** `feat/broker-profile-isolation-rebased` is 69 commits ahead / 34 behind `main` and has no matching open PR. Do not merge or continue on it; use the merged PR #43 implementation on `main`.
+
+
+## Funds cash reconciliation — issue #42 (2026-10-31)
+
+Implementation is on `feat/funds-cash-reconciliation`, branched from current `main`. The chosen model is one portfolio-level cash account per currency because Funds linked transfers do not identify a fund or broker. BUY moves money from cash into units; valid SELL returns proceeds; transfer fees are applied once; currencies remain separate.
+
+New/edited transfers persist `currencyCode`. Legacy transfers are not rewritten: a versioned metadata migration snapshots their legacy Funds default currency once and the UI warns users to review/assign explicit currencies. Funds Summary separates holdings from cash, and current/historical Net Worth includes both exactly once with a dedicated Funds cash inclusion toggle. Tests cover fees, multi-currency balances, unmatched SELLs, legacy currency fallback and historical Net Worth.
+
+**Validation is pending on the final branch/PR head.** Require full tests, type-check and production build before merge. Real backup/export migration review and interactive browser smoke tests remain outstanding. Keep `README.md`, `USER_MANUAL.md`, `SESSION_HANDOFF.md`, and `audit.md` synchronized. Never push directly to `main`; use small focused commits and a PR.
