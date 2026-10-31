@@ -1044,10 +1044,18 @@ function IncludeInNetWorthControls({
               </div>
             )}
 
-            {funds.funds.length > 0 && (
+            {(funds.funds.length > 0 || funds.transfers.length > 0) && (
               <div>
                 <div className="text-muted" style={{ marginBottom: 6, fontWeight: 600 }}>Funds</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  <IncludeChip
+                    label="Funds cash"
+                    checked={funds.settings.includeCashInNetWorth !== false}
+                    onToggle={() => toggleInclude(() => setFundsWorkbook({
+                      ...funds,
+                      settings: { ...funds.settings, includeCashInNetWorth: funds.settings.includeCashInNetWorth === false },
+                    }))}
+                  />
                   {funds.funds.map((f) => (
                     <IncludeChip key={f.id} label={`${f.name} (${f.currencyCode})`} checked={f.includeInNetWorth !== false} onToggle={() => toggleFund(f)} />
                   ))}
