@@ -1,6 +1,5 @@
 import { createWorkbookStore } from './createWorkbookStore';
-import { createEmptyFundsWorkbook } from './defaultFundsWorkbook';
-import { migrateLegacyFundsCashSettings } from '../lib/calc/fundsModule';
+import { createEmptyFundsWorkbook, migrateLegacyFundsCashSettings } from './defaultFundsWorkbook';
 
 /** Funds reuses the exact same factory QSE/PSX use — see FundsWorkbook's
  * own doc comment for why. Fund CRUD (add/update/delete a Fund, as opposed
