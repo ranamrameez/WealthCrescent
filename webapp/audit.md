@@ -150,4 +150,4 @@ Design decision: a separate **portfolio-level cash account per currency**, not p
 - Current and historical Net Worth include Funds cash plus holdings exactly once. Funds cash has its own inclusion toggle; individual fund toggles do not alter the portfolio cash ledger.
 - Regression tests cover deposit/BUY/SELL/withdrawal arithmetic, fees, multi-currency separation, unmatched SELL exclusion, legacy currency fallback and historical Net Worth.
 
-**Validation still required:** run full tests, type-check and production build on the final PR head. Real legacy-data backup/export review and interactive browser smoke tests have not been performed in this session.
+**CI validation passed:** Actions run [#280](https://github.com/ranamrameez/WealthCrescent/actions/runs/41204911191) passed 138 test files / 1,093 tests, type-check and production build on application-code head `28028459c82aa12c976fd4410588e8d24d24d7a3`. Later commits are documentation-only. **Manual validation remains:** inspect a real pre-migration backup/export and perform interactive browser smoke tests. The browser connection was unavailable in this session; PR #46 remains draft.
