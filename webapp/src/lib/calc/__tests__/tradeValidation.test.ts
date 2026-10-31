@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { tradePriceDeviationPct, validateSellQuantities } from '../tradeValidation';
+import { tradePriceDeviationPct, validateSellQuantities, validateTransactionEdit } from '../tradeValidation';
 
 describe('validateSellQuantities', () => {
   it('blocks a sell above current holdings', () => {
@@ -29,5 +29,34 @@ describe('tradePriceDeviationPct', () => {
     expect(tradePriceDeviationPct(110, 100)).toBe(10);
     expect(tradePriceDeviationPct(90, 100)).toBe(-10);
     expect(tradePriceDeviationPct(100, 0)).toBeNull();
+  });
+});
+
+describe('validateTransactionEdit', () => {
+  const buy = (id: string, date: string, shares: number, seq: number) => ({ id, date, seq, ticker: 'PSO', action: 'BUY' as const, shares, price: 100 });
+  const sell = (id: string, date: string, shares: number, seq: number) => ({ id, date, seq, ticker: 'PSO', action: 'SELL' as const, shares, price: 100 });
+
+  it('rejects a historical sell edit using holdings available on that date, not later buys', () => {
+    const existing = [buy('b1', '2026-01-01', 10, 1), sell('s1', '2026-01-02', 5, 2), buy('b2', '2026-01-03', 20, 3)];
+    const candidate = [existing[0], sell('s1', '2026-01-02', 15, 2), existing[2]];
+    expect(validateTransactionEdit(existing, candidate)).toEqual({ ticker: 'PSO', additionalUnmatchedShares: 5 });
+  });
+
+  it('rejects reducing an earlier buy when that creates a later oversell', () => {
+    const existing = [buy('b1', '2026-01-01', 100, 1), sell('s1', '2026-01-02', 80, 2)];
+    const candidate = [buy('b1', '2026-01-01', 50, 1), existing[1]];
+    expect(validateTransactionEdit(existing, candidate)).toEqual({ ticker: 'PSO', additionalUnmatchedShares: 30 });
+  });
+
+  it('allows an edit that does not increase a pre-existing legacy discrepancy', () => {
+    const existing = [buy('b1', '2026-01-01', 5, 1), sell('s1', '2026-01-02', 10, 2)];
+    const candidate = [existing[0], { ...existing[1], price: 105 }];
+    expect(validateTransactionEdit(existing, candidate)).toBeNull();
+  });
+
+  it('ignores pending orders consistently with position accounting', () => {
+    const existing = [buy('b1', '2026-01-01', 5, 1)];
+    const candidate = [existing[0], { ...sell('s1', '2026-01-02', 20, 2), isPending: true }];
+    expect(validateTransactionEdit(existing, candidate)).toBeNull();
   });
 });
