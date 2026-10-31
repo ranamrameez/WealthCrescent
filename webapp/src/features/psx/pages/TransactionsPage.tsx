@@ -832,11 +832,9 @@ function TransactionList() {
 function TransfersSection() {
   const dateSort = useDateTableSort();
   const workbook = usePSXWorkbookStore((s) => s.workbook);
-  const updateTransfer = usePSXWorkbookStore((s) => s.updateTransfer);
   const deleteTransfer = usePSXWorkbookStore((s) => s.deleteTransfer);
   const currency = workbook.settings.currency;
   const links = useInterEntityTransfersStore((s) => s.workbook.entries);
-  const ensureSignedIn = useEnsureSignedIn();
   const sideLabel = useLinkSideLabel();
 
   const [editRow, setEditRow] = useState<Transfer | null>(null);

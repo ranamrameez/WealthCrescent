@@ -745,11 +745,9 @@ function TransfersSection({ sectionProps }: { sectionProps?: SectionCardProps } 
   const dateSort = useDateTableSort();
   const [modifying, setModifying] = useState(false);
   const workbook = useWorkbookStore((s) => s.workbook);
-  const updateTransfer = useWorkbookStore((s) => s.updateTransfer);
   const deleteTransfer = useWorkbookStore((s) => s.deleteTransfer);
   const currency = workbook.settings.currency;
   const links = useInterEntityTransfersStore((s) => s.workbook.entries);
-  const ensureSignedIn = useEnsureSignedIn();
   const sideLabel = useLinkSideLabel();
 
   const [editRow, setEditRow] = useState<Transfer | null>(null);
