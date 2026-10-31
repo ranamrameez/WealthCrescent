@@ -1261,7 +1261,6 @@ function EditTransactionModal({ tx, onClose }: { tx: BankTransaction; onClose: (
  * (README Done item 224) here too. */
 function TransactionsList({ account, ledger, allLedgerCount, showActions }: { account: BankAccount; ledger: ReturnType<typeof accountRunningLedger>; allLedgerCount: number; showActions: boolean }) {
   const dateSort = useDateTableSort();
-  useEffect(() => setPage(1), [dateSort.selection]);
   const dateFormat = useAppearanceStore((state) => state.appearance.dateFormat ?? 'DD-MMM-YYYY');
   const updateTransaction = useBankWorkbookStore((state) => state.updateTransaction);
   const deleteTransaction = useBankWorkbookStore((state) => state.deleteTransaction);
