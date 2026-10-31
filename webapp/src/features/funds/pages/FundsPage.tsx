@@ -99,7 +99,7 @@ function emptyFund(defaultCurrency: string, brokerId?: string): Fund {
 function AddFundFab() {
   const [open, setOpen] = useState<'fund' | 'transfer' | 'helper' | 'broker' | null>(null);
   const primaryCurrency = usePrimaryCurrency();
-  const workbookDefaultCurrency = useFundsWorkbookStore((s) => s.(workbook.settings.legacyTransferCurrency ?? workbook.settings.defaultCurrency));
+  const workbookDefaultCurrency = useFundsWorkbookStore((s) => s.workbook.settings.defaultCurrency);
   const defaultCurrency = primaryCurrency ?? workbookDefaultCurrency;
   return (
     <>
@@ -485,7 +485,7 @@ function OverallSummary({ selectedIds }: { selectedIds?: string[] } = {}) {
   const totals: Record<string, { invested: number; value: number; cash: number; profit: number; expDaily: number; expMonthly: number }> = {};
   const includePortfolioCash = !selectedIds || selectedIds.length === funds.length;
   const cashBalances = includePortfolioCash
-    ? fundsCashBalanceByCurrency(workbook.funds, workbook.transactions, workbook.transfers, workbook.settings.defaultCurrency)
+    ? fundsCashBalanceByCurrency(workbook.funds, workbook.transactions, workbook.transfers, workbook.settings.legacyTransferCurrency ?? workbook.settings.defaultCurrency)
     : {};
   scopedFunds.forEach((fund) => {
     const p = positions.find((pos) => pos.ticker === fund.id);
@@ -1466,7 +1466,7 @@ function FundsTransfersSection() {
   const [typeFilter, setTypeFilter] = useState<'all' | Transfer['type']>('all');
 
   const cashLedgers = useMemo(
-    () => fundsCashLedgerByCurrency(workbook.funds, workbook.transactions, workbook.transfers, workbook.settings.defaultCurrency),
+    () => fundsCashLedgerByCurrency(workbook.funds, workbook.transactions, workbook.transfers, workbook.settings.legacyTransferCurrency ?? workbook.settings.defaultCurrency),
     [workbook.funds, workbook.transactions, workbook.transfers, workbook.settings.defaultCurrency],
   );
   const balances = useMemo(
