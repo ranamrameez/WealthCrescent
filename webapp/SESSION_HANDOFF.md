@@ -1,5 +1,21 @@
 # WealthCrescent — Session Handoff (refreshed 2026-10-31)
 
+## 2026-10-31 — Funds cash reconciliation / issue #42 (latest work)
+
+- Open issue: [#42 — Design and implement Funds cash-on-hand reconciliation without double-counting holdings](https://github.com/ranamrameez/WealthCrescent/issues/42).
+- Implementation branch: `feat/funds-cash-reconciliation` (branched from current `main`); no PR opened yet.
+- Architecture: a separate portfolio-level cash account per currency. Funds linked transfers are portfolio-level and have no fund/broker reference, so a per-fund account would not match the existing transfer model.
+- New/edited Funds transfers store `currencyCode`. A versioned metadata-only migration snapshots the existing Funds default currency for legacy transfers without rewriting the original transfer records. The Cash ledger warns about those rows and lets users assign a currency by editing.
+- BUY reduces cash in the fund's currency; valid SELL adds proceeds; transfer fees are applied once; unmatched SELLs and pending trades do not create cash movement. Each currency has an independent ledger.
+- Funds Summary separates invested cost basis, holdings value, cash on hand and total Funds value. Current and historical Net Worth add cash to holdings once, with a separate Funds cash inclusion toggle.
+- Regression tests added for fees, BUY/SELL movement, currency separation, unmatched SELL handling, legacy currency fallback and historical Net Worth.
+- **Not yet validated:** no local run or CI run on this branch yet. Do not merge until the exact latest PR head passes full tests, type-check and production build. Real legacy backup/export review and interactive browser smoke tests remain outstanding.
+
+### Broker-profile branch status
+
+The broker-profile feature was delivered by merged [PR #43](https://github.com/ranamrameez/WealthCrescent/pull/43). The specifically requested `feat/broker-profile-isolation-rebased` branch is diverged from main (69 commits ahead / 34 behind) and has no matching open PR; do not merge or continue work on that stale branch. Use merged `main` as the source of truth.
+
+
 ## 2026-10-31 — PR #44 merged into main (latest)
 
 
