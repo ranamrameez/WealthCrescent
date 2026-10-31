@@ -17,6 +17,7 @@ const emptyInputs = () => ({
   fundsTransactions: [],
   fundsTransfers: [],
   fundsDefaultCurrency: 'USD',
+  fundsIncludeCashInNetWorth: true,
   fundsPriceHistory: {},
   qseTransactions: [],
   qseTransfers: [],
