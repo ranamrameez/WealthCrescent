@@ -97,6 +97,8 @@ type Drilldown =
 
 function NetWorthDrilldownModal({ drilldown, onClose }: { drilldown: Drilldown; onClose: () => void }) {
   const dateSort = useDateTableSort();
+  const flowRows = drilldown.kind === 'flow' ? dateSort.rows(drilldown.items, { date: row => row }) : [];
+  const { rows: pageFlowRows, controls: flowPaginationControls } = useTablePagination(flowRows);
   return (
     <Modal title={drilldown.title} onClose={onClose}>
       <p className="text-muted mt-0">{drilldown.explanation}</p>
@@ -126,7 +128,7 @@ function NetWorthDrilldownModal({ drilldown, onClose }: { drilldown: Drilldown; 
             <table>
               <thead><tr><dateSort.Th rows={drilldown.kind === 'flow' ? drilldown.items : []} column="date">Date</dateSort.Th><th>Source</th><th>Description</th><th style={{ textAlign: 'right' }}>Amount</th></tr></thead>
               <tbody>
-                {dateSort.rows(drilldown.items, { date: row => row }).map((it, i) => (
+                {pageFlowRows.map((it, i) => (
                   <RecordRow record={it} key={i}>
                     <td><DateValue value={it.date} /></td>
                     <td>{it.module}{it.accountName ? ` (${it.accountName})` : ''}</td>
@@ -139,6 +141,7 @@ function NetWorthDrilldownModal({ drilldown, onClose }: { drilldown: Drilldown; 
               </tbody>
             </table>
           )}
+          {flowPaginationControls}
         </>
       )}
       {drilldown.kind === 'delta' && (() => {
