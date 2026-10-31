@@ -8,6 +8,10 @@ function tx(over: Partial<Transaction>): Transaction {
   return { date: '2026-01-01', ticker: 'ABC', action: 'BUY', shares: 1, price: 100, ...over };
 }
 
+function xfer(over: Partial<Transfer>): Transfer {
+  return { id: 'xfer', date: '2026-01-01', type: 'DEPOSIT', gross: 100, fee: 0, ...over };
+}
+
 describe('buildCashLedger', () => {
   it('puts a transfer before a trade on an exact instant tie, regardless of seq', () => {
     // A preceding BUY (seq 1, an earlier date so it's never part of the
@@ -60,7 +64,7 @@ it('keeps the full cash proceeds from an executed oversell while stock accountin
 
 it('uses the shared same-day sequence across trades and transfers instead of their separate seq values', () => {
   const buy = tx({ id: 'trade', date: '2026-01-02', time: '12:00', action: 'BUY', shares: 1, price: 10, seq: 1, accountingOrder: 2 });
-  const deposit = transfer({ id: 'deposit', date: '2026-01-02', time: '09:00', type: 'DEPOSIT', gross: 20, fee: 0, seq: 99, accountingOrder: 1 });
+  const deposit = xfer({ id: 'deposit', date: '2026-01-02', time: '09:00', type: 'DEPOSIT', gross: 20, fee: 0, seq: 99, accountingOrder: 1 });
   const ledger = buildCashLedger([buy], [deposit], [], flatFee);
   expect(ledger.map(event => event.sourceId)).toEqual(['deposit', 'trade']);
   expect(ledger.map(event => event.accountingOrder)).toEqual([1, 2]);

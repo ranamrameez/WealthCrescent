@@ -123,9 +123,9 @@ describe('syncAccountingEventCollections', () => {
 
   it('reindexes trade compatibility fields from date plus shared same-day order', () => {
     const result = syncTransactionIndexes([
-      { id: 'later', ticker: 'AAA', date: '2026-01-02', action: 'BUY', accountingOrder: 1, globalTransactionIndex: 1 },
-      { id: 'same-day-second', ticker: 'AAA', date: '2026-01-01', action: 'SELL', accountingOrder: 2, globalTransactionIndex: 2 },
-      { id: 'same-day-first', ticker: 'AAA', date: '2026-01-01', action: 'BUY', accountingOrder: 1, globalTransactionIndex: 3 },
+      { id: 'later', ticker: 'AAA', date: '2026-01-02', action: 'BUY', accountingOrder: 1, globalTransactionIndex: 1, perTickerIndex: 0 },
+      { id: 'same-day-second', ticker: 'AAA', date: '2026-01-01', action: 'SELL', accountingOrder: 2, globalTransactionIndex: 2, perTickerIndex: 0 },
+      { id: 'same-day-first', ticker: 'AAA', date: '2026-01-01', action: 'BUY', accountingOrder: 1, globalTransactionIndex: 3, perTickerIndex: 0 },
     ]);
     const byId = Object.fromEntries(result.map(row => [row.id, row]));
     expect(byId['same-day-first'].globalTransactionIndex).toBe(1);
