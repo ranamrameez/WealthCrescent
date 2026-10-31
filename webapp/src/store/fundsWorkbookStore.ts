@@ -7,4 +7,22 @@ import { createEmptyFundsWorkbook } from './defaultFundsWorkbook';
  * doesn't know about the extra `funds` field — the Funds page mutates it
  * directly via the store's generic `setWorkbook`, which is exactly what
  * that action is for. */
-export const useFundsWorkbookStore = createWorkbookStore('WealthCrescent_funds_workbook_v1', createEmptyFundsWorkbook);
+const fundsStore = createWorkbookStore('WealthCrescent_funds_workbook_v1', createEmptyFundsWorkbook);
+
+// Metadata-only, versioned migration for legacy Funds transfers that predate
+// Transfer.currencyCode. Snapshot the existing Funds default once so later
+// changes to the new-fund default cannot silently move historical cash rows
+// between currencies. The transfer records themselves are left untouched.
+const initialWorkbook = fundsStore.getState().workbook;
+if ((initialWorkbook.settings.cashLedgerMigrationVersion ?? 0) < 1) {
+  fundsStore.getState().setWorkbook({
+    ...initialWorkbook,
+    settings: {
+      ...initialWorkbook.settings,
+      legacyTransferCurrency: initialWorkbook.settings.legacyTransferCurrency || initialWorkbook.settings.defaultCurrency || 'USD',
+      cashLedgerMigrationVersion: 1,
+    },
+  });
+}
+
+export const useFundsWorkbookStore = fundsStore;
