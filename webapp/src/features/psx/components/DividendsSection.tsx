@@ -18,6 +18,7 @@ import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { useSortableRows } from '../../../hooks/useSortableRows';
 import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
 import type { Dividend } from '../../../types/workbook';
+import { PSXReorder } from './PSXReorder';
 import { usePSXDerived } from '../hooks/usePSXDerived';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -137,8 +138,10 @@ export function DividendsSection() {
       default: return d.date;
     }
   };
-  const { sorted: rows, sort, toggleSort } = useSortableRows([...workbook.dividends.map((d, i) => ({ ...d, i }))]
-    .filter((d) => tickerFilter === 'ALL' || d.ticker === tickerFilter), sortValue, 'date');
+  const dividendRows = [...workbook.dividends.map((d, i) => ({ ...d, i }))]
+    .sort((a, b) => b.date.localeCompare(a.date) || (a.accountingOrder ?? 0) - (b.accountingOrder ?? 0))
+    .filter((d) => tickerFilter === 'ALL' || d.ticker === tickerFilter);
+  const { sorted: rows, sort, toggleSort } = useSortableRows(dividendRows, sortValue, 'date');
   const arrow = (col: string) => <SortIcon direction={sort.col === col ? sort.dir : undefined} />;
   // Reflects the ticker filter above, so "Total collected" always matches
   // what's actually shown in the table above it.
@@ -201,7 +204,7 @@ export function DividendsSection() {
                 </RecordRow>
               ) : (
                 <RecordRow market="psx" onEdit={() => startEdit(d.i, d)}    record={d}  key={d.i}>
-                  <td><DateValue value={d.date} /></td>
+                  <td><DateValue value={d.date} /><PSXReorder kind="dividend" id={d.id!} date={d.date} /></td>
                   <td><TickerLogo ticker={d.ticker} size="sm" exchange="psx" /><Link to={`/psx/stock/${d.ticker}`}>{d.ticker}</Link></td>
                   <td>{fmtPSXPrice(d.perShare)}</td>
                   <td>{d.shares || '—'}</td>

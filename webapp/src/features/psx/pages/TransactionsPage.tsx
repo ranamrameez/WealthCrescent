@@ -34,16 +34,14 @@ import { IconButton } from '../../../components/ui/IconButton';
 import { TimeZoneFields } from '../../../components/ui/TimeZoneFields';
 import { defaultTimeForDate, defaultTimezoneForCurrency, defaultTimezoneForMarket, nowTime } from '../../../lib/datetime';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
-import { ReorderButtons } from '../../../components/ui/ReorderButtons';
 import { PendingToggle } from '../../../components/ui/PendingToggle';
-import { dateOnlyMs } from '../../../lib/datetime';
 import { createEmptyPSXWorkbook } from '../../../store/defaultPsxWorkbook';
 import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
 import { useInterEntityTransfersStore } from '../../../store/interEntityTransfersStore';
 import { linkTargetPath, useLinkSideLabel } from '../../transfers/pages/TransferLinksPage';
 import type { Adjustment, Transaction, Transfer } from '../../../types/workbook';
-import { syncTransactionIndexes } from '../../../lib/seq';
 import { DividendsSection } from '../components/DividendsSection';
+import { PSXReorder } from '../components/PSXReorder';
 import { usePSXDerived } from '../hooks/usePSXDerived';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -488,27 +486,6 @@ function TransactionList() {
   };
 
   const setWorkbook = usePSXWorkbookStore((s) => s.setWorkbook);
-  const transactionOrderRows = useMemo(
-    () => [...workbook.transactions].sort((a, b) => (a.globalTransactionIndex ?? a.transactionIndex ?? Number.MAX_SAFE_INTEGER) - (b.globalTransactionIndex ?? b.transactionIndex ?? Number.MAX_SAFE_INTEGER)),
-    [workbook.transactions],
-  );
-  const reorderTransaction = async (pair: [{ id: string; order: number }, { id: string; order: number }]) => {
-    if (!(await ensureSignedIn('Sign in to reorder transactions.'))) return;
-    const current = usePSXWorkbookStore.getState().workbook;
-    const a = current.transactions.find(tx => tx.id === pair[0].id);
-    const b = current.transactions.find(tx => tx.id === pair[1].id);
-    const aIndex = a?.globalTransactionIndex ?? a?.transactionIndex;
-    const bIndex = b?.globalTransactionIndex ?? b?.transactionIndex;
-    if (!a || !b || !Number.isInteger(aIndex) || !Number.isInteger(bIndex)) return toast('Transactions changed or accounting order is missing. Reload and try again.');
-    const swapped = current.transactions.map(tx => tx.id === a.id
-      ? { ...tx, globalTransactionIndex: bIndex, transactionIndex: bIndex }
-      : tx.id === b.id
-        ? { ...tx, globalTransactionIndex: aIndex, transactionIndex: aIndex }
-        : tx);
-    const transactions = syncTransactionIndexes(swapped);
-    usePSXWorkbookStore.getState().setWorkbook({ ...current, transactions });
-    toast('Transaction accounting order updated.');
-  };
   const clearAll = async () => {
     const ok = await confirmDialog(
       'This clears all transactions, prices and watchlist entries in this browser.',
@@ -610,7 +587,7 @@ function TransactionList() {
                   </Fragment>
                 ) : (
                   <RecordRow market="psx" onEdit={() => startEdit(i, tx)}    record={{ tx, i }}  key={i}  className="clickable">
-                    <td><DateValue value={tx.date} />{' '}<ReorderButtons rows={transactionOrderRows} index={transactionOrderRows.findIndex(row => row.id === tx.id)} instantOf={row => dateOnlyMs(row.date)} idOf={row => row.id!} orderOf={row => row.globalTransactionIndex ?? row.transactionIndex} allowAcrossInstants onMove={reorderTransaction} /></td>
+                    <td><DateValue value={tx.date} />{' '}<PSXReorder kind="trade" id={tx.id!} date={tx.date} /></td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <TickerLogo ticker={tx.ticker} size="sm" exchange="psx" /><Link to={`/psx/stock/${tx.ticker}`}>{tx.ticker}</Link>
                       {tx.isPending && (
@@ -885,24 +862,13 @@ function TransfersSection() {
     [workbook.transfers, typeFilter],
   );
 
-  // User-reported (2026-09-06): "we may stop sorting options for
-  // chronologically important tables (only sequence-aware tables) to
-  // avoid the disordered mess" — same reasoning as QSE's own equivalent
-  // (Done item 235): Balance only makes sense in real chronological+
-  // sequence order, so free column sorting is gone here, replaced by
-  // `ReorderButtons` for the one thing that genuinely needs fixing (two
-  // same-instant transfers in the wrong relative order).
-  const instantOf = (t: Transfer) => dateOnlyMs(t.date);
+  // Latest dates first; within each date, preserve the shared accounting sequence.
   const dateSortInput = useMemo(
-    () => [...filteredTransfers].sort((a, b) => instantOf(b) - instantOf(a) || (b.seq ?? 0) - (a.seq ?? 0)),
+    () => [...filteredTransfers].sort((a, b) => b.date.localeCompare(a.date) || (a.accountingOrder ?? 0) - (b.accountingOrder ?? 0)),
     [filteredTransfers],
   );
   const sorted = dateSort.rows(dateSortInput, { date: row => row });
   const page = useTablePagination(sorted);
-  const reorderTransfer = async (pair: [{ id: string; order: number }, { id: string; order: number }]) => {
-    if (!(await ensureSignedIn('Sign in to reorder transfers.'))) return;
-    for (const p of pair) updateTransfer(p.id, { seq: p.order });
-  };
 
   const startEdit = (t: Transfer) => setEditRow({ ...t });
 
@@ -937,14 +903,7 @@ function TransfersSection() {
                 <RecordRow market="psx" onEdit={() => startEdit(t)}    record={t}  key={t.id}>
                   <td>
                     <DateValue value={t.date} />{' '}
-                    <ReorderButtons
-                      rows={sorted}
-                      index={sorted.findIndex(row => row.id === t.id)}
-                      instantOf={instantOf}
-                      idOf={(row) => row.id}
-                      orderOf={(row) => row.seq}
-                      onMove={reorderTransfer}
-                    />
+                    <PSXReorder kind="transfer" id={t.id} date={t.date} />
                   </td>
                   <td>
                     {t.type}
@@ -984,7 +943,7 @@ function AdjustmentsSection() {
   const updateAdjustment = usePSXWorkbookStore((s) => s.updateAdjustment);
   const deleteAdjustment = usePSXWorkbookStore((s) => s.deleteAdjustment);
   const currency = workbook.settings.currency;
-  const indexed = workbook.adjustments.map((a, i) => ({ a, i }));
+  const indexed = workbook.adjustments.map((a, i) => ({ a, i })).sort((a, b) => b.a.date.localeCompare(a.a.date) || (a.a.accountingOrder ?? 0) - (b.a.accountingOrder ?? 0));
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [editRow, setEditRow] = useState<Adjustment | null>(null);
 
@@ -1035,7 +994,7 @@ function AdjustmentsSection() {
                 </RecordRow>
               ) : (
                 <RecordRow market="psx" onEdit={() => startEdit(i, a)}    record={{ a, i }}  key={i}>
-                  <td><DateValue value={a.date} /></td>
+                  <td><DateValue value={a.date} /><PSXReorder kind="adjustment" id={a.id!} date={a.date} /></td>
                   <td>{fmtMoney(a.amount, currency)}</td>
                   <td>{a.note}</td>
                   <td>
@@ -1075,8 +1034,8 @@ function CashLedgerSection() {
   // from a real record living in its own native table (Trade Transactions
   // / the Transfers section above / Adjustments); reordering happens
   // there and flows through automatically.
-  const dateSortInput = [...filtered].reverse();
-  const sorted = dateSort.rows(dateSortInput, { date: row => ({ ...row, seq: ledger.indexOf(row) }) });
+  const dateSortInput = [...filtered].sort((a, b) => b.date.localeCompare(a.date) || (a.accountingOrder ?? 0) - (b.accountingOrder ?? 0));
+  const sorted = dateSort.rows(dateSortInput, { date: row => ({ ...row, seq: row.accountingOrder ?? 0 }) });
   const page = useTablePagination(sorted);
 
   return (
@@ -1105,7 +1064,7 @@ function CashLedgerSection() {
         <tbody>
           {page.rows.map((e, i) => (
             <RecordRow market="psx" record={e} key={i}>
-              <td><DateValue value={e.date} /></td>
+              <td><DateValue value={e.date} />{e.sourceId && <PSXReorder kind={e.kind} id={e.sourceId} date={e.date} />}</td>
               <td>{e.kind}</td>
               <td>{e.label}</td>
               <td className={e.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(e.amount, currency)}</td>

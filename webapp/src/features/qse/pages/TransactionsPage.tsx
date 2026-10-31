@@ -36,7 +36,6 @@ import { IconButton } from '../../../components/ui/IconButton';
 import { TimeZoneFields } from '../../../components/ui/TimeZoneFields';
 import { defaultTimeForDate, defaultTimezoneForCurrency, defaultTimezoneForMarket, nowTime } from '../../../lib/datetime';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
-import { ReorderButtons } from '../../../components/ui/ReorderButtons';
 import { PendingToggle } from '../../../components/ui/PendingToggle';
 import { toInstantMs } from '../../../lib/datetime';
 import { createEmptyWorkbook } from '../../../store/defaultWorkbook';
@@ -475,7 +474,6 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   };
 
   const setWorkbook = useWorkbookStore((s) => s.setWorkbook);
-  const transactionOrderRows = useMemo(() => [...workbook.transactions].sort((a, b) => (a.globalTransactionIndex ?? a.transactionIndex ?? Number.MAX_SAFE_INTEGER) - (b.globalTransactionIndex ?? b.transactionIndex ?? Number.MAX_SAFE_INTEGER)), [workbook.transactions]);
   const clearAll = async () => {
     const ok = await confirmDialog(
       'This clears all transactions, prices and watchlist entries in this browser.',
@@ -561,7 +559,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
                   </Fragment>
                 ) : (
                   <RecordRow market="qse" onEdit={() => startEdit(i, tx)}    record={{ tx, i }}  key={i}  className="clickable">
-                    <td><DateValue value={tx.date} />{modifying && <span onClick={event => event.stopPropagation()}><QseReorder kind="transactions" row={tx} rows={transactionOrderRows} /></span>}</td>
+                    <td><DateValue value={tx.date} />{modifying && <span onClick={event => event.stopPropagation()}><QseReorder kind="transactions" row={tx}  /></span>}</td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <TickerLogo ticker={tx.ticker} size="sm" exchange="qse" /><Link to={`/stock/${tx.ticker}`}>{tx.ticker}</Link>
                       {tx.isPending && (
@@ -777,14 +775,9 @@ function TransfersSection({ sectionProps }: { sectionProps?: SectionCardProps } 
     [workbook.transfers, typeFilter, pageFilters],
   );
 
-  // Display direction preserves chronological sequence ties and precomputed balances.
-  const instantOf = (t: Transfer) => toInstantMs(t.date, t.time, t.timezone);
-  const dateSortInput = [...filteredTransfers].sort((a, b) => instantOf(b) - instantOf(a) || (b.seq ?? 0) - (a.seq ?? 0));
+  // Latest dates first; within each date, preserve the shared accounting sequence.
+  const dateSortInput = [...filteredTransfers].sort((a, b) => b.date.localeCompare(a.date) || (a.accountingOrder ?? 0) - (b.accountingOrder ?? 0));
   const sorted = dateSort.rows(dateSortInput, { date: row => row });
-  const reorderTransfer = async (pair: [{ id: string; order: number }, { id: string; order: number }]) => {
-    if (!(await ensureSignedIn('Sign in to reorder transfers.'))) return;
-    for (const p of pair) updateTransfer(p.id, { seq: p.order });
-  };
 
   const page = useQseTablePagination(sorted);
   const startEdit = (t: Transfer) => setEditRow({ ...t });
@@ -811,14 +804,7 @@ function TransfersSection({ sectionProps }: { sectionProps?: SectionCardProps } 
                 <RecordRow market="qse" onEdit={() => startEdit(t)}    record={t}  key={t.id}>
                   <td>
                     <DateValue value={t.date} />{' '}
-                    {modifying && <ReorderButtons
-                      rows={sorted}
-                      index={sorted.findIndex(row => row.id === t.id)}
-                      instantOf={instantOf}
-                      idOf={(row) => row.id}
-                      orderOf={(row) => row.seq}
-                      onMove={reorderTransfer}
-                    />}
+                    {modifying && <QseReorder kind="transfers" row={t} />}
                   </td>
                   <td>
                     {t.type}
@@ -862,7 +848,7 @@ function AdjustmentsSection({ sectionProps }: { sectionProps?: SectionCardProps 
   const updateAdjustment = useWorkbookStore((s) => s.updateAdjustment);
   const deleteAdjustment = useWorkbookStore((s) => s.deleteAdjustment);
   const currency = workbook.settings.currency;
-  const indexed = workbook.adjustments.map((a, i) => ({ a, i })).filter(row => matchesQseFilters(row.a, pageFilters));
+  const indexed = workbook.adjustments.map((a, i) => ({ a, i })).sort((a, b) => b.a.date.localeCompare(a.a.date) || (a.a.accountingOrder ?? 0) - (b.a.accountingOrder ?? 0)).filter(row => matchesQseFilters(row.a, pageFilters));
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [editRow, setEditRow] = useState<Adjustment | null>(null);
 
@@ -871,7 +857,7 @@ function AdjustmentsSection({ sectionProps }: { sectionProps?: SectionCardProps 
     switch (col) {
       case 'amount': return r.a.amount;
       case 'note': return r.a.note ?? '';
-      default: return `${toInstantMs(r.a.date, r.a.time, r.a.timezone)} ${String(r.a.seq ?? 0).padStart(12, '0')}`;
+      default: return `${toInstantMs(r.a.date, r.a.time, r.a.timezone)} ${String(r.a.accountingOrder ?? 0).padStart(12, '0')}`;
     }
   };
   const { sorted, Th, dateSort } = useSortableRows(indexed, sortValue, 'date', 'desc');
@@ -948,8 +934,8 @@ function CashLedgerSection({ sectionProps }: { sectionProps?: SectionCardProps }
     const record = collection.find(row => row.id === event.sourceId);
     return record ? { ...record, id: record.id!, kind: event.kind } : undefined;
   };
-  const dateSortInput = [...ledger].reverse();
-  const sorted = dateSort.rows(dateSortInput, { date: row => ({ ...row, seq: ledger.indexOf(row) }) });
+  const dateSortInput = [...ledger].sort((a, b) => b.date.localeCompare(a.date) || (a.accountingOrder ?? 0) - (b.accountingOrder ?? 0));
+  const sorted = dateSort.rows(dateSortInput, { date: row => ({ ...row, seq: row.accountingOrder ?? 0 }) });
   const filtered = sorted.filter(event => (!filters.kind || event.kind === filters.kind) && matchesQseFilters({ ...event, description: event.label }, filters));
   const page = useQseTablePagination(filtered);
   const sources = (events: typeof ledger) => events.map(sourceFor).filter((row): row is QseRow => !!row);
