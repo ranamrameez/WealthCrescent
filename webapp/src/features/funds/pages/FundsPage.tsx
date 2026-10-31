@@ -1,5 +1,6 @@
 import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
+import { useTablePagination } from '../../../hooks/useTablePagination';
 import { DateValue } from '../../../components/DateValue';
 import { ToggleChip } from '../../../components/ui/ToggleChip';
 import { QuickEntitySwitch } from '../../../components/QuickEntitySwitch';
@@ -685,6 +686,8 @@ function SnapshotImportSection() {
     () => (rows ? buildFundsImportPlan(rows, workbook.funds) : []),
     [rows, workbook.funds],
   );
+  const indexedPlan = useMemo(() => plan.map((row, index) => ({ row, index })), [plan]);
+  const { rows: pagePlanRows, controls: planPaginationControls } = useTablePagination(indexedPlan);
 
   const duplicateCodes = useMemo(() => {
     if (!rows) return [];
@@ -791,7 +794,7 @@ function SnapshotImportSection() {
                 </tr>
               </thead>
               <tbody>
-                {plan.map((p, i) => (
+                {pagePlanRows.map(({ row: p, index: i }) => (
                   <RecordRow market="funds" record={p} key={i}>
                     <td><TextInput value={p.row.bank} onChange={(e) => editRow(i, { bank: e.target.value })} className="w-140" /></td>
                     <td><TextInput value={p.row.code} onChange={(e) => editRow(i, { code: e.target.value.toUpperCase() })} className="w-90" /></td>
@@ -806,6 +809,7 @@ function SnapshotImportSection() {
               </tbody>
             </table>
           </div>
+          {planPaginationControls}
           <button className="btn" disabled={busy} onClick={runImport}>
             <PlusIcon />Import {plan.length} fund{plan.length === 1 ? '' : 's'}
           </button>
@@ -883,6 +887,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
   const [showAllUpdates, setShowAllUpdates] = useState(false);
   const dateSort2Input = showAllUpdates ? [...balanceRows].reverse() : balanceRows.slice(-8).reverse();
   const updateRows = dateSort2.rows(dateSort2Input, { date: row => row });
+  const { rows: pageUpdateRows, controls: updatePaginationControls } = useTablePagination(updateRows, 8);
   const rawPriceHistory = workbook.priceHistory[fund.id] ?? [];
   const [editUpdateIndex, setEditUpdateIndex] = useState<number | null>(null);
   const [editUpdateRow, setEditUpdateRow] = useState<{ date: string; price: number } | null>(null);
@@ -981,6 +986,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
   const dateSortInput = (typeFilter === 'all' ? allTxs : allTxs.filter((r) => r.t.action === typeFilter)).filter(row => (!fromDate || row.t.date >= fromDate) && (!toDate || row.t.date <= toDate) && filters.source !== 'statement-import')
     .sort((a, b) => b.t.date.localeCompare(a.t.date));
   const txs = dateSort.rows(dateSortInput, { date: row => row.t });
+  const { rows: pageTxs, controls: txPaginationControls } = useTablePagination(txs);
 
   /** README item 40: extends Banking's statement-export pattern (Done
    * item 58) to this module's own primary record — a fund's "statement"
@@ -1249,7 +1255,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
         <table>
           <thead><tr><dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th><th>Type</th><th>Units</th><th>NAV</th><th>Amount</th><th></th></tr></thead>
           <tbody>
-            {txs.map(({ t, i }) =>
+            {pageTxs.map(({ t, i }) =>
               editIndex === i && editRow ? (
                 <RecordRow market="funds" record={{ t, i }} onCancel={() => setEditIndex(null)} key={i}>
                   <td><input type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} className="w-130" /></td>
@@ -1334,6 +1340,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
           </tbody>
         </table>
       </div>
+      {txPaginationControls}
       </> },
 { table: true, key: 'history', label: 'Balance history', defaultOpen: true, headerEnd: balanceRows.length > 0 ? <button className="btn secondary" onClick={exportBalanceHistory}>Export CSV</button> : undefined, content: <>
         {!balanceRows.length && <p className="text-muted">No balance/NAV updates recorded yet — use "Update balance or NAV" above.</p>}
@@ -1352,7 +1359,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
                   </tr>
                 </thead>
                 <tbody>
-                  {updateRows.map((r) => {
+                  {pageUpdateRows.map((r) => {
                     const rawIndex = rawPriceHistory.indexOf(r.point);
                     return editUpdateIndex === rawIndex && editUpdateRow ? (
                       <RecordRow market="funds" record={r} onCancel={() => { setEditUpdateIndex(null); setEditUpdateRow(null); }} key={rawIndex}>
@@ -1389,6 +1396,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
                 </tbody>
               </table>
             </div>
+            {showAllUpdates && updateRows.length > 8 ? updatePaginationControls : null}
           </>
         )}
       </> }]} >{editingFund && <EntityEditorModal title="Edit fund" onClose={() => setEditingFund(false)}><AddFundForm fund={fund} onSaved={() => setEditingFund(false)} /></EntityEditorModal>}{detailTx && (
@@ -1477,6 +1485,7 @@ function FundsTransfersSection() {
     [filteredTransfers],
   );
   const sorted = dateSort.rows(dateSortInput, { date: row => row });
+  const { rows: pageRows, controls: paginationControls, page, pageSize } = useTablePagination(sorted);
   const reorderTransfer = async (pair: [{ id: string; order: number }, { id: string; order: number }]) => {
     if (!(await ensureSignedIn('Sign in to reorder transfers.'))) return;
     for (const p of pair) updateTransfer(p.id, { seq: p.order });
@@ -1512,7 +1521,7 @@ function FundsTransfersSection() {
             </tr>
           </thead>
           <tbody>
-            {sorted.map((t, i) => {
+            {pageRows.map((t, i) => {
               const link = linkByRecordId.get(t.id);
               const otherSide = link ? (link.from.module === 'funds' && link.fromRecordId === t.id ? link.to : link.from) : undefined;
               return (
@@ -1521,7 +1530,7 @@ function FundsTransfersSection() {
                     <DateValue value={t.date} />{' '}
                     <ReorderButtons
                       rows={sorted}
-                      index={i}
+                      index={(page - 1) * pageSize + i}
                       instantOf={instantOf}
                       idOf={(row) => row.id}
                       orderOf={(row) => row.seq}
@@ -1554,6 +1563,7 @@ function FundsTransfersSection() {
           </tbody>
         </table>
       </div>
+      {paginationControls}
     </div>
       {editRow && <TransactionEntryModal editTransfer={{ module: 'funds', record: editRow }} onClose={() => setEditRow(null)} />}
     </>
