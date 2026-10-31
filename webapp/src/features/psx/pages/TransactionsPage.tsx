@@ -5,7 +5,7 @@ import { PageHeading } from '../../../components/PageHeading';
 import { BackButton } from '../../../components/BackButton';
 import { PageFilters } from '../../../components/PageFilters';
 import { PriceInput } from "../../../components/ui/PriceInput";
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { PSX_TICKER_DATALIST_ID } from '../../../components/PSXTickerDatalist';
 import { TickerLogo } from '../../../components/TickerLogo';
@@ -19,6 +19,7 @@ import { TransactionEntryModal } from '../../../components/TransactionEntryModal
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
 import { LotAllocationFields } from '../../../components/ui/LotAllocationFields';
 import { useSortableRows } from '../../../hooks/useSortableRows';
+import { useTablePagination } from '../../../hooks/useTablePagination';
 import { usePageFabActions } from '../../../hooks/usePageFabActions';
 import { fmt, fmtMoney, fmtPSXPrice } from '../../../lib/format';
 import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
@@ -368,8 +369,10 @@ function TransactionList() {
       .sort((a, b) => b[0].localeCompare(a[0]))
       .map(([key, rows]) => ({ key, rows }));
   };
-  const openGroups = useMemo(() => groupRows(openSorted), [openSorted, groupBy]);
-  const closedGroups = useMemo(() => groupRows(closedSorted), [closedSorted, groupBy]);
+  const openPage = useTablePagination(openSorted);
+  const closedPage = useTablePagination(closedSorted);
+  const openGroups = groupRows(openPage.rows);
+  const closedGroups = groupRows(closedPage.rows);
 
   // User's own words: "Individual stock should be marker as open/close with
   // its own buy & selling price, B&S taxes, net Buy/sale, so that sold/
@@ -405,6 +408,7 @@ function TransactionList() {
     }
   };
   const { sorted: sortedClosedTrades, Th: CTTh } = useSortableRows(closedTrades, ctSortValue, 'sellDate', 'desc');
+  const closedTradesPage = useTablePagination(sortedClosedTrades);
 
   // User's own ask (2026-09-08): "show the sold price and PL w.r.t. that
   // lot's buy price... inline in the main trade row." Computed from the
@@ -451,6 +455,7 @@ function TransactionList() {
     }
   };
   const { sorted: sortedOpenLots, Th: OLTh } = useSortableRows(openLots, olSortValue, 'buyDate', 'desc');
+  const openLotsPage = useTablePagination(sortedOpenLots);
 
   const startEdit = (i: number, tx: Transaction) => {
     setEditIndex(i);
@@ -506,7 +511,7 @@ function TransactionList() {
     toast('All transaction data cleared.');
   };
 
-  const renderTable = (groups: typeof openGroups, emptyMessage: string) => (
+  const renderTable = (groups: typeof openGroups, emptyMessage: string, controls: ReactNode) => (
     <div className="table-scroll">
       <table>
         <thead>
@@ -662,6 +667,7 @@ function TransactionList() {
         </tbody>
       </table>
     </div>
+    {controls}
   );
 
   return (
@@ -690,14 +696,14 @@ function TransactionList() {
         <summary className="summary-heading">
           Open positions — {openSorted.length} txns
         </summary>
-        {renderTable(openGroups, 'No transactions for a currently open position.')}
+        {renderTable(openGroups, 'No transactions for a currently open position.', openPage.controls)}
       </details>
 
       <details open>
         <summary className="summary-heading">
           Closed positions — {closedSorted.length} txns
         </summary>
-        {renderTable(closedGroups, 'No transactions for a fully closed position yet.')}
+        {renderTable(closedGroups, 'No transactions for a fully closed position yet.', closedPage.controls)}
       </details>
 
 
@@ -728,7 +734,7 @@ function TransactionList() {
               </tr>
             </thead>
             <tbody>
-              {sortedOpenLots.map((l, i) => (
+              {openLotsPage.rows.map((l, i) => (
                 <RecordRow market="psx" record={l} key={i}>
                   <td><TickerLogo ticker={l.ticker} size="sm" exchange="psx" /><Link to={`/psx/stock/${l.ticker}`}>{l.ticker}</Link></td>
                   <td>{l.buyDate}</td>
@@ -745,6 +751,7 @@ function TransactionList() {
             </tbody>
           </table>
         </div>
+        {openLotsPage.controls}
       </details>
 
       <details open className="mt-md">
@@ -773,7 +780,7 @@ function TransactionList() {
               </tr>
             </thead>
             <tbody>
-              {sortedClosedTrades.map((t, i) => (
+              {closedTradesPage.rows.map((t, i) => (
                 <RecordRow market="psx" record={t} key={i}>
                   <td><TickerLogo ticker={t.ticker} size="sm" exchange="psx" /><Link to={`/psx/stock/${t.ticker}`}>{t.ticker}</Link></td>
                   <td>{t.buyDate}</td>
@@ -794,6 +801,7 @@ function TransactionList() {
             </tbody>
           </table>
         </div>
+        {closedTradesPage.controls}
       </details>
       </> : <p className="text-muted mb-sm mt-md">
         Average cost blends all buys into one running cost basis, so individual open/closed lot attribution is not applicable. The transaction rows and portfolio calculations use weighted-average cost.
@@ -880,6 +888,7 @@ function TransfersSection() {
     [filteredTransfers],
   );
   const sorted = dateSort.rows(dateSortInput, { date: row => row });
+  const page = useTablePagination(sorted);
   const reorderTransfer = async (pair: [{ id: string; order: number }, { id: string; order: number }]) => {
     if (!(await ensureSignedIn('Sign in to reorder transfers.'))) return;
     for (const p of pair) updateTransfer(p.id, { seq: p.order });
@@ -911,7 +920,7 @@ function TransfersSection() {
             </tr>
           </thead>
           <tbody>
-            {sorted.map((t, i) => {
+            {page.rows.map((t) => {
               const link = linkByRecordId.get(t.id);
               const otherSide = link ? (link.from.module === 'psx' && link.fromRecordId === t.id ? link.to : link.from) : undefined;
               return (
@@ -920,7 +929,7 @@ function TransfersSection() {
                     <DateValue value={t.date} />{' '}
                     <ReorderButtons
                       rows={sorted}
-                      index={i}
+                      index={sorted.findIndex(row => row.id === t.id)}
                       instantOf={instantOf}
                       idOf={(row) => row.id}
                       orderOf={(row) => row.seq}
@@ -953,6 +962,7 @@ function TransfersSection() {
           </tbody>
         </table>
       </div>
+      {page.controls}
     </div>
       {editRow && <TransactionEntryModal editTransfer={{ module: 'psx', record: editRow }} onClose={() => setEditRow(null)} />}
     </>
@@ -977,6 +987,7 @@ function AdjustmentsSection() {
     }
   };
   const { sorted, Th } = useSortableRows(indexed, sortValue, 'date', 'desc');
+  const page = useTablePagination(sorted);
 
   const startEdit = (i: number, a: Adjustment) => { setEditIndex(i); setEditRow({ ...a }); };
   const saveEdit = () => {
@@ -1001,7 +1012,7 @@ function AdjustmentsSection() {
             </tr>
           </thead>
           <tbody>
-            {sorted.map(({ a, i }) =>
+            {page.rows.map(({ a, i }) =>
               editIndex === i && editRow ? (
                 <RecordRow market="psx" record={{ a, i }} onCancel={() => setEditIndex(null)} key={i}>
                   <td><input type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} className="w-130" /></td>
@@ -1028,6 +1039,7 @@ function AdjustmentsSection() {
           </tbody>
         </table>
       </div>
+      {page.controls}
     </div>
   );
 }
@@ -1055,6 +1067,7 @@ function CashLedgerSection() {
   // there and flows through automatically.
   const dateSortInput = [...filtered].reverse();
   const sorted = dateSort.rows(dateSortInput, { date: row => ({ ...row, seq: ledger.indexOf(row) }) });
+  const page = useTablePagination(sorted);
 
   return (
     <div>
@@ -1080,7 +1093,7 @@ function CashLedgerSection() {
           </tr>
         </thead>
         <tbody>
-          {sorted.map((e, i) => (
+          {page.rows.map((e, i) => (
             <RecordRow market="psx" record={e} key={i}>
               <td><DateValue value={e.date} /></td>
               <td>{e.kind}</td>
@@ -1093,6 +1106,7 @@ function CashLedgerSection() {
         </tbody>
       </table>
       </div>
+      {page.controls}
     </div>
   );
 }
