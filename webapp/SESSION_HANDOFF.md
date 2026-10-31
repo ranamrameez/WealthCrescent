@@ -6,12 +6,25 @@
 
 - PR: **#44**, open, draft, base `main`.
 - Branch: `fix/trade-entry-validation-and-transactions-ui`.
-- Latest branch head before this handoff refresh: `9d52df8cd6de8f1e10aaeb73ba125b7991be0c28`; this update adds documentation only. Re-fetch the branch after this commit rather than relying on this snapshot SHA.
+- Latest application-code/PR head before this handoff refresh: `54560149c170a2af1d32223c1e4bafdd2c6c0afa`; this update adds documentation only. Re-fetch the branch after this commit rather than relying on this snapshot SHA.
 - Base SHA reported by PR at the last comparison: `49cb2a40810619fa075cd422703ab4a6900adce2`; re-check live main before any merge.
-- PR has a large commit history (132 commits at the previous comparison) and 52 application/documentation files. Review the complete diff and commit history carefully; do not assume the PR description's validation refers to the current head.
-- Latest verified application-code head: `bf80f6217ef00f26a1ec45ea1f825841c7790e18`. GitHub Actions run [#41199973181](https://github.com/ranamrameez/WealthCrescent/actions/runs/41199973181) passed **Type-check and production build** and the **full test suite** on that exact code head. Subsequent commits update only `USER_MANUAL.md`, `README.md`, and `CLAUDE.md`; re-check Actions for the final PR head before marking ready or merging.
+- PR has a large commit history (159 commits at this comparison) and 56 changed files. Review the complete diff and commit history carefully; do not assume the PR description's validation refers to the current head. Review the complete diff and commit history carefully; do not assume the PR description's validation refers to the current head.
+- Latest verified application-code/PR head: `54560149c170a2af1d32223c1e4bafdd2c6c0afa`. GitHub Actions run [#41200626771](https://github.com/ranamrameez/WealthCrescent/actions/runs/41200626771) passed **Type-check and production build** and the **full test suite** on that exact head. This handoff refresh adds documentation only; re-check Actions for the resulting documentation head before marking ready or merging.
 - Intermediate pagination commits exposed a leftover `setPage(1)` reference in Banking after moving to the shared hook; it was removed in code head `bf80f621`, whose build and tests passed. A final review also strengthened historical edit validation to compare unmatched quantities per SELL transaction, not only per-ticker totals.
 - Nothing from this work has been merged into `main`. Keep the PR as a draft until current-head tests/build, full diff review, and any required manual checks are complete.
+
+### Latest continuation update (2026-10-31)
+
+After the earlier `bf80f621` checkpoint, the branch received the following additional application work:
+
+- Extended shared pagination to Bank account/all-bank ledgers, Cash planned entries, Funds import/transaction/balance/transfer tables, Net Worth activity drilldowns, Planning category/activity tables, Rental property plans/monthly rollups/plan overview, and Subscription renewals. Existing intentionally short import previews and small summary tables remain bounded.
+- Corrected the PSO fixture to the actual supplied **122 BUY / 132 SELL** history. The final 80-share SELL matches 70 available shares and leaves 10 unmatched; no synthetic BUY is added and no profit is recognized on unmatched shares.
+- Added transaction-specific chronological edit validation so an edit cannot move a pre-existing unmatched quantity from one SELL row to another.
+- Added proportional-fee regression coverage and surfaced unmatched SELL fees in reconciliation warnings and all-time summaries for both QSE and PSX.
+- Applied sell-quantity and configurable price-deviation checks to Trade Strategy plan execution and verify that the transaction is actually recorded before showing success.
+- Kept the FAB calculator ticker synchronized with stock-detail route changes and added summary regressions for date formatting and credit-card debt-change tone.
+
+The exact application-code head `54560149` passed type-check, production build, and the full test suite in run `41200626771`. The current PR remains open and in draft; nothing has been merged to `main`.
 
 ### Scope already represented in PR #44 — verify rather than re-implement
 
