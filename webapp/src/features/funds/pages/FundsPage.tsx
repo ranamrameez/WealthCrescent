@@ -99,7 +99,7 @@ function emptyFund(defaultCurrency: string, brokerId?: string): Fund {
 function AddFundFab() {
   const [open, setOpen] = useState<'fund' | 'transfer' | 'helper' | 'broker' | null>(null);
   const primaryCurrency = usePrimaryCurrency();
-  const workbookDefaultCurrency = useFundsWorkbookStore((s) => s.workbook.settings.defaultCurrency);
+  const workbookDefaultCurrency = useFundsWorkbookStore((s) => s.(workbook.settings.legacyTransferCurrency ?? workbook.settings.defaultCurrency));
   const defaultCurrency = primaryCurrency ?? workbookDefaultCurrency;
   return (
     <>
@@ -1455,7 +1455,7 @@ function FundsTransfersSection() {
   const workbook = useFundsWorkbookStore((s) => s.workbook);
   const updateTransfer = useFundsWorkbookStore((s) => s.updateTransfer);
   const deleteTransfer = useFundsWorkbookStore((s) => s.deleteTransfer);
-  const currency = workbook.settings.defaultCurrency;
+  const currency = workbook.settings.legacyTransferCurrency ?? workbook.settings.defaultCurrency;
   const links = useInterEntityTransfersStore((s) => s.workbook.entries);
 
   const [editRow, setEditRow] = useState<Transfer | null>(null);
