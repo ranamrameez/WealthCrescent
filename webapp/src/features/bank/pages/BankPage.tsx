@@ -77,7 +77,7 @@ import { useInterEntityTransfersStore } from '../../../store/interEntityTransfer
 import { linkTargetPath, useLinkSideLabel } from '../../transfers/pages/TransferLinksPage';
 import { CreditCardsTab } from './CreditCardsSection';
 import { CreditCardVisual } from '../../../components/CreditCardVisual';
-import { SummaryGroupCard, SummaryMetric } from '../../../components/SummaryGroupCard';
+
 import type { Bank, BankAccount, BankTransaction } from '../../../types/bankWorkbook';
 import type { PlannedBankTransaction } from '../../../types/plannedBank';
 import { gridAutoStyle } from '../../../lib/gridStyle';
@@ -947,18 +947,6 @@ export function AccountDetailPage() {
   const plannedOutflow = planOccurrences(plannedEntries, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters)).filter((plan) => plan.accountId === account?.id && !plan.executed && plan.amount < 0 && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
   const balanceChange = periodCurrentBalance - periodStartBalance;
   const balanceChangePercent = periodStartBalance === 0 ? null : (balanceChange / Math.abs(periodStartBalance)) * 100;
-  const summaryMetric = (label: string, value: string, tone = 'pill-info', large = false, suffix?: ReactNode) => {
-    const isFlow = /inflow|outflow/i.test(label);
-    const numericValue = Number(value.replace(/[^0-9.-]/g, ''));
-    const hasValue = Number.isFinite(numericValue) && numericValue !== 0;
-    const indicator = hasValue && tone === 'pill-positive'
-      ? (isFlow ? <span aria-hidden>↘</span> : <span aria-hidden>▲</span>)
-      : hasValue && tone === 'pill-negative'
-        ? (isFlow ? <span aria-hidden>↗</span> : <span aria-hidden>▼</span>)
-        : null;
-    return <SummaryMetric label={label} value={<>{indicator}{value}</>} tone={tone} large={large} suffix={suffix} tooltip={`${label} for the selected period.`} />;
-  };
-  const summaryCard = (title: string, metrics: ReactNode, tooltip: string, className = '') => <SummaryGroupCard title={title} tooltip={tooltip} className={className}>{metrics}</SummaryGroupCard>;
   const upcoming = useMemo(
     () => account
       ? planOccurrences(plannedEntries, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters))
@@ -1065,35 +1053,16 @@ export function AccountDetailPage() {
       label: 'Account summary',
       hue: account.color,
       summary: <span className="text-muted">{periodSummary}</span>,
-      content: <div className="account-summary-grid">
-        {summaryCard('Actual balance', <>
-          {summaryMetric('Current balance', fmtMoney(periodCurrentBalance, account.currencyCode), periodCurrentBalance >= 0 ? 'pill-positive' : 'pill-negative', true)}
-          {summaryMetric('Start balance', fmtMoney(periodStartBalance, account.currencyCode))}
-          {summaryMetric('Change', fmtMoney(balanceChange, account.currencyCode), balanceChange >= 0 ? 'pill-positive' : 'pill-negative', false, <small className="summary-percent" title="Change as a percentage of the period start balance">{balanceChangePercent === null ? '—' : ` (${balanceChangePercent.toFixed(1)}%)`}</small>)}
-        </>, 'Actual cleared account balance over the selected period.', 'account-summary-card-balance')}
-        {summaryCard('Expected Final balance', <>
-          {summaryMetric('Expected Net Balance', fmtMoney(periodCurrentBalance + pendingNet + plannedNet, account.currencyCode), periodCurrentBalance + pendingNet + plannedNet >= 0 ? 'pill-positive' : 'pill-negative', true)}
-          {summaryMetric('Total expected flow', fmtMoney(pendingNet + plannedNet, account.currencyCode), pendingNet + plannedNet >= 0 ? 'pill-positive' : 'pill-negative')}
-          {summaryMetric('Expected inflow', fmtMoney(pendingInflow + plannedInflow, account.currencyCode), 'pill-positive')}
-          {summaryMetric('Expected outflow', fmtMoney(pendingOutflow + plannedOutflow, account.currencyCode), 'pill-negative')}
-          {summaryMetric('Change', fmtMoney(pendingNet + plannedNet, account.currencyCode), pendingNet + plannedNet >= 0 ? 'pill-positive' : 'pill-negative')}
-        </>, 'Pending and planned money expected to change the account balance.',)}
-        {(pendingNet !== 0 || pendingInflow !== 0 || pendingOutflow !== 0) && summaryCard('Pending', <>
-          {summaryMetric('Net pending', fmtMoney(pendingNet, account.currencyCode), pendingNet >= 0 ? 'pill-positive' : 'pill-negative', true)}
-          {summaryMetric('Inflow', fmtMoney(pendingInflow, account.currencyCode), 'pill-positive')}
-          {summaryMetric('Outflow', fmtMoney(pendingOutflow, account.currencyCode), 'pill-negative')}
-        </>, 'Transactions marked pending and not yet cleared.')}
-        {(plannedNet !== 0 || plannedInflow !== 0 || plannedOutflow !== 0) && summaryCard('Planned', <>
-          {summaryMetric('Net planned', fmtMoney(plannedNet, account.currencyCode), plannedNet >= 0 ? 'pill-positive' : 'pill-negative', true)}
-          {summaryMetric('Inflow', fmtMoney(plannedInflow, account.currencyCode), 'pill-positive')}
-          {summaryMetric('Outflow', fmtMoney(plannedOutflow, account.currencyCode), 'pill-negative')}
-        </>, 'Future plans that have not been executed.')}
-        {summaryCard('Actual flow', <>
-          {summaryMetric('Net flow', fmtMoney(analytics.netFlow, account.currencyCode), analytics.netFlow >= 0 ? 'pill-positive' : 'pill-negative', true)}
-          {summaryMetric('Inflow', fmtMoney(analytics.deposits, account.currencyCode), 'pill-positive')}
-          {summaryMetric('Outflow', fmtMoney(analytics.withdrawals, account.currencyCode), 'pill-negative')}
-        </>, 'Cleared deposits and withdrawals in the selected period.')}
-      </div>,
+      content: <BalanceSummaryCards currency={account.currencyCode} summary={{
+        start: periodStartBalance,
+        current: periodCurrentBalance,
+        inflow: analytics.deposits,
+        outflow: -analytics.withdrawals,
+        pendingInflow,
+        pendingOutflow,
+        plannedInflow,
+        plannedOutflow,
+      }} />,
     },
     {
       key: 'details',
