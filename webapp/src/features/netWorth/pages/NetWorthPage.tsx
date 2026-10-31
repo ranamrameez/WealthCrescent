@@ -11,6 +11,7 @@ import { TopBarControls } from '../../../components/TopBarControls';
 import { Chart, Doughnut } from 'react-chartjs-2';
 import { Card, CollapsibleCard, MoneyValue, StatCard } from '../../../components/Card';
 import { StandardPageSections } from '../../../components/StandardPageSections';
+import { SummarySection, SummarySections, SummaryValue } from '../../../components/SummaryGroupCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { Modal } from '../../../components/Modal';
 import { Notice } from '../../../components/Notice';
@@ -934,12 +935,19 @@ function NetWorthPlanningReality({ activities, selectedModules, currencies, curr
         const change = projected - current;
         return <Card key={currency}>
           <h3 className="mt-0">{currency} planning reality</h3>
-          <div className="grid-auto" style={gridAutoStyle(135, 8)}>
-            <div className="stat-card card"><div className="label">Current net worth</div><MoneyValue n={current} currency={currency} /></div>
-            <div className="stat-card card" style={hueStyle('var(--profit)')}><div className="label">Planned inflow</div><MoneyValue n={inflow} currency={currency} /></div>
-            <div className="stat-card card" style={hueStyle('var(--loss)')}><div className="label">Planned outflow</div><MoneyValue n={outflow} currency={currency} /></div>
-            <div className="stat-card card" style={hueStyle(projected >= 0 ? 'var(--profit)' : 'var(--loss)')}><div className="label">Projected net worth</div><MoneyValue n={projected} currency={currency} /><div className={change >= 0 ? 'pill-positive' : 'pill-negative'}>{change >= 0 ? '+' : ''}{fmtMoney(change, currency)} change</div></div>
-          </div>
+          <SummarySections className="account-summary-sections">
+            <SummarySection title="Current position">
+              <SummaryValue label="Current net worth" value={<MoneyValue n={current} currency={currency} />} primary tone={current >= 0 ? 'positive' : 'negative'} />
+            </SummarySection>
+            <SummarySection title="Planned activity">
+              <SummaryValue label="Planned inflow" value={<MoneyValue n={inflow} currency={currency} />} tone="positive" />
+              <SummaryValue label="Planned outflow" value={<MoneyValue n={outflow} currency={currency} />} tone="negative" />
+            </SummarySection>
+            <SummarySection title="Expected position">
+              <SummaryValue label="Projected net worth" value={<MoneyValue n={projected} currency={currency} />} primary tone={projected >= 0 ? 'positive' : 'negative'} />
+              <SummaryValue label="Change" value={fmtMoney(change, currency)} tone={change >= 0 ? 'positive' : 'negative'} />
+            </SummarySection>
+          </SummarySections>
         </Card>;
       })}
     </div>
