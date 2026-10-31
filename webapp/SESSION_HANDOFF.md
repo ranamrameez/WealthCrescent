@@ -6,10 +6,10 @@
 
 - PR: **#44**, open, draft, base `main`.
 - Branch: `fix/trade-entry-validation-and-transactions-ui`.
-- Current PR head before this handoff update: `0901cfc9c8704c470e0fb954fb049390e6d8d4e4`.
+- Current PR head after the latest status update: `91650673f4f7bc0c17793a0a8759961a62a0d2ee`.
 - Base SHA reported by PR: `49cb2a40810619fa075cd422703ab4a6900adce2`.
-- PR currently contains 122 commits and 50 changed files. Review the diff and commit history carefully; do not assume the PR description's validation refers to the current head.
-- PR description says type-check and production build passed at older head `7e58b931`; the full suite was still running at that point, with the preceding completed suite at `50917bf1`. **No validation result for head `0901cfc9` was established in this session.** Re-run/check CI for the exact current head before marking ready or merging.
+- PR currently contains 129 commits and 52 changed files. Review the diff and commit history carefully; do not assume the PR description's validation refers to the current head.
+- GitHub Actions run `41199236906` for code head `0901cfc9` completed successfully (build and full tests). Code head `79c017fd` passed the production build; its full test suite was still running at the last check. Current PR head `91650673` is a README-only status-pointer commit on top of that code head, and its own CI run is in progress. Re-check the exact latest head before marking ready or merging.
 - Nothing from this work has been merged into `main`. Keep the PR as a draft until current-head tests/build, full diff review, and any required manual checks are complete.
 
 ### Scope already represented in PR #44 — verify rather than re-implement
@@ -37,6 +37,21 @@ Before merge, inspect the PSO regression test and implementation to ensure it en
 5. Specifically verify: credit-card opening debt and chronological running limits; Funds/Brokers route and navigation hierarchy; default-open behavior; All Time filter behavior and URL persistence; summary groups on each affected entity page; daily/lifetime chart bounds; QSE and PSX sell guards including sequential/multi-row entries; ±10% warning/cancel path; FAB ticker preselection and correct broker-profile persistence; and PSO 122/132 reconciliation math.
 6. Finish the cross-page audit for remaining inert section actions and unpaginated tables. Do not add fake menu actions or paginate a dataset before calculations/exports consume it.
 7. Update `webapp/README.md` Done/Pending, `webapp/USER_MANUAL.md`, and this handoff only for behavior actually verified. Keep PR #44 draft until ready; never push directly to `main`. The user explicitly requested this handoff be pushed, but did not authorize merging PR #44.
+
+### Continuation work after the initial handoff snapshot (2026-10-31)
+
+The next context continued on the same branch and preserved the handoff/docs commits. Additional code changes after head `0901cfc9`:
+
+- Applied shared pagination to Personal Loans plan/payment tables, EMI repayment and planned-installment tables, QSE/PSX stock-detail transaction tables, and expanded stock price-history tables.
+- Expanded default-open primary sections to Summary, Banks, Accounts, Funds, Brokers, Properties, Loans, and Subscriptions (explicit `defaultOpen: false` remains respected).
+- Corrected shared summary date detection and credit-card debt-change tone; added regression tests.
+- Added chronological edit validation so changing a historical BUY/SELL cannot introduce new unmatched sells, while existing legacy discrepancies remain editable.
+- Added sell-quantity and configurable price-deviation checks to Trade Strategy plan execution; verify the store actually records the planned transaction before showing success.
+- Kept the FAB calculator ticker synchronized if the stock-detail route changes while the modal is open.
+- Corrected the PSO regression fixture: removed an unsupported 10-share BUY. The supplied history is 122 BUY / 132 SELL; the final 80-share SELL matches 70 and leaves 10 unmatched. No synthetic BUY is introduced and no profit is recognized on those 10 shares.
+- Updated PR #44's description to reflect these changes and the correct PSO totals.
+
+The latest code head in the branch is currently `79c017fd` with README-only commit `91650673` on top. Build passed at `79c017fd`; full tests for that code head and CI for the current PR head were still in progress at the last check. Do not claim the latest full suite passed until the exact current head's run completes.
 
 ### Tool/session limitation
 
