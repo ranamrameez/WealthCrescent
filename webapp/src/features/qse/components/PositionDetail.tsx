@@ -248,7 +248,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
   const lifetimeBounds=recordedPrices.length?[Math.min(...recordedPrices.map(point=>point.price)),Math.max(...recordedPrices.map(point=>point.price))]:[];
   const comparisonValues=[...baseComparisonValues,...dailyBounds,...lifetimeBounds];
   const comparisonLabels=[...baseComparisonLabels,...(dailyBounds.length?['Latest day low','Latest day high']:[]),...(lifetimeBounds.length?['Lifetime low','Lifetime high']:[])];
-  const comparisonTerms=[...baseComparisonTerms,...(dailyBounds.length?[\`Lowest recorded price on \${latestPriceDate}\`,\`Highest recorded price on \${latestPriceDate}\`]:[]),...(lifetimeBounds.length?['Lowest recorded price in history','Highest recorded price in history']:[])];
+  const comparisonTerms=[...baseComparisonTerms,...(dailyBounds.length?['Lowest recorded price on ' + latestPriceDate,'Highest recorded price on ' + latestPriceDate]:[]),...(lifetimeBounds.length?['Lowest recorded price in history','Highest recorded price in history']:[])];
   const comparisonLow=Math.min(...comparisonValues),comparisonHigh=Math.max(...comparisonValues),comparisonPadding=Math.max((comparisonHigh-comparisonLow)*.15,comparisonHigh*.02,workbook.settings.tick);
   const profitableShares=mp>0&&['all','current','position'].includes(section)?[...(usingLots?officialLots:reportOpenLots)].filter(lot=>mp>=breakEvenPrice(lot.remainingShares*(lot.buyPrice+lot.buyFeeTotal/lot.originalShares),lot.remainingShares,workbook.settings.feePct,workbook.settings.tick,calcFee)).reduce((sum,lot)=>sum+lot.remainingShares,0):0;
   const netValue=mp>0?value-sellFee:NaN;
