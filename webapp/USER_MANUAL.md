@@ -170,7 +170,7 @@ keeps a fallback copy for reloads and outages and never writes those
 live observations into your private manual history. A newer manual observation continues to
 take priority. Under "Recent updates," click **Export price history CSV** to download
 every price update you've ever recorded for this ticker (not just the recent few shown on
-screen) as a spreadsheet file. On the stock page, the transaction/history filter defaults to **All time** so older activity is included unless you narrow the date range. The **Price comparison** chart also includes the latest recorded day's low/high and the lifetime recorded low/high when price history exists. On the stock page's **Transactions** tab, optionally set a from/to date range and click **Export CSV** to download that ticker's own trade history separately.
+screen) as a spreadsheet file. On the stock page, the transaction/history filter defaults to **All time** so older activity is included unless you narrow the date range. The **Price comparison** chart also includes the latest recorded day's low/high and the lifetime recorded low/high when price history exists. On the stock page's **Transactions** tab, optionally set a from/to date range and click **Export CSV** to download that ticker's own trade history separately. Legacy unmatched SELLs are flagged for reconciliation: excess shares and their proportional SELL fees are shown separately, and neither is treated as matched realized profit.
 
 ---
 
