@@ -26,6 +26,7 @@ import { HUES, hueStyle } from '../../../lib/statCardHues';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { ArchiveIcon, CheckIcon, EditIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { StandardPageSections } from '../../../components/StandardPageSections';
+import { SummarySection, SummarySections, SummaryValue } from '../../../components/SummaryGroupCard';
 import { toast } from '../../../components/Toast';
 import { Tooltip } from '../../../components/Tooltip';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
@@ -513,36 +514,21 @@ function OverallSummary({ selectedIds }: { selectedIds?: string[] } = {}) {
   if (!codes.length) return null;
 
   return (
-    <div className="grid-auto" style={{ ...gridAutoStyle(150, 8), marginBottom: 16 }}>
+    <SummarySections className="funds-overall-summary">
       {codes.map((code) => {
         const t = totals[code];
         const profitPct = t.invested > 0 ? (t.profit / t.invested) * 100 : 0;
         const expDailyPct = t.invested > 0 ? (t.expDaily / t.invested) * 100 : 0;
         const expMonthlyPct = t.invested > 0 ? (t.expMonthly / t.invested) * 100 : 0;
-        return (
-          <div key={code} className="card" style={{ padding: 12 }}>
-            <div className="text-muted" style={{ marginBottom: 6 }}>{code}</div>
-            <div className="grid-auto" style={gridAutoStyle(110, 8)}>
-              <div className="stat-card card" style={hueStyle(HUES[3])}><div className="label">Invested</div><MoneyValue n={t.invested} currency={code} /></div>
-              <div className="stat-card card" style={hueStyle(HUES[6])}><div className="label">Current value</div><MoneyValue n={t.value} currency={code} /></div>
-              <div className="stat-card card" style={hueStyle(t.profit >= 0 ? 'var(--profit)' : 'var(--loss)')}><div className="label">Net profit</div><MoneyValue n={t.profit} currency={code} after={` (${profitPct.toFixed(1)}%)`} /></div>
-              <div className="stat-card card" style={hueStyle(t.expDaily >= 0 ? 'var(--profit)' : 'var(--loss)')}>
-                <Tooltip text="An average of what your funds actually earned/lost per day, based on their real NAV/balance history — not a promise of future returns.">
-                  <div className="label clickable">Expected daily P/L</div>
-                </Tooltip>
-                <MoneyValue n={t.expDaily} currency={code} after={` (${expDailyPct.toFixed(2)}%)`} />
-              </div>
-              <div className="stat-card card" style={hueStyle(t.expMonthly >= 0 ? 'var(--profit)' : 'var(--loss)')}>
-                <Tooltip text="The same average daily rate, scaled to a typical calendar month.">
-                  <div className="label clickable">Expected monthly P/L</div>
-                </Tooltip>
-                <MoneyValue n={t.expMonthly} currency={code} after={` (${expMonthlyPct.toFixed(2)}%)`} />
-              </div>
-            </div>
-          </div>
-        );
+        return <SummarySection key={code} title={code}>
+          <SummaryValue label="Invested" value={<MoneyValue n={t.invested} currency={code} />} />
+          <SummaryValue label="Current value" value={<MoneyValue n={t.value} currency={code} />} primary />
+          <SummaryValue label="Net profit" value={<MoneyValue n={t.profit} currency={code} after={` (${profitPct.toFixed(1)}%)`} />} tone={t.profit >= 0 ? 'positive' : 'negative'} />
+          <SummaryValue label={<Tooltip text="An average of what your funds actually earned/lost per day, based on their real NAV/balance history — not a promise of future returns.">Expected daily P/L</Tooltip>} value={<MoneyValue n={t.expDaily} currency={code} after={` (${expDailyPct.toFixed(2)}%)`} />} tone={t.expDaily >= 0 ? 'positive' : 'negative'} />
+          <SummaryValue label={<Tooltip text="The same average daily rate, scaled to a typical calendar month.">Expected monthly P/L</Tooltip>} value={<MoneyValue n={t.expMonthly} currency={code} after={` (${expMonthlyPct.toFixed(2)}%)`} />} tone={t.expMonthly >= 0 ? 'positive' : 'negative'} />
+        </SummarySection>;
       })}
-    </div>
+    </SummarySections>
   );
 }
 
@@ -1121,51 +1107,20 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
                 </div>
               </div>
             )}
-            <div className="grid-auto" style={{ ...gridAutoStyle(120, 8), marginTop: 12 }}>
-              <div className="stat-card card" style={hueStyle('var(--info)')}>
-                <div className="label">Units held</div>
-                <div className="value">{fmt(units, 2)}</div>
-                {!!pendingUnitDelta && (
-                  <div className="sub" title="Placed but not yet settled orders for this fund — units will change by this much once they clear.">
-                    {pendingUnitDelta > 0 ? '+' : ''}{fmt(pendingUnitDelta, 2)} pending
-                  </div>
-                )}
-              </div>
-              <div className="stat-card card" style={hueStyle('var(--accent)')}>
-                <Tooltip text="NAV = Net Asset Value, the price of one unit of this fund. This is the average price you paid per unit across all your purchases.">
-                  <div className="label clickable">Avg NAV cost</div>
-                </Tooltip>
-                <div className="value">{fmtPrice(avgNav)}</div>
-              </div>
-              <div className="stat-card card" style={hueStyle('var(--info)')}><div className="label">Invested</div><MoneyValue n={invested} currency={fund.currencyCode} /></div>
-              <div className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">Current value</div><MoneyValue n={currentValue} currency={fund.currencyCode} /></div>
-              <div className="stat-card card" style={hueStyle(profit >= 0 ? 'var(--profit)' : 'var(--loss)')}>
-                <Tooltip text="Realized profit from every past withdrawal/sell, plus unrealized profit on units still held — your true total gain, not just what's sitting in the fund right now.">
-                  <div className="label clickable">Net profit</div>
-                </Tooltip>
-                <MoneyValue n={profit} currency={fund.currencyCode} after={` (${profitPct.toFixed(1)}%)`} />
-              </div>
-              <div className="stat-card card" style={hueStyle(rate === null ? 'var(--accent)' : rate < 0 ? 'var(--loss)' : 'var(--profit)')}>
-                <Tooltip text="XIRR: your annualized rate of return, accounting for the exact dates and amounts of every purchase — a fairer comparison than a flat percentage when you've invested at different times.">
-                  <div className="label clickable">XIRR</div>
-                </Tooltip>
-                <div className="value">{rate !== null ? `${(rate * 100).toFixed(1)}%` : '—'}</div>
-              </div>
-              {/* User-requested (2026-09-03): "Display expected daily/monthly
-                  PL+PL%age... on each item page." */}
-              <div className="stat-card card" style={hueStyle(plRate && plRate.dailyAmount < 0 ? 'var(--loss)' : 'var(--profit)')}>
-                <Tooltip text="An average of what this fund actually earned/lost per day, based on its real NAV/balance history — not a promise of future returns.">
-                  <div className="label clickable">Expected daily P/L</div>
-                </Tooltip>
-                <div className="value">{plRate ? <>{fmtMoney(plRate.dailyAmount, fund.currencyCode)} <span style={{ fontSize: 12 }}>({plRate.dailyPct.toFixed(2)}%)</span></> : '—'}</div>
-              </div>
-              <div className="stat-card card" style={hueStyle(plRate && plRate.monthlyAmount < 0 ? 'var(--loss)' : 'var(--profit)')}>
-                <Tooltip text="The same average daily rate, scaled to a typical calendar month.">
-                  <div className="label clickable">Expected monthly P/L</div>
-                </Tooltip>
-                <div className="value">{plRate ? <>{fmtMoney(plRate.monthlyAmount, fund.currencyCode)} <span style={{ fontSize: 12 }}>({plRate.monthlyPct.toFixed(2)}%)</span></> : '—'}</div>
-              </div>
-            </div>
+            <SummarySections className="fund-detail-summary">
+              <SummarySection title="Position">
+                <SummaryValue label="Units held" value={fmt(units, 2)} primary detail={!!pendingUnitDelta ? `${pendingUnitDelta > 0 ? '+' : ''}${fmt(pendingUnitDelta, 2)} pending` : undefined} />
+                <SummaryValue label={<Tooltip text="NAV = Net Asset Value, the price of one unit of this fund. This is the average price you paid per unit across all your purchases.">Average NAV cost</Tooltip>} value={fmtPrice(avgNav)} />
+                <SummaryValue label="Invested" value={<MoneyValue n={invested} currency={fund.currencyCode} />} />
+                <SummaryValue label="Current value" value={<MoneyValue n={currentValue} currency={fund.currencyCode} />} primary />
+              </SummarySection>
+              <SummarySection title="Performance">
+                <SummaryValue label={<Tooltip text="Realized profit from every past withdrawal/sell, plus unrealized profit on units still held — your true total gain, not just what's sitting in the fund right now.">Net profit</Tooltip>} value={<MoneyValue n={profit} currency={fund.currencyCode} after={` (${profitPct.toFixed(1)}%)`} />} tone={profit >= 0 ? 'positive' : 'negative'} primary />
+                <SummaryValue label={<Tooltip text="XIRR: your annualized rate of return, accounting for the exact dates and amounts of every purchase — a fairer comparison than a flat percentage when you've invested at different times.">XIRR</Tooltip>} value={rate !== null ? `${(rate * 100).toFixed(1)}%` : '—'} tone={rate === null ? 'neutral' : rate >= 0 ? 'positive' : 'negative'} />
+                <SummaryValue label={<Tooltip text="An average of what this fund actually earned/lost per day, based on its real NAV/balance history — not a promise of future returns.">Expected daily P/L</Tooltip>} value={plRate ? fmtMoney(plRate.dailyAmount, fund.currencyCode) : '—'} detail={plRate ? `${plRate.dailyPct.toFixed(2)}%` : undefined} tone={plRate && plRate.dailyAmount < 0 ? 'negative' : 'positive'} />
+                <SummaryValue label={<Tooltip text="The same average daily rate, scaled to a typical calendar month.">Expected monthly P/L</Tooltip>} value={plRate ? fmtMoney(plRate.monthlyAmount, fund.currencyCode) : '—'} detail={plRate ? `${plRate.monthlyPct.toFixed(2)}%` : undefined} tone={plRate && plRate.monthlyAmount < 0 ? 'negative' : 'positive'} />
+              </SummarySection>
+            </SummarySections>
       </> },
 { key: 'analytics', label: 'Analytics', content: <>            {/* User-requested (2026-09-03): "add a chart to view periodic
                 growth with balance & PL indications over time." */}
