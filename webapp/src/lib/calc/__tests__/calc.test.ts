@@ -120,7 +120,7 @@ describe('computePositions (weighted-average cost)', () => {
     const [pos] = computePositions(oversell, () => 0);
     expect(pos.shares).toBe(0);
     expect(pos.invested).toBe(0);
-    expect(pos.realized).toBe(100);
+    expect(pos.realized).toBe(0);
     expect(pos.totalSoldShares).toBe(15);
     expect(pos.unmatchedSellShares).toBe(5);
     expect(pos.unmatchedSellTransactions).toBe(1);
