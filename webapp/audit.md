@@ -117,7 +117,7 @@ A fresh main-based branch ports the scoped Mutual Funds corrections after PR #36
 - Invest/Withdraw edit mode accepts Amount and derives units using the transaction NAV (`unitsFromAmount`).
 - Regression tests cover amount-to-units conversion, effective-date ordering with a stale timestamp, and latest market-price synchronization.
 
-**Originally deferred, now implemented on `feat/funds-cash-reconciliation` (issue #42):** one portfolio-level Funds cash account per currency. This matches the existing linked-transfer model, where the Funds side is portfolio-level and has no fund/broker reference; per-fund cash would make linked deposits ambiguous. A valid BUY reduces that currency's cash and adds NAV-valued units; a valid SELL returns proceeds to cash. Cash and holdings are combined once for Net Worth, including historical as-of calculations.
+**Originally deferred, now implemented in draft [PR #46](https://github.com/ranamrameez/WealthCrescent/pull/46) on `feat/funds-cash-reconciliation` (issue #42):** one portfolio-level Funds cash account per currency. This matches the existing linked-transfer model, where the Funds side is portfolio-level and has no fund/broker reference; per-fund cash would make linked deposits ambiguous. A valid BUY reduces that currency's cash and adds NAV-valued units; a valid SELL returns proceeds to cash. Cash and holdings are combined once for Net Worth, including historical as-of calculations.
 
 PR #36 is merged and passed run #94. Broker-profile isolation is being re-targeted through PR #39; the Funds date/amount patch is being re-targeted through PR #40. Only merge each after its own latest-head full test suite and production build pass.
 
