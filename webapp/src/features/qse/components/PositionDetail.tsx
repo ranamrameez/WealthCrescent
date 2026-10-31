@@ -32,7 +32,6 @@ import { useAppearanceStore } from '../../../store/appearanceStore';
 import { useWorkbookStore } from '../../../store/workbookStore';
 import type { PricePoint } from '../../../types/workbook';
 import { useQSEDerived } from '../hooks/useQSEDerived';
-import { gridAutoStyle } from '../../../lib/gridStyle';
 
 function DetailCard({section,title,children,...props}: ComponentProps<typeof StandardCard> & {section:string}) {
   return section === 'all' ? <StandardCard title={title} {...props}>{children}</StandardCard>
