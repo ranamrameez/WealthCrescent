@@ -81,7 +81,15 @@ export function InvestmentPlans({ market, items, filters }: { market: 'qse' | 'p
       }
     }
 
+    const beforeCount = state.workbook.transactions.length;
     state.executeTradePlanLeg(planId, index);
+    const afterWorkbook = useStore.getState().workbook;
+    const savedLeg = afterWorkbook.tradePlans.find(item => item.id === planId)?.legs[index];
+    if (afterWorkbook.transactions.length !== beforeCount + 1 || !savedLeg?.executed) {
+      toast('The planned trade was not recorded. The plan remains available; please try again.');
+      return;
+    }
+    toast('Planned trade recorded.');
   };
 
   const save = async () => {
