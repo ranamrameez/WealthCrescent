@@ -68,23 +68,36 @@ const cashToBankInput: InterEntityTransferInput = {
 describe('broker profile currency resolution', () => {
   it('uses the selected QSE and PSX broker settings instead of exchange defaults', () => {
     const qse = useWorkbookStore.getState().workbook;
-    const qseProfile = qse.brokerProfiles[0];
+    const qseActive = qse.brokerProfiles[0];
+    const qseOther = {
+      ...qseActive,
+      id: 'qse-usd-broker',
+      name: 'USD broker',
+      settings: { ...qseActive.settings, currency: 'USD' },
+      data: { transactions: [], transfers: [], adjustments: [], dividends: [], tradePlans: [] },
+    };
     useWorkbookStore.getState().setWorkbook({
       ...qse,
       settings: { ...qse.settings, currency: 'QAR' },
-      brokerProfiles: [{ ...qseProfile, settings: { ...qseProfile.settings, currency: 'USD' } }],
+      activeBrokerId: qseActive.id,
+      brokerProfiles: [{ ...qseActive, settings: { ...qseActive.settings, currency: 'QAR' } }, qseOther],
     });
 
     const psx = usePSXWorkbookStore.getState().workbook;
-    const psxProfile = psx.brokerProfiles[0];
+    const psxActive = psx.brokerProfiles[0];
+    const psxOther = {
+      ...psx.brokerProfiles[1],
+      settings: { ...psx.brokerProfiles[1].settings, currency: 'USD' },
+    };
     usePSXWorkbookStore.getState().setWorkbook({
       ...psx,
       settings: { ...psx.settings, currency: 'PKR' },
-      brokerProfiles: [{ ...psxProfile, settings: { ...psxProfile.settings, currency: 'USD' } }],
+      activeBrokerId: psxActive.id,
+      brokerProfiles: [psxActive, psxOther],
     });
 
-    expect(resolveSideCurrency({ module: 'qse', ref: qseProfile.id })).toBe('USD');
-    expect(resolveSideCurrency({ module: 'psx', ref: psxProfile.id })).toBe('USD');
+    expect(resolveSideCurrency({ module: 'qse', ref: qseOther.id })).toBe('USD');
+    expect(resolveSideCurrency({ module: 'psx', ref: psxOther.id })).toBe('USD');
   });
 });
 
