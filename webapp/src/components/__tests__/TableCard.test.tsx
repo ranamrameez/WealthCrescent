@@ -18,7 +18,11 @@ it('provides standard actions, preserves supplied handlers, and sorts dates with
   const { container } = render(<TableCard title="Ledger" actions={[{ label: 'Modify', onClick: modify }]}><DateRows /></TableCard>);
   fireEvent.click(screen.getByRole('button', { name: 'Card options' }));
   const menu = screen.getByRole('menu');
-  for (const name of ['Import', 'Export filtered', 'Export all', 'Batch edit', 'Modify']) expect(within(menu).getByRole('button', { name })).toBeVisible();
+  expect(within(menu).queryByRole('button', { name: 'Import' })).not.toBeInTheDocument();
+  expect(within(menu).getByRole('button', { name: 'Export filtered' })).toBeVisible();
+  expect(within(menu).queryByRole('button', { name: 'Export all' })).not.toBeInTheDocument();
+  expect(within(menu).queryByRole('button', { name: 'Batch edit' })).not.toBeInTheDocument();
+  expect(within(menu).getByRole('button', { name: 'Modify' })).toBeVisible();
   fireEvent.click(within(menu).getByRole('button', { name: 'Modify' }));
   expect(modify).toHaveBeenCalledOnce();
   fireEvent.click(screen.getByRole('columnheader', { name: 'Date' }));
