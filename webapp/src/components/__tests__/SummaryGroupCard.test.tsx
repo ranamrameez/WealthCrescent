@@ -16,7 +16,7 @@ it('formats ISO date values through DateValue', () => {
 });
 
 it('leaves ordinary strings as ordinary summary values', () => {
-  render(<SummaryMetric label="Status" value="Pending" />);
+  const { container } = render(<SummaryMetric label="Status" value="Pending" />);
   expect(screen.getByText('Pending')).toBeInTheDocument();
-  expect(screen.queryByRole('time')).not.toBeInTheDocument();
+  expect(container.querySelector('time')).toBeNull();
 });
