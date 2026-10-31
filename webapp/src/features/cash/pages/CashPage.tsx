@@ -456,6 +456,7 @@ function CashStatementTable({ code, rows: allRows }: { code: string; rows: CashL
           </tbody>
         </table>
       </div>
+      {paginationControls}
       {editingEntry && <EditEntryModal entry={editingEntry} onClose={() => setEditingEntry(null)} />}
       {detailEntry && (
         <RecordDetailModal
