@@ -1,3 +1,4 @@
+import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
@@ -660,7 +661,9 @@ function SubscriptionPlansOverview({ subscriptions, filters }: { subscriptions: 
   const categories = useCategoryStore(state => state.workbook.categories);
   const rows = subscriptions.flatMap(subscription => generateRenewalOccurrences(subscription).filter(occurrence => !payments.some(plan => plan.sourceSubscriptionId === subscription.id && plan.executed && plan.date === occurrence.date)).map(occurrence => ({ subscription, ...occurrence })))
     .filter(row => (!filters.fromDate || row.date >= filters.fromDate) && (!filters.toDate || row.date <= filters.toDate) && filters.direction !== 'in' && filters.source !== 'statement-import' && (filters.category === 'all' || subCategoryLabel(row.subscription, categories) === filters.category)).sort((a, b) => a.date.localeCompare(b.date));
-  return <div className="table-scroll"><table><thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Subscription</th><th>Paying account</th><th>Amount</th></tr></thead><tbody>{dateSort.rows(rows, { date: row => row }).map(row => <SubscriptionRecordRow subscription={row.subscription} record={row} key={row.subscription.id + ':' + row.date}><td>{formatDate(row.date, dateFormat)}</td><td>{row.subscription.name}</td><td>{row.subscription.paidVia?.module ?? 'Not linked'}</td><td>{fmtMoney(row.amount, row.subscription.currencyCode)}</td></SubscriptionRecordRow>)}</tbody></table>{!rows.length && <p className="text-muted">No unpaid renewals in this period.</p>}</div>;
+  const sortedRows = dateSort.rows(rows, { date: row => row });
+  const { rows: pageRows, controls } = useTablePagination(sortedRows);
+  return <div className="table-scroll"><table><thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Subscription</th><th>Paying account</th><th>Amount</th></tr></thead><tbody>{pageRows.map(row => <SubscriptionRecordRow subscription={row.subscription} record={row} key={row.subscription.id + ':' + row.date}><td>{formatDate(row.date, dateFormat)}</td><td>{row.subscription.name}</td><td>{row.subscription.paidVia?.module ?? 'Not linked'}</td><td>{fmtMoney(row.amount, row.subscription.currencyCode)}</td></SubscriptionRecordRow>)}</tbody></table>{controls}{!rows.length && <p className="text-muted">No unpaid renewals in this period.</p>}</div>;
 }
 
 function SubscriptionPaymentsOverview({ subscriptions, filters }: { subscriptions: Subscription[]; filters: TransactionPageFilters }) {
@@ -670,7 +673,9 @@ function SubscriptionPaymentsOverview({ subscriptions, filters }: { subscription
   const rows = plans.filter(plan => plan.executed && subscriptions.some(sub => sub.id === plan.sourceSubscriptionId && (filters.category === 'all' || subCategoryLabel(sub, categories) === filters.category)))
     .map(plan => ({ plan, date: plan.fulfilledDate ?? plan.date, sub: subscriptions.find(sub => sub.id === plan.sourceSubscriptionId)! }))
     .filter(row => (!filters.fromDate || row.date >= filters.fromDate) && (!filters.toDate || row.date <= filters.toDate) && filters.direction !== 'in' && filters.source !== 'statement-import').sort((a, b) => b.date.localeCompare(a.date));
-  return <div className="table-scroll"><table><thead><tr><dateSort.Th rows={rows} column="date">Paid on</dateSort.Th><th>Subscription</th><dateSort.Th rows={rows} column="renewal">Scheduled renewal</dateSort.Th><th>Amount</th></tr></thead><tbody>{dateSort.rows(rows, { date: row => row, renewal: row => row.plan }).map(row => <RecordRow record={row} key={row.plan.id}><td><DateValue value={row.date} /></td><td>{row.sub.name}</td><td><DateValue value={row.plan.date} /></td><td>{fmtMoney(Math.abs(row.plan.amount), row.sub.currencyCode)}</td></RecordRow>)}</tbody></table>{!rows.length && <p className="text-muted">No fulfilled renewal plans in this period.</p>}</div>;
+  const sortedRows = dateSort.rows(rows, { date: row => row, renewal: row => row.plan });
+  const { rows: pageRows, controls } = useTablePagination(sortedRows);
+  return <div className="table-scroll"><table><thead><tr><dateSort.Th rows={rows} column="date">Paid on</dateSort.Th><th>Subscription</th><dateSort.Th rows={rows} column="renewal">Scheduled renewal</dateSort.Th><th>Amount</th></tr></thead><tbody>{pageRows.map(row => <RecordRow record={row} key={row.plan.id}><td><DateValue value={row.date} /></td><td>{row.sub.name}</td><td><DateValue value={row.plan.date} /></td><td>{fmtMoney(Math.abs(row.plan.amount), row.sub.currencyCode)}</td></RecordRow>)}</tbody></table>{controls}{!rows.length && <p className="text-muted">No fulfilled renewal plans in this period.</p>}</div>;
 }
 
 function SubscriptionAlertsOverview({ subscriptions }: { subscriptions: Subscription[] }) {
