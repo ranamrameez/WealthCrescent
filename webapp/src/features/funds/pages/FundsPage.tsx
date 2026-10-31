@@ -18,7 +18,7 @@ import { EntityScopeMenu, selectedEntityValues } from '../../../components/Entit
 import { TopBarControls } from '../../../components/TopBarControls';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { Line } from 'react-chartjs-2';
-import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
+import { Card, EntityCard, MoneyValue } from '../../../components/Card';
 import { Modal } from '../../../components/Modal';
 import { Notice } from '../../../components/Notice';
 import { TickerLogo } from '../../../components/TickerLogo';
