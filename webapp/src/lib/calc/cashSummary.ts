@@ -3,6 +3,17 @@ import { buildCashLedger, totalTransferFees } from './cashLedger';
 import { computePositions } from './positions';
 import { getMarketPrice } from './priceHistory';
 
+export interface PositionValuation {
+  ticker: string;
+  shares: number;
+  invested: number;
+  marketPrice: number;
+  value: number;
+  sellFee: number;
+  profit: number;
+  roiPct: number;
+}
+
 /** Single all-in summary: actual cash, trading gains/losses and fees. Pending
  * trades are excluded; executed oversells retain their real cash movement while
  * unmatched shares are excluded from cost basis and realized P/L. */
@@ -15,6 +26,7 @@ export function cashSummary(
   positions: Position[] = computePositions(transactions, calcFee),
   dividends: Dividend[] = [],
   precomputedLedger?: CashLedgerEvent[],
+  precomputedPositionRows?: PositionValuation[],
 ): CashSummary {
   const totalInward = transfers.filter((t) => t.type === 'DEPOSIT').reduce((s, t) => s + t.gross, 0);
   const totalOutward = transfers.filter((t) => t.type === 'WITHDRAWAL').reduce((s, t) => s + t.gross, 0);
@@ -27,14 +39,21 @@ export function cashSummary(
 
   let unrealizedPL = 0;
   let portfolioValue = 0;
-  positions.filter((p) => p.shares > 0).forEach((p) => {
-    const mp = getMarketPrice(p.ticker, marketPrices, transactions);
-    const grossValue = p.shares * mp;
-    const estSellFee = mp > 0 ? calcFee(grossValue, false, { shares: p.shares }) : 0;
-    const netValue = grossValue - estSellFee;
-    unrealizedPL += netValue - p.invested;
-    portfolioValue += netValue;
-  });
+  if (precomputedPositionRows) {
+    precomputedPositionRows.forEach(row => {
+      unrealizedPL += row.profit;
+      portfolioValue += row.value - row.sellFee;
+    });
+  } else {
+    positions.filter((p) => p.shares > 0).forEach((p) => {
+      const mp = getMarketPrice(p.ticker, marketPrices, transactions);
+      const grossValue = p.shares * mp;
+      const estSellFee = mp > 0 ? calcFee(grossValue, false, { shares: p.shares }) : 0;
+      const netValue = grossValue - estSellFee;
+      unrealizedPL += netValue - p.invested;
+      portfolioValue += netValue;
+    });
+  }
 
   const ledger = precomputedLedger ?? buildCashLedger(transactions, transfers, adjustments, calcFee, dividends);
   const cashBalance = ledger.length ? ledger[ledger.length - 1].balance : 0;

@@ -10,20 +10,11 @@ import type {
   Transfer,
 } from '../../types/workbook';
 import { buildCashLedger } from './cashLedger';
-import { cashSummary } from './cashSummary';
+import { cashSummary, type PositionValuation } from './cashSummary';
 import { getMarketPrice } from './priceHistory';
 import { calculateStockPortfolio, type StockBasisMethod, type StockCalculationResult } from './stockCalculationEngine';
 
-export interface PortfolioPositionRow {
-  ticker: string;
-  shares: number;
-  invested: number;
-  marketPrice: number;
-  value: number;
-  sellFee: number;
-  profit: number;
-  roiPct: number;
-}
+export type PortfolioPositionRow = PositionValuation;
 
 /**
  * One public calculation pipeline for an exchange portfolio. Cost-basis
@@ -60,17 +51,6 @@ export function calculatePortfolio(input: PortfolioCalculationInput): PortfolioC
   } = input;
 
   const stock = calculateStockPortfolio(transactions, calcFee, costBasisMethod);
-  const cashLedger = buildCashLedger(transactions, transfers, adjustments, calcFee, dividends);
-  const summary = cashSummary(
-    transactions,
-    transfers,
-    adjustments,
-    marketPrices,
-    calcFee,
-    stock.positions,
-    dividends,
-    cashLedger,
-  );
 
   const positionRows: PortfolioPositionRow[] = stock.positions
     .filter(position => position.shares > 0)
@@ -91,6 +71,19 @@ export function calculatePortfolio(input: PortfolioCalculationInput): PortfolioC
         roiPct,
       };
     });
+
+  const cashLedger = buildCashLedger(transactions, transfers, adjustments, calcFee, dividends);
+  const summary = cashSummary(
+    transactions,
+    transfers,
+    adjustments,
+    marketPrices,
+    calcFee,
+    stock.positions,
+    dividends,
+    cashLedger,
+    positionRows,
+  );
 
   return {
     ...stock,
