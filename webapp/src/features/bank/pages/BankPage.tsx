@@ -940,7 +940,6 @@ export function AccountDetailPage() {
   const pendingOutflow = filteredLedger.filter(({ tx }) => tx.isPending && tx.amount < 0).reduce((sum, row) => sum + row.tx.amount, 0);
   const plannedInflow = planOccurrences(plannedEntries, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters)).filter((plan) => plan.accountId === account?.id && !plan.executed && plan.amount >= 0 && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
   const plannedOutflow = planOccurrences(plannedEntries, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters)).filter((plan) => plan.accountId === account?.id && !plan.executed && plan.amount < 0 && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
-  const balanceChange = periodCurrentBalance - periodStartBalance;
   const upcoming = useMemo(
     () => account
       ? planOccurrences(plannedEntries, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters))
