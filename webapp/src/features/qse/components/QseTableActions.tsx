@@ -6,8 +6,8 @@ import type { SectionCardProps } from '../../../components/StandardPageSections'
 import { IconButton } from '../../../components/ui/IconButton';
 import { XIcon } from '../../../components/icons';
 import { propagateLinkedEdit, resolveLinkedEdit } from '../../../lib/linkCascade';
-import { ReorderButtons } from '../../../components/ui/ReorderButtons';
-import { toInstantMs } from '../../../lib/datetime';
+import { AccountingEventOrderControls } from '../../../components/AccountingEventOrderControls';
+import { getAccountingEventRefs, type AccountingEventKind } from '../../../lib/seq';
 import { useId, useMemo, useState, type ReactNode } from 'react';
 import { BatchEditGrid, type BatchColumn } from '../../../components/BatchEditGrid';
 import { validBatchDate, prepareBatch } from '../../../components/batchEditModel';
@@ -244,41 +244,36 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
   }} />}</>;
 }
 
-/** Reorder exact-time peers; trades also share ticker and action so lot rules remain intact. */
-export function QseReorder({ kind, row, rows }: { kind: Kind; row: Transaction | Transfer | Adjustment | Dividend | Row; rows: Array<Transaction | Transfer | Adjustment | Dividend | Row> }) {
+/** Shared same-day accounting order controls for trades, transfers, adjustments,
+ * dividends and rows shown in the merged cash ledger. */
+export function QseReorder({ kind, row }: {
+  kind: Kind;
+  row: { id?: string; date: string; kind?: string };
+  rows?: Array<Transaction | Transfer | Adjustment | Dividend | Row>;
+}) {
   const ensureSignedIn = useEnsureSignedIn();
-  const isTradeList = kind === 'transactions';
-  const peers = isTradeList ? rows as Transaction[] : rows.filter(candidate => (kind !== 'ledger' || (candidate as Row).kind === (row as Row).kind) && (kind !== 'ledger' || (row as Row).kind !== 'trade' || ((candidate as Transaction).ticker === (row as Transaction).ticker && (candidate as Transaction).action === (row as Transaction).action)));
-  return <ReorderButtons rows={peers} index={peers.findIndex(candidate => candidate.id === row.id)} instantOf={candidate => toInstantMs(candidate.date, candidate.time, candidate.timezone)} idOf={candidate => candidate.id!} orderOf={candidate => isTradeList ? (candidate as Transaction).globalTransactionIndex ?? (candidate as Transaction).transactionIndex : candidate.seq} allowAcrossInstants={isTradeList} onMove={async pair => {
-    if (!(await ensureSignedIn('Sign in to reorder records.'))) return;
-    const state = useWorkbookStore.getState();
-    if (isTradeList) {
-      const transactions = state.workbook.transactions;
-      const a = transactions.find(candidate => candidate.id === pair[0].id), b = transactions.find(candidate => candidate.id === pair[1].id);
-      const aIndex = a?.globalTransactionIndex ?? a?.transactionIndex;
-      const bIndex = b?.globalTransactionIndex ?? b?.transactionIndex;
-      if (!a || !b || !Number.isInteger(aIndex) || !Number.isInteger(bIndex)) return toast('Transactions changed or accounting order is missing. Reload and try again.');
-      // Swap the canonical global positions, then derive per-ticker indexes from that same order.
-      const swapped = transactions.map(candidate => candidate.id === a.id
-        ? { ...candidate, globalTransactionIndex: bIndex, transactionIndex: bIndex }
-        : candidate.id === b.id
-          ? { ...candidate, globalTransactionIndex: aIndex, transactionIndex: aIndex }
-          : candidate);
-      const next = syncTransactionIndexes(swapped);
-      state.setWorkbook({ ...state.workbook, transactions: next });
-      toast('Transaction accounting order updated.');
-      return;
-    }
-    const sourceKind = kind === 'ledger' ? (row as Row).kind === 'trade' ? 'transactions' : (row as Row).kind === 'transfer' ? 'transfers' : 'adjustments' : kind;
-    const records = state.workbook[sourceKind];
-    const a = records.find(candidate => candidate.id === pair[0].id), b = records.find(candidate => candidate.id === pair[1].id);
-    if (!a || !b || toInstantMs(a.date, a.time, a.timezone) !== toInstantMs(b.date, b.time, b.timezone)) return toast('Records changed. Please try again.');
-    const next = records.map(candidate => { const order = pair.find(item => item.id === candidate.id); return order ? { ...candidate, seq: order.order } : candidate; });
-    if (sourceKind === 'transactions') state.setWorkbook({ ...state.workbook, transactions: next as Transaction[] });
-    else if (sourceKind === 'transfers') state.setWorkbook({ ...state.workbook, transfers: next as Transfer[] });
-    else if (sourceKind === 'adjustments') state.setWorkbook({ ...state.workbook, adjustments: next as Adjustment[] });
-    else state.setWorkbook({ ...state.workbook, dividends: next as Dividend[] });
-  }} />;
+  const workbook = useWorkbookStore(state => state.workbook);
+  const eventKind = (kind === 'transactions' ? 'trade'
+    : kind === 'transfers' ? 'transfer'
+      : kind === 'adjustments' ? 'adjustment'
+        : kind === 'dividends' ? 'dividend'
+          : row.kind) as AccountingEventKind;
+  const events = getAccountingEventRefs(workbook);
+  if (!row.id || !eventKind) return null;
+
+  return (
+    <AccountingEventOrderControls
+      events={events}
+      kind={eventKind}
+      id={row.id}
+      date={row.date}
+      onMove={async pair => {
+        if (!(await ensureSignedIn('Sign in to reorder accounting events.'))) return;
+        useWorkbookStore.getState().reorderAccountingEvents(pair);
+        toast('Same-day accounting sequence updated.');
+      }}
+    />
+  );
 }
 
 export function QseRecordCard({ title, sectionProps, children, ...props }: QseRecordActionProps & { title: ReactNode; sectionProps?: SectionCardProps; children: ReactNode }) {
