@@ -290,6 +290,8 @@ export interface QSESettings {
   tick: number;
   currency: string;
   depositFee: number;
+  /** Warn before saving a trade whose entered price differs from the stored market price by more than this percent. Defaults to 10%. */
+  tradePriceDeviationPct?: number;
   /** User-requested (2026-09-06): "let the user choose (checkboxes?) to
    * include the accounts in the Net calcs" — QSE is one portfolio with no
    * sub-accounts, so this is a whole-module on/off switch (same rationale
