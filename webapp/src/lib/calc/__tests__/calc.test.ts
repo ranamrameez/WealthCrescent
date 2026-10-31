@@ -145,12 +145,14 @@ describe('computeRealizedPLTimeSeries', () => {
     expect(points[0].value).toBeCloseTo(8, 5);
   });
 
-  it('ignores an oversell instead of making the running P/L jump by zero-cost proceeds', () => {
+  it('realizes only the matched portion of an oversell, never the unmatched zero-basis shares', () => {
     const oversell: Transaction[] = [
       { date: '2026-08-24', ticker: 'OVER', action: 'BUY', shares: 10, price: 10, seq: 1 },
       { date: '2026-08-25', ticker: 'OVER', action: 'SELL', shares: 15, price: 10, seq: 2 },
     ];
-    expect(computeRealizedPLTimeSeries(oversell, () => 0)).toHaveLength(0);
+    const points = computeRealizedPLTimeSeries(oversell, () => 0);
+    expect(points).toHaveLength(1);
+    expect(points[0].value).toBeCloseTo(0, 8);
   });
 });
 
