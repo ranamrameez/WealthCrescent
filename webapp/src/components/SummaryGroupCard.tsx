@@ -8,7 +8,7 @@ export function SummaryMetric({ label, value, tone = 'pill-info', large = false,
 }) {
   return <div className={`summary-metric${large ? ' summary-metric-large' : ''}`}>
     {tooltip ? <Tooltip text={tooltip}><span className="summary-metric-label clickable">{label}</span></Tooltip> : <span className="summary-metric-label">{label}</span>}
-    <strong className={`pill ${tone}`}>{typeof value === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(value) ? <DateValue value={value} /> : value}{suffix}</strong>
+    <strong className={`pill ${tone}`}>{typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? <DateValue value={value} /> : value}{suffix}</strong>
   </div>;
 }
 
