@@ -130,7 +130,7 @@ describe('PSX legacy broker migration', () => {
     expect(wb.activeBrokerId).toBe('psx-js-zindigi');
     expect(wb.transactions[0]).toMatchObject({
       id: 'old-psx-trade', brokerId: 'psx-js-zindigi', shares: 10,
-      price: 12.34, transactionIndex: 7, feeOverride: 1.25,
+      price: 12.34, transactionIndex: 1, globalTransactionIndex: 1, perTickerIndex: 1, accountingOrder: 1, feeOverride: 1.25,
     });
     expect(wb.transfers[0]).toMatchObject({ id: 'old-psx-cash', brokerId: 'psx-js-zindigi', gross: 1000, fee: 5 });
     expect(wb.marketPrices).toEqual({ ABC: 12.5 });
