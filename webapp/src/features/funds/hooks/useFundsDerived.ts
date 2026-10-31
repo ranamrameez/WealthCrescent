@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { buildCashLedger, cashSummary, computePositions, computeRealizedPLTimeSeries, getMarketPrice } from '../../../lib/calc';
+import { computePositions, computeRealizedPLTimeSeries, getMarketPrice } from '../../../lib/calc';
+import { fundsCashBalanceByCurrency, fundsCashLedgerByCurrency } from '../../../lib/calc/fundsModule';
 import { xirr } from '../../../lib/calc/xirr';
 import { useFundsWorkbookStore } from '../../../store/fundsWorkbookStore';
 
@@ -13,9 +14,9 @@ export function useFundsDerived() {
 
   return useMemo(() => {
     const positions = computePositions(workbook.transactions, calcFee);
-    const summary = cashSummary(workbook.transactions, workbook.transfers, workbook.adjustments, workbook.marketPrices, calcFee);
     const realizedSeries = computeRealizedPLTimeSeries(workbook.transactions, calcFee);
-    const ledger = buildCashLedger(workbook.transactions, workbook.transfers, workbook.adjustments, calcFee);
+    const cashLedgers = fundsCashLedgerByCurrency(workbook.funds, workbook.transactions, workbook.transfers, workbook.settings.defaultCurrency);
+    const cashBalances = fundsCashBalanceByCurrency(workbook.funds, workbook.transactions, workbook.transfers, workbook.settings.defaultCurrency);
 
     /** XIRR for one fund: every transaction as a cash flow (negative for
      * BUY, positive for SELL) plus a final synthetic +currentValue flow
@@ -36,6 +37,6 @@ export function useFundsDerived() {
       return xirr(flows);
     };
 
-    return { workbook, calcFee, positions, summary, realizedSeries, ledger, fundXIRR };
+    return { workbook, calcFee, positions, realizedSeries, cashLedgers, cashBalances, fundXIRR };
   }, [workbook]);
 }
