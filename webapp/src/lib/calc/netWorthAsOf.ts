@@ -6,7 +6,7 @@ import { assetBalanceByCurrency, creditCardLiabilityByCurrency as legacyCreditCa
 import { creditCardLiabilityByCurrency } from './creditCardModule';
 import { netPositionByCurrency } from './personalLoansModule';
 import { totalsByCurrency as emiTotalsByCurrency } from './emiModule';
-import { fundsValueByCurrency } from './fundsModule';
+import { fundsCashBalanceByCurrency, fundsValueByCurrency } from './fundsModule';
 import { computeNetWorthByCurrency, mergeCurrencyTotals, type CurrencyNetWorth } from './netWorth';
 import { includedBankAccounts, includedCreditCards, includedEmiLoans, includedFunds, includedPersonalLoans } from './netWorthInclusion';
 import type { CashEntry, CashSettings } from '../../types/cashWorkbook';
@@ -53,6 +53,8 @@ export interface NetWorthAsOfInputs {
   emiLoans: EMILoan[];
   fundsFunds: Fund[];
   fundsTransactions: Transaction[];
+  fundsTransfers: Transfer[];
+  fundsDefaultCurrency: string;
   fundsPriceHistory: Record<string, PricePoint[]>;
   qseTransactions: Transaction[];
   qseTransfers: Transfer[];
@@ -150,7 +152,12 @@ export function netWorthAsOfDate(asOfDate: string, inputs: NetWorthAsOfInputs): 
 
   const fundsTxAsOf = inputs.fundsTransactions.filter((t) => t.date <= asOfDate);
   const fundsPricesAsOf = marketPricesAsOf(fundsTxAsOf, inputs.fundsPriceHistory, asOfDate);
-  const fundsValues = fundsValueByCurrency(includedFunds(inputs.fundsFunds), fundsTxAsOf, fundsPricesAsOf);
+  const fundsIncluded = includedFunds(inputs.fundsFunds);
+  const fundsTransfersAsOf = inputs.fundsTransfers.filter((transfer) => transfer.date <= asOfDate);
+  const fundsValues = mergeCurrencyTotals(
+    fundsValueByCurrency(fundsIncluded, fundsTxAsOf, fundsPricesAsOf),
+    fundsCashBalanceByCurrency(fundsIncluded, fundsTxAsOf, fundsTransfersAsOf, inputs.fundsDefaultCurrency),
+  );
 
   const qseTxAsOf = inputs.qseTransactions.filter((t) => t.date <= asOfDate);
   const qseTransfersAsOf = inputs.qseTransfers.filter((t) => t.date <= asOfDate);
@@ -202,6 +209,7 @@ export function earliestActivityDate(inputs: NetWorthAsOfInputs): string | undef
     ...inputs.personalLoanRepayments.map((r) => r.date),
     ...inputs.emiLoans.map((l) => l.startDate),
     ...inputs.fundsTransactions.map((t) => t.date),
+    ...inputs.fundsTransfers.map((t) => t.date),
     ...inputs.qseTransactions.map((t) => t.date),
     ...inputs.qseTransfers.map((t) => t.date),
     ...inputs.qseAdjustments.map((a) => a.date),
