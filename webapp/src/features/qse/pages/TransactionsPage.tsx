@@ -946,7 +946,7 @@ function CashLedgerSection({ sectionProps }: { sectionProps?: SectionCardProps }
     if (!(await confirmDialog('This cannot be undone.', 'Delete this ledger record?'))) return;
     const state = useWorkbookStore.getState();
     if (source.kind === 'trade') { const index = state.workbook.transactions.findIndex(row => row.id === source.id); if (index >= 0) state.deleteTransaction(index); }
-    else if (source.kind === 'dividend') { const index = state.workbook.dividends.findIndex(row => row.id === source.id); if (index >= 0) state.deleteDividend(index); }
+    else if (source.kind === 'dividend') { const index = state.workbook.dividends.findIndex(row => row.id === source.id); if (index >= 0) state.removeDividend(index); }
     else { const index = state.workbook.adjustments.findIndex(row => row.id === source.id); if (index >= 0) state.deleteAdjustment(index); }
   };
   return <QseRecordCard dateSort={dateSort} title="Cash ledger" sectionProps={sectionProps} kind="ledger" rows={sources(filtered)} allRecords={sources(sorted)} modifying={modifying} onModify={() => setModifying(value => !value)} editRequest={editRequest} exportData={{ rows: exportRows(filtered), allRows: exportRows(sorted) }}>

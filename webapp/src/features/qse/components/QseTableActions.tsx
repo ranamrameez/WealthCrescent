@@ -147,7 +147,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
         const importedId = idColumn < 0 ? '' : cells[idColumn]?.trim();
         if (importedId) explicitIds.add(importedId);
         const row: Row = { id: importedId || crypto.randomUUID(), date: '' };
-        for (const c of columns.filter(c => c.key !== 'seq' && c.key !== 'perTickerIndex' && c.key !== 'accountingOrder' && c.key !== 'accountingOrder')) {
+        for (const c of columns.filter(c => c.key !== 'seq' && c.key !== 'perTickerIndex' && c.key !== 'accountingOrder')) {
           const normalizedHeaders = headers.map(header => header.trim().toLowerCase());
           let position = normalizedHeaders.indexOf(c.key.toLowerCase());
           if (kind === 'ledger' && c.key === 'type') {
@@ -181,7 +181,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
       });
       const signature = (row: Row) => {
         const nativeColumns = kind === 'ledger' ? qseColumns(row.kind === 'trade' ? 'transactions' : row.kind === 'transfer' ? 'transfers' : row.kind === 'dividend' ? 'dividends' : 'adjustments') : columns;
-        return JSON.stringify([kind === 'ledger' ? row.kind : '', ...nativeColumns.filter(c => c.key !== 'seq' && c.key !== 'perTickerIndex' && c.key !== 'accountingOrder' && c.key !== 'accountingOrder').map(c => c.type === 'boolean' ? !!row[c.key] : row[c.key] ?? '')]);
+        return JSON.stringify([kind === 'ledger' ? row.kind : '', ...nativeColumns.filter(c => c.key !== 'seq' && c.key !== 'perTickerIndex' && c.key !== 'accountingOrder').map(c => c.type === 'boolean' ? !!row[c.key] : row[c.key] ?? '')]);
       };
       const importedIds = new Set<string>();
       const updates: Row[] = [];
