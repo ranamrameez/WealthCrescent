@@ -82,6 +82,9 @@ export interface Fund {
 export interface FundsSettings {
   /** Pre-fills new funds only — never converts existing ones. */
   defaultCurrency: string;
+  /** Independent inclusion control for the portfolio-level, per-currency
+   * Funds cash account. Missing on legacy workbooks means included. */
+  includeCashInNetWorth?: boolean;
 }
 
 /** Structurally closest of the new modules to QSE/PSX (buy/sell units at a
