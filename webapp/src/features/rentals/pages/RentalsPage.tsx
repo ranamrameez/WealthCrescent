@@ -1070,6 +1070,7 @@ function CategoryAndRollup({ property, entries: suppliedEntries }: { property: P
   const sortedRollup = dateSort.rows(rollup, { date: row => row.month });
   const { rows: pageRollup, controls: rollupControls } = useTablePagination(sortedRollup);
   const cats = Object.keys(byCategory);
+  const { rows: pageCats, controls: categoryControls } = useTablePagination(cats);
 
   return (
     <div className="grid-auto" style={{ ...gridAutoStyle(260, 16), marginBottom: 16 }}>
@@ -1078,7 +1079,7 @@ function CategoryAndRollup({ property, entries: suppliedEntries }: { property: P
           <div className="table-scroll">
             <table>
               <tbody>
-                {cats.map((cat) => (
+                {pageCats.map((cat) => (
                   <RecordRow record={cat} key={cat}>
                     <td>{cat}</td>
                     <td className={byCategory[cat] >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(byCategory[cat], property.currencyCode)}</td>
@@ -1087,7 +1088,7 @@ function CategoryAndRollup({ property, entries: suppliedEntries }: { property: P
               </tbody>
             </table>
           </div>
-          {rollupControls}
+          {categoryControls}
         </TableCard>
       )}
       {rollup.length > 0 && (
@@ -1107,6 +1108,7 @@ function CategoryAndRollup({ property, entries: suppliedEntries }: { property: P
               </tbody>
             </table>
           </div>
+          {rollupControls}
         </TableCard>
       )}
     </div>
