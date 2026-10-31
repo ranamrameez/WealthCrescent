@@ -1028,12 +1028,10 @@ function CashLedgerSection() {
   // User-reported (2026-09-06): "we may stop sorting options for
   // chronologically important tables (only sequence-aware tables) to
   // avoid the disordered mess" — same reasoning as QSE's own equivalent
-  // (Done item 235): a merged trades+transfers+adjustments ledger's
+  // (Done item 235): a merged trades+transfers+adjustments+dividends ledger's
   // Balance column only makes sense in `buildCashLedger`'s own real
-  // chronological order. No `ReorderButtons` here — each row is DERIVED
-  // from a real record living in its own native table (Trade Transactions
-  // / the Transfers section above / Adjustments); reordering happens
-  // there and flows through automatically.
+  // chronological order. The same-day arrows below operate on the complete
+  // event stream, including rows from the other transaction sections.
   const dateSortInput = [...filtered].sort((a, b) => b.date.localeCompare(a.date) || (a.accountingOrder ?? 0) - (b.accountingOrder ?? 0));
   const sorted = dateSort.rows(dateSortInput, { date: row => ({ ...row, seq: row.accountingOrder ?? 0 }) });
   const page = useTablePagination(sorted);
@@ -1047,6 +1045,7 @@ function CashLedgerSection() {
             <option value="trade">Trade</option>
             <option value="transfer">Transfer</option>
             <option value="adjustment">Adjustment</option>
+            <option value="dividend">Dividend</option>
           </Select>
         </Field>
       </div></PageFilters>

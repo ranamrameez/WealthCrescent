@@ -45,7 +45,7 @@ function validateQseRow(kind: Kind, row: Row): Record<string, string> {
   if (!validBatchDate(row.date)) errors.date = 'Enter a valid date.';
   if (row.time && !/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(row.time)) errors.time = 'Enter a valid time.';
   if (row.timezone) { try { new Intl.DateTimeFormat('en', { timeZone: row.timezone }); } catch { errors.timezone = 'Enter a valid IANA timezone.'; } }
-  for (const c of qseColumns(kind)) if (c.type === 'number' && c.key !== 'seq' && c.key !== 'perTickerIndex' && c.key !== 'accountingOrder' && c.key !== 'accountingOrder' && c.key !== 'accountingOrder' && (!Number.isFinite(row[c.key]) || Number(row[c.key]) < 0 && !(kind === 'adjustments' && c.key === 'amount'))) errors[c.key] = 'Enter a valid amount.';
+  for (const c of qseColumns(kind)) if (c.type === 'number' && c.key !== 'seq' && c.key !== 'perTickerIndex' && c.key !== 'accountingOrder' && c.key !== 'accountingOrder' && (!Number.isFinite(row[c.key]) || Number(row[c.key]) < 0 && !(kind === 'adjustments' && c.key === 'amount'))) errors[c.key] = 'Enter a valid amount.';
   if ((kind === 'transactions' || kind === 'dividends') && !row.ticker?.trim()) errors.ticker = 'Ticker is required.';
   if (kind === 'transactions') { if (!['BUY', 'SELL'].includes(row.action || '')) errors.action = 'Choose BUY or SELL.'; if (!(row.shares! > 0)) errors.shares = 'Shares must be positive.'; if (!(row.price! > 0)) errors.price = 'Price must be positive.'; }
   if (kind === 'transfers') { if (!['DEPOSIT', 'WITHDRAWAL'].includes(row.type || '')) errors.type = 'Choose DEPOSIT or WITHDRAWAL.'; if (!(row.gross! > 0)) errors.gross = 'Gross must be positive.'; }
@@ -132,7 +132,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
           'The Group Excel statement contains rounded cash amounts instead of exact figures. Importing rounded numbers may produce incorrect balances, fees, profit/loss and other calculations. Use an exact statement where available and verify the imported figures. Rounded rewards will be excluded; existing exact rewards are retained. Continue to review this import?',
           'Warning: rounded statement figures',
         ))) return;
-        const existing = recordsFor('ledger').filter(row => row.kind !== 'adjustment') as StatementRecord[];
+        const existing = recordsFor('ledger').filter(row => row.kind === 'trade' || row.kind === 'transfer') as StatementRecord[];
         const result = parseTheGroupStatement(table, existing);
         statementWarning = result.warning;
         const records = kind === 'transactions' ? result.records.filter(row => row.kind === 'trade') : result.records;
