@@ -1542,7 +1542,7 @@ function FundsTransfersSection() {
               const link = linkByRecordId.get(t.id);
               const otherSide = link ? (link.from.module === 'funds' && link.fromRecordId === t.id ? link.to : link.from) : undefined;
               return (
-                <RecordRow market="funds" onEdit={() => startEdit(t)}    record={t}  key={t.id}>
+                <RecordRow onEdit={() => startEdit(t)} record={t} key={t.id}>
                   <td>
                     <DateValue value={t.date} />{' '}
                     <ReorderButtons
