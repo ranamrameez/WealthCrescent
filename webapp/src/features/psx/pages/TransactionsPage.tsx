@@ -543,6 +543,7 @@ function TransactionList() {
   };
 
   const renderTable = (groups: typeof openGroups, emptyMessage: string, controls: ReactNode) => (
+    <>
     <div className="table-scroll">
       <table>
         <thead>
@@ -700,7 +701,7 @@ function TransactionList() {
     </div>
     {controls}
   );
-  };
+    </>
 
   return (
     <div>
