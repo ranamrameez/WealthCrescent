@@ -1,3 +1,4 @@
+import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
@@ -474,6 +475,7 @@ function LoanDetail({ loan, onSelect, onBack, startInEditMode }: { loan: EMILoan
   }));
   const dateSortInput = scheduleWithStatus.filter(({ status, r }) => (statusFilter === 'all' || status === statusFilter) && filters.direction !== 'in' && filters.source !== 'statement-import' && (!filters.fromDate || resolvedDueDate(loan, r.month, loanRepayments) >= filters.fromDate) && (!filters.toDate || resolvedDueDate(loan, r.month, loanRepayments) <= filters.toDate));
   const visibleScheduleRows = dateSort.rows(dateSortInput, { date: row => resolvedDueDate(loan, row.r.month, loanRepayments) });
+  const { rows: pageScheduleRows, controls: schedulePaginationControls } = useTablePagination(visibleScheduleRows);
 
   /** README item 6 of a 2026-08-26 feedback batch: some real loans aren't
    * a flat EMI every month — e.g. a property installment plan with one
@@ -686,7 +688,7 @@ function LoanDetail({ loan, onSelect, onBack, startInEditMode }: { loan: EMILoan
             </tr>
           </thead>
           <tbody>
-            {visibleScheduleRows.map(({ r, status }) => {
+            {pageScheduleRows.map(({ r, status }) => {
               // User-reported (2026-08-28): "didn't allow me to change the
               // dates, amount and other data" — a past (already-"elapsed")
               // month used to be locked from editing entirely, on the
@@ -792,6 +794,7 @@ function LoanDetail({ loan, onSelect, onBack, startInEditMode }: { loan: EMILoan
           </tbody>
         </table>
       </div>
+      {schedulePaginationControls}
       </> },
 { table: true, key: 'payments', label: 'Payments', defaultOpen: true,  content: <><HomepagePayments loans={[loan]} filters={filters} /></> },
 { key: 'analytics', label: 'Analytics', defaultOpen: true,  content: <>
