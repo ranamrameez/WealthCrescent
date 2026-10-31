@@ -757,7 +757,7 @@ function AnalyticsTab({ selectedIds, currencyCode }: { selectedIds?: string[]; c
               <thead><tr><dateSort.Th rows={renewals} column="date">Date</dateSort.Th><th>Name</th><th>Amount</th></tr></thead>
               <tbody>
                 {pageRenewals.map((r) => (
-                  <RecordRow record={r} key={r.subscription.id}>
+                  <RecordRow record={r} key={`${r.subscription.id}:${r.date}`}>
                     <td><DateValue value={r.date} /></td>
                     <td>{r.subscription.name}</td>
                     <td>{fmtMoney(r.subscription.amount, r.subscription.currencyCode)}</td>
