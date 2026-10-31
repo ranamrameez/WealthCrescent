@@ -95,27 +95,57 @@ describe('computeFIFOPositions', () => {
     expect(p.realized).toBeCloseTo(40 * 30 - 40 * 10.5, 5);
   });
 
-  it('rejects an oversell (more sold than held) entirely, matching computePositions — never manufactures zero-cost profit for the excess', () => {
-    // Both `computeFIFOPositions` and `computePositions` skip an invalid
-    // oversell transaction wholesale (see each function's own oversell
-    // guard/doc comment: "this app does not model short positions, so a
-    // SELL larger than the currently-held quantity cannot legitimately
-    // create zero-cost profit") — NOT a partial fill with the excess
-    // treated as zero-cost, which an earlier version of this test wrongly
-    // asserted (a stale expectation neither engine has ever actually
-    // implemented; corrected 2026-09-18 while verifying an unrelated
-    // change, matching `positions.ts`'s own passing "does not manufacture
-    // profit from an oversell" test for the identical scenario).
+  it('closes the matched portion of a legacy oversell and reports the excess without zero-cost profit', () => {
     const txs: Transaction[] = [
       { date: '2026-01-01', ticker: 'TEST', action: 'BUY', shares: 10, price: 10 },
       { date: '2026-02-01', ticker: 'TEST', action: 'SELL', shares: 15, price: 20 },
     ];
-    const { positions } = computeFIFOPositions(txs, noFee);
-    const p = positions.find((x) => x.ticker === 'TEST')!;
-    expect(p.shares).toBe(10);
-    expect(p.invested).toBe(100);
-    expect(p.realized).toBe(0);
-    expect(p.totalSoldShares).toBe(0);
+    const fifo = computeFIFOPositions(txs, noFee).positions.find((x) => x.ticker === 'TEST')!;
+    const average = computePositions(txs, noFee).find((x) => x.ticker === 'TEST')!;
+    for (const position of [fifo, average]) {
+      expect(position.shares).toBe(0);
+      expect(position.invested).toBe(0);
+      expect(position.realized).toBe(100);
+      expect(position.totalSoldShares).toBe(15);
+      expect(position.unmatchedSellShares).toBe(5);
+      expect(position.unmatchedSellFees).toBe(0);
+      expect(position.unmatchedSellTransactions).toBe(1);
+    }
+  });
+
+  it('reconciles the user-reported PSO history as fully closed with 10 unmatched sell shares', () => {
+    const txs: Transaction[] = [
+      { date: '2026-08-24', seq: 1, ticker: 'PSO', action: 'BUY', shares: 2, price: 378.8 },
+      { date: '2026-08-24', seq: 2, ticker: 'PSO', action: 'SELL', shares: 2, price: 380 },
+      { date: '2026-08-24', seq: 3, ticker: 'PSO', action: 'BUY', shares: 10, price: 378.2 },
+      { date: '2026-08-24', seq: 4, ticker: 'PSO', action: 'BUY', shares: 10, price: 377.7 },
+      { date: '2026-08-24', seq: 5, ticker: 'PSO', action: 'BUY', shares: 10, price: 376.25 },
+      { date: '2026-08-24', seq: 6, ticker: 'PSO', action: 'BUY', shares: 10, price: 378.03 },
+      { date: '2026-08-24', seq: 7, ticker: 'PSO', action: 'BUY', shares: 10, price: 377.1 },
+      { date: '2026-08-24', seq: 8, ticker: 'PSO', action: 'BUY', shares: 10, price: 376.12 },
+      { date: '2026-08-24', seq: 9, ticker: 'PSO', action: 'BUY', shares: 4, price: 374.51 },
+      { date: '2026-08-24', seq: 10, ticker: 'PSO', action: 'BUY', shares: 15, price: 374.25 },
+      { date: '2026-08-25', seq: 11, ticker: 'PSO', action: 'BUY', shares: 26, price: 374 },
+      { date: '2026-08-25', seq: 12, ticker: 'PSO', action: 'BUY', shares: 15, price: 372.5 },
+      { date: '2026-08-27', seq: 13, ticker: 'PSO', action: 'BUY', shares: 10, price: 371.5 },
+      { date: '2026-09-04', seq: 14, ticker: 'PSO', action: 'SELL', shares: 50, price: 357.5 },
+      { date: '2026-09-04', seq: 15, ticker: 'PSO', action: 'SELL', shares: 80, price: 357.8 },
+    ];
+    const buyCost = txs.filter(tx => tx.action === 'BUY').reduce((sum, tx) => sum + tx.shares * tx.price, 0);
+    const matchedProceeds = 2 * 380 + 50 * 357.5 + 70 * 357.8;
+    const positions = [
+      computeFIFOPositions(txs, noFee).positions.find(item => item.ticker === 'PSO')!,
+      computePositions(txs, noFee).find(item => item.ticker === 'PSO')!,
+    ];
+    for (const position of positions) {
+      expect(position.totalBoughtShares).toBe(122);
+      expect(position.totalSoldShares).toBe(132);
+      expect(position.shares).toBe(0);
+      expect(position.invested).toBe(0);
+      expect(position.unmatchedSellShares).toBe(10);
+      expect(position.unmatchedSellTransactions).toBe(1);
+      expect(position.realized).toBeCloseTo(matchedProceeds - buyCost, 5);
+    }
   });
 
   it('closes a same-day round trip correctly even when the SELL is entered before the matching BUY', () => {
