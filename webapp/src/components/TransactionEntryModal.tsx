@@ -509,6 +509,8 @@ export function TransactionEntryModal({
   const addBankTransactions = useBankWorkbookStore((s) => s.addTransactions);
   const addCashEntry = useCashWorkbookStore((s) => s.addEntry);
   const cashDefaultCurrency = useCashWorkbookStore((s) => s.workbook.settings.defaultCurrency);
+  const qseWorkbook = useWorkbookStore((s) => s.workbook);
+  const psxWorkbook = usePSXWorkbookStore((s) => s.workbook);
   const addRentalEntry = useRentalsWorkbookStore((s) => s.addEntry);
   const addPersonalLoanRepayment = usePersonalLoansWorkbookStore((s) => s.addRepayment);
   const updatePersonalLoanRepayment = usePersonalLoansWorkbookStore((s) => s.updateRepayment);
@@ -562,7 +564,14 @@ export function TransactionEntryModal({
   // the linked side record before rendering the locked edit form.
   const linkFinance = rawLinkFinance && editLink ? enrichLinkSide(rawLinkFinance, editLink.recordId) : rawLinkFinance;
   const [linkSnapshot] = useState(() => editLink ? [structuredClone(getLinkedSideRecord(editLink.link.from, editLink.link.fromRecordId)), structuredClone(getLinkedSideRecord(editLink.link.to, editLink.link.toRecordId))] : []);
-  const baseFinance = linkFinance ?? (editTransfer ? { module: editTransfer.module, ref: editTransfer.record.brokerId, fee: editTransfer.record.fee, ...(editTransfer.module === 'funds' ? { currencyCode: editTransfer.record.currencyCode ?? fundsLegacyTransferCurrency } : {}) } : editFinance ?? defaultFinance);
+  const rawBaseFinance = linkFinance ?? (editTransfer ? { module: editTransfer.module, ref: editTransfer.record.brokerId, fee: editTransfer.record.fee, ...(editTransfer.module === 'funds' ? { currencyCode: editTransfer.record.currencyCode ?? fundsLegacyTransferCurrency } : {}) } : editFinance ?? defaultFinance);
+  // QSE/PSX transfer ownership and currency both come from the selected
+  // broker profile, never from whichever exchange profile happens to be active.
+  const baseFinance: LinkSideConfig | undefined = rawBaseFinance?.module === 'qse'
+    ? { ...rawBaseFinance, ref: rawBaseFinance.ref ?? qseWorkbook.activeBrokerId, currencyCode: qseWorkbook.brokerProfiles.find((p) => p.id === (rawBaseFinance.ref ?? qseWorkbook.activeBrokerId))?.settings.currency ?? qseWorkbook.settings.currency }
+    : rawBaseFinance?.module === 'psx'
+      ? { ...rawBaseFinance, ref: rawBaseFinance.ref ?? psxWorkbook.activeBrokerId, currencyCode: psxWorkbook.brokerProfiles.find((p) => p.id === (rawBaseFinance.ref ?? psxWorkbook.activeBrokerId))?.settings.currency ?? psxWorkbook.settings.currency }
+      : rawBaseFinance;
   const resolvedDefaultFinance: LinkSideConfig = baseFinance
     ? (baseFinance.module === 'cash' && !baseFinance.currencyCode ? { ...baseFinance, currencyCode: cashDefaultCurrency } : baseFinance)
     : { module: 'cash', currencyCode: cashDefaultCurrency };
