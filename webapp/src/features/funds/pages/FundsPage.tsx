@@ -22,7 +22,7 @@ import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../componen
 import { Modal } from '../../../components/Modal';
 import { Notice } from '../../../components/Notice';
 import { TickerLogo } from '../../../components/TickerLogo';
-import { HUES, hueStyle } from '../../../lib/statCardHues';
+import { hueStyle } from '../../../lib/statCardHues';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { ArchiveIcon, CheckIcon, EditIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { StandardPageSections } from '../../../components/StandardPageSections';
