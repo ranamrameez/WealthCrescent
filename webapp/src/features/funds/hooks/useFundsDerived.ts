@@ -16,7 +16,7 @@ export function useFundsDerived() {
     const positions = computePositions(workbook.transactions, calcFee);
     const realizedSeries = computeRealizedPLTimeSeries(workbook.transactions, calcFee);
     const cashLedgers = fundsCashLedgerByCurrency(workbook.funds, workbook.transactions, workbook.transfers, (workbook.settings.legacyTransferCurrency ?? workbook.settings.defaultCurrency));
-    const cashBalances = fundsCashBalanceByCurrency(workbook.funds, workbook.transactions, workbook.transfers, workbook.settings.defaultCurrency);
+    const cashBalances = fundsCashBalanceByCurrency(workbook.funds, workbook.transactions, workbook.transfers, workbook.settings.legacyTransferCurrency ?? workbook.settings.defaultCurrency);
 
     /** XIRR for one fund: every transaction as a cash flow (negative for
      * BUY, positive for SELL) plus a final synthetic +currentValue flow
