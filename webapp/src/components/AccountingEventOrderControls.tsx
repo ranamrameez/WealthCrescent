@@ -41,7 +41,12 @@ export function AccountingEventOrderControls({
           instantOf={event => dateOnlyMs(event.date)}
           idOf={event => `${event.kind}:${event.id}`}
           orderOf={event => event.accountingOrder}
-          onMove={pair => onMove(pair.map(item => ({ ...decode(item.id), order: item.order })) as AccountingEventOrderPair)}
+          onMove={pair => onMove(pair.map(item => {
+            const target = decode(item.id);
+            const current = dayEvents.find(event => event.kind === target.kind && event.id === target.id);
+            // The store validates the pre-move order values, then swaps them.
+            return { ...target, order: current?.accountingOrder ?? item.order };
+          }) as AccountingEventOrderPair)}
         />
       )}
     </span>
