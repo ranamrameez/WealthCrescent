@@ -210,6 +210,7 @@ export function calculateStockPortfolio(
         realizedDelta = matchedShares * tx.price - matchedFee - costRemoved;
         state.principalCost -= principalRemoved;
         state.buyFeeCost -= buyFeeRemoved;
+        state.invested = Math.max(0, state.invested - costRemoved);
         if (lifecycle) {
           closedTrades.push({
             ticker: tx.ticker,
@@ -279,12 +280,14 @@ export function calculateStockPortfolio(
       state.shares = Math.max(0, state.shares - matchedShares);
       state.realized += realizedDelta;
       if (lifecycle) {
-        lifecycle.soldShares += method === 'average' ? matchedShares : 0;
         if (method === 'average') {
-          lifecycle.remainingShares = Math.max(0, lifecycle.remainingShares - matchedShares);
-          const costRemoved = state.shares > EPSILON ? 0 : lifecycle.invested;
-          lifecycle.invested = Math.max(0, lifecycle.invested - (matchedShares * (lifecycle.invested / (lifecycle.remainingShares + matchedShares || 1))));
-          void costRemoved;
+          const lifecycleSharesBefore = lifecycle.remainingShares;
+          const lifecycleCostRemoved = lifecycleSharesBefore > EPSILON
+            ? lifecycle.invested * matchedShares / lifecycleSharesBefore
+            : 0;
+          lifecycle.soldShares += matchedShares;
+          lifecycle.remainingShares = Math.max(0, lifecycleSharesBefore - matchedShares);
+          lifecycle.invested = Math.max(0, lifecycle.invested - lifecycleCostRemoved);
           lifecycle.sellFees += matchedFee;
         }
         lifecycle.realized += realizedDelta;
