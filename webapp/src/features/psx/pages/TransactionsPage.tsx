@@ -26,6 +26,7 @@ import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
 import { closedPLBySellTxId, computeClosedTrades, type LotMatchOrder } from '../../../lib/calc/closedTrades';
 import { computeAveragePLBySellTxId } from '../../../lib/calc/realizedPL';
 import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
+import { tradePriceDeviationPct, validateSellQuantities } from '../../../lib/calc/tradeValidation';
 import { isNettedLeg } from '../../../lib/calc/psxFees';
 import { transferRunningBalance } from '../../../lib/calc/transferBalance';
 import { FeeModeControl, feeModeFor } from '../../../components/ui/FeeModeControl';
@@ -56,7 +57,7 @@ function emptyRow(): Transaction {
 export function TransactionRows({ initial, onSaved }: { initial?: Partial<Transaction>; onSaved?: () => void } = {}) {
   const addTransactions = usePSXWorkbookStore((s) => s.addTransactions);
   const workbook = usePSXWorkbookStore((s) => s.workbook);
-  const { calcFee } = usePSXDerived();
+  const { calcFee, positions } = usePSXDerived();
   const ensureSignedIn = useEnsureSignedIn();
   // Partial Trade's "Sell this lot" (one click into this same Add-trade
   // flow, per the confirmed design) pre-fills ticker/action/shares/price
@@ -87,6 +88,21 @@ export function TransactionRows({ initial, onSaved }: { initial?: Partial<Transa
       toast('Fill in at least one complete row.');
       return;
     }
+    const quantityError = validateSellQuantities(valid, Object.fromEntries(positions.map(position => [position.ticker, position.shares])));
+    if (quantityError) {
+      toast(`Cannot sell ${quantityError.requested} ${quantityError.ticker}: only ${fmt(quantityError.available, 0)} shares are available after the earlier rows.`);
+      return;
+    }
+    const threshold = workbook.settings.tradePriceDeviationPct ?? 10;
+    const deviations = valid.flatMap(row => {
+      const ticker = row.ticker.toUpperCase();
+      const marketPrice = workbook.marketPrices[ticker] ?? 0;
+      const deviation = tradePriceDeviationPct(row.price, marketPrice);
+      return deviation !== null && Math.abs(deviation) > threshold
+        ? [`${ticker}: entered ${fmtPSXPrice(row.price)} vs market ${fmtPSXPrice(marketPrice)} (${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%)`]
+        : [];
+    });
+    if (deviations.length && !(await confirmDialog(`${deviations.join('\\n')}\\n\\nThis exceeds your ${threshold}% warning threshold. Save these trades anyway?`, 'Trade prices differ from market prices?'))) return;
     if (!(await ensureSignedIn('Sign in to save your transactions.'))) return;
     try {
       addTransactions(valid.map((r) => ({ ...r, ticker: r.ticker.toUpperCase() })));
