@@ -2,6 +2,7 @@ import type { Adjustment, CashLedgerEvent, CashSummary, Dividend, FeeCalculator,
 import { buildCashLedger, totalTransferFees } from './cashLedger';
 import { computePositions } from './positions';
 import { getMarketPrice } from './priceHistory';
+import { calculatePositionMarketValue } from './positionValuation';
 
 export interface PositionValuation {
   ticker: string;
@@ -53,11 +54,9 @@ export function cashSummary(
   } else {
     positions.filter((p) => p.shares > 0).forEach((p) => {
       const mp = getMarketPrice(p.ticker, marketPrices, transactions);
-      const grossValue = p.shares * mp;
-      const estSellFee = mp > 0 ? calcFee(grossValue, false, { shares: p.shares }) : 0;
-      const netValue = grossValue - estSellFee;
-      if (mp > 0) unrealizedPL += netValue - p.invested;
-      portfolioValue += netValue;
+      const valuation = calculatePositionMarketValue(p, mp, calcFee);
+      if (Number.isFinite(valuation.profit)) unrealizedPL += valuation.profit;
+      portfolioValue += valuation.value - valuation.sellFee;
     });
   }
 

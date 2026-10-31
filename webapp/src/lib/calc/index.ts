@@ -7,3 +7,5 @@ export { cashSummary, type PositionValuation } from './cashSummary';
 export { calculateStockPortfolio, type StockBasisMethod, type StockCalculationResult, type PositionLifecycle, type SellReconciliation } from './stockCalculationEngine';
 
 export { calculatePortfolio, type PortfolioCalculationInput, type PortfolioCalculationResult, type PortfolioPositionRow } from './portfolioCalculationEngine';
+
+export { calculatePositionMarketValue, type PositionMarketValue } from './positionValuation';

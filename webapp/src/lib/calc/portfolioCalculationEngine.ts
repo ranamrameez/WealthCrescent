@@ -13,6 +13,7 @@ import { buildCashLedger } from './cashLedger';
 import { cashSummary, type PositionValuation } from './cashSummary';
 import { getMarketPrice } from './priceHistory';
 import { breakEvenPrice, perShareCommission } from './fees';
+import { calculatePositionMarketValue } from './positionValuation';
 import { calculateStockPortfolio, type StockBasisMethod, type StockCalculationResult } from './stockCalculationEngine';
 
 export type PortfolioPositionRow = PositionValuation;
@@ -61,22 +62,14 @@ export function calculatePortfolio(input: PortfolioCalculationInput): PortfolioC
     .filter(position => position.shares > 0)
     .map(position => {
       const marketPrice = getMarketPrice(position.ticker, marketPrices, transactions);
-      const hasMarketPrice = marketPrice > 0;
-      const value = hasMarketPrice ? position.shares * marketPrice : 0;
-      const sellFee = hasMarketPrice ? calcFee(value, false, { shares: position.shares }) : 0;
-      const profit = hasMarketPrice ? value - sellFee - position.invested : Number.NaN;
-      const roiPct = hasMarketPrice && position.invested > 0 ? (profit / position.invested) * 100 : Number.NaN;
+      const marketValue = calculatePositionMarketValue(position, marketPrice, calcFee);
       const targetPrice = (pct: number) => breakEvenPrice(position.invested * (1 + pct / 100), position.shares, feePct, tick, calcFee);
       return {
         ticker: position.ticker,
         shares: position.shares,
         invested: position.invested,
         avgCost: position.invested / position.shares,
-        marketPrice,
-        value,
-        sellFee,
-        profit,
-        roiPct,
+        ...marketValue,
         breakEvenPrice: breakEvenPrice(position.invested, position.shares, feePct, tick, calcFee),
         target1Pct: targetPrice(1),
         target2Pct: targetPrice(2),

@@ -2,6 +2,7 @@ import type { FeeCalculator, Position, PricePoint, Transaction } from '../../typ
 import { computePositions } from './positions';
 import { computeFIFOPositions } from './fifoPositions';
 import { sortTransactionsChronological } from './sortTransactions';
+import { calculatePositionMarketValue } from './positionValuation';
 
 export type StockBasisMethod = 'average' | 'fifo' | 'lowestCostFirst';
 export interface StockPLPoint {
@@ -27,8 +28,7 @@ export function stockPLHistory(transactions: Transaction[], priceHistory: Record
       const quote = quotes[p.ticker]?.filter(point => point.date <= date).at(-1);
       if (!quote || quote.price <= 0) return { value: null, quoteDates };
       quoteDates.push(quote.date);
-      const gross = p.shares * quote.price;
-      value += gross - calcFee(gross, false, { shares: p.shares }) - p.invested;
+      value += calculatePositionMarketValue(p, quote.price, calcFee).profit;
     }
     return { value, quoteDates };
   };
