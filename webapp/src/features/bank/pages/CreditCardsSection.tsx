@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CreditCardVisual } from '../../../components/CreditCardVisual';
-import { SummaryGroupCard, SummaryMetric } from '../../../components/SummaryGroupCard';
+import { SummaryGroupCard, SummaryMetric, SummarySection, SummarySections, SummaryValue } from '../../../components/SummaryGroupCard';
 import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu';
 import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls';
 import { StandardCard, SummaryChip } from '../../../components/StandardCard';
@@ -794,31 +794,32 @@ export function CreditCardDetailPage() {
         hue={card.color}
         summary={<SummaryChip label="Outstanding" value={fmtMoney(balance, card.currencyCode)} />}
       >
-        <CreditCardPositionSummary card={card} filters={filters} /><div className="grid-auto" style={gridAutoStyle(300, 12)}>
-          <SummaryGroupCard title="Locked billing cycle" hue="var(--loss)" tooltip="The completed billing cycle. New purchases cannot change these bill figures; eligible payments reduce what remains due.">
+        <CreditCardPositionSummary card={card} filters={filters} />
+        <SummarySections className="credit-card-cycle-summary">
+          <SummarySection title="Locked billing cycle">
             {statement ? <>
-              <SummaryMetric label="Remaining total due" value={fmtMoney(statement.remainingStatementBalance, card.currencyCode)} tone={statement.remainingStatementBalance > 0 ? 'pill-negative' : 'pill-positive'} large />
-              <SummaryMetric label="Original bill" value={fmtMoney(statement.statementBalance, card.currencyCode)} />
-              <SummaryMetric label="Paid after billing" value={fmtMoney(statement.paymentsAfterClose, card.currencyCode)} tone="pill-positive" />
-              <SummaryMetric label="Minimum still due" value={fmtMoney(statement.remainingMinimumDue, card.currencyCode)} tone={statement.remainingMinimumDue > 0 ? 'pill-negative' : 'pill-positive'} />
-              <SummaryMetric label="Minimum date" value={statement.minDueDate ?? 'Not set'} />
-              <SummaryMetric label="Full-payment date" value={statement.dueDate ?? 'Not set'} />
-              {markup > 0 && <SummaryMetric label="Markup if carried" value={fmtMoney(markup, card.currencyCode)} tone="pill-negative" />}
-              <SummaryMetric label="Cycle" value={<><DateValue value={statement.cycleStart} /> {'\u2192'} <DateValue value={statement.cycleEnd} /></>} />
+              <SummaryValue label="Remaining total due" value={fmtMoney(statement.remainingStatementBalance, card.currencyCode)} tone={statement.remainingStatementBalance > 0 ? 'negative' : 'positive'} primary />
+              <SummaryValue label="Original bill" value={fmtMoney(statement.statementBalance, card.currencyCode)} />
+              <SummaryValue label="Paid after billing" value={fmtMoney(statement.paymentsAfterClose, card.currencyCode)} tone="positive" />
+              <SummaryValue label="Minimum still due" value={fmtMoney(statement.remainingMinimumDue, card.currencyCode)} tone={statement.remainingMinimumDue > 0 ? 'negative' : 'positive'} />
+              <SummaryValue label="Minimum date" value={statement.minDueDate ?? 'Not set'} />
+              <SummaryValue label="Full-payment date" value={statement.dueDate ?? 'Not set'} />
+              {markup > 0 && <SummaryValue label="Markup if carried" value={fmtMoney(markup, card.currencyCode)} tone="negative" />}
+              <SummaryValue label="Cycle" value={<><DateValue value={statement.cycleStart} /> {'\u2192'} <DateValue value={statement.cycleEnd} /></>} />
             </> : <p className="text-muted m-0">Add the last billing date in Card details.</p>}
-          </SummaryGroupCard>
-          <SummaryGroupCard title="Open billing cycle" hue="var(--accent)" tooltip="Activity accumulating since the last billing cut-off. It belongs to the next bill and does not alter the locked cycle.">
+          </SummarySection>
+          <SummarySection title="Open billing cycle">
             {openCycle ? <>
-              <SummaryMetric label="Net new balance" value={fmtMoney(openCycleNet, card.currencyCode)} tone={openCycleNet > 0 ? 'pill-negative' : 'pill-positive'} large />
-              <SummaryMetric label="Spent" value={fmtMoney(openCycle.chargesThisCycle, card.currencyCode)} tone="pill-negative" />
-              <SummaryMetric label="Paid" value={fmtMoney(openCycle.paymentsThisCycle, card.currencyCode)} tone="pill-positive" />
-              <SummaryMetric label="Current outstanding" value={fmtMoney(balance, card.currencyCode)} tone={balance > 0 ? 'pill-negative' : 'pill-positive'} />
-              {card.creditLimit ? <SummaryMetric label="Available credit" value={fmtMoney(Math.max(0, card.creditLimit - Math.max(0, balance)), card.currencyCode)} tone="pill-positive" /> : null}
-              <SummaryMetric label="Next billing date" value={openCycle.cycleEnd} />
-              <SummaryMetric label="Cycle" value={<><DateValue value={openCycle.cycleStart} /> {'\u2192'} <DateValue value={openCycle.cycleEnd} /></>} />
+              <SummaryValue label="Net new balance" value={fmtMoney(openCycleNet, card.currencyCode)} tone={openCycleNet > 0 ? 'negative' : 'positive'} primary />
+              <SummaryValue label="Spent" value={fmtMoney(openCycle.chargesThisCycle, card.currencyCode)} tone="negative" />
+              <SummaryValue label="Paid" value={fmtMoney(openCycle.paymentsThisCycle, card.currencyCode)} tone="positive" />
+              <SummaryValue label="Current outstanding" value={fmtMoney(balance, card.currencyCode)} tone={balance > 0 ? 'negative' : 'positive'} />
+              {card.creditLimit ? <SummaryValue label="Available credit" value={fmtMoney(Math.max(0, card.creditLimit - Math.max(0, balance)), card.currencyCode)} tone="positive" /> : null}
+              <SummaryValue label="Next billing date" value={openCycle.cycleEnd} />
+              <SummaryValue label="Cycle" value={<><DateValue value={openCycle.cycleStart} /> {'\u2192'} <DateValue value={openCycle.cycleEnd} /></>} />
             </> : <p className="text-muted m-0">Add the last billing date in Card details.</p>}
-          </SummaryGroupCard>
-        </div>
+          </SummarySection>
+        </SummarySections>
       </StandardCard></div>
 
       {statement && (
