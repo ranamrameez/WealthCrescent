@@ -1467,7 +1467,7 @@ function FundsTransfersSection() {
 
   const cashLedgers = useMemo(
     () => fundsCashLedgerByCurrency(workbook.funds, workbook.transactions, workbook.transfers, workbook.settings.legacyTransferCurrency ?? workbook.settings.defaultCurrency),
-    [workbook.funds, workbook.transactions, workbook.transfers, workbook.settings.defaultCurrency],
+    [workbook.funds, workbook.transactions, workbook.transfers, workbook.settings.defaultCurrency, workbook.settings.legacyTransferCurrency],
   );
   const balances = useMemo(
     () => new Map(Object.values(cashLedgers).flat().filter((event) => event.kind === 'transfer' && event.sourceId).map((event) => [event.sourceId!, event.balance])),
