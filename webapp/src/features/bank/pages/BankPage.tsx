@@ -2316,6 +2316,7 @@ export function BankPage({
     {
       key: 'banks',
       label: 'Banks',
+      defaultOpen: true,
       actions: bankActions,
       content: <BanksList showArchived={showArchivedBanks} />,
     },
