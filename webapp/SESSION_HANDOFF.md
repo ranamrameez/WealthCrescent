@@ -10,6 +10,7 @@
 - Funds Summary separates invested cost basis, holdings value, cash on hand and total Funds value. Current and historical Net Worth add cash to holdings once, with a separate Funds cash inclusion toggle.
 - Regression tests added for fees, BUY/SELL movement, currency separation, matched/unmatched partial SELLs, legacy currency fallback and JSON backup round-tripping, linked Funds transfer add/edit/delete with cross-module consistency, and historical Net Worth.
 - **Validated application-code head:** `28028459c82aa12c976fd4410588e8d24d24d7a3`. GitHub Actions run [#280](https://github.com/ranamrameez/WealthCrescent/actions/runs/41204911191) passed: 138 test files / 1,093 tests, type-check and production build. Commits after that code head are documentation-only; current PR head is `80307afb6a17dd7b93cabd793aeb45350c8369e3`. Interactive browser smoke tests could not be run because the connected browser was unavailable. Real legacy backup/export review also remains outstanding. Keep PR #46 in draft until those manual checks are completed.
+- Root `README.md`, `USER_MANUAL.md`, `audit.md`, `SESSION_HANDOFF.md`, and `CLAUDE.md` were updated. `webapp/README.md` could not be read through the repository connector (empty content was returned), so it was deliberately left untouched rather than overwritten.
 
 ### Broker-profile branch status
 
