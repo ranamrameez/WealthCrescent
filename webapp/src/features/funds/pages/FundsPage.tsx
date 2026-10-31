@@ -1665,7 +1665,7 @@ function FundsCashLedgerSection() {
             const transfer = event.kind === 'transfer' && event.sourceId ? transferById.get(event.sourceId) : undefined;
             const link = transfer ? linkByRecordId.get(transfer.id) : undefined;
             const otherSide = link ? (link.from.module === 'funds' && link.fromRecordId === transfer?.id ? link.to : link.from) : undefined;
-            return <RecordRow market="funds" record={transfer ?? event} key={`${event.currencyCode}:${event.sourceId ?? event.date}:${event.kind}`}>
+            return <RecordRow market={event.kind === 'trade' ? 'funds' : undefined} onEdit={transfer ? () => setEditRow(transfer) : undefined} record={transfer ?? event} key={`${event.currencyCode}:${event.sourceId ?? event.date}:${event.kind}`}>
               <td><DateValue value={event.date} /></td>
               <td>{event.label}</td>
               <td>
