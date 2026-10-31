@@ -78,11 +78,12 @@ it('exports the filtered records separately from all table records', async () =>
   expect(contents[1]).toContain('SELL');
   click.mockRestore();
 });
-it('keeps batch sequence read-only and exposes the shared row-arrow reorder control', async () => {
+it('keeps the batch editor sequence read-only instead of offering an isolated reorder control', () => {
   show(); batch();
   expect(screen.getByLabelText('Row 1, Sequence')).toBeDisabled();
   expect(screen.queryByRole('button', { name: /Move row/ })).toBeNull();
-
+});
+it('uses the existing row arrows to reorder a trade with a same-day transfer', async () => {
   const workbook = createEmptyWorkbook();
   workbook.transactions = [{
     id: 'trade', date: '2026-10-01', ticker: 'QNBK', action: 'BUY', shares: 10, price: 12,
