@@ -17,6 +17,8 @@ export interface PSXSettings {
   tick: number;
   currency: string;
   depositFee: number;
+  /** Warn before saving a trade whose entered price differs from the stored market price by more than this percent. Defaults to 10%. */
+  tradePriceDeviationPct?: number;
   cgtFilerPct: number;
   cgtNonFilerPct: number;
   filerStatus: 'filer' | 'nonfiler';
