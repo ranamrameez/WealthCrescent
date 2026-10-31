@@ -700,8 +700,8 @@ function TransactionList() {
       </table>
     </div>
     {controls}
-  );
     </>
+  );
 
   return (
     <div>
