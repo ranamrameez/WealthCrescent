@@ -112,16 +112,18 @@ describe('computePositions (weighted-average cost)', () => {
     expect(pos.realized).toBeCloseTo(40 / 3, 5);
   });
 
-  it('does not manufacture profit from an oversell', () => {
+  it('matches the available shares in a legacy oversell and flags the excess', () => {
     const oversell: Transaction[] = [
       { date: '2026-08-24', ticker: 'OVER', action: 'BUY', shares: 10, price: 10, seq: 1 },
       { date: '2026-08-25', ticker: 'OVER', action: 'SELL', shares: 15, price: 10, seq: 2 },
     ];
     const [pos] = computePositions(oversell, () => 0);
-    expect(pos.shares).toBe(10);
-    expect(pos.invested).toBe(100);
-    expect(pos.realized).toBe(0);
-    expect(pos.totalSoldShares).toBe(0);
+    expect(pos.shares).toBe(0);
+    expect(pos.invested).toBe(0);
+    expect(pos.realized).toBe(100);
+    expect(pos.totalSoldShares).toBe(15);
+    expect(pos.unmatchedSellShares).toBe(5);
+    expect(pos.unmatchedSellTransactions).toBe(1);
   });
 
   it('excludes pending trades from positions', () => {
