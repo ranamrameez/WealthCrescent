@@ -117,7 +117,7 @@ A fresh main-based branch ports the scoped Mutual Funds corrections after PR #36
 - Invest/Withdraw edit mode accepts Amount and derives units using the transaction NAV (`unitsFromAmount`).
 - Regression tests cover amount-to-units conversion, effective-date ordering with a stale timestamp, and latest market-price synchronization.
 
-**Originally deferred, now implemented in draft [PR #46](https://github.com/ranamrameez/WealthCrescent/pull/46) on `feat/funds-cash-reconciliation` (issue #42):** one portfolio-level Funds cash account per currency. This matches the existing linked-transfer model, where the Funds side is portfolio-level and has no fund/broker reference; per-fund cash would make linked deposits ambiguous. A valid BUY reduces that currency's cash and adds NAV-valued units; a valid SELL returns proceeds to cash. Cash and holdings are combined once for Net Worth, including historical as-of calculations.
+**Implemented and merged through [PR #46](https://github.com/ranamrameez/WealthCrescent/pull/46) (issue #42; merge `b0986efa5f3610cf8031b02748f4233ffdfbd4ad`):** one portfolio-level Funds cash account per currency. This matches the existing linked-transfer model, where the Funds side is portfolio-level and has no fund/broker reference; per-fund cash would make linked deposits ambiguous. A valid BUY reduces that currency's cash and adds NAV-valued units; a valid SELL returns proceeds to cash. Cash and holdings are combined once for Net Worth, including historical as-of calculations.
 
 PR #36 is merged and passed run #94. Broker-profile isolation is being re-targeted through PR #39; the Funds date/amount patch is being re-targeted through PR #40. Only merge each after its own latest-head full test suite and production build pass.
 
@@ -150,7 +150,7 @@ Design decision: a separate **portfolio-level cash account per currency**, not p
 - Current and historical Net Worth include Funds cash plus holdings exactly once. Funds cash has its own inclusion toggle; individual fund toggles do not alter the portfolio cash ledger.
 - Regression tests cover deposit/BUY/SELL/withdrawal arithmetic, fees, multi-currency separation, matched versus unmatched partial SELLs, legacy currency fallback and JSON backup round-tripping, linked Funds transfer add/edit/delete with cross-module consistency, and historical Net Worth.
 
-**CI validation passed:** Actions run [#291](https://github.com/ranamrameez/WealthCrescent/actions/runs/41205303758) passed 138 test files / 1,097 tests, type-check and production build on application-code head `dd95f68e705d0a08c8e8005836ed2db78c71f37f`. Later commits are documentation-only. **Manual validation remains:** inspect a real pre-migration backup/export and perform interactive browser smoke tests. The browser connection was unavailable in this session; PR #46 remains draft.
+**Final CI validation before merge:** Actions run [#314](https://github.com/ranamrameez/WealthCrescent/actions/runs/41208426730) passed 138 test files / 1,100 tests, type-check and production build on application-code head `4841fb6b3b0059738d7d3972804a37662196d869`. Later commits through the merged PR head were documentation-only. **Post-merge manual validation remains:** inspect a real pre-migration backup/export and perform interactive browser smoke tests. These were not completed in this session and must not be represented as verified.
 
 ### Broker-profile preservation check (PR #46 follow-up)
 

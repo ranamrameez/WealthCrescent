@@ -1,22 +1,17 @@
 # WealthCrescent — Session Handoff (refreshed 2026-10-31)
 
-## 2026-10-31 — Funds cash reconciliation / issue #42 (latest work)
+## 2026-10-31 — Funds cash reconciliation / issue #42 (merged)
 
-- Open issue: [#42 — Design and implement Funds cash-on-hand reconciliation without double-counting holdings](https://github.com/ranamrameez/WealthCrescent/issues/42).
-- Implementation branch: `feat/funds-cash-reconciliation` (branched from current `main`); draft [PR #46](https://github.com/ranamrameez/WealthCrescent/pull/46) is open against `main` and linked to issue #42.
-- Architecture: a separate portfolio-level cash account per currency. Funds linked transfers are portfolio-level and have no fund/broker reference, so a per-fund account would not match the existing transfer model.
+- [PR #46](https://github.com/ranamrameez/WealthCrescent/pull/46) is closed and merged into `main`; merge commit: `b0986efa5f3610cf8031b02748f4233ffdfbd4ad`. [Issue #42](https://github.com/ranamrameez/WealthCrescent/issues/42) is closed.
+- **No recent main changes were discarded:** PR #46 targeted current `main` and the final PR head `66f2a28fe0b09384999062ce22f3a82ba5fa73bd` compared as 106 commits ahead / 0 behind main before merge. The stale `feat/broker-profile-isolation-rebased` branch was not used; merged PR #43 remains the source of truth for broker isolation.
+- Architecture: a separate portfolio-level Funds cash account per currency. Funds linked transfers are portfolio-level and have no fund/broker reference, so a per-fund account would not match the existing transfer model.
 - New/edited Funds transfers store `currencyCode`. A versioned metadata-only migration snapshots the existing Funds default currency for legacy transfers without rewriting the original transfer records. The Cash ledger warns about those rows and lets users assign a currency by editing.
 - BUY reduces cash in the fund's currency; valid SELL adds proceeds; transfer fees are applied once; unmatched SELL quantities and pending trades do not create cash movement; matched portions of partial SELLs return proceeds. Each currency has an independent ledger.
 - Funds Summary separates invested cost basis, holdings value, cash on hand and total Funds value. Current and historical Net Worth add cash to holdings once, with a separate Funds cash inclusion toggle.
-- Regression tests added for fees, BUY/SELL movement, currency separation, matched/unmatched partial SELLs, legacy currency fallback and JSON backup round-tripping, linked Funds transfer add/edit/delete with cross-module consistency, and historical Net Worth.
-- **Validated application-code head:** `4841fb6b3b0059738d7d3972804a37662196d869`. GitHub Actions run [#314](https://github.com/ranamrameez/WealthCrescent/actions/runs/41208426730) passed: 138 test files / 1,100 tests, type-check and production build. Commits after that code head are documentation-only; current PR head is `d4ad7842938539651163471e5603e1acdedb52ec`. Interactive browser smoke tests could not be run because the connected browser was unavailable. Real legacy backup/export review also remains outstanding. Keep PR #46 in draft until those manual checks are completed.
-- **Broker isolation verified and reinforced:** QSE/PSX transfers continue to carry `brokerId` and route into the selected broker profile's `data.transfers`; add/edit/delete supports non-active profiles. Linked transfer picker and save-time currency now resolve from the selected profile's own settings, not the parent exchange default. Profile deposit fees remain profile-specific. Funds' new portfolio-level cash ledger is separate and does not replace exchange broker cash accounts.
-- Added regression tests for distinct QSE/PSX broker currencies in the link picker and save-time resolver.
-- Root `README.md`, `USER_MANUAL.md`, `audit.md`, `SESSION_HANDOFF.md`, and `CLAUDE.md` were updated. `webapp/README.md` could not be read through the repository connector (empty content was returned), so it was deliberately left untouched rather than overwritten.
-
-### Broker-profile branch status
-
-The broker-profile feature was delivered by merged [PR #43](https://github.com/ranamrameez/WealthCrescent/pull/43). The specifically requested `feat/broker-profile-isolation-rebased` branch is diverged from main (69 commits ahead / 34 behind) and has no matching open PR; do not merge or continue work on that stale branch. Use merged `main` as the source of truth.
+- QSE/PSX broker transfers remain profile-owned through `brokerId` and the selected profile's `data.transfers`; the selected broker's own currency and deposit-fee settings drive linked transfer resolution. Funds cash does not replace or share exchange broker cash.
+- **Validation:** Actions [run #314](https://github.com/ranamrameez/WealthCrescent/actions/runs/41208426730) passed 138 test files / 1,100 tests, type-check and production build on application-code head `4841fb6b3b0059738d7d3972804a37662196d869`. The commits after that validated code head were documentation-only.
+- **Post-merge manual follow-ups:** real legacy backup/export review and interactive browser smoke tests were not completed in this session. The user explicitly requested the merge; do not claim these manual checks passed. Complete them against the merged `main` before treating those manual verification items as done.
+- The specifically requested `feat/broker-profile-isolation-rebased` branch was stale/diverged and was not merged. Use merged `main` as the source of truth.
 
 
 ## 2026-10-31 — PR #44 merged into main (latest)
