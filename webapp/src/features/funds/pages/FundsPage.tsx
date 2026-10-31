@@ -148,7 +148,7 @@ function BrokersList({ onSelect }: { onSelect: (broker: Broker) => void }) {
   );
   if (!brokers.length) return null;
   return (
-    <CollapsibleCard title="Brokers" defaultOpen={false}>
+    <div>
       {archivedCount > 0 && (
         <button className="btn secondary small mb-12" onClick={() => setShowArchived((v) => !v)}>
           {showArchived ? 'Hide' : 'Show'} closed ({archivedCount})
@@ -180,7 +180,7 @@ function BrokersList({ onSelect }: { onSelect: (broker: Broker) => void }) {
           );
         })}
       </div>
-    </CollapsibleCard>
+    </div>
   );
 }
 
