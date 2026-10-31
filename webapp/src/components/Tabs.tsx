@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { StandardPageSections } from './StandardPageSections';
+import type { StandardCardAction } from './StandardCard';
 
 export interface TabDef {
   table?: boolean;
@@ -7,6 +8,7 @@ export interface TabDef {
   label: string;
   content: ReactNode;
   headerExtra?: ReactNode;
+  actions?: StandardCardAction[];
   defaultOpen?: boolean;
 }
 
@@ -23,6 +25,7 @@ export function Tabs({ tabs, defaultKey }: { tabs: TabDef[]; defaultKey?: string
         label: tab.label,
         content: tab.content,
         headerEnd: tab.headerExtra,
+        actions: tab.actions,
         defaultOpen: tab.defaultOpen,
       }))}
     />
