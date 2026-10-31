@@ -60,9 +60,12 @@ export function validateTransactionEdit(
   existingTransactions: Transaction[],
   candidateTransactions: Transaction[],
 ): TransactionEditSellError | null {
-  const unmatchedByTicker = (transactions: Transaction[]) => {
+  const unmatchedByTransaction = (transactions: Transaction[]) => {
     const balances = new Map<string, number>();
-    const unmatched = new Map<string, number>();
+    const unmatched = new Map<string, { ticker: string; shares: number }>();
+    // Keep a stable fallback for older records without IDs. Candidate edits
+    // preserve array order, while modern records use their durable ID.
+    const originalIndexes = new Map(transactions.map((transaction, index) => [transaction, index]));
     for (const transaction of sortTransactionsChronological(transactions.filter(item => !item.isPending))) {
       const ticker = transaction.ticker.trim().toUpperCase();
       if (!ticker || !Number.isFinite(transaction.shares) || transaction.shares <= 0) continue;
@@ -73,19 +76,22 @@ export function validateTransactionEdit(
         const matched = Math.min(held, transaction.shares);
         balances.set(ticker, Math.max(0, held - matched));
         if (transaction.shares > matched) {
-          unmatched.set(ticker, (unmatched.get(ticker) ?? 0) + transaction.shares - matched);
+          const identity = transaction.id ? `id:${transaction.id}` : `index:${originalIndexes.get(transaction) ?? -1}`;
+          const previous = unmatched.get(identity);
+          unmatched.set(identity, { ticker, shares: (previous?.ticker === ticker ? previous.shares : 0) + transaction.shares - matched });
         }
       }
     }
     return unmatched;
   };
 
-  const before = unmatchedByTicker(existingTransactions);
-  const after = unmatchedByTicker(candidateTransactions);
-  for (const [ticker, totalUnmatched] of after) {
-    const previousUnmatched = before.get(ticker) ?? 0;
-    if (totalUnmatched > previousUnmatched + EPSILON) {
-      return { ticker, additionalUnmatchedShares: totalUnmatched - previousUnmatched };
+  const before = unmatchedByTransaction(existingTransactions);
+  const after = unmatchedByTransaction(candidateTransactions);
+  for (const [identity, discrepancy] of after) {
+    const previous = before.get(identity);
+    const previousShares = previous?.ticker === discrepancy.ticker ? previous.shares : 0;
+    if (discrepancy.shares > previousShares + EPSILON) {
+      return { ticker: discrepancy.ticker, additionalUnmatchedShares: discrepancy.shares - previousShares };
     }
   }
   return null;
