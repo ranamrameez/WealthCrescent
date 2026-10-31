@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import fixture from './fixtures/psx-workbook-backup.json';
 import type { PSXSettings } from '../../../types/psxWorkbook';
-import type { Transaction } from '../../../types/workbook';
+import type { FeeCalculator, Transaction } from '../../../types/workbook';
 import { computeFIFOPositions } from '../fifoPositions';
 import { computePositions } from '../positions';
 import { makePSXFeeCalculator } from '../psxFees';
@@ -110,6 +110,26 @@ describe('computeFIFOPositions', () => {
       expect(position.unmatchedSellShares).toBe(5);
       expect(position.unmatchedSellFees).toBe(0);
       expect(position.unmatchedSellTransactions).toBe(1);
+    }
+  });
+
+  it('allocates SELL fees proportionally between matched and unmatched legacy oversell shares', () => {
+    const calcFee: FeeCalculator = (_amount, isBuy, context) => isBuy ? 0 : (context?.shares ?? 0);
+    const txs: Transaction[] = [
+      { date: '2026-01-01', ticker: 'TEST', action: 'BUY', shares: 10, price: 10 },
+      { date: '2026-02-01', ticker: 'TEST', action: 'SELL', shares: 15, price: 20 },
+    ];
+    const positions = [
+      computeFIFOPositions(txs, calcFee).positions.find((x) => x.ticker === 'TEST')!,
+      computePositions(txs, calcFee).find((x) => x.ticker === 'TEST')!,
+    ];
+    for (const position of positions) {
+      // 10/15 of the 15-unit sell fee belongs to matched shares; the remaining
+      // 5 is retained as a separate reconciliation fee, not realized P/L.
+      expect(position.realized).toBeCloseTo(90, 5);
+      expect(position.sellFees).toBe(15);
+      expect(position.unmatchedSellShares).toBe(5);
+      expect(position.unmatchedSellFees).toBeCloseTo(5, 5);
     }
   });
 
