@@ -55,7 +55,7 @@ The latest code head in the branch is currently `79c017fd` with README-only comm
 
 ### Tool/session limitation
 
-This handoff update is documentation-only. No application code was changed in this session, and no build, tests, or browser verification were run here. The handoff was committed to the existing PR branch so the next session can resume from the current draft PR.
+The original handoff commit `8688aebb` was documentation-only; that handoff-writing context made no application-code changes and ran no build, tests, or browser verification. Subsequent continuation changes are recorded in the section above and have their own branch commits and CI runs.
 
 ---
 
