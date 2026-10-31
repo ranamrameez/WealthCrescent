@@ -11,7 +11,7 @@ import { useMemo, useState } from 'react';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CreditCardVisual } from '../../../components/CreditCardVisual';
-import { SummaryGroupCard, SummaryMetric, SummarySection, SummarySections, SummaryValue } from '../../../components/SummaryGroupCard';
+import { SummarySection, SummarySections, SummaryValue } from '../../../components/SummaryGroupCard';
 import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu';
 import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls';
 import { StandardCard, SummaryChip } from '../../../components/StandardCard';
@@ -631,16 +631,18 @@ function CreditCardAnalyticsSection({ card, transactions }: { card: CreditCard; 
 
   return <>
     <div className="account-summary-grid mb-md">
-      <SummaryGroupCard title="Credit utilization" hue={utilization !== null && utilization > 80 ? 'var(--loss)' : 'var(--accent)'} tooltip="Current outstanding balance as a percentage of the configured credit limit.">
-        <SummaryMetric label="Used of limit" value={utilization === null ? 'Limit not set' : `${utilization.toFixed(1)}%`} tone={utilization !== null && utilization > 80 ? 'pill-negative' : 'pill-positive'} large />
-        <SummaryMetric label="Outstanding" value={fmtMoney(periodEndActual, card.currencyCode)} tone="pill-negative" />
-        {card.creditLimit ? <SummaryMetric label="Available" value={fmtMoney(Math.max(0, card.creditLimit - Math.max(0, periodEndActual)), card.currencyCode)} tone="pill-positive" /> : null}
-      </SummaryGroupCard>
-      <SummaryGroupCard title="Payment coverage" hue={paymentCoverage !== null && paymentCoverage < 100 ? 'var(--gold)' : 'var(--profit)'} tooltip="Payments divided by charges across the visible card history. This is a trend signal, not a statement amount.">
-        <SummaryMetric label="Paid vs spent" value={paymentCoverage === null ? 'No charges yet' : `${paymentCoverage.toFixed(1)}%`} tone={paymentCoverage !== null && paymentCoverage < 100 ? 'pill-negative' : 'pill-positive'} large />
-        <SummaryMetric label="Total spent" value={fmtMoney(totalSpent, card.currencyCode)} tone="pill-negative" />
-        <SummaryMetric label="Total paid" value={fmtMoney(totalPaid, card.currencyCode)} tone="pill-positive" />
-      </SummaryGroupCard>
+      <SummarySections className="account-summary-sections">
+        <SummarySection title="Credit utilization">
+          <SummaryValue label="Used of limit" value={utilization === null ? 'Limit not set' : `${utilization.toFixed(1)}%`} primary tone={utilization !== null && utilization > 80 ? 'negative' : 'positive'} />
+          <SummaryValue label="Outstanding" value={fmtMoney(periodEndActual, card.currencyCode)} tone="negative" />
+          {card.creditLimit ? <SummaryValue label="Available" value={fmtMoney(Math.max(0, card.creditLimit - Math.max(0, periodEndActual)), card.currencyCode)} tone="positive" /> : null}
+        </SummarySection>
+        <SummarySection title="Payment coverage">
+          <SummaryValue label="Paid vs spent" value={paymentCoverage === null ? 'No charges yet' : `${paymentCoverage.toFixed(1)}%`} primary tone={paymentCoverage !== null && paymentCoverage < 100 ? 'negative' : 'positive'} />
+          <SummaryValue label="Total spent" value={fmtMoney(totalSpent, card.currencyCode)} tone="negative" />
+          <SummaryValue label="Total paid" value={fmtMoney(totalPaid, card.currencyCode)} tone="positive" />
+        </SummarySection>
+      </SummarySections>
     </div>
     <div className="analytics-grid">
     <AnalyticsChartEnhancer />
@@ -867,22 +869,26 @@ export function CreditCardDetailPage() {
       {batchEditOpen && <CreditCardTransactionsBatchEditor card={card} rows={visibleTransactions} onClose={() => setBatchEditOpen(false)} />}
 
       <div id="card-history"><StandardCard title="Monthly history" hue={card.color} defaultOpen={false}>
-        <div className="account-summary-grid">{monthlyHistory.map((month) => <SummaryGroupCard key={month.month} title={month.month} hue={month.spent - month.paid > 0 ? 'var(--loss)' : 'var(--profit)'} tooltip="Calendar-month spending, payments, net change, and closing card balance.">
-          <SummaryMetric label="Closing balance" value={fmtMoney(month.balanceEnd, card.currencyCode)} tone={month.balanceEnd > 0 ? 'pill-negative' : 'pill-positive'} large />
-          <SummaryMetric label="Spent" value={fmtMoney(month.spent, card.currencyCode)} tone="pill-negative" />
-          <SummaryMetric label="Paid" value={fmtMoney(month.paid, card.currencyCode)} tone="pill-positive" />
-          <SummaryMetric label="Net change" value={fmtMoney(month.spent - month.paid, card.currencyCode)} tone={month.spent - month.paid > 0 ? 'pill-negative' : 'pill-positive'} />
-        </SummaryGroupCard>)}</div>
+        <SummarySections className="account-summary-sections">
+          {monthlyHistory.map((month) => <SummarySection key={month.month} title={month.month}>
+            <SummaryValue label="Closing balance" value={fmtMoney(month.balanceEnd, card.currencyCode)} primary tone={month.balanceEnd > 0 ? 'negative' : 'positive'} />
+            <SummaryValue label="Spent" value={fmtMoney(month.spent, card.currencyCode)} tone="negative" />
+            <SummaryValue label="Paid" value={fmtMoney(month.paid, card.currencyCode)} tone="positive" />
+            <SummaryValue label="Net change" value={fmtMoney(month.spent - month.paid, card.currencyCode)} tone={month.spent - month.paid > 0 ? 'negative' : 'positive'} />
+          </SummarySection>)}
+        </SummarySections>
       </StandardCard></div>
 
       <div id="card-cycles"><StandardCard title="Billing cycle history" hue={card.color} defaultOpen={false}>
-        <div className="account-summary-grid">{cycleHistory.map((cycle) => <SummaryGroupCard key={`${cycle.cycleStart}-${cycle.cycleEnd}`} title={`${cycle.cycleStart} → ${cycle.cycleEnd}`} hue={cycle.remainingStatementBalance > 0 ? 'var(--loss)' : 'var(--profit)'} tooltip="Locked statement cycle. Payments through the final due date reduce this cycle; later payments belong to the next active cycle.">
-          <SummaryMetric label="Remaining total due" value={fmtMoney(cycle.remainingStatementBalance, card.currencyCode)} tone={cycle.remainingStatementBalance > 0 ? 'pill-negative' : 'pill-positive'} large />
-          <SummaryMetric label="Original bill" value={fmtMoney(cycle.statementBalance, card.currencyCode)} />
-          <SummaryMetric label="Paid after billing" value={fmtMoney(cycle.paymentsAfterClose, card.currencyCode)} tone="pill-positive" />
-          <SummaryMetric label="Minimum still due" value={fmtMoney(cycle.remainingMinimumDue, card.currencyCode)} tone={cycle.remainingMinimumDue > 0 ? 'pill-negative' : 'pill-positive'} />
-          <SummaryMetric label="Full-payment date" value={cycle.dueDate ?? 'Not set'} />
-        </SummaryGroupCard>)}</div>
+        <SummarySections className="account-summary-sections">
+          {cycleHistory.map((cycle) => <SummarySection key={`${cycle.cycleStart}-${cycle.cycleEnd}`} title={`${cycle.cycleStart} → ${cycle.cycleEnd}`}>
+            <SummaryValue label="Remaining total due" value={fmtMoney(cycle.remainingStatementBalance, card.currencyCode)} primary tone={cycle.remainingStatementBalance > 0 ? 'negative' : 'positive'} />
+            <SummaryValue label="Original bill" value={fmtMoney(cycle.statementBalance, card.currencyCode)} />
+            <SummaryValue label="Paid after billing" value={fmtMoney(cycle.paymentsAfterClose, card.currencyCode)} tone="positive" />
+            <SummaryValue label="Minimum still due" value={fmtMoney(cycle.remainingMinimumDue, card.currencyCode)} tone={cycle.remainingMinimumDue > 0 ? 'negative' : 'positive'} />
+            <SummaryValue label="Full-payment date" value={cycle.dueDate ?? 'Not set'} />
+          </SummarySection>)}
+        </SummarySections>
       </StandardCard></div>
 
       <div id="card-analytics"><StandardCard title="Analytics" hue={card.color} defaultOpen={false}>
