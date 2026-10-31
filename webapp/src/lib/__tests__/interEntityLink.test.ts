@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildLinkedRecords, defaultLinkedOtherSide, isSupportedLinkPair, linkSideRequiresRef } from '../interEntityLink';
+import { resolveCurrency } from '../../features/transfers/pages/TransferLinksPage';
 import type { InterEntityTransferInput } from '../../types/interEntityTransfer';
 
 const ids = { linkId: 'link-1', fromRecordId: 'from-1', toRecordId: 'to-1' };
@@ -359,6 +360,38 @@ describe('isSupportedLinkPair', () => {
     expect(isSupportedLinkPair('cash', 'cash')).toBe(false);
     expect(isSupportedLinkPair('qse', 'funds')).toBe(false);
     expect(isSupportedLinkPair('rentals', 'funds')).toBe(false);
+  });
+});
+
+describe('broker-profile linked transfer currency', () => {
+  const currencyContext = {
+    cashCurrency: 'USD',
+    bankAccounts: [],
+    qseCurrency: 'QAR',
+    psxCurrency: 'PKR',
+    qseBrokers: [
+      { id: 'qse-a', settings: { currency: 'QAR' } },
+      { id: 'qse-b', settings: { currency: 'USD' } },
+    ],
+    psxBrokers: [
+      { id: 'psx-a', settings: { currency: 'PKR' } },
+      { id: 'psx-b', settings: { currency: 'USD' } },
+    ],
+    fundsCurrency: 'USD',
+    properties: [],
+    loans: [],
+    emiLoans: [],
+    creditCards: [],
+  };
+
+  it('uses the selected QSE broker profile currency, not the parent exchange default', () => {
+    expect(resolveCurrency({ module: 'qse', ref: 'qse-b' }, currencyContext)).toBe('USD');
+    expect(resolveCurrency({ module: 'qse', ref: 'qse-missing' }, currencyContext)).toBe('QAR');
+  });
+
+  it('uses the selected PSX broker profile currency, not the parent exchange default', () => {
+    expect(resolveCurrency({ module: 'psx', ref: 'psx-b' }, currencyContext)).toBe('USD');
+    expect(resolveCurrency({ module: 'psx', ref: 'psx-missing' }, currencyContext)).toBe('PKR');
   });
 });
 
