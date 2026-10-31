@@ -108,7 +108,7 @@ auto-loading for future sessions, even though its content is almost entirely abo
 
 ## Project status
 
-Latest delivery update (2026-10-31): broker-profile isolation is merged through [PR #43](https://github.com/ranamrameez/WealthCrescent/pull/43). Funds cash-on-hand reconciliation for [issue #42](https://github.com/ranamrameez/WealthCrescent/issues/42) is in draft [PR #46](https://github.com/ranamrameez/WealthCrescent/pull/46) from `feat/funds-cash-reconciliation`; it is not merged until the latest branch passes full tests, type-check and production build. See `webapp/SESSION_HANDOFF.md` for the current implementation and verification checkpoint.
+Latest delivery update (2026-10-31): broker-profile isolation is merged through [PR #43](https://github.com/ranamrameez/WealthCrescent/pull/43). Funds cash-on-hand reconciliation for [issue #42](https://github.com/ranamrameez/WealthCrescent/issues/42) is in draft [PR #46](https://github.com/ranamrameez/WealthCrescent/pull/46) from `feat/funds-cash-reconciliation`; GitHub Actions run #280 passed the full test suite (138 files / 1,093 tests), type-check and production build on application-code head `28028459c82aa12c976fd4410588e8d24d24d7a3`. Real legacy backup/export review and interactive browser smoke tests remain outstanding, so PR #46 stays draft. See `webapp/SESSION_HANDOFF.md` for the current implementation and verification checkpoint.
 
 The web app (`webapp/`) is the primary platform under active development. Its own
 `webapp/README.md` is the real, continuously-updated Done/Pending backlog — this file
