@@ -98,7 +98,7 @@ it('uses the existing row arrows to reorder a trade with a same-day transfer', a
       <QseReorder kind="transfers" row={workbook.transfers[0]} />
     </>,
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Move row 2 up' }));
+  fireEvent.click(screen.getByRole('button', { name: /Move up — shares the same date/ }));
   await waitFor(() => expect(useWorkbookStore.getState().workbook.transactions[0].accountingOrder).toBe(1));
   expect(useWorkbookStore.getState().workbook.transfers[0].accountingOrder).toBe(2);
   expect(useWorkbookStore.getState().workbook.transactions[0].date).toBe('2026-10-01');
