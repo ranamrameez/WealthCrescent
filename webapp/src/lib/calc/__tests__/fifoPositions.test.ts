@@ -109,11 +109,11 @@ describe('computeFIFOPositions', () => {
       expect(position.totalSoldShares).toBe(15);
       expect(position.unmatchedSellShares).toBe(5);
       expect(position.unmatchedSellFees).toBe(0);
-      expect(position.unmatchedSellTransactions).toBe(0);
+      expect(position.unmatchedSellTransactions).toBe(1);
     }
   });
 
-  it('reconciles the user-reported PSO history as fully closed with 10 unmatched sell shares', () => {
+  it('reconciles the user-reported PSO history as fully closed with no unmatched sell shares', () => {
     const txs: Transaction[] = [
       { date: '2026-08-24', seq: 1, ticker: 'PSO', action: 'BUY', shares: 2, price: 378.8 },
       { date: '2026-08-24', seq: 2, ticker: 'PSO', action: 'SELL', shares: 2, price: 380 },
@@ -143,7 +143,7 @@ describe('computeFIFOPositions', () => {
       expect(position.shares).toBe(0);
       expect(position.invested).toBe(0);
       expect(position.unmatchedSellShares).toBe(0);
-      expect(position.unmatchedSellTransactions).toBe(1);
+      expect(position.unmatchedSellTransactions).toBe(0);
       expect(position.realized).toBeCloseTo(matchedProceeds - buyCost, 5);
     }
   });
