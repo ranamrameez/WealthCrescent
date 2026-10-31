@@ -170,23 +170,21 @@ keeps a fallback copy for reloads and outages and never writes those
 live observations into your private manual history. A newer manual observation continues to
 take priority. Under "Recent updates," click **Export price history CSV** to download
 every price update you've ever recorded for this ticker (not just the recent few shown on
-screen) as a spreadsheet file. On the stock page's **Transactions** tab, below the trade
-table, optionally set a from/to date range and click **Export CSV** to download that
-ticker's own trade history separately.
+screen) as a spreadsheet file. On the stock page, the transaction/history filter defaults to **All time** so older activity is included unless you narrow the date range. The **Price comparison** chart also includes the latest recorded day's low/high and the lifetime recorded low/high when price history exists. On the stock page's **Transactions** tab, optionally set a from/to date range and click **Export CSV** to download that ticker's own trade history separately.
 
 ---
 
 ## 6. Transactions
 
-> **Upcoming behavior — PR #36 is still under review:** QSE and PSX trades use a global accounting order that can differ from their recorded trade dates. Moving a trade changes its accounting position, not the trade date. Each ticker's `perTickerIndex` is synchronized from the global order. This will be available only after the PR passes CI and is merged.
+QSE and PSX trades use a persisted global accounting order that can differ from their recorded trade dates. Moving a trade changes its accounting position, not the trade date. Each ticker's `perTickerIndex` is synchronized from the global order. The combined cash ledger still orders mixed trades, transfers, and adjustments by effective date; it does not yet share one global event order across all three event types.
 
 
 The Transactions page has several sections. Each one is a collapsible card, and the chip row
 at the top is a *jump-to* nav, not a switch — clicking a chip scrolls to that section and opens
-it if it was collapsed, but it doesn't hide any of the others. Only the first section starts
-open; scroll down (or click a chip) to see the rest. This applies to every chip row like this
-one across the app (Analytics' category tabs, Settings' Account/Data tabs, etc.) — nothing is
-ever hidden behind a chip, just collapsed further down the same page.
+it if it was collapsed, but it doesn't hide any of the others. Primary sections such as Summary and frequently used entity sections start expanded by
+default; you can still collapse them, and the other sections' open/closed state is preserved.
+This applies across shared finance pages — nothing is hidden behind a chip, just collapsed
+further down the same page.
 
 ### Add transaction(s)
 Enter one or more BUY/SELL rows at once (date, ticker, action, shares, price) and save them
@@ -208,6 +206,14 @@ together. On PSX, each row also has a **Fee mode** dropdown with three options:
 
 Switching modes clears whatever the other mode was using, so there's no way for a leftover
 checkbox and a leftover fee number to silently conflict with each other.
+
+Before saving, the app checks SELL quantities against shares currently available, accounting
+for earlier rows in the same batch. It blocks an oversell rather than silently recording it.
+When a saved market price exists, a trade price more than the configured percentage away from
+that price prompts for confirmation (default **±10%**). You can change **Price warning (%)**
+in the exchange's Settings → Fees & amounts; set it to 0 to warn on any difference. The same
+checks apply when editing historical transactions, while existing legacy unmatched sells can
+still be corrected without increasing the discrepancy.
 
 ### Transaction list
 Split into two collapsible sections — **Open positions** (tickers you're still holding) and
@@ -623,7 +629,7 @@ date belongs to the active cycle and does not rewrite the earlier bill. The
 Current Statement section shows the locked bill, how much post-cutoff payment was applied, and
 the separate open-cycle spending total.
 Card details are available from the card's action menu in a popup, keeping the page focused on
-the financial summary. Transactions support search, type/date filters, and pagination. Use **Modify** for individual row actions or **Batch edit** to update, add, or remove multiple transactions in one validated save. The batch editor respects the current transaction filters; linked transactions and their source/card identity are protected. Plans show
+the financial summary. Transactions support search, type/date filters, and pagination. Each row also shows the running **Consumed limit**, the card's **Allowed limit**, and the remaining **Available limit** after that transaction. These values are calculated from the complete chronological ledger (including opening debt), so filtering or changing the display sort does not reset the running balance. Use **Modify** for individual row actions or **Batch edit** to update, add, or remove multiple transactions in one validated save. The batch editor respects the current transaction filters; linked transactions and their source/card identity are protected. Plans show
 Current balance and Expected final balance summary cards; Monthly history is grouped by month;
 Analytics includes utilization and payment coverage alongside balance, spending, category, and
 projection charts.
@@ -1021,7 +1027,9 @@ If a number here ever disagrees with your official statement, trust the statemen
 
 Cash: select a date range and other ledger filters, then choose **Batch edit** beside the currency ledger. Rentals: choose a property and date period, then **Batch edit** above its income/expense entries. Use positive amounts and the direction checkbox (Cash in or Rent income). Formula amounts such as `=5*986.5` work in either editor. Save applies the whole validated batch; discard leaves the ledger unchanged. Linked transfers use the existing single-record editing flow.
 
-EMI, Funds, brokers, and Subscriptions now use the same section navigation and fullscreen cards as Banking. Cash and Rentals have separate Summary sections. Use the section chips to jump to details, plans, activity, or analytics where available. Existing transaction and planning controls remain within their relevant sections.
+EMI, Funds, brokers, and Subscriptions now use the same section navigation and fullscreen cards as Banking. Funds and Brokers are peer sections rather than one being nested under the other. Cash and Rentals have separate Summary sections. Primary sections (including Summary and frequently used entity sections) start expanded by default; users can still collapse them. Use the section chips to jump to details, plans, activity, or analytics where available.
+
+Standardized table cards show only actions that have a real handler for that table. Long tables use shared pagination (25 rows by default, with 50 or 100 available). Filtering and sorting happen before pagination, while exports and financial calculations continue to use the complete filtered dataset rather than only the visible page. Summary views use the same light-border inline subsection layout as Portfolio Item, with groups tailored to each entity.
 
 
 ### Row details and navigation
