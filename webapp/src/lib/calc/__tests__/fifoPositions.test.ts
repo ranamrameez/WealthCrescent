@@ -113,7 +113,7 @@ describe('computeFIFOPositions', () => {
     }
   });
 
-  it('reconciles the user-reported PSO history as fully closed with no unmatched sell shares', () => {
+  it('reconciles the user-reported PSO history and preserves 10 unmatched excess SELL shares', () => {
     const txs: Transaction[] = [
       { date: '2026-08-24', seq: 1, ticker: 'PSO', action: 'BUY', shares: 2, price: 378.8 },
       { date: '2026-08-24', seq: 2, ticker: 'PSO', action: 'SELL', shares: 2, price: 380 },
@@ -127,23 +127,23 @@ describe('computeFIFOPositions', () => {
       { date: '2026-08-24', seq: 10, ticker: 'PSO', action: 'BUY', shares: 15, price: 374.25 },
       { date: '2026-08-25', seq: 11, ticker: 'PSO', action: 'BUY', shares: 26, price: 374 },
       { date: '2026-08-25', seq: 12, ticker: 'PSO', action: 'BUY', shares: 15, price: 372.5 },
-      { date: '2026-08-27', seq: 13, ticker: 'PSO', action: 'BUY', shares: 10, price: 371.5 },
       { date: '2026-09-04', seq: 14, ticker: 'PSO', action: 'SELL', shares: 50, price: 357.5 },
       { date: '2026-09-04', seq: 15, ticker: 'PSO', action: 'SELL', shares: 80, price: 357.8 },
     ];
     const buyCost = txs.filter(tx => tx.action === 'BUY').reduce((sum, tx) => sum + tx.shares * tx.price, 0);
-    const matchedProceeds = 2 * 380 + 50 * 357.5 + 80 * 357.8;
+    // The final SELL of 80 matches the 70 shares still held; 10 remain unmatched.
+    const matchedProceeds = 2 * 380 + 50 * 357.5 + 70 * 357.8;
     const positions = [
       computeFIFOPositions(txs, noFee).positions.find(item => item.ticker === 'PSO')!,
       computePositions(txs, noFee).find(item => item.ticker === 'PSO')!,
     ];
     for (const position of positions) {
-      expect(position.totalBoughtShares).toBe(132);
+      expect(position.totalBoughtShares).toBe(122);
       expect(position.totalSoldShares).toBe(132);
       expect(position.shares).toBe(0);
       expect(position.invested).toBe(0);
-      expect(position.unmatchedSellShares).toBe(0);
-      expect(position.unmatchedSellTransactions).toBe(0);
+      expect(position.unmatchedSellShares).toBe(10);
+      expect(position.unmatchedSellTransactions).toBe(1);
       expect(position.realized).toBeCloseTo(matchedProceeds - buyCost, 5);
     }
   });
