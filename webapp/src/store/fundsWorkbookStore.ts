@@ -13,16 +13,22 @@ const fundsStore = createWorkbookStore('WealthCrescent_funds_workbook_v1', creat
 // Transfer.currencyCode. Snapshot the existing Funds default once so later
 // changes to the new-fund default cannot silently move historical cash rows
 // between currencies. The transfer records themselves are left untouched.
-const initialWorkbook = fundsStore.getState().workbook;
-if ((initialWorkbook.settings.cashLedgerMigrationVersion ?? 0) < 1) {
+function ensureCashLedgerMigration() {
+  const workbook = fundsStore.getState().workbook;
+  if ((workbook.settings.cashLedgerMigrationVersion ?? 0) >= 1) return;
   fundsStore.getState().setWorkbook({
-    ...initialWorkbook,
+    ...workbook,
     settings: {
-      ...initialWorkbook.settings,
-      legacyTransferCurrency: initialWorkbook.settings.legacyTransferCurrency || initialWorkbook.settings.defaultCurrency || 'USD',
+      ...workbook.settings,
+      legacyTransferCurrency: workbook.settings.legacyTransferCurrency || workbook.settings.defaultCurrency || 'USD',
       cashLedgerMigrationVersion: 1,
     },
   });
 }
+
+// Run for local data immediately and subscribe for a cloud workbook that may
+// replace it after authentication. The version guard makes this idempotent.
+ensureCashLedgerMigration();
+fundsStore.subscribe(() => ensureCashLedgerMigration());
 
 export const useFundsWorkbookStore = fundsStore;
