@@ -9,7 +9,7 @@
 - BUY reduces cash in the fund's currency; valid SELL adds proceeds; transfer fees are applied once; unmatched SELL quantities and pending trades do not create cash movement; matched portions of partial SELLs return proceeds. Each currency has an independent ledger.
 - Funds Summary separates invested cost basis, holdings value, cash on hand and total Funds value. Current and historical Net Worth add cash to holdings once, with a separate Funds cash inclusion toggle.
 - Regression tests added for fees, BUY/SELL movement, currency separation, unmatched SELL handling, legacy currency fallback and historical Net Worth.
-- **Latest head:** `4f2322cdd0751874085e6f9cde9b7ab348380a2e`. Actions run #273 is queued for that exact head; earlier runs were triggered before the last code/test changes and do not validate this head. No local run is available in this session. Do not merge until the exact latest PR head passes full tests, type-check and production build. Real legacy backup/export review and interactive browser smoke tests remain outstanding.
+- **Validated application-code head:** `28028459c82aa12c976fd4410588e8d24d24d7a3`. GitHub Actions run [#280](https://github.com/ranamrameez/WealthCrescent/actions/runs/41204911191) passed: 138 test files / 1,093 tests, type-check and production build. Commits after that code head are documentation-only; current PR head is `80307afb6a17dd7b93cabd793aeb45350c8369e3`. Interactive browser smoke tests could not be run because the connected browser was unavailable. Real legacy backup/export review also remains outstanding. Keep PR #46 in draft until those manual checks are completed.
 
 ### Broker-profile branch status
 
