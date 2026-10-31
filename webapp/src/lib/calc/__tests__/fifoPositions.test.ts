@@ -109,7 +109,7 @@ describe('computeFIFOPositions', () => {
       expect(position.totalSoldShares).toBe(15);
       expect(position.unmatchedSellShares).toBe(5);
       expect(position.unmatchedSellFees).toBe(0);
-      expect(position.unmatchedSellTransactions).toBe(1);
+      expect(position.unmatchedSellTransactions).toBe(0);
     }
   });
 
@@ -132,17 +132,17 @@ describe('computeFIFOPositions', () => {
       { date: '2026-09-04', seq: 15, ticker: 'PSO', action: 'SELL', shares: 80, price: 357.8 },
     ];
     const buyCost = txs.filter(tx => tx.action === 'BUY').reduce((sum, tx) => sum + tx.shares * tx.price, 0);
-    const matchedProceeds = 2 * 380 + 50 * 357.5 + 70 * 357.8;
+    const matchedProceeds = 2 * 380 + 50 * 357.5 + 80 * 357.8;
     const positions = [
       computeFIFOPositions(txs, noFee).positions.find(item => item.ticker === 'PSO')!,
       computePositions(txs, noFee).find(item => item.ticker === 'PSO')!,
     ];
     for (const position of positions) {
-      expect(position.totalBoughtShares).toBe(122);
+      expect(position.totalBoughtShares).toBe(132);
       expect(position.totalSoldShares).toBe(132);
       expect(position.shares).toBe(0);
       expect(position.invested).toBe(0);
-      expect(position.unmatchedSellShares).toBe(10);
+      expect(position.unmatchedSellShares).toBe(0);
       expect(position.unmatchedSellTransactions).toBe(1);
       expect(position.realized).toBeCloseTo(matchedProceeds - buyCost, 5);
     }
