@@ -119,7 +119,7 @@ describe('PSX legacy broker migration', () => {
       settings: { ...legacy.settings, feePct: 0.123 },
       transactions: [{
         id: 'old-psx-trade', date: '2026-09-01', ticker: 'ABC', action: 'BUY',
-        shares: 10, price: 12.34, transactionIndex: 7, feeOverride: 1.25,
+        shares: 10, price: 12.34, transactionIndex: 1, globalTransactionIndex: 1, perTickerIndex: 1, accountingOrder: 1, feeOverride: 1.25,
       }],
       transfers: [{ id: 'old-psx-cash', date: '2026-09-02', type: 'DEPOSIT', gross: 1000, fee: 5 }],
       marketPrices: { ABC: 12.5 },
