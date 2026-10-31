@@ -294,6 +294,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
                 <SummaryValue label="Realized P/L" value={fmtMoney(position.realized, currency)} tone={position.realized >= 0 ? 'positive' : 'negative'} primary />
                 <SummaryValue label="Fees paid" value={fmtMoney(position.buyFees + position.sellFees, currency)} />
                 {(position.unmatchedSellShares ?? 0) > 0 && <SummaryValue label="Unmatched sells" value={fmt(position.unmatchedSellShares ?? 0, 0)} detail={`${position.unmatchedSellTransactions ?? 1} transaction(s) require reconciliation`} tone="negative" />}
+                {(position.unmatchedSellFees ?? 0) > 0 && <SummaryValue label="Fees on unmatched sells" value={fmtMoney(position.unmatchedSellFees ?? 0, currency)} detail="Allocated to excess SELL shares; excluded from realized P/L" tone="negative" />}
               </SummarySection>
             </SummarySections>
           </DetailCard>
