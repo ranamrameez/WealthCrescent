@@ -272,7 +272,7 @@ function TickerTransactions({ ticker, filters }: { ticker: string; filters: Tran
  * its own add/edit/delete concerns unchanged. */
 function useTickerExport(ticker: string) {
   const { workbook } = useQSEDerived();
-  const { filters } = useUrlTransactionFilters();
+  const { filters } = useUrlTransactionFilters('all');
   const { fromDate, toDate } = filters;
   const rows = workbook.transactions.filter((tx) => tx.ticker === ticker);
 
