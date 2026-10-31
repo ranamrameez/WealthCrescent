@@ -338,7 +338,7 @@ function TickerTransactions({ ticker, filters }: { ticker: string; filters: Tran
  * are variable (same-day netting, overrides) unlike QSE's flat rate. */
 function useTickerExport(ticker: string) {
   const { workbook, calcFee } = usePSXDerived();
-  const { filters } = useUrlTransactionFilters();
+  const { filters } = useUrlTransactionFilters('all');
   const { fromDate, toDate } = filters;
   const rows = workbook.transactions.filter((tx) => tx.ticker === ticker);
 
