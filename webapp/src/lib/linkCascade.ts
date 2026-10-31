@@ -152,9 +152,11 @@ export function updateLinkedTransfer(
 ): { link: InterEntityTransfer } | { error: string } {
   const ids = { linkId: link.id, fromRecordId: link.fromRecordId, toRecordId: link.toRecordId };
   const resolved = resolveTransferInput(input);
+  const fromSide = resolveTransferSide(input.from, 'out', link.fromRecordId);
+  const toSide = resolveTransferSide(input.to, 'in', link.toRecordId);
   const { from, to, link: updated } = buildLinkedRecords({ ...resolved,
-    from: { ...resolveTransferSide(input.from, 'out', link.fromRecordId), ...input.from, ...(input.from.module === 'funds' && !input.from.currencyCode ? { currencyCode: resolved.from.currencyCode } : {}) },
-    to: { ...resolveTransferSide(input.to, 'in', link.toRecordId), ...input.to, ...(input.to.module === 'funds' && !input.to.currencyCode ? { currencyCode: resolved.to.currencyCode } : {}) },
+    from: { ...fromSide, ...input.from, ...(input.from.module === 'funds' && !input.from.currencyCode ? { currencyCode: fromSide.currencyCode } : {}) },
+    to: { ...toSide, ...input.to, ...(input.to.module === 'funds' && !input.to.currencyCode ? { currencyCode: toSide.currencyCode } : {}) },
   }, ids);
   try {
     dispatchUpdate(from);
