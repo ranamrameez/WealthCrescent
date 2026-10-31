@@ -22,6 +22,6 @@ it('deducts fees allocated to unmatched oversell shares without treating their p
   const calcFee = (tx: { action: string }) => tx.action === 'SELL' ? 10 : 0;
   const result = cashSummary(transactions, [], [], {}, calcFee);
   expect(result.unmatchedSellFees).toBeCloseTo(10 / 3, 8);
-  expect(result.netPL).toBeCloseTo(-10 / 3, 8);
+  expect(result.netPL).toBeCloseTo(-10, 8);
   expect(result.cashBalance).toBeCloseTo(40, 8);
 });

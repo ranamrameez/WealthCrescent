@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createWorkbookStore, type BaseWorkbook } from '../createWorkbookStore';
 import { createEmptyPSXWorkbook } from '../defaultPsxWorkbook';
+import { computePositions } from '../../lib/calc/positions';
+import { buildCashLedger } from '../../lib/calc/cashLedger';
+import { sortTransactionsChronological } from '../../lib/calc/sortTransactions';
 
 interface TestSettings {
   currency: string;
@@ -364,5 +367,59 @@ describe('createWorkbookStore normalize', () => {
     state = useStore.getState();
     expect(state.workbook.priceHistory.QGTS).toHaveLength(0);
     expect(state.workbook.marketPrices.QGTS).toBeUndefined();
+  });
+});
+
+
+describe('shared same-day accounting event order', () => {
+  it('reorders mixed event types with arrows while preserving dates and recalculating trade chronology', () => {
+    const useStore = createWorkbookStore('test_shared_accounting_event_order', () => ({
+      ...createEmptyTestWorkbook(),
+      transactions: [
+        { id: 'buy', date: '2026-10-01', ticker: 'AAA', action: 'BUY' as const, shares: 6, price: 10, accountingOrder: 2, globalTransactionIndex: 1 },
+        { id: 'sell', date: '2026-10-01', ticker: 'AAA', action: 'SELL' as const, shares: 6, price: 12, accountingOrder: 3, globalTransactionIndex: 2 },
+      ],
+      transfers: [
+        { id: 'deposit', date: '2026-10-01', type: 'DEPOSIT' as const, gross: 100, fee: 0, accountingOrder: 1 },
+        { id: 'next-day', date: '2026-10-02', type: 'DEPOSIT' as const, gross: 5, fee: 0, accountingOrder: 1 },
+      ],
+      adjustments: [{ id: 'reward', date: '2026-10-01', amount: 2, note: 'Reward', accountingOrder: 4 }],
+      dividends: [{ id: 'dividend', date: '2026-10-01', ticker: 'AAA', perShare: 0.5, shares: 6, amount: 3, accountingOrder: 5 }],
+    }));
+
+    const reorder = useStore.getState().reorderAccountingEvents;
+    reorder([{ kind: 'transfer', id: 'deposit', order: 1 }, { kind: 'trade', id: 'buy', order: 2 }]);
+    reorder([{ kind: 'transfer', id: 'deposit', order: 2 }, { kind: 'trade', id: 'sell', order: 3 }]);
+    reorder([{ kind: 'trade', id: 'buy', order: 1 }, { kind: 'trade', id: 'sell', order: 2 }]);
+
+    const workbook = useStore.getState().workbook;
+    expect(workbook.transactions.map(tx => tx.id)).toEqual(['buy', 'sell']);
+    expect(workbook.transactions.every(tx => tx.date === '2026-10-01')).toBe(true);
+    expect(workbook.transactions.find(tx => tx.id === 'sell')?.accountingOrder).toBe(1);
+    expect(workbook.transactions.find(tx => tx.id === 'buy')?.accountingOrder).toBe(2);
+    expect(workbook.transfers.find(row => row.id === 'deposit')?.accountingOrder).toBe(3);
+    expect(workbook.adjustments[0].accountingOrder).toBe(4);
+    expect(workbook.dividends[0].accountingOrder).toBe(5);
+
+    const orderedTrades = sortTransactionsChronological(workbook.transactions);
+    expect(orderedTrades.map(tx => tx.id)).toEqual(['sell', 'buy']);
+    const positions = computePositions(workbook.transactions, () => 0);
+    expect(positions[0].shares).toBe(6);
+    expect(positions[0].unmatchedSellShares).toBe(6);
+
+    const ledger = buildCashLedger(workbook.transactions, workbook.transfers, workbook.adjustments, () => 0, workbook.dividends);
+    expect(ledger.slice(0, 5).map(event => event.sourceId)).toEqual(['sell', 'buy', 'deposit', 'reward', 'dividend']);
+    expect(ledger.slice(0, 5).every(event => event.date === '2026-10-01')).toBe(true);
+
+    // The store itself rejects cross-date swaps; arrow controls are also scoped
+    // to one date, so neither path can mutate an event's date.
+    useStore.getState().reorderAccountingEvents([
+      { kind: 'trade', id: 'sell', order: 1 },
+      { kind: 'transfer', id: 'next-day', order: 1 },
+    ]);
+    const afterRejectedMove = useStore.getState().workbook;
+    expect(afterRejectedMove.transactions.find(tx => tx.id === 'sell')?.date).toBe('2026-10-01');
+    expect(afterRejectedMove.transfers.find(row => row.id === 'next-day')?.date).toBe('2026-10-02');
+    expect(afterRejectedMove.transactions.find(tx => tx.id === 'sell')?.accountingOrder).toBe(1);
   });
 });
