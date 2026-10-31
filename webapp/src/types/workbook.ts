@@ -157,6 +157,10 @@ export interface Transfer {
   time?: string;
   timezone?: string;
   type: 'DEPOSIT' | 'WITHDRAWAL';
+  /** Funds-only cash account currency. Optional for legacy QSE/PSX and
+   * historical Funds transfers; missing Funds values use the workbook's
+   * default currency until the user edits/assigns them. */
+  currencyCode?: string;
   gross: number;
   fee: number;
   /** Optional description entered through the centralized Transfers popup. */

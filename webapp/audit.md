@@ -117,7 +117,7 @@ A fresh main-based branch ports the scoped Mutual Funds corrections after PR #36
 - Invest/Withdraw edit mode accepts Amount and derives units using the transaction NAV (`unitsFromAmount`).
 - Regression tests cover amount-to-units conversion, effective-date ordering with a stale timestamp, and latest market-price synchronization.
 
-**Not fixed in this slice:** transfer-to-Funds reconciliation. The current Funds workbook has no explicit uninvested cash-on-hand account per fund. Adding transfer amounts to invested portfolio value would double-count after cash is converted into units by a BUY. A separate design must model cash held at the fund/broker, then move value between cash and units on BUY/SELL, and cover linked transfer edits/deletes and cash/holdings totals. Keep this out of the date/amount patch until that model and tests exist.
+**Originally deferred, now implemented in draft [PR #46](https://github.com/ranamrameez/WealthCrescent/pull/46) on `feat/funds-cash-reconciliation` (issue #42):** one portfolio-level Funds cash account per currency. This matches the existing linked-transfer model, where the Funds side is portfolio-level and has no fund/broker reference; per-fund cash would make linked deposits ambiguous. A valid BUY reduces that currency's cash and adds NAV-valued units; a valid SELL returns proceeds to cash. Cash and holdings are combined once for Net Worth, including historical as-of calculations.
 
 PR #36 is merged and passed run #94. Broker-profile isolation is being re-targeted through PR #39; the Funds date/amount patch is being re-targeted through PR #40. Only merge each after its own latest-head full test suite and production build pass.
 
@@ -137,3 +137,24 @@ Clean main-based broker-profile PR #43 passed GitHub Actions run #107 on exact h
 ## PR #43 latest-head CI (2026-10-30)
 
 Latest head `dcf3181a0a8955417c4049089f4735685c25a8ec` passed Actions run #112 (full tests + production build). Manual migration validation against a real backup/export and browser verification are still outstanding; no merge until completed.
+
+
+## 2026-10-31 — Funds cash reconciliation (issue #42; implementation branch)
+
+Design decision: a separate **portfolio-level cash account per currency**, not per fund or broker. Existing Funds linked transfers are portfolio-level and do not identify a fund or broker; adding a per-fund account would make the current link picker ambiguous. Fund BUY/SELL transactions are attributed to their fund's currency.
+
+- Added optional `Transfer.currencyCode` for Funds transfers. New plain and linked transfers persist the selected currency; edit flows preserve it.
+- Added a versioned, metadata-only migration (`cashLedgerMigrationVersion`) that snapshots the legacy Funds default currency once. Existing transfer records are not rewritten. Legacy rows remain readable under that frozen currency and the Cash ledger warns users to review/assign an explicit currency where needed.
+- Added `fundsCashLedgerByCurrency` / `fundsCashBalanceByCurrency`. These reuse the shared cash-ledger matching rules: pending trades and unmatched SELLs do not move cash; transfer fees are applied once; currencies never net against each other.
+- Funds Summary now separates invested cost basis, holdings value, cash on hand and total Funds value. The Transfers table's balance is currency-specific and includes intervening BUY/SELL activity; the new Cash ledger shows all events.
+- Current and historical Net Worth include Funds cash plus holdings exactly once. Funds cash has its own inclusion toggle; individual fund toggles do not alter the portfolio cash ledger.
+- Regression tests cover deposit/BUY/SELL/withdrawal arithmetic, fees, multi-currency separation, matched versus unmatched partial SELLs, legacy currency fallback and JSON backup round-tripping, linked Funds transfer add/edit/delete with cross-module consistency, and historical Net Worth.
+
+**CI validation passed:** Actions run [#291](https://github.com/ranamrameez/WealthCrescent/actions/runs/41205303758) passed 138 test files / 1,097 tests, type-check and production build on application-code head `dd95f68e705d0a08c8e8005836ed2db78c71f37f`. Later commits are documentation-only. **Manual validation remains:** inspect a real pre-migration backup/export and perform interactive browser smoke tests. The browser connection was unavailable in this session; PR #46 remains draft.
+
+### Broker-profile preservation check (PR #46 follow-up)
+
+- QSE/PSX transfers remain profile-owned: `Transfer.brokerId` identifies the broker, and the exchange store routes add/edit/delete to that profile's `data.transfers`. Non-active profile transfer routing is covered by the broker store regression tests.
+- Linked transfer picker and save-time currency resolution now use the selected profile's `settings.currency`, not the parent exchange's active/global setting. Profile deposit fees continue to come from that same profile.
+- Funds cash remains a separate portfolio-level per-currency ledger; this is not a shared exchange cash account and does not change QSE/PSX broker ownership.
+- Added tests for distinct QSE/PSX profile currencies in both picker and save-time resolution. CI run [#314](https://github.com/ranamrameez/WealthCrescent/actions/runs/41208426730) passed 138 test files / 1,100 tests, type-check and production build on code head `4841fb6b3b0059738d7d3972804a37662196d869`.

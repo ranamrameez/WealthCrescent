@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildLinkedRecords, defaultLinkedOtherSide, isSupportedLinkPair, linkSideRequiresRef } from '../interEntityLink';
+import { resolveCurrency } from '../../features/transfers/pages/TransferLinksPage';
 import type { InterEntityTransferInput } from '../../types/interEntityTransfer';
 
 const ids = { linkId: 'link-1', fromRecordId: 'from-1', toRecordId: 'to-1' };
@@ -280,32 +281,32 @@ describe('buildLinkedRecords', () => {
     expect(() => buildLinkedRecords(input, ids)).toThrow();
   });
 
-  it('maps Bank -> Funds to a WITHDRAWAL/DEPOSIT pair with zero fee, same as QSE/PSX', () => {
+  it('maps Bank -> Funds to a WITHDRAWAL/DEPOSIT pair and persists the Funds currency', () => {
     const input: InterEntityTransferInput = {
       date: '2026-06-01',
       fromAmount: 2000,
       toAmount: 2000,
       from: { module: 'bank', ref: 'acct-1' },
-      to: { module: 'funds' },
+      to: { module: 'funds', currencyCode: 'QAR' },
     };
     const { from, to } = buildLinkedRecords(input, ids);
     expect(from.module).toBe('bank');
     if (from.module === 'bank') expect(from.record.amount).toBe(-2000);
     expect(to.module).toBe('funds');
-    if (to.module === 'funds') expect(to.record).toMatchObject({ type: 'DEPOSIT', gross: 2000, fee: 0 });
+    if (to.module === 'funds') expect(to.record).toMatchObject({ type: 'DEPOSIT', gross: 2000, fee: 0, currencyCode: 'QAR' });
   });
 
-  it('maps Funds -> Cash to a WITHDRAWAL on the Funds side', () => {
+  it('maps Funds -> Cash to a WITHDRAWAL and preserves the Funds currency', () => {
     const input: InterEntityTransferInput = {
       date: '2026-06-02',
       fromAmount: 500,
       toAmount: 500,
-      from: { module: 'funds' },
+      from: { module: 'funds', currencyCode: 'PKR' },
       to: { module: 'cash', currencyCode: 'USD' },
     };
     const { from, to } = buildLinkedRecords(input, ids);
     expect(from.module).toBe('funds');
-    if (from.module === 'funds') expect(from.record).toMatchObject({ type: 'WITHDRAWAL', gross: 500 });
+    if (from.module === 'funds') expect(from.record).toMatchObject({ type: 'WITHDRAWAL', gross: 500, currencyCode: 'PKR' });
     expect(to.module).toBe('cash');
     if (to.module === 'cash') expect(to.record).toMatchObject({ isDeposit: true, amount: 500 });
   });
@@ -359,6 +360,38 @@ describe('isSupportedLinkPair', () => {
     expect(isSupportedLinkPair('cash', 'cash')).toBe(false);
     expect(isSupportedLinkPair('qse', 'funds')).toBe(false);
     expect(isSupportedLinkPair('rentals', 'funds')).toBe(false);
+  });
+});
+
+describe('broker-profile linked transfer currency', () => {
+  const currencyContext = {
+    cashCurrency: 'USD',
+    bankAccounts: [],
+    qseCurrency: 'QAR',
+    psxCurrency: 'PKR',
+    qseBrokers: [
+      { id: 'qse-a', settings: { currency: 'QAR' } },
+      { id: 'qse-b', settings: { currency: 'USD' } },
+    ],
+    psxBrokers: [
+      { id: 'psx-a', settings: { currency: 'PKR' } },
+      { id: 'psx-b', settings: { currency: 'USD' } },
+    ],
+    fundsCurrency: 'USD',
+    properties: [],
+    loans: [],
+    emiLoans: [],
+    creditCards: [],
+  };
+
+  it('uses the selected QSE broker profile currency, not the parent exchange default', () => {
+    expect(resolveCurrency({ module: 'qse', ref: 'qse-b' }, currencyContext)).toBe('USD');
+    expect(resolveCurrency({ module: 'qse', ref: 'qse-missing' }, currencyContext)).toBe('QAR');
+  });
+
+  it('uses the selected PSX broker profile currency, not the parent exchange default', () => {
+    expect(resolveCurrency({ module: 'psx', ref: 'psx-b' }, currencyContext)).toBe('USD');
+    expect(resolveCurrency({ module: 'psx', ref: 'psx-missing' }, currencyContext)).toBe('PKR');
   });
 });
 

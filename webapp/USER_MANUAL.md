@@ -770,10 +770,21 @@ sell shares at a price), so it shares the same underlying calculation engine.
   never manually updated a fund's NAV, its NAV-over-time chart stays empty until you do — but
   the Contribution vs. value chart still works, using the price from your buy/sell
   transactions themselves.
-- **Transfers tab**: cash moved into or out of your Funds account, separate from buying/
+- **Cash ledger tab**: one uninvested cash account per currency. It combines deposits,
+  withdrawals, valid BUY/SELL cash movements, and the running balance. A deposit increases
+  cash; BUY moves cash into NAV-valued units; SELL returns proceeds to cash; a withdrawal
+  reduces cash. Transfer fees are applied once. The currency balances are never blended.
+- **Transfers tab**: cash moved into or out of your Funds cash account, separate from buying/
   selling fund units — e.g. topping up before a purchase, or withdrawing after a redemption.
   Log a deposit/withdrawal here, edit or delete one later, or check the linking checkbox to
-  create a matching entry in Bank/Cash at the same time (see §23 below).
+  create a matching entry in Bank/Cash at the same time (see §23 below). Each new transfer
+  stores its currency. Older transfers that predate currency storage are kept under the
+  one-time snapshot of the Funds default currency; the Cash ledger warns you about these.
+  Edit a legacy transfer to assign its actual currency if it was different.
+- **Summary** distinguishes invested cost basis, current holdings value, cash on hand, and
+  total Funds value. Net Worth adds Funds cash to holdings once, and its Filters popup has
+  an independent **Funds cash** inclusion switch. Individual fund inclusion switches affect
+  holdings; they do not rewrite the portfolio-level cash ledger.
 - **Import tab**: two different ways to load fund data, picked via the chip toggle at the top.
   - **Daily history (XLSX)** — recommended if you track each fund's balance day by day (a
     workbook with one sheet per fund, a row per update: Date / PrvBlc / NewBlc / Profit-Loss).
@@ -1066,9 +1077,9 @@ Loading masks use small rounded stat placeholders and large 600px section cards 
 
 - Invest and Withdraw remain separate transaction actions. Editing an Invest/Withdraw row lets you edit Amount; units are recalculated from the row's NAV. Editing the units or NAV retains the same transaction model.
 - Balance History shows the effective valuation date. When a historical date is changed, the history and latest NAV are ordered by that date; the original timestamp is retained only as audit/intraday metadata and as a same-day tie-breaker.
-- Profit/Loss is derived performance, not a separate transaction row. Transfer-to-Funds cash-on-hand reconciliation is not yet included; do not treat a transfer as invested holdings until a future cash ledger explicitly models uninvested cash.
+- Profit/Loss is derived performance, not a separate transaction row. The Funds cash ledger now reconciles transfer cash with BUY/SELL movements per currency; see §20 above.
 
 
 ## Stock broker profiles
 
-QSE and PSX portfolios can be separated by broker profile. Select the broker profile before adding trades, transfers, adjustments, dividends or trade plans; fee and cost-basis settings are stored per profile. Market prices, price history and watchlists remain shared for the exchange. Archived profiles remain available as read-only history; deactivated profiles are hidden from normal activity and cannot be selected for new activity. Legacy PSX records are assigned to the default JS Zindigi/JS Zindagi profile during the versioned migration. Review your backup/export after migration before relying on the new profile separation.
+QSE and PSX portfolios are separated by broker profile. Each broker owns its own trades, cash transfers, adjustments, dividends, trade plans, settings and derived P/L. Select the broker profile before adding activity. A cash transfer linked to QSE or PSX must target the specific broker profile; its own currency and deposit-fee settings are used, not the parent exchange defaults. Market prices, price history and watchlists remain shared for the exchange. Archived profiles remain available as read-only history; deactivated profiles are hidden from normal activity and cannot be selected for new activity. Legacy PSX records are assigned to the default JS Zindigi/JS Zindagi profile during the versioned migration. Review your backup/export after migration before relying on the new profile separation.

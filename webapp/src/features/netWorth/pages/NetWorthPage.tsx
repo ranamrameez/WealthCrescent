@@ -292,7 +292,7 @@ export function NetWorthPage({
     creditCards: selectedModules.includes('creditCards') ? creditCardsWb.cards : [], creditCardTransactions: creditCardsWb.transactions,
     personalLoans: selectedModules.includes('personalLoans') ? personalLoans.loans : [], personalLoanRepayments: personalLoans.repayments,
     emiLoans: selectedModules.includes('emi') ? emiLoans.filter(loan => loan.includeInNetWorth !== false) : [],
-    fundsFunds: selectedModules.includes('funds') ? funds.funds : [], fundsTransactions: funds.transactions, fundsPriceHistory: funds.priceHistory,
+    fundsFunds: selectedModules.includes('funds') ? funds.funds : [], fundsTransactions: selectedModules.includes('funds') ? funds.transactions : [], fundsTransfers: selectedModules.includes('funds') ? funds.transfers : [], fundsDefaultCurrency: funds.settings.legacyTransferCurrency ?? funds.settings.defaultCurrency, fundsIncludeCashInNetWorth: selectedModules.includes('funds') && funds.settings.includeCashInNetWorth !== false, fundsPriceHistory: selectedModules.includes('funds') ? funds.priceHistory : {},
     qseTransactions: qse.transactions, qseTransfers: qse.transfers, qseAdjustments: qse.adjustments,
     qsePriceHistory: qse.priceHistory, qseSettings: { ...qse.settings, includeInNetWorth: selectedModules.includes('qse') && qse.settings.includeInNetWorth !== false },
     psxTransactions: psx.transactions, psxTransfers: psx.transfers, psxAdjustments: psx.adjustments,
@@ -1044,10 +1044,18 @@ function IncludeInNetWorthControls({
               </div>
             )}
 
-            {funds.funds.length > 0 && (
+            {(funds.funds.length > 0 || funds.transfers.length > 0) && (
               <div>
                 <div className="text-muted" style={{ marginBottom: 6, fontWeight: 600 }}>Funds</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  <IncludeChip
+                    label="Funds cash"
+                    checked={funds.settings.includeCashInNetWorth !== false}
+                    onToggle={() => toggleInclude(() => setFundsWorkbook({
+                      ...funds,
+                      settings: { ...funds.settings, includeCashInNetWorth: funds.settings.includeCashInNetWorth === false },
+                    }))}
+                  />
                   {funds.funds.map((f) => (
                     <IncludeChip key={f.id} label={`${f.name} (${f.currencyCode})`} checked={f.includeInNetWorth !== false} onToggle={() => toggleFund(f)} />
                   ))}

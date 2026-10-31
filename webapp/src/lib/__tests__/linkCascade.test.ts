@@ -6,6 +6,7 @@ import {
   findLinkForRecord,
   propagateLinkedEdit,
   resolveLinkedEdit,
+  resolveSideCurrency,
   updateLinkedTransfer,
   warnIfLinked,
 } from '../linkCascade';
@@ -19,7 +20,13 @@ import { createEmptyBankWorkbook } from '../../store/defaultBankWorkbook';
 import { createEmptyCashWorkbook } from '../../store/defaultCashWorkbook';
 import { createEmptyPersonalLoansWorkbook } from '../../store/defaultPersonalLoansWorkbook';
 import { useInterEntityTransfersStore } from '../../store/interEntityTransfersStore';
+import { useFundsWorkbookStore } from '../../store/fundsWorkbookStore';
+import { createEmptyFundsWorkbook } from '../../store/defaultFundsWorkbook';
 import { usePersonalLoansWorkbookStore } from '../../store/personalLoansWorkbookStore';
+import { useWorkbookStore } from '../../store/workbookStore';
+import { usePSXWorkbookStore } from '../../store/psxWorkbookStore';
+import { createEmptyWorkbook } from '../../store/defaultWorkbook';
+import { createEmptyPSXWorkbook } from '../../store/defaultPsxWorkbook';
 import type { InterEntityTransferInput } from '../../types/interEntityTransfer';
 
 const bankAccountId = 'acct-1';
@@ -32,12 +39,23 @@ beforeEach(() => {
     ...createEmptyBankWorkbook(),
     settings: { accounts: [{ id: bankAccountId, name: 'Checking', currencyCode: 'USD', openingBalance: 0 }] },
   });
+  useFundsWorkbookStore.getState().setWorkbook(createEmptyFundsWorkbook());
+  useWorkbookStore.getState().setWorkbook(createEmptyWorkbook());
+  usePSXWorkbookStore.getState().setWorkbook(createEmptyPSXWorkbook());
   usePersonalLoansWorkbookStore.getState().setWorkbook({
     ...createEmptyPersonalLoansWorkbook(),
     loans: [{ id: loanId, person: 'Bilal', direction: 'i_owe', currencyCode: 'USD', principal: 1000, date: '2026-01-01' }],
   });
   useInterEntityTransfersStore.getState().setWorkbook({ settings: {}, entries: [] });
 });
+
+const bankToFundsInput: InterEntityTransferInput = {
+  date: '2026-02-01',
+  fromAmount: 2000,
+  toAmount: 2000,
+  from: { module: 'bank', ref: bankAccountId },
+  to: { module: 'funds', currencyCode: 'QAR' },
+};
 
 const cashToBankInput: InterEntityTransferInput = {
   date: '2026-01-01',
@@ -46,6 +64,42 @@ const cashToBankInput: InterEntityTransferInput = {
   from: { module: 'cash', currencyCode: 'USD' },
   to: { module: 'bank', ref: bankAccountId },
 };
+
+describe('broker profile currency resolution', () => {
+  it('uses the selected QSE and PSX broker settings instead of exchange defaults', () => {
+    const qse = useWorkbookStore.getState().workbook;
+    const qseActive = qse.brokerProfiles[0];
+    const qseOther = {
+      ...qseActive,
+      id: 'qse-usd-broker',
+      name: 'USD broker',
+      settings: { ...qseActive.settings, currency: 'USD' },
+      data: { transactions: [], transfers: [], adjustments: [], dividends: [], tradePlans: [] },
+    };
+    useWorkbookStore.getState().setWorkbook({
+      ...qse,
+      settings: { ...qse.settings, currency: 'QAR' },
+      activeBrokerId: qseActive.id,
+      brokerProfiles: [{ ...qseActive, settings: { ...qseActive.settings, currency: 'QAR' } }, qseOther],
+    });
+
+    const psx = usePSXWorkbookStore.getState().workbook;
+    const psxActive = psx.brokerProfiles[0];
+    const psxOther = {
+      ...psx.brokerProfiles[1],
+      settings: { ...psx.brokerProfiles[1].settings, currency: 'USD' },
+    };
+    usePSXWorkbookStore.getState().setWorkbook({
+      ...psx,
+      settings: { ...psx.settings, currency: 'PKR' },
+      activeBrokerId: psxActive.id,
+      brokerProfiles: [psxActive, psxOther],
+    });
+
+    expect(resolveSideCurrency({ module: 'qse', ref: qseOther.id })).toBe('USD');
+    expect(resolveSideCurrency({ module: 'psx', ref: psxOther.id })).toBe('USD');
+  });
+});
 
 describe('createLinkedTransfer', () => {
   it('writes a record to each module store and the link store', () => {
@@ -92,6 +146,50 @@ describe('createLinkedTransfer', () => {
   });
 });
 
+describe('Funds linked transfer lifecycle', () => {
+  it('creates the Funds cash entry with its selected currency and a stable cross-module link', () => {
+    const created = createLinkedTransfer(bankToFundsInput);
+    if (!('link' in created)) throw new Error('expected success');
+
+    expect(useFundsWorkbookStore.getState().workbook.transfers).toHaveLength(1);
+    expect(useFundsWorkbookStore.getState().workbook.transfers[0]).toMatchObject({
+      type: 'DEPOSIT', gross: 2000, currencyCode: 'QAR',
+    });
+    expect(useBankWorkbookStore.getState().workbook.transactions[0].amount).toBe(-2000);
+    expect(created.link.to).toMatchObject({ module: 'funds', currencyCode: 'QAR' });
+  });
+
+  it('updates the Funds amount and currency while keeping both linked records in sync', () => {
+    const created = createLinkedTransfer(bankToFundsInput);
+    if (!('link' in created)) throw new Error('expected success');
+
+    const updated = updateLinkedTransfer({
+      ...bankToFundsInput,
+      fromAmount: 2500,
+      toAmount: 2500,
+      to: { module: 'funds', currencyCode: 'PKR' },
+    }, created.link);
+    if (!('link' in updated)) throw new Error('expected update success');
+
+    expect(useFundsWorkbookStore.getState().workbook.transfers[0]).toMatchObject({
+      type: 'DEPOSIT', gross: 2500, currencyCode: 'PKR',
+    });
+    expect(useBankWorkbookStore.getState().workbook.transactions[0].amount).toBe(-2500);
+    expect(updated.link.to).toMatchObject({ module: 'funds', currencyCode: 'PKR' });
+  });
+
+  it('deletes the Funds cash entry, the source-side record, and the cross-module link together', () => {
+    const created = createLinkedTransfer(bankToFundsInput);
+    if (!('link' in created)) throw new Error('expected success');
+
+    deleteLinkCascade(created.link);
+
+    expect(useFundsWorkbookStore.getState().workbook.transfers).toHaveLength(0);
+    expect(useBankWorkbookStore.getState().workbook.transactions).toHaveLength(0);
+    expect(useInterEntityTransfersStore.getState().workbook.entries).toHaveLength(0);
+  });
+});
+
 describe('findLinkForRecord', () => {
   it('finds the link by either side\'s record id', () => {
     const result = createLinkedTransfer(cashToBankInput);
@@ -114,6 +212,26 @@ describe('updateLinkedTransfer', () => {
     expect(useCashWorkbookStore.getState().workbook.entries[0].amount).toBe(250);
     expect(useBankWorkbookStore.getState().workbook.transactions[0].amount).toBe(250);
     expect(useInterEntityTransfersStore.getState().workbook.entries[0].fromAmount).toBe(250);
+  });
+});
+
+describe('Funds linked transfer currency fallback', () => {
+  it('preserves the existing Funds currency when an edit payload omits it', () => {
+    const created = createLinkedTransfer(bankToFundsInput);
+    if (!('link' in created)) throw new Error('expected success');
+
+    const updated = updateLinkedTransfer({
+      ...bankToFundsInput,
+      fromAmount: 2100,
+      toAmount: 2100,
+      to: { module: 'funds' },
+    }, created.link);
+    if (!('link' in updated)) throw new Error('expected update success');
+
+    expect(useFundsWorkbookStore.getState().workbook.transfers[0]).toMatchObject({
+      gross: 2100, currencyCode: 'QAR',
+    });
+    expect(updated.link.to).toMatchObject({ module: 'funds', currencyCode: 'QAR' });
   });
 });
 
@@ -292,8 +410,6 @@ describe('propagateLinkedEdit', () => {
     expect(useInterEntityTransfersStore.getState().workbook.entries[0].note).toBe('renamed');
   });
 });
-import { useWorkbookStore } from '../../store/workbookStore';
-import { createEmptyWorkbook } from '../../store/defaultWorkbook';
 it('defaults bank-to-QSE fees, preserves explicit zero, time and later module-side fee corrections', () => {
   useWorkbookStore.getState().setWorkbook(createEmptyWorkbook());
   useBankWorkbookStore.getState().setWorkbook({ ...createEmptyBankWorkbook(), settings: { accounts: [{ id: bankAccountId, name: 'QAR Bank', currencyCode: 'QAR', openingBalance: 0 }] } });

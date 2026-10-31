@@ -76,7 +76,7 @@ function buildSideRecord(
     case 'funds':
       return {
         module: cfg.module,
-        record: { id, brokerId: cfg.ref, date, type: direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: amount, fee: cfg.fee ?? 0, description: note },
+        record: { id, brokerId: cfg.ref, date, type: direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', ...(cfg.module === 'funds' ? { currencyCode: cfg.currencyCode || 'USD' } : {}), gross: amount, fee: cfg.fee ?? 0, description: note },
       };
     case 'rentals':
       // Unlike Bank/Cash/QSE/PSX/Funds, Rentals has no real balance of its

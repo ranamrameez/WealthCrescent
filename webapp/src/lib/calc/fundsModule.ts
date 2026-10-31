@@ -1,6 +1,8 @@
 import type { Fund } from '../../types/fundsWorkbook';
 import type { Category } from '../../types/finance';
-import type { Position, PricePoint, Transaction } from '../../types/workbook';
+import type { Position, PricePoint, Transaction, Transfer } from '../../types/workbook';
+import { buildCashLedger } from './cashLedger';
+import { sortTransactionsChronological } from './sortTransactions';
 import { categoryName } from '../categories';
 import { computePositions } from './positions';
 import { getDailyPriceHistory, getMarketPrice, getPriceHistory } from './priceHistory';
@@ -49,6 +51,82 @@ export function fundsValueByCurrency(
     out[fund.currencyCode] = (out[fund.currencyCode] ?? 0) + units * nav;
   });
   return out;
+}
+
+/** One Funds cash account per currency. Funds transfers are portfolio-level
+ * (the transfer picker has no fund reference), while each BUY/SELL belongs
+ * to a fund whose currency is known from Fund.currencyCode. This keeps
+ * uninvested cash separate from NAV-valued units without blending currencies.
+ *
+ * Legacy transfers without currencyCode remain in the workbook unchanged and
+ * are read using the one-time legacyTransferCurrency snapshot. New transfers
+ * always persist their selected currency. */
+export type FundsCashLedgerEvent = ReturnType<typeof buildCashLedger>[number] & {
+  currencyCode: string;
+};
+
+/** The shared cash ledger intentionally rejects an entire SELL row if
+ * it oversells. Funds positions, however, already account for the matched
+ * portion of a partial SELL. Truncate only that row's unmatched quantity so
+ * cash proceeds mirror the units actually removed; a wholly unmatched SELL
+ * still contributes no cash. */
+function matchedFundsCashTransactions(transactions: Transaction[]): Transaction[] {
+  const heldByFund = new Map<string, number>();
+  const valid: Transaction[] = [];
+  sortTransactionsChronological(transactions.filter((transaction) => !transaction.isPending)).forEach((transaction) => {
+    const held = heldByFund.get(transaction.ticker) ?? 0;
+    if (transaction.action === 'BUY') {
+      heldByFund.set(transaction.ticker, held + transaction.shares);
+      valid.push(transaction);
+      return;
+    }
+    const matchedShares = Math.min(transaction.shares, held);
+    if (matchedShares <= 1e-7) return;
+    heldByFund.set(transaction.ticker, Math.max(0, held - matchedShares));
+    valid.push(matchedShares === transaction.shares ? transaction : { ...transaction, shares: matchedShares });
+  });
+  return valid;
+}
+
+export function fundsCashLedgerByCurrency(
+  funds: Fund[],
+  transactions: Transaction[],
+  transfers: Transfer[],
+  legacyCurrency = 'USD',
+): Record<string, FundsCashLedgerEvent[]> {
+  const fundCurrency = new Map(funds.map((fund) => [fund.id, fund.currencyCode]));
+  const currencies = new Set<string>();
+  transactions.forEach((transaction) => {
+    const currency = fundCurrency.get(transaction.ticker);
+    if (currency) currencies.add(currency);
+  });
+  transfers.forEach((transfer) => currencies.add(transfer.currencyCode || legacyCurrency));
+
+  const result: Record<string, FundsCashLedgerEvent[]> = {};
+  currencies.forEach((currencyCode) => {
+    const currencyTransactions = transactions.filter((transaction) => fundCurrency.get(transaction.ticker) === currencyCode);
+    const currencyTransfers = transfers.filter((transfer) => (transfer.currencyCode || legacyCurrency) === currencyCode);
+    result[currencyCode] = buildCashLedger(matchedFundsCashTransactions(currencyTransactions), currencyTransfers, [], calcFee)
+      .map((event) => ({ ...event, currencyCode }));
+  });
+  return result;
+}
+
+/** Current uninvested Funds cash, grouped by currency. BUY/SELL cash flows
+ * are included alongside deposits/withdrawals, so adding this to current
+ * holdings value counts every unit of money exactly once. */
+export function fundsCashBalanceByCurrency(
+  funds: Fund[],
+  transactions: Transaction[],
+  transfers: Transfer[],
+  legacyCurrency = 'USD',
+): Record<string, number> {
+  const balances: Record<string, number> = {};
+  Object.entries(fundsCashLedgerByCurrency(funds, transactions, transfers, legacyCurrency))
+    .forEach(([currencyCode, events]) => {
+      if (events.length) balances[currencyCode] = events[events.length - 1].balance;
+    });
+  return balances;
 }
 
 /** Pending item 115(b): the "total balance with that broker" rollup —

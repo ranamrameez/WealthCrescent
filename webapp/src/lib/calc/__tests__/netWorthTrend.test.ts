@@ -23,7 +23,7 @@ const emptyNetWorthAsOfInputs: NetWorthAsOfInputs = {
   cashEntries: [], cashSettings: { defaultCurrency: 'USD' }, bankAccounts: [], bankTransactions: [],
   creditCards: [], creditCardTransactions: [],
   personalLoans: [], personalLoanRepayments: [], emiLoans: [],
-  fundsFunds: [], fundsTransactions: [], fundsPriceHistory: {},
+  fundsFunds: [], fundsTransactions: [], fundsTransfers: [], fundsDefaultCurrency: 'USD', fundsIncludeCashInNetWorth: true, fundsPriceHistory: {},
   qseTransactions: [], qseTransfers: [], qseAdjustments: [], qsePriceHistory: {},
   qseSettings: { feePct: 0.15, minFee: 5, tick: 0.01, currency: 'USD', depositFee: 0 } as QSESettings,
   psxTransactions: [], psxTransfers: [], psxAdjustments: [], psxPriceHistory: {},
