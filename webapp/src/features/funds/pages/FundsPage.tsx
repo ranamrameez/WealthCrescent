@@ -1,5 +1,6 @@
 import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
+import { useTablePagination } from '../../../hooks/useTablePagination';
 import { DateValue } from '../../../components/DateValue';
 import { ToggleChip } from '../../../components/ui/ToggleChip';
 import { QuickEntitySwitch } from '../../../components/QuickEntitySwitch';
@@ -18,14 +19,15 @@ import { EntityScopeMenu, selectedEntityValues } from '../../../components/Entit
 import { TopBarControls } from '../../../components/TopBarControls';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { Line } from 'react-chartjs-2';
-import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
+import { Card, EntityCard, MoneyValue } from '../../../components/Card';
 import { Modal } from '../../../components/Modal';
 import { Notice } from '../../../components/Notice';
 import { TickerLogo } from '../../../components/TickerLogo';
-import { HUES, hueStyle } from '../../../lib/statCardHues';
+import { hueStyle } from '../../../lib/statCardHues';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { ArchiveIcon, CheckIcon, EditIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { StandardPageSections } from '../../../components/StandardPageSections';
+import { SummarySection, SummarySections, SummaryValue } from '../../../components/SummaryGroupCard';
 import { toast } from '../../../components/Toast';
 import { Tooltip } from '../../../components/Tooltip';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
@@ -147,7 +149,7 @@ function BrokersList({ onSelect }: { onSelect: (broker: Broker) => void }) {
   );
   if (!brokers.length) return null;
   return (
-    <CollapsibleCard title="Brokers" defaultOpen={false}>
+    <div>
       {archivedCount > 0 && (
         <button className="btn secondary small mb-12" onClick={() => setShowArchived((v) => !v)}>
           {showArchived ? 'Hide' : 'Show'} closed ({archivedCount})
@@ -179,7 +181,7 @@ function BrokersList({ onSelect }: { onSelect: (broker: Broker) => void }) {
           );
         })}
       </div>
-    </CollapsibleCard>
+    </div>
   );
 }
 
@@ -513,36 +515,21 @@ function OverallSummary({ selectedIds }: { selectedIds?: string[] } = {}) {
   if (!codes.length) return null;
 
   return (
-    <div className="grid-auto" style={{ ...gridAutoStyle(150, 8), marginBottom: 16 }}>
+    <SummarySections className="funds-overall-summary">
       {codes.map((code) => {
         const t = totals[code];
         const profitPct = t.invested > 0 ? (t.profit / t.invested) * 100 : 0;
         const expDailyPct = t.invested > 0 ? (t.expDaily / t.invested) * 100 : 0;
         const expMonthlyPct = t.invested > 0 ? (t.expMonthly / t.invested) * 100 : 0;
-        return (
-          <div key={code} className="card" style={{ padding: 12 }}>
-            <div className="text-muted" style={{ marginBottom: 6 }}>{code}</div>
-            <div className="grid-auto" style={gridAutoStyle(110, 8)}>
-              <div className="stat-card card" style={hueStyle(HUES[3])}><div className="label">Invested</div><MoneyValue n={t.invested} currency={code} /></div>
-              <div className="stat-card card" style={hueStyle(HUES[6])}><div className="label">Current value</div><MoneyValue n={t.value} currency={code} /></div>
-              <div className="stat-card card" style={hueStyle(t.profit >= 0 ? 'var(--profit)' : 'var(--loss)')}><div className="label">Net profit</div><MoneyValue n={t.profit} currency={code} after={` (${profitPct.toFixed(1)}%)`} /></div>
-              <div className="stat-card card" style={hueStyle(t.expDaily >= 0 ? 'var(--profit)' : 'var(--loss)')}>
-                <Tooltip text="An average of what your funds actually earned/lost per day, based on their real NAV/balance history — not a promise of future returns.">
-                  <div className="label clickable">Expected daily P/L</div>
-                </Tooltip>
-                <MoneyValue n={t.expDaily} currency={code} after={` (${expDailyPct.toFixed(2)}%)`} />
-              </div>
-              <div className="stat-card card" style={hueStyle(t.expMonthly >= 0 ? 'var(--profit)' : 'var(--loss)')}>
-                <Tooltip text="The same average daily rate, scaled to a typical calendar month.">
-                  <div className="label clickable">Expected monthly P/L</div>
-                </Tooltip>
-                <MoneyValue n={t.expMonthly} currency={code} after={` (${expMonthlyPct.toFixed(2)}%)`} />
-              </div>
-            </div>
-          </div>
-        );
+        return <SummarySection key={code} title={code}>
+          <SummaryValue label="Invested" value={<MoneyValue n={t.invested} currency={code} />} />
+          <SummaryValue label="Current value" value={<MoneyValue n={t.value} currency={code} />} primary />
+          <SummaryValue label="Net profit" value={<MoneyValue n={t.profit} currency={code} after={` (${profitPct.toFixed(1)}%)`} />} tone={t.profit >= 0 ? 'positive' : 'negative'} />
+          <SummaryValue label={<Tooltip text="An average of what your funds actually earned/lost per day, based on their real NAV/balance history — not a promise of future returns.">Expected daily P/L</Tooltip>} value={<MoneyValue n={t.expDaily} currency={code} after={` (${expDailyPct.toFixed(2)}%)`} />} tone={t.expDaily >= 0 ? 'positive' : 'negative'} />
+          <SummaryValue label={<Tooltip text="The same average daily rate, scaled to a typical calendar month.">Expected monthly P/L</Tooltip>} value={<MoneyValue n={t.expMonthly} currency={code} after={` (${expMonthlyPct.toFixed(2)}%)`} />} tone={t.expMonthly >= 0 ? 'positive' : 'negative'} />
+        </SummarySection>;
       })}
-    </div>
+    </SummarySections>
   );
 }
 
@@ -699,6 +686,8 @@ function SnapshotImportSection() {
     () => (rows ? buildFundsImportPlan(rows, workbook.funds) : []),
     [rows, workbook.funds],
   );
+  const indexedPlan = useMemo(() => plan.map((row, index) => ({ row, index })), [plan]);
+  const { rows: pagePlanRows, controls: planPaginationControls } = useTablePagination(indexedPlan);
 
   const duplicateCodes = useMemo(() => {
     if (!rows) return [];
@@ -805,7 +794,7 @@ function SnapshotImportSection() {
                 </tr>
               </thead>
               <tbody>
-                {plan.map((p, i) => (
+                {pagePlanRows.map(({ row: p, index: i }) => (
                   <RecordRow market="funds" record={p} key={i}>
                     <td><TextInput value={p.row.bank} onChange={(e) => editRow(i, { bank: e.target.value })} className="w-140" /></td>
                     <td><TextInput value={p.row.code} onChange={(e) => editRow(i, { code: e.target.value.toUpperCase() })} className="w-90" /></td>
@@ -820,6 +809,7 @@ function SnapshotImportSection() {
               </tbody>
             </table>
           </div>
+          {planPaginationControls}
           <button className="btn" disabled={busy} onClick={runImport}>
             <PlusIcon />Import {plan.length} fund{plan.length === 1 ? '' : 's'}
           </button>
@@ -897,6 +887,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
   const [showAllUpdates, setShowAllUpdates] = useState(false);
   const dateSort2Input = showAllUpdates ? [...balanceRows].reverse() : balanceRows.slice(-8).reverse();
   const updateRows = dateSort2.rows(dateSort2Input, { date: row => row });
+  const { rows: pageUpdateRows, controls: updatePaginationControls } = useTablePagination(updateRows, 8);
   const rawPriceHistory = workbook.priceHistory[fund.id] ?? [];
   const [editUpdateIndex, setEditUpdateIndex] = useState<number | null>(null);
   const [editUpdateRow, setEditUpdateRow] = useState<{ date: string; price: number } | null>(null);
@@ -995,6 +986,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
   const dateSortInput = (typeFilter === 'all' ? allTxs : allTxs.filter((r) => r.t.action === typeFilter)).filter(row => (!fromDate || row.t.date >= fromDate) && (!toDate || row.t.date <= toDate) && filters.source !== 'statement-import')
     .sort((a, b) => b.t.date.localeCompare(a.t.date));
   const txs = dateSort.rows(dateSortInput, { date: row => row.t });
+  const { rows: pageTxs, controls: txPaginationControls } = useTablePagination(txs);
 
   /** README item 40: extends Banking's statement-export pattern (Done
    * item 58) to this module's own primary record — a fund's "statement"
@@ -1121,51 +1113,20 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
                 </div>
               </div>
             )}
-            <div className="grid-auto" style={{ ...gridAutoStyle(120, 8), marginTop: 12 }}>
-              <div className="stat-card card" style={hueStyle('var(--info)')}>
-                <div className="label">Units held</div>
-                <div className="value">{fmt(units, 2)}</div>
-                {!!pendingUnitDelta && (
-                  <div className="sub" title="Placed but not yet settled orders for this fund — units will change by this much once they clear.">
-                    {pendingUnitDelta > 0 ? '+' : ''}{fmt(pendingUnitDelta, 2)} pending
-                  </div>
-                )}
-              </div>
-              <div className="stat-card card" style={hueStyle('var(--accent)')}>
-                <Tooltip text="NAV = Net Asset Value, the price of one unit of this fund. This is the average price you paid per unit across all your purchases.">
-                  <div className="label clickable">Avg NAV cost</div>
-                </Tooltip>
-                <div className="value">{fmtPrice(avgNav)}</div>
-              </div>
-              <div className="stat-card card" style={hueStyle('var(--info)')}><div className="label">Invested</div><MoneyValue n={invested} currency={fund.currencyCode} /></div>
-              <div className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">Current value</div><MoneyValue n={currentValue} currency={fund.currencyCode} /></div>
-              <div className="stat-card card" style={hueStyle(profit >= 0 ? 'var(--profit)' : 'var(--loss)')}>
-                <Tooltip text="Realized profit from every past withdrawal/sell, plus unrealized profit on units still held — your true total gain, not just what's sitting in the fund right now.">
-                  <div className="label clickable">Net profit</div>
-                </Tooltip>
-                <MoneyValue n={profit} currency={fund.currencyCode} after={` (${profitPct.toFixed(1)}%)`} />
-              </div>
-              <div className="stat-card card" style={hueStyle(rate === null ? 'var(--accent)' : rate < 0 ? 'var(--loss)' : 'var(--profit)')}>
-                <Tooltip text="XIRR: your annualized rate of return, accounting for the exact dates and amounts of every purchase — a fairer comparison than a flat percentage when you've invested at different times.">
-                  <div className="label clickable">XIRR</div>
-                </Tooltip>
-                <div className="value">{rate !== null ? `${(rate * 100).toFixed(1)}%` : '—'}</div>
-              </div>
-              {/* User-requested (2026-09-03): "Display expected daily/monthly
-                  PL+PL%age... on each item page." */}
-              <div className="stat-card card" style={hueStyle(plRate && plRate.dailyAmount < 0 ? 'var(--loss)' : 'var(--profit)')}>
-                <Tooltip text="An average of what this fund actually earned/lost per day, based on its real NAV/balance history — not a promise of future returns.">
-                  <div className="label clickable">Expected daily P/L</div>
-                </Tooltip>
-                <div className="value">{plRate ? <>{fmtMoney(plRate.dailyAmount, fund.currencyCode)} <span style={{ fontSize: 12 }}>({plRate.dailyPct.toFixed(2)}%)</span></> : '—'}</div>
-              </div>
-              <div className="stat-card card" style={hueStyle(plRate && plRate.monthlyAmount < 0 ? 'var(--loss)' : 'var(--profit)')}>
-                <Tooltip text="The same average daily rate, scaled to a typical calendar month.">
-                  <div className="label clickable">Expected monthly P/L</div>
-                </Tooltip>
-                <div className="value">{plRate ? <>{fmtMoney(plRate.monthlyAmount, fund.currencyCode)} <span style={{ fontSize: 12 }}>({plRate.monthlyPct.toFixed(2)}%)</span></> : '—'}</div>
-              </div>
-            </div>
+            <SummarySections className="fund-detail-summary">
+              <SummarySection title="Position">
+                <SummaryValue label="Units held" value={fmt(units, 2)} primary detail={!!pendingUnitDelta ? `${pendingUnitDelta > 0 ? '+' : ''}${fmt(pendingUnitDelta, 2)} pending` : undefined} />
+                <SummaryValue label={<Tooltip text="NAV = Net Asset Value, the price of one unit of this fund. This is the average price you paid per unit across all your purchases.">Average NAV cost</Tooltip>} value={fmtPrice(avgNav)} />
+                <SummaryValue label="Invested" value={<MoneyValue n={invested} currency={fund.currencyCode} />} />
+                <SummaryValue label="Current value" value={<MoneyValue n={currentValue} currency={fund.currencyCode} />} primary />
+              </SummarySection>
+              <SummarySection title="Performance">
+                <SummaryValue label={<Tooltip text="Realized profit from every past withdrawal/sell, plus unrealized profit on units still held — your true total gain, not just what's sitting in the fund right now.">Net profit</Tooltip>} value={<MoneyValue n={profit} currency={fund.currencyCode} after={` (${profitPct.toFixed(1)}%)`} />} tone={profit >= 0 ? 'positive' : 'negative'} primary />
+                <SummaryValue label={<Tooltip text="XIRR: your annualized rate of return, accounting for the exact dates and amounts of every purchase — a fairer comparison than a flat percentage when you've invested at different times.">XIRR</Tooltip>} value={rate !== null ? `${(rate * 100).toFixed(1)}%` : '—'} tone={rate === null ? 'neutral' : rate >= 0 ? 'positive' : 'negative'} />
+                <SummaryValue label={<Tooltip text="An average of what this fund actually earned/lost per day, based on its real NAV/balance history — not a promise of future returns.">Expected daily P/L</Tooltip>} value={plRate ? fmtMoney(plRate.dailyAmount, fund.currencyCode) : '—'} detail={plRate ? `${plRate.dailyPct.toFixed(2)}%` : undefined} tone={plRate && plRate.dailyAmount < 0 ? 'negative' : 'positive'} />
+                <SummaryValue label={<Tooltip text="The same average daily rate, scaled to a typical calendar month.">Expected monthly P/L</Tooltip>} value={plRate ? fmtMoney(plRate.monthlyAmount, fund.currencyCode) : '—'} detail={plRate ? `${plRate.monthlyPct.toFixed(2)}%` : undefined} tone={plRate && plRate.monthlyAmount < 0 ? 'negative' : 'positive'} />
+              </SummarySection>
+            </SummarySections>
       </> },
 { key: 'analytics', label: 'Analytics', content: <>            {/* User-requested (2026-09-03): "add a chart to view periodic
                 growth with balance & PL indications over time." */}
@@ -1294,7 +1255,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
         <table>
           <thead><tr><dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th><th>Type</th><th>Units</th><th>NAV</th><th>Amount</th><th></th></tr></thead>
           <tbody>
-            {txs.map(({ t, i }) =>
+            {pageTxs.map(({ t, i }) =>
               editIndex === i && editRow ? (
                 <RecordRow market="funds" record={{ t, i }} onCancel={() => setEditIndex(null)} key={i}>
                   <td><input type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} className="w-130" /></td>
@@ -1379,6 +1340,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
           </tbody>
         </table>
       </div>
+      {txPaginationControls}
       </> },
 { table: true, key: 'history', label: 'Balance history', defaultOpen: true, headerEnd: balanceRows.length > 0 ? <button className="btn secondary" onClick={exportBalanceHistory}>Export CSV</button> : undefined, content: <>
         {!balanceRows.length && <p className="text-muted">No balance/NAV updates recorded yet — use "Update balance or NAV" above.</p>}
@@ -1397,7 +1359,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
                   </tr>
                 </thead>
                 <tbody>
-                  {updateRows.map((r) => {
+                  {pageUpdateRows.map((r) => {
                     const rawIndex = rawPriceHistory.indexOf(r.point);
                     return editUpdateIndex === rawIndex && editUpdateRow ? (
                       <RecordRow market="funds" record={r} onCancel={() => { setEditUpdateIndex(null); setEditUpdateRow(null); }} key={rawIndex}>
@@ -1434,6 +1396,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
                 </tbody>
               </table>
             </div>
+            {showAllUpdates && updateRows.length > 8 ? updatePaginationControls : null}
           </>
         )}
       </> }]} >{editingFund && <EntityEditorModal title="Edit fund" onClose={() => setEditingFund(false)}><AddFundForm fund={fund} onSaved={() => setEditingFund(false)} /></EntityEditorModal>}{detailTx && (
@@ -1522,6 +1485,7 @@ function FundsTransfersSection() {
     [filteredTransfers],
   );
   const sorted = dateSort.rows(dateSortInput, { date: row => row });
+  const { rows: pageRows, controls: paginationControls, page, pageSize } = useTablePagination(sorted);
   const reorderTransfer = async (pair: [{ id: string; order: number }, { id: string; order: number }]) => {
     if (!(await ensureSignedIn('Sign in to reorder transfers.'))) return;
     for (const p of pair) updateTransfer(p.id, { seq: p.order });
@@ -1557,7 +1521,7 @@ function FundsTransfersSection() {
             </tr>
           </thead>
           <tbody>
-            {sorted.map((t, i) => {
+            {pageRows.map((t, i) => {
               const link = linkByRecordId.get(t.id);
               const otherSide = link ? (link.from.module === 'funds' && link.fromRecordId === t.id ? link.to : link.from) : undefined;
               return (
@@ -1566,7 +1530,7 @@ function FundsTransfersSection() {
                     <DateValue value={t.date} />{' '}
                     <ReorderButtons
                       rows={sorted}
-                      index={i}
+                      index={(page - 1) * pageSize + i}
                       instantOf={instantOf}
                       idOf={(row) => row.id}
                       orderOf={(row) => row.seq}
@@ -1599,6 +1563,7 @@ function FundsTransfersSection() {
           </tbody>
         </table>
       </div>
+      {paginationControls}
     </div>
       {editRow && <TransactionEntryModal editTransfer={{ module: 'funds', record: editRow }} onClose={() => setEditRow(null)} />}
     </>
@@ -1723,20 +1688,20 @@ export function FundsPage({
         />
       ) : (
         <StandardPageSections sections={[
-            { key: 'summary', label: 'Summary', content: <div className="stack-lg"><FundsScopeSummary ids={selectedIds} filters={filters} /><OverallSummary selectedIds={selectedIds} /></div> },
+            { key: 'summary', label: 'Summary', defaultOpen: true, content: <div className="stack-lg"><FundsScopeSummary ids={selectedIds} filters={filters} /><OverallSummary selectedIds={selectedIds} /></div> },
             { table: true, key: 'plans', label: 'Plans', content: <FundsScopePlans ids={selectedIds} filters={filters} /> },
             { table: true, key: 'transactions', label: 'Transactions', content: <FundsScopeTransactions ids={selectedIds} filters={filters} onSelect={id => setSelected(funds.find(fund => fund.id === id) ?? null)} /> },
             {
               key: 'funds',
               label: 'Funds',
-              content: (
-                <div>
-
-                  <BrokersList onSelect={setSelectedBroker} />
-                  <FundList onSelect={setSelected} selectedIds={selectedIds} />
-
-                </div>
-              ),
+              defaultOpen: true,
+              content: <FundList onSelect={setSelected} selectedIds={selectedIds} />,
+            },
+            {
+              key: 'brokers',
+              label: 'Brokers',
+              defaultOpen: true,
+              content: <BrokersList onSelect={setSelectedBroker} />,
             },
             { table: true, key: 'transfers', label: 'Transfers', content: <FundsTransfersSection /> },
             { table: true, key: 'import', label: 'Import', content: <SnapshotImportSection /> },

@@ -1,3 +1,4 @@
+import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
@@ -10,6 +11,7 @@ import { TopBarControls } from '../../../components/TopBarControls';
 import { Chart, Doughnut } from 'react-chartjs-2';
 import { Card, CollapsibleCard, MoneyValue, StatCard } from '../../../components/Card';
 import { StandardPageSections } from '../../../components/StandardPageSections';
+import { SummarySection, SummarySections, SummaryValue } from '../../../components/SummaryGroupCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { Modal } from '../../../components/Modal';
 import { Notice } from '../../../components/Notice';
@@ -95,6 +97,8 @@ type Drilldown =
 
 function NetWorthDrilldownModal({ drilldown, onClose }: { drilldown: Drilldown; onClose: () => void }) {
   const dateSort = useDateTableSort();
+  const flowRows = drilldown.kind === 'flow' ? dateSort.rows(drilldown.items, { date: row => row }) : [];
+  const { rows: pageFlowRows, controls: flowPaginationControls } = useTablePagination(flowRows);
   return (
     <Modal title={drilldown.title} onClose={onClose}>
       <p className="text-muted mt-0">{drilldown.explanation}</p>
@@ -124,7 +128,7 @@ function NetWorthDrilldownModal({ drilldown, onClose }: { drilldown: Drilldown; 
             <table>
               <thead><tr><dateSort.Th rows={drilldown.kind === 'flow' ? drilldown.items : []} column="date">Date</dateSort.Th><th>Source</th><th>Description</th><th style={{ textAlign: 'right' }}>Amount</th></tr></thead>
               <tbody>
-                {dateSort.rows(drilldown.items, { date: row => row }).map((it, i) => (
+                {pageFlowRows.map((it, i) => (
                   <RecordRow record={it} key={i}>
                     <td><DateValue value={it.date} /></td>
                     <td>{it.module}{it.accountName ? ` (${it.accountName})` : ''}</td>
@@ -137,6 +141,7 @@ function NetWorthDrilldownModal({ drilldown, onClose }: { drilldown: Drilldown; 
               </tbody>
             </table>
           )}
+          {drilldown.items.length > 0 ? flowPaginationControls : null}
         </>
       )}
       {drilldown.kind === 'delta' && (() => {
@@ -910,6 +915,8 @@ function NetWorthPlanningReality({ activities, selectedModules, currencies, curr
   }, [todayISODate, horizonDays]);
   const scopedActivities = useMemo(() => activities.filter((activity) => selectedModules.includes(activity.module)), [activities, selectedModules]);
   const planned = useMemo(() => scopedActivities.filter((activity) => !activity.executed && activity.date >= todayISODate && activity.date <= endDate), [scopedActivities, todayISODate, endDate]);
+  const sortedPlanned = dateSort.rows(planned.slice().sort((a, b) => a.date.localeCompare(b.date)), { date: row => row });
+  const { rows: pagePlannedRows, controls: plannedPaginationControls } = useTablePagination(sortedPlanned);
   const projectionMonths = useMemo(() => monthRange(0, Math.max(0, monthsBetween(currentMonthOf(), endDate.slice(0, 7)))), [endDate]);
   const projection = useMemo(() => projectedNetWorthTrend({
     months: projectionMonths, currentMonth: currentMonthOf(), todayISODate, currentRows, activities: scopedActivities,
@@ -931,19 +938,27 @@ function NetWorthPlanningReality({ activities, selectedModules, currencies, curr
         const change = projected - current;
         return <Card key={currency}>
           <h3 className="mt-0">{currency} planning reality</h3>
-          <div className="grid-auto" style={gridAutoStyle(135, 8)}>
-            <div className="stat-card card"><div className="label">Current net worth</div><MoneyValue n={current} currency={currency} /></div>
-            <div className="stat-card card" style={hueStyle('var(--profit)')}><div className="label">Planned inflow</div><MoneyValue n={inflow} currency={currency} /></div>
-            <div className="stat-card card" style={hueStyle('var(--loss)')}><div className="label">Planned outflow</div><MoneyValue n={outflow} currency={currency} /></div>
-            <div className="stat-card card" style={hueStyle(projected >= 0 ? 'var(--profit)' : 'var(--loss)')}><div className="label">Projected net worth</div><MoneyValue n={projected} currency={currency} /><div className={change >= 0 ? 'pill-positive' : 'pill-negative'}>{change >= 0 ? '+' : ''}{fmtMoney(change, currency)} change</div></div>
-          </div>
+          <SummarySections className="account-summary-sections">
+            <SummarySection title="Current position">
+              <SummaryValue label="Current net worth" value={<MoneyValue n={current} currency={currency} />} primary tone={current >= 0 ? 'positive' : 'negative'} />
+            </SummarySection>
+            <SummarySection title="Planned activity">
+              <SummaryValue label="Planned inflow" value={<MoneyValue n={inflow} currency={currency} />} tone="positive" />
+              <SummaryValue label="Planned outflow" value={<MoneyValue n={outflow} currency={currency} />} tone="negative" />
+            </SummarySection>
+            <SummarySection title="Expected position">
+              <SummaryValue label="Projected net worth" value={<MoneyValue n={projected} currency={currency} />} primary tone={projected >= 0 ? 'positive' : 'negative'} />
+              <SummaryValue label="Change" value={fmtMoney(change, currency)} tone={change >= 0 ? 'positive' : 'negative'} />
+            </SummarySection>
+          </SummarySections>
         </Card>;
       })}
     </div>
-    <div className="table-scroll"><table><thead><tr><dateSort.Th rows={planned.slice().sort((a, b) => a.date.localeCompare(b.date))} column="date">Date</dateSort.Th><th>Source</th><th>Description</th><th>Category</th><th>Amount</th></tr></thead><tbody>
-      {dateSort.rows(planned.slice().sort((a, b) => a.date.localeCompare(b.date)), { date: row => row }).map((activity) => <RecordRow record={activity} key={`${activity.module}:${activity.id}`}><td><DateValue value={activity.date} /></td><td>{activity.sourceLabel}</td><td>{activity.description}</td><td>{activity.category || 'Uncategorized'}</td><td className={activity.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(activity.amount, activity.currencyCode)}</td></RecordRow>)}
+    <div className="table-scroll"><table><thead><tr><dateSort.Th rows={sortedPlanned} column="date">Date</dateSort.Th><th>Source</th><th>Description</th><th>Category</th><th>Amount</th></tr></thead><tbody>
+      {pagePlannedRows.map((activity) => <RecordRow record={activity} key={`${activity.module}:${activity.id}`}><td><DateValue value={activity.date} /></td><td>{activity.sourceLabel}</td><td>{activity.description}</td><td>{activity.category || 'Uncategorized'}</td><td className={activity.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(activity.amount, activity.currencyCode)}</td></RecordRow>)}
       {!planned.length && <tr><td colSpan={5} className="text-muted">No plans fall within this horizon and source scope.</td></tr>}
     </tbody></table></div>
+    {plannedPaginationControls}
     <p className="text-muted mb-0">Projection includes EMI liability reduction without counting a linked bank installment twice.</p>
   </div>;
 }

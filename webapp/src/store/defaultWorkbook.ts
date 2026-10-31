@@ -7,6 +7,7 @@ export const DEFAULT_SETTINGS: Workbook['settings'] = {
   tick: 0.001,
   currency: 'QAR',
   depositFee: 10,
+  tradePriceDeviationPct: 10,
 };
 
 // Deliberately empty — the legacy app's SEED_TRANSACTIONS/etc. baked one

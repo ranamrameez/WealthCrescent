@@ -1,3 +1,4 @@
+import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
@@ -358,6 +359,7 @@ function CashStatementTable({ code, rows: allRows }: { code: string; rows: CashL
   // order).
   const dateSortInput = rows;
   const sorted = dateSort.rows(dateSortInput, { date: row => row.entry }); // buildCashLedger already returns ascending chronological order
+  const { rows: pageRows, controls: paginationControls, page, pageSize } = useTablePagination(sorted);
   const instantOf = (r: (typeof sorted)[number]) => dateOnlyMs(r.entry.date);
   const reorder = async (pair: [{ id: string; order: number }, { id: string; order: number }]) => {
     if (!(await ensureSignedIn('Sign in to reorder entries.'))) return;
@@ -390,7 +392,7 @@ function CashStatementTable({ code, rows: allRows }: { code: string; rows: CashL
             </tr>
           </thead>
           <tbody>
-            {sorted.map(({ entry, balance }, i) => {
+            {pageRows.map(({ entry, balance }, i) => {
               const link = linkByRecordId.get(entry.id);
               const otherSide = link ? (link.from.module === 'cash' && link.fromRecordId === entry.id ? link.to : link.from) : undefined;
               return (
@@ -400,7 +402,7 @@ function CashStatementTable({ code, rows: allRows }: { code: string; rows: CashL
                     <span onClick={(e) => e.stopPropagation()}>
                       <ReorderButtons
                         rows={sorted}
-                        index={i}
+                        index={(page - 1) * pageSize + i}
                         instantOf={instantOf}
                         idOf={(r) => r.entry.id}
                         orderOf={(r) => r.entry.serialNumber}
@@ -454,6 +456,7 @@ function CashStatementTable({ code, rows: allRows }: { code: string; rows: CashL
           </tbody>
         </table>
       </div>
+      {paginationControls}
       {editingEntry && <EditEntryModal entry={editingEntry} onClose={() => setEditingEntry(null)} />}
       {detailEntry && (
         <RecordDetailModal
@@ -898,6 +901,7 @@ function PlanCurrencyTable({
     }
   };
   const { sorted, Th } = useSortableRows(plans, sortValue, 'date', 'asc');
+  const { rows: pageRows, controls } = useTablePagination(sorted);
 
   const startEdit = (p: PlannedCashEntry & { planId?: string }) => {
     const { planId, ...plan } = p;
@@ -916,7 +920,7 @@ function PlanCurrencyTable({
             </tr>
           </thead>
           <tbody>
-            {sorted.map((p) =>
+            {pageRows.map((p) =>
               (
                 <RecordRow financeModule="cash" onEdit={() => startEdit(p)}    record={p}  key={p.id}>
                   <td><DateValue value={p.date} /></td>
@@ -946,6 +950,7 @@ function PlanCurrencyTable({
           </tbody>
         </table>
       </div>
+      {controls}
       {editRow && <FinancePlanEditor reference={{ module: "cash", id: editRow.id }} occurrenceDate={plans.find(p => p.id === editId)?.recurrence ? plans.find(p => p.id === editId)?.date : undefined} onClose={() => { setEditId(null); setEditRow(null); }} />}
     </TableCard>
   );

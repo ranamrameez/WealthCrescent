@@ -29,6 +29,7 @@ import { fmt, fmtMoney, fmtQSEPrice } from '../../../lib/format';
 import { closedPLBySellTxId, computeClosedTrades, type LotMatchOrder } from '../../../lib/calc/closedTrades';
 import { computeAveragePLBySellTxId } from '../../../lib/calc/realizedPL';
 import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
+import { tradePriceDeviationPct, validateTransactionEdit, validateSellQuantities } from '../../../lib/calc/tradeValidation';
 import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
 import { transferRunningBalance } from '../../../lib/calc/transferBalance';
 import { Field } from '../../../components/ui/Field';
@@ -57,7 +58,7 @@ function emptyRow(): Transaction {
 export function TransactionRows({ initial, onSaved }: { initial?: Partial<Transaction>; onSaved?: () => void } = {}) {
   const addTransactions = useWorkbookStore((s) => s.addTransactions);
   const workbook = useWorkbookStore((s) => s.workbook);
-  const { calcFee } = useQSEDerived();
+  const { calcFee, positions } = useQSEDerived();
   const ensureSignedIn = useEnsureSignedIn();
   // Pending item 143 (closed 2026-09-19): manual multi-lot Specific
   // Identification, gated the same way `targetLotBuyId` already is — inert
@@ -96,9 +97,27 @@ export function TransactionRows({ initial, onSaved }: { initial?: Partial<Transa
       toast('Fill in at least one complete row.');
       return;
     }
+    const quantityError = validateSellQuantities(valid, Object.fromEntries(positions.map(position => [position.ticker, position.shares])));
+    if (quantityError) {
+      toast(`Cannot sell ${quantityError.requested} ${quantityError.ticker}: only ${fmt(quantityError.available, 0)} shares are available after the earlier rows.`);
+      return;
+    }
+    const threshold = workbook.settings.tradePriceDeviationPct ?? 10;
+    const deviations = valid.flatMap(row => {
+      const ticker = row.ticker.toUpperCase();
+      const marketPrice = workbook.marketPrices[ticker] ?? 0;
+      const deviation = tradePriceDeviationPct(row.price, marketPrice);
+      return deviation !== null && Math.abs(deviation) > threshold
+        ? [`${ticker}: entered ${fmtQSEPrice(row.price)} vs market ${fmtQSEPrice(marketPrice)} (${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%)`]
+        : [];
+    });
+    if (deviations.length && !(await confirmDialog(`${deviations.join('\\n')}\\n\\nThis exceeds your ${threshold}% warning threshold. Save these trades anyway?`, 'Trade prices differ from market prices?'))) return;
     if (!(await ensureSignedIn('Sign in to save your transactions.'))) return;
     try {
+      const beforeCount = useWorkbookStore.getState().workbook.transactions.length;
       addTransactions(valid.map((r) => ({ ...r, ticker: r.ticker.toUpperCase() })));
+      const afterCount = useWorkbookStore.getState().workbook.transactions.length;
+      if (afterCount !== beforeCount + valid.length) throw new Error('Transaction store did not retain every submitted row.');
     } catch (error) {
       console.error('Failed to add QSE trade from the transaction form.', error);
       toast('Could not save the trade. Your entries are still here; please try again.');
@@ -452,6 +471,16 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   };
   const saveEdit = async () => {
     if (editIndex === null || !editRow) return;
+    const candidateTransactions = workbook.transactions.map((transaction, index) => index === editIndex ? editRow : transaction);
+    const quantityError = validateTransactionEdit(workbook.transactions, candidateTransactions);
+    if (quantityError) return toast(`Cannot save this edit: it would create ${fmt(quantityError.additionalUnmatchedShares, 0)} unmatched SELL shares for ${quantityError.ticker}.`);
+    const marketPrice = workbook.marketPrices[editRow.ticker.toUpperCase()] ?? 0;
+    const deviation = tradePriceDeviationPct(editRow.price, marketPrice);
+    const threshold = workbook.settings.tradePriceDeviationPct ?? 10;
+    if (deviation !== null && Math.abs(deviation) > threshold) {
+      const accepted = await confirmDialog(`Entered ${fmtQSEPrice(editRow.price)}; saved market price is ${fmtQSEPrice(marketPrice)} (${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%). This exceeds your ${threshold}% warning threshold. Save anyway?`, 'Trade price differs from market price?');
+      if (!accepted) return;
+    }
     if (!(await ensureSignedIn('Sign in to save changes.'))) return;
     updateTransaction(editIndex, editRow);
     toast('Transaction updated.');

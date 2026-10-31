@@ -1,9 +1,11 @@
 import { PriceInput } from "../../../components/ui/PriceInput";
 import { useEffect, useMemo, useState } from 'react';
 import { breakEvenPrice, requiredSellPrice, roundTick } from '../../../lib/calc';
+import { tradePriceDeviationPct } from '../../../lib/calc/tradeValidation';
 import { PlusIcon, SaveIcon } from '../../../components/icons';
 import { TickerLogo } from '../../../components/TickerLogo';
 import { toast } from '../../../components/Toast';
+import { confirmDialog } from '../../../components/ConfirmDialog';
 import { Field, TextInput } from '../../../components/ui/Field';
 import { Tooltip } from '../../../components/Tooltip';
 import { fmt, fmtMoney, fmtQSEPrice } from '../../../lib/format';
@@ -59,6 +61,7 @@ export function TradeCalculator({ initialTicker }: { initialTicker?: string } = 
 
   const [mode, setMode] = useState<Mode>('BUY');
   const [ticker, setTicker] = useState(initialTicker || '');
+  useEffect(() => { if (initialTicker) setTicker(initialTicker); }, [initialTicker]);
   const [targetTouched, setTargetTouched] = useState(false);
 
   const [sellShares, setSellShares] = useState(0);
@@ -176,19 +179,36 @@ export function TradeCalculator({ initialTicker }: { initialTicker?: string } = 
     targetProfit !== 0 && sellCap > 0 ? requiredSellPrice(sellCostBasis, sellCap, targetProfit, feePct, tick, calcFee) : null;
 
   const addTrade = async () => {
-    if (mode === 'SELL') {
-      if (!ticker || sellCap <= 0 || sellPrice <= 0) return toast('Fill in shares and price.');
-      if (!(await ensureSignedIn('Sign in to save this trade.'))) return;
-      addTransaction({ date: new Date().toISOString().slice(0, 10), ticker, action: 'SELL', shares: sellCap, price: sellPrice });
-      toast(`Logged SELL ${sellCap} ${ticker} @ ${fmtQSEPrice(sellPrice)}`);
+    const action = mode === 'SELL' ? 'SELL' : 'BUY';
+    const sharesToSave = action === 'SELL' ? sellShares : newShares;
+    const priceToSave = action === 'SELL' ? sellPrice : buyPrice;
+    if (!ticker || sharesToSave <= 0 || priceToSave <= 0) return toast('Fill in shares and price.');
+    if (action === 'SELL' && sharesToSave > shares + 1e-7) {
+      return toast(`Cannot sell ${sharesToSave} ${ticker}: only ${fmt(shares, 0)} shares are available.`);
+    }
+    const deviation = tradePriceDeviationPct(priceToSave, mp);
+    const threshold = workbook.settings.tradePriceDeviationPct ?? 10;
+    if (deviation !== null && Math.abs(deviation) > threshold) {
+      const accepted = await confirmDialog(`Entered ${fmtQSEPrice(priceToSave)}; saved market price is ${fmtQSEPrice(mp)} (${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%). This exceeds your ${threshold}% warning threshold. Save anyway?`, 'Trade price differs from market price?');
+      if (!accepted) return;
+    }
+    if (!(await ensureSignedIn('Sign in to save this trade.'))) return;
+    const transaction = { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), ticker, action: action as 'BUY' | 'SELL', shares: sharesToSave, price: priceToSave };
+    try {
+      addTransaction(transaction);
+      const saved = useWorkbookStore.getState().workbook.transactions.some(row => row.id === transaction.id);
+      if (!saved) return toast('The trade was not saved. Please try again.');
+    } catch (error) {
+      console.error('Failed to save trade from the calculator.', error);
+      return toast('The trade could not be saved. Please try again.');
+    }
+    if (action === 'SELL') {
+      toast(`Logged SELL ${sharesToSave} ${ticker} @ ${fmtQSEPrice(priceToSave)}`);
     } else {
-      if (!ticker || newShares <= 0 || buyPrice <= 0) return toast('Fill in shares and price.');
-      if (!(await ensureSignedIn('Sign in to save this trade.'))) return;
-      addTransaction({ date: new Date().toISOString().slice(0, 10), ticker, action: 'BUY', shares: newShares, price: buyPrice });
       toast(
         mode === 'CYCLE'
-          ? `Logged the BUY leg: ${newShares} ${ticker} @ ${fmtQSEPrice(buyPrice)}. The planned sell is not auto-logged — add it when you actually sell.`
-          : `Logged BUY ${newShares} ${ticker} @ ${fmtQSEPrice(buyPrice)}`,
+          ? `Logged the BUY leg: ${sharesToSave} ${ticker} @ ${fmtQSEPrice(priceToSave)}. The planned sell is not auto-logged — add it when you actually sell.`
+          : `Logged BUY ${sharesToSave} ${ticker} @ ${fmtQSEPrice(priceToSave)}`,
       );
       setNewShares(0);
       setAmountInput('');

@@ -28,6 +28,7 @@ export const DEFAULT_PSX_SETTINGS: PSXSettings = {
   tick: 0.01,
   currency: 'PKR',
   depositFee: 0,
+  tradePriceDeviationPct: 10,
   cgtFilerPct: 15,
   // README item 5: real broker schedules charge non-filers a much higher
   // rate than filers (JS Bank: ~30%) — the legacy app defaulted both to

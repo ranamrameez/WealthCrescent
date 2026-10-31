@@ -1,3 +1,4 @@
+import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
 import { DateValue } from '../../../components/DateValue';
@@ -104,6 +105,7 @@ function BudgetOverview({ activities, filters }: { activities: BudgetActivity[];
     });
     return [...out.entries()].sort((a, b) => (b[1].expense + b[1].income) - (a[1].expense + a[1].income));
   }, [monthRows]);
+  const { rows: pageCategoryTotals, controls: categoryPaginationControls } = useTablePagination(categoryTotals);
   const moduleTotals = useMemo(() => {
     const out = new Map<BudgetModule, number>();
     monthRows.forEach((row) => out.set(row.module, (out.get(row.module) ?? 0) + row.amount));
@@ -118,7 +120,7 @@ function BudgetOverview({ activities, filters }: { activities: BudgetActivity[];
       {currencyTotals.map(([currency, totals]) => <div className="card" key={currency}><div className="label">{currency} budget</div><div className="sub pill-positive">Income {fmtMoney(totals.income, currency)}</div><div className="sub pill-negative">Expenses {fmtMoney(totals.expenses, currency)}</div><div className={`value ${totals.income - totals.expenses >= 0 ? 'pill-positive' : 'pill-negative'}`}>Net {fmtMoney(totals.income - totals.expenses, currency)}</div></div>)}
       <div className="stat-card card"><div className="label">Planned items</div><div className="value">{monthRows.length}</div></div>
     </div>
-    {mode === 'budget' ? <div className="table-scroll"><table><thead><tr><th>Category</th><th>Income</th><th>Expenses</th><th>Net</th></tr></thead><tbody>{categoryTotals.map(([category, totals]) => <RecordRow record={{ category, totals }} key={category}><td>{category}</td><td className="pill-positive">{fmtMoney(totals.income, monthRows.find((row) => row.category === category)?.currencyCode ?? 'USD')}</td><td className="pill-negative">{fmtMoney(totals.expense, monthRows.find((row) => row.category === category)?.currencyCode ?? 'USD')}</td><td>{fmtMoney(totals.income - totals.expense, monthRows.find((row) => row.category === category)?.currencyCode ?? 'USD')}</td></RecordRow>)}{!categoryTotals.length && <tr><td colSpan={4} className="text-muted">No planned items for this month.</td></tr>}</tbody></table></div> : <div className="account-summary-grid">{moduleTotals.map(([module, total]) => <div className="card" key={module}><strong>{module === 'bank' ? 'Banking' : module[0].toUpperCase() + module.slice(1)}</strong><div className={total >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(total, monthRows.find((row) => row.module === module)?.currencyCode ?? 'USD')} net planned</div></div>)}</div>}
+    {mode === 'budget' ? <><div className="table-scroll"><table><thead><tr><th>Category</th><th>Income</th><th>Expenses</th><th>Net</th></tr></thead><tbody>{pageCategoryTotals.map(([category, totals]) => <RecordRow record={{ category, totals }} key={category}><td>{category}</td><td className="pill-positive">{fmtMoney(totals.income, monthRows.find((row) => row.category === category)?.currencyCode ?? 'USD')}</td><td className="pill-negative">{fmtMoney(totals.expense, monthRows.find((row) => row.category === category)?.currencyCode ?? 'USD')}</td><td>{fmtMoney(totals.income - totals.expense, monthRows.find((row) => row.category === category)?.currencyCode ?? 'USD')}</td></RecordRow>)}{!categoryTotals.length && <tr><td colSpan={4} className="text-muted">No planned items for this month.</td></tr>}</tbody></table></div>{categoryTotals.length ? categoryPaginationControls : null}</> : <div className="account-summary-grid">{moduleTotals.map(([module, total]) => <div className="card" key={module}><strong>{module === 'bank' ? 'Banking' : module[0].toUpperCase() + module.slice(1)}</strong><div className={total >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(total, monthRows.find((row) => row.module === module)?.currencyCode ?? 'USD')} net planned</div></div>)}</div>}
   </TableCard>;
 }
 
@@ -149,6 +151,7 @@ function ActivityList({ activities, filters }: { activities: BudgetActivity[]; f
     }
   };
   const { sorted, Th } = useSortableRows(filtered, sortValue, 'date', 'desc');
+  const { rows: pageRows, controls: paginationControls } = useTablePagination(sorted);
 
   return (
     <TableCard rows={sorted} title={<h3 className="m-0">All planned financial activity</h3>} className="mb-md">
@@ -162,7 +165,7 @@ function ActivityList({ activities, filters }: { activities: BudgetActivity[]; f
             </tr>
           </thead>
           <tbody>
-            {sorted.map((a) => (
+            {pageRows.map((a) => (
               <RecordRow record={a} key={`${a.module}:${a.id}`}>
                 <td><DateValue value={a.date} /></td>
                 <td>{moduleLabel[a.module]}</td>
@@ -183,6 +186,7 @@ function ActivityList({ activities, filters }: { activities: BudgetActivity[]; f
           </tbody>
         </table>
       </div>
+      {paginationControls}
     </TableCard>
   );
 }

@@ -1,3 +1,4 @@
+import { useTablePagination } from '../hooks/useTablePagination';
 import { RecordRow } from './RecordRow';
 import { useDateTableSort } from '../hooks/useDateTableSort';
 import { useState } from 'react';
@@ -6,9 +7,11 @@ import { usePSXWorkbookStore } from '../store/psxWorkbookStore';
 import { useFundsWorkbookStore } from '../store/fundsWorkbookStore';
 import { useEnsureSignedIn } from '../lib/firebase/useEnsureSignedIn';
 import { resolveNumericInput } from '../lib/mathExpression';
-import { fmtMoney } from '../lib/format';
+import { fmt, fmtMoney, fmtPSXPrice, fmtQSEPrice } from '../lib/format';
+import { tradePriceDeviationPct, validateTransactionEdit } from '../lib/calc/tradeValidation';
+import { toast } from './Toast';
 import type { TransactionPageFilters } from '../hooks/useUrlTransactionFilters';
-import type { TradePlanLeg } from '../types/workbook';
+import type { TradePlanLeg, Transaction } from '../types/workbook';
 import { PlanEditorModal } from './PlanEditorModal';
 import { DateValue } from './DateValue';
 import { FeeModeControl, feeModeFor } from './ui/FeeModeControl';
@@ -25,10 +28,73 @@ export function InvestmentPlans({ market, items, filters }: { market: 'qse' | 'p
   const ensureSignedIn = useEnsureSignedIn();
   const [draft, setDraft] = useState<{ planId?: string; index?: number; original?: string; ticker: string; action: 'BUY' | 'SELL'; date: string; shares: string; price: string; manualSameDay?: boolean; feeOverride?: number } | null>(null);
   const [error, setError] = useState('');
-  const rows = plans.flatMap(plan => plan.legs.map((leg, index) => ({ plan, leg, index }))).filter(({ leg }) => items.some(item => item.id === leg.ticker)
-    && (!filters?.fromDate || !leg.date || leg.date >= filters.fromDate) && (!filters?.toDate || !leg.date || leg.date <= filters.toDate)
-    && (!filters || filters.direction === 'all' || (filters.direction === 'in' ? leg.action === 'BUY' : leg.action === 'SELL'))
-    && (!filters || filters.source !== 'statement-import'));
+  const rows = plans
+    .flatMap(plan => plan.legs.map((leg, index) => ({ plan, leg, index })))
+    .filter(({ leg }) =>
+      items.some(item => item.id === leg.ticker)
+      && (!filters?.fromDate || !leg.date || leg.date >= filters.fromDate)
+      && (!filters?.toDate || !leg.date || leg.date <= filters.toDate)
+      && (!filters || filters.direction === 'all' || (filters.direction === 'in' ? leg.action === 'BUY' : leg.action === 'SELL'))
+      && (!filters || filters.source !== 'statement-import'),
+    );
+  const sortedRows = dateSort.rows(rows, { date: row => row.leg });
+  const { rows: pageRows, controls } = useTablePagination(sortedRows);
+  const markDone = async (planId: string, leg: TradePlanLeg, index: number) => {
+    if (!(await confirmDialog('Add this planned trade to transaction history?', 'Mark plan as done?')) || !(await ensureSignedIn('Sign in to fulfill this plan.'))) return;
+    const state = useStore.getState();
+    const current = state.workbook.tradePlans.find(item => item.id === planId);
+    if (!current || current.legs[index]?.executed || JSON.stringify(current.legs[index]) !== JSON.stringify(leg)) {
+      toast('This plan changed. Refresh the page and try again.');
+      return;
+    }
+
+    const stockWorkbook = market === 'qse'
+      ? useWorkbookStore.getState().workbook
+      : market === 'psx'
+        ? usePSXWorkbookStore.getState().workbook
+        : null;
+    if (stockWorkbook) {
+      const nextGlobalTransactionIndex = Math.max(0, ...stockWorkbook.transactions.map(transaction => transaction.globalTransactionIndex ?? transaction.transactionIndex ?? 0)) + 1;
+      const preview: Transaction = {
+        id: '__trade-plan-validation__',
+        globalTransactionIndex: nextGlobalTransactionIndex,
+        transactionIndex: nextGlobalTransactionIndex,
+        date: leg.date ?? new Date().toISOString().slice(0, 10),
+        ticker: leg.ticker,
+        action: leg.action,
+        shares: leg.shares,
+        price: leg.price,
+        manualSameDay: leg.manualSameDay,
+        feeOverride: leg.feeOverride,
+      };
+      const quantityError = validateTransactionEdit(stockWorkbook.transactions, [...stockWorkbook.transactions, preview]);
+      if (quantityError) {
+        toast(`Cannot execute this plan: it would create ${fmt(quantityError.additionalUnmatchedShares, 0)} unmatched SELL shares for ${quantityError.ticker}.`);
+        return;
+      }
+
+      const marketPrice = stockWorkbook.marketPrices[leg.ticker.toUpperCase()] ?? 0;
+      const deviation = tradePriceDeviationPct(leg.price, marketPrice);
+      const threshold = stockWorkbook.settings.tradePriceDeviationPct ?? 10;
+      if (deviation !== null && Math.abs(deviation) > threshold) {
+        const entered = market === 'psx' ? fmtPSXPrice(leg.price) : fmtQSEPrice(leg.price);
+        const currentPrice = market === 'psx' ? fmtPSXPrice(marketPrice) : fmtQSEPrice(marketPrice);
+        const accepted = await confirmDialog(`Planned price ${entered}; saved market price is ${currentPrice} (${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%). This exceeds your ${threshold}% warning threshold. Execute anyway?`, 'Trade price differs from market price?');
+        if (!accepted) return;
+      }
+    }
+
+    const beforeCount = state.workbook.transactions.length;
+    state.executeTradePlanLeg(planId, index);
+    const afterWorkbook = useStore.getState().workbook;
+    const savedLeg = afterWorkbook.tradePlans.find(item => item.id === planId)?.legs[index];
+    if (afterWorkbook.transactions.length !== beforeCount + 1 || !savedLeg?.executed) {
+      toast('The planned trade was not recorded. The plan remains available; please try again.');
+      return;
+    }
+    toast('Planned trade recorded.');
+  };
+
   const save = async () => {
     if (!draft) return;
     const shares = resolveNumericInput(draft.shares), price = resolveNumericInput(draft.price);
@@ -45,11 +111,12 @@ export function InvestmentPlans({ market, items, filters }: { market: 'qse' | 'p
   };
   return <>
     <button className="btn secondary small" disabled={!items.length} onClick={() => { setError(''); setDraft({ ticker: items[0]?.id ?? '', action: 'BUY', date: new Date().toISOString().slice(0, 10), shares: '', price: '' }); }}>+ Add plan</button>
-    <div className="table-scroll mt-12"><table><thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Item</th><th>Plan</th><th>Units</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead><tbody>{dateSort.rows(rows, { date: row => row.leg }).map(({ plan, leg, index }) => <RecordRow onEdit={(!leg.executed) ? () => { setError(''); setDraft({ planId: plan.id, index, original: JSON.stringify(leg), ticker: leg.ticker, action: leg.action, date: leg.date ?? '', shares: String(leg.shares), price: String(leg.price), manualSameDay:leg.manualSameDay, feeOverride:leg.feeOverride }); } : undefined}    record={{ plan, leg, index }}  key={`${plan.id}:${index}`}><td>{leg.date ? <DateValue value={leg.date} /> : 'Unscheduled'}</td><td>{items.find(item => item.id === leg.ticker)?.name}</td><td>{leg.action === 'BUY' ? 'Buy' : 'Sell'}</td><td>{leg.shares}</td><td>{fmtMoney(leg.shares * leg.price, items.find(item => item.id === leg.ticker)?.currency ?? '')}</td><td>{leg.executed ? 'Done' : 'Planned'}</td><td>{!leg.executed && <>
+    <div className="table-scroll mt-12"><table><thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Item</th><th>Plan</th><th>Units</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead><tbody>{pageRows.map(({ plan, leg, index }) => <RecordRow onEdit={(!leg.executed) ? () => { setError(''); setDraft({ planId: plan.id, index, original: JSON.stringify(leg), ticker: leg.ticker, action: leg.action, date: leg.date ?? '', shares: String(leg.shares), price: String(leg.price), manualSameDay:leg.manualSameDay, feeOverride:leg.feeOverride }); } : undefined}    record={{ plan, leg, index }}  key={`${plan.id}:${index}`}><td>{leg.date ? <DateValue value={leg.date} /> : 'Unscheduled'}</td><td>{items.find(item => item.id === leg.ticker)?.name}</td><td>{leg.action === 'BUY' ? 'Buy' : 'Sell'}</td><td>{leg.shares}</td><td>{fmtMoney(leg.shares * leg.price, items.find(item => item.id === leg.ticker)?.currency ?? '')}</td><td>{leg.executed ? 'Done' : 'Planned'}</td><td>{!leg.executed && <>
       <button className="btn secondary small" onClick={() => { setError(''); setDraft({ planId: plan.id, index, original: JSON.stringify(leg), ticker: leg.ticker, action: leg.action, date: leg.date ?? '', shares: String(leg.shares), price: String(leg.price), manualSameDay:leg.manualSameDay, feeOverride:leg.feeOverride }); }}>Edit</button>{' '}
-      <button className="btn secondary small" onClick={async () => { if (!(await confirmDialog('Add this planned trade to transaction history?', 'Mark plan as done?')) || !(await ensureSignedIn('Sign in to fulfill this plan.'))) return; const current = useStore.getState().workbook.tradePlans.find(item => item.id === plan.id); if (JSON.stringify(current?.legs[index]) === JSON.stringify(leg)) useStore.getState().executeTradePlanLeg(plan.id, index); }}>Mark done</button>{' '}
+      <button className="btn secondary small" onClick={() => void markDone(plan.id, leg, index)}>Mark done</button>{' '}
       <button className="btn secondary small" onClick={async () => { if (!(await confirmDialog('Remove this unfulfilled trade from the plan?')) || !(await ensureSignedIn('Sign in to remove this plan.'))) return; const current = useStore.getState().workbook.tradePlans.find(item => item.id === plan.id); if (current && !current.legs[index]?.executed && JSON.stringify(current.legs[index]) === JSON.stringify(leg)) useStore.getState().updateTradePlan(plan.id, { legs: current.legs.filter((_, i) => i !== index) }); }}>Remove</button>
     </>}</td></RecordRow>)}</tbody></table>{!rows.length && <p className="text-muted">No plans in this view.</p>}</div>
+    {controls}
     {draft && <PlanEditorModal title={draft.planId ? 'Edit investment plan' : 'Add investment plan'} onClose={() => setDraft(null)}><div className="row gap-sm">
       <Field label="Item"><select value={draft.ticker} onChange={e => setDraft({ ...draft, ticker: e.target.value })}>{items.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
       <Field label="Action"><select value={draft.action} onChange={e => setDraft({ ...draft, action: e.target.value as 'BUY' | 'SELL' })}><option value="BUY">Buy</option><option value="SELL">Sell</option></select></Field>
