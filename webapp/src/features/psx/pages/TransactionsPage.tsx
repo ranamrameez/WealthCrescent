@@ -23,7 +23,7 @@ import { useTablePagination } from '../../../hooks/useTablePagination';
 import { usePageFabActions } from '../../../hooks/usePageFabActions';
 import { fmt, fmtMoney, fmtPSXPrice } from '../../../lib/format';
 import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
-import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
+import { computeFIFOPositions } from '../../../lib/calc/fifoPositions';
 import { tradePriceDeviationPct, validateTransactionEdit, validateSellQuantities } from '../../../lib/calc/tradeValidation';
 import { isNettedLeg } from '../../../lib/calc/psxFees';
 import { transferRunningBalance } from '../../../lib/calc/transferBalance';
@@ -421,7 +421,7 @@ function TransactionList() {
   // lot's buy price... inline in the main trade row." Computed from the
   // WHOLE workbook (not `filterTicker`-scoped like `closedTrades` above) so
   // a row's own P&L figure never changes just because the ticker filter is
-  // narrowed to something else. Shares `ctMatchOrder` with the Closed Trades
+  // narrowed to something else. Shares the selected cost-basis method with the Closed Trades
   // table above (2026-09-13) — a feature rolled out to one view of a sell's
   // realized P&L must stay consistent with every other view of the same
   // number, or this row's own pill and the table below could show two
@@ -434,7 +434,7 @@ function TransactionList() {
   // of it (`computeFIFOPositions`'s own `lotsByTicker`) — a pure reporting
   // ledger, independent of PSX's own costBasisMethod setting. Shares
   // `ctMatchOrder` with Closed trades below (2026-09-13, see
-  // `LotMatchOrder`'s own doc comment) so the two tables always add up to
+  // selected-method calculation) so the two tables always add up to
   // the same picture of which lots are still open vs. already sold.
   const openLots = useMemo(() => Object.entries(lots)
     .filter(([ticker]) => filterTicker === 'ALL' || ticker === filterTicker)
@@ -720,7 +720,7 @@ function TransactionList() {
 
       {(workbook.settings.costBasisMethod === 'fifo' || workbook.settings.costBasisMethod === 'lowestCostFirst') ? <>
       <p className="text-muted mb-sm mt-md">
-        Lot attribution follows the configured cost-basis method: {ctMatchOrder === 'lowestCostFirst' ? 'Lowest cost first' : 'FIFO'}.
+        Lot attribution follows the configured cost-basis method: {workbook.settings.costBasisMethod === 'lowestCostFirst' ? 'Lowest cost first' : 'FIFO'}.
       </p>
       <details open>
         <summary className="summary-heading">

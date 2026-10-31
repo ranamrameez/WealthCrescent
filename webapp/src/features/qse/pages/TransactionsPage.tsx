@@ -26,7 +26,7 @@ import { LotAllocationFields } from '../../../components/ui/LotAllocationFields'
 import { useSortableRows } from '../../../hooks/useSortableRows';
 import { usePageFabActions } from '../../../hooks/usePageFabActions';
 import { fmt, fmtMoney, fmtQSEPrice } from '../../../lib/format';
-import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
+import { computeFIFOPositions } from '../../../lib/calc/fifoPositions';
 import { tradePriceDeviationPct, validateTransactionEdit, validateSellQuantities } from '../../../lib/calc/tradeValidation';
 import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
 import { transferRunningBalance } from '../../../lib/calc/transferBalance';
@@ -403,14 +403,13 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   // lot's buy price... inline in the main trade row." Computed from the
   // WHOLE workbook before display filters are applied so
   // a row's own P&L figure never changes just because the ticker filter is
-  // narrowed to something else. Shares `ctMatchOrder` with the Closed Trades
+  // narrowed to something else. Shares the selected cost-basis method with the Closed Trades
   // table above (2026-09-13) — a feature rolled out to one view of a sell's
   // realized P&L must stay consistent with every other view of the same
   // number, or this row's own pill and the table below could show two
   // contradicting figures for the identical sell.
   // Row-level SELL P/L is the same per-sell result used by the closed-trade view.
   // It is computed once in the shared stock calculation engine.
-  const sellPLById = useMemo(() => sellPLBySellTxId, [sellPLBySellTxId]);
 
   // User's own words: "make separate sections for open and closed trades...
   // it gets difficult to know the sold status and price of a lot." Same
@@ -421,7 +420,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   // of the lot-based methods) so this page's own reporting view never
   // silently changes shape depending on that setting. Shares
   // `ctMatchOrder` with Closed trades below (2026-09-13, see
-  // `LotMatchOrder`'s own doc comment) so the two tables always add up to
+  // selected-method calculation) so the two tables always add up to
   // the same picture of which lots are still open vs. already sold.
   const openLots = useMemo(() => Object.entries(lots).flatMap(([ticker, tickerLots]) =>
     tickerLots.map(lot => ({ ticker, ...lot })),
