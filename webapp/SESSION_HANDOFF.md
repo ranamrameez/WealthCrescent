@@ -163,3 +163,18 @@ PR #43 (`feat/broker-profile-isolation-main-v2`) is based on current `main`, inc
 ## PR #43 latest-head validation (2026-10-30)
 
 Latest head `dcf3181a0a8955417c4049089f4735685c25a8ec` passed GitHub Actions run #112: full test suite and production build. PR #43 is code/CI ready but remains open pending a real PSX backup/export migration review and browser verification. The connected browser context was unavailable during this session; do not claim those manual checks were completed.
+
+
+## 2026-10-31 — merge authorization and workflow rules
+
+The user confirmed that only this session is active and explicitly instructed us to complete PR #44 and merge it. Do not defer to earlier notes asking to keep the PR in draft without user approval; that approval has now been given.
+
+**Standing workflow rules (user-confirmed 2026-10-31):** make small, focused commits; push regularly to the existing feature branch; keep `CLAUDE.md`, `webapp/README.md`, `webapp/USER_MANUAL.md`, and this handoff updated when relevant; never push directly to `main`; and never merge unless the exact latest PR head has successful type-check, production build, and full test suite. Any code change after validation requires a fresh full run on the new head.
+
+### Live review checkpoint
+
+- PR #44 was open, draft, and mergeable at head `18348fa258be95767b209b8585b575a8acdd2cf8`; 56 files changed, 163 commits, and no inline review threads or submitted reviews were present.
+- GitHub Actions run [#41201015866](https://github.com/ranamrameez/WealthCrescent/actions/runs/41201015866) completed successfully on that exact head (Webapp checks workflow).
+- The diff was reviewed for the shared section actions, default section expansion, shared pagination, credit-card chronological balances, FIFO legacy-oversell matching/fee allocation, transaction edit validation, QSE/PSX position summaries and trade calculator changes. The PSO fixture expectation remains 122 BUY / 132 SELL, with 10 unmatched SELL shares and no fictitious realized profit.
+- The connected production browser tab exposed the deployed Net Worth analytics page for read-only inspection. This session's browser connection provides tab reading only, not navigation/click interaction, so end-to-end interaction checks for the PR branch could not be performed here. Do not claim those manual flows were browser-verified; automated validation and source review are the available evidence.
+- The user explicitly authorized merging despite the earlier draft-only checkpoint. Re-fetch PR head and Actions after the documentation commits below; mark ready and merge only if the exact current head's workflow succeeds and GitHub reports it mergeable.
