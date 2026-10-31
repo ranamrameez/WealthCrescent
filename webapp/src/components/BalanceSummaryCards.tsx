@@ -47,7 +47,7 @@ export function BalanceSummaryCards({ currency, summary: s, kind = 'balance' }: 
     <SummarySection title={labels.actual}>
       {metric(labels.current, s.current, true, 'Current position')}
       {metric(labels.start, s.start, false, 'At the start of the selected period')}
-      <SummaryValue label="Change" value={fmtMoney(change, currency)} tone={change >= 0 ? 'positive' : 'negative'} detail={s.start === 0 ? '—' : `${(change / Math.abs(s.start) * 100).toFixed(1)}% change`} />
+      <SummaryValue label="Change" value={fmtMoney(change, currency)} tone={(kind === 'creditCard' ? change <= 0 : change >= 0) ? 'positive' : 'negative'} detail={s.start === 0 ? '—' : `${(change / Math.abs(s.start) * 100).toFixed(1)}% change`} />
     </SummarySection>
     <SummarySection title={labels.expected}>
       {metric(labels.net, s.current + expectedFlow, true, 'Actual position plus pending and planned activity')}
