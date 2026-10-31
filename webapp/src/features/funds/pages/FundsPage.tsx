@@ -1600,7 +1600,7 @@ function FundsCashLedgerSection() {
   const [kindFilter, setKindFilter] = useState<'all' | 'trade' | 'transfer'>('all');
   const [editRow, setEditRow] = useState<Transfer | null>(null);
   const ledgerByCurrency = useMemo(
-    () => fundsCashLedgerByCurrency(workbook.funds, workbook.transactions, workbook.transfers, workbook.settings.defaultCurrency),
+    () => fundsCashLedgerByCurrency(workbook.funds, workbook.transactions, workbook.transfers, workbook.settings.legacyTransferCurrency ?? workbook.settings.defaultCurrency),
     [workbook.funds, workbook.transactions, workbook.transfers, workbook.settings.defaultCurrency],
   );
   const currencyCodes = Object.keys(ledgerByCurrency).sort();
