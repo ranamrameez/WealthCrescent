@@ -8025,7 +8025,7 @@ PR #41 carries the clean main-based broker-profile implementation. Keep QSE/PSX 
 
 ## Funds cash reconciliation — issue #42 (2026-10-31)
 
-Implementation is on `feat/funds-cash-reconciliation`, branched from current `main`. The chosen model is one portfolio-level cash account per currency because Funds linked transfers do not identify a fund or broker. BUY moves money from cash into units; valid SELL returns proceeds; transfer fees are applied once; currencies remain separate.
+Implementation is in draft PR #46 on `feat/funds-cash-reconciliation`, branched from current `main`. Latest checked head is `4f2322cdd0751874085e6f9cde9b7ab348380a2e`; Actions run #273 is queued for that exact head. The chosen model is one portfolio-level cash account per currency because Funds linked transfers do not identify a fund or broker. BUY moves money from cash into units; valid SELL returns proceeds; transfer fees are applied once; currencies remain separate.
 
 New/edited transfers persist `currencyCode`. Legacy transfers are not rewritten: a versioned metadata migration snapshots their legacy Funds default currency once and the UI warns users to review/assign explicit currencies. Funds Summary separates holdings from cash, and current/historical Net Worth includes both exactly once with a dedicated Funds cash inclusion toggle. Tests cover fees, multi-currency balances, unmatched SELLs, legacy currency fallback and historical Net Worth.
 
