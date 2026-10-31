@@ -292,7 +292,7 @@ export function NetWorthPage({
     creditCards: selectedModules.includes('creditCards') ? creditCardsWb.cards : [], creditCardTransactions: creditCardsWb.transactions,
     personalLoans: selectedModules.includes('personalLoans') ? personalLoans.loans : [], personalLoanRepayments: personalLoans.repayments,
     emiLoans: selectedModules.includes('emi') ? emiLoans.filter(loan => loan.includeInNetWorth !== false) : [],
-    fundsFunds: selectedModules.includes('funds') ? funds.funds : [], fundsTransactions: funds.transactions, fundsTransfers: funds.transfers, fundsDefaultCurrency: funds.settings.legacyTransferCurrency ?? funds.settings.defaultCurrency, fundsIncludeCashInNetWorth: selectedModules.includes('funds') && funds.settings.includeCashInNetWorth !== false, fundsPriceHistory: funds.priceHistory,
+    fundsFunds: selectedModules.includes('funds') ? funds.funds : [], fundsTransactions: selectedModules.includes('funds') ? funds.transactions : [], fundsTransfers: selectedModules.includes('funds') ? funds.transfers : [], fundsDefaultCurrency: funds.settings.legacyTransferCurrency ?? funds.settings.defaultCurrency, fundsIncludeCashInNetWorth: selectedModules.includes('funds') && funds.settings.includeCashInNetWorth !== false, fundsPriceHistory: selectedModules.includes('funds') ? funds.priceHistory : {},
     qseTransactions: qse.transactions, qseTransfers: qse.transfers, qseAdjustments: qse.adjustments,
     qsePriceHistory: qse.priceHistory, qseSettings: { ...qse.settings, includeInNetWorth: selectedModules.includes('qse') && qse.settings.includeInNetWorth !== false },
     psxTransactions: psx.transactions, psxTransfers: psx.transfers, psxAdjustments: psx.adjustments,
