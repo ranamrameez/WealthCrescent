@@ -695,6 +695,8 @@ function PersonalLoanPlansSection({ loan, showActions }: { loan: PersonalLoan; s
     () => plans.filter((plan) => plan.loanId === loan.id).sort((a, b) => a.date.localeCompare(b.date)),
     [plans, loan.id],
   );
+  const sortedRows = dateSort.rows(rows, { date: row => row });
+  const { rows: pageRows, controls } = useTablePagination(sortedRows);
 
   const execute = async (plan: PersonalLoanPlan) => {
     if (plan.executed) return;
@@ -718,7 +720,7 @@ function PersonalLoanPlansSection({ loan, showActions }: { loan: PersonalLoan; s
         <table>
           <thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th><th></th></tr></thead>
           <tbody>
-            {dateSort.rows(rows, { date: row => row }).map((plan) => (
+            {pageRows.map((plan) => (
               <RecordRow record={plan} key={plan.id}>
                 <td><DateValue value={plan.date} /></td>
                 <td>{plan.description || '—'}</td>
@@ -737,6 +739,7 @@ function PersonalLoanPlansSection({ loan, showActions }: { loan: PersonalLoan; s
           </tbody>
         </table>
       </div>
+      {controls}
     </div>
   );
 }
@@ -1143,13 +1146,15 @@ function PersonalLoansModulePlans({
       && (!filters.toDate || plan.date <= filters.toDate)
       && (filters.category === 'all' || categoryName(plan.categoryID, categories) === filters.category))
     .sort((a, b) => a.date.localeCompare(b.date));
+  const sortedRows = dateSort.rows(rows, { date: row => row });
+  const { rows: pageRows, controls } = useTablePagination(sortedRows);
 
   return (
     <div className="table-responsive">
       <table>
         <thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Loan</th><th>Description</th><th>Amount</th><th>Status</th></tr></thead>
         <tbody>
-          {dateSort.rows(rows, { date: row => row }).map((plan) => {
+          {pageRows.map((plan) => {
             const loan = visibleLoans.get(plan.loanId)!;
             return (
               <RecordRow record={plan} onOpen={() => onSelectLoan(loan)} key={plan.id} className="clickable" >
@@ -1164,6 +1169,7 @@ function PersonalLoansModulePlans({
           {!rows.length && <tr><td colSpan={5} className="text-muted">No plans match this loan filter.</td></tr>}
         </tbody>
       </table>
+      {controls}
     </div>
   );
 }
@@ -1193,13 +1199,15 @@ function PersonalLoansModulePayments({
       && (filters.source === 'all' || (payment.source ?? 'manual') === filters.source)
       && (filters.category === 'all' || categoryName(payment.categoryID, categories) === filters.category))
     .sort((a, b) => b.date.localeCompare(a.date) || (b.seq ?? 0) - (a.seq ?? 0));
+  const sortedRows = dateSort.rows(rows, { date: row => row });
+  const { rows: pageRows, controls } = useTablePagination(sortedRows);
 
   return (
     <div className="table-responsive">
       <table>
         <thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Loan</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th></tr></thead>
         <tbody>
-          {dateSort.rows(rows, { date: row => row }).map((payment) => {
+          {pageRows.map((payment) => {
             const loan = visibleLoans.get(payment.loanId)!;
             return (
               <RecordRow record={payment} onOpen={() => onSelectLoan(loan)} key={payment.id} className="clickable" >
@@ -1215,6 +1223,7 @@ function PersonalLoansModulePayments({
           {!rows.length && <tr><td colSpan={6} className="text-muted">No payments match this loan filter.</td></tr>}
         </tbody>
       </table>
+      {controls}
     </div>
   );
 }
