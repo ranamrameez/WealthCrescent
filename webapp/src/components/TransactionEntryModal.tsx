@@ -518,6 +518,7 @@ export function TransactionEntryModal({
   const addQSETransfer = useWorkbookStore((s) => s.addTransfer);
   const addPSXTransfer = usePSXWorkbookStore((s) => s.addTransfer);
   const addFundsTransfer = useFundsWorkbookStore((s) => s.addTransfer);
+  const fundsDefaultCurrency = useFundsWorkbookStore((s) => s.workbook.settings.defaultCurrency);
   const addCreditCardTransaction = useCreditCardWorkbookStore((s) => s.addTransaction);
   const updateSubscription = useSubscriptionsWorkbookStore((s) => s.updateEntry);
   const bankAccounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
@@ -555,7 +556,7 @@ export function TransactionEntryModal({
   // rendering the locked edit form, rather than relying on a disabled picker.
   const linkFinance = rawLinkFinance && editLink ? enrichBrokerRef(rawLinkFinance, editLink.recordId) : rawLinkFinance;
   const [linkSnapshot] = useState(() => editLink ? [structuredClone(getLinkedSideRecord(editLink.link.from, editLink.link.fromRecordId)), structuredClone(getLinkedSideRecord(editLink.link.to, editLink.link.toRecordId))] : []);
-  const baseFinance = linkFinance ?? (editTransfer ? { module: editTransfer.module, ref: editTransfer.record.brokerId, fee: editTransfer.record.fee } : editFinance ?? defaultFinance);
+  const baseFinance = linkFinance ?? (editTransfer ? { module: editTransfer.module, ref: editTransfer.record.brokerId, fee: editTransfer.record.fee, ...(editTransfer.module === 'funds' ? { currencyCode: editTransfer.record.currencyCode ?? fundsDefaultCurrency } : {}) } : editFinance ?? defaultFinance);
   const resolvedDefaultFinance: LinkSideConfig = baseFinance
     ? (baseFinance.module === 'cash' && !baseFinance.currencyCode ? { ...baseFinance, currencyCode: cashDefaultCurrency } : baseFinance)
     : { module: 'cash', currencyCode: cashDefaultCurrency };
@@ -677,7 +678,7 @@ export function TransactionEntryModal({
       if (!current || JSON.stringify(current) !== JSON.stringify(record)) return toast('This transfer changed. Reopen its editor.');
       const choice = await resolveLinkedEdit(module, record.id);
       if (choice === 'cancel') return;
-      store.updateTransfer(record.id, { date: row.date, time: row.time, timezone: row.timezone, gross: Math.abs(row.amount), fee: row.finance.fee ?? record.fee, type: row.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', description: row.description.trim() || undefined });
+      store.updateTransfer(record.id, { date: row.date, time: row.time, timezone: row.timezone, gross: Math.abs(row.amount), fee: row.finance.fee ?? record.fee, type: row.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', ...(module === 'funds' ? { currencyCode: row.finance.currencyCode ?? fundsDefaultCurrency } : {}), description: row.description.trim() || undefined });
       if (choice === 'both') {
         const result = propagateLinkedEdit(module, record.id, { date: row.date, time: row.time, timezone: row.timezone, amount: Math.abs(row.amount), direction: row.direction, note: row.description.trim() || undefined });
         if (result.error) { toast(result.error); return; }
@@ -818,7 +819,7 @@ export function TransactionEntryModal({
           addPSXTransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: resolveTransferSide(r.finance, r.direction).fee ?? 0, description: r.description.trim() || undefined, brokerId: r.finance.ref });
           break;
         case 'funds':
-          addFundsTransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: resolveTransferSide(r.finance, r.direction).fee ?? 0, description: r.description.trim() || undefined });
+          addFundsTransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', currencyCode: r.finance.currencyCode ?? fundsDefaultCurrency, gross: Math.abs(r.amount), fee: resolveTransferSide(r.finance, r.direction).fee ?? 0, description: r.description.trim() || undefined });
           break;
         case 'creditCard': {
           // User-reported (2026-09-14): "no choice of expense or payment,
