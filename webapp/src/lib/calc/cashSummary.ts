@@ -12,6 +12,12 @@ export interface PositionValuation {
   sellFee: number;
   profit: number;
   roiPct: number;
+  avgCost: number;
+  breakEvenPrice: number;
+  target1Pct: number;
+  target2Pct: number;
+  target5Pct: number;
+  perShareCommission: { buy: number; sell: number } | null;
 }
 
 /** Single all-in summary: actual cash, trading gains/losses and fees. Pending

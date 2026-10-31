@@ -26,7 +26,7 @@ import { useQSEStockData } from '../hooks/useQSEStockData';
 type SortCol = 'ticker' | 'shares' | 'avgCost' | 'market' | 'value' | 'net' | 'status';
 
 function OpenPositionsTable({ onSelect }: { onSelect: (ticker: string) => void }) {
-  const { workbook, calcFee, rows: valuationRows } = useQSEDerived();
+  const { workbook, rows: valuationRows } = useQSEDerived();
   const { tickerNames } = useQSEStockData();
   const setMarketPrice = useWorkbookStore((s) => s.setMarketPrice);
   const ensureSignedIn = useEnsureSignedIn();

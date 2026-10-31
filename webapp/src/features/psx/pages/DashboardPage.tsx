@@ -42,14 +42,14 @@ const INVEST_PALETTE = ['#3d4b58', '#c9a227', '#34c77b', '#3b6bd6', '#8a97a3', '
 
 type PositionsViewProps = Pick<
   ReturnType<typeof usePSXDerived>,
-  'workbook' | 'calcFee' | 'positions' | 'rows' | 'summary' | 'realizedSeries'
+  'workbook' | 'rows' | 'summary' | 'realizedSeries'
 >;
 
 /** Shared by both Dashboard tabs — "Broker Style" (official numbers, fed
  * from `usePSXDerived()`) and "Strategic Trades" (a `'lowestCostFirst'`
  * what-if view, fed from `usePSXStrategicDerived()`). See QSE's identical
  * `DashboardPositionsView` for the full reasoning — this is a pure port. */
-function DashboardPositionsView({ workbook, calcFee, positions, rows, summary, realizedSeries }: PositionsViewProps) {
+function DashboardPositionsView({ workbook, rows, summary, realizedSeries }: PositionsViewProps) {
   const navigate = useNavigate();
   const { tickerNames } = usePSXStockData();
   const setMarketPrice = usePSXWorkbookStore((s) => s.setMarketPrice);
@@ -402,8 +402,6 @@ export function DashboardPage() {
             content: (
               <DashboardPositionsView
                 workbook={official.workbook}
-                calcFee={official.calcFee}
-                positions={official.positions}
                 rows={official.rows}
                 summary={official.summary}
                 realizedSeries={official.realizedSeries}
@@ -418,8 +416,6 @@ export function DashboardPage() {
             content: (
               <DashboardPositionsView
                 workbook={strategic.workbook}
-                calcFee={strategic.calcFee}
-                positions={strategic.positions}
                 rows={strategic.rows}
                 summary={strategic.summary}
                 realizedSeries={strategic.realizedSeries}

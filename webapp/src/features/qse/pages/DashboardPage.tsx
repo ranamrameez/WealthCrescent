@@ -42,7 +42,7 @@ const INVEST_PALETTE = ['#3d4b58', '#c9a227', '#34c77b', '#3b6bd6', '#8a97a3', '
 
 type PositionsViewProps = Pick<
   ReturnType<typeof useQSEDerived>,
-  'workbook' | 'calcFee' | 'positions' | 'rows' | 'summary' | 'realizedSeries'
+  'workbook' | 'rows' | 'summary' | 'realizedSeries'
 >;
 
 /** Shared by both Dashboard tabs — "Broker Style" (official numbers, fed
@@ -55,7 +55,7 @@ type PositionsViewProps = Pick<
  * fees, rewards, open-position count) is identical regardless of which lot
  * a sale is attributed to, so those stay in the page's own unified grid,
  * outside this component. */
-function DashboardPositionsView({ workbook, calcFee, positions, rows, summary, realizedSeries }: PositionsViewProps) {
+function DashboardPositionsView({ workbook, rows, summary, realizedSeries }: PositionsViewProps) {
   const navigate = useNavigate();
   const { tickerNames } = useQSEStockData();
   const setMarketPrice = useWorkbookStore((s) => s.setMarketPrice);
@@ -426,8 +426,6 @@ export function DashboardPage() {
             content: (
               <DashboardPositionsView
                 workbook={official.workbook}
-                calcFee={official.calcFee}
-                positions={official.positions}
                 rows={official.rows}
                 summary={official.summary}
                 realizedSeries={official.realizedSeries}
@@ -442,8 +440,6 @@ export function DashboardPage() {
             content: (
               <DashboardPositionsView
                 workbook={strategic.workbook}
-                calcFee={strategic.calcFee}
-                positions={strategic.positions}
                 rows={strategic.rows}
                 summary={strategic.summary}
                 realizedSeries={strategic.realizedSeries}
