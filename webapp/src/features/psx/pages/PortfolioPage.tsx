@@ -26,7 +26,7 @@ import { usePSXStockData } from '../hooks/usePSXStockData';
 type SortCol = 'ticker' | 'shares' | 'avgCost' | 'market' | 'value' | 'net' | 'status';
 
 function OpenPositionsTable({ onSelect }: { onSelect: (ticker: string) => void }) {
-  const { workbook, positions, calcFee, rows: valuationRows } = usePSXDerived();
+  const { workbook, calcFee, rows: valuationRows } = usePSXDerived();
   const { tickerNames } = usePSXStockData();
   const setMarketPrice = usePSXWorkbookStore((s) => s.setMarketPrice);
   const ensureSignedIn = useEnsureSignedIn();
