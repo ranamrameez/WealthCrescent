@@ -6,6 +6,7 @@ import {
   findLinkForRecord,
   propagateLinkedEdit,
   resolveLinkedEdit,
+  resolveSideCurrency,
   updateLinkedTransfer,
   warnIfLinked,
 } from '../linkCascade';
@@ -22,6 +23,10 @@ import { useInterEntityTransfersStore } from '../../store/interEntityTransfersSt
 import { useFundsWorkbookStore } from '../../store/fundsWorkbookStore';
 import { createEmptyFundsWorkbook } from '../../store/defaultFundsWorkbook';
 import { usePersonalLoansWorkbookStore } from '../../store/personalLoansWorkbookStore';
+import { useWorkbookStore } from '../../store/workbookStore';
+import { usePSXWorkbookStore } from '../../store/psxWorkbookStore';
+import { createEmptyWorkbook } from '../../store/defaultWorkbook';
+import { createEmptyPSXWorkbook } from '../../store/defaultPsxWorkbook';
 import type { InterEntityTransferInput } from '../../types/interEntityTransfer';
 
 const bankAccountId = 'acct-1';
@@ -35,6 +40,8 @@ beforeEach(() => {
     settings: { accounts: [{ id: bankAccountId, name: 'Checking', currencyCode: 'USD', openingBalance: 0 }] },
   });
   useFundsWorkbookStore.getState().setWorkbook(createEmptyFundsWorkbook());
+  useWorkbookStore.getState().setWorkbook(createEmptyWorkbook());
+  usePSXWorkbookStore.getState().setWorkbook(createEmptyPSXWorkbook());
   usePersonalLoansWorkbookStore.getState().setWorkbook({
     ...createEmptyPersonalLoansWorkbook(),
     loans: [{ id: loanId, person: 'Bilal', direction: 'i_owe', currencyCode: 'USD', principal: 1000, date: '2026-01-01' }],
@@ -57,6 +64,29 @@ const cashToBankInput: InterEntityTransferInput = {
   from: { module: 'cash', currencyCode: 'USD' },
   to: { module: 'bank', ref: bankAccountId },
 };
+
+describe('broker profile currency resolution', () => {
+  it('uses the selected QSE and PSX broker settings instead of exchange defaults', () => {
+    const qse = useWorkbookStore.getState().workbook;
+    const qseProfile = qse.brokerProfiles[0];
+    useWorkbookStore.getState().setWorkbook({
+      ...qse,
+      settings: { ...qse.settings, currency: 'QAR' },
+      brokerProfiles: [{ ...qseProfile, settings: { ...qseProfile.settings, currency: 'USD' } }],
+    });
+
+    const psx = usePSXWorkbookStore.getState().workbook;
+    const psxProfile = psx.brokerProfiles[0];
+    usePSXWorkbookStore.getState().setWorkbook({
+      ...psx,
+      settings: { ...psx.settings, currency: 'PKR' },
+      brokerProfiles: [{ ...psxProfile, settings: { ...psxProfile.settings, currency: 'USD' } }],
+    });
+
+    expect(resolveSideCurrency({ module: 'qse', ref: qseProfile.id })).toBe('USD');
+    expect(resolveSideCurrency({ module: 'psx', ref: psxProfile.id })).toBe('USD');
+  });
+});
 
 describe('createLinkedTransfer', () => {
   it('writes a record to each module store and the link store', () => {
