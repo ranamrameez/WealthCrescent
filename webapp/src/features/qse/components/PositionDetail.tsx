@@ -4,6 +4,7 @@ import { RecordRow } from '../../../components/RecordRow';
 import { Pagination } from '../../../components/Pagination';
 import { usePagination } from '../../../hooks/usePagination';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
+import { useTablePagination } from '../../../hooks/useTablePagination';
 import { MarketPriceHistory } from './MarketPriceHistory';
 import { PriceInput } from "../../../components/ui/PriceInput";
 import { useEffect, useMemo, useState } from 'react';
@@ -169,6 +170,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
   const recentSortValue = (p: (typeof recentRows)[number], col: RecentCol): number | string =>
     col === 'price' ? p.price : (p.time ?? p.date);
   const { sorted: sortedRecent, Th: RecentTh } = useSortableRows(recentRows, recentSortValue, 'when', 'desc');
+  const { rows: priceHistoryPageRows, controls: priceHistoryPagination } = useTablePagination(sortedRecent);
 
   // README item 1 of the same batch: "the option to change the past
   // current prices" — `setMarketPrice` only ever appends a new point for
@@ -414,7 +416,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
               <table>
                 <thead><tr><RecentTh col="when">When</RecentTh><RecentTh col="price">Price</RecentTh><th></th></tr></thead>
                 <tbody>
-                  {sortedRecent.map((p, rowIndex) => {
+                  {priceHistoryPageRows.map((p, rowIndex) => {
                     const rawIndex = rawHistory.indexOf(p);
                     return editPriceIndex === rawIndex && editPriceRow ? (
                       <RecordRow market="qse" record={p} onCancel={cancelEditPrice} key={rawIndex >= 0 ? 'manual:'+rawIndex : 'shared:'+rowIndex}>
@@ -439,6 +441,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
                 </tbody>
               </table>
             </div>
+            {priceHistoryPagination}
             <button className="btn secondary small mt-sm" onClick={exportPriceHistory}>Export price history CSV</button>
           </details>
         </DetailCard>
