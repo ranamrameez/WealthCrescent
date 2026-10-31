@@ -27,7 +27,12 @@ describe('central portfolio calculation pipeline', () => {
     expect(average.cashSummary.portfolioValue).toBeCloseTo(fifo.cashSummary.portfolioValue, 8);
     expect(average.cashSummary.totalDividends).toBe(7.5);
     expect(average.cashLedger.some(event => event.kind === 'dividend' && event.sourceId === 'dividend')).toBe(true);
-    expect(average.cashSummary.netPL).not.toBe(fifo.cashSummary.netPL);
+    expect(average.cashSummary.realizedPL).not.toBe(fifo.cashSummary.realizedPL);
+    expect(average.cashSummary.unrealizedPL).not.toBe(fifo.cashSummary.unrealizedPL);
+    expect(average.cashSummary.netPL).toBeCloseTo(fifo.cashSummary.netPL, 8);
+    const averageAgain = calculatePortfolio({ ...input, costBasisMethod: 'average' });
+    expect(averageAgain.positions).toEqual(average.positions);
+    expect(averageAgain.realizedSeries).toEqual(average.realizedSeries);
     expect(JSON.stringify(input)).toBe(before);
   });
 });
