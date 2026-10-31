@@ -214,3 +214,36 @@ The user confirmed that only this session is active and explicitly instructed us
 - The diff was reviewed for the shared section actions, default section expansion, shared pagination, credit-card chronological balances, FIFO legacy-oversell matching/fee allocation, transaction edit validation, QSE/PSX position summaries and trade calculator changes. The PSO fixture expectation remains 122 BUY / 132 SELL, with 10 unmatched SELL shares and no fictitious realized profit.
 - The connected production browser tab exposed the deployed Net Worth analytics page for read-only inspection. This session's browser connection provides tab reading only, not navigation/click interaction, so end-to-end interaction checks for the PR branch could not be performed here. Do not claim those manual flows were browser-verified; automated validation and source review are the available evidence.
 - The user explicitly authorized merging despite the earlier draft-only checkpoint. The remaining actions are to re-fetch the live PR head/base and mergeability, confirm no application-code changes occurred after the successful run, mark PR #44 ready, and merge it. Never push directly to `main`.
+
+
+## 2026-10-31 — PR #48 unified stock calculation engine (current work)
+
+- **PR:** [#48 — Unify stock calculations, lifecycles, and same-day event ordering](https://github.com/ranamrameez/WealthCrescent/pull/48)
+- **Branch:** `feat/unified-stock-calculation-engine`
+- **Current code head at this handoff update:** `24bfbf12d4642d9df6c11f596a4cced3a8fcdd01` (re-fetch live head before continuing).
+- Do not start a duplicate branch or revert any newer main changes. Continue on this PR branch.
+
+### Architecture delivered in the branch
+
+1. `stockCalculationEngine.ts` is the single stock-accounting pass. Average/FIFO/other lot methods share chronological lifecycle processing and produce positions, realized P/L, per-SELL attribution, closed trades, open lots, lifecycle reporting and oversell reconciliation.
+2. `portfolioCalculationEngine.ts` is the public exchange portfolio pipeline. QSE and PSX derived hooks call it and consume the returned stock results, position valuations, cash ledger and cash summary.
+3. `positions.ts`, `realizedPL.ts`, `closedTrades.ts` and `fifoPositions.ts` are compatibility adapters into the stock engine. Do not reintroduce parallel accounting logic into pages/hooks.
+4. A fully closed position lifecycle is reset before a later BUY. Reopening the ticker starts a new lifecycle with no inherited shares, cost or FIFO lots.
+5. Oversells preserve actual cash movement but unmatched shares receive no cost basis or realized P/L. Unmatched quantities and their proportional SELL fees are returned per SELL transaction and surfaced in QSE/PSX transaction views.
+6. Same-day ordering is persisted as one `accountingOrder` across trades, transfers, adjustments and dividends. Existing arrow controls use the complete same-day event stream, preserve event dates, and recalculate through the central pipeline. QSE controls are available in Modify mode; PSX controls are displayed beside rows. Sequence is not edited in Batch Edit.
+
+### Latest validation checkpoint
+
+- The prior CI attempt failed because the QSE reorder test expected a sequence input that the Batch Edit UI intentionally does not expose. The test was corrected to assert that Batch Edit has no separate reorder arrows and that the existing row arrows reorder a trade across a same-day transfer.
+- The QSE test import was also corrected to import `QseReorder` from its actual module, `QseTableActions.tsx`.
+- Actions must be checked again on the exact current head. Do not use the earlier failed runs as evidence of success. The latest known build/type-check job passed, but the full test suite failed on the now-corrected batch-editor assertion; the rerun for the corrected head is pending.
+- Manual browser smoke tests and real backup/export migration review remain outstanding.
+- No merge has been performed. Never push directly to `main`.
+
+### Next steps
+
+1. Verify Actions on the live PR head: full tests, type-check and production build.
+2. If tests fail, inspect logs and fix only the actual failing regression; rerun on the new head.
+3. Review the complete PR diff for unintended changes and ensure every QSE/PSX transaction card uses the shared ordering control.
+4. Perform interactive browser smoke tests when browser interaction is available.
+5. Only after exact-head CI and review, consider merge according to the user's approval.
