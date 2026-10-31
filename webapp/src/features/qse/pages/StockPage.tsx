@@ -328,7 +328,7 @@ export function StockPage() {
   const { tickerNames } = useQSEStockData();
   const name = tickerNames[ticker];
   const { exportStatement, hasRows } = useTickerExport(ticker);
-  const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
+  const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters('all');
   const { workbook, rows, calcFee, positions } = useQSEDerived();
   const isOpen = (positions.find((p) => p.ticker === ticker)?.shares || 0) > 0;
   usePageTopBarRightSlot(
