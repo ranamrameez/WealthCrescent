@@ -123,6 +123,23 @@ describe('netWorthAsOfDate', () => {
     expect(rows.find((r) => r.currency === 'USD')).toBeUndefined();
   });
 
+  it('counts Funds cash and NAV holdings once, with BUY/SELL cash flows, as of the requested date', () => {
+    const inputs = {
+      ...emptyInputs(),
+      fundsFunds: [{ id: 'f1', name: 'USD Fund', code: 'USF', platform: 'Platform', currencyCode: 'USD' }],
+      fundsTransfers: [{ id: 'd1', date: '2026-01-01', type: 'DEPOSIT' as const, gross: 1000, fee: 0, currencyCode: 'USD' }],
+      fundsTransactions: [
+        { id: 'b1', date: '2026-01-02', ticker: 'f1', action: 'BUY' as const, shares: 60, price: 10 },
+        { id: 's1', date: '2026-01-10', ticker: 'f1', action: 'SELL' as const, shares: 20, price: 12 },
+      ],
+      fundsPriceHistory: { f1: [{ date: '2026-01-10', price: 12 }] },
+    };
+    const rows = netWorthAsOfDate('2026-01-31', inputs as never);
+    const usd = rows.find((row) => row.currency === 'USD');
+    expect(usd?.assets).toBeCloseTo(1120, 6); // 640 cash + 480 remaining units
+    expect(usd?.breakdown).toContainEqual({ module: 'Funds', amount: 1120 });
+  });
+
   it('values a QSE position using the price known AS OF that date, not a later one', () => {
     const base = {
       ...emptyInputs(),
