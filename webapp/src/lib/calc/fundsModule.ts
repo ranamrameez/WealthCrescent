@@ -1,6 +1,7 @@
 import type { Fund } from '../../types/fundsWorkbook';
 import type { Category } from '../../types/finance';
-import type { Position, PricePoint, Transaction } from '../../types/workbook';
+import type { Position, PricePoint, Transaction, Transfer } from '../../types/workbook';
+import { buildCashLedger } from './cashLedger';
 import { categoryName } from '../categories';
 import { computePositions } from './positions';
 import { getDailyPriceHistory, getMarketPrice, getPriceHistory } from './priceHistory';
@@ -49,6 +50,59 @@ export function fundsValueByCurrency(
     out[fund.currencyCode] = (out[fund.currencyCode] ?? 0) + units * nav;
   });
   return out;
+}
+
+/** One Funds cash account per currency. Funds transfers are portfolio-level
+ * (the transfer picker has no fund reference), while each BUY/SELL belongs
+ * to a fund whose currency is known from Fund.currencyCode. This keeps
+ * uninvested cash separate from NAV-valued units without blending currencies.
+ *
+ * Legacy transfers without currencyCode remain in the workbook unchanged and
+ * are read using the historical Funds default currency. New transfers always
+ * persist their selected currency. */
+export type FundsCashLedgerEvent = ReturnType<typeof buildCashLedger>[number] & {
+  currencyCode: string;
+};
+
+export function fundsCashLedgerByCurrency(
+  funds: Fund[],
+  transactions: Transaction[],
+  transfers: Transfer[],
+  legacyCurrency = 'USD',
+): Record<string, FundsCashLedgerEvent[]> {
+  const fundCurrency = new Map(funds.map((fund) => [fund.id, fund.currencyCode]));
+  const currencies = new Set<string>();
+  transactions.forEach((transaction) => {
+    const currency = fundCurrency.get(transaction.ticker);
+    if (currency) currencies.add(currency);
+  });
+  transfers.forEach((transfer) => currencies.add(transfer.currencyCode || legacyCurrency));
+
+  const result: Record<string, FundsCashLedgerEvent[]> = {};
+  currencies.forEach((currencyCode) => {
+    const currencyTransactions = transactions.filter((transaction) => fundCurrency.get(transaction.ticker) === currencyCode);
+    const currencyTransfers = transfers.filter((transfer) => (transfer.currencyCode || legacyCurrency) === currencyCode);
+    result[currencyCode] = buildCashLedger(currencyTransactions, currencyTransfers, [], calcFee)
+      .map((event) => ({ ...event, currencyCode }));
+  });
+  return result;
+}
+
+/** Current uninvested Funds cash, grouped by currency. BUY/SELL cash flows
+ * are included alongside deposits/withdrawals, so adding this to current
+ * holdings value counts every unit of money exactly once. */
+export function fundsCashBalanceByCurrency(
+  funds: Fund[],
+  transactions: Transaction[],
+  transfers: Transfer[],
+  legacyCurrency = 'USD',
+): Record<string, number> {
+  const balances: Record<string, number> = {};
+  Object.entries(fundsCashLedgerByCurrency(funds, transactions, transfers, legacyCurrency))
+    .forEach(([currencyCode, events]) => {
+      if (events.length) balances[currencyCode] = events[events.length - 1].balance;
+    });
+  return balances;
 }
 
 /** Pending item 115(b): the "total balance with that broker" rollup —
