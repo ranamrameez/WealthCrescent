@@ -1633,6 +1633,12 @@ function FundsCashLedgerSection() {
       The running balance includes deposits and withdrawals plus the cash effect of every valid BUY/SELL.
       Each currency has its own balance; fund units remain separate and are valued at NAV.
     </p>
+    {workbook.transfers.some((transfer) => !transfer.currencyCode) && (
+      <Notice tone="warning" className="mb-12">
+        Older Funds transfers did not store a currency. They are kept in {workbook.settings.legacyTransferCurrency ?? workbook.settings.defaultCurrency}
+        using the one-time migration snapshot. Edit any row whose original currency was different to assign it explicitly.
+      </Notice>
+    )}
     <PageFilters><div className="row gap-sm mb-sm">
       <Field label="Currency" width={150}>
         <Select value={currencyFilter} onChange={(event) => setCurrencyFilter(event.target.value)}>
