@@ -8048,3 +8048,12 @@ The stock engine must retain the user-approved semantics: true chronological pro
 Same-day event ordering uses one persisted `accountingOrder` across trade, transfer, adjustment and dividend events. Use the existing shared row-arrow component/control; never build a second reorder UI or separate trade/cash ordering. Reorder only within the same date and preserve IDs and economic fields. QSE controls are shown in Modify mode; PSX row controls are already present. Batch Edit does not edit sequence; its header explains that users should use row arrows.
 
 Latest CI checkpoint and continuation details are in `webapp/SESSION_HANDOFF.md` and `webapp/audit.md`. Verify the live PR head before trusting any run; a code change after a successful run requires a new full validation. No direct pushes to `main`.
+
+
+## Latest WealthCrescent calculation-engine checkpoint — 2026-10-31
+
+PR #48, branch `feat/unified-stock-calculation-engine`, has a validated application-code checkpoint at `48fde7820b387ec1c1fa4184bb02dd5600774330`. GitHub Actions run #41242056151 passed type-check, production build, broker-profile/PSX-fee regressions, and the full suite (142 files, 1,123 tests).
+
+The exchange pipeline now owns cost-basis-dependent average cost, break-even and exit targets, plus method-independent market valuation and commission estimates. The shared `positionValuation.ts` helper is used by live portfolio, cash-summary fallback and historical P/L. Strategic Trades and historical analytics route their stock basis through `stockCalculationEngine.ts`. Same-day row arrows use one persisted sequence across trades, transfers, adjustments and dividends; the control/store mapping and recorded-time fallback were regression-tested.
+
+The latest docs/comment refresh is behavior-neutral. Before merging, verify Actions on the exact live PR head. No browser smoke test or real-backup review is claimed. Continue on the existing feature branch; never push directly to `main`.

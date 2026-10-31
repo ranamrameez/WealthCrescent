@@ -13,13 +13,13 @@ export interface Transaction {
    * by `createWorkbookStore.ts`'s `normalize()`, same pattern as
    * `Transfer.id`. */
   id?: string;
-  /** Legacy compatibility alias. For transactions this mirrors perTickerIndex; globalTransactionIndex now controls accounting order. Other record types still use seq as their own sequence. */
+  /** Legacy compatibility alias. For transactions this mirrors perTickerIndex. Shared same-day order is controlled by accountingOrder; globalTransactionIndex is retained only as a legacy trade-only fallback. */
   seq?: number;
   /** Shared same-day accounting sequence across trades, transfers, adjustments and dividends. */
   accountingOrder?: number;
-  /** Canonical trade-only global accounting position. Retained for cross-date trade ordering compatibility. */
+  /** Legacy trade-only global index. Used only when no shared accountingOrder exists and recorded times do not distinguish same-day trades. */
   globalTransactionIndex?: number;
-  /** Canonical position within this ticker's own transaction sequence, derived from globalTransactionIndex order. */
+  /** Position within this ticker's chronological trade sequence, synchronized from date, shared accountingOrder and legacy tie-breakers. */
   perTickerIndex?: number;
   /** @deprecated Compatibility alias for globalTransactionIndex while older exports/imports migrate. Never use as the ordering source. */
   transactionIndex?: number;

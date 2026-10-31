@@ -247,3 +247,23 @@ The user confirmed that only this session is active and explicitly instructed us
 3. Review the complete PR diff for unintended changes and ensure every QSE/PSX transaction card uses the shared ordering control.
 4. Perform interactive browser smoke tests when browser interaction is available.
 5. Only after exact-head CI and review, consider merge according to the user's approval.
+
+
+## 2026-10-31 — latest validated calculation-engine checkpoint
+
+The latest validated application-code head before this documentation/comment refresh was `48fde7820b387ec1c1fa4184bb02dd5600774330` on `feat/unified-stock-calculation-engine`, PR #48.
+
+**Actions run #41242056151 passed**:
+- Type-check and production build.
+- Broker-profile and PSX-fee regression tests.
+- Full Vitest suite: **142 files / 1,123 tests passed**.
+
+Latest implementation details:
+- `stockCalculationEngine.ts` is the sole stock-basis accounting pass for Average/FIFO/lowestCostFirst. The exchange-level `portfolioCalculationEngine.ts` returns positions, realized series, sale attribution, closed trades, lifecycle records, open lots, oversell reconciliation, valuation rows, cash ledger and cash summary.
+- `positionValuation.ts` is the shared market-value/unrealized-P&L formula used by the portfolio pipeline, cash-summary fallback and historical chart snapshots. Whole-position average cost, break-even, +1%/+2%/+5% targets and per-share commission are returned by the pipeline and consumed by QSE/PSX dashboard and portfolio views.
+- Strategic Trades views also use the same pipeline with `lowestCostFirst`; historical P/L uses the central stock engine for each chronological prefix and the shared valuation helper for historical quotes.
+- Shared same-day `accountingOrder` spans trades, transfers, adjustments and dividends. Existing arrows are fixed to map target orders to the store's expected current values, then swap them. The store rejects cross-date moves.
+- Legacy same-day rows without saved sequence use actual recorded time before legacy global trade indexes. Explicit saved `accountingOrder` remains authoritative.
+- Unmatched SELL shares remain visible and receive no invented cost basis or realized profit; actual proceeds remain in cash and unmatched SELL fees are expensed separately.
+
+The current documentation/comment refresh is behavior-neutral. Verify the live PR head and Actions again before merge; any later application-code change requires a fresh full validation. No browser smoke test or real-backup review is claimed. No merge to `main` has been performed.

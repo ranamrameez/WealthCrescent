@@ -180,3 +180,19 @@ Design decision: a separate **portfolio-level cash account per currency**, not p
 - The current PR head must pass the full Actions test suite and type-check/production build before merge. Record the exact successful run and exact head here after CI completes; do not infer success from an earlier commit.
 - Manual browser smoke tests and review of a real backup/export have not been performed in this session. Do not claim those checks passed.
 - No merge to `main` has been performed.
+
+
+## 2026-10-31 — validated unified calculation engine checkpoint
+
+**Validated code commit:** `48fde7820b387ec1c1fa4184bb02dd5600774330`  
+**GitHub Actions run:** [#41242056151](https://github.com/ranamrameez/WealthCrescent/actions/runs/41242056151) — success.
+
+- Type-check and production build passed.
+- Full suite: **142 test files, 1,123 tests passed**.
+- Broker-profile and PSX-fee regression job passed.
+- The central portfolio pipeline now owns average cost, market value, unrealized P/L, break-even, +1%/+2%/+5% exit targets and per-share commission estimates.
+- Shared `positionValuation.ts` is used by live portfolio valuation, the cash-summary fallback and historical P/L snapshots. Historical realized P/L continues to call the same stock engine for each chronological prefix.
+- Same-day reorder arrows now correctly translate the widget's target order into the store's expected pre-move order before the store swaps values. The regression covers the same-day SELL-then-BUY correction and mixed event types.
+- Legacy records without saved `accountingOrder` now use recorded event time before old trade indexes; explicit saved same-day order remains authoritative.
+- The documentation/comment refresh in this commit does not change calculation behavior. Re-run validation on the exact live PR head before merge.
+- Browser smoke tests and real-backup review remain outstanding. PR #48 remains unmerged.
