@@ -77,7 +77,7 @@ export function resolveTransferSide(cfg: LinkSideConfig, direction: 'in' | 'out'
   const existing = recordId ? workbook.transfers.find(row => row.id === recordId) ?? profileTransfer : undefined;
   const settings = profileSettings ?? workbook.settings;
   const defaultFee = direction === 'in' && 'depositFee' in settings ? Number(settings.depositFee) || 0 : 0;
-  return { ...cfg, ...(cfg.module === 'funds' ? { currencyCode: cfg.currencyCode ?? useFundsWorkbookStore.getState().workbook.settings.defaultCurrency } : {}), fee: existing?.fee ?? cfg.fee ?? defaultFee };
+  return { ...cfg, ...(cfg.module === 'funds' ? { currencyCode: cfg.currencyCode ?? existing?.currencyCode ?? (recordId ? useFundsWorkbookStore.getState().workbook.settings.legacyTransferCurrency : undefined) ?? useFundsWorkbookStore.getState().workbook.settings.defaultCurrency } : {}), fee: existing?.fee ?? cfg.fee ?? defaultFee };
 }
 function resolveTransferInput(input: InterEntityTransferInput, link?: InterEntityTransfer): InterEntityTransferInput {
   const timezone = input.timezone ?? defaultTimezoneForCurrency(resolveSideCurrency(input.from) ?? resolveSideCurrency(input.to) ?? 'USD');
