@@ -6,10 +6,11 @@
 
 - PR: **#44**, open, draft, base `main`.
 - Branch: `fix/trade-entry-validation-and-transactions-ui`.
-- Current PR head after the latest status update: `8de0690c678b9fbaa254c64868294fb71af62c80`.
-- Base SHA reported by PR: `49cb2a40810619fa075cd422703ab4a6900adce2`.
-- PR currently contains 131 commits and 52 changed files. Review the diff and commit history carefully; do not assume the PR description's validation refers to the current head.
-- GitHub Actions run `41199236906` for code head `0901cfc9` completed successfully (build and full tests). The later application-code head `79c017fd` passed both the production build and full test suite in run `41199370800`. Current PR head `8de0690c` contains only README/handoff documentation commits on top of that validated code head; CI run `41199512451` was in progress at the last check. Re-check the exact latest head before marking ready or merging.
+- Latest branch head before this handoff refresh: `9d52df8cd6de8f1e10aaeb73ba125b7991be0c28`; this update adds documentation only. Re-fetch the branch after this commit rather than relying on this snapshot SHA.
+- Base SHA reported by PR at the last comparison: `49cb2a40810619fa075cd422703ab4a6900adce2`; re-check live main before any merge.
+- PR has a large commit history (132 commits at the previous comparison) and 52 application/documentation files. Review the complete diff and commit history carefully; do not assume the PR description's validation refers to the current head.
+- Latest verified application-code head: `bf80f6217ef00f26a1ec45ea1f825841c7790e18`. GitHub Actions run [#41199973181](https://github.com/ranamrameez/WealthCrescent/actions/runs/41199973181) passed **Type-check and production build** and the **full test suite** on that exact code head. Subsequent commits update only `USER_MANUAL.md`, `README.md`, and `CLAUDE.md`; re-check Actions for the final PR head before marking ready or merging.
+- Intermediate pagination commits exposed a leftover `setPage(1)` reference in Banking after moving to the shared hook; it was removed in code head `bf80f621`, whose build and tests passed. A final review also strengthened historical edit validation to compare unmatched quantities per SELL transaction, not only per-ticker totals.
 - Nothing from this work has been merged into `main`. Keep the PR as a draft until current-head tests/build, full diff review, and any required manual checks are complete.
 
 ### Scope already represented in PR #44 — verify rather than re-implement
@@ -26,7 +27,7 @@ The transaction table supplied by the user totals **122 BUY shares and 132 SELL 
 - Do not invent 10 BUY shares, silently discard the excess, or count unmatched shares/fees as realized profit.
 - Allocate the SELL fee proportionally to the matched quantity; separately surface the unmatched portion/fee for reconciliation.
 
-Before merge, inspect the PSO regression test and implementation to ensure it encodes those exact totals and outcomes. The PR body currently says “132 bought / 132 sold”; correct that statement if the code/test is actually based on the user's supplied 122/132 ledger.
+The PSO regression fixture and PR description now use those exact 122/132 totals. Re-check the test and description if the fixture is edited; never add a synthetic BUY to make the numbers balance.
 
 ### Next-session execution order
 
@@ -51,7 +52,7 @@ The next context continued on the same branch and preserved the handoff/docs com
 - Corrected the PSO regression fixture: removed an unsupported 10-share BUY. The supplied history is 122 BUY / 132 SELL; the final 80-share SELL matches 70 and leaves 10 unmatched. No synthetic BUY is introduced and no profit is recognized on those 10 shares.
 - Updated PR #44's description to reflect these changes and the correct PSO totals.
 
-The latest application-code head in the branch is `79c017fd`; it passed build and full tests in run `41199370800`. Current PR head `8de0690c` adds only README/handoff documentation commits on top, with CI run `41199512451` in progress at the last check. Do not claim the current PR-head run completed until it does.
+The latest verified application-code head is `bf80f6217ef00f26a1ec45ea1f825841c7790e18`; it passed type-check, production build, and full tests in run `41199973181`. This code head includes the transaction-specific legacy-oversell edit validation and the Banking pagination cleanup. Subsequent documentation-only commits refreshed `USER_MANUAL.md`, `README.md`, and `CLAUDE.md`; verify the current PR head and its latest Actions run before merge.
 
 ### Tool/session limitation
 
