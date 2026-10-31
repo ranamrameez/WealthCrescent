@@ -2,14 +2,21 @@ import type { Transaction } from '../../types/workbook';
 import { toInstantMs } from '../datetime';
 
 /**
- * Canonical processing order for stock transactions. A persisted globalTransactionIndex
- * is authoritative even when it intentionally crosses trade dates; this is the
- * accounting order users can explicitly correct after imports or statement review.
- * Legacy/unindexed records retain the safe chronological fallback, including the
- * BUY-before-SELL rule for exact-instant ties that prevents phantom oversells.
+ * Canonical stock transaction chronology: calendar date first, then the
+ * persisted shared accounting sequence within that date. Legacy records fall
+ * back to their previous global index, real instant, BUY-before-SELL tie-break
+ * and per-ticker sequence until store normalization supplies accountingOrder.
  */
-export function sortTransactionsChronological<T extends Pick<Transaction, 'date' | 'action' | 'time' | 'timezone' | 'seq' | 'transactionIndex' | 'globalTransactionIndex' | 'perTickerIndex'>>(transactions: T[]): T[] {
+export function sortTransactionsChronological<T extends Pick<Transaction, 'date' | 'action' | 'time' | 'timezone' | 'seq' | 'transactionIndex' | 'globalTransactionIndex' | 'perTickerIndex' | 'accountingOrder'>>(transactions: T[]): T[] {
   return [...transactions].sort((a, b) => {
+    const byDate = a.date.localeCompare(b.date);
+    if (byDate) return byDate;
+
+    const aHasOrder = Number.isInteger(a.accountingOrder);
+    const bHasOrder = Number.isInteger(b.accountingOrder);
+    if (aHasOrder && bHasOrder && a.accountingOrder !== b.accountingOrder) return a.accountingOrder! - b.accountingOrder!;
+    if (aHasOrder !== bHasOrder) return aHasOrder ? -1 : 1;
+
     const ai = Number.isInteger(a.globalTransactionIndex) ? a.globalTransactionIndex : Number.isInteger(a.transactionIndex) ? a.transactionIndex : undefined;
     const bi = Number.isInteger(b.globalTransactionIndex) ? b.globalTransactionIndex : Number.isInteger(b.transactionIndex) ? b.transactionIndex : undefined;
     if (ai !== undefined && bi !== undefined && ai !== bi) return ai - bi;

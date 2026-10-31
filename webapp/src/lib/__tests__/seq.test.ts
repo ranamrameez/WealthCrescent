@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assignSeqForEntities, backfillSeq, nextSeq, nextSeqForEntity } from '../seq';
+import { assignSeqForEntities, backfillSeq, getAccountingEventRefs, nextSeq, nextSeqForEntity, syncAccountingEventCollections, syncTransactionIndexes } from '../seq';
 
 describe('nextSeq', () => {
   it('returns 1 for an empty array', () => {
@@ -89,5 +89,63 @@ describe('assignSeqForEntities', () => {
   it('leaves a record that already carries a seq untouched', () => {
     const result = assignSeqForEntities([], [{ ticker: 'AAPL', seq: 42 }], (r: { ticker: string; seq?: number }) => r.ticker);
     expect(result[0].seq).toBe(42);
+  });
+});
+
+
+describe('syncAccountingEventCollections', () => {
+  it('backfills one same-day sequence across trades, transfers, adjustments and dividends', () => {
+    const result = syncAccountingEventCollections({
+      transactions: [{ id: 'trade-a', date: '2026-01-01', time: '10:00', action: 'BUY', globalTransactionIndex: 1 }],
+      transfers: [{ id: 'transfer', date: '2026-01-01', time: '09:00', seq: 1 }],
+      adjustments: [{ id: 'reward', date: '2026-01-01', time: '11:00', seq: 1 }],
+      dividends: [{ id: 'dividend', date: '2026-01-01', time: '12:00', seq: 1 }],
+    });
+    expect(result.transfers[0].accountingOrder).toBe(1);
+    expect(result.transactions[0].accountingOrder).toBe(2);
+    expect(result.adjustments[0].accountingOrder).toBe(3);
+    expect(result.dividends[0].accountingOrder).toBe(4);
+  });
+
+  it('preserves saved same-day ordering and appends newly added rows without changing dates', () => {
+    const result = syncAccountingEventCollections({
+      transactions: [{ id: 'trade', date: '2026-01-01', accountingOrder: 2, action: 'BUY', globalTransactionIndex: 1 }],
+      transfers: [{ id: 'transfer', date: '2026-01-01', accountingOrder: 1, seq: 1 }],
+      adjustments: [{ id: 'new-reward', date: '2026-01-01', seq: 2 }],
+      dividends: [],
+    });
+    expect(result.transfers[0].accountingOrder).toBe(1);
+    expect(result.transactions[0].accountingOrder).toBe(2);
+    expect(result.adjustments[0].accountingOrder).toBe(3);
+    expect(result.transactions[0].date).toBe('2026-01-01');
+    expect(result.adjustments[0].date).toBe('2026-01-01');
+  });
+
+  it('reindexes trade compatibility fields from date plus shared same-day order', () => {
+    const result = syncTransactionIndexes([
+      { id: 'later', ticker: 'AAA', date: '2026-01-02', action: 'BUY', accountingOrder: 1, globalTransactionIndex: 1 },
+      { id: 'same-day-second', ticker: 'AAA', date: '2026-01-01', action: 'SELL', accountingOrder: 2, globalTransactionIndex: 2 },
+      { id: 'same-day-first', ticker: 'AAA', date: '2026-01-01', action: 'BUY', accountingOrder: 1, globalTransactionIndex: 3 },
+    ]);
+    const byId = Object.fromEntries(result.map(row => [row.id, row]));
+    expect(byId['same-day-first'].globalTransactionIndex).toBe(1);
+    expect(byId['same-day-second'].globalTransactionIndex).toBe(2);
+    expect(byId.later.globalTransactionIndex).toBe(3);
+    expect(byId['same-day-first'].perTickerIndex).toBe(1);
+    expect(byId['same-day-second'].perTickerIndex).toBe(2);
+    expect(byId.later.perTickerIndex).toBe(3);
+  });
+
+  it('returns a mixed event stream with pending trades excluded', () => {
+    const events = getAccountingEventRefs({
+      transactions: [
+        { id: 'trade', date: '2026-01-01', accountingOrder: 2 },
+        { id: 'pending', date: '2026-01-01', accountingOrder: 3, isPending: true },
+      ],
+      transfers: [{ id: 'transfer', date: '2026-01-01', accountingOrder: 1 }],
+      adjustments: [],
+      dividends: [{ id: 'dividend', date: '2026-01-01', accountingOrder: 4 }],
+    });
+    expect(events.map(event => event.kind + ':' + event.id)).toEqual(['transfer:transfer', 'trade:trade', 'dividend:dividend']);
   });
 });

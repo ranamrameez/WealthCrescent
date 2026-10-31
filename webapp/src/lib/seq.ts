@@ -105,189 +105,57 @@ export function backfillSeq<T extends { seq?: number }>(records: T[], chronologi
  * transactionIndex are mirrored only as compatibility aliases for old code/data.
  * Missing global indexes are appended after the current maximum in input order.
  */
-export function syncTransactionIndexes<T extends { id?: string; ticker: string; globalTransactionIndex?: number; perTickerIndex?: number; transactionIndex?: number; seq?: number }>(records: T[]): T[] {
-  let nextGlobal = Math.max(0, ...records.map(r => r.globalTransactionIndex ?? r.transactionIndex ?? 0));
-  const withGlobal = records.map(record => {
-    const globalTransactionIndex = record.globalTransactionIndex ?? record.transactionIndex ?? ++nextGlobal;
-    return { ...record, globalTransactionIndex, transactionIndex: globalTransactionIndex };
-  });
-  const ordered = [...withGlobal].sort((a, b) => a.globalTransactionIndex! - b.globalTransactionIndex!);
-  const perTicker = new Map<string, number>();
-  const byId = new Map<string | undefined, T>();
-  ordered.forEach(record => {
-    const perTickerIndex = (perTicker.get(record.ticker) ?? 0) + 1;
-    perTicker.set(record.ticker, perTickerIndex);
-    byId.set(record.id, { ...record, perTickerIndex, seq: perTickerIndex });
-  });
-  return withGlobal.map(record => byId.get(record.id)!);
-}
-
-
-export type AccountingEventKind = 'trade' | 'transfer' | 'adjustment' | 'dividend';
-
-export interface AccountingEventRef {
-  kind: AccountingEventKind;
-  id: string;
-  date: string;
-  accountingOrder: number;
-}
-
-export interface AccountingEventOrderChange {
-  kind: AccountingEventKind;
-  id: string;
-  order: number;
-}
-
-export type AccountingEventOrderPair = [AccountingEventOrderChange, AccountingEventOrderChange];
-
-interface AccountingOrderRecord {
+/**
+ * Rebuilds compatibility indexes from the actual accounting chronology:
+ * date first, then the shared same-day event sequence. The old global index
+ * remains a derived trade-only projection; it no longer permits transactions
+ * from different dates to be moved ahead of one another.
+ */
+export function syncTransactionIndexes<T extends {
+  id?: string;
+  ticker: string;
   date: string;
   time?: string;
   timezone?: string;
-  accountingOrder?: number;
-  seq?: number;
-  globalTransactionIndex?: number;
-  transactionIndex?: number;
   action?: string;
-  isPending?: boolean;
-}
-
-interface AccountingEventEntry {
-  kind: AccountingEventKind;
-  record: AccountingOrderRecord;
-  originalIndex: number;
-}
-
-function accountingEventInstant(record: AccountingOrderRecord): number {
-  return toInstantMs(record.date, record.time, record.timezone);
-}
-
-function accountingEventPriority(kind: AccountingEventKind): number {
-  return kind === 'transfer' ? 0 : 1;
-}
-
-function compareLegacyAccountingEvents(a: AccountingEventEntry, b: AccountingEventEntry): number {
-  const byInstant = accountingEventInstant(a.record) - accountingEventInstant(b.record);
-  if (byInstant) return byInstant;
-  const byPriority = accountingEventPriority(a.kind) - accountingEventPriority(b.kind);
-  if (byPriority) return byPriority;
-  if (a.kind === 'trade' && b.kind === 'trade') {
-    const aIndex = a.record.globalTransactionIndex ?? a.record.transactionIndex;
-    const bIndex = b.record.globalTransactionIndex ?? b.record.transactionIndex;
+  accountingOrder?: number;
+  globalTransactionIndex?: number;
+  perTickerIndex?: number;
+  transactionIndex?: number;
+  seq?: number;
+}>(records: T[]): T[] {
+  const ordered = [...records].sort((a, b) => {
+    const byDate = a.date.localeCompare(b.date);
+    if (byDate) return byDate;
+    const aHasOrder = Number.isInteger(a.accountingOrder);
+    const bHasOrder = Number.isInteger(b.accountingOrder);
+    if (aHasOrder && bHasOrder && a.accountingOrder !== b.accountingOrder) return a.accountingOrder! - b.accountingOrder!;
+    if (aHasOrder !== bHasOrder) return aHasOrder ? -1 : 1;
+    const aIndex = a.globalTransactionIndex ?? a.transactionIndex;
+    const bIndex = b.globalTransactionIndex ?? b.transactionIndex;
     if (aIndex !== undefined && bIndex !== undefined && aIndex !== bIndex) return aIndex - bIndex;
-  }
-  const bySeq = (a.record.seq ?? 0) - (b.record.seq ?? 0);
-  return bySeq || a.originalIndex - b.originalIndex;
-}
-
-/**
- * Creates one persisted same-day sequence across every accounting event type.
- * Existing sequence values are authoritative. Legacy records without the new
- * field are backfilled without changing their source arrays or transaction IDs.
- * For a legacy day, trade-to-trade order is preserved from global transaction
- * indexes; non-trade events are interleaved using their recorded instant and
- * existing sequence where available.
- */
-export function syncAccountingEventCollections<
-  TTrade extends AccountingOrderRecord,
-  TTransfer extends AccountingOrderRecord,
-  TAdjustment extends AccountingOrderRecord,
-  TDividend extends AccountingOrderRecord,
->(collections: {
-  transactions: TTrade[];
-  transfers: TTransfer[];
-  adjustments: TAdjustment[];
-  dividends: TDividend[];
-}): {
-  transactions: TTrade[];
-  transfers: TTransfer[];
-  adjustments: TAdjustment[];
-  dividends: TDividend[];
-} {
-  const events: AccountingEventEntry[] = [
-    ...collections.transactions.filter(record => !record.isPending).map(record => ({ kind: 'trade' as const, record, originalIndex: 0 })),
-    ...collections.transfers.map(record => ({ kind: 'transfer' as const, record, originalIndex: 0 })),
-    ...collections.adjustments.map(record => ({ kind: 'adjustment' as const, record, originalIndex: 0 })),
-    ...collections.dividends.map(record => ({ kind: 'dividend' as const, record, originalIndex: 0 })),
-  ];
-  events.forEach((event, index) => { event.originalIndex = index; });
-
-  const byDate = new Map<string, AccountingEventEntry[]>();
-  for (const event of events) {
-    const group = byDate.get(event.record.date) ?? [];
-    group.push(event);
-    byDate.set(event.record.date, group);
-  }
-
-  const orderByRecord = new Map<AccountingOrderRecord, number>();
-  for (const dayEvents of byDate.values()) {
-    const hasSavedOrder = dayEvents.some(event => Number.isInteger(event.record.accountingOrder));
-    let ordered: AccountingEventEntry[];
-
-    if (hasSavedOrder) {
-      const saved = dayEvents.filter(event => Number.isInteger(event.record.accountingOrder))
-        .sort((a, b) => (a.record.accountingOrder! - b.record.accountingOrder!) || compareLegacyAccountingEvents(a, b));
-      const missing = dayEvents.filter(event => !Number.isInteger(event.record.accountingOrder))
-        .sort(compareLegacyAccountingEvents);
-      ordered = [...saved, ...missing];
-    } else {
-      const trades = dayEvents.filter(event => event.kind === 'trade').sort((a, b) => {
-        const aIndex = a.record.globalTransactionIndex ?? a.record.transactionIndex;
-        const bIndex = b.record.globalTransactionIndex ?? b.record.transactionIndex;
-        if (aIndex !== undefined && bIndex !== undefined && aIndex !== bIndex) return aIndex - bIndex;
-        return a.originalIndex - b.originalIndex;
-      });
-      const otherEvents = dayEvents.filter(event => event.kind !== 'trade').sort(compareLegacyAccountingEvents);
-      ordered = [...trades];
-      for (const event of otherEvents) {
-        const index = ordered.findIndex(existing => compareLegacyAccountingEvents(event, existing) < 0);
-        ordered.splice(index < 0 ? ordered.length : index, 0, event);
-      }
-    }
-
-    ordered.forEach((event, index) => orderByRecord.set(event.record, index + 1));
-  }
-
-  const apply = <T extends AccountingOrderRecord>(records: T[]): T[] => records.map(record => {
-    const order = orderByRecord.get(record);
-    return order === undefined ? record : { ...record, accountingOrder: order };
+    const byInstant = toInstantMs(a.date, a.time, a.timezone) - toInstantMs(b.date, b.time, b.timezone);
+    if (byInstant) return byInstant;
+    if (a.action !== b.action) return a.action === 'BUY' ? -1 : 1;
+    return (a.seq ?? 0) - (b.seq ?? 0);
   });
 
-  return {
-    transactions: apply(collections.transactions),
-    transfers: apply(collections.transfers),
-    adjustments: apply(collections.adjustments),
-    dividends: apply(collections.dividends),
-  };
-}
+  const perTicker = new Map<string, number>();
+  const indexes = new Map<T, { globalTransactionIndex: number; perTickerIndex: number }>();
+  ordered.forEach((record, index) => {
+    const perTickerIndex = (perTicker.get(record.ticker) ?? 0) + 1;
+    perTicker.set(record.ticker, perTickerIndex);
+    indexes.set(record, { globalTransactionIndex: index + 1, perTickerIndex });
+  });
 
-export function nextAccountingOrderForDate(
-  records: Array<{ date: string; accountingOrder?: number }>,
-  date: string,
-): number {
-  return records.reduce((max, record) => record.date === date
-    ? Math.max(max, record.accountingOrder ?? 0)
-    : max, 0) + 1;
-}
-
-export function getAccountingEventRefs(workbook: {
-  transactions: Array<{ id?: string; date: string; accountingOrder?: number; isPending?: boolean }>;
-  transfers: Array<{ id?: string; date: string; accountingOrder?: number }>;
-  adjustments: Array<{ id?: string; date: string; accountingOrder?: number }>;
-  dividends: Array<{ id?: string; date: string; accountingOrder?: number }>;
-}): AccountingEventRef[] {
-  return [
-    ...workbook.transactions.filter(record => !!record.id && !record.isPending).map(record => ({
-      kind: 'trade' as const, id: record.id!, date: record.date, accountingOrder: record.accountingOrder ?? 0,
-    })),
-    ...workbook.transfers.filter(record => !!record.id).map(record => ({
-      kind: 'transfer' as const, id: record.id!, date: record.date, accountingOrder: record.accountingOrder ?? 0,
-    })),
-    ...workbook.adjustments.filter(record => !!record.id).map(record => ({
-      kind: 'adjustment' as const, id: record.id!, date: record.date, accountingOrder: record.accountingOrder ?? 0,
-    })),
-    ...workbook.dividends.filter(record => !!record.id).map(record => ({
-      kind: 'dividend' as const, id: record.id!, date: record.date, accountingOrder: record.accountingOrder ?? 0,
-    })),
-  ].sort((a, b) => a.date.localeCompare(b.date) || a.accountingOrder - b.accountingOrder);
+  return records.map(record => {
+    const index = indexes.get(record)!;
+    return {
+      ...record,
+      globalTransactionIndex: index.globalTransactionIndex,
+      transactionIndex: index.globalTransactionIndex,
+      perTickerIndex: index.perTickerIndex,
+      seq: index.perTickerIndex,
+    };
+  });
 }
