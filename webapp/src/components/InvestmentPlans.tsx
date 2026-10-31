@@ -54,8 +54,11 @@ export function InvestmentPlans({ market, items, filters }: { market: 'qse' | 'p
         ? usePSXWorkbookStore.getState().workbook
         : null;
     if (stockWorkbook) {
+      const nextGlobalTransactionIndex = Math.max(0, ...stockWorkbook.transactions.map(transaction => transaction.globalTransactionIndex ?? transaction.transactionIndex ?? 0)) + 1;
       const preview: Transaction = {
         id: '__trade-plan-validation__',
+        globalTransactionIndex: nextGlobalTransactionIndex,
+        transactionIndex: nextGlobalTransactionIndex,
         date: leg.date ?? new Date().toISOString().slice(0, 10),
         ticker: leg.ticker,
         action: leg.action,
