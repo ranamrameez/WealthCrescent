@@ -114,7 +114,10 @@ export function TransactionRows({ initial, onSaved }: { initial?: Partial<Transa
     if (deviations.length && !(await confirmDialog(`${deviations.join('\\n')}\\n\\nThis exceeds your ${threshold}% warning threshold. Save these trades anyway?`, 'Trade prices differ from market prices?'))) return;
     if (!(await ensureSignedIn('Sign in to save your transactions.'))) return;
     try {
+      const beforeCount = useWorkbookStore.getState().workbook.transactions.length;
       addTransactions(valid.map((r) => ({ ...r, ticker: r.ticker.toUpperCase() })));
+      const afterCount = useWorkbookStore.getState().workbook.transactions.length;
+      if (afterCount !== beforeCount + valid.length) throw new Error('Transaction store did not retain every submitted row.');
     } catch (error) {
       console.error('Failed to add QSE trade from the transaction form.', error);
       toast('Could not save the trade. Your entries are still here; please try again.');
@@ -468,6 +471,17 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   };
   const saveEdit = async () => {
     if (editIndex === null || !editRow) return;
+    if (editRow.action === 'SELL' && !editRow.isPending) {
+      const available = computeFIFOPositions(workbook.transactions.filter((_, index) => index !== editIndex), calcFee).positions.find(position => position.ticker === editRow.ticker.toUpperCase())?.shares ?? 0;
+      if (editRow.shares > available + 1e-7) return toast(`Cannot save this sell: only ${fmt(available, 0)} ${editRow.ticker.toUpperCase()} shares are available.`);
+    }
+    const marketPrice = workbook.marketPrices[editRow.ticker.toUpperCase()] ?? 0;
+    const deviation = tradePriceDeviationPct(editRow.price, marketPrice);
+    const threshold = workbook.settings.tradePriceDeviationPct ?? 10;
+    if (deviation !== null && Math.abs(deviation) > threshold) {
+      const accepted = await confirmDialog(`Entered ${fmtQSEPrice(editRow.price)}; saved market price is ${fmtQSEPrice(marketPrice)} (${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%). This exceeds your ${threshold}% warning threshold. Save anyway?`, 'Trade price differs from market price?');
+      if (!accepted) return;
+    }
     if (!(await ensureSignedIn('Sign in to save changes.'))) return;
     updateTransaction(editIndex, editRow);
     toast('Transaction updated.');
