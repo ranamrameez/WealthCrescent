@@ -48,7 +48,12 @@ export function InvestmentPlans({ market, items, filters }: { market: 'qse' | 'p
       return;
     }
 
-    if (market !== 'funds') {
+    const stockWorkbook = market === 'qse'
+      ? useWorkbookStore.getState().workbook
+      : market === 'psx'
+        ? usePSXWorkbookStore.getState().workbook
+        : null;
+    if (stockWorkbook) {
       const preview: Transaction = {
         id: '__trade-plan-validation__',
         date: leg.date ?? new Date().toISOString().slice(0, 10),
@@ -59,15 +64,15 @@ export function InvestmentPlans({ market, items, filters }: { market: 'qse' | 'p
         manualSameDay: leg.manualSameDay,
         feeOverride: leg.feeOverride,
       };
-      const quantityError = validateTransactionEdit(state.workbook.transactions, [...state.workbook.transactions, preview]);
+      const quantityError = validateTransactionEdit(stockWorkbook.transactions, [...stockWorkbook.transactions, preview]);
       if (quantityError) {
         toast(`Cannot execute this plan: it would create ${fmt(quantityError.additionalUnmatchedShares, 0)} unmatched SELL shares for ${quantityError.ticker}.`);
         return;
       }
 
-      const marketPrice = state.workbook.marketPrices[leg.ticker.toUpperCase()] ?? 0;
+      const marketPrice = stockWorkbook.marketPrices[leg.ticker.toUpperCase()] ?? 0;
       const deviation = tradePriceDeviationPct(leg.price, marketPrice);
-      const threshold = state.workbook.settings.tradePriceDeviationPct ?? 10;
+      const threshold = stockWorkbook.settings.tradePriceDeviationPct ?? 10;
       if (deviation !== null && Math.abs(deviation) > threshold) {
         const entered = market === 'psx' ? fmtPSXPrice(leg.price) : fmtQSEPrice(leg.price);
         const currentPrice = market === 'psx' ? fmtPSXPrice(marketPrice) : fmtQSEPrice(marketPrice);
