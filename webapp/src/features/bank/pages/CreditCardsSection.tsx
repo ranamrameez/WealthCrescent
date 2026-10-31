@@ -2,6 +2,7 @@ import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { CreditCardPositionSummary } from '../../../components/CreditCardPositionSummary';
 import { DateValue } from '../../../components/DateValue';
+import { useTablePagination } from '../../../hooks/useTablePagination';
 import { ToggleChip } from '../../../components/ui/ToggleChip';
 import { EntityEditorModal } from '../../../components/EntityEditorModal';
 import { planOccurrences, occurrenceCompleted } from '../../../lib/calc/planOccurrences';
@@ -451,14 +452,11 @@ function CreditCardTransactionEditModal({
 
 function TransactionsTable({ card, filters, showActions = false }: { card: CreditCard; filters: TransactionPageFilters; showActions?: boolean }) {
   const dateSort = useDateTableSort();
-  useEffect(() => setPage(1), [dateSort.selection]);
   const transactions = useCreditCardWorkbookStore((s) => s.workbook.transactions);
   const deleteTransaction = useCreditCardWorkbookStore((s) => s.deleteTransaction);
   const categories = useCategoryStore((s) => s.workbook.categories);
   const [detail, setDetail] = useState<CreditCardTransaction | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<CreditCardTransaction | null>(null);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
   const cardTxs = useMemo(
     () => [...transactions].filter((t) => t.cardId === card.id).sort((a, b) => b.date.localeCompare(a.date) || (b.seq ?? 0) - (a.seq ?? 0)),
     [transactions, card.id],
@@ -473,10 +471,20 @@ function TransactionsTable({ card, filters, showActions = false }: { card: Credi
     return true;
   }), [cardTxs, filters, categories]);
   const filtered = dateSort.rows(dateSortInput, { date: row => row });
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const safePage = Math.min(page, pageCount);
-  const pageRows = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
-  useEffect(() => setPage(1), [filters.fromDate, filters.toDate, filters.direction, filters.category, filters.source, pageSize]);
+  const { rows: pageRows, controls: paginationControls } = useTablePagination(filtered);
+  // Running utilization is calculated from the complete chronological ledger,
+  // never from the filtered/sorted page, so a date filter cannot reset the
+  // opening balance or change the limit usage shown on an individual row.
+  const runningConsumedById = useMemo(() => {
+    const chronological = [...cardTxs].sort((a, b) => a.date.localeCompare(b.date) || (a.seq ?? 0) - (b.seq ?? 0));
+    let consumed = card.openingBalance ?? 0;
+    const result = new Map<string, number>();
+    for (const tx of chronological) {
+      consumed = Math.max(0, consumed + (tx.kind === 'payment' ? -tx.amount : tx.amount));
+      result.set(tx.id, consumed);
+    }
+    return result;
+  }, [cardTxs, card.openingBalance]);
 
   if (!cardTxs.length) return <p className="text-muted m-0">No transactions yet.</p>;
   return (
@@ -484,7 +492,7 @@ function TransactionsTable({ card, filters, showActions = false }: { card: Credi
     <div className="section-toolbar"><span className="text-muted">Central filters apply to this ledger: {filtered.length} of {cardTxs.length} transactions</span></div>
     <div className="table-responsive">
       <table>
-        <thead><tr><dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th><th>Type</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr></thead>
+        <thead><tr><dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th><th>Type</th><th>Description</th><th>Category</th><th>Amount</th><th>Consumed limit</th><th>Allowed limit</th><th>Available limit</th><th></th></tr></thead>
         <tbody>
           {pageRows.map((t) => (
             <RecordRow onEdit={() => setEditingTransaction(t)}    record={t}  key={t.id} className="clickable" >
@@ -493,6 +501,9 @@ function TransactionsTable({ card, filters, showActions = false }: { card: Credi
               <td className="cell-clip" title={t.description}>{t.description}</td>
               <td>{categoryName(t.categoryID, categories)}</td>
               <td>{fmtMoney(t.amount, card.currencyCode)}</td>
+              <td>{fmtMoney(runningConsumedById.get(t.id) ?? 0, card.currencyCode)}</td>
+              <td>{card.creditLimit == null ? '—' : fmtMoney(card.creditLimit, card.currencyCode)}</td>
+              <td>{card.creditLimit == null ? '—' : fmtMoney(Math.max(0, card.creditLimit - (runningConsumedById.get(t.id) ?? 0)), card.currencyCode)}</td>
               <td onClick={(e) => e.stopPropagation()}>
                 {showActions && <IconButton label="Edit" icon={<EditIcon size={12} />} align="right" onClick={() => setEditingTransaction(t)} />}
                 {showActions && <IconButton
@@ -506,14 +517,11 @@ function TransactionsTable({ card, filters, showActions = false }: { card: Credi
               </td>
             </RecordRow>
           ))}
-          {!pageRows.length && <tr><td colSpan={6} className="text-muted">No transactions match these filters.</td></tr>}
+          {!pageRows.length && <tr><td colSpan={9} className="text-muted">No transactions match these filters.</td></tr>}
         </tbody>
       </table>
     </div>
-      <div className="pagination-bar">
-        <div className="text-muted">{filtered.length ? `Showing ${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, filtered.length)} of ${filtered.length}` : 'No rows'}</div>
-        <div className="pagination-actions"><span className="text-muted">Page {safePage} of {pageCount}</span><Field label="Rows" width={78}><Select value={String(pageSize)} onChange={(event) => setPageSize(Number(event.target.value))}><option value="25">25</option><option value="50">50</option><option value="100">100</option></Select></Field><StandardButton tone="secondary" size="small" icon={<ArrowLeftIcon />} disabled={safePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</StandardButton><StandardButton tone="secondary" size="small" icon={<ArrowRightIcon />} disabled={safePage >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Next</StandardButton></div>
-      </div>
+      {paginationControls}
       {editingTransaction && <CreditCardTransactionEditModal transaction={editingTransaction} onClose={() => setEditingTransaction(null)} />}
       {detail && (
         <RecordDetailModal
