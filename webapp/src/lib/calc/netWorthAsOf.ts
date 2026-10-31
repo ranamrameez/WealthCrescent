@@ -157,7 +157,7 @@ export function netWorthAsOfDate(asOfDate: string, inputs: NetWorthAsOfInputs): 
   const fundsTransfersAsOf = inputs.fundsTransfers.filter((transfer) => transfer.date <= asOfDate);
   const fundsValues = mergeCurrencyTotals(
     fundsValueByCurrency(fundsIncluded, fundsTxAsOf, fundsPricesAsOf),
-    inputs.fundsIncludeCashInNetWorth ? fundsCashBalanceByCurrency(fundsIncluded, fundsTxAsOf, fundsTransfersAsOf, inputs.fundsDefaultCurrency) : {},
+    inputs.fundsIncludeCashInNetWorth ? fundsCashBalanceByCurrency(inputs.fundsFunds, fundsTxAsOf, fundsTransfersAsOf, inputs.fundsDefaultCurrency) : {},
   );
 
   const qseTxAsOf = inputs.qseTransactions.filter((t) => t.date <= asOfDate);
