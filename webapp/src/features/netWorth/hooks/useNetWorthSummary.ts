@@ -73,7 +73,7 @@ export function useNetWorthSummary(selectedModules?: string[]): NetWorthSummary 
   const fundsValues = enabled('funds')
     ? mergeCurrencyTotals(
         fundsValueByCurrency(fundsIncluded, funds.transactions, funds.marketPrices),
-        funds.settings.includeCashInNetWorth === false ? {} : fundsCashBalanceByCurrency(fundsIncluded, funds.transactions, funds.transfers, funds.settings.defaultCurrency),
+        funds.settings.includeCashInNetWorth === false ? {} : fundsCashBalanceByCurrency(fundsIncluded, funds.transactions, funds.transfers, (funds.settings.legacyTransferCurrency ?? funds.settings.defaultCurrency)),
       )
     : {};
 
