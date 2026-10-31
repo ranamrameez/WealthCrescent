@@ -111,7 +111,7 @@ describe('syncAccountingEventCollections', () => {
     const result = syncAccountingEventCollections({
       transactions: [{ id: 'trade', date: '2026-01-01', accountingOrder: 2, action: 'BUY', globalTransactionIndex: 1 }],
       transfers: [{ id: 'transfer', date: '2026-01-01', accountingOrder: 1, seq: 1 }],
-      adjustments: [{ id: 'new-reward', date: '2026-01-01', seq: 2, accountingOrder: 0 }],
+      adjustments: [{ id: 'new-reward', date: '2026-01-01', seq: 2, accountingOrder: undefined as number | undefined }],
       dividends: [],
     });
     expect(result.transfers[0].accountingOrder).toBe(1);

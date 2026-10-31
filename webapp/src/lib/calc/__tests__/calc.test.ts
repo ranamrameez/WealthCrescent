@@ -209,14 +209,15 @@ describe('computeAveragePLBySellTxId', () => {
 });
 
 describe('persisted transaction accounting order', () => {
-  it('uses transactionIndex for positions even when the order crosses trade dates', () => {
+  it('processes trade dates chronologically regardless of legacy transactionIndex values', () => {
     const rows: Transaction[] = [
       { id: 'buy-later-date', date: '2026-10-27', ticker: 'ORDER', action: 'BUY', shares: 10, price: 10, transactionIndex: 1 },
       { id: 'sell-earlier-date', date: '2026-10-18', ticker: 'ORDER', action: 'SELL', shares: 10, price: 12, transactionIndex: 2 },
     ];
     const [position] = computePositions(rows, () => 0);
-    expect(position.shares).toBe(0);
-    expect(position.invested).toBe(0);
-    expect(position.realized).toBe(20);
+    expect(position.shares).toBe(10);
+    expect(position.invested).toBe(100);
+    expect(position.realized).toBe(0);
+    expect(position.unmatchedSellShares).toBe(10);
   });
 });
