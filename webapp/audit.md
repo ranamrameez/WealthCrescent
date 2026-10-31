@@ -151,3 +151,10 @@ Design decision: a separate **portfolio-level cash account per currency**, not p
 - Regression tests cover deposit/BUY/SELL/withdrawal arithmetic, fees, multi-currency separation, matched versus unmatched partial SELLs, legacy currency fallback and JSON backup round-tripping, linked Funds transfer add/edit/delete with cross-module consistency, and historical Net Worth.
 
 **CI validation passed:** Actions run [#291](https://github.com/ranamrameez/WealthCrescent/actions/runs/41205303758) passed 138 test files / 1,097 tests, type-check and production build on application-code head `dd95f68e705d0a08c8e8005836ed2db78c71f37f`. Later commits are documentation-only. **Manual validation remains:** inspect a real pre-migration backup/export and perform interactive browser smoke tests. The browser connection was unavailable in this session; PR #46 remains draft.
+
+### Broker-profile preservation check (PR #46 follow-up)
+
+- QSE/PSX transfers remain profile-owned: `Transfer.brokerId` identifies the broker, and the exchange store routes add/edit/delete to that profile's `data.transfers`. Non-active profile transfer routing is covered by the broker store regression tests.
+- Linked transfer picker and save-time currency resolution now use the selected profile's `settings.currency`, not the parent exchange's active/global setting. Profile deposit fees continue to come from that same profile.
+- Funds cash remains a separate portfolio-level per-currency ledger; this is not a shared exchange cash account and does not change QSE/PSX broker ownership.
+- Added tests for distinct QSE/PSX profile currencies in both picker and save-time resolution. CI run [#307](https://github.com/ranamrameez/WealthCrescent/actions/runs/41208028278) passed 138 test files / 1,100 tests, type-check and production build on code head `2725ee1ac63c6e4b19c65f23965ff6098fc0a19c`.
