@@ -26,8 +26,6 @@ import { LotAllocationFields } from '../../../components/ui/LotAllocationFields'
 import { useSortableRows } from '../../../hooks/useSortableRows';
 import { usePageFabActions } from '../../../hooks/usePageFabActions';
 import { fmt, fmtMoney, fmtQSEPrice } from '../../../lib/format';
-import { closedPLBySellTxId, computeClosedTrades, type LotMatchOrder } from '../../../lib/calc/closedTrades';
-import { computeAveragePLBySellTxId } from '../../../lib/calc/realizedPL';
 import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
 import { tradePriceDeviationPct, validateTransactionEdit, validateSellQuantities } from '../../../lib/calc/tradeValidation';
 import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
@@ -296,7 +294,7 @@ function groupKey(tx: Transaction, groupBy: GroupBy): string {
 function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } = {}) {
   const pageFilters = useQseFilters();
   const [modifying, setModifying] = useState(false);
-  const { workbook, calcFee, positions } = useQSEDerived();
+  const { workbook, calcFee, positions, closedTrades, realizedBySellTxId: sellPLById, lots } = useQSEDerived();
   const deleteTransaction = useWorkbookStore((s) => s.deleteTransaction);
   const updateTransaction = useWorkbookStore((s) => s.updateTransaction);
   const ensureSignedIn = useEnsureSignedIn();
@@ -309,12 +307,8 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   const [editRow, setEditRow] = useState<Transaction | null>(null);
   const [detailTx, setDetailTx] = useState<Transaction | null>(null);
   const [sourceEditRequest, setSourceEditRequest] = useState<QseRow | null>(null);
-  // User-reported (2026-09-13): the flat 0.275% fee never depends on which
-  // lot a sale is later attributed to, so FIFO's "oldest lot first" is a
-  // pure reporting convention here, not a real constraint — offer the
-  // cheapest-lot-first alternative as a second, explicitly comparison-only
-  // view (see `closedTrades.ts`'s own `LotMatchOrder` doc comment).
-  const ctMatchOrder: LotMatchOrder = workbook.settings.costBasisMethod === 'lowestCostFirst' ? 'lowestCostFirst' : 'fifo';
+  // Closed-trade attribution, open lots and row-level realized P/L all come
+  // from the same selected-method calculation returned by useQSEDerived.
 
   // Pending item 143: manual lot allocation for the inline edit-row SELL
   // form — same gate as `TransactionRows`' add-row copy above. Lots are
@@ -387,15 +381,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   // FIFO matching, with its own buy price/sell price/fees/net P&L, entirely
   // independent of the aggregate position calc (computeClosedTrades never
   // feeds back into computePositions).
-  const closedTrades = useMemo(
-    () =>
-      computeClosedTrades(
-        workbook.transactions,
-        calcFee,
-        ctMatchOrder,
-      ),
-    [workbook.transactions, calcFee, ctMatchOrder],
-  );
+  const methodClosedTrades = closedTrades;
   type CTCol = 'ticker' | 'buyDate' | 'buyPrice' | 'sellDate' | 'sellPrice' | 'shares' | 'buyFee' | 'sellFee' | 'netPL' | 'holdingDays';
   const ctSortValue = (t: (typeof closedTrades)[number], col: CTCol): number | string => {
     switch (col) {
@@ -411,7 +397,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
       default: return t.buyDate;
     }
   };
-  const { sorted: sortedClosedTrades, Th: CTTh, dateSort: closedDateSort } = useSortableRows(closedTrades.filter(row => (filterTicker === 'ALL' || row.ticker === filterTicker) && filterAction !== 'BUY' && matchesQseFilters({ date: row.sellDate, ticker: row.ticker, action: 'SELL' }, pageFilters)), ctSortValue, 'sellDate', 'desc');
+  const { sorted: sortedClosedTrades, Th: CTTh, dateSort: closedDateSort } = useSortableRows(methodClosedTrades.filter(row => (filterTicker === 'ALL' || row.ticker === filterTicker) && filterAction !== 'BUY' && matchesQseFilters({ date: row.sellDate, ticker: row.ticker, action: 'SELL' }, pageFilters)), ctSortValue, 'sellDate', 'desc');
 
   // User's own ask (2026-09-08): "show the sold price and PL w.r.t. that
   // lot's buy price... inline in the main trade row." Computed from the
@@ -422,12 +408,9 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   // realized P&L must stay consistent with every other view of the same
   // number, or this row's own pill and the table below could show two
   // contradicting figures for the identical sell.
-  const sellPLById = useMemo(
-    () => (workbook.settings.costBasisMethod === 'average' || !workbook.settings.costBasisMethod)
-      ? computeAveragePLBySellTxId(workbook.transactions, calcFee)
-      : closedPLBySellTxId(computeClosedTrades(workbook.transactions, calcFee, ctMatchOrder)),
-    [workbook.transactions, workbook.settings.costBasisMethod, calcFee, ctMatchOrder],
-  );
+  // Row-level SELL P/L is the same per-sell result used by the closed-trade view.
+  // It is computed once in the shared stock calculation engine.
+  const sellPLById = useMemo(() => sellPLBySellTxId, [sellPLBySellTxId]);
 
   // User's own words: "make separate sections for open and closed trades...
   // it gets difficult to know the sold status and price of a lot." Same
@@ -440,15 +423,9 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   // `ctMatchOrder` with Closed trades below (2026-09-13, see
   // `LotMatchOrder`'s own doc comment) so the two tables always add up to
   // the same picture of which lots are still open vs. already sold.
-  const openLots = useMemo(() => {
-    const txs = workbook.transactions;
-    const { lotsByTicker } = computeFIFOPositions(txs, calcFee, ctMatchOrder);
-    const flat: (FIFOLot & { ticker: string })[] = [];
-    for (const [ticker, lots] of Object.entries(lotsByTicker)) {
-      for (const lot of lots) flat.push({ ticker, ...lot });
-    }
-    return flat;
-  }, [workbook.transactions, calcFee, ctMatchOrder]);
+  const openLots = useMemo(() => Object.entries(lots).flatMap(([ticker, tickerLots]) =>
+    tickerLots.map(lot => ({ ticker, ...lot })),
+  ), [lots]);
   type OLCol = 'ticker' | 'buyDate' | 'buyPrice' | 'shares' | 'invested' | 'buyFeeTotal';
   const olSortValue = (l: (typeof openLots)[number], col: OLCol): number | string => {
     switch (col) {

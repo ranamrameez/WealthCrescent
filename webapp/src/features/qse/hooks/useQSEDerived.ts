@@ -1,8 +1,8 @@
 import type { Workbook } from '../../../types/workbook';
 import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { buildCashLedger, cashSummary, computePositions, computeRealizedPLTimeSeries, getMarketPrice, makeQSEFeeCalculator } from '../../../lib/calc';
-import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
+import { buildCashLedger, cashSummary, getMarketPrice, makeQSEFeeCalculator } from '../../../lib/calc';
+import { calculateStockPortfolio } from '../../../lib/calc/stockCalculationEngine';
 import { useLiveQseWorkbook } from './useLiveQseWorkbook';
 import { useQseFeed } from './useLiveQseWorkbook';
 import { useWorkbookStore } from '../../../store/workbookStore';
@@ -29,19 +29,8 @@ function calculateDerived(workbook: Workbook, selectedTickers?: string[]) {
     const scoped = selectedTickers?.length ? workbook.transactions.filter((tx) => selectedTickers.includes(tx.ticker)) : workbook.transactions;
     const calcFee = makeQSEFeeCalculator(workbook.settings);
     const method = workbook.settings.costBasisMethod ?? 'average';
-
-    let positions;
-    let realizedSeries;
-    let lots: Record<string, FIFOLot[]> = {};
-    if (method === 'average') {
-      positions = computePositions(scoped, calcFee);
-      realizedSeries = computeRealizedPLTimeSeries(scoped, calcFee);
-    } else {
-      const fifo = computeFIFOPositions(scoped, calcFee, method);
-      positions = fifo.positions;
-      realizedSeries = fifo.realizedSeries;
-      lots = fifo.lotsByTicker;
-    }
+    const calculation = calculateStockPortfolio(scoped, calcFee, method);
+    const { positions, realizedSeries, lotsByTicker: lots } = calculation;
 
     const summary = cashSummary(
       scoped,
@@ -66,7 +55,7 @@ function calculateDerived(workbook: Workbook, selectedTickers?: string[]) {
         return { ticker: p.ticker, shares: p.shares, invested: p.invested, marketPrice, value, sellFee, profit, roiPct };
       });
 
-    return { workbook, calcFee, positions, summary, realizedSeries, ledger, rows, lots };
+    return { workbook, calcFee, positions, summary, realizedSeries, ledger, rows, lots, calculation, closedTrades: calculation.closedTrades, realizedBySellTxId: calculation.realizedBySellTxId, lifecycles: calculation.lifecycles, sellReconciliationByTxId: calculation.sellReconciliationByTxId };
 
 }
 

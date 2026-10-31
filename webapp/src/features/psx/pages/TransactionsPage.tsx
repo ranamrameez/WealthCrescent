@@ -23,8 +23,6 @@ import { useTablePagination } from '../../../hooks/useTablePagination';
 import { usePageFabActions } from '../../../hooks/usePageFabActions';
 import { fmt, fmtMoney, fmtPSXPrice } from '../../../lib/format';
 import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
-import { closedPLBySellTxId, computeClosedTrades, type LotMatchOrder } from '../../../lib/calc/closedTrades';
-import { computeAveragePLBySellTxId } from '../../../lib/calc/realizedPL';
 import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
 import { tradePriceDeviationPct, validateTransactionEdit, validateSellQuantities } from '../../../lib/calc/tradeValidation';
 import { isNettedLeg } from '../../../lib/calc/psxFees';
@@ -312,7 +310,7 @@ function groupKey(tx: Transaction, groupBy: GroupBy): string {
 }
 
 function TransactionList() {
-  const { workbook, calcFee, positions } = usePSXDerived();
+  const { workbook, calcFee, positions, closedTrades: calculatedClosedTrades, realizedBySellTxId: sellPLById, lots } = usePSXDerived();
   const deleteTransaction = usePSXWorkbookStore((s) => s.deleteTransaction);
   const updateTransaction = usePSXWorkbookStore((s) => s.updateTransaction);
   const ensureSignedIn = useEnsureSignedIn();
@@ -324,13 +322,8 @@ function TransactionList() {
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [editRow, setEditRow] = useState<Transaction | null>(null);
   const [detailTx, setDetailTx] = useState<Transaction | null>(null);
-  // User-reported (2026-09-13): PSX's own same-day netting decides a whole
-  // TRANSACTION's fee from that day's total buy vs. sell quantity, never
-  // from which lot a sale is later attributed to here — so FIFO's "oldest
-  // lot first" is a pure reporting convention in this ledger too, not a
-  // real constraint. Offer cheapest-lot-first as a second, explicitly
-  // comparison-only view (see `closedTrades.ts`'s `LotMatchOrder` comment).
-  const ctMatchOrder: LotMatchOrder = workbook.settings.costBasisMethod === 'lowestCostFirst' ? 'lowestCostFirst' : 'fifo';
+  // Closed trades, open lots and row-level realized P/L all use the same
+  // selected-method result from usePSXDerived.
 
   // Pending item 143 PSX fast-follow: manual lot allocation for the inline
   // edit-row SELL form — same gate/derivation as QSE's identical file. Lots
@@ -403,13 +396,8 @@ function TransactionList() {
   // independent of the aggregate position calc (computeClosedTrades never
   // feeds back into computePositions/computeFIFOPositions).
   const closedTrades = useMemo(
-    () =>
-      computeClosedTrades(
-        filterTicker === 'ALL' ? workbook.transactions : workbook.transactions.filter((t) => t.ticker === filterTicker),
-        calcFee,
-        ctMatchOrder,
-      ),
-    [workbook.transactions, calcFee, filterTicker, ctMatchOrder],
+    () => calculatedClosedTrades.filter(row => filterTicker === 'ALL' || row.ticker === filterTicker),
+    [calculatedClosedTrades, filterTicker],
   );
   type CTCol = 'ticker' | 'buyDate' | 'buyPrice' | 'sellDate' | 'sellPrice' | 'shares' | 'buyFee' | 'sellFee' | 'netPL' | 'holdingDays';
   const ctSortValue = (t: (typeof closedTrades)[number], col: CTCol): number | string => {
@@ -438,12 +426,7 @@ function TransactionList() {
   // realized P&L must stay consistent with every other view of the same
   // number, or this row's own pill and the table below could show two
   // contradicting figures for the identical sell.
-  const sellPLById = useMemo(
-    () => (workbook.settings.costBasisMethod === 'average' || !workbook.settings.costBasisMethod)
-      ? computeAveragePLBySellTxId(workbook.transactions, calcFee)
-      : closedPLBySellTxId(computeClosedTrades(workbook.transactions, calcFee, ctMatchOrder)),
-    [workbook.transactions, workbook.settings.costBasisMethod, calcFee, ctMatchOrder],
-  );
+  // Row-level SELL P/L is read from the same selected-method engine result.
 
   // User's own words: "make separate sections for open and closed trades...
   // it gets difficult to know the sold status and price of a lot." Same
@@ -453,15 +436,10 @@ function TransactionList() {
   // `ctMatchOrder` with Closed trades below (2026-09-13, see
   // `LotMatchOrder`'s own doc comment) so the two tables always add up to
   // the same picture of which lots are still open vs. already sold.
-  const openLots = useMemo(() => {
-    const txs = filterTicker === 'ALL' ? workbook.transactions : workbook.transactions.filter((t) => t.ticker === filterTicker);
-    const { lotsByTicker } = computeFIFOPositions(txs, calcFee, ctMatchOrder);
-    const flat: (FIFOLot & { ticker: string })[] = [];
-    for (const [ticker, lots] of Object.entries(lotsByTicker)) {
-      for (const lot of lots) flat.push({ ticker, ...lot });
-    }
-    return flat;
-  }, [workbook.transactions, calcFee, filterTicker, ctMatchOrder]);
+  const openLots = useMemo(() => Object.entries(lots)
+    .filter(([ticker]) => filterTicker === 'ALL' || ticker === filterTicker)
+    .flatMap(([ticker, tickerLots]) => tickerLots.map(lot => ({ ticker, ...lot }))),
+  [lots, filterTicker]);
   type OLCol = 'ticker' | 'buyDate' | 'buyPrice' | 'shares' | 'invested' | 'buyFeeTotal';
   const olSortValue = (l: (typeof openLots)[number], col: OLCol): number | string => {
     switch (col) {

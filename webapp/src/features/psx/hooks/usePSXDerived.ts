@@ -1,8 +1,8 @@
 import type { PSXWorkbook } from '../../../types/psxWorkbook';
 import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { buildCashLedger, cashSummary, computePositions, computeRealizedPLTimeSeries, getMarketPrice } from '../../../lib/calc';
-import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
+import { buildCashLedger, cashSummary, getMarketPrice } from '../../../lib/calc';
+import { calculateStockPortfolio } from '../../../lib/calc/stockCalculationEngine';
 import { makePSXFeeCalculator } from '../../../lib/calc/psxFees';
 import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
 import { applyLivePsx } from '../../../lib/stockData/livePsx';
@@ -37,20 +37,9 @@ export interface PSXRow {
 function calculateDerived(workbook: PSXWorkbook, selectedTickers?: string[]) {
     const scoped = selectedTickers?.length ? workbook.transactions.filter((tx) => selectedTickers.includes(tx.ticker)) : workbook.transactions;
     const calcFee = makePSXFeeCalculator(workbook.settings, scoped);
-    const method = workbook.settings.costBasisMethod;
-
-    let positions;
-    let realizedSeries;
-    let lots: Record<string, FIFOLot[]> = {};
-    if (method === 'fifo' || method === 'lowestCostFirst') {
-      const fifo = computeFIFOPositions(scoped, calcFee, method);
-      positions = fifo.positions;
-      realizedSeries = fifo.realizedSeries;
-      lots = fifo.lotsByTicker;
-    } else {
-      positions = computePositions(scoped, calcFee);
-      realizedSeries = computeRealizedPLTimeSeries(scoped, calcFee);
-    }
+    const method = workbook.settings.costBasisMethod ?? 'average';
+    const calculation = calculateStockPortfolio(scoped, calcFee, method);
+    const { positions, realizedSeries, lotsByTicker: lots } = calculation;
 
     const summary = cashSummary(
       scoped,
@@ -73,7 +62,7 @@ function calculateDerived(workbook: PSXWorkbook, selectedTickers?: string[]) {
         return { ticker: p.ticker, shares: p.shares, invested: p.invested, marketPrice, value, sellFee, profit, roiPct };
       });
 
-    return { workbook, calcFee, positions, summary, realizedSeries, ledger, rows, lots };
+    return { workbook, calcFee, positions, summary, realizedSeries, ledger, rows, lots, calculation, closedTrades: calculation.closedTrades, realizedBySellTxId: calculation.realizedBySellTxId, lifecycles: calculation.lifecycles, sellReconciliationByTxId: calculation.sellReconciliationByTxId };
 
 }
 
