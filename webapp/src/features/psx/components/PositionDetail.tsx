@@ -33,7 +33,6 @@ import { useAppearanceStore } from '../../../store/appearanceStore';
 import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
 import type { PricePoint } from '../../../types/workbook';
 import { usePSXDerived } from '../hooks/usePSXDerived';
-import { gridAutoStyle } from '../../../lib/gridStyle';
 
 function DetailCard({section,title,children,...props}: ComponentProps<typeof StandardCard> & {section:string}) {
   return section === 'all' ? <StandardCard title={title} {...props}>{children}</StandardCard>
