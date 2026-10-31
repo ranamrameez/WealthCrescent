@@ -141,7 +141,7 @@ function NetWorthDrilldownModal({ drilldown, onClose }: { drilldown: Drilldown; 
               </tbody>
             </table>
           )}
-          {flowPaginationControls}
+          {drilldown.items.length > 0 ? flowPaginationControls : null}
         </>
       )}
       {drilldown.kind === 'delta' && (() => {
