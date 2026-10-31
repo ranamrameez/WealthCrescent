@@ -189,7 +189,7 @@ export function TradeCalculator({ initialTicker }: { initialTicker?: string } = 
       if (!accepted) return;
     }
     if (!(await ensureSignedIn('Sign in to save this trade.'))) return;
-    const transaction = { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), ticker, action, shares: sharesToSave, price: priceToSave };
+    const transaction = { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), ticker, action: action as 'BUY' | 'SELL', shares: sharesToSave, price: priceToSave };
     try {
       addTransaction(transaction);
       const saved = usePSXWorkbookStore.getState().workbook.transactions.some(row => row.id === transaction.id);
@@ -199,7 +199,7 @@ export function TradeCalculator({ initialTicker }: { initialTicker?: string } = 
       return toast('The trade could not be saved. Please try again.');
     }
     if (action === 'SELL') {
-      toast(`Logged SELL ${sharesToSave} ${ticker} @ fmtPSXPrice(priceToSave)}`);
+      toast(`Logged SELL ${sharesToSave} ${ticker} @ ${fmtPSXPrice(priceToSave)}}`);
     } else {
       toast(
         mode === 'CYCLE'
