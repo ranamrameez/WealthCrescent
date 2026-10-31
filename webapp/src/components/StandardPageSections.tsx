@@ -17,7 +17,7 @@ export function StandardPageSections({sections: suppliedSections,defaultKey,pres
   const firstKey=defaultKey||sections[0]?.key||'';
   const requested=params.get('section');
   const activeKey=requested&&sections.some(s=>s.key===requested)?requested:firstKey;
-  const [openKeys,setOpenKeys]=useState<Record<string,boolean>>(()=>Object.fromEntries(sections.map(s=>[s.key,s.defaultOpen??(s.key===activeKey||s.key==='summary'||s.key==='funds'||s.key==='brokers'||s.key==='banks')])));
+  const [openKeys,setOpenKeys]=useState<Record<string,boolean>>(()=>Object.fromEntries(sections.map(s=>[s.key,s.defaultOpen??(s.key===activeKey||s.key==='summary'||s.key==='funds'||s.key==='brokers'||s.key==='banks'||s.key==='accounts'||s.key==='properties'||s.key==='loans'||s.key==='subscriptions')])));
   const refs=useRef<Record<string,HTMLElement|null>>({});
   // Clearing the selected section must not reopen the default section.
   // Initial defaults are handled by the state initializer; only explicit URL
