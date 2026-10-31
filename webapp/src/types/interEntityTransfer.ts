@@ -57,9 +57,10 @@ export interface LinkSideConfig {
    * more than one sub-entity to choose from. Ignored otherwise. */
   ref?: string;
   /** A `CashEntry.currencyCode` when `module === 'cash'` — the only side
-   * whose ledger record needs its own currency field (Bank/Rentals derive
-   * it from the account/property, QSE/PSX from the exchange's single
-   * settings.currency). */
+   * whose ledger record needs its own currency field. QSE/PSX currency is
+   * resolved from the selected broker profile's settings; Bank/Rentals
+   * derive it from the selected account/property. Funds stores it on each
+   * transfer because its portfolio can hold multiple currencies. */
   currencyCode?: string;
   /** The 1-indexed schedule month an EMI repayment applies to, when
    * `module === 'emi'` — resolved by the picker UI as "the next
