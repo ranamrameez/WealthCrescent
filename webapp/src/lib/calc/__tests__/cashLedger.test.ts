@@ -43,3 +43,16 @@ describe('buildCashLedger', () => {
     expect(ledger.map((e) => e.kind)).toEqual(['transfer', 'adjustment']);
   });
 });
+
+
+it('keeps the full cash proceeds from an executed oversell while stock accounting flags the unmatched quantity', async () => {
+  const { calculateStockPortfolio } = await import('../stockCalculationEngine');
+  const buy = tx({ id: 'buy', date: '2026-01-01', action: 'BUY', shares: 2, price: 10, seq: 1 });
+  const sell = tx({ id: 'sell', date: '2026-01-02', action: 'SELL', shares: 3, price: 12, seq: 2 });
+  const ledger = buildCashLedger([buy, sell], [], [], flatFee);
+  const accounting = calculateStockPortfolio([buy, sell], flatFee, 'average');
+
+  expect(ledger.map(event => event.amount)).toEqual([-20, 36]);
+  expect(accounting.positions[0].unmatchedSellShares).toBe(1);
+  expect(accounting.realizedBySellTxId.sell).toEqual({ netPL: 4, shares: 2 });
+});

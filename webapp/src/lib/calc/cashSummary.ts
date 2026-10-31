@@ -4,7 +4,8 @@ import { computePositions } from './positions';
 import { getMarketPrice } from './priceHistory';
 
 /** Single all-in summary: actual cash, trading gains/losses and fees. Pending
- * and invalid oversell trades are excluded from actual cash/position ledgers. */
+ * trades are excluded; executed oversells retain their real cash movement while
+ * unmatched shares are excluded from cost basis and realized P/L. */
 export function cashSummary(
   transactions: Transaction[],
   transfers: Transfer[],

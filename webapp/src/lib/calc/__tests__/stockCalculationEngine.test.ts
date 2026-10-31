@@ -75,12 +75,17 @@ describe('calculateStockPortfolio', () => {
     expect(position.realized).toBeCloseTo(-1.2, 8);
     expect(position.unmatchedSellShares).toBe(2);
     expect(position.unmatchedSellFees).toBeCloseTo(2.4, 8);
-    expect(result.realizedBySellTxId.oversell).toEqual({ netPL: expect.closeTo(-1.2, 8), shares: 6 });
-    expect(result.sellReconciliationByTxId.oversell).toMatchObject({
-      requestedShares: 8, matchedShares: 6, unmatchedShares: 2,
-      totalFee: 9.6, matchedFee: 7.2, unmatchedFee: 2.4, matchedProceeds: 64.8,
-    });
-    expect(result.realizedSeries).toEqual([{ date: '2026-10-01', value: expect.closeTo(-1.2, 8) }]);
+    expect(result.realizedBySellTxId.oversell.shares).toBe(6);
+    expect(result.realizedBySellTxId.oversell.netPL).toBeCloseTo(-1.2, 8);
+    const reconciliation = result.sellReconciliationByTxId.oversell;
+    expect(reconciliation).toMatchObject({ requestedShares: 8, matchedShares: 6, unmatchedShares: 2 });
+    expect(reconciliation.totalFee).toBeCloseTo(9.6, 8);
+    expect(reconciliation.matchedFee).toBeCloseTo(7.2, 8);
+    expect(reconciliation.unmatchedFee).toBeCloseTo(2.4, 8);
+    expect(reconciliation.matchedProceeds).toBeCloseTo(64.8, 8);
+    expect(result.realizedSeries).toHaveLength(1);
+    expect(result.realizedSeries[0].date).toBe('2026-10-01');
+    expect(result.realizedSeries[0].value).toBeCloseTo(-1.2, 8);
   });
 
   it('switches basis methods without mutating history and reproduces Average results', () => {

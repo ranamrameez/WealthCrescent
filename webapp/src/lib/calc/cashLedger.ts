@@ -3,9 +3,10 @@ import { fmt } from '../format';
 import { toInstantMs } from '../datetime';
 import { sortTransactionsChronological } from './sortTransactions';
 
-/** Merges completed valid trades, transfers and adjustments into one
- * chronological cash ledger. Pending orders and unmatched sells are not cash
- * events because this app does not model short positions. */
+/** Merges completed trades, transfers and adjustments into one chronological
+ * cash ledger. An executed SELL is always a real cash event, even if the
+ * stock engine flags some shares as unmatched; only matched shares receive
+ * cost basis and realized P/L. Pending orders remain excluded. */
 export function buildCashLedger(
   transactions: Transaction[],
   transfers: Transfer[],
@@ -13,17 +14,13 @@ export function buildCashLedger(
   calcFee: FeeCalculator,
 ): CashLedgerEvent[] {
   const events: Omit<CashLedgerEvent, 'balance'>[] = [];
-  const heldByTicker: Record<string, number> = {};
 
   sortTransactionsChronological(transactions.filter((tx) => !tx.isPending)).forEach((tx) => {
     const isBuy = tx.action === 'BUY';
-    if (!isBuy && tx.shares > (heldByTicker[tx.ticker] || 0) + 1e-7) return;
-
     const amount = tx.shares * tx.price;
     const fee = calcFee(amount, isBuy, { shares: tx.shares, tx });
     const cashDelta = isBuy ? -(amount + fee) : amount - fee;
     events.push({ sourceId: tx.id, ticker: tx.ticker, date: tx.date, time: tx.time, timezone: tx.timezone, seq: tx.perTickerIndex ?? tx.seq, globalTransactionIndex: tx.globalTransactionIndex ?? tx.transactionIndex, perTickerIndex: tx.perTickerIndex ?? tx.seq, transactionIndex: tx.globalTransactionIndex ?? tx.transactionIndex, kind: 'trade', action: tx.action, label: `${tx.action} ${fmt(tx.shares, 0)} ${tx.ticker} @ ${fmt(tx.price, 3)}`, amount: cashDelta, fee });
-    heldByTicker[tx.ticker] = (heldByTicker[tx.ticker] || 0) + (isBuy ? tx.shares : -tx.shares);
   });
 
   transfers.forEach((t) => {
