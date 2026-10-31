@@ -14,14 +14,14 @@ FinanceManager live link:
 > backlog/status doc for the project — keep it in sync with reality, not just with
 > `CLAUDE.md` (which is continuity notes for an AI session, not a substitute for this).
 >
-> **Also (2026-08-23): tested changes are auto-committed and pushed without asking first,
-> and the modules in `MODULES_PLAN.md` are being built in suggested order without waiting
-> for per-step confirmation** — both by explicit user instruction. See `USER_MANUAL.md` for
-> end-user-facing docs (kept up to date alongside this file).
+> **Delivery workflow (updated 2026-10-31):** make small, focused commits and push regularly
+> on the active feature branch; keep this README, `USER_MANUAL.md`, `CLAUDE.md`, and
+> `SESSION_HANDOFF.md` current; never push directly to `main`; and do not merge until the
+> latest application-code head passes the full test suite and production build/type-check.
 
 ## Current session handoff
 
-For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) before continuing. **Latest handoff: 2026-10-31 — PR #44** (`fix/trade-entry-validation-and-transactions-ui`), open as a draft against `main`; see the handoff for the latest exact head SHA, validation status, full remaining checklist, and the PSO reconciliation correction (122 BUY vs 132 SELL, 10 unmatched). Re-check live GitHub state and exact PR head before continuing.
+For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) before continuing. **Latest handoff: 2026-10-31 — PR #44 merged** (`fix/trade-entry-validation-and-transactions-ui`) into `main` as `d1c3c4c33776dc871cf15f044353359a71c18986`. The merged scope, CI evidence, PSO reconciliation correction (122 BUY vs 132 SELL, 10 unmatched), and remaining manual browser-verification note are recorded in the handoff.
 
 ## Cost-basis worked examples (canonical — keep in sync with tests)
 
@@ -10272,9 +10272,11 @@ from the lot system."*
 
 - **Persisted QSE/PSX transaction ordering (2026-10-30, PR #36 merged):** `globalTransactionIndex` is the canonical accounting order across all trades; `perTickerIndex` is derived from that same order for each ticker. Reordering trades swaps global positions and recalculates per-ticker positions in one shared helper, so the two indexes cannot drift. Legacy `transactionIndex` and `seq` are compatibility mirrors only. Legacy workbooks are migrated and all store add/edit/delete/plan-execution paths keep indexes synchronized. QSE/PSX tables expose cross-date move controls without changing effective trade dates. PR #36 merged as `e4aef0bcd2ccf20e2cd7c73a3fe98cc293943be8` after full tests and production build passed in Actions run #94. The combined cash ledger still displays mixed trade/transfer/adjustment events chronologically; unified mixed-event ordering remains a separate unresolved design item.
 
+- **PR #44 — shared finance UI and trade-entry safeguards (2026-10-31, merged):** Squash-merged from `fix/trade-entry-validation-and-transactions-ui` into `main` as `d1c3c4c33776dc871cf15f044353359a71c18986`. This standardizes functional section-card actions, shared pagination across finance/trading ledgers, credit-card running limit columns, Funds/Brokers peer navigation, expanded primary sections, inline summary subsections, all-time stock-detail defaults, daily/lifetime price bounds, QSE/PSX sell and price-deviation safeguards, FAB save verification, and legacy oversell reconciliation. Unmatched SELL fees are allocated proportionally, excluded from realized P/L, and displayed in QSE/PSX warnings and all-time summaries. Application-code head `18348fa258be95767b209b8585b575a8acdd2cf8` passed the full test suite and type-check/production build in Actions run #41201015866; later branch commits were documentation-only. PSO regression remains 122 BUY / 132 SELL with 10 unmatched SELL shares and no fictitious realized profit. Interactive browser checks were not completed in the connected session; verify the affected flows in the deployed UI when convenient. See `SESSION_HANDOFF.md` for the full review and validation record.
+
 ## Pending
 
-- **PR #44 — shared finance UI and trade-entry safeguards (2026-10-31, draft):** Implementation is on `fix/trade-entry-validation-and-transactions-ui`. The branch standardizes functional section-card actions, shared pagination across finance/trading ledgers, credit-card running limit columns, Funds/Brokers peer navigation, expanded primary sections, inline summary subsections, all-time stock-detail defaults, daily/lifetime price bounds, QSE/PSX sell and price-deviation safeguards, FAB save verification, and legacy oversell reconciliation. Unmatched SELL fees are allocated proportionally, excluded from realized P/L, and displayed in QSE/PSX reconciliation warnings and all-time summaries. Current application-code head `54560149c170a2af1d32223c1e4bafdd2c6c0afa` passed type-check/production build and the full test suite in Actions run #41200626771. The PR remains draft and unmerged. Before merge, complete the final diff review and manual/browser checks for the affected flows; see `SESSION_HANDOFF.md`.
+
 
 - **Remaining cost-basis dependency audit (after PR #31):** continue beyond the QSE/PSX transaction pages. Verify Dashboard, Position Detail, analytics/time series, exports, charts, and strategy/advisory surfaces against the configured method. Canonical synchronized global/per-ticker transaction ordering was merged in PR #36 and passed CI. The separate mixed-event cash ledger still displays by effective date and needs its own design/tests if it must follow global accounting order. Do not merge stale PR #22. See `SESSION_HANDOFF.md` and `audit.md`.
 
