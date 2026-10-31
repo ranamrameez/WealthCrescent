@@ -342,6 +342,19 @@ describe('Funds cash ledger', () => {
     expect(fundsCashBalanceByCurrency([usdFund, pkrFund], txs, transfers)).toEqual({ USD: 900, PKR: 3000 });
   });
 
+  it('returns proceeds only for matched shares in a partially unmatched SELL', () => {
+    const txs: Transaction[] = [
+      { date: '2026-01-01', ticker: 'usd', action: 'BUY', shares: 5, price: 10 },
+      { date: '2026-01-02', ticker: 'usd', action: 'SELL', shares: 10, price: 20 },
+    ];
+    const ledger = fundsCashLedgerByCurrency([usdFund], txs, [
+      { id: 'deposit', date: '2026-01-01', type: 'DEPOSIT', gross: 100, fee: 0, currencyCode: 'USD' },
+    ]);
+    const sell = ledger.USD.find((event) => event.kind === 'trade' && event.action === 'SELL');
+    expect(sell?.amount).toBe(100); // 5 matched shares * 20; excess 5 shares are ignored
+    expect(ledger.USD.at(-1)?.balance).toBe(150);
+  });
+
   it('does not add proceeds from an unmatched SELL to cash', () => {
     const txs: Transaction[] = [
       { date: '2026-01-01', ticker: 'usd', action: 'BUY', shares: 5, price: 10 },
