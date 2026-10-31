@@ -1,5 +1,27 @@
 # WealthCrescent — Session Handoff (refreshed 2026-10-31)
 
+## 2026-10-31 — PR #44 merged into main (latest)
+
+<badge> </badge>
+
+- **PR #44:** [Standardize section actions, pagination, and finance summaries](https://github.com/ranamrameez/WealthCrescent/pull/44) is closed and merged.
+- **Merge method:** Squash merge.
+- **Merge commit on `main`:** `d1c3c4c33776dc871cf15f044353359a71c18986`.
+- **Merged feature branch:** `fix/trade-entry-validation-and-transactions-ui`.
+- **Scope:** 56 files covering shared actions and pagination, finance summaries, credit-card running limits, QSE/PSX trade safeguards, FAB/plan execution verification, and legacy oversell reconciliation.
+- **Validation:** application-code head `18348fa258be95767b209b8585b575a8acdd2cf8` passed both jobs in Actions run [#41201015866](https://github.com/ranamrameez/WealthCrescent/actions/runs/41201015866): full test suite and type-check/production build. Later commits before merge were documentation-only; no application code or tests changed after this successful run.
+- **Accounting regression:** PSO history is 122 BUY / 132 SELL; 122 shares are matched, 10 excess SELL shares remain flagged, and unmatched shares/fees do not create realized profit.
+- **Manual verification limitation:** the connected browser in that session exposed read-only tab content only. Interactive branch-level testing of trade entry, FAB persistence, credit limits, pagination, and chart/filter behavior was not completed. Do not represent those flows as manually verified; perform a production UI smoke test when interactive browser access is available.
+
+### User-confirmed delivery rules (2026-10-31)
+
+1. Make small, focused commits and push them regularly on the active feature branch.
+2. Keep `webapp/README.md`, `webapp/USER_MANUAL.md`, root `CLAUDE.md`, and this handoff current when relevant.
+3. Never push directly to `main`; use a branch and PR.
+4. Before merging, verify the latest application-code head with successful type-check, production build, and full test suite. If application code changes after validation, rerun the full checks.
+
+---
+
 ## 2026-10-31 — PR #44 continuation handoff (latest)
 
 **Current work is already in draft PR #44** — [Standardize section actions, pagination, and finance summaries](https://github.com/ranamrameez/WealthCrescent/pull/44). Do not start a duplicate branch or duplicate implementation. Live GitHub check at handoff time:
