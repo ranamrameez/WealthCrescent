@@ -61,6 +61,7 @@ export function TradeCalculator({ initialTicker }: { initialTicker?: string } = 
 
   const [mode, setMode] = useState<Mode>('BUY');
   const [ticker, setTicker] = useState(initialTicker || '');
+  useEffect(() => { if (initialTicker) setTicker(initialTicker); }, [initialTicker]);
   const [targetTouched, setTargetTouched] = useState(false);
 
   const [sellShares, setSellShares] = useState(0);
