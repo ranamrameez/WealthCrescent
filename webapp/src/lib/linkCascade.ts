@@ -153,8 +153,8 @@ export function updateLinkedTransfer(
   const ids = { linkId: link.id, fromRecordId: link.fromRecordId, toRecordId: link.toRecordId };
   const resolved = resolveTransferInput(input);
   const { from, to, link: updated } = buildLinkedRecords({ ...resolved,
-    from: { ...resolveTransferSide(input.from, 'out', link.fromRecordId), ...input.from },
-    to: { ...resolveTransferSide(input.to, 'in', link.toRecordId), ...input.to },
+    from: resolveTransferSide({ ...input.from, ...resolved.from }, 'out', link.fromRecordId),
+    to: resolveTransferSide({ ...input.to, ...resolved.to }, 'in', link.toRecordId),
   }, ids);
   try {
     dispatchUpdate(from);
