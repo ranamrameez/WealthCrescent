@@ -698,6 +698,8 @@ function AnalyticsTab({ selectedIds, currencyCode }: { selectedIds?: string[]; c
   const byCategory = useMemo(() => spendByCategory(scopedSubs, effectiveCurrency, categoryRegistry), [scopedSubs, effectiveCurrency, categoryRegistry]);
   const categories = Object.keys(byCategory);
   const renewals = useMemo(() => upcomingRenewals(scopedSubs.filter((subscription) => subscription.currencyCode === effectiveCurrency), 30), [scopedSubs, effectiveCurrency]);
+  const sortedRenewals = dateSort.rows(renewals, { date: row => row });
+  const { rows: pageRenewals, controls: renewalControls } = useTablePagination(sortedRenewals);
 
   const accounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
   const cards = useCreditCardWorkbookStore((s) => s.workbook.cards);
@@ -754,7 +756,7 @@ function AnalyticsTab({ selectedIds, currencyCode }: { selectedIds?: string[]; c
             <table>
               <thead><tr><dateSort.Th rows={renewals} column="date">Date</dateSort.Th><th>Name</th><th>Amount</th></tr></thead>
               <tbody>
-                {dateSort.rows(renewals, { date: row => row }).map((r) => (
+                {pageRenewals.map((r) => (
                   <RecordRow record={r} key={r.subscription.id}>
                     <td><DateValue value={r.date} /></td>
                     <td>{r.subscription.name}</td>
@@ -764,6 +766,7 @@ function AnalyticsTab({ selectedIds, currencyCode }: { selectedIds?: string[]; c
               </tbody>
             </table>
           </div>
+          {renewals.length > 0 ? renewalControls : null}
         </ChartCard>
       </div>
     </div>
