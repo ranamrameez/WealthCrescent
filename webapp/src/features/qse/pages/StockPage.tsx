@@ -7,7 +7,7 @@ import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu
 import { InvestmentPlans } from '../../../components/InvestmentPlans';
 import { BackButton } from '../../../components/BackButton';
 import { PriceInput } from "../../../components/ui/PriceInput";
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { CheckIcon, EditIcon, SaveIcon, TrashIcon, XIcon } from '../../../components/icons';
