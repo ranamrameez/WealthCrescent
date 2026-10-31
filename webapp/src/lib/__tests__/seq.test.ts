@@ -110,8 +110,8 @@ describe('syncAccountingEventCollections', () => {
   it('backfills legacy trade sequence from recorded time before old global indexes', () => {
     const result = syncAccountingEventCollections({
       transactions: [
-        { id: 'later-time', date: '2026-01-01', time: '11:00', action: 'BUY', globalTransactionIndex: 1 },
-        { id: 'earlier-time', date: '2026-01-01', time: '09:00', action: 'SELL', globalTransactionIndex: 2 },
+        { id: 'later-time', date: '2026-01-01', time: '11:00', action: 'BUY', globalTransactionIndex: 1, accountingOrder: undefined as number | undefined },
+        { id: 'earlier-time', date: '2026-01-01', time: '09:00', action: 'SELL', globalTransactionIndex: 2, accountingOrder: undefined as number | undefined },
       ],
       transfers: [],
       adjustments: [],
