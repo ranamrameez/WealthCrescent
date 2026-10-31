@@ -2,7 +2,6 @@
 
 ## 2026-10-31 — PR #44 merged into main (latest)
 
-<badge> </badge>
 
 - **PR #44:** [Standardize section actions, pagination, and finance summaries](https://github.com/ranamrameez/WealthCrescent/pull/44) is closed and merged.
 - **Merge method:** Squash merge.
