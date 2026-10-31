@@ -930,7 +930,7 @@ function CashLedgerSection({ sectionProps }: { sectionProps?: SectionCardProps }
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editRequest, setEditRequest] = useState<QseRow | null>(null);
   const sourceFor = (event: (typeof ledger)[number]): QseRow | undefined => {
-    const collection = event.kind === 'trade' ? workbook.transactions : event.kind === 'transfer' ? workbook.transfers : workbook.adjustments;
+    const collection = event.kind === 'trade' ? workbook.transactions : event.kind === 'transfer' ? workbook.transfers : event.kind === 'dividend' ? workbook.dividends : workbook.adjustments;
     const record = collection.find(row => row.id === event.sourceId);
     return record ? { ...record, id: record.id!, kind: event.kind } : undefined;
   };
@@ -946,6 +946,7 @@ function CashLedgerSection({ sectionProps }: { sectionProps?: SectionCardProps }
     if (!(await confirmDialog('This cannot be undone.', 'Delete this ledger record?'))) return;
     const state = useWorkbookStore.getState();
     if (source.kind === 'trade') { const index = state.workbook.transactions.findIndex(row => row.id === source.id); if (index >= 0) state.deleteTransaction(index); }
+    else if (source.kind === 'dividend') { const index = state.workbook.dividends.findIndex(row => row.id === source.id); if (index >= 0) state.deleteDividend(index); }
     else { const index = state.workbook.adjustments.findIndex(row => row.id === source.id); if (index >= 0) state.deleteAdjustment(index); }
   };
   return <QseRecordCard dateSort={dateSort} title="Cash ledger" sectionProps={sectionProps} kind="ledger" rows={sources(filtered)} allRecords={sources(sorted)} modifying={modifying} onModify={() => setModifying(value => !value)} editRequest={editRequest} exportData={{ rows: exportRows(filtered), allRows: exportRows(sorted) }}>
@@ -962,13 +963,13 @@ function CashLedgerSection({ sectionProps }: { sectionProps?: SectionCardProps }
           <td><DateValue value={event.date} />{modifying && source && <QseReorder kind="ledger" row={source} rows={sources(filtered)} />}</td>
           <td className={event.kind === 'trade' ? event.action === 'BUY' ? 'pill-buy' : 'pill-sell' : undefined}>
             <span className="cash-ledger-type">{event.kind === 'trade' && <span className="cash-ledger-direction">{event.action === 'BUY' ? <ArrowRightIcon size={13} /> : <ArrowLeftIcon size={13} />}</span>}
-              {event.kind === 'trade' ? event.action === 'BUY' ? 'Buy' : 'Sell' : event.kind === 'transfer' ? source?.description || (event.action === 'DEPOSIT' ? 'Deposit' : 'Withdrawal') : source?.note || (event.amount >= 0 ? 'Trading reward' : 'Adjustment')}
+              {event.kind === 'trade' ? event.action === 'BUY' ? 'Buy' : 'Sell' : event.kind === 'transfer' ? source?.description || (event.action === 'DEPOSIT' ? 'Deposit' : 'Withdrawal') : event.kind === 'dividend' ? 'Dividend' : source?.note || (event.amount >= 0 ? 'Trading reward' : 'Adjustment')}
               <Tooltip text={info} />
             </span>
           </td>
-          <td className="text-center">{event.kind === 'trade' ? fmt(source?.shares ?? 0, 0) : ''}</td>
-          <td>{event.kind === 'trade' && event.ticker ? <span className="cash-ledger-unit"><TickerLogo ticker={event.ticker} size="sm" exchange="qse" /><Link to={`/stock/${event.ticker}`}>{tickerNames[event.ticker] ? shortenCompanyName(tickerNames[event.ticker]) : event.ticker}</Link></span> : <span className="cash-ledger-unit"><CashIcon size={19} />{workbook.settings.currency === 'QAR' ? 'Riyal' : workbook.settings.currency}</span>}</td>
-          <td className="text-center">{event.kind === 'trade' ? fmtQSEPrice(source?.price ?? 0) : '-'}</td>
+          <td className="text-center">{(event.kind === 'trade' || event.kind === 'dividend') ? fmt(source?.shares ?? 0, 0) : ''}</td>
+          <td>{(event.kind === 'trade' || event.kind === 'dividend') && event.ticker ? <span className="cash-ledger-unit"><TickerLogo ticker={event.ticker} size="sm" exchange="qse" /><Link to={`/stock/${event.ticker}`}>{tickerNames[event.ticker] ? shortenCompanyName(tickerNames[event.ticker]) : event.ticker}</Link></span> : <span className="cash-ledger-unit"><CashIcon size={19} />{workbook.settings.currency === 'QAR' ? 'Riyal' : workbook.settings.currency}</span>}</td>
+          <td className="text-center">{(event.kind === 'trade' || event.kind === 'dividend') ? fmtQSEPrice(source?.price ?? source?.perShare ?? 0) : '-'}</td>
           <td className={event.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(event.amount, workbook.settings.currency)}</td>
           <td>{fmtMoney(event.balance, workbook.settings.currency)}</td>
           {modifying && <td>{source && <><IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => setEditRequest({ ...source })} /><IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => remove(source)} /></>}</td>}
