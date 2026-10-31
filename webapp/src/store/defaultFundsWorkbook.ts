@@ -3,6 +3,8 @@ import type { FundsSettings, FundsWorkbook } from '../types/fundsWorkbook';
 export const DEFAULT_FUNDS_SETTINGS: FundsSettings = {
   defaultCurrency: 'USD',
   includeCashInNetWorth: true,
+  legacyTransferCurrency: 'USD',
+  cashLedgerMigrationVersion: 1,
 };
 
 export function createEmptyFundsWorkbook(): FundsWorkbook {
