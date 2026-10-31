@@ -2,6 +2,7 @@ import type { FundsSettings, FundsWorkbook } from '../types/fundsWorkbook';
 
 export const DEFAULT_FUNDS_SETTINGS: FundsSettings = {
   defaultCurrency: 'USD',
+  includeCashInNetWorth: true,
 };
 
 export function createEmptyFundsWorkbook(): FundsWorkbook {
