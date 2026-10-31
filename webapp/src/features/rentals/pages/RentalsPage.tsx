@@ -367,6 +367,8 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
   const propertyPlans = plannedEntries
     .filter((p) => p.propertyId === property.id)
     .sort((a, b) => a.date.localeCompare(b.date));
+  const sortedPropertyPlans = dateSort.rows(propertyPlans, { date: row => row });
+  const { rows: pagePropertyPlans, controls: propertyPlansControls } = useTablePagination(sortedPropertyPlans);
 
   // README item 61: semi-automated rent collection — a separate, simpler
   // mechanism from the bulk lease-plan generator above. `proposal` is
@@ -512,7 +514,7 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
         <table>
           <thead><tr><dateSort.Th rows={propertyPlans} column="date">Date</dateSort.Th><th>Type</th><th>Description</th><th>Amount</th><th>Status</th><th></th></tr></thead>
           <tbody>
-            {dateSort.rows(propertyPlans, { date: row => row }).map((p) => (
+            {pagePropertyPlans.map((p) => (
               <RecordRow onEdit={(!p.executed) ? () => setEditingPlan(p) : undefined}  record={p}  key={p.id}>
                 <td><DateValue value={p.date} /></td>
                 <td>{p.type === 'RENT_INCOME' ? 'Rent income' : 'Expense'}</td>
@@ -534,6 +536,7 @@ function PropertyDetailModal({ property, onClose }: { property: Property; onClos
           </tbody>
         </table>
       </div>
+      {propertyPlans.length > 0 ? propertyPlansControls : null}
     </EntityEditorModal>
   );
 }
@@ -1064,6 +1067,8 @@ function CategoryAndRollup({ property, entries: suppliedEntries }: { property: P
   const categories = useCategoryStore((s) => s.workbook.categories);
   const byCategory = propertyByCategory(property, entries, categories);
   const rollup = useMemo(() => propertyMonthlyRollup(property, entries), [property, entries]);
+  const sortedRollup = dateSort.rows(rollup, { date: row => row.month });
+  const { rows: pageRollup, controls: rollupControls } = useTablePagination(sortedRollup);
   const cats = Object.keys(byCategory);
 
   return (
@@ -1082,6 +1087,7 @@ function CategoryAndRollup({ property, entries: suppliedEntries }: { property: P
               </tbody>
             </table>
           </div>
+          {rollupControls}
         </TableCard>
       )}
       {rollup.length > 0 && (
@@ -1090,7 +1096,7 @@ function CategoryAndRollup({ property, entries: suppliedEntries }: { property: P
             <table>
               <thead><tr><dateSort.Th rows={rollup} column="date">Month</dateSort.Th><th>Income</th><th>Expense</th><th>Net</th></tr></thead>
               <tbody>
-                {dateSort.rows(rollup, { date: row => row.month }).map((r) => (
+                {pageRollup.map((r) => (
                   <RecordRow record={r} key={r.month}>
                     <td>{r.month}</td>
                     <td>{fmtMoney(r.income, property.currencyCode)}</td>
@@ -1223,6 +1229,8 @@ function RentalPlansOverview({ propertyIds, filters }: { propertyIds: string[]; 
   const effectiveId = propertyIds.includes(newPropertyId) ? newPropertyId : propertyIds[0] ?? '';
   const ensureSignedIn = useEnsureSignedIn();
   const rows = plans.filter(plan => propertyIds.includes(plan.propertyId) && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate) && (filters.category === 'all' || plan.category === filters.category) && (filters.direction === 'all' || (filters.direction === 'in' ? plan.type === 'RENT_INCOME' : plan.type === 'EXPENSE')) && filters.source !== 'statement-import');
+  const sortedRows = dateSort.rows(rows, { date: row => row });
+  const { rows: pageRows, controls } = useTablePagination(sortedRows);
   const fulfill = async (id: string) => {
     if (!(await ensureSignedIn('Sign in to fulfill this plan.'))) return;
     const plan = usePlannedRentalsWorkbookStore.getState().workbook.entries.find(item => item.id === id);
@@ -1230,7 +1238,7 @@ function RentalPlansOverview({ propertyIds, filters }: { propertyIds: string[]; 
     const error=fulfillRentalPlan(id);
     if (error) toast(error);
   };
-  return <><button className="btn secondary small" disabled={!properties.length} onClick={() => setEditing('new')}>+ Add plan</button><div className="table-scroll mt-12"><table><thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Property</th><th>Plan</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead><tbody>{dateSort.rows(rows, { date: row => row }).map(plan => <RecordRow onEdit={(!plan.executed) ? () => setEditing(plan) : undefined}    record={plan}  key={plan.id}><td><DateValue value={plan.date} /></td><td>{properties.find(p => p.id === plan.propertyId)?.name}</td><td>{plan.note || plan.category || plan.type}</td><td>{fmtMoney(plan.amount, properties.find(p => p.id === plan.propertyId)?.currencyCode ?? '')}</td><td>{plan.executed ? 'Done' : 'Planned'}</td><td>{!plan.executed && <><button className="btn secondary small" onClick={() => setEditing(plan)}>Edit</button>{' '}<button className="btn secondary small" onClick={() => setFinancePlanId(plan.id)}>Link finance</button>{' '}<button className="btn secondary small" onClick={() => void fulfill(plan.id)}>Mark done</button>{' '}<button className="btn secondary small" onClick={async () => { if (await ensureSignedIn('Sign in to remove this plan.')) usePlannedRentalsWorkbookStore.getState().deleteEntry(plan.id); }}>Remove</button></>}</td></RecordRow>)}</tbody></table>{!rows.length && <p className="text-muted">No plans in this period.</p>}</div>{financePlanId && <FinancePlanEditor reference={{ module:"rentals",id:financePlanId }} onClose={() => setFinancePlanId(null)} />}{editing && <PlanEditorModal title={editing === 'new' ? 'Add rental plan' : 'Edit rental plan'} onClose={() => setEditing(null)}>{editing === 'new' && properties.length > 1 && <Field label="Property"><Select value={effectiveId} onChange={event => setNewPropertyId(event.target.value)}>{properties.map(property => <option key={property.id} value={property.id}>{property.name}</option>)}</Select></Field>}<RentalPlanEditor key={editing === 'new' ? effectiveId : editing.id} propertyId={editing === 'new' ? effectiveId : editing.propertyId} plan={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} /></PlanEditorModal>}</>;
+  return <><button className="btn secondary small" disabled={!properties.length} onClick={() => setEditing('new')}>+ Add plan</button><div className="table-scroll mt-12"><table><thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Property</th><th>Plan</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead><tbody>{pageRows.map(plan => <RecordRow onEdit={(!plan.executed) ? () => setEditing(plan) : undefined}    record={plan}  key={plan.id}><td><DateValue value={plan.date} /></td><td>{properties.find(p => p.id === plan.propertyId)?.name}</td><td>{plan.note || plan.category || plan.type}</td><td>{fmtMoney(plan.amount, properties.find(p => p.id === plan.propertyId)?.currencyCode ?? '')}</td><td>{plan.executed ? 'Done' : 'Planned'}</td><td>{!plan.executed && <><button className="btn secondary small" onClick={() => setEditing(plan)}>Edit</button>{' '}<button className="btn secondary small" onClick={() => setFinancePlanId(plan.id)}>Link finance</button>{' '}<button className="btn secondary small" onClick={() => void fulfill(plan.id)}>Mark done</button>{' '}<button className="btn secondary small" onClick={async () => { if (await ensureSignedIn('Sign in to remove this plan.')) usePlannedRentalsWorkbookStore.getState().deleteEntry(plan.id); }}>Remove</button></>}</td></RecordRow>)}</tbody></table>{!rows.length && <p className="text-muted">No plans in this period.</p>}</div>{rows.length ? controls : null}{financePlanId && <FinancePlanEditor reference={{ module:"rentals",id:financePlanId }} onClose={() => setFinancePlanId(null)} />}{editing && <PlanEditorModal title={editing === 'new' ? 'Add rental plan' : 'Edit rental plan'} onClose={() => setEditing(null)}>{editing === 'new' && properties.length > 1 && <Field label="Property"><Select value={effectiveId} onChange={event => setNewPropertyId(event.target.value)}>{properties.map(property => <option key={property.id} value={property.id}>{property.name}</option>)}</Select></Field>}<RentalPlanEditor key={editing === 'new' ? effectiveId : editing.id} propertyId={editing === 'new' ? effectiveId : editing.propertyId} plan={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} /></PlanEditorModal>}</>;
 }
 
 export function RentalsPage({
