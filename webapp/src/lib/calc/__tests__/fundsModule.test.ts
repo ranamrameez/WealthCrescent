@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Category } from '../../../types/finance';
 import type { Fund } from '../../../types/fundsWorkbook';
-import type { PricePoint, Transaction } from '../../../types/workbook';
-import { allocationByCategory, balanceUpdateHistory, contributionVsValueSeries, expectedPLRate, fundCategoryLabel, fundNetProfit, fundsValueByCurrency, organicPLByPeriod, projectInvestmentReturn, unitsFromAmount } from '../fundsModule';
+import type { PricePoint, Transaction, Transfer } from '../../../types/workbook';
+import { allocationByCategory, balanceUpdateHistory, contributionVsValueSeries, expectedPLRate, fundCategoryLabel, fundNetProfit, fundsCashBalanceByCurrency, fundsCashLedgerByCurrency, fundsValueByCurrency, organicPLByPeriod, projectInvestmentReturn, unitsFromAmount } from '../fundsModule';
 import { computePositions } from '../positions';
 
 const funds: Fund[] = [
@@ -305,5 +305,56 @@ describe('fundNetProfit', () => {
 
     // The fix: realized + unrealized is the true Net P/L, ~269 PKR.
     expect(fundNetProfit(position, currentValue)).toBeCloseTo(268.66, 1);
+  });
+});
+
+
+describe('Funds cash ledger', () => {
+  const usdFund: Fund = { id: 'usd', name: 'USD Fund', code: 'USF', platform: 'Platform', currencyCode: 'USD' };
+  const pkrFund: Fund = { id: 'pkr', name: 'PKR Fund', code: 'PKF', platform: 'Platform', currencyCode: 'PKR' };
+
+  it('keeps deposits as cash, moves cash into holdings on BUY, and returns proceeds on SELL', () => {
+    const transfers: Transfer[] = [
+      { id: 'deposit', date: '2026-01-01', type: 'DEPOSIT', gross: 1000, fee: 10, currencyCode: 'USD' },
+      { id: 'withdraw', date: '2026-01-04', type: 'WITHDRAWAL', gross: 100, fee: 5, currencyCode: 'USD' },
+    ];
+    const txs: Transaction[] = [
+      { id: 'buy', date: '2026-01-02', ticker: 'usd', action: 'BUY', shares: 60, price: 10 },
+      { id: 'sell', date: '2026-01-03', ticker: 'usd', action: 'SELL', shares: 20, price: 12 },
+    ];
+    const cash = fundsCashBalanceByCurrency([usdFund], txs, transfers, 'USD');
+    const holdings = fundsValueByCurrency([usdFund], txs, { usd: 12 });
+    expect(cash.USD).toBeCloseTo(525, 6); // 990 - 600 + 240 - 105
+    expect(holdings.USD).toBeCloseTo(480, 6); // 40 remaining units * NAV 12
+    expect(cash.USD + holdings.USD).toBeCloseTo(1005, 6);
+  });
+
+  it('keeps cash ledgers separate for each fund currency', () => {
+    const transfers: Transfer[] = [
+      { id: 'usd-deposit', date: '2026-01-01', type: 'DEPOSIT', gross: 1000, fee: 0, currencyCode: 'USD' },
+      { id: 'pkr-deposit', date: '2026-01-01', type: 'DEPOSIT', gross: 5000, fee: 0, currencyCode: 'PKR' },
+    ];
+    const txs: Transaction[] = [
+      { date: '2026-01-02', ticker: 'usd', action: 'BUY', shares: 10, price: 10 },
+      { date: '2026-01-02', ticker: 'pkr', action: 'BUY', shares: 20, price: 100 },
+    ];
+    expect(fundsCashBalanceByCurrency([usdFund, pkrFund], txs, transfers)).toEqual({ USD: 900, PKR: 3000 });
+  });
+
+  it('does not add proceeds from an unmatched SELL to cash', () => {
+    const txs: Transaction[] = [
+      { date: '2026-01-01', ticker: 'usd', action: 'BUY', shares: 5, price: 10 },
+      { date: '2026-01-02', ticker: 'usd', action: 'SELL', shares: 10, price: 20 },
+    ];
+    const ledger = fundsCashLedgerByCurrency([usdFund], txs, [
+      { id: 'deposit', date: '2026-01-01', type: 'DEPOSIT', gross: 100, fee: 0, currencyCode: 'USD' },
+    ]);
+    expect(ledger.USD.filter((event) => event.kind === 'trade')).toHaveLength(1);
+    expect(ledger.USD.at(-1)?.balance).toBe(50);
+  });
+
+  it('keeps legacy transfers without a currency in the workbook default currency', () => {
+    const legacy: Transfer[] = [{ id: 'legacy', date: '2026-01-01', type: 'DEPOSIT', gross: 250, fee: 0 }];
+    expect(fundsCashBalanceByCurrency([], [], legacy, 'QAR')).toEqual({ QAR: 250 });
   });
 });
