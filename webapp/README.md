@@ -21,7 +21,7 @@ FinanceManager live link:
 
 ## Current session handoff
 
-For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) before continuing. **Latest handoff: 2026-10-31 — PR #44** (`fix/trade-entry-validation-and-transactions-ui`), open as a draft against `main`, current recorded head `0901cfc9c8704c470e0fb954fb049390e6d8d4e4`. PR #44 covers shared section actions/pagination, credit-card running limits, Funds/Brokers navigation, summary parity, All Time stock history, chart bounds, trade safeguards/FAB save, and legacy oversell reconciliation. Current-head full validation and final diff audit remain outstanding; do not merge until verified. The handoff also corrects the PSO example: user-supplied totals are 122 BUY vs 132 SELL, leaving 10 unmatched excess SELL shares to flag, not 132/132. Re-check live GitHub state and exact PR head before continuing.
+For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) before continuing. **Latest handoff: 2026-10-31 — PR #44** (`fix/trade-entry-validation-and-transactions-ui`), open as a draft against `main`; see the handoff for the latest exact head SHA, validation status, full remaining checklist, and the PSO reconciliation correction (122 BUY vs 132 SELL, 10 unmatched). Re-check live GitHub state and exact PR head before continuing.
 
 ## Cost-basis worked examples (canonical — keep in sync with tests)
 
