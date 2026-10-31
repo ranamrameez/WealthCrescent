@@ -48,6 +48,25 @@ describe('validateTransactionEdit', () => {
     expect(validateTransactionEdit(existing, candidate)).toEqual({ ticker: 'PSO', additionalUnmatchedShares: 30 });
   });
 
+  it('rejects moving a legacy oversell to a different SELL even when total unmatched shares stay unchanged', () => {
+    const existing = [
+      buy('b1', '2026-01-01', 5, 1),
+      sell('s1', '2026-01-02', 10, 2), // 5 unmatched on this legacy SELL
+      buy('b2', '2026-01-03', 5, 3),
+      sell('s2', '2026-01-05', 5, 4), // fully matched
+    ];
+    // Moving s1 later makes it fully matched, but now s2 becomes unmatched.
+    // The total discrepancy remains 5; transaction-level validation must
+    // still reject the newly introduced oversell on s2.
+    const candidate = [
+      existing[0],
+      { ...existing[1], date: '2026-01-04' },
+      existing[2],
+      existing[3],
+    ];
+    expect(validateTransactionEdit(existing, candidate)).toEqual({ ticker: 'PSO', additionalUnmatchedShares: 5 });
+  });
+
   it('allows an edit that does not increase a pre-existing legacy discrepancy', () => {
     const existing = [buy('b1', '2026-01-01', 5, 1), sell('s1', '2026-01-02', 10, 2)];
     const candidate = [existing[0], { ...existing[1], price: 105 }];
