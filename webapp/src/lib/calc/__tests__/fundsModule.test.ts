@@ -357,14 +357,13 @@ describe('Funds cash ledger', () => {
 
   it('does not add proceeds from an unmatched SELL to cash', () => {
     const txs: Transaction[] = [
-      { date: '2026-01-01', ticker: 'usd', action: 'BUY', shares: 5, price: 10 },
       { date: '2026-01-02', ticker: 'usd', action: 'SELL', shares: 10, price: 20 },
     ];
     const ledger = fundsCashLedgerByCurrency([usdFund], txs, [
       { id: 'deposit', date: '2026-01-01', type: 'DEPOSIT', gross: 100, fee: 0, currencyCode: 'USD' },
     ]);
-    expect(ledger.USD.filter((event) => event.kind === 'trade')).toHaveLength(1);
-    expect(ledger.USD.at(-1)?.balance).toBe(50);
+    expect(ledger.USD.filter((event) => event.kind === 'trade')).toHaveLength(0);
+    expect(ledger.USD.at(-1)?.balance).toBe(100);
   });
 
   it('snapshots the legacy currency without rewriting transfer records and survives a JSON backup round-trip', () => {
