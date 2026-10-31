@@ -26,12 +26,17 @@ export function InvestmentPlans({ market, items, filters }: { market: 'qse' | 'p
   const ensureSignedIn = useEnsureSignedIn();
   const [draft, setDraft] = useState<{ planId?: string; index?: number; original?: string; ticker: string; action: 'BUY' | 'SELL'; date: string; shares: string; price: string; manualSameDay?: boolean; feeOverride?: number } | null>(null);
   const [error, setError] = useState('');
-  const rows = plans.flatMap(plan => plan.legs.map((leg, index) => ({ plan, leg, index }))).filter(({ leg }) => items.some(item => item.id === leg.ticker)
+  const rows = plans
+    .flatMap(plan => plan.legs.map((leg, index) => ({ plan, leg, index })))
+    .filter(({ leg }) =>
+      items.some(item => item.id === leg.ticker)
+      && (!filters?.fromDate || !leg.date || leg.date >= filters.fromDate)
+      && (!filters?.toDate || !leg.date || leg.date <= filters.toDate)
+      && (!filters || filters.direction === 'all' || (filters.direction === 'in' ? leg.action === 'BUY' : leg.action === 'SELL'))
+      && (!filters || filters.source !== 'statement-import'),
+    );
   const sortedRows = dateSort.rows(rows, { date: row => row.leg });
   const { rows: pageRows, controls } = useTablePagination(sortedRows);
-    && (!filters?.fromDate || !leg.date || leg.date >= filters.fromDate) && (!filters?.toDate || !leg.date || leg.date <= filters.toDate)
-    && (!filters || filters.direction === 'all' || (filters.direction === 'in' ? leg.action === 'BUY' : leg.action === 'SELL'))
-    && (!filters || filters.source !== 'statement-import'));
   const save = async () => {
     if (!draft) return;
     const shares = resolveNumericInput(draft.shares), price = resolveNumericInput(draft.price);
@@ -53,6 +58,7 @@ export function InvestmentPlans({ market, items, filters }: { market: 'qse' | 'p
       <button className="btn secondary small" onClick={async () => { if (!(await confirmDialog('Add this planned trade to transaction history?', 'Mark plan as done?')) || !(await ensureSignedIn('Sign in to fulfill this plan.'))) return; const current = useStore.getState().workbook.tradePlans.find(item => item.id === plan.id); if (JSON.stringify(current?.legs[index]) === JSON.stringify(leg)) useStore.getState().executeTradePlanLeg(plan.id, index); }}>Mark done</button>{' '}
       <button className="btn secondary small" onClick={async () => { if (!(await confirmDialog('Remove this unfulfilled trade from the plan?')) || !(await ensureSignedIn('Sign in to remove this plan.'))) return; const current = useStore.getState().workbook.tradePlans.find(item => item.id === plan.id); if (current && !current.legs[index]?.executed && JSON.stringify(current.legs[index]) === JSON.stringify(leg)) useStore.getState().updateTradePlan(plan.id, { legs: current.legs.filter((_, i) => i !== index) }); }}>Remove</button>
     </>}</td></RecordRow>)}</tbody></table>{!rows.length && <p className="text-muted">No plans in this view.</p>}</div>
+    {controls}
     {draft && <PlanEditorModal title={draft.planId ? 'Edit investment plan' : 'Add investment plan'} onClose={() => setDraft(null)}><div className="row gap-sm">
       <Field label="Item"><select value={draft.ticker} onChange={e => setDraft({ ...draft, ticker: e.target.value })}>{items.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
       <Field label="Action"><select value={draft.action} onChange={e => setDraft({ ...draft, action: e.target.value as 'BUY' | 'SELL' })}><option value="BUY">Buy</option><option value="SELL">Sell</option></select></Field>
