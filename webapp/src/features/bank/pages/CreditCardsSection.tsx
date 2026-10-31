@@ -53,6 +53,7 @@ import { type PlanningHorizonDays } from '../../../lib/calc/plannedBalance';
 import { useCategoryStore } from '../../../store/categoryStore';
 import {
   creditCardMonthlyHistory,
+  creditCardRunningBalances,
   creditCardCycleHistory,
   activeCycleStatement,
   latestClosedStatement,
@@ -475,16 +476,7 @@ function TransactionsTable({ card, filters, showActions = false }: { card: Credi
   // Running utilization is calculated from the complete chronological ledger,
   // never from the filtered/sorted page, so a date filter cannot reset the
   // opening balance or change the limit usage shown on an individual row.
-  const runningConsumedById = useMemo(() => {
-    const chronological = [...cardTxs].sort((a, b) => a.date.localeCompare(b.date) || (a.seq ?? 0) - (b.seq ?? 0));
-    let consumed = card.openingBalance ?? 0;
-    const result = new Map<string, number>();
-    for (const tx of chronological) {
-      consumed = Math.max(0, consumed + (tx.kind === 'payment' ? -tx.amount : tx.amount));
-      result.set(tx.id, consumed);
-    }
-    return result;
-  }, [cardTxs, card.openingBalance]);
+  const runningConsumedById = useMemo(() => creditCardRunningBalances(card, cardTxs), [card, cardTxs]);
 
   if (!cardTxs.length) return <p className="text-muted m-0">No transactions yet.</p>;
   return (
