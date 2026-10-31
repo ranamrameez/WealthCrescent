@@ -1,4 +1,4 @@
-export { makeQSEFeeCalculator, roundTick, breakEvenPrice, requiredSellPrice } from './fees';
+export { makeQSEFeeCalculator, roundTick, breakEvenPrice, requiredSellPrice, perShareCommission } from './fees';
 export { computePositions } from './positions';
 export { buildCashLedger, totalTransferFees } from './cashLedger';
 export { computeRealizedPLTimeSeries } from './realizedPL';

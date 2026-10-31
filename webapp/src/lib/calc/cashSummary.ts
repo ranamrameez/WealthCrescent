@@ -41,7 +41,7 @@ export function cashSummary(
   let portfolioValue = 0;
   if (precomputedPositionRows) {
     precomputedPositionRows.forEach(row => {
-      unrealizedPL += row.profit;
+      if (Number.isFinite(row.profit)) unrealizedPL += row.profit;
       portfolioValue += row.value - row.sellFee;
     });
   } else {
@@ -50,7 +50,7 @@ export function cashSummary(
       const grossValue = p.shares * mp;
       const estSellFee = mp > 0 ? calcFee(grossValue, false, { shares: p.shares }) : 0;
       const netValue = grossValue - estSellFee;
-      unrealizedPL += netValue - p.invested;
+      if (mp > 0) unrealizedPL += netValue - p.invested;
       portfolioValue += netValue;
     });
   }

@@ -12,6 +12,7 @@ import type {
 import { buildCashLedger } from './cashLedger';
 import { cashSummary, type PositionValuation } from './cashSummary';
 import { getMarketPrice } from './priceHistory';
+import { breakEvenPrice, perShareCommission } from './fees';
 import { calculateStockPortfolio, type StockBasisMethod, type StockCalculationResult } from './stockCalculationEngine';
 
 export type PortfolioPositionRow = PositionValuation;
@@ -29,6 +30,8 @@ export interface PortfolioCalculationInput {
   marketPrices: Record<string, number>;
   calcFee: FeeCalculator;
   costBasisMethod: StockBasisMethod;
+  feePct: number;
+  tick: number;
 }
 
 export interface PortfolioCalculationResult extends StockCalculationResult {
@@ -48,6 +51,8 @@ export function calculatePortfolio(input: PortfolioCalculationInput): PortfolioC
     marketPrices,
     calcFee,
     costBasisMethod,
+    feePct,
+    tick,
   } = input;
 
   const stock = calculateStockPortfolio(transactions, calcFee, costBasisMethod);
@@ -56,19 +61,27 @@ export function calculatePortfolio(input: PortfolioCalculationInput): PortfolioC
     .filter(position => position.shares > 0)
     .map(position => {
       const marketPrice = getMarketPrice(position.ticker, marketPrices, transactions);
-      const value = position.shares * marketPrice;
-      const sellFee = marketPrice > 0 ? calcFee(value, false, { shares: position.shares }) : 0;
-      const profit = value - sellFee - position.invested;
-      const roiPct = position.invested > 0 ? (profit / position.invested) * 100 : 0;
+      const hasMarketPrice = marketPrice > 0;
+      const value = hasMarketPrice ? position.shares * marketPrice : 0;
+      const sellFee = hasMarketPrice ? calcFee(value, false, { shares: position.shares }) : 0;
+      const profit = hasMarketPrice ? value - sellFee - position.invested : Number.NaN;
+      const roiPct = hasMarketPrice && position.invested > 0 ? (profit / position.invested) * 100 : Number.NaN;
+      const targetPrice = (pct: number) => breakEvenPrice(position.invested * (1 + pct / 100), position.shares, feePct, tick, calcFee);
       return {
         ticker: position.ticker,
         shares: position.shares,
         invested: position.invested,
+        avgCost: position.invested / position.shares,
         marketPrice,
         value,
         sellFee,
         profit,
         roiPct,
+        breakEvenPrice: breakEvenPrice(position.invested, position.shares, feePct, tick, calcFee),
+        target1Pct: targetPrice(1),
+        target2Pct: targetPrice(2),
+        target5Pct: targetPrice(5),
+        perShareCommission: hasMarketPrice ? perShareCommission(marketPrice, calcFee) : null,
       };
     });
 

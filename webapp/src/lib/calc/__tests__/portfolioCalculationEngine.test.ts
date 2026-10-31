@@ -14,6 +14,8 @@ describe('central portfolio calculation pipeline', () => {
       dividends: [{ id: 'dividend', date: '2026-01-03', ticker: 'AAA', perShare: 0.5, shares: 15, amount: 7.5, accountingOrder: 3 }],
       marketPrices: { AAA: 25 },
       calcFee: () => 0,
+      feePct: 0,
+      tick: 0.01,
     };
     const before = JSON.stringify(input);
     const average = calculatePortfolio({ ...input, costBasisMethod: 'average' });
@@ -22,6 +24,9 @@ describe('central portfolio calculation pipeline', () => {
     expect(average.positions[0].shares).toBe(fifo.positions[0].shares);
     expect(average.positions[0].invested).not.toBe(fifo.positions[0].invested);
     expect(average.positionRows[0].value).toBe(fifo.positionRows[0].value);
+    expect(average.positionRows[0].breakEvenPrice).not.toBe(fifo.positionRows[0].breakEvenPrice);
+    expect(average.positionRows[0].avgCost).toBeCloseTo(15, 8);
+    expect(fifo.positionRows[0].avgCost).toBeCloseTo(16.6666667, 6);
     expect(average.cashLedger).toEqual(fifo.cashLedger);
     expect(average.cashSummary.cashBalance).toBeCloseTo(fifo.cashSummary.cashBalance, 8);
     expect(average.cashSummary.portfolioValue).toBeCloseTo(fifo.cashSummary.portfolioValue, 8);
