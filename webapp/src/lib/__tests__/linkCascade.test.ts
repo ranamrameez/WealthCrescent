@@ -397,8 +397,6 @@ describe('propagateLinkedEdit', () => {
     expect(useInterEntityTransfersStore.getState().workbook.entries[0].note).toBe('renamed');
   });
 });
-import { useWorkbookStore } from '../../store/workbookStore';
-import { createEmptyWorkbook } from '../../store/defaultWorkbook';
 it('defaults bank-to-QSE fees, preserves explicit zero, time and later module-side fee corrections', () => {
   useWorkbookStore.getState().setWorkbook(createEmptyWorkbook());
   useBankWorkbookStore.getState().setWorkbook({ ...createEmptyBankWorkbook(), settings: { accounts: [{ id: bankAccountId, name: 'QAR Bank', currencyCode: 'QAR', openingBalance: 0 }] } });
