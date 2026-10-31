@@ -1,4 +1,4 @@
-import type { Fund, FundsWorkbook } from '../../types/fundsWorkbook';
+import type { Fund } from '../../types/fundsWorkbook';
 import type { Category } from '../../types/finance';
 import type { Position, PricePoint, Transaction, Transfer } from '../../types/workbook';
 import { buildCashLedger } from './cashLedger';
@@ -50,22 +50,6 @@ export function fundsValueByCurrency(
     out[fund.currencyCode] = (out[fund.currencyCode] ?? 0) + units * nav;
   });
   return out;
-}
-
-/** Versioned, metadata-only migration for Funds transfers created before
- * Transfer.currencyCode existed. It snapshots the old default once and
- * deliberately leaves every transfer byte-for-byte unchanged, so JSON
- * backup/export round-trips preserve the original rows. */
-export function migrateLegacyFundsCashSettings(workbook: FundsWorkbook): FundsWorkbook {
-  if ((workbook.settings.cashLedgerMigrationVersion ?? 0) >= 1) return workbook;
-  return {
-    ...workbook,
-    settings: {
-      ...workbook.settings,
-      legacyTransferCurrency: workbook.settings.legacyTransferCurrency || workbook.settings.defaultCurrency || 'USD',
-      cashLedgerMigrationVersion: 1,
-    },
-  };
 }
 
 /** One Funds cash account per currency. Funds transfers are portfolio-level
