@@ -29,6 +29,7 @@ import { defaultTimeForDate, defaultTimezoneForMarket, nowTime } from '../../../
 import { toCSV } from '../../../lib/csv';
 import { fmt, fmtMoney, fmtPSXPrice } from '../../../lib/format';
 import { computeFIFOPositions } from '../../../lib/calc/fifoPositions';
+import { tradePriceDeviationPct } from '../../../lib/calc/tradeValidation';
 import { isNettedLeg } from '../../../lib/calc/psxFees';
 import { FeeModeControl, feeModeFor, type FeeMode } from '../../../components/ui/FeeModeControl';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
@@ -42,7 +43,7 @@ import { usePSXStockData } from '../hooks/usePSXStockData';
 const today = () => new Date().toISOString().slice(0, 10);
 
 function TickerTransactions({ ticker, filters }: { ticker: string; filters: TransactionPageFilters }) {
-  const { workbook, calcFee } = usePSXDerived();
+  const { workbook, calcFee, positions } = usePSXDerived();
   const updateTransaction = usePSXWorkbookStore((s) => s.updateTransaction);
   const deleteTransaction = usePSXWorkbookStore((s) => s.deleteTransaction);
   const addTransaction = usePSXWorkbookStore((s) => s.addTransaction);
@@ -120,6 +121,17 @@ function TickerTransactions({ ticker, filters }: { ticker: string; filters: Tran
     const shares = Number(sharesInput);
     const price = Number(priceInput);
     if (!shares || !price) return toast('Enter shares and price.');
+    if (action === 'SELL') {
+      const available = positions.find(position => position.ticker === ticker)?.shares ?? 0;
+      if (shares > available + 1e-7) return toast(`Cannot sell ${shares} ${ticker}: only ${fmt(available, 0)} shares are available.`);
+    }
+    const marketPrice = workbook.marketPrices[ticker] ?? 0;
+    const deviation = tradePriceDeviationPct(price, marketPrice);
+    const threshold = workbook.settings.tradePriceDeviationPct ?? 10;
+    if (deviation !== null && Math.abs(deviation) > threshold) {
+      const accepted = await confirmDialog(`Entered ${fmtPSXPrice(price)}; saved market price is ${fmtPSXPrice(marketPrice)} (${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%). This exceeds your ${threshold}% warning threshold. Save anyway?`, 'Trade price differs from market price?');
+      if (!accepted) return;
+    }
     if (!(await ensureSignedIn('Sign in to save this transaction.'))) return;
     addTransaction({
       date, ticker, action, shares, price, time, timezone,
@@ -139,8 +151,21 @@ function TickerTransactions({ ticker, filters }: { ticker: string; filters: Tran
     setEditIndex(i);
     setEditRow({ ...tx });
   };
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (editIndex === null || !editRow) return;
+    if (editRow.action === 'SELL' && !editRow.isPending) {
+      const otherTransactions = workbook.transactions.filter((_, index) => index !== editIndex);
+      const available = computeFIFOPositions(otherTransactions, calcFee).positions.find(position => position.ticker === editRow.ticker.toUpperCase())?.shares ?? 0;
+      if (editRow.shares > available + 1e-7) return toast(`Cannot save this sell: only ${fmt(available, 0)} ${editRow.ticker.toUpperCase()} shares are available.`);
+    }
+    const marketPrice = workbook.marketPrices[editRow.ticker.toUpperCase()] ?? 0;
+    const deviation = tradePriceDeviationPct(editRow.price, marketPrice);
+    const threshold = workbook.settings.tradePriceDeviationPct ?? 10;
+    if (deviation !== null && Math.abs(deviation) > threshold) {
+      const accepted = await confirmDialog(`Entered ${fmtPSXPrice(editRow.price)}; saved market price is ${fmtPSXPrice(marketPrice)} (${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%). This exceeds your ${threshold}% warning threshold. Save anyway?`, 'Trade price differs from market price?');
+      if (!accepted) return;
+    }
+    if (!(await ensureSignedIn('Sign in to save changes.'))) return;
     updateTransaction(editIndex, editRow);
     toast('Transaction updated.');
     setEditIndex(null);
