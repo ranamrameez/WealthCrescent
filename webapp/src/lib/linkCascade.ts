@@ -256,8 +256,14 @@ export function resolveSideCurrency(cfg: LinkSideConfig): string | null {
   switch (cfg.module) {
     case 'cash': return cfg.currencyCode || useCashWorkbookStore.getState().workbook.settings.defaultCurrency;
     case 'bank': return useBankWorkbookStore.getState().workbook.settings.accounts.find((a) => a.id === cfg.ref)?.currencyCode ?? null;
-    case 'qse': return useWorkbookStore.getState().workbook.settings.currency;
-    case 'psx': return usePSXWorkbookStore.getState().workbook.settings.currency;
+    case 'qse': {
+      const workbook = useWorkbookStore.getState().workbook;
+      return workbook.brokerProfiles?.find((profile) => profile.id === cfg.ref)?.settings.currency ?? workbook.settings.currency;
+    }
+    case 'psx': {
+      const workbook = usePSXWorkbookStore.getState().workbook;
+      return workbook.brokerProfiles?.find((profile) => profile.id === cfg.ref)?.settings.currency ?? workbook.settings.currency;
+    }
     case 'funds': return cfg.currencyCode || useFundsWorkbookStore.getState().workbook.settings.defaultCurrency;
     case 'rentals': return useRentalsWorkbookStore.getState().workbook.settings.properties.find((p) => p.id === cfg.ref)?.currencyCode ?? null;
     case 'personalLoans': return usePersonalLoansWorkbookStore.getState().workbook.loans.find((l) => l.id === cfg.ref)?.currencyCode ?? null;
