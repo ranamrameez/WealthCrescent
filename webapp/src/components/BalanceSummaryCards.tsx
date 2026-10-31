@@ -1,5 +1,5 @@
 import { fmtMoney } from '../lib/format';
-import { SummaryGroupCard, SummaryMetric } from './SummaryGroupCard';
+import { SummarySection, SummarySections, SummaryValue } from './SummaryGroupCard';
 
 export interface BalanceSummary {
   start: number; current: number;
@@ -19,27 +19,44 @@ const summaryLabels: Record<SummaryKind, { actual: string; current: string; star
   subscriptions: { actual: 'Subscription spending', current: 'Net renewal spending to date', start: 'Spending before period', expected: 'Expected subscription spending', net: 'Net spending including renewals', inflow: 'Expected refunds', outflow: 'Expected renewal costs', actualFlow: 'Renewals paid' },
 };
 
-/** Shared Bank Account summary presentation; outflows are signed negative. */
+/** Shared Portfolio Item-style summary presentation. Outflows are signed negative;
+ * every entity keeps its own meaningful groups, but the light-border inline
+ * subsection layout stays consistent across the app. */
 export function BalanceSummaryCards({ currency, summary: s, kind = 'balance' }: { currency: string; summary: BalanceSummary; kind?: SummaryKind }) {
   const labels = summaryLabels[kind];
-  const metric = (label: string, amount: number, large = false) => <SummaryMetric label={label} value={fmtMoney(amount, currency)} large={large} tone={(kind==='creditCard'?amount<=0:amount>=0) ? 'pill-positive' : 'pill-negative'} />;
-  const flow = (title: string, inflow: number, outflow: number) => <SummaryGroupCard title={title}>
-    {metric(title === 'Pending' ? 'Net pending' : title === 'Planned' ? 'Net planned' : 'Net flow', inflow + outflow, true)}{metric('Inflow', inflow)}{metric('Outflow', outflow)}
-  </SummaryGroupCard>;
+  const metric = (label: string, amount: number, primary = false, detail?: React.ReactNode) => (
+    <SummaryValue
+      label={label}
+      value={fmtMoney(amount, currency)}
+      primary={primary}
+      detail={detail}
+      tone={(kind === 'creditCard' ? amount <= 0 : amount >= 0) ? 'positive' : 'negative'}
+    />
+  );
+  const flow = (title: string, inflow: number, outflow: number) => (
+    <SummarySection title={title}>
+      {metric(title === 'Pending' ? 'Net pending' : title === 'Planned' ? 'Net planned' : 'Net flow', inflow + outflow, true)}
+      {metric('Inflow', inflow)}
+      {metric('Outflow', outflow)}
+    </SummarySection>
+  );
   const expectedFlow = s.pendingInflow + s.pendingOutflow + s.plannedInflow + s.plannedOutflow;
   const change = s.current - s.start;
-  return <div className="account-summary-grid">
-    <SummaryGroupCard title={labels.actual} className="account-summary-card-balance" tooltip="Actual position includes activity carried forward before the selected period.">
-      {metric(labels.current, s.current, true)}<SummaryMetric label={labels.start} value={fmtMoney(s.start, currency)} />
-      <SummaryMetric label="Change" value={fmtMoney(change, currency)} tone={change >= 0 ? 'pill-positive' : 'pill-negative'} suffix={<small className="summary-percent">{s.start === 0 ? ' —' : ` (${(change / Math.abs(s.start) * 100).toFixed(1)}%)`}</small>} />
-    </SummaryGroupCard>
-    <SummaryGroupCard title={labels.expected} tooltip="Actual balance plus unexecuted plans and pending transactions in the selected period.">
-      {metric(labels.net, s.current + expectedFlow, true)}{metric('Total expected flow', expectedFlow)}
-      {metric(labels.inflow, s.pendingInflow + s.plannedInflow)}{metric(labels.outflow, s.pendingOutflow + s.plannedOutflow)}
+  return <SummarySections className="account-summary-sections">
+    <SummarySection title={labels.actual}>
+      {metric(labels.current, s.current, true, 'Current position')}
+      {metric(labels.start, s.start, false, 'At the start of the selected period')}
+      <SummaryValue label="Change" value={fmtMoney(change, currency)} tone={change >= 0 ? 'positive' : 'negative'} detail={s.start === 0 ? '—' : `${(change / Math.abs(s.start) * 100).toFixed(1)}% change`} />
+    </SummarySection>
+    <SummarySection title={labels.expected}>
+      {metric(labels.net, s.current + expectedFlow, true, 'Actual position plus pending and planned activity')}
+      {metric('Total expected flow', expectedFlow)}
+      {metric(labels.inflow, s.pendingInflow + s.plannedInflow)}
+      {metric(labels.outflow, s.pendingOutflow + s.plannedOutflow)}
       {metric('Change', expectedFlow)}
-    </SummaryGroupCard>
+    </SummarySection>
     {(s.pendingInflow !== 0 || s.pendingOutflow !== 0) && flow('Pending', s.pendingInflow, s.pendingOutflow)}
     {(s.plannedInflow !== 0 || s.plannedOutflow !== 0) && flow('Planned', s.plannedInflow, s.plannedOutflow)}
     {flow(labels.actualFlow, s.inflow, s.outflow)}
-  </div>;
+  </SummarySections>;
 }
