@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createWorkbookStore, type BaseWorkbook } from '../createWorkbookStore';
 import { createEmptyPSXWorkbook } from '../defaultPsxWorkbook';
+import { computePositions } from '../../lib/calc/positions';
+import { buildCashLedger } from '../../lib/calc/cashLedger';
+import { sortTransactionsChronological } from '../../lib/calc/sortTransactions';
 
 interface TestSettings {
   currency: string;
@@ -119,7 +122,7 @@ describe('PSX legacy broker migration', () => {
       settings: { ...legacy.settings, feePct: 0.123 },
       transactions: [{
         id: 'old-psx-trade', date: '2026-09-01', ticker: 'ABC', action: 'BUY',
-        shares: 10, price: 12.34, transactionIndex: 7, feeOverride: 1.25,
+        shares: 10, price: 12.34, transactionIndex: 1, globalTransactionIndex: 1, perTickerIndex: 1, accountingOrder: 1, feeOverride: 1.25,
       }],
       transfers: [{ id: 'old-psx-cash', date: '2026-09-02', type: 'DEPOSIT', gross: 1000, fee: 5 }],
       marketPrices: { ABC: 12.5 },
@@ -130,7 +133,7 @@ describe('PSX legacy broker migration', () => {
     expect(wb.activeBrokerId).toBe('psx-js-zindigi');
     expect(wb.transactions[0]).toMatchObject({
       id: 'old-psx-trade', brokerId: 'psx-js-zindigi', shares: 10,
-      price: 12.34, transactionIndex: 7, feeOverride: 1.25,
+      price: 12.34, transactionIndex: 1, globalTransactionIndex: 1, perTickerIndex: 1, accountingOrder: 1, feeOverride: 1.25,
     });
     expect(wb.transfers[0]).toMatchObject({ id: 'old-psx-cash', brokerId: 'psx-js-zindigi', gross: 1000, fee: 5 });
     expect(wb.marketPrices).toEqual({ ABC: 12.5 });
@@ -364,5 +367,61 @@ describe('createWorkbookStore normalize', () => {
     state = useStore.getState();
     expect(state.workbook.priceHistory.QGTS).toHaveLength(0);
     expect(state.workbook.marketPrices.QGTS).toBeUndefined();
+  });
+});
+
+
+describe('shared same-day accounting event order', () => {
+  it('corrects a same-day SELL-then-BUY sequence to BUY-then-SELL across the shared event stream', () => {
+    const useStore = createWorkbookStore('test_shared_accounting_event_order', () => ({
+      ...createEmptyTestWorkbook(),
+      transactions: [
+        { id: 'buy', date: '2026-10-01', ticker: 'AAA', action: 'BUY' as const, shares: 6, price: 10, accountingOrder: 2, globalTransactionIndex: 1 },
+        { id: 'sell', date: '2026-10-01', ticker: 'AAA', action: 'SELL' as const, shares: 6, price: 12, accountingOrder: 1, globalTransactionIndex: 2 },
+      ],
+      transfers: [
+        { id: 'deposit', date: '2026-10-01', type: 'DEPOSIT' as const, gross: 100, fee: 0, accountingOrder: 3 },
+        { id: 'next-day', date: '2026-10-02', type: 'DEPOSIT' as const, gross: 5, fee: 0, accountingOrder: 1 },
+      ],
+      adjustments: [{ id: 'reward', date: '2026-10-01', amount: 2, note: 'Reward', accountingOrder: 4 }],
+      dividends: [{ id: 'dividend', date: '2026-10-01', ticker: 'AAA', perShare: 0.5, shares: 6, amount: 3, accountingOrder: 5 }],
+    }));
+
+    // The existing row-arrow control moves the BUY up across the same-day SELL.
+    useStore.getState().reorderAccountingEvents([
+      { kind: 'trade', id: 'buy', order: 2 },
+      { kind: 'trade', id: 'sell', order: 1 },
+    ]);
+
+    const workbook = useStore.getState().workbook;
+    expect(workbook.transactions.map(tx => tx.id)).toEqual(['buy', 'sell']);
+    expect(workbook.transactions.every(tx => tx.date === '2026-10-01')).toBe(true);
+    expect(workbook.transactions.find(tx => tx.id === 'buy')?.accountingOrder).toBe(1);
+    expect(workbook.transactions.find(tx => tx.id === 'sell')?.accountingOrder).toBe(2);
+    expect(workbook.transfers.find(row => row.id === 'deposit')?.accountingOrder).toBe(3);
+    expect(workbook.adjustments[0].accountingOrder).toBe(4);
+    expect(workbook.dividends[0].accountingOrder).toBe(5);
+
+    const orderedTrades = sortTransactionsChronological(workbook.transactions);
+    expect(orderedTrades.map(tx => tx.id)).toEqual(['buy', 'sell']);
+    const positions = computePositions(workbook.transactions, () => 0);
+    expect(positions[0].shares).toBe(0);
+    expect(positions[0].realized).toBe(12);
+    expect(positions[0].unmatchedSellShares).toBe(0);
+
+    const ledger = buildCashLedger(workbook.transactions, workbook.transfers, workbook.adjustments, () => 0, workbook.dividends);
+    expect(ledger.slice(0, 5).map(event => event.sourceId)).toEqual(['buy', 'sell', 'deposit', 'reward', 'dividend']);
+    expect(ledger.slice(0, 5).every(event => event.date === '2026-10-01')).toBe(true);
+    expect(ledger.slice(0, 5).map(event => event.amount)).toEqual([-60, 72, 100, 2, 3]);
+
+    // Cross-date swaps are rejected; neither event's date or order is changed.
+    useStore.getState().reorderAccountingEvents([
+      { kind: 'trade', id: 'sell', order: 2 },
+      { kind: 'transfer', id: 'next-day', order: 1 },
+    ]);
+    const afterRejectedMove = useStore.getState().workbook;
+    expect(afterRejectedMove.transactions.find(tx => tx.id === 'sell')?.date).toBe('2026-10-01');
+    expect(afterRejectedMove.transfers.find(row => row.id === 'next-day')?.date).toBe('2026-10-02');
+    expect(afterRejectedMove.transactions.find(tx => tx.id === 'sell')?.accountingOrder).toBe(2);
   });
 });

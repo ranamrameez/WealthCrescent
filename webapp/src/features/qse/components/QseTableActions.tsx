@@ -6,8 +6,8 @@ import type { SectionCardProps } from '../../../components/StandardPageSections'
 import { IconButton } from '../../../components/ui/IconButton';
 import { XIcon } from '../../../components/icons';
 import { propagateLinkedEdit, resolveLinkedEdit } from '../../../lib/linkCascade';
-import { ReorderButtons } from '../../../components/ui/ReorderButtons';
-import { toInstantMs } from '../../../lib/datetime';
+import { AccountingEventOrderControls } from '../../../components/AccountingEventOrderControls';
+import { getAccountingEventRefs, type AccountingEventKind } from '../../../lib/seq';
 import { useId, useMemo, useState, type ReactNode } from 'react';
 import { BatchEditGrid, type BatchColumn } from '../../../components/BatchEditGrid';
 import { validBatchDate, prepareBatch } from '../../../components/batchEditModel';
@@ -20,17 +20,16 @@ import { getCurrentUser } from '../../../lib/firebase/useAuthState';
 import { useWorkbookStore } from '../../../store/workbookStore';
 import { useInterEntityTransfersStore } from '../../../store/interEntityTransfersStore';
 import type { Transaction, Transfer, Adjustment, Dividend } from '../../../types/workbook';
-import { syncTransactionIndexes } from '../../../lib/seq';
 
 type Kind = 'ledger' | 'transactions' | 'transfers' | 'adjustments' | 'dividends';
-export type QseRow = { id: string; globalTransactionIndex?: number; perTickerIndex?: number; transactionIndex?: number; kind?: 'trade' | 'transfer' | 'adjustment'; seq?: number; date: string; time?: string; timezone?: string; ticker?: string; action?: string; shares?: number; price?: number; gross?: number; fee?: number; type?: string; description?: string; amount?: number; note?: string; perShare?: number; isPending?: boolean; targetLotBuyId?: string; feeOverride?: number };
+export type QseRow = { id: string; globalTransactionIndex?: number; perTickerIndex?: number; transactionIndex?: number; kind?: 'trade' | 'transfer' | 'adjustment' | 'dividend'; seq?: number; accountingOrder?: number; date: string; time?: string; timezone?: string; ticker?: string; action?: string; shares?: number; price?: number; gross?: number; fee?: number; type?: string; description?: string; amount?: number; note?: string; perShare?: number; isPending?: boolean; targetLotBuyId?: string; feeOverride?: number };
 type Row = QseRow;
 const column = (key: keyof Row, label: string, type: BatchColumn<Row>['type'] = 'text'): BatchColumn<Row> => ({ key, label, type });
 function qseColumns(kind: Kind): BatchColumn<Row>[] {
-  const common = [{ ...column(kind === 'transactions' ? 'perTickerIndex' : 'seq', '#', 'number'), editable: false }, column('date', 'Date', 'date'), column('time', 'Time', 'time'), column('timezone', 'Timezone')];
+  const common = [{ ...column('accountingOrder', 'Sequence', 'number'), editable: false }, column('date', 'Date', 'date'), column('time', 'Time', 'time'), column('timezone', 'Timezone')];
   if (kind === 'ledger') {
-    const specific = (source: Exclude<Kind, 'ledger' | 'dividends'>, recordKind: Row['kind']) => qseColumns(source).filter(c => !common.some(shared => shared.key === c.key) && c.key !== 'perTickerIndex').map(c => ({ ...c, label: c.key === 'type' ? 'Transfer type' : c.label, editable: (row: Row) => row.kind === recordKind }));
-    return [...common, { ...column('kind', 'Type'), editable: false }, ...specific('transactions', 'trade'), ...specific('transfers', 'transfer'), ...specific('adjustments', 'adjustment')];
+    const specific = (source: Exclude<Kind, 'ledger'>, recordKind: Row['kind']) => qseColumns(source).filter(c => !common.some(shared => shared.key === c.key) && c.key !== 'perTickerIndex').map(c => ({ ...c, label: c.key === 'type' ? 'Transfer type' : c.label, editable: (row: Row) => row.kind === recordKind }));
+    return [...common, { ...column('kind', 'Type'), editable: false }, ...specific('transactions', 'trade'), ...specific('transfers', 'transfer'), ...specific('adjustments', 'adjustment'), ...specific('dividends', 'dividend')];
   }
   if (kind === 'transactions') return [...common, { ...column('ticker', 'Ticker'), parser: value => String(value).trim().toUpperCase() }, { ...column('action', 'Action', 'select'), options: ['BUY', 'SELL'].map(value => ({ value, label: value })) }, column('shares', 'Shares', 'number'), column('price', 'Price', 'number'), column('isPending', 'Pending', 'boolean')];
   if (kind === 'transfers') return [...common, { ...column('type', 'Type', 'select'), options: ['DEPOSIT', 'WITHDRAWAL'].map(value => ({ value, label: value })) }, column('gross', 'Gross', 'number'), column('fee', 'Fee', 'number'), column('description', 'Description')];
@@ -39,14 +38,14 @@ function qseColumns(kind: Kind): BatchColumn<Row>[] {
 }
 function validateQseRow(kind: Kind, row: Row): Record<string, string> {
   if (kind === 'ledger') {
-    if (!row.kind || !['trade', 'transfer', 'adjustment'].includes(row.kind)) return { kind: 'Choose trade, transfer or adjustment in the CSV Type column.' };
-    return validateQseRow(row.kind === 'trade' ? 'transactions' : row.kind === 'transfer' ? 'transfers' : 'adjustments', row);
+    if (!row.kind || !['trade', 'transfer', 'adjustment', 'dividend'].includes(row.kind)) return { kind: 'Choose trade, transfer, adjustment or dividend in the CSV Type column.' };
+    return validateQseRow(row.kind === 'trade' ? 'transactions' : row.kind === 'transfer' ? 'transfers' : row.kind === 'dividend' ? 'dividends' : 'adjustments', row);
   }
   const errors: Record<string, string> = {};
   if (!validBatchDate(row.date)) errors.date = 'Enter a valid date.';
   if (row.time && !/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(row.time)) errors.time = 'Enter a valid time.';
   if (row.timezone) { try { new Intl.DateTimeFormat('en', { timeZone: row.timezone }); } catch { errors.timezone = 'Enter a valid IANA timezone.'; } }
-  for (const c of qseColumns(kind)) if (c.type === 'number' && c.key !== 'seq' && c.key !== 'perTickerIndex' && (!Number.isFinite(row[c.key]) || Number(row[c.key]) < 0 && !(kind === 'adjustments' && c.key === 'amount'))) errors[c.key] = 'Enter a valid amount.';
+  for (const c of qseColumns(kind)) if (c.type === 'number' && c.key !== 'seq' && c.key !== 'perTickerIndex' && c.key !== 'accountingOrder' && (!Number.isFinite(row[c.key]) || Number(row[c.key]) < 0 && !(kind === 'adjustments' && c.key === 'amount'))) errors[c.key] = 'Enter a valid amount.';
   if ((kind === 'transactions' || kind === 'dividends') && !row.ticker?.trim()) errors.ticker = 'Ticker is required.';
   if (kind === 'transactions') { if (!['BUY', 'SELL'].includes(row.action || '')) errors.action = 'Choose BUY or SELL.'; if (!(row.shares! > 0)) errors.shares = 'Shares must be positive.'; if (!(row.price! > 0)) errors.price = 'Price must be positive.'; }
   if (kind === 'transfers') { if (!['DEPOSIT', 'WITHDRAWAL'].includes(row.type || '')) errors.type = 'Choose DEPOSIT or WITHDRAWAL.'; if (!(row.gross! > 0)) errors.gross = 'Gross must be positive.'; }
@@ -66,7 +65,7 @@ export function QseExportActions<T extends object>({ name, rows, allRows, action
 function recordsFor(kind: Kind): Row[] {
   const wb = useWorkbookStore.getState().workbook;
   if (kind !== 'ledger') return wb[kind] as Row[];
-  return [...wb.transactions.map(row => ({ ...row, kind: 'trade' as const })), ...wb.transfers.map(row => ({ ...row, kind: 'transfer' as const })), ...wb.adjustments.map(row => ({ ...row, kind: 'adjustment' as const }))] as Row[];
+  return [...wb.transactions.map(row => ({ ...row, kind: 'trade' as const })), ...wb.transfers.map(row => ({ ...row, kind: 'transfer' as const })), ...wb.adjustments.map(row => ({ ...row, kind: 'adjustment' as const })), ...wb.dividends.map(row => ({ ...row, kind: 'dividend' as const }))] as Row[];
 }
 export interface QseActionHeader { actions: StandardCardAction[]; summary: ReactNode; headerEnd: ReactNode }
 export interface QseRecordActionProps {
@@ -89,7 +88,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
   const editing = requestSnapshot && dismissedRequest !== editRequest ? requestSnapshot : storedEditing;
   const transferEdit = editing?.single && (kind === 'transfers' || editing.rows[0].kind === 'transfer');
   const closeEditor = () => { setEditing(null); setDismissedRequest(editRequest ?? null); };
-  const columns = qseColumns(kind === 'ledger' && editing?.single ? editing.rows[0].kind === 'trade' ? 'transactions' : editing.rows[0].kind === 'transfer' ? 'transfers' : 'adjustments' : kind);
+  const columns = qseColumns(kind === 'ledger' && editing?.single ? editing.rows[0].kind === 'trade' ? 'transactions' : editing.rows[0].kind === 'transfer' ? 'transfers' : editing.rows[0].kind === 'dividend' ? 'dividends' : 'adjustments' : kind);
   const allRows = (allRecords ?? (kind === 'ledger' ? recordsFor(kind) : workbook[kind])) as Row[];
   const createRow = (): Row => {
     const base = { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), seq: Math.max(0, ...recordsFor(kind).map(row => row.seq || 0)) + 1, ...(kind === 'transactions' || kind === 'ledger' ? { globalTransactionIndex: Math.max(0, ...recordsFor('transactions').map(row => row.globalTransactionIndex ?? row.transactionIndex ?? 0)) + 1 } : {}), timestamp: new Date().toISOString() };
@@ -104,7 +103,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
     const wb = state.workbook;
     if (kind === 'ledger') {
       const strip = ({ kind: _kind, ...row }: Row) => row;
-      state.setWorkbook({ ...wb, transactions: next.filter(row => row.kind === 'trade').map(strip) as Transaction[], transfers: next.filter(row => row.kind === 'transfer').map(strip) as Transfer[], adjustments: next.filter(row => row.kind === 'adjustment').map(strip) as Adjustment[] });
+      state.setWorkbook({ ...wb, transactions: next.filter(row => row.kind === 'trade').map(strip) as Transaction[], transfers: next.filter(row => row.kind === 'transfer').map(strip) as Transfer[], adjustments: next.filter(row => row.kind === 'adjustment').map(strip) as Adjustment[], dividends: next.filter(row => row.kind === 'dividend').map(strip) as Dividend[] });
     } else if (kind === 'transactions') state.setWorkbook({ ...wb, transactions: next as Transaction[] });
     else if (kind === 'transfers') state.setWorkbook({ ...wb, transfers: next as Transfer[] });
     else if (kind === 'adjustments') state.setWorkbook({ ...wb, adjustments: next as Adjustment[] });
@@ -122,6 +121,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
   const importFile = async (file: File) => {
     try {
       const current = recordsFor(kind);
+      const brokerId = useWorkbookStore.getState().workbook.activeBrokerId;
       const xlsx = /\.xlsx$/i.test(file.name);
       const table = xlsx ? readStatementXlsx(new Uint8Array(await file.arrayBuffer())) : parseCSV(await file.text());
       const isStatement = xlsx || table.some(row => row[0]?.trim().toLowerCase() === 'date' && row[1]?.trim().toLowerCase() === 'type' && row[2]?.trim().toLowerCase() === 'count');
@@ -130,14 +130,14 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
       if (isStatement) {
         if (kind !== 'ledger' && kind !== 'transactions') throw new Error('Import The Group statements from Cash ledger or Trade list.');
         if (!(await confirmDialog(
-          'The Group Excel statement contains rounded cash amounts instead of exact figures. Importing rounded numbers may produce incorrect balances, fees, profit/loss and other calculations. Use an exact statement where available and verify the imported figures. Rounded rewards will be excluded; existing exact rewards are retained. Continue to review this import?',
+          'The Group Excel statement contains rounded cash amounts instead of exact figures. Importing rounded numbers may produce incorrect balances, fees, profit/loss and other calculations. Use an exact statement where available and verify the imported figures. Rounded rewards are excluded; existing exact rewards are retained. Statement sequence and uniquely matched price corrections will be applied after review. Continue to review this import?',
           'Warning: rounded statement figures',
         ))) return;
-        const existing = recordsFor('ledger').filter(row => row.kind !== 'adjustment') as StatementRecord[];
+        const existing = recordsFor('ledger').filter(row => row.kind !== 'dividend') as StatementRecord[];
         const result = parseTheGroupStatement(table, existing);
-        statementWarning = result.warning;
+        statementWarning = result.warning + (kind === 'transactions' ? ' Trade list imports trades only. Use Cash ledger to reconcile transfers and existing reward sequence as well.' : '');
         const records = kind === 'transactions' ? result.records.filter(row => row.kind === 'trade') : result.records;
-        const keys = ['id', 'kind', 'date', 'ticker', 'action', 'shares', 'price', 'type', 'gross', 'fee', 'description', 'time', 'timezone'];
+        const keys = ['id', 'kind', 'date', 'ticker', 'action', 'shares', 'price', 'type', 'gross', 'fee', 'description', 'time', 'timezone', 'amount', 'note', 'feeOverride', 'targetLotBuyId', 'accountingOrder'];
         importTable = [keys, ...records.map(row => keys.map(key => String((row as unknown as Record<string, unknown>)[key] ?? '')))];
       }
       const [headers, ...data] = importTable;
@@ -148,7 +148,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
         const importedId = idColumn < 0 ? '' : cells[idColumn]?.trim();
         if (importedId) explicitIds.add(importedId);
         const row: Row = { id: importedId || crypto.randomUUID(), date: '' };
-        for (const c of columns.filter(c => c.key !== 'seq' && c.key !== 'perTickerIndex')) {
+        for (const c of columns.filter(c => c.key !== 'seq' && c.key !== 'perTickerIndex' && c.key !== 'accountingOrder')) {
           const normalizedHeaders = headers.map(header => header.trim().toLowerCase());
           let position = normalizedHeaders.indexOf(c.key.toLowerCase());
           if (kind === 'ledger' && c.key === 'type') {
@@ -161,6 +161,10 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
           if (c.type === 'number') Object.assign(row, { [c.key]: value === '' ? 0 : Number(value) });
           else if (c.type === 'boolean') { if (value && !['true', 'false', '1', '0'].includes(value.toLowerCase())) throw new Error(`Row ${index + 2}: invalid boolean.`); row.isPending = value === '1' || value.toLowerCase() === 'true'; }
           else if (value) Object.assign(row, { [c.key]: c.key === 'kind' ? value.toLowerCase() : ['ticker', 'action', 'type'].includes(c.key) ? value.toUpperCase() : value });
+        }
+        if (isStatement) {
+          const orderColumn = headers.indexOf('accountingOrder');
+          row.accountingOrder = Number(cells[orderColumn]);
         }
         const trade = kind === 'transactions' || kind === 'ledger' && row.kind === 'trade';
         if (trade) {
@@ -175,14 +179,14 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
         const error = Object.values(validateQseRow(kind, row))[0];
         if (error) throw new Error(`Row ${index + 2}: ${error}`);
         if (kind === 'ledger') {
-          const nativeKind = row.kind === 'trade' ? 'transactions' : row.kind === 'transfer' ? 'transfers' : 'adjustments';
-          return { ...Object.fromEntries([['id', row.id], ['kind', row.kind], ...qseColumns(nativeKind).filter(c => c.key !== 'seq' && row[c.key] !== undefined).map(c => [c.key, row[c.key]])]), ...(trade && row.targetLotBuyId ? { targetLotBuyId: row.targetLotBuyId } : {}), ...(trade && row.feeOverride !== undefined ? { feeOverride: row.feeOverride } : {}) } as Row;
+          const nativeKind = row.kind === 'trade' ? 'transactions' : row.kind === 'transfer' ? 'transfers' : row.kind === 'dividend' ? 'dividends' : 'adjustments';
+          return { ...Object.fromEntries([['id', row.id], ['kind', row.kind], ...qseColumns(nativeKind).filter(c => c.key !== 'seq' && c.key !== 'accountingOrder' && row[c.key] !== undefined).map(c => [c.key, row[c.key]])]), ...(isStatement ? { accountingOrder: row.accountingOrder } : {}), ...(trade && row.targetLotBuyId ? { targetLotBuyId: row.targetLotBuyId } : {}), ...(trade && row.feeOverride !== undefined ? { feeOverride: row.feeOverride } : {}) } as Row;
         }
         return row;
       });
       const signature = (row: Row) => {
-        const nativeColumns = kind === 'ledger' ? qseColumns(row.kind === 'trade' ? 'transactions' : row.kind === 'transfer' ? 'transfers' : 'adjustments') : columns;
-        return JSON.stringify([kind === 'ledger' ? row.kind : '', ...nativeColumns.filter(c => c.key !== 'seq' && c.key !== 'perTickerIndex').map(c => c.type === 'boolean' ? !!row[c.key] : row[c.key] ?? '')]);
+        const nativeColumns = kind === 'ledger' ? qseColumns(row.kind === 'trade' ? 'transactions' : row.kind === 'transfer' ? 'transfers' : row.kind === 'dividend' ? 'dividends' : 'adjustments') : columns;
+        return JSON.stringify([kind === 'ledger' ? row.kind : '', ...nativeColumns.filter(c => c.key !== 'seq' && c.key !== 'perTickerIndex' && c.key !== 'accountingOrder').map(c => c.type === 'boolean' ? !!row[c.key] : row[c.key] ?? '')]);
       };
       const importedIds = new Set<string>();
       const updates: Row[] = [];
@@ -196,7 +200,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
           if (kind === 'ledger' && before.kind !== row.kind) throw new Error('An imported ID cannot change its source type.');
           const merged = { ...before, ...row };
           if (locked(before) && (before.gross !== merged.gross || before.type !== merged.type || before.date !== merged.date)) throw new Error('Use single Modify to change the amount, direction or date of a linked transfer. Fee and description corrections can be imported safely.');
-          if (signature(before) !== signature(merged) || before.targetLotBuyId !== merged.targetLotBuyId || before.feeOverride !== merged.feeOverride) updates.push(merged);
+          if (signature(before) !== signature(merged) || before.targetLotBuyId !== merged.targetLotBuyId || before.feeOverride !== merged.feeOverride || isStatement && before.accountingOrder !== merged.accountingOrder) updates.push(merged);
         } else {
           const sig = signature(row);
           if (isStatement || explicitIds.has(row.id) || !seen.has(sig)) { additions.push(row); seen.add(sig); }
@@ -206,7 +210,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
       if (!(await confirmDialog(`Add ${additions.length} records; update ${updates.length} matching IDs; skip ${parsed.length - additions.length - updates.length} unchanged records. Existing records are retained.${statementWarning ? '\n' + statementWarning : ''}`, `Import QSE ${kind}?`))) return;
       if (!(await ensureSignedIn('Sign in to import records.'))) return;
       const latest = recordsFor(kind);
-      if (JSON.stringify(latest) !== JSON.stringify(current)) throw new Error('Records changed during import. Please try again.');
+      if (useWorkbookStore.getState().workbook.activeBrokerId !== brokerId || JSON.stringify(latest) !== JSON.stringify(current)) throw new Error('Records changed during import. Please try again.');
       let seq = Math.max(0, ...latest.map(row => row.seq || 0));
       commit([...latest.map(row => updates.find(update => update.id === row.id) ?? row), ...additions.map(row => ({ ...row, seq: ++seq, timestamp: new Date().toISOString() }))]);
       toast(`Imported ${additions.length} records; updated ${updates.length}.${statementWarning ? ' ' + statementWarning : ''}`);
@@ -224,7 +228,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
   return <>{render ? render(header) : <div className="section-toolbar">{header.summary}<CardActionMenu actions={actions} /></div>}
   <input id={inputId} type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void importFile(file); }} />
   {editing && transferEdit && <TransactionEntryModal editTransfer={{ module: 'qse', record: Object.fromEntries(Object.entries(editing.rows[0]).filter(([key]) => key !== 'kind')) as unknown as Transfer }} onClose={closeEditor} />}
-  {editing && !transferEdit && <BatchEditGrid title={`${editing.single ? 'Edit' : 'Batch edit'} QSE ${kind}`} description="Reorder records sharing an effective time with the move buttons. Linked transfers must be edited individually." rows={editing.rows} columns={columns} getRowId={row => row.id} getRowDate={row => row.date} getReorderGroup={row => `${row.date} ${toInstantMs(row.date, row.time, row.timezone)}${kind === 'transactions' ? ` ${row.ticker} ${row.action}` : kind === 'ledger' ? ` ${row.kind} ${row.kind === 'trade' ? `${row.ticker} ${row.action}` : ''}` : ''}`} orderKey={kind === 'transactions' ? 'globalTransactionIndex' : 'seq'} createRow={editing.single ? undefined : createRow} validateRow={row => validateQseRow(kind, row)} rowReadOnly={editing.single ? undefined : locked} onClose={closeEditor} onSave={async (changes, mutations) => {
+  {editing && !transferEdit && <BatchEditGrid title={`${editing.single ? 'Edit' : 'Batch edit'} QSE ${kind}`} description="Use the row arrows in the transaction tables to change the shared same-day sequence. Dates remain unchanged. Linked transfers must be edited individually." rows={editing.rows} columns={columns} getRowId={row => row.id} getRowDate={row => row.date} createRow={editing.single ? undefined : createRow} validateRow={row => validateQseRow(kind, row)} rowReadOnly={editing.single ? undefined : locked} onClose={closeEditor} onSave={async (changes, mutations) => {
     if (!(await ensureSignedIn('Sign in to save changes.'))) throw new Error('Sign in is required.');
     if (editing.owner && editing.owner !== getCurrentUser()?.uid) throw new Error('Signed-in account changed. Reopen the editor.');
     let linkChoice: 'both' | 'this' | 'cancel' | undefined;
@@ -234,7 +238,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
       if (choice === 'cancel') throw new Error('Edit cancelled.');
       linkChoice = choice === 'both' ? 'both' : 'this';
     }
-    commit(prepareBatch(recordsFor(kind), changes, [...columns.map(c => c.key), kind === 'transactions' ? 'globalTransactionIndex' : 'seq'], row => validateQseRow(kind, row), editing.single ? () => undefined : locked, mutations));
+    commit(prepareBatch(recordsFor(kind), changes, [...columns.map(c => c.key)], row => validateQseRow(kind, row), editing.single ? () => undefined : locked, mutations));
     if (linked && linkChoice === 'both') {
       const row = linked.after;
       const result = propagateLinkedEdit('qse', row.id, { date: row.date, amount: row.gross!, direction: row.type === 'DEPOSIT' ? 'in' : 'out' });
@@ -244,41 +248,36 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
   }} />}</>;
 }
 
-/** Reorder exact-time peers; trades also share ticker and action so lot rules remain intact. */
-export function QseReorder({ kind, row, rows }: { kind: Kind; row: Transaction | Transfer | Adjustment | Dividend | Row; rows: Array<Transaction | Transfer | Adjustment | Dividend | Row> }) {
+/** Shared same-day accounting order controls for trades, transfers, adjustments,
+ * dividends and rows shown in the merged cash ledger. */
+export function QseReorder({ kind, row }: {
+  kind: Kind;
+  row: { id?: string; date: string; kind?: string };
+  rows?: Array<Transaction | Transfer | Adjustment | Dividend | Row>;
+}) {
   const ensureSignedIn = useEnsureSignedIn();
-  const isTradeList = kind === 'transactions';
-  const peers = isTradeList ? rows as Transaction[] : rows.filter(candidate => (kind !== 'ledger' || (candidate as Row).kind === (row as Row).kind) && (kind !== 'ledger' || (row as Row).kind !== 'trade' || ((candidate as Transaction).ticker === (row as Transaction).ticker && (candidate as Transaction).action === (row as Transaction).action)));
-  return <ReorderButtons rows={peers} index={peers.findIndex(candidate => candidate.id === row.id)} instantOf={candidate => toInstantMs(candidate.date, candidate.time, candidate.timezone)} idOf={candidate => candidate.id!} orderOf={candidate => isTradeList ? (candidate as Transaction).globalTransactionIndex ?? (candidate as Transaction).transactionIndex : candidate.seq} allowAcrossInstants={isTradeList} onMove={async pair => {
-    if (!(await ensureSignedIn('Sign in to reorder records.'))) return;
-    const state = useWorkbookStore.getState();
-    if (isTradeList) {
-      const transactions = state.workbook.transactions;
-      const a = transactions.find(candidate => candidate.id === pair[0].id), b = transactions.find(candidate => candidate.id === pair[1].id);
-      const aIndex = a?.globalTransactionIndex ?? a?.transactionIndex;
-      const bIndex = b?.globalTransactionIndex ?? b?.transactionIndex;
-      if (!a || !b || !Number.isInteger(aIndex) || !Number.isInteger(bIndex)) return toast('Transactions changed or accounting order is missing. Reload and try again.');
-      // Swap the canonical global positions, then derive per-ticker indexes from that same order.
-      const swapped = transactions.map(candidate => candidate.id === a.id
-        ? { ...candidate, globalTransactionIndex: bIndex, transactionIndex: bIndex }
-        : candidate.id === b.id
-          ? { ...candidate, globalTransactionIndex: aIndex, transactionIndex: aIndex }
-          : candidate);
-      const next = syncTransactionIndexes(swapped);
-      state.setWorkbook({ ...state.workbook, transactions: next });
-      toast('Transaction accounting order updated.');
-      return;
-    }
-    const sourceKind = kind === 'ledger' ? (row as Row).kind === 'trade' ? 'transactions' : (row as Row).kind === 'transfer' ? 'transfers' : 'adjustments' : kind;
-    const records = state.workbook[sourceKind];
-    const a = records.find(candidate => candidate.id === pair[0].id), b = records.find(candidate => candidate.id === pair[1].id);
-    if (!a || !b || toInstantMs(a.date, a.time, a.timezone) !== toInstantMs(b.date, b.time, b.timezone)) return toast('Records changed. Please try again.');
-    const next = records.map(candidate => { const order = pair.find(item => item.id === candidate.id); return order ? { ...candidate, seq: order.order } : candidate; });
-    if (sourceKind === 'transactions') state.setWorkbook({ ...state.workbook, transactions: next as Transaction[] });
-    else if (sourceKind === 'transfers') state.setWorkbook({ ...state.workbook, transfers: next as Transfer[] });
-    else if (sourceKind === 'adjustments') state.setWorkbook({ ...state.workbook, adjustments: next as Adjustment[] });
-    else state.setWorkbook({ ...state.workbook, dividends: next as Dividend[] });
-  }} />;
+  const workbook = useWorkbookStore(state => state.workbook);
+  const eventKind = (kind === 'transactions' ? 'trade'
+    : kind === 'transfers' ? 'transfer'
+      : kind === 'adjustments' ? 'adjustment'
+        : kind === 'dividends' ? 'dividend'
+          : row.kind) as AccountingEventKind;
+  const events = getAccountingEventRefs(workbook);
+  if (!row.id || !eventKind) return null;
+
+  return (
+    <AccountingEventOrderControls
+      events={events}
+      kind={eventKind}
+      id={row.id}
+      date={row.date}
+      onMove={async pair => {
+        if (!(await ensureSignedIn('Sign in to reorder accounting events.'))) return;
+        useWorkbookStore.getState().reorderAccountingEvents(pair);
+        toast('Same-day accounting sequence updated.');
+      }}
+    />
+  );
 }
 
 export function QseRecordCard({ title, sectionProps, children, ...props }: QseRecordActionProps & { title: ReactNode; sectionProps?: SectionCardProps; children: ReactNode }) {

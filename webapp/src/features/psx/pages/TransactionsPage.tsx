@@ -23,9 +23,7 @@ import { useTablePagination } from '../../../hooks/useTablePagination';
 import { usePageFabActions } from '../../../hooks/usePageFabActions';
 import { fmt, fmtMoney, fmtPSXPrice } from '../../../lib/format';
 import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
-import { closedPLBySellTxId, computeClosedTrades, type LotMatchOrder } from '../../../lib/calc/closedTrades';
-import { computeAveragePLBySellTxId } from '../../../lib/calc/realizedPL';
-import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
+import { computeFIFOPositions } from '../../../lib/calc/fifoPositions';
 import { tradePriceDeviationPct, validateTransactionEdit, validateSellQuantities } from '../../../lib/calc/tradeValidation';
 import { isNettedLeg } from '../../../lib/calc/psxFees';
 import { transferRunningBalance } from '../../../lib/calc/transferBalance';
@@ -36,16 +34,14 @@ import { IconButton } from '../../../components/ui/IconButton';
 import { TimeZoneFields } from '../../../components/ui/TimeZoneFields';
 import { defaultTimeForDate, defaultTimezoneForCurrency, defaultTimezoneForMarket, nowTime } from '../../../lib/datetime';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
-import { ReorderButtons } from '../../../components/ui/ReorderButtons';
 import { PendingToggle } from '../../../components/ui/PendingToggle';
-import { dateOnlyMs } from '../../../lib/datetime';
 import { createEmptyPSXWorkbook } from '../../../store/defaultPsxWorkbook';
 import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
 import { useInterEntityTransfersStore } from '../../../store/interEntityTransfersStore';
 import { linkTargetPath, useLinkSideLabel } from '../../transfers/pages/TransferLinksPage';
 import type { Adjustment, Transaction, Transfer } from '../../../types/workbook';
-import { syncTransactionIndexes } from '../../../lib/seq';
 import { DividendsSection } from '../components/DividendsSection';
+import { PSXReorder } from '../components/PSXReorder';
 import { usePSXDerived } from '../hooks/usePSXDerived';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -312,7 +308,7 @@ function groupKey(tx: Transaction, groupBy: GroupBy): string {
 }
 
 function TransactionList() {
-  const { workbook, calcFee, positions } = usePSXDerived();
+  const { workbook, calcFee, positions, closedTrades: calculatedClosedTrades, realizedBySellTxId: sellPLById, sellReconciliationByTxId, lots } = usePSXDerived();
   const deleteTransaction = usePSXWorkbookStore((s) => s.deleteTransaction);
   const updateTransaction = usePSXWorkbookStore((s) => s.updateTransaction);
   const ensureSignedIn = useEnsureSignedIn();
@@ -324,13 +320,8 @@ function TransactionList() {
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [editRow, setEditRow] = useState<Transaction | null>(null);
   const [detailTx, setDetailTx] = useState<Transaction | null>(null);
-  // User-reported (2026-09-13): PSX's own same-day netting decides a whole
-  // TRANSACTION's fee from that day's total buy vs. sell quantity, never
-  // from which lot a sale is later attributed to here — so FIFO's "oldest
-  // lot first" is a pure reporting convention in this ledger too, not a
-  // real constraint. Offer cheapest-lot-first as a second, explicitly
-  // comparison-only view (see `closedTrades.ts`'s `LotMatchOrder` comment).
-  const ctMatchOrder: LotMatchOrder = workbook.settings.costBasisMethod === 'lowestCostFirst' ? 'lowestCostFirst' : 'fifo';
+  // Closed trades, open lots and row-level realized P/L all use the same
+  // selected-method result from usePSXDerived.
 
   // Pending item 143 PSX fast-follow: manual lot allocation for the inline
   // edit-row SELL form — same gate/derivation as QSE's identical file. Lots
@@ -403,13 +394,8 @@ function TransactionList() {
   // independent of the aggregate position calc (computeClosedTrades never
   // feeds back into computePositions/computeFIFOPositions).
   const closedTrades = useMemo(
-    () =>
-      computeClosedTrades(
-        filterTicker === 'ALL' ? workbook.transactions : workbook.transactions.filter((t) => t.ticker === filterTicker),
-        calcFee,
-        ctMatchOrder,
-      ),
-    [workbook.transactions, calcFee, filterTicker, ctMatchOrder],
+    () => calculatedClosedTrades.filter(row => filterTicker === 'ALL' || row.ticker === filterTicker),
+    [calculatedClosedTrades, filterTicker],
   );
   type CTCol = 'ticker' | 'buyDate' | 'buyPrice' | 'sellDate' | 'sellPrice' | 'shares' | 'buyFee' | 'sellFee' | 'netPL' | 'holdingDays';
   const ctSortValue = (t: (typeof closedTrades)[number], col: CTCol): number | string => {
@@ -433,17 +419,12 @@ function TransactionList() {
   // lot's buy price... inline in the main trade row." Computed from the
   // WHOLE workbook (not `filterTicker`-scoped like `closedTrades` above) so
   // a row's own P&L figure never changes just because the ticker filter is
-  // narrowed to something else. Shares `ctMatchOrder` with the Closed Trades
+  // narrowed to something else. Shares the selected cost-basis method with the Closed Trades
   // table above (2026-09-13) — a feature rolled out to one view of a sell's
   // realized P&L must stay consistent with every other view of the same
   // number, or this row's own pill and the table below could show two
   // contradicting figures for the identical sell.
-  const sellPLById = useMemo(
-    () => (workbook.settings.costBasisMethod === 'average' || !workbook.settings.costBasisMethod)
-      ? computeAveragePLBySellTxId(workbook.transactions, calcFee)
-      : closedPLBySellTxId(computeClosedTrades(workbook.transactions, calcFee, ctMatchOrder)),
-    [workbook.transactions, workbook.settings.costBasisMethod, calcFee, ctMatchOrder],
-  );
+  // Row-level SELL P/L is read from the same selected-method engine result.
 
   // User's own words: "make separate sections for open and closed trades...
   // it gets difficult to know the sold status and price of a lot." Same
@@ -451,17 +432,12 @@ function TransactionList() {
   // of it (`computeFIFOPositions`'s own `lotsByTicker`) — a pure reporting
   // ledger, independent of PSX's own costBasisMethod setting. Shares
   // `ctMatchOrder` with Closed trades below (2026-09-13, see
-  // `LotMatchOrder`'s own doc comment) so the two tables always add up to
+  // selected-method calculation) so the two tables always add up to
   // the same picture of which lots are still open vs. already sold.
-  const openLots = useMemo(() => {
-    const txs = filterTicker === 'ALL' ? workbook.transactions : workbook.transactions.filter((t) => t.ticker === filterTicker);
-    const { lotsByTicker } = computeFIFOPositions(txs, calcFee, ctMatchOrder);
-    const flat: (FIFOLot & { ticker: string })[] = [];
-    for (const [ticker, lots] of Object.entries(lotsByTicker)) {
-      for (const lot of lots) flat.push({ ticker, ...lot });
-    }
-    return flat;
-  }, [workbook.transactions, calcFee, filterTicker, ctMatchOrder]);
+  const openLots = useMemo(() => Object.entries(lots)
+    .filter(([ticker]) => filterTicker === 'ALL' || ticker === filterTicker)
+    .flatMap(([ticker, tickerLots]) => tickerLots.map(lot => ({ ticker, ...lot }))),
+  [lots, filterTicker]);
   type OLCol = 'ticker' | 'buyDate' | 'buyPrice' | 'shares' | 'invested' | 'buyFeeTotal';
   const olSortValue = (l: (typeof openLots)[number], col: OLCol): number | string => {
     switch (col) {
@@ -510,27 +486,6 @@ function TransactionList() {
   };
 
   const setWorkbook = usePSXWorkbookStore((s) => s.setWorkbook);
-  const transactionOrderRows = useMemo(
-    () => [...workbook.transactions].sort((a, b) => (a.globalTransactionIndex ?? a.transactionIndex ?? Number.MAX_SAFE_INTEGER) - (b.globalTransactionIndex ?? b.transactionIndex ?? Number.MAX_SAFE_INTEGER)),
-    [workbook.transactions],
-  );
-  const reorderTransaction = async (pair: [{ id: string; order: number }, { id: string; order: number }]) => {
-    if (!(await ensureSignedIn('Sign in to reorder transactions.'))) return;
-    const current = usePSXWorkbookStore.getState().workbook;
-    const a = current.transactions.find(tx => tx.id === pair[0].id);
-    const b = current.transactions.find(tx => tx.id === pair[1].id);
-    const aIndex = a?.globalTransactionIndex ?? a?.transactionIndex;
-    const bIndex = b?.globalTransactionIndex ?? b?.transactionIndex;
-    if (!a || !b || !Number.isInteger(aIndex) || !Number.isInteger(bIndex)) return toast('Transactions changed or accounting order is missing. Reload and try again.');
-    const swapped = current.transactions.map(tx => tx.id === a.id
-      ? { ...tx, globalTransactionIndex: bIndex, transactionIndex: bIndex }
-      : tx.id === b.id
-        ? { ...tx, globalTransactionIndex: aIndex, transactionIndex: aIndex }
-        : tx);
-    const transactions = syncTransactionIndexes(swapped);
-    usePSXWorkbookStore.getState().setWorkbook({ ...current, transactions });
-    toast('Transaction accounting order updated.');
-  };
   const clearAll = async () => {
     const ok = await confirmDialog(
       'This clears all transactions, prices and watchlist entries in this browser.',
@@ -632,7 +587,7 @@ function TransactionList() {
                   </Fragment>
                 ) : (
                   <RecordRow market="psx" onEdit={() => startEdit(i, tx)}    record={{ tx, i }}  key={i}  className="clickable">
-                    <td><DateValue value={tx.date} />{' '}<ReorderButtons rows={transactionOrderRows} index={transactionOrderRows.findIndex(row => row.id === tx.id)} instantOf={row => dateOnlyMs(row.date)} idOf={row => row.id!} orderOf={row => row.globalTransactionIndex ?? row.transactionIndex} allowAcrossInstants onMove={reorderTransaction} /></td>
+                    <td><DateValue value={tx.date} />{' '}<PSXReorder kind="trade" id={tx.id!} date={tx.date} /></td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <TickerLogo ticker={tx.ticker} size="sm" exchange="psx" /><Link to={`/psx/stock/${tx.ticker}`}>{tx.ticker}</Link>
                       {tx.isPending && (
@@ -663,6 +618,11 @@ function TransactionList() {
                     </td>
                     <td className={tx.id && sellPLById[tx.id] ? (sellPLById[tx.id].netPL >= 0 ? 'pill-positive' : 'pill-negative') : undefined}>
                       {tx.id && sellPLById[tx.id] ? fmtMoney(sellPLById[tx.id].netPL, currency) : '—'}
+                      {tx.id && (sellReconciliationByTxId[tx.id]?.unmatchedShares ?? 0) > 0 && (
+                        <div className="text-warning small" title="Unmatched shares have no buy cost in this workbook. Their proceeds are excluded from realized profit; the unmatched sell fee is still expensed.">
+                          Unmatched {fmt(sellReconciliationByTxId[tx.id]?.unmatchedShares ?? 0, 0)} shares · fee {fmtMoney(sellReconciliationByTxId[tx.id]?.unmatchedFee ?? 0, currency)}
+                        </div>
+                      )}
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
                       {tx.isPending && (
@@ -742,7 +702,7 @@ function TransactionList() {
 
       {(workbook.settings.costBasisMethod === 'fifo' || workbook.settings.costBasisMethod === 'lowestCostFirst') ? <>
       <p className="text-muted mb-sm mt-md">
-        Lot attribution follows the configured cost-basis method: {ctMatchOrder === 'lowestCostFirst' ? 'Lowest cost first' : 'FIFO'}.
+        Lot attribution follows the configured cost-basis method: {workbook.settings.costBasisMethod === 'lowestCostFirst' ? 'Lowest cost first' : 'FIFO'}.
       </p>
       <details open>
         <summary className="summary-heading">
@@ -865,6 +825,9 @@ function TransactionList() {
             ...(detailTx.id && sellPLById[detailTx.id]
               ? [{ label: 'Realized P/L', value: fmtMoney(sellPLById[detailTx.id].netPL, currency) }]
               : []),
+            ...(detailTx.id && (sellReconciliationByTxId[detailTx.id]?.unmatchedShares ?? 0) > 0
+              ? [{ label: 'Unmatched shares', value: fmt(sellReconciliationByTxId[detailTx.id]?.unmatchedShares ?? 0, 0) }, { label: 'Unmatched sell fee', value: fmtMoney(sellReconciliationByTxId[detailTx.id]?.unmatchedFee ?? 0, currency) }]
+              : []),
             { label: 'Status', value: detailTx.isPending ? 'Pending (not yet cleared)' : 'Cleared' },
           ]}
         />
@@ -877,11 +840,9 @@ function TransactionList() {
 function TransfersSection() {
   const dateSort = useDateTableSort();
   const workbook = usePSXWorkbookStore((s) => s.workbook);
-  const updateTransfer = usePSXWorkbookStore((s) => s.updateTransfer);
   const deleteTransfer = usePSXWorkbookStore((s) => s.deleteTransfer);
   const currency = workbook.settings.currency;
   const links = useInterEntityTransfersStore((s) => s.workbook.entries);
-  const ensureSignedIn = useEnsureSignedIn();
   const sideLabel = useLinkSideLabel();
 
   const [editRow, setEditRow] = useState<Transfer | null>(null);
@@ -907,24 +868,13 @@ function TransfersSection() {
     [workbook.transfers, typeFilter],
   );
 
-  // User-reported (2026-09-06): "we may stop sorting options for
-  // chronologically important tables (only sequence-aware tables) to
-  // avoid the disordered mess" — same reasoning as QSE's own equivalent
-  // (Done item 235): Balance only makes sense in real chronological+
-  // sequence order, so free column sorting is gone here, replaced by
-  // `ReorderButtons` for the one thing that genuinely needs fixing (two
-  // same-instant transfers in the wrong relative order).
-  const instantOf = (t: Transfer) => dateOnlyMs(t.date);
+  // Latest dates first; within each date, preserve the shared accounting sequence.
   const dateSortInput = useMemo(
-    () => [...filteredTransfers].sort((a, b) => instantOf(b) - instantOf(a) || (b.seq ?? 0) - (a.seq ?? 0)),
+    () => [...filteredTransfers].sort((a, b) => b.date.localeCompare(a.date) || (a.accountingOrder ?? 0) - (b.accountingOrder ?? 0)),
     [filteredTransfers],
   );
   const sorted = dateSort.rows(dateSortInput, { date: row => row });
   const page = useTablePagination(sorted);
-  const reorderTransfer = async (pair: [{ id: string; order: number }, { id: string; order: number }]) => {
-    if (!(await ensureSignedIn('Sign in to reorder transfers.'))) return;
-    for (const p of pair) updateTransfer(p.id, { seq: p.order });
-  };
 
   const startEdit = (t: Transfer) => setEditRow({ ...t });
 
@@ -959,14 +909,7 @@ function TransfersSection() {
                 <RecordRow market="psx" onEdit={() => startEdit(t)}    record={t}  key={t.id}>
                   <td>
                     <DateValue value={t.date} />{' '}
-                    <ReorderButtons
-                      rows={sorted}
-                      index={sorted.findIndex(row => row.id === t.id)}
-                      instantOf={instantOf}
-                      idOf={(row) => row.id}
-                      orderOf={(row) => row.seq}
-                      onMove={reorderTransfer}
-                    />
+                    <PSXReorder kind="transfer" id={t.id} date={t.date} />
                   </td>
                   <td>
                     {t.type}
@@ -1006,7 +949,7 @@ function AdjustmentsSection() {
   const updateAdjustment = usePSXWorkbookStore((s) => s.updateAdjustment);
   const deleteAdjustment = usePSXWorkbookStore((s) => s.deleteAdjustment);
   const currency = workbook.settings.currency;
-  const indexed = workbook.adjustments.map((a, i) => ({ a, i }));
+  const indexed = workbook.adjustments.map((a, i) => ({ a, i })).sort((a, b) => b.a.date.localeCompare(a.a.date) || (a.a.accountingOrder ?? 0) - (b.a.accountingOrder ?? 0));
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [editRow, setEditRow] = useState<Adjustment | null>(null);
 
@@ -1057,7 +1000,7 @@ function AdjustmentsSection() {
                 </RecordRow>
               ) : (
                 <RecordRow market="psx" onEdit={() => startEdit(i, a)}    record={{ a, i }}  key={i}>
-                  <td><DateValue value={a.date} /></td>
+                  <td><DateValue value={a.date} /><PSXReorder kind="adjustment" id={a.id!} date={a.date} /></td>
                   <td>{fmtMoney(a.amount, currency)}</td>
                   <td>{a.note}</td>
                   <td>
@@ -1091,14 +1034,12 @@ function CashLedgerSection() {
   // User-reported (2026-09-06): "we may stop sorting options for
   // chronologically important tables (only sequence-aware tables) to
   // avoid the disordered mess" — same reasoning as QSE's own equivalent
-  // (Done item 235): a merged trades+transfers+adjustments ledger's
+  // (Done item 235): a merged trades+transfers+adjustments+dividends ledger's
   // Balance column only makes sense in `buildCashLedger`'s own real
-  // chronological order. No `ReorderButtons` here — each row is DERIVED
-  // from a real record living in its own native table (Trade Transactions
-  // / the Transfers section above / Adjustments); reordering happens
-  // there and flows through automatically.
-  const dateSortInput = [...filtered].reverse();
-  const sorted = dateSort.rows(dateSortInput, { date: row => ({ ...row, seq: ledger.indexOf(row) }) });
+  // chronological order. The same-day arrows below operate on the complete
+  // event stream, including rows from the other transaction sections.
+  const dateSortInput = [...filtered].sort((a, b) => b.date.localeCompare(a.date) || (a.accountingOrder ?? 0) - (b.accountingOrder ?? 0));
+  const sorted = dateSort.rows(dateSortInput, { date: row => ({ ...row, seq: row.accountingOrder ?? 0 }) });
   const page = useTablePagination(sorted);
 
   return (
@@ -1110,6 +1051,7 @@ function CashLedgerSection() {
             <option value="trade">Trade</option>
             <option value="transfer">Transfer</option>
             <option value="adjustment">Adjustment</option>
+            <option value="dividend">Dividend</option>
           </Select>
         </Field>
       </div></PageFilters>
@@ -1127,7 +1069,7 @@ function CashLedgerSection() {
         <tbody>
           {page.rows.map((e, i) => (
             <RecordRow market="psx" record={e} key={i}>
-              <td><DateValue value={e.date} /></td>
+              <td><DateValue value={e.date} />{e.sourceId && <PSXReorder kind={e.kind} id={e.sourceId} date={e.date} />}</td>
               <td>{e.kind}</td>
               <td>{e.label}</td>
               <td className={e.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(e.amount, currency)}</td>

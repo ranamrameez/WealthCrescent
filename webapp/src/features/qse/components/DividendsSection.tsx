@@ -145,10 +145,11 @@ export function DividendsSection({ sectionProps }: { sectionProps?: SectionCardP
       case 'perShare': return d.perShare;
       case 'shares': return d.shares;
       case 'amount': return d.amount;
-      default: return `${toInstantMs(d.date, d.time, d.timezone)} ${String(d.seq ?? 0).padStart(12, '0')}`;
+      default: return `${toInstantMs(d.date, d.time, d.timezone)} ${String(d.accountingOrder ?? 0).padStart(12, '0')}`;
     }
   };
   const { sorted: rows, sort, toggleSort, dateSort } = useSortableRows([...workbook.dividends.map((d, i) => ({ ...d, i }))]
+    .sort((a, b) => b.date.localeCompare(a.date) || (a.accountingOrder ?? 0) - (b.accountingOrder ?? 0))
     .filter((d) => (tickerFilter === 'ALL' || d.ticker === tickerFilter) && matchesQseFilters(d, pageFilters)), sortValue, 'date');
   const arrow = (col: string) => <SortIcon direction={sort.col === col ? sort.dir : undefined} />;
   // Reflects the ticker filter above, so "Total collected" always matches

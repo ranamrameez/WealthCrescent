@@ -8037,3 +8037,23 @@ Linked-transfer currency resolution uses the selected QSE/PSX broker profile's c
 
 
 **Documentation limitation:** root `README.md`, `USER_MANUAL.md`, `audit.md`, and `SESSION_HANDOFF.md` are updated for issue #42. `webapp/README.md` returned empty content from the repository file reader, so it was not overwritten; revisit it when its contents can be fetched safely.
+
+
+## Unified stock calculation engine — 2026-10-31 (PR #48)
+
+Continue the active work on [PR #48](https://github.com/ranamrameez/WealthCrescent/pull/48), branch `feat/unified-stock-calculation-engine`; do not recreate the branch or base changes on an older branch. The stock accounting pass is `webapp/src/lib/calc/stockCalculationEngine.ts`; the public exchange-level pipeline is `portfolioCalculationEngine.ts`. QSE/PSX derived hooks should consume this pipeline. The old `positions.ts`, `realizedPL.ts`, `closedTrades.ts` and `fifoPositions.ts` modules are compatibility adapters; do not add independent calculation implementations to components or hooks.
+
+The stock engine must retain the user-approved semantics: true chronological processing; distinct ticker position lifecycles; close/reopen resets cost and lots; Average/FIFO/other basis methods return internally consistent method-dependent outputs; method switching does not mutate transactions/fees/cash; cash movement and market value remain method-independent; unmatched SELL shares never receive invented cost basis or realized profit, and unmatched fees remain separately expensed. Keep lifecycle-level close status distinct from individual closed lot/trade records.
+
+Same-day event ordering uses one persisted `accountingOrder` across trade, transfer, adjustment and dividend events. Use the existing shared row-arrow component/control; never build a second reorder UI or separate trade/cash ordering. Reorder only within the same date and preserve IDs and economic fields. QSE controls are shown in Modify mode; PSX row controls are already present. Batch Edit does not edit sequence; its header explains that users should use row arrows.
+
+Latest CI checkpoint and continuation details are in `webapp/SESSION_HANDOFF.md` and `webapp/audit.md`. Verify the live PR head before trusting any run; a code change after a successful run requires a new full validation. No direct pushes to `main`.
+
+
+## Latest WealthCrescent calculation-engine checkpoint — 2026-10-31
+
+PR #48, branch `feat/unified-stock-calculation-engine`, has a validated application-code checkpoint at `48fde7820b387ec1c1fa4184bb02dd5600774330`. GitHub Actions run #41242056151 passed type-check, production build, broker-profile/PSX-fee regressions, and the full suite (142 files, 1,123 tests).
+
+The exchange pipeline now owns cost-basis-dependent average cost, break-even and exit targets, plus method-independent market valuation and commission estimates. The shared `positionValuation.ts` helper is used by live portfolio, cash-summary fallback and historical P/L. Strategic Trades and historical analytics route their stock basis through `stockCalculationEngine.ts`. Same-day row arrows use one persisted sequence across trades, transfers, adjustments and dividends; the control/store mapping and recorded-time fallback were regression-tested.
+
+The latest docs/comment refresh is behavior-neutral. Before merging, verify Actions on the exact live PR head. No browser smoke test or real-backup review is claimed. Continue on the existing feature branch; never push directly to `main`.

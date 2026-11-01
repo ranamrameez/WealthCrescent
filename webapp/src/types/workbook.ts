@@ -13,11 +13,13 @@ export interface Transaction {
    * by `createWorkbookStore.ts`'s `normalize()`, same pattern as
    * `Transfer.id`. */
   id?: string;
-  /** Legacy compatibility alias. For transactions this mirrors perTickerIndex; globalTransactionIndex now controls accounting order. Other record types still use seq as their own sequence. */
+  /** Legacy compatibility alias. For transactions this mirrors perTickerIndex. Shared same-day order is controlled by accountingOrder; globalTransactionIndex is retained only as a legacy trade-only fallback. */
   seq?: number;
-  /** Canonical global accounting position across all transactions in this exchange workbook. Reordering the global sequence must also recalculate perTickerIndex. */
+  /** Shared same-day accounting sequence across trades, transfers, adjustments and dividends. */
+  accountingOrder?: number;
+  /** Legacy trade-only global index. Used only when no shared accountingOrder exists and recorded times do not distinguish same-day trades. */
   globalTransactionIndex?: number;
-  /** Canonical position within this ticker's own transaction sequence, derived from globalTransactionIndex order. */
+  /** Position within this ticker's chronological trade sequence, synchronized from date, shared accountingOrder and legacy tie-breakers. */
   perTickerIndex?: number;
   /** @deprecated Compatibility alias for globalTransactionIndex while older exports/imports migrate. Never use as the ordering source. */
   transactionIndex?: number;
@@ -149,8 +151,10 @@ export interface Transfer {
    * transfer links (README item 19) can reference a specific transfer that
    * survives other transfers being added/edited/deleted around it. */
   id: string;
-  /** Same reasoning and retrofit pattern as `Transaction.seq` above. */
+  /** Legacy per-record-type sequence. */
   seq?: number;
+  /** Shared same-day accounting sequence across all event types. */
+  accountingOrder?: number;
   date: string;
   /** Pending item 41 — see `Transaction.time`/`timezone` above for the
    * shared reasoning; same optional, backfill-to-noon fields here. */
@@ -181,8 +185,10 @@ export interface Adjustment {
    * needs to reference a specific adjustment the way linking needs
    * `Transfer.id`, so this is the groundwork, not a full addressing switch. */
   id?: string;
-  /** Same reasoning and retrofit pattern as `Transaction.seq` above. */
+  /** Legacy per-record-type sequence. */
   seq?: number;
+  /** Shared same-day accounting sequence across all event types. */
+  accountingOrder?: number;
   date: string;
   /** Pending item 41 — same optional time/timezone fields as `Transaction`. */
   time?: string;
@@ -274,8 +280,10 @@ export interface Dividend {
   brokerId?: string;
   /** Stable id — same reasoning as `Adjustment.id` above (README item 51). */
   id?: string;
-  /** Same reasoning and retrofit pattern as `Transaction.seq` above. */
+  /** Legacy per-record-type sequence. */
   seq?: number;
+  /** Shared same-day accounting sequence across all event types. */
+  accountingOrder?: number;
   date: string;
   /** Pending item 41 — same optional time/timezone fields as `Transaction`. */
   time?: string;
@@ -452,6 +460,8 @@ export interface Position {
 export interface CashLedgerEvent {
   sourceId?: string;
   ticker?: string;
+  shares?: number;
+  price?: number;
   date: string;
   /** Pending item 41 — carried through from whichever record produced this
    * event, for real chronological sorting and (optionally) display. */
@@ -461,13 +471,15 @@ export interface CashLedgerEvent {
    * `Transaction.seq`'s doc comment) — the tie-breaker `buildCashLedger`
    * falls back to for two events of the SAME `kind` at the same instant. */
   seq?: number;
+  /** Shared same-day accounting sequence across every event type. */
+  accountingOrder?: number;
   /** Canonical global accounting position for trade events. */
   globalTransactionIndex?: number;
   /** Canonical per-ticker accounting position for trade events. */
   perTickerIndex?: number;
   /** @deprecated Compatibility alias for older ledger consumers. */
   transactionIndex?: number;
-  kind: 'trade' | 'transfer' | 'adjustment';
+  kind: 'trade' | 'transfer' | 'adjustment' | 'dividend';
   action: string;
   label: string;
   amount: number;
@@ -482,6 +494,9 @@ export interface CashSummary {
   tradingFees: number;
   totalCharges: number;
   totalRewards: number;
+  totalDividends: number;
+  /** Sell fees allocated to unmatched shares; excluded from matched realized P/L but still an expense. */
+  unmatchedSellFees: number;
   realizedPL: number;
   unrealizedPL: number;
   netPL: number;

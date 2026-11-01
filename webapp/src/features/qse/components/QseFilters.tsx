@@ -29,7 +29,7 @@ export function QseFilterProvider({ children, tickers }: { children: ReactNode; 
       <Field label="Trade action"><select value={filters.action} onChange={e => update({ action: e.target.value })}><option value="">Buy &amp; sell</option><option value="BUY">Buy</option><option value="SELL">Sell</option></select></Field>
       <Field label="Group trades"><select value={filters.group} onChange={e => update({ group: e.target.value })}><option value="">No grouping</option><option value="ticker">Ticker</option><option value="action">Buy/sell</option><option value="month">Month</option></select></Field>
       <Field label="Transfer type"><select value={filters.transferType} onChange={e => update({ transferType: e.target.value })}><option value="">All</option><option value="DEPOSIT">Deposit</option><option value="WITHDRAWAL">Withdrawal</option></select></Field>
-      <Field label="Ledger type"><select value={filters.kind} onChange={e => update({ kind: e.target.value })}><option value="">All</option><option value="trade">Trade</option><option value="transfer">Transfer</option><option value="adjustment">Adjustment</option></select></Field>
+      <Field label="Ledger type"><select value={filters.kind} onChange={e => update({ kind: e.target.value })}><option value="">All</option><option value="trade">Trade</option><option value="transfer">Transfer</option><option value="adjustment">Adjustment</option><option value="dividend">Dividend</option></select></Field>
       <Field label="Search"><input value={filters.search} onChange={e => update({ search: e.target.value })} /></Field>
     </div>
   </PageFilterModal>}</QseFilterContext.Provider>;

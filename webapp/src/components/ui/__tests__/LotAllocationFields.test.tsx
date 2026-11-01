@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { LotAllocationFields } from '../LotAllocationFields';
 import type { FIFOLot } from '../../../lib/calc/fifoPositions';
 
-const lotA: FIFOLot = { buyDate: '2026-08-06', buyPrice: 13.66, buyFeeTotal: 0, originalShares: 25, remainingShares: 25, buyId: 'a' };
-const lotB: FIFOLot = { buyDate: '2026-09-08', buyPrice: 12.46, buyFeeTotal: 0, originalShares: 16, remainingShares: 16, buyId: 'b' };
+const lotA: FIFOLot = { buyDate: '2026-08-06', buyPrice: 13.66, buyFeeTotal: 0, originalShares: 25, remainingShares: 25, buyId: 'a', lifecycleId: 'QIBK#1' };
+const lotB: FIFOLot = { buyDate: '2026-09-08', buyPrice: 12.46, buyFeeTotal: 0, originalShares: 16, remainingShares: 16, buyId: 'b', lifecycleId: 'QIBK#1' };
 
 // README Pending item 143 (closed 2026-09-19): manual multi-lot Specific
 // Identification UI, the first wiring of `Transaction.lotAllocations`

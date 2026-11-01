@@ -15,8 +15,7 @@ import { StatSourceBadge } from '../../../components/StatSourceBadge';
 import { toast } from '../../../components/Toast';
 import { Tooltip } from '../../../components/Tooltip';
 import { useSortableRows } from '../../../hooks/useSortableRows';
-import { breakEvenPrice, getDailyPriceHistory, getMarketPrice } from '../../../lib/calc';
-import { perShareCommission } from '../../../lib/calc/partialTradeStrategy';
+import { getDailyPriceHistory } from '../../../lib/calc';
 import { fmt, fmtMoney, fmtQSEPrice, qsePriceStep } from '../../../lib/format';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { shortenCompanyName } from '../../../lib/shortenName';
@@ -27,12 +26,11 @@ import { useQSEStockData } from '../hooks/useQSEStockData';
 type SortCol = 'ticker' | 'shares' | 'avgCost' | 'market' | 'value' | 'net' | 'status';
 
 function OpenPositionsTable({ onSelect }: { onSelect: (ticker: string) => void }) {
-  const { workbook, positions, calcFee } = useQSEDerived();
+  const { workbook, rows: valuationRows } = useQSEDerived();
   const { tickerNames } = useQSEStockData();
   const setMarketPrice = useWorkbookStore((s) => s.setMarketPrice);
   const ensureSignedIn = useEnsureSignedIn();
   const currency = workbook.settings.currency;
-  const { feePct, tick } = workbook.settings;
 
   // Merges what used to be a separate "Exit Board" (break-even / +1% / +2%
   // / +5% exit targets, status) directly into the holdings table — same
@@ -40,21 +38,14 @@ function OpenPositionsTable({ onSelect }: { onSelect: (ticker: string) => void }
   // duplication worth removing.
   const rows = useMemo(
     () =>
-      positions
-        .filter((p) => p.shares > 0)
-        .map((p) => {
-          const mp = getMarketPrice(p.ticker, workbook.marketPrices, workbook.transactions);
+      valuationRows
+        .filter((row) => row.shares > 0)
+        .map((row) => {
+          const mp = row.marketPrice;
           const hasMarket = mp > 0;
-          const avgCost = p.invested / p.shares;
-          const gross = hasMarket ? mp * p.shares : 0;
-          const sellFee = hasMarket ? calcFee(gross, false) : 0;
-          const net = hasMarket ? gross - sellFee - p.invested : NaN;
-          const netPct = hasMarket && p.invested > 0 ? (net / p.invested) * 100 : NaN;
-          const be = breakEvenPrice(p.invested, p.shares, feePct, tick, calcFee);
-          const target = (pct: number) => breakEvenPrice(p.invested * (1 + pct / 100), p.shares, feePct, tick, calcFee);
-          const sparkData = getDailyPriceHistory(p.ticker, workbook.priceHistory).map((pt) => pt.price);
-          const rt = hasMarket ? perShareCommission(mp, calcFee) : null;
-
+          const sparkData = getDailyPriceHistory(row.ticker, workbook.priceHistory).map((pt) => pt.price);
+          const net = row.profit;
+          const netPct = row.roiPct;
           let statusRank: number;
           let statusLabel: string;
           let statusClass: string;
@@ -62,19 +53,34 @@ function OpenPositionsTable({ onSelect }: { onSelect: (ticker: string) => void }
             statusRank = 3; statusLabel = 'PRICE NEEDED'; statusClass = '';
           } else if (net >= 0) {
             statusRank = 0; statusLabel = 'EXIT READY'; statusClass = 'pill-positive';
-          } else if ((net / p.invested) * 100 > -3) {
+          } else if ((net / row.invested) * 100 > -3) {
             statusRank = 1; statusLabel = 'WATCH'; statusClass = '';
           } else {
             statusRank = 2; statusLabel = 'HOLD / REVIEW'; statusClass = 'pill-negative';
           }
 
           return {
-            ticker: p.ticker, shares: p.shares, invested: p.invested, avgCost, mp, hasMarket, sparkData, value: gross,
-            be, net, netPct, rt, t1: target(1), t2: target(2), t3: target(5),
-            statusRank, statusLabel, statusClass,
+            ticker: row.ticker,
+            shares: row.shares,
+            invested: row.invested,
+            avgCost: row.avgCost,
+            mp,
+            hasMarket,
+            sparkData,
+            value: row.value,
+            be: row.breakEvenPrice,
+            net,
+            netPct,
+            rt: row.perShareCommission,
+            t1: row.target1Pct,
+            t2: row.target2Pct,
+            t3: row.target5Pct,
+            statusRank,
+            statusLabel,
+            statusClass,
           };
         }),
-    [positions, workbook.marketPrices, workbook.transactions, workbook.priceHistory, calcFee, feePct, tick],
+    [valuationRows, workbook.priceHistory],
   );
 
   const sortValue = (r: (typeof rows)[number], col: SortCol): number | string => {

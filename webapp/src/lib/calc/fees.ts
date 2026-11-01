@@ -66,3 +66,21 @@ export function requiredSellPrice(
 ): number {
   return breakEvenPrice(costBasis + targetProfit, shares, feePct, tick, calcFee);
 }
+
+
+/**
+ * Accurate per-share buy/sell commission estimate at the current price.
+ * Actual fee calculators round billed fees to cents, so a one-share estimate
+ * for a low-priced stock can round to 0.00. Scale to 1,000 hypothetical
+ * shares and divide back down to retain precision without changing the
+ * real transaction fee. PSX price-tiering is preserved because amount and
+ * shares scale together, leaving the derived per-share price unchanged.
+ */
+export function perShareCommission(currentPrice: number, calcFee: FeeCalculator): { buy: number; sell: number } {
+  if (currentPrice <= 0) return { buy: 0, sell: 0 };
+  const shares = 1000;
+  return {
+    buy: calcFee(currentPrice * shares, true, { shares }) / shares,
+    sell: calcFee(currentPrice * shares, false, { shares }) / shares,
+  };
+}

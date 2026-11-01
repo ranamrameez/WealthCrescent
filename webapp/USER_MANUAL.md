@@ -176,7 +176,7 @@ screen) as a spreadsheet file. On the stock page, the transaction/history filter
 
 ## 6. Transactions
 
-QSE and PSX trades use a persisted global accounting order that can differ from their recorded trade dates. Moving a trade changes its accounting position, not the trade date. Each ticker's `perTickerIndex` is synchronized from the global order. The combined cash ledger still orders mixed trades, transfers, and adjustments by effective date; it does not yet share one global event order across all three event types.
+QSE and PSX use one persisted same-day accounting sequence across trades, cash transfers, rewards/adjustments and dividends. The sequence is shared across event types, so a trade can be moved before or after a same-day deposit, withdrawal, reward or dividend. Use the existing row arrows; the date and transaction identity remain unchanged, and the affected calculations and cash ledger are rebuilt from the corrected order. In QSE, turn on **Modify** to reveal the arrows; PSX shows its row arrows beside the records. The Batch Editor does not change sequence. Fees remain part of their owning trade or transfer event and move with that event.
 
 
 The Transactions page has several sections. Each one is a collapsible card, and the chip row
@@ -248,8 +248,9 @@ or **Modify**. Modify reveals editing, deletion and eligible reorder controls; e
 a ledger event updates its original trade, transfer or adjustment. Linked transfers
 follow the existing linked-record editing flow.
 When modification controls appear, **Actions** is the last column, after Balance.
-Batch Editor also places its reorder/delete controls in the last Actions column
-and opens above the popup or fullscreen table that launched it.
+Use the row arrows beside a transaction to change its shared same-day sequence; the
+Batch Editor is for editing record fields and does not reorder events. It opens above
+the popup or fullscreen table that launched it.
 
 Click a data row to see its full source details, including values hidden or shortened
 in the table. You can also focus the row and press Enter or Space. Links, buttons and

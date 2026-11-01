@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { QseRecordActions } from '../QseTableActions';
+import { QseRecordActions, QseReorder } from '../QseTableActions';
 import { useWorkbookStore } from '../../../../store/workbookStore';
 import { createEmptyWorkbook } from '../../../../store/defaultWorkbook';
 import { useInterEntityTransfersStore } from '../../../../store/interEntityTransfersStore';
@@ -77,14 +77,35 @@ it('exports the filtered records separately from all table records', async () =>
   expect(contents[1]).toContain('SELL');
   click.mockRestore();
 });
-it('persists sequence changes made with the batch reorder controls', async () => {
-  useWorkbookStore.getState().updateTransaction(1, { date: '2026-10-01', action: 'BUY' });
-  render(<QseRecordActions kind="transactions" rows={useWorkbookStore.getState().workbook.transactions} modifying={false} onModify={() => {}} />);
-  batch();
-  fireEvent.click(screen.getByRole('button', { name: 'Move row 1 down' }));
-  fireEvent.click(screen.getByText('Save all changes'));
-  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-  expect(useWorkbookStore.getState().workbook.transactions.find(row => row.id === 'buy')).toMatchObject({ globalTransactionIndex: 2, perTickerIndex: 2, seq: 2 });
+it('keeps the batch editor sequence read-only instead of offering an isolated reorder control', () => {
+  show(); batch();
+  // Reordering is provided by the existing table-row arrows, not the batch editor.
+  expect(screen.queryByRole('button', { name: /Move row/ })).toBeNull();
+});
+it('uses the existing row arrows to reorder a trade with a same-day transfer', async () => {
+  const workbook = createEmptyWorkbook();
+  workbook.transactions = [{
+    id: 'trade', date: '2026-10-01', ticker: 'QNBK', action: 'BUY', shares: 10, price: 12,
+    accountingOrder: 2, globalTransactionIndex: 1, transactionIndex: 1, perTickerIndex: 1, seq: 1,
+  }];
+  workbook.transfers = [{
+    id: 'transfer', date: '2026-10-01', type: 'DEPOSIT', gross: 100, fee: 0, accountingOrder: 1, seq: 1,
+  }];
+  useWorkbookStore.setState({ workbook });
+  render(
+    <>
+      <QseReorder kind="transactions" row={workbook.transactions[0]} />
+      <QseReorder kind="transfers" row={workbook.transfers[0]} />
+    </>,
+  );
+  const enabledMoveUp = screen
+    .getAllByRole('button', { name: /Move up — shares the same date/ })
+    .find(button => !button.hasAttribute('disabled'));
+  expect(enabledMoveUp).toBeDefined();
+  fireEvent.click(enabledMoveUp!);
+  await waitFor(() => expect(useWorkbookStore.getState().workbook.transactions[0].accountingOrder).toBe(1));
+  expect(useWorkbookStore.getState().workbook.transfers[0].accountingOrder).toBe(2);
+  expect(useWorkbookStore.getState().workbook.transactions[0].date).toBe('2026-10-01');
 });
 it('locks linked transfers in the batch editor', () => {
   const transfer = { id: 'transfer', date: '2026-10-01', type: 'DEPOSIT' as const, gross: 100, fee: 0, seq: 1 };
@@ -96,16 +117,16 @@ it('locks linked transfers in the batch editor', () => {
   expect(screen.queryByLabelText('Row 1, Gross')).toBeNull();
   expect(screen.queryByRole('button', { name: 'Delete row 1' })).toBeNull();
 });
-it('assigns added rows a sequence beyond records hidden by the filter', async () => {
-  useWorkbookStore.getState().updateTransaction(1, { globalTransactionIndex: 100 });
+it('assigns added rows the next shared sequence after same-day records hidden by the filter', async () => {
   show(); batch();
   fireEvent.click(screen.getByRole('button', { name: 'Add row' }));
+  fireEvent.change(screen.getByLabelText('Row 2, Date'), { target: { value: '2026-10-02' } });
   fireEvent.change(screen.getByLabelText('Row 2, Ticker'), { target: { value: 'qibk' } });
   fireEvent.change(screen.getByLabelText('Row 2, Shares'), { target: { value: '3' } });
   fireEvent.change(screen.getByLabelText('Row 2, Price'), { target: { value: '8' } });
   fireEvent.click(screen.getByText('Save all changes'));
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-  expect(useWorkbookStore.getState().workbook.transactions.find(row => row.ticker === 'QIBK')).toMatchObject({ globalTransactionIndex: 101, perTickerIndex: 1, seq: 1, shares: 3 });
+  expect(useWorkbookStore.getState().workbook.transactions.find(row => row.ticker === 'QIBK')).toMatchObject({ accountingOrder: 2, globalTransactionIndex: 3, perTickerIndex: 1, seq: 1, shares: 3, date: '2026-10-02' });
 });
 it('imports mixed ledger records into their owning collections and skips duplicate trades', async () => {
   const rows = useWorkbookStore.getState().workbook.transactions.map(row => ({ ...row, id: row.id!, kind: 'trade' as const }));
@@ -159,4 +180,33 @@ it('warns about rounded Excel figures before import confirmation and lets the us
   fireEvent.change(input, { target: { files: [file] } });
   await waitFor(() => expect(useWorkbookStore.getState().workbook.transactions).toHaveLength(3));
   expect(vi.mocked(confirmDialog).mock.calls.map(call => call[1])).toEqual(['Warning: rounded statement figures', 'Import QSE transactions?']);
+});
+it('imports statement sequence and price corrections while keeping precise rewards and repeated imports unchanged', async () => {
+  const wb = createEmptyWorkbook();
+  wb.transactions = [{ id: 'buy', date: '2026-11-01', ticker: 'MARK', action: 'BUY', shares: 10, price: 1.8, feeOverride: 0.02 }, { id: 'sale', date: '2026-11-01', ticker: 'MARK', action: 'SELL', shares: 10, price: 1.836 }];
+  wb.adjustments = [{ id: 'reward', date: '2026-11-01', amount: 0.34, note: 'Trading Reward' }];
+  useWorkbookStore.setState({workbook:wb});
+  const {container} = render(<QseRecordActions kind="ledger" rows={[]} modifying={false} onModify={() => {}} />);
+  const file = new File([], 'statement.csv');
+  Object.defineProperty(file, 'text', {value:async()=>toCSV([
+    ['Date','Type','Count','Unit','Price','Amount'],
+    ['01/11/2026','Buy',10,'Rayyan B',1.8,-18],
+    ['01/11/2026','Sell',10,'Rayyan B',1.835,18],
+    ['01/11/2026','Trading Reward','','','',0],
+    ['02/11/2026','Trading Reward','','','',40],
+  ])});
+  const input = container.querySelector('input[type=file]')!;
+  fireEvent.change(input,{target:{files:[file]}});
+  await waitFor(()=>expect(useWorkbookStore.getState().workbook.transactions.find(r=>r.id==='sale')?.price).toBe(1.835));
+  const after = structuredClone(useWorkbookStore.getState().workbook);
+  expect(after.transactions).toHaveLength(2);
+  expect(after.transactions.find(r=>r.id==='buy')).toMatchObject({accountingOrder:1,feeOverride:0.02});
+  expect(after.transactions.find(r=>r.id==='sale')).toMatchObject({accountingOrder:2});
+  expect(after.adjustments).toHaveLength(1);
+  expect(after.adjustments[0]).toMatchObject({id:'reward',amount:0.34,accountingOrder:3});
+  vi.mocked(confirmDialog).mockClear();
+  fireEvent.change(input,{target:{files:[file]}});
+  await waitFor(()=>expect(confirmDialog).toHaveBeenCalledTimes(1));
+  await new Promise(resolve=>setTimeout(resolve,20));
+  expect(useWorkbookStore.getState().workbook).toEqual(after);
 });

@@ -1,6 +1,6 @@
 import { create, type UseBoundStore, type StoreApi } from 'zustand';
 import { toInstantMs } from '../lib/datetime';
-import { backfillSeq, nextSeq, nextSeqForEntity, syncTransactionIndexes } from '../lib/seq';
+import { backfillSeq, nextSeq, nextSeqForEntity, syncAccountingEventCollections, syncTransactionIndexes, type AccountingEventOrderPair, type AccountingEventKind } from '../lib/seq';
 import type { Adjustment, BrokerPortfolioData, BrokerProfile, Dividend, PricePoint, Transaction, TradePlan, Transfer, WatchlistItem } from '../types/workbook';
 import { scheduleLocalStorageWrite } from '../lib/localStoragePersistence';
 
@@ -33,6 +33,7 @@ export interface WorkbookStoreState<TWorkbook extends BaseWorkbook<unknown>> {
   addTransactions: (txs: Transaction[]) => void;
   updateTransaction: (index: number, patch: Partial<Transaction>) => void;
   deleteTransaction: (index: number) => void;
+  reorderAccountingEvents: (pair: AccountingEventOrderPair) => void;
   addTransfer: (t: Transfer) => void;
   updateTransfer: (id: string, patch: Partial<Transfer>) => void;
   deleteTransfer: (id: string) => void;
@@ -133,14 +134,18 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
     const adjustmentsWithId = wb.adjustments.map((a) => ({ ...a, ...(shouldMigrateLegacy && migrationProfile?.id ? { brokerId: migrationProfile.id } : a.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), ...(a.id ? {} : { id: crypto.randomUUID() }) }));
     const dividendsWithId = wb.dividends.map((d) => ({ ...d, ...(shouldMigrateLegacy && migrationProfile?.id ? { brokerId: migrationProfile.id } : d.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), ...(d.id ? {} : { id: crypto.randomUUID() }) }));
     const plansWithId = wb.tradePlans.map((p) => ({ ...p, ...(shouldMigrateLegacy && migrationProfile?.id ? { brokerId: migrationProfile.id } : p.brokerId || !activeBrokerId ? {} : { brokerId: activeBrokerId }), id: p.id || crypto.randomUUID(), legs: p.legs || [] }));
-    const normalized = {
-      ...wb,
-      ...(profiles.length ? { brokerProfiles, activeBrokerId } : {}),
-      ...(profiles.length ? { brokerMigrationVersion: 1 } : {}),
+    const accountingOrdered = syncAccountingEventCollections({
       transactions: syncedTransactions,
       transfers: backfillSeq(transfersWithId, chronologicalByInstant(transfersWithId)),
       adjustments: backfillSeq(adjustmentsWithId, chronologicalByInstant(adjustmentsWithId)),
       dividends: backfillSeq(dividendsWithId, chronologicalByInstant(dividendsWithId)),
+    });
+    const normalized = {
+      ...wb,
+      ...(profiles.length ? { brokerProfiles, activeBrokerId } : {}),
+      ...(profiles.length ? { brokerMigrationVersion: 1 } : {}),
+      ...accountingOrdered,
+      transactions: syncTransactionIndexes(accountingOrdered.transactions),
       tradePlans: plansWithId,
     } as TWorkbook;
     // Route every record into the profile named by its brokerId. This is
@@ -177,10 +182,11 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
         existing.tradePlans.map((item) => ({ ...item, brokerId: item.brokerId ?? profile.id })),
         normalized.tradePlans.filter((item) => item.brokerId === profile.id),
       );
+      const accountingOrdered = syncAccountingEventCollections({ transactions, transfers, adjustments, dividends });
       return {
         ...profile,
         ...(profile.id === normalized.activeBrokerId ? { settings: normalized.settings } : {}),
-        data: { transactions, transfers, adjustments, dividends, tradePlans },
+        data: { ...accountingOrdered, transactions: syncTransactionIndexes(accountingOrdered.transactions), tradePlans },
       };
     });
     const active = profilesWithData.find((profile) => profile.id === normalized.activeBrokerId);
@@ -234,8 +240,21 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
           : profile),
       };
     };
+    const syncProfileEventOrders = (wb: TWorkbook): TWorkbook => ({
+      ...wb,
+      ...(wb.brokerProfiles?.length ? {
+        brokerProfiles: wb.brokerProfiles.map(profile => {
+          if (!profile.data) return profile;
+          const ordered = syncAccountingEventCollections(profile.data);
+          return { ...profile, data: { ...profile.data, ...ordered, transactions: syncTransactionIndexes(ordered.transactions) } };
+        }),
+      } : {}),
+    });
     const mutate = (updater: (wb: TWorkbook) => TWorkbook) => {
-      const next = snapshotActiveProfile(updater(get().workbook));
+      const mutated = updater(get().workbook);
+      const ordered = syncAccountingEventCollections(mutated);
+      const withTradeIndexes = { ...mutated, ...ordered, transactions: syncTransactionIndexes(ordered.transactions) };
+      const next = syncProfileEventOrders(snapshotActiveProfile(withTradeIndexes));
       set({ workbook: next });
       persist(next);
     };
@@ -270,6 +289,33 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
       }),
       updateTransaction: (index, patch) => mutate((wb) => ({ ...wb, transactions: syncTransactionIndexes(wb.transactions.map((t, i) => (i === index ? { ...t, ...patch } : t))) })),
       deleteTransaction: (index) => mutate((wb) => ({ ...wb, transactions: syncTransactionIndexes(wb.transactions.filter((_, i) => i !== index)) })),
+      reorderAccountingEvents: (pair) => mutate((wb) => {
+        const [first, second] = pair;
+        if (first.kind === second.kind && first.id === second.id) return wb;
+        const findRecord = (kind: AccountingEventKind, id: string) => {
+          const records = kind === 'trade' ? wb.transactions
+            : kind === 'transfer' ? wb.transfers
+              : kind === 'adjustment' ? wb.adjustments : wb.dividends;
+          return records.find(record => record.id === id);
+        };
+        const a = findRecord(first.kind, first.id);
+        const b = findRecord(second.kind, second.id);
+        if (!a || !b || a.date !== b.date) return wb;
+        if (a.accountingOrder !== first.order || b.accountingOrder !== second.order) return wb;
+        const swap = <T extends { id?: string; accountingOrder?: number }>(records: T[], kind: AccountingEventKind): T[] =>
+          records.map(record => {
+            if (kind === first.kind && record.id === first.id) return { ...record, accountingOrder: second.order };
+            if (kind === second.kind && record.id === second.id) return { ...record, accountingOrder: first.order };
+            return record;
+          });
+        return {
+          ...wb,
+          transactions: syncTransactionIndexes(swap(wb.transactions, 'trade')),
+          transfers: swap(wb.transfers, 'transfer'),
+          adjustments: swap(wb.adjustments, 'adjustment'),
+          dividends: swap(wb.dividends, 'dividend'),
+        };
+      }),
       addTransfer: (t) => mutate((wb) => {
         const withId = t.id ? t : { ...t, id: crypto.randomUUID() };
         const brokerId = withId.brokerId ?? wb.activeBrokerId;

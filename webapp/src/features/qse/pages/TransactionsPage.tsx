@@ -26,9 +26,7 @@ import { LotAllocationFields } from '../../../components/ui/LotAllocationFields'
 import { useSortableRows } from '../../../hooks/useSortableRows';
 import { usePageFabActions } from '../../../hooks/usePageFabActions';
 import { fmt, fmtMoney, fmtQSEPrice } from '../../../lib/format';
-import { closedPLBySellTxId, computeClosedTrades, type LotMatchOrder } from '../../../lib/calc/closedTrades';
-import { computeAveragePLBySellTxId } from '../../../lib/calc/realizedPL';
-import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
+import { computeFIFOPositions } from '../../../lib/calc/fifoPositions';
 import { tradePriceDeviationPct, validateTransactionEdit, validateSellQuantities } from '../../../lib/calc/tradeValidation';
 import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
 import { transferRunningBalance } from '../../../lib/calc/transferBalance';
@@ -38,7 +36,6 @@ import { IconButton } from '../../../components/ui/IconButton';
 import { TimeZoneFields } from '../../../components/ui/TimeZoneFields';
 import { defaultTimeForDate, defaultTimezoneForCurrency, defaultTimezoneForMarket, nowTime } from '../../../lib/datetime';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
-import { ReorderButtons } from '../../../components/ui/ReorderButtons';
 import { PendingToggle } from '../../../components/ui/PendingToggle';
 import { toInstantMs } from '../../../lib/datetime';
 import { createEmptyWorkbook } from '../../../store/defaultWorkbook';
@@ -296,7 +293,7 @@ function groupKey(tx: Transaction, groupBy: GroupBy): string {
 function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } = {}) {
   const pageFilters = useQseFilters();
   const [modifying, setModifying] = useState(false);
-  const { workbook, calcFee, positions } = useQSEDerived();
+  const { workbook, calcFee, positions, closedTrades, realizedBySellTxId: sellPLById, sellReconciliationByTxId, lots } = useQSEDerived();
   const deleteTransaction = useWorkbookStore((s) => s.deleteTransaction);
   const updateTransaction = useWorkbookStore((s) => s.updateTransaction);
   const ensureSignedIn = useEnsureSignedIn();
@@ -309,12 +306,8 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   const [editRow, setEditRow] = useState<Transaction | null>(null);
   const [detailTx, setDetailTx] = useState<Transaction | null>(null);
   const [sourceEditRequest, setSourceEditRequest] = useState<QseRow | null>(null);
-  // User-reported (2026-09-13): the flat 0.275% fee never depends on which
-  // lot a sale is later attributed to, so FIFO's "oldest lot first" is a
-  // pure reporting convention here, not a real constraint — offer the
-  // cheapest-lot-first alternative as a second, explicitly comparison-only
-  // view (see `closedTrades.ts`'s own `LotMatchOrder` doc comment).
-  const ctMatchOrder: LotMatchOrder = workbook.settings.costBasisMethod === 'lowestCostFirst' ? 'lowestCostFirst' : 'fifo';
+  // Closed-trade attribution, open lots and row-level realized P/L all come
+  // from the same selected-method calculation returned by useQSEDerived.
 
   // Pending item 143: manual lot allocation for the inline edit-row SELL
   // form — same gate as `TransactionRows`' add-row copy above. Lots are
@@ -387,15 +380,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   // FIFO matching, with its own buy price/sell price/fees/net P&L, entirely
   // independent of the aggregate position calc (computeClosedTrades never
   // feeds back into computePositions).
-  const closedTrades = useMemo(
-    () =>
-      computeClosedTrades(
-        workbook.transactions,
-        calcFee,
-        ctMatchOrder,
-      ),
-    [workbook.transactions, calcFee, ctMatchOrder],
-  );
+  const methodClosedTrades = closedTrades;
   type CTCol = 'ticker' | 'buyDate' | 'buyPrice' | 'sellDate' | 'sellPrice' | 'shares' | 'buyFee' | 'sellFee' | 'netPL' | 'holdingDays';
   const ctSortValue = (t: (typeof closedTrades)[number], col: CTCol): number | string => {
     switch (col) {
@@ -411,23 +396,19 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
       default: return t.buyDate;
     }
   };
-  const { sorted: sortedClosedTrades, Th: CTTh, dateSort: closedDateSort } = useSortableRows(closedTrades.filter(row => (filterTicker === 'ALL' || row.ticker === filterTicker) && filterAction !== 'BUY' && matchesQseFilters({ date: row.sellDate, ticker: row.ticker, action: 'SELL' }, pageFilters)), ctSortValue, 'sellDate', 'desc');
+  const { sorted: sortedClosedTrades, Th: CTTh, dateSort: closedDateSort } = useSortableRows(methodClosedTrades.filter(row => (filterTicker === 'ALL' || row.ticker === filterTicker) && filterAction !== 'BUY' && matchesQseFilters({ date: row.sellDate, ticker: row.ticker, action: 'SELL' }, pageFilters)), ctSortValue, 'sellDate', 'desc');
 
   // User's own ask (2026-09-08): "show the sold price and PL w.r.t. that
   // lot's buy price... inline in the main trade row." Computed from the
   // WHOLE workbook before display filters are applied so
   // a row's own P&L figure never changes just because the ticker filter is
-  // narrowed to something else. Shares `ctMatchOrder` with the Closed Trades
+  // narrowed to something else. Shares the selected cost-basis method with the Closed Trades
   // table above (2026-09-13) — a feature rolled out to one view of a sell's
   // realized P&L must stay consistent with every other view of the same
   // number, or this row's own pill and the table below could show two
   // contradicting figures for the identical sell.
-  const sellPLById = useMemo(
-    () => (workbook.settings.costBasisMethod === 'average' || !workbook.settings.costBasisMethod)
-      ? computeAveragePLBySellTxId(workbook.transactions, calcFee)
-      : closedPLBySellTxId(computeClosedTrades(workbook.transactions, calcFee, ctMatchOrder)),
-    [workbook.transactions, workbook.settings.costBasisMethod, calcFee, ctMatchOrder],
-  );
+  // Row-level SELL P/L is the same per-sell result used by the closed-trade view.
+  // It is computed once in the shared stock calculation engine.
 
   // User's own words: "make separate sections for open and closed trades...
   // it gets difficult to know the sold status and price of a lot." Same
@@ -438,17 +419,11 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   // of the lot-based methods) so this page's own reporting view never
   // silently changes shape depending on that setting. Shares
   // `ctMatchOrder` with Closed trades below (2026-09-13, see
-  // `LotMatchOrder`'s own doc comment) so the two tables always add up to
+  // selected-method calculation) so the two tables always add up to
   // the same picture of which lots are still open vs. already sold.
-  const openLots = useMemo(() => {
-    const txs = workbook.transactions;
-    const { lotsByTicker } = computeFIFOPositions(txs, calcFee, ctMatchOrder);
-    const flat: (FIFOLot & { ticker: string })[] = [];
-    for (const [ticker, lots] of Object.entries(lotsByTicker)) {
-      for (const lot of lots) flat.push({ ticker, ...lot });
-    }
-    return flat;
-  }, [workbook.transactions, calcFee, ctMatchOrder]);
+  const openLots = useMemo(() => Object.entries(lots).flatMap(([ticker, tickerLots]) =>
+    tickerLots.map(lot => ({ ticker, ...lot })),
+  ), [lots]);
   type OLCol = 'ticker' | 'buyDate' | 'buyPrice' | 'shares' | 'invested' | 'buyFeeTotal';
   const olSortValue = (l: (typeof openLots)[number], col: OLCol): number | string => {
     switch (col) {
@@ -499,7 +474,6 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   };
 
   const setWorkbook = useWorkbookStore((s) => s.setWorkbook);
-  const transactionOrderRows = useMemo(() => [...workbook.transactions].sort((a, b) => (a.globalTransactionIndex ?? a.transactionIndex ?? Number.MAX_SAFE_INTEGER) - (b.globalTransactionIndex ?? b.transactionIndex ?? Number.MAX_SAFE_INTEGER)), [workbook.transactions]);
   const clearAll = async () => {
     const ok = await confirmDialog(
       'This clears all transactions, prices and watchlist entries in this browser.',
@@ -585,7 +559,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
                   </Fragment>
                 ) : (
                   <RecordRow market="qse" onEdit={() => startEdit(i, tx)}    record={{ tx, i }}  key={i}  className="clickable">
-                    <td><DateValue value={tx.date} />{modifying && <span onClick={event => event.stopPropagation()}><QseReorder kind="transactions" row={tx} rows={transactionOrderRows} /></span>}</td>
+                    <td><DateValue value={tx.date} />{modifying && <span onClick={event => event.stopPropagation()}><QseReorder kind="transactions" row={tx}  /></span>}</td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <TickerLogo ticker={tx.ticker} size="sm" exchange="qse" /><Link to={`/stock/${tx.ticker}`}>{tx.ticker}</Link>
                       {tx.isPending && (
@@ -600,6 +574,11 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
                     <td>{fmtMoney(tx.shares * tx.price, currency)}</td>
                     <td className={tx.id && sellPLById[tx.id] ? (sellPLById[tx.id].netPL >= 0 ? 'pill-positive' : 'pill-negative') : undefined}>
                       {tx.id && sellPLById[tx.id] ? fmtMoney(sellPLById[tx.id].netPL, currency) : '—'}
+                      {tx.id && (sellReconciliationByTxId[tx.id]?.unmatchedShares ?? 0) > 0 && (
+                        <div className="text-warning small" title="Unmatched shares have no buy cost in this workbook. Their proceeds are excluded from realized profit; the unmatched sell fee is still expensed.">
+                          Unmatched {fmt(sellReconciliationByTxId[tx.id]?.unmatchedShares ?? 0, 0)} shares · fee {fmtMoney(sellReconciliationByTxId[tx.id]?.unmatchedFee ?? 0, currency)}
+                        </div>
+                      )}
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
                       {modifying && <>{tx.isPending && (
@@ -755,6 +734,9 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
             ...(detailTx.id && sellPLById[detailTx.id]
               ? [{ label: 'Realized P/L', value: fmtMoney(sellPLById[detailTx.id].netPL, currency) }]
               : []),
+            ...(detailTx.id && (sellReconciliationByTxId[detailTx.id]?.unmatchedShares ?? 0) > 0
+              ? [{ label: 'Unmatched shares', value: fmt(sellReconciliationByTxId[detailTx.id]?.unmatchedShares ?? 0, 0) }, { label: 'Unmatched sell fee', value: fmtMoney(sellReconciliationByTxId[detailTx.id]?.unmatchedFee ?? 0, currency) }]
+              : []),
             { label: 'Status', value: detailTx.isPending ? 'Pending (not yet cleared)' : 'Cleared' },
           ]}
         />
@@ -771,11 +753,9 @@ function TransfersSection({ sectionProps }: { sectionProps?: SectionCardProps } 
   const dateSort = useDateTableSort();
   const [modifying, setModifying] = useState(false);
   const workbook = useWorkbookStore((s) => s.workbook);
-  const updateTransfer = useWorkbookStore((s) => s.updateTransfer);
   const deleteTransfer = useWorkbookStore((s) => s.deleteTransfer);
   const currency = workbook.settings.currency;
   const links = useInterEntityTransfersStore((s) => s.workbook.entries);
-  const ensureSignedIn = useEnsureSignedIn();
   const sideLabel = useLinkSideLabel();
 
   const [editRow, setEditRow] = useState<Transfer | null>(null);
@@ -801,14 +781,9 @@ function TransfersSection({ sectionProps }: { sectionProps?: SectionCardProps } 
     [workbook.transfers, typeFilter, pageFilters],
   );
 
-  // Display direction preserves chronological sequence ties and precomputed balances.
-  const instantOf = (t: Transfer) => toInstantMs(t.date, t.time, t.timezone);
-  const dateSortInput = [...filteredTransfers].sort((a, b) => instantOf(b) - instantOf(a) || (b.seq ?? 0) - (a.seq ?? 0));
+  // Latest dates first; within each date, preserve the shared accounting sequence.
+  const dateSortInput = [...filteredTransfers].sort((a, b) => b.date.localeCompare(a.date) || (a.accountingOrder ?? 0) - (b.accountingOrder ?? 0));
   const sorted = dateSort.rows(dateSortInput, { date: row => row });
-  const reorderTransfer = async (pair: [{ id: string; order: number }, { id: string; order: number }]) => {
-    if (!(await ensureSignedIn('Sign in to reorder transfers.'))) return;
-    for (const p of pair) updateTransfer(p.id, { seq: p.order });
-  };
 
   const page = useQseTablePagination(sorted);
   const startEdit = (t: Transfer) => setEditRow({ ...t });
@@ -835,14 +810,7 @@ function TransfersSection({ sectionProps }: { sectionProps?: SectionCardProps } 
                 <RecordRow market="qse" onEdit={() => startEdit(t)}    record={t}  key={t.id}>
                   <td>
                     <DateValue value={t.date} />{' '}
-                    {modifying && <ReorderButtons
-                      rows={sorted}
-                      index={sorted.findIndex(row => row.id === t.id)}
-                      instantOf={instantOf}
-                      idOf={(row) => row.id}
-                      orderOf={(row) => row.seq}
-                      onMove={reorderTransfer}
-                    />}
+                    {modifying && <QseReorder kind="transfers" row={t} />}
                   </td>
                   <td>
                     {t.type}
@@ -886,7 +854,7 @@ function AdjustmentsSection({ sectionProps }: { sectionProps?: SectionCardProps 
   const updateAdjustment = useWorkbookStore((s) => s.updateAdjustment);
   const deleteAdjustment = useWorkbookStore((s) => s.deleteAdjustment);
   const currency = workbook.settings.currency;
-  const indexed = workbook.adjustments.map((a, i) => ({ a, i })).filter(row => matchesQseFilters(row.a, pageFilters));
+  const indexed = workbook.adjustments.map((a, i) => ({ a, i })).sort((a, b) => b.a.date.localeCompare(a.a.date) || (a.a.accountingOrder ?? 0) - (b.a.accountingOrder ?? 0)).filter(row => matchesQseFilters(row.a, pageFilters));
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [editRow, setEditRow] = useState<Adjustment | null>(null);
 
@@ -895,7 +863,7 @@ function AdjustmentsSection({ sectionProps }: { sectionProps?: SectionCardProps 
     switch (col) {
       case 'amount': return r.a.amount;
       case 'note': return r.a.note ?? '';
-      default: return `${toInstantMs(r.a.date, r.a.time, r.a.timezone)} ${String(r.a.seq ?? 0).padStart(12, '0')}`;
+      default: return `${toInstantMs(r.a.date, r.a.time, r.a.timezone)} ${String(r.a.accountingOrder ?? 0).padStart(12, '0')}`;
     }
   };
   const { sorted, Th, dateSort } = useSortableRows(indexed, sortValue, 'date', 'desc');
@@ -968,12 +936,12 @@ function CashLedgerSection({ sectionProps }: { sectionProps?: SectionCardProps }
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editRequest, setEditRequest] = useState<QseRow | null>(null);
   const sourceFor = (event: (typeof ledger)[number]): QseRow | undefined => {
-    const collection = event.kind === 'trade' ? workbook.transactions : event.kind === 'transfer' ? workbook.transfers : workbook.adjustments;
+    const collection = event.kind === 'trade' ? workbook.transactions : event.kind === 'transfer' ? workbook.transfers : event.kind === 'dividend' ? workbook.dividends : workbook.adjustments;
     const record = collection.find(row => row.id === event.sourceId);
     return record ? { ...record, id: record.id!, kind: event.kind } : undefined;
   };
-  const dateSortInput = [...ledger].reverse();
-  const sorted = dateSort.rows(dateSortInput, { date: row => ({ ...row, seq: ledger.indexOf(row) }) });
+  const dateSortInput = [...ledger].sort((a, b) => b.date.localeCompare(a.date) || (a.accountingOrder ?? 0) - (b.accountingOrder ?? 0));
+  const sorted = dateSort.rows(dateSortInput, { date: row => ({ ...row, seq: row.accountingOrder ?? 0 }) });
   const filtered = sorted.filter(event => (!filters.kind || event.kind === filters.kind) && matchesQseFilters({ ...event, description: event.label }, filters));
   const page = useQseTablePagination(filtered);
   const sources = (events: typeof ledger) => events.map(sourceFor).filter((row): row is QseRow => !!row);
@@ -984,6 +952,7 @@ function CashLedgerSection({ sectionProps }: { sectionProps?: SectionCardProps }
     if (!(await confirmDialog('This cannot be undone.', 'Delete this ledger record?'))) return;
     const state = useWorkbookStore.getState();
     if (source.kind === 'trade') { const index = state.workbook.transactions.findIndex(row => row.id === source.id); if (index >= 0) state.deleteTransaction(index); }
+    else if (source.kind === 'dividend') { const index = state.workbook.dividends.findIndex(row => row.id === source.id); if (index >= 0) state.removeDividend(index); }
     else { const index = state.workbook.adjustments.findIndex(row => row.id === source.id); if (index >= 0) state.deleteAdjustment(index); }
   };
   return <QseRecordCard dateSort={dateSort} title="Cash ledger" sectionProps={sectionProps} kind="ledger" rows={sources(filtered)} allRecords={sources(sorted)} modifying={modifying} onModify={() => setModifying(value => !value)} editRequest={editRequest} exportData={{ rows: exportRows(filtered), allRows: exportRows(sorted) }}>
@@ -1000,13 +969,13 @@ function CashLedgerSection({ sectionProps }: { sectionProps?: SectionCardProps }
           <td><DateValue value={event.date} />{modifying && source && <QseReorder kind="ledger" row={source} rows={sources(filtered)} />}</td>
           <td className={event.kind === 'trade' ? event.action === 'BUY' ? 'pill-buy' : 'pill-sell' : undefined}>
             <span className="cash-ledger-type">{event.kind === 'trade' && <span className="cash-ledger-direction">{event.action === 'BUY' ? <ArrowRightIcon size={13} /> : <ArrowLeftIcon size={13} />}</span>}
-              {event.kind === 'trade' ? event.action === 'BUY' ? 'Buy' : 'Sell' : event.kind === 'transfer' ? source?.description || (event.action === 'DEPOSIT' ? 'Deposit' : 'Withdrawal') : source?.note || (event.amount >= 0 ? 'Trading reward' : 'Adjustment')}
+              {event.kind === 'trade' ? event.action === 'BUY' ? 'Buy' : 'Sell' : event.kind === 'transfer' ? source?.description || (event.action === 'DEPOSIT' ? 'Deposit' : 'Withdrawal') : event.kind === 'dividend' ? 'Dividend' : source?.note || (event.amount >= 0 ? 'Trading reward' : 'Adjustment')}
               <Tooltip text={info} />
             </span>
           </td>
-          <td className="text-center">{event.kind === 'trade' ? fmt(source?.shares ?? 0, 0) : ''}</td>
-          <td>{event.kind === 'trade' && event.ticker ? <span className="cash-ledger-unit"><TickerLogo ticker={event.ticker} size="sm" exchange="qse" /><Link to={`/stock/${event.ticker}`}>{tickerNames[event.ticker] ? shortenCompanyName(tickerNames[event.ticker]) : event.ticker}</Link></span> : <span className="cash-ledger-unit"><CashIcon size={19} />{workbook.settings.currency === 'QAR' ? 'Riyal' : workbook.settings.currency}</span>}</td>
-          <td className="text-center">{event.kind === 'trade' ? fmtQSEPrice(source?.price ?? 0) : '-'}</td>
+          <td className="text-center">{(event.kind === 'trade' || event.kind === 'dividend') ? fmt(source?.shares ?? 0, 0) : ''}</td>
+          <td>{(event.kind === 'trade' || event.kind === 'dividend') && event.ticker ? <span className="cash-ledger-unit"><TickerLogo ticker={event.ticker} size="sm" exchange="qse" /><Link to={`/stock/${event.ticker}`}>{tickerNames[event.ticker] ? shortenCompanyName(tickerNames[event.ticker]) : event.ticker}</Link></span> : <span className="cash-ledger-unit"><CashIcon size={19} />{workbook.settings.currency === 'QAR' ? 'Riyal' : workbook.settings.currency}</span>}</td>
+          <td className="text-center">{(event.kind === 'trade' || event.kind === 'dividend') ? fmtQSEPrice(source?.price ?? source?.perShare ?? 0) : '-'}</td>
           <td className={event.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(event.amount, workbook.settings.currency)}</td>
           <td>{fmtMoney(event.balance, workbook.settings.currency)}</td>
           {modifying && <td>{source && <><IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => setEditRequest({ ...source })} /><IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => remove(source)} /></>}</td>}

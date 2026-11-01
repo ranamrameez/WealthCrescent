@@ -158,3 +158,41 @@ Design decision: a separate **portfolio-level cash account per currency**, not p
 - Linked transfer picker and save-time currency resolution now use the selected profile's `settings.currency`, not the parent exchange's active/global setting. Profile deposit fees continue to come from that same profile.
 - Funds cash remains a separate portfolio-level per-currency ledger; this is not a shared exchange cash account and does not change QSE/PSX broker ownership.
 - Added tests for distinct QSE/PSX profile currencies in both picker and save-time resolution. CI run [#314](https://github.com/ranamrameez/WealthCrescent/actions/runs/41208426730) passed 138 test files / 1,100 tests, type-check and production build on code head `4841fb6b3b0059738d7d3972804a37662196d869`.
+
+
+## 2026-10-31 — unified stock calculation engine (PR #48; active)
+
+**Branch:** `feat/unified-stock-calculation-engine`  
+**PR:** [#48 — Unify stock calculations, lifecycles, and same-day event ordering](https://github.com/ranamrameez/WealthCrescent/pull/48)
+
+### Implemented on the feature branch
+
+- Added `stockCalculationEngine.ts` as the single stock-accounting pass for Average, FIFO and other supported lot methods. It returns positions, realized series, per-SELL P/L, closed-trade allocations, open lots, lifecycle records and per-SELL unmatched-share/fee reconciliation.
+- Added `portfolioCalculationEngine.ts` as the exchange-level orchestration contract. QSE and PSX derived hooks now consume its result for stock accounting, valuation rows, cash ledger and cash summary. Existing calculation modules are compatibility adapters to the stock engine rather than independent accounting implementations.
+- Position history is processed chronologically. A fully closed ticker position ends its lifecycle; a later BUY opens a new lifecycle with no inherited quantity, cost or FIFO lots. A closed lifecycle is distinct from an individual closed lot/trade.
+- Unmatched SELL shares are reported separately and never receive invented cost basis or realized profit. SELL cash proceeds remain a real cash movement; unmatched SELL fees are allocated proportionally and expensed separately.
+- Added persisted `accountingOrder` across trades, transfers, adjustments and dividends. Existing row-arrow controls use one shared same-day event stream, can move adjacent events across event types, and do not change dates. QSE controls appear in Modify mode; PSX uses its row arrows. Batch edit keeps sequence outside its editable fields.
+- The selected cost-basis method changes cost attribution and dependent P/L/lot/lifecycle outputs, while source transactions, fees, cash ledger movement and market value remain method-independent.
+
+### Validation and remaining review
+
+- Added regression coverage for lifecycle close/reopen, Average/FIFO consistency, method switching, chronological processing, unmatched SELLs and mixed-event same-day reorder.
+- The current PR head must pass the full Actions test suite and type-check/production build before merge. Record the exact successful run and exact head here after CI completes; do not infer success from an earlier commit.
+- Manual browser smoke tests and review of a real backup/export have not been performed in this session. Do not claim those checks passed.
+- No merge to `main` has been performed.
+
+
+## 2026-10-31 — validated unified calculation engine checkpoint
+
+**Validated code commit:** `48fde7820b387ec1c1fa4184bb02dd5600774330`  
+**GitHub Actions run:** [#41242056151](https://github.com/ranamrameez/WealthCrescent/actions/runs/41242056151) — success.
+
+- Type-check and production build passed.
+- Full suite: **142 test files, 1,123 tests passed**.
+- Broker-profile and PSX-fee regression job passed.
+- The central portfolio pipeline now owns average cost, market value, unrealized P/L, break-even, +1%/+2%/+5% exit targets and per-share commission estimates.
+- Shared `positionValuation.ts` is used by live portfolio valuation, the cash-summary fallback and historical P/L snapshots. Historical realized P/L continues to call the same stock engine for each chronological prefix.
+- Same-day reorder arrows now correctly translate the widget's target order into the store's expected pre-move order before the store swaps values. The regression covers the same-day SELL-then-BUY correction and mixed event types.
+- Legacy records without saved `accountingOrder` now use recorded event time before old trade indexes; explicit saved same-day order remains authoritative.
+- The documentation/comment refresh in this commit does not change calculation behavior. Re-run validation on the exact live PR head before merge.
+- Browser smoke tests and real-backup review remain outstanding. PR #48 remains unmerged.

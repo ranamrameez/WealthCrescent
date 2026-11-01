@@ -33,12 +33,28 @@ describe('sortTransactionsChronological', () => {
     expect(synced.every(row => row.transactionIndex === row.globalTransactionIndex && row.seq === row.perTickerIndex)).toBe(true);
   });
 
-  it('uses persisted accounting order across dates, even when it differs from chronology', () => {
+  it('always processes dates chronologically, regardless of legacy global indexes', () => {
     const sorted = sortTransactionsChronological([
       tx({ id: 'later-date', date: '2026-10-27', action: 'BUY', globalTransactionIndex: 1 }),
       tx({ id: 'earlier-date', date: '2026-10-18', action: 'SELL', globalTransactionIndex: 2 }),
     ]);
-    expect(sorted.map(t => t.id)).toEqual(['later-date', 'earlier-date']);
+    expect(sorted.map(t => t.id)).toEqual(['earlier-date', 'later-date']);
+  });
+
+  it('uses the shared same-day accounting order ahead of trade-only compatibility indexes', () => {
+    const sorted = sortTransactionsChronological([
+      tx({ id: 'first-in-old-index', date: '2026-01-01', action: 'BUY', globalTransactionIndex: 1, accountingOrder: 2 }),
+      tx({ id: 'second-in-old-index', date: '2026-01-01', action: 'SELL', globalTransactionIndex: 2, accountingOrder: 1 }),
+    ]);
+    expect(sorted.map(t => t.id)).toEqual(['second-in-old-index', 'first-in-old-index']);
+  });
+
+  it('uses recorded same-day time before legacy global indexes when no shared order exists', () => {
+    const sorted = sortTransactionsChronological([
+      tx({ id: 'later-time', date: '2026-01-01', time: '11:00', action: 'BUY', globalTransactionIndex: 1 }),
+      tx({ id: 'earlier-time', date: '2026-01-01', time: '09:00', action: 'SELL', globalTransactionIndex: 2 }),
+    ]);
+    expect(sorted.map(row => row.id)).toEqual(['earlier-time', 'later-time']);
   });
 
   it('honors globalTransactionIndex over same-instant BUY-before-SELL fallback', () => {
@@ -49,12 +65,12 @@ describe('sortTransactionsChronological', () => {
     expect(sorted.map(t => t.action)).toEqual(['SELL', 'BUY']);
   });
 
-  it('places indexed rows before legacy rows pending migration', () => {
+  it('keeps date chronology ahead of a legacy index while migration is pending', () => {
     const sorted = sortTransactionsChronological([
       tx({ id: 'legacy', date: '2026-01-01' }),
       tx({ id: 'indexed', date: '2026-01-02', globalTransactionIndex: 5 }),
     ]);
-    expect(sorted.map(t => t.id)).toEqual(['indexed', 'legacy']);
+    expect(sorted.map(t => t.id)).toEqual(['legacy', 'indexed']);
   });
 
   it('puts BUY before SELL on an exact instant tie, regardless of seq', () => {

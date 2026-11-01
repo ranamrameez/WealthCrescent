@@ -145,12 +145,14 @@ describe('computeRealizedPLTimeSeries', () => {
     expect(points[0].value).toBeCloseTo(8, 5);
   });
 
-  it('ignores an oversell instead of making the running P/L jump by zero-cost proceeds', () => {
+  it('realizes only the matched portion of an oversell, never the unmatched zero-basis shares', () => {
     const oversell: Transaction[] = [
       { date: '2026-08-24', ticker: 'OVER', action: 'BUY', shares: 10, price: 10, seq: 1 },
       { date: '2026-08-25', ticker: 'OVER', action: 'SELL', shares: 15, price: 10, seq: 2 },
     ];
-    expect(computeRealizedPLTimeSeries(oversell, () => 0)).toHaveLength(0);
+    const points = computeRealizedPLTimeSeries(oversell, () => 0);
+    expect(points).toHaveLength(1);
+    expect(points[0].value).toBeCloseTo(0, 8);
   });
 });
 
@@ -207,14 +209,15 @@ describe('computeAveragePLBySellTxId', () => {
 });
 
 describe('persisted transaction accounting order', () => {
-  it('uses transactionIndex for positions even when the order crosses trade dates', () => {
+  it('processes trade dates chronologically regardless of legacy transactionIndex values', () => {
     const rows: Transaction[] = [
       { id: 'buy-later-date', date: '2026-10-27', ticker: 'ORDER', action: 'BUY', shares: 10, price: 10, transactionIndex: 1 },
       { id: 'sell-earlier-date', date: '2026-10-18', ticker: 'ORDER', action: 'SELL', shares: 10, price: 12, transactionIndex: 2 },
     ];
     const [position] = computePositions(rows, () => 0);
-    expect(position.shares).toBe(0);
-    expect(position.invested).toBe(0);
-    expect(position.realized).toBe(20);
+    expect(position.shares).toBe(10);
+    expect(position.invested).toBe(100);
+    expect(position.realized).toBe(0);
+    expect(position.unmatchedSellShares).toBe(10);
   });
 });
