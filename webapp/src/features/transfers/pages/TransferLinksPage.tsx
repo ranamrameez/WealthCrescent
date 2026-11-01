@@ -38,6 +38,8 @@ interface CurrencyContext {
   bankAccounts: { id: string; currencyCode: string }[];
   qseCurrency: string;
   psxCurrency: string;
+  qseBrokers: { id: string; settings: { currency: string } }[];
+  psxBrokers: { id: string; settings: { currency: string } }[];
   fundsCurrency: string;
   properties: { id: string; currencyCode: string }[];
   loans: { id: string; currencyCode: string }[];
@@ -59,12 +61,12 @@ export function nextUnpaidEmiMonth(loan: EMILoan): number {
  * hook) so it can be called per-row inside a `.map()`, e.g. in a batch
  * transaction list, where the store selectors are read once at the top of
  * the component instead of once per row. */
-function resolveCurrency(cfg: LinkSideConfig, ctx: CurrencyContext): string | null {
+export function resolveCurrency(cfg: LinkSideConfig, ctx: CurrencyContext): string | null {
   switch (cfg.module) {
     case 'cash': return cfg.currencyCode || ctx.cashCurrency;
     case 'bank': return ctx.bankAccounts.find((a) => a.id === cfg.ref)?.currencyCode ?? null;
-    case 'qse': return ctx.qseCurrency;
-    case 'psx': return ctx.psxCurrency;
+    case 'qse': return ctx.qseBrokers.find((broker) => broker.id === cfg.ref)?.settings.currency ?? ctx.qseCurrency;
+    case 'psx': return ctx.psxBrokers.find((broker) => broker.id === cfg.ref)?.settings.currency ?? ctx.psxCurrency;
     // Unlike QSE/PSX, Funds has no single portfolio currency (funds can be
     // added in different currencies) — `defaultCurrency` is a pragmatic
     // stand-in, same simplification the unused `cashSummary`/
@@ -88,15 +90,19 @@ export function useSideCurrency(cfg: LinkSideConfig): string | null {
   const bankAccounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
   const qseCurrency = useWorkbookStore((s) => s.workbook.settings.currency);
   const psxCurrency = usePSXWorkbookStore((s) => s.workbook.settings.currency);
+  const qseBrokers = useWorkbookStore((s) => s.workbook.brokerProfiles ?? []);
+  const psxBrokers = usePSXWorkbookStore((s) => s.workbook.brokerProfiles ?? []);
   const fundsCurrency = useFundsWorkbookStore((s) => s.workbook.settings.defaultCurrency);
   const properties = useRentalsWorkbookStore((s) => s.workbook.settings.properties);
   const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const emiLoans = useEMIWorkbookStore((s) => s.workbook.entries);
   const creditCards = useCreditCardWorkbookStore((s) => s.workbook.cards);
-  return resolveCurrency(cfg, { cashCurrency, bankAccounts, qseCurrency, psxCurrency, fundsCurrency, properties, loans, emiLoans, creditCards });
+  return resolveCurrency(cfg, { cashCurrency, bankAccounts, qseCurrency, psxCurrency, qseBrokers, psxBrokers, fundsCurrency, properties, loans, emiLoans, creditCards });
 }
 
 interface NameContext {
+  qseBrokers: { id: string; name: string; archived?: boolean; deactivated?: boolean }[];
+  psxBrokers: { id: string; name: string; archived?: boolean; deactivated?: boolean }[];
   bankAccounts: { id: string; name: string }[];
   properties: { id: string; name: string }[];
   loans: { id: string; person: string }[];
@@ -115,6 +121,14 @@ interface NameContext {
 function describeSide(cfg: LinkSideConfig, ctx: NameContext): string {
   const base = LINK_MODULE_LABELS[cfg.module];
   switch (cfg.module) {
+    case 'qse': {
+      const name = ctx.qseBrokers.find((p) => p.id === cfg.ref)?.name;
+      return name ? `${base} (${name})` : base;
+    }
+    case 'psx': {
+      const name = ctx.psxBrokers.find((p) => p.id === cfg.ref)?.name;
+      return name ? `${base} (${name})` : base;
+    }
     case 'bank': {
       const name = ctx.bankAccounts.find((a) => a.id === cfg.ref)?.name;
       return name ? `${base} (${name})` : base;
@@ -151,12 +165,14 @@ function describeSide(cfg: LinkSideConfig, ctx: NameContext): string {
  * since it describes the WHOLE link, not just "the other side" relative
  * to this row. */
 export function useLinkSideLabel(): (cfg: LinkSideConfig) => string {
+  const qseBrokers = useWorkbookStore((s) => s.workbook.brokerProfiles ?? []);
+  const psxBrokers = usePSXWorkbookStore((s) => s.workbook.brokerProfiles ?? []);
   const bankAccounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
   const properties = useRentalsWorkbookStore((s) => s.workbook.settings.properties);
   const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
   const emiLoans = useEMIWorkbookStore((s) => s.workbook.entries);
   const creditCards = useCreditCardWorkbookStore((s) => s.workbook.cards);
-  return (cfg: LinkSideConfig) => describeSide(cfg, { bankAccounts, properties, loans, emiLoans, creditCards });
+  return (cfg: LinkSideConfig) => describeSide(cfg, { qseBrokers, psxBrokers, bankAccounts, properties, loans, emiLoans, creditCards });
 }
 
 /** Best-effort "go see the other side" route for a linked transaction's tag
@@ -179,6 +195,8 @@ export function linkTargetPath(cfg: LinkSideConfig): string {
 }
 
 const REF_PICKER_LABELS: Partial<Record<LinkModule, string>> = {
+  qse: 'Broker',
+  psx: 'Broker',
   bank: 'Account',
   rentals: 'Property',
   personalLoans: 'Loan',
@@ -235,6 +253,8 @@ export function SideFields({
   onSubscriptionChange?: (subscriptionId: string, finance?: LinkSideConfig) => void;
   disabled?: boolean;
 }) {
+  const qseBrokers = useWorkbookStore((s) => s.workbook.brokerProfiles ?? []);
+  const psxBrokers = usePSXWorkbookStore((s) => s.workbook.brokerProfiles ?? []);
   const bankAccounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
   const properties = useRentalsWorkbookStore((s) => s.workbook.settings.properties);
   const loans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
@@ -253,6 +273,8 @@ export function SideFields({
       // transaction goes" list (2026-09-03) — same "hide from pickers for
       // new activity, never from totals" rule as `AccountsList`'s own
       // filter; see `BankAccount.isActive`'s own doc comment.
+      case 'qse': return qseBrokers.filter((p) => !p.archived && !p.deactivated).map((p) => ({ id: p.id, label: p.name, currencyCode: p.settings.currency }));
+      case 'psx': return psxBrokers.filter((p) => !p.archived && !p.deactivated).map((p) => ({ id: p.id, label: p.name, currencyCode: p.settings.currency }));
       case 'bank': return bankAccounts.filter((a) => a.isActive !== false).map((a) => ({ id: a.id, label: `${a.name} (${a.currencyCode})`, currencyCode: a.currencyCode }));
       // Same archived-hiding rule extended to every other linkable entity
       // list with its own `isActive` flag (2026-09-03) — see each type's
@@ -264,11 +286,19 @@ export function SideFields({
       default: return [];
     }
   };
-  const hasRefPicker = cfg.module === 'bank' || cfg.module === 'rentals' || cfg.module === 'personalLoans' || cfg.module === 'emi' || cfg.module === 'creditCard';
+  const hasRefPicker = cfg.module === 'qse' || cfg.module === 'psx' || cfg.module === 'bank' || cfg.module === 'rentals' || cfg.module === 'personalLoans' || cfg.module === 'emi' || cfg.module === 'creditCard';
   const activeEntities = entitiesForModule(cfg.module);
   const selectedHistoricalEntity = (() => {
     if (!disabled || !cfg.ref || activeEntities.some((entity) => entity.id === cfg.ref)) return undefined;
     switch (cfg.module) {
+      case 'qse': {
+        const profile = qseBrokers.find((item) => item.id === cfg.ref);
+        return profile ? { id: profile.id, label: profile.name, currencyCode: profile.settings.currency } : undefined;
+      }
+      case 'psx': {
+        const profile = psxBrokers.find((item) => item.id === cfg.ref);
+        return profile ? { id: profile.id, label: profile.name, currencyCode: profile.settings.currency } : undefined;
+      }
       case 'bank': {
         const account = bankAccounts.find((item) => item.id === cfg.ref);
         return account ? { id: account.id, label: `${account.name} (${account.currencyCode})`, currencyCode: account.currencyCode } : undefined;

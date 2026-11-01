@@ -12,7 +12,7 @@ describe('Investment balance scopes', () => {
       { id: 'pending', ticker: 'A', action: 'BUY', date: '2026-09-01', shares: 2, price: 11, isPending: true },
       { id: 'other', ticker: 'B', action: 'BUY', date: '2026-09-01', shares: 100, price: 100 },
     ]} plans={[{ id: 'plan', name: 'Planned sell', createdAt: '', legs: [{ ticker: 'A', action: 'SELL', shares: 1, price: 12, date: '2026-09-25' }] }]} />);
-    const actual = container.querySelector('.account-summary-card-balance')! as HTMLElement;
+    const actual = [...container.querySelectorAll('.current-position-section')].find(group => group.querySelector('h4')?.textContent === 'Holdings value')! as HTMLElement;
     expect(within(actual).getByText('100.00 QAR')).toBeTruthy();
     expect(within(actual).getByText('120.00 QAR')).toBeTruthy();
     expect(container.textContent).toContain('130.00 QAR');

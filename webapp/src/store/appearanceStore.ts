@@ -58,6 +58,7 @@ function persist(a: Appearance) {
 interface AppearanceState {
   appearance: Appearance;
   update: (patch: Partial<Appearance>) => void;
+  resetToDefaults: () => void;
 }
 
 export const useAppearanceStore = create<AppearanceState>((set, get) => ({
@@ -66,6 +67,13 @@ export const useAppearanceStore = create<AppearanceState>((set, get) => ({
   update: (patch) => {
     const next = { ...get().appearance, ...patch };
     next.colorTheme = normalizeColorTheme(next.colorTheme);
+    set({ appearance: next });
+    persist(next);
+  },
+
+  /** Reset only this account's appearance preferences to the current app defaults. */
+  resetToDefaults: () => {
+    const next = { ...DEFAULT_APPEARANCE };
     set({ appearance: next });
     persist(next);
   },

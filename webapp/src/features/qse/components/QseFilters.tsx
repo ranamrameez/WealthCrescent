@@ -30,7 +30,6 @@ export function QseFilterProvider({ children, tickers }: { children: ReactNode; 
       <Field label="Group trades"><select value={filters.group} onChange={e => update({ group: e.target.value })}><option value="">No grouping</option><option value="ticker">Ticker</option><option value="action">Buy/sell</option><option value="month">Month</option></select></Field>
       <Field label="Transfer type"><select value={filters.transferType} onChange={e => update({ transferType: e.target.value })}><option value="">All</option><option value="DEPOSIT">Deposit</option><option value="WITHDRAWAL">Withdrawal</option></select></Field>
       <Field label="Ledger type"><select value={filters.kind} onChange={e => update({ kind: e.target.value })}><option value="">All</option><option value="trade">Trade</option><option value="transfer">Transfer</option><option value="adjustment">Adjustment</option></select></Field>
-      <Field label="Lot matching"><select value={filters.matchOrder} onChange={e => update({ matchOrder: e.target.value })}><option value="">FIFO</option><option value="lowestCostFirst">Cheapest lot first</option></select></Field>
       <Field label="Search"><input value={filters.search} onChange={e => update({ search: e.target.value })} /></Field>
     </div>
   </PageFilterModal>}</QseFilterContext.Provider>;

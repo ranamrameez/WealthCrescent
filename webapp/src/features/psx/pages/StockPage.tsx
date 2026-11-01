@@ -7,7 +7,7 @@ import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu
 import { InvestmentPlans } from '../../../components/InvestmentPlans';
 import { BackButton } from '../../../components/BackButton';
 import { PriceInput } from "../../../components/ui/PriceInput";
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { CheckIcon, EditIcon, SaveIcon, TrashIcon, XIcon } from '../../../components/icons';
@@ -24,11 +24,13 @@ import { PendingToggle } from '../../../components/ui/PendingToggle';
 import { TimeZoneFields } from '../../../components/ui/TimeZoneFields';
 import { LotAllocationFields, type LotAllocations } from '../../../components/ui/LotAllocationFields';
 import { useSortableRows } from '../../../hooks/useSortableRows';
+import { useTablePagination } from '../../../hooks/useTablePagination';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { defaultTimeForDate, defaultTimezoneForMarket, nowTime } from '../../../lib/datetime';
 import { toCSV } from '../../../lib/csv';
 import { fmt, fmtMoney, fmtPSXPrice } from '../../../lib/format';
 import { computeFIFOPositions } from '../../../lib/calc/fifoPositions';
+import { tradePriceDeviationPct, validateTransactionEdit } from '../../../lib/calc/tradeValidation';
 import { isNettedLeg } from '../../../lib/calc/psxFees';
 import { FeeModeControl, feeModeFor, type FeeMode } from '../../../components/ui/FeeModeControl';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
@@ -42,7 +44,7 @@ import { usePSXStockData } from '../hooks/usePSXStockData';
 const today = () => new Date().toISOString().slice(0, 10);
 
 function TickerTransactions({ ticker, filters }: { ticker: string; filters: TransactionPageFilters }) {
-  const { workbook, calcFee } = usePSXDerived();
+  const { workbook, calcFee, positions } = usePSXDerived();
   const updateTransaction = usePSXWorkbookStore((s) => s.updateTransaction);
   const deleteTransaction = usePSXWorkbookStore((s) => s.deleteTransaction);
   const addTransaction = usePSXWorkbookStore((s) => s.addTransaction);
@@ -110,16 +112,23 @@ function TickerTransactions({ ticker, filters }: { ticker: string; filters: Tran
     }
   };
   const { sorted: rows, Th } = useSortableRows(filteredRows, sortValue, 'date', 'desc');
-  const [page,setPage]=useState(1),[pageSize,setPageSize]=useState(25);
-  const pageCount=Math.max(1,Math.ceil(rows.length/pageSize)),safePage=Math.min(page,pageCount);
-  const pageRows=rows.slice((safePage-1)*pageSize,safePage*pageSize);
-  useEffect(()=>setPage(1),[filters.fromDate,filters.toDate,filters.direction,filters.source,pageSize,ticker]);
-  useEffect(()=>{if(page>pageCount)setPage(pageCount);},[page,pageCount]);
+  const { rows: pageRows, controls: paginationControls } = useTablePagination(rows);
 
   const submit = async () => {
     const shares = Number(sharesInput);
     const price = Number(priceInput);
     if (!shares || !price) return toast('Enter shares and price.');
+    if (action === 'SELL') {
+      const available = positions.find(position => position.ticker === ticker)?.shares ?? 0;
+      if (shares > available + 1e-7) return toast(`Cannot sell ${shares} ${ticker}: only ${fmt(available, 0)} shares are available.`);
+    }
+    const marketPrice = workbook.marketPrices[ticker] ?? 0;
+    const deviation = tradePriceDeviationPct(price, marketPrice);
+    const threshold = workbook.settings.tradePriceDeviationPct ?? 10;
+    if (deviation !== null && Math.abs(deviation) > threshold) {
+      const accepted = await confirmDialog(`Entered ${fmtPSXPrice(price)}; saved market price is ${fmtPSXPrice(marketPrice)} (${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%). This exceeds your ${threshold}% warning threshold. Save anyway?`, 'Trade price differs from market price?');
+      if (!accepted) return;
+    }
     if (!(await ensureSignedIn('Sign in to save this transaction.'))) return;
     addTransaction({
       date, ticker, action, shares, price, time, timezone,
@@ -139,8 +148,19 @@ function TickerTransactions({ ticker, filters }: { ticker: string; filters: Tran
     setEditIndex(i);
     setEditRow({ ...tx });
   };
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (editIndex === null || !editRow) return;
+    const candidateTransactions = workbook.transactions.map((transaction, index) => index === editIndex ? editRow : transaction);
+    const quantityError = validateTransactionEdit(workbook.transactions, candidateTransactions);
+    if (quantityError) return toast(`Cannot save this edit: it would create ${fmt(quantityError.additionalUnmatchedShares, 0)} unmatched SELL shares for ${quantityError.ticker}.`);
+    const marketPrice = workbook.marketPrices[editRow.ticker.toUpperCase()] ?? 0;
+    const deviation = tradePriceDeviationPct(editRow.price, marketPrice);
+    const threshold = workbook.settings.tradePriceDeviationPct ?? 10;
+    if (deviation !== null && Math.abs(deviation) > threshold) {
+      const accepted = await confirmDialog(`Entered ${fmtPSXPrice(editRow.price)}; saved market price is ${fmtPSXPrice(marketPrice)} (${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%). This exceeds your ${threshold}% warning threshold. Save anyway?`, 'Trade price differs from market price?');
+      if (!accepted) return;
+    }
+    if (!(await ensureSignedIn('Sign in to save changes.'))) return;
     updateTransaction(editIndex, editRow);
     toast('Transaction updated.');
     setEditIndex(null);
@@ -323,7 +343,7 @@ function TickerTransactions({ ticker, filters }: { ticker: string; filters: Tran
           </tbody>
         </table>
       </div>
-      <div className="pagination-bar"><span className="text-muted">{rows.length?`Showing ${(safePage-1)*pageSize+1}–${Math.min(safePage*pageSize,rows.length)} of ${rows.length}`:'No rows'}</span><div className="pagination-actions"><label>Rows <select value={pageSize} onChange={event=>setPageSize(Number(event.target.value))}><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select></label><button className="btn secondary small" disabled={safePage<=1} onClick={()=>setPage(value=>Math.max(1,value-1))}>Previous</button><button className="btn secondary small" disabled={safePage>=pageCount} onClick={()=>setPage(value=>Math.min(pageCount,value+1))}>Next</button></div></div>
+      {paginationControls}
     </div>
   );
 }
@@ -338,7 +358,7 @@ function TickerTransactions({ ticker, filters }: { ticker: string; filters: Tran
  * are variable (same-day netting, overrides) unlike QSE's flat rate. */
 function useTickerExport(ticker: string) {
   const { workbook, calcFee } = usePSXDerived();
-  const { filters } = useUrlTransactionFilters();
+  const { filters } = useUrlTransactionFilters('all');
   const { fromDate, toDate } = filters;
   const rows = workbook.transactions.filter((tx) => tx.ticker === ticker);
 
@@ -369,7 +389,7 @@ export function StockPage() {
   const { tickerNames } = usePSXStockData();
   const name = tickerNames[ticker];
   const { exportStatement, hasRows } = useTickerExport(ticker);
-  const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
+  const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters('all');
   const { workbook, rows, calcFee, positions } = usePSXDerived();
   const isOpen = (positions.find((p) => p.ticker === ticker)?.shares || 0) > 0;
   usePageTopBarRightSlot(

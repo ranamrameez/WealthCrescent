@@ -2,7 +2,7 @@ import { cleanup,render,screen } from '@testing-library/react';
 import { afterEach,expect,it,vi } from 'vitest';
 const state=vi.hoisted(()=>({shares:10}));
 vi.mock('../PositionDetail',()=>({PositionDetail:({section}:{section:string})=><div data-testid="position-detail">{section}</div>}));
-vi.mock('../../hooks/useQSEDerived',()=>({useQSEDerived:()=>({positions:[{ticker:'TEST',shares:state.shares}]})}));
+vi.mock('../../hooks/useQSEDerived',()=>({useQSEDerived:()=>({positions:[{ticker:'TEST',shares:state.shares}],workbook:{settings:{currency:'QAR'}}})}));
 import { StockPortfolioSummary } from '../StockPortfolioSummary';
 afterEach(cleanup);
 it('shows the consolidated position overview before its comparison chart',()=>{

@@ -100,11 +100,19 @@ off-canvas menu opened via the **☰ Menu** button, unaffected by this setting.
 Each exchange's pages, data, and settings are completely separate — QSE holdings don't mix
 with PSX holdings, and each has its own fee model (see §7).
 
+### Broker profiles and changing defaults
+
+Stock Exchanges supports separate broker profiles so trades and related history can be kept with the appropriate broker. QSE starts with The Group; PSX includes JS Zindigi and AL Habib Capital Markets profiles. The published fee schedules used as initial defaults may not list every levy or remain current, so compare the editable fee settings with your actual broker contract notes. When a newer broker-default version is available and your profile differs, choose whether to **apply the current defaults** or **keep your custom settings**; accepting new defaults must not delete your transaction history.
+
+Use **Reset appearance to app defaults** to restore only UI/appearance preferences. Use **Reset all settings to app defaults** on the Account page to restore settings across modules, including appearance, while retaining financial records and user-created financial entities. These are reset actions, not a way to delete your transaction history.
+
 The **✦ Appearance** button (sidebar) controls font, text size, color theme, density, light/
 dark mode, and **Number display** — choose "shortened" (large stat-card numbers show as
 "10k"/"1.23M", with the exact figure available as a hover tooltip) or "full" (every stat card
 always shows the complete, un-abbreviated number). This is a global, app-wide preference, not
-per-module — change it once and it applies everywhere.
+per-module — change it once and it applies everywhere. Use **Reset appearance to app defaults** in the same panel to restore the current built-in appearance defaults; this does not delete your financial records.
+
+On the **Account** page, **Reset all settings to app defaults** restores broker fee schedules, module settings, currency filters, module visibility, and appearance to the current app defaults. It preserves transactions, balances, accounts, properties, categories, plans, and other financial records. You can customize settings again afterward.
 
 ---
 
@@ -162,20 +170,21 @@ keeps a fallback copy for reloads and outages and never writes those
 live observations into your private manual history. A newer manual observation continues to
 take priority. Under "Recent updates," click **Export price history CSV** to download
 every price update you've ever recorded for this ticker (not just the recent few shown on
-screen) as a spreadsheet file. On the stock page's **Transactions** tab, below the trade
-table, optionally set a from/to date range and click **Export CSV** to download that
-ticker's own trade history separately.
+screen) as a spreadsheet file. On the stock page, the transaction/history filter defaults to **All time** so older activity is included unless you narrow the date range. The **Price comparison** chart also includes the latest recorded day's low/high and the lifetime recorded low/high when price history exists. On the stock page's **Transactions** tab, optionally set a from/to date range and click **Export CSV** to download that ticker's own trade history separately. Legacy unmatched SELLs are flagged for reconciliation: excess shares and their proportional SELL fees are shown separately, and neither is treated as matched realized profit.
 
 ---
 
 ## 6. Transactions
 
+QSE and PSX trades use a persisted global accounting order that can differ from their recorded trade dates. Moving a trade changes its accounting position, not the trade date. Each ticker's `perTickerIndex` is synchronized from the global order. The combined cash ledger still orders mixed trades, transfers, and adjustments by effective date; it does not yet share one global event order across all three event types.
+
+
 The Transactions page has several sections. Each one is a collapsible card, and the chip row
 at the top is a *jump-to* nav, not a switch — clicking a chip scrolls to that section and opens
-it if it was collapsed, but it doesn't hide any of the others. Only the first section starts
-open; scroll down (or click a chip) to see the rest. This applies to every chip row like this
-one across the app (Analytics' category tabs, Settings' Account/Data tabs, etc.) — nothing is
-ever hidden behind a chip, just collapsed further down the same page.
+it if it was collapsed, but it doesn't hide any of the others. Primary sections such as Summary and frequently used entity sections start expanded by
+default; you can still collapse them, and the other sections' open/closed state is preserved.
+This applies across shared finance pages — nothing is hidden behind a chip, just collapsed
+further down the same page.
 
 ### Add transaction(s)
 Enter one or more BUY/SELL rows at once (date, ticker, action, shares, price) and save them
@@ -197,6 +206,14 @@ together. On PSX, each row also has a **Fee mode** dropdown with three options:
 
 Switching modes clears whatever the other mode was using, so there's no way for a leftover
 checkbox and a leftover fee number to silently conflict with each other.
+
+Before saving, the app checks SELL quantities against shares currently available, accounting
+for earlier rows in the same batch. It blocks an oversell rather than silently recording it.
+When a saved market price exists, a trade price more than the configured percentage away from
+that price prompts for confirmation (default **±10%**). You can change **Price warning (%)**
+in the exchange's Settings → Fees & amounts; set it to 0 to warn on any difference. The same
+checks apply when editing historical transactions, while existing legacy unmatched sells can
+still be corrected without increasing the discrepancy.
 
 ### Transaction list
 Split into two collapsible sections — **Open positions** (tickers you're still holding) and
@@ -302,11 +319,12 @@ understanding:
   awareness — it isn't deducted from any number automatically.
 - **Cost basis method** (Settings → Fees & amounts): **Average cost** (default) blends
   every buy into one running average — a sell can't be tied to a specific lot. **FIFO**
-  tracks each buy as its own lot and sells the oldest one first, giving lot-accurate
-  realized P/L and CGT. Switching this recalculates your *entire* history under the new
-  method immediately (nothing here is stored per-transaction) — it's not the default
-  because that's a real change to your computed numbers, not a cosmetic one. Try it, compare,
-  switch back if you don't like it.
+  consumes the oldest buy lot first; **Lowest cost first** consumes the cheapest open lot
+  first. The selected method controls position calculations and per-SELL realized P/L.
+  When Average cost is selected, the transaction page does not show open/closed lot-attribution
+  tables because those individual-lot reports are not valid for weighted-average accounting.
+  Switching methods recalculates dependent results from the full history; it does not rewrite
+  your transactions. Compare the results before making any real-world trading decision.
 
 ---
 
@@ -333,6 +351,17 @@ mistype a ticker, remove it and re-add it correctly.
   CGT rates and filer status, cost-basis method, tick size, currency, and default deposit
   fee. Change these to match your actual broker's schedule.
 
+### Broker profiles
+
+Application defaults are versioned by the app. If a later app release updates a default and this profile still differs from it, the page offers **Use app defaults** or **Keep my settings**. The app never silently replaces a custom broker fee schedule. Applying defaults changes that profile's settings only; transaction and portfolio history are preserved.
+
+
+Use the **Broker** selector in the stock top bar or the stock-exchange side menu to switch the active account. Open **Brokers** in the exchange's side menu to add a profile, edit its name/account label, or archive it. A profile owns its own trades, transfers, adjustments, dividends, trade plans, and fee/cost-basis settings. Switching profiles loads that account's history; it does not transfer trades between accounts. Profiles with history are archived rather than permanently deleted; empty profiles can be deleted.
+
+- **QSE** starts with **The Group**.
+- **PSX** starts with **JS Zindagi** selected and **AL Habib Capital Markets** available as a second profile. The latter is the securities broker subsidiary of Bank AL Habib.
+- Initial PSX commission rates are prefilled from the brokers' published material: [Zindigi stock charges](https://zindigi.pk/features/stocks/) and [AL Habib Capital Markets' account-opening tariff](https://ahcml.com/assets/uploads/Normal_AOF.pdf). Both JS Zindigi and AL Habib Capital Markets default to the higher-value-side commission rule for same-day buy/sell pairs, based on the user's broker-specific clarification. You can change the active profile's **Same-day commission rule** in Settings → Fees & amounts if your contract note confirms a different policy. New PSX profiles use defaults for the recognized broker name instead of copying whichever profile is active; unknown brokers start from generic defaults with same-day netting off. Other levies/taxes are estimates or configurable fields; check your current broker contract note and update the active profile's Settings → Fees & amounts before relying on net P/L or break-even estimates.
+
 ---
 
 ## 10. Trade Calculator
@@ -340,7 +369,7 @@ mistype a ticker, remove it and re-add it correctly.
 A floating 🧮 button, available on Stock Exchanges pages (QSE and PSX). Model a hypothetical
 BUY, SELL, or (PSX "Cycle" mode) a buy-then-planned-sell — see break-even price, current P/L,
 estimated fees, and (PSX) estimated CGT — before you actually commit to a trade. You can log
-the modeled trade straight from here once you're ready. It doesn't appear on other modules
+the modeled trade straight from here once you're ready. The separate **Buy/sell stock** action opens the trade-entry popup; after a successful save it closes automatically. If saving fails, your entered values remain in the popup so you can retry. It doesn't appear on other modules
 (Cash, Banking, etc.) since a stock trade calculator wouldn't mean anything there.
 
 Opening it from a specific stock's own page pre-selects that ticker automatically — you don't
@@ -449,6 +478,8 @@ those to a ticker or date window wouldn't mean what it looks like it means (your
 holdings aren't a function of which window you're looking at).
 
 ---
+
+When two categories are merged, the source category is removed from the registry even if it originally came from the bundled app defaults. Its records are reassigned to the destination category.
 
 ## 14. Cash
 
@@ -598,7 +629,7 @@ date belongs to the active cycle and does not rewrite the earlier bill. The
 Current Statement section shows the locked bill, how much post-cutoff payment was applied, and
 the separate open-cycle spending total.
 Card details are available from the card's action menu in a popup, keeping the page focused on
-the financial summary. Transactions support search, type/date filters, and pagination. Use **Modify** for individual row actions or **Batch edit** to update, add, or remove multiple transactions in one validated save. The batch editor respects the current transaction filters; linked transactions and their source/card identity are protected. Plans show
+the financial summary. Transactions support search, type/date filters, and pagination. Each row also shows the running **Consumed limit**, the card's **Allowed limit**, and the remaining **Available limit** after that transaction. These values are calculated from the complete chronological ledger (including opening debt), so filtering or changing the display sort does not reset the running balance. Use **Modify** for individual row actions or **Batch edit** to update, add, or remove multiple transactions in one validated save. The batch editor respects the current transaction filters; linked transactions and their source/card identity are protected. Plans show
 Current balance and Expected final balance summary cards; Monthly history is grouped by month;
 Analytics includes utilization and payment coverage alongside balance, spending, category, and
 projection charts.
@@ -739,10 +770,21 @@ sell shares at a price), so it shares the same underlying calculation engine.
   never manually updated a fund's NAV, its NAV-over-time chart stays empty until you do — but
   the Contribution vs. value chart still works, using the price from your buy/sell
   transactions themselves.
-- **Transfers tab**: cash moved into or out of your Funds account, separate from buying/
+- **Cash ledger tab**: one uninvested cash account per currency. It combines deposits,
+  withdrawals, valid BUY/SELL cash movements, and the running balance. A deposit increases
+  cash; BUY moves cash into NAV-valued units; SELL returns proceeds to cash; a withdrawal
+  reduces cash. Transfer fees are applied once. The currency balances are never blended.
+- **Transfers tab**: cash moved into or out of your Funds cash account, separate from buying/
   selling fund units — e.g. topping up before a purchase, or withdrawing after a redemption.
   Log a deposit/withdrawal here, edit or delete one later, or check the linking checkbox to
-  create a matching entry in Bank/Cash at the same time (see §23 below).
+  create a matching entry in Bank/Cash at the same time (see §23 below). Each new transfer
+  stores its currency. Older transfers that predate currency storage are kept under the
+  one-time snapshot of the Funds default currency; the Cash ledger warns you about these.
+  Edit a legacy transfer to assign its actual currency if it was different.
+- **Summary** distinguishes invested cost basis, current holdings value, cash on hand, and
+  total Funds value. Net Worth adds Funds cash to holdings once, and its Filters popup has
+  an independent **Funds cash** inclusion switch. Individual fund inclusion switches affect
+  holdings; they do not rewrite the portfolio-level cash ledger.
 - **Import tab**: two different ways to load fund data, picked via the chip toggle at the top.
   - **Daily history (XLSX)** — recommended if you track each fund's balance day by day (a
     workbook with one sheet per fund, a row per update: Date / PrvBlc / NewBlc / Profit-Loss).
@@ -996,7 +1038,9 @@ If a number here ever disagrees with your official statement, trust the statemen
 
 Cash: select a date range and other ledger filters, then choose **Batch edit** beside the currency ledger. Rentals: choose a property and date period, then **Batch edit** above its income/expense entries. Use positive amounts and the direction checkbox (Cash in or Rent income). Formula amounts such as `=5*986.5` work in either editor. Save applies the whole validated batch; discard leaves the ledger unchanged. Linked transfers use the existing single-record editing flow.
 
-EMI, Funds, brokers, and Subscriptions now use the same section navigation and fullscreen cards as Banking. Cash and Rentals have separate Summary sections. Use the section chips to jump to details, plans, activity, or analytics where available. Existing transaction and planning controls remain within their relevant sections.
+EMI, Funds, brokers, and Subscriptions now use the same section navigation and fullscreen cards as Banking. Funds and Brokers are peer sections rather than one being nested under the other. Cash and Rentals have separate Summary sections. Primary sections (including Summary and frequently used entity sections) start expanded by default; users can still collapse them. Use the section chips to jump to details, plans, activity, or analytics where available.
+
+Standardized table cards show only actions that have a real handler for that table. Long tables use shared pagination (25 rows by default, with 50 or 100 available). Filtering and sorting happen before pagination, while exports and financial calculations continue to use the complete filtered dataset rather than only the visible page. Summary views use the same light-border inline subsection layout as Portfolio Item, with groups tailored to each entity.
 
 
 ### Row details and navigation
@@ -1027,3 +1071,15 @@ status and provides a refresh request action. A request confirmation means the r
 was queued; the saved timestamp changes only after the service writes fresh data.
 
 Loading masks use small rounded stat placeholders and large 600px section cards containing smaller stat cards and a content panel with a few lines across the loading area. Opening a different page starts at the top, including when using browser Back or Forward; section and filter changes on the same page retain your scroll position.
+
+
+## Mutual Funds — editing transactions and balance history
+
+- Invest and Withdraw remain separate transaction actions. Editing an Invest/Withdraw row lets you edit Amount; units are recalculated from the row's NAV. Editing the units or NAV retains the same transaction model.
+- Balance History shows the effective valuation date. When a historical date is changed, the history and latest NAV are ordered by that date; the original timestamp is retained only as audit/intraday metadata and as a same-day tie-breaker.
+- Profit/Loss is derived performance, not a separate transaction row. The Funds cash ledger now reconciles transfer cash with BUY/SELL movements per currency; see §20 above.
+
+
+## Stock broker profiles
+
+QSE and PSX portfolios are separated by broker profile. Each broker owns its own trades, cash transfers, adjustments, dividends, trade plans, settings and derived P/L. Select the broker profile before adding activity. A cash transfer linked to QSE or PSX must target the specific broker profile; its own currency and deposit-fee settings are used, not the parent exchange defaults. Market prices, price history and watchlists remain shared for the exchange. Archived profiles remain available as read-only history; deactivated profiles are hidden from normal activity and cannot be selected for new activity. Legacy PSX records are assigned to the default JS Zindigi/JS Zindagi profile during the versioned migration. Review your backup/export after migration before relying on the new profile separation.

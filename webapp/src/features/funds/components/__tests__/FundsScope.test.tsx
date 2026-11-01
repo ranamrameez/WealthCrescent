@@ -18,12 +18,12 @@ describe('Funds scope summaries', () => {
       { id: 'other', ticker: 'b', action: 'BUY', date: '2026-09-01', shares: 100, price: 10 },
     ], priceHistory: { a: [{ date: '2026-10-01', price: 11 }], b: [{ date: '2026-10-01', price: 20 }] } });
     const { container, rerender } = render(<FundsScopeSummary ids={['a']} filters={filters} />);
-    const actual = container.querySelector('.account-summary-card-balance')! as HTMLElement;
+    const actual = [...container.querySelectorAll('.current-position-section')].find(group => group.querySelector('h4')?.textContent === 'Holdings value')! as HTMLElement;
     expect(within(actual).getByText('110.00 QAR')).toBeTruthy();
     expect(within(actual).getByText('100.00 QAR')).toBeTruthy();
     expect(screen.getByText('Pending')).toBeTruthy();
     expect(screen.queryByText('2,110.00 QAR')).toBeNull();
     rerender(<FundsScopeSummary ids={['a', 'b']} filters={filters} />);
-    expect(within(container.querySelector('.account-summary-card-balance')! as HTMLElement).getByText('2,110.00 QAR')).toBeTruthy();
+    expect(within([...container.querySelectorAll('.current-position-section')].find(group => group.querySelector('h4')?.textContent === 'Holdings value')! as HTMLElement).getByText('2,110.00 QAR')).toBeTruthy();
   });
 });

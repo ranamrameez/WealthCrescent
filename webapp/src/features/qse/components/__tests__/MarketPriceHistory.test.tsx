@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { qatarDay } from '../../../../lib/stockData/qsePrices';
 const state=vi.hoisted(()=>({denied:false,paths:[] as string[]}));
 vi.mock('../../../../lib/firebase/client',()=>({db:{}}));
@@ -34,8 +34,8 @@ it('defaults the chart timeframe to Today',()=>{
   expect(screen.getByRole('button',{name:'Today'}).getAttribute('aria-pressed')).toBe('true');
   expect(screen.getByText(/1 shared points; 1 manual points/)).toBeTruthy();
 });
-it('updates the price input when a scraped price arrives',()=>{
-  useQseFeed.setState({points:{QFLS:[{date:qatarDay(),time:new Date().toISOString(),price:14}]},error:''});
+it('updates the price input when a scraped price arrives',async()=>{
   render(<MarketPriceHistory ticker="QFLS" />);
-  expect(Number((screen.getByRole('spinbutton') as HTMLInputElement).value)).toBe(14);
+  act(() => useQseFeed.setState({points:{QFLS:[{date:qatarDay(),time:new Date().toISOString(),price:14}]},error:''}));
+  await waitFor(()=>expect(Number((screen.getByRole('spinbutton') as HTMLInputElement).value)).toBe(14));
 });

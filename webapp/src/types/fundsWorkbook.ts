@@ -82,6 +82,14 @@ export interface Fund {
 export interface FundsSettings {
   /** Pre-fills new funds only — never converts existing ones. */
   defaultCurrency: string;
+  /** Independent inclusion control for the portfolio-level, per-currency
+   * Funds cash account. Missing on legacy workbooks means included. */
+  includeCashInNetWorth?: boolean;
+  /** Versioned metadata migration: one-time currency snapshot used only for
+   * legacy transfers that predate Transfer.currencyCode. Existing transfer
+   * records are not rewritten; users can assign an explicit currency by editing them. */
+  legacyTransferCurrency?: string;
+  cashLedgerMigrationVersion?: number;
 }
 
 /** Structurally closest of the new modules to QSE/PSX (buy/sell units at a

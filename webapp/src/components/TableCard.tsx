@@ -1,6 +1,6 @@
 ﻿import { useCallback, useMemo, useState, type ComponentProps, type CSSProperties, type ReactNode } from 'react';
 import { StandardCard, SummaryChip, type StandardCardAction } from './StandardCard';
-import { CheckIcon, EditIcon, ExportIcon, PlusIcon, SortIcon } from './icons';
+import { ExportIcon, PlusIcon, SortIcon } from './icons';
 import { TableSortContext, type TableCardDateSort, type DateSortSelection } from './tableSortContext';
 import { toCSV } from '../lib/csv';
 
@@ -31,17 +31,45 @@ export function TableCard({ title = 'Records', children, actions = [], rows, all
   const data = rows ?? Object.values(datasets)[0]?.rows;
   const hasDate = !!dateSort || Object.values(datasets).some(dataset => dataset.hasDate);
   const remaining = [...actions];
-  const take = (matches: (label: string) => boolean, fallback: StandardCardAction) => { const index = remaining.findIndex(action => matches(action.label.toLowerCase())); return index < 0 ? fallback : remaining.splice(index, 1)[0]; };
-  const menu: StandardCardAction[] = [
-    take(label => label.includes('import'), { label: 'Import', icon: <PlusIcon />, onClick: onImport ?? (() => {}), disabled: !onImport }),
-    take(label => label.includes('export') && !label.includes('all') && !label.includes('backup'), { label: 'Export filtered', icon: <ExportIcon />, onClick: onExportFiltered ?? (() => exportRows(`${exportFilename}-filtered`, data ?? [])), disabled: !onExportFiltered && !data?.length }),
-    take(label => label.includes('export') && label.includes('all'), { label: 'Export all', icon: <ExportIcon />, onClick: onExportAll ?? (() => exportRows(`${exportFilename}-all`, allRows ?? [])), disabled: !onExportAll && !allRows?.length }),
-    take(label => label.includes('batch'), { label: 'Batch edit', icon: <EditIcon />, onClick: onBatchEdit ?? (() => {}), disabled: !onBatchEdit }),
-    take(label => label.includes('modify'), { label: modifying ? 'Done modifying' : 'Modify', icon: modifying ? <CheckIcon /> : <EditIcon />, onClick: onModify ?? (() => {}), disabled: !onModify }),
-    ...remaining,
-    { label: 'Date: newest first', icon: <SortIcon direction="desc" />, disabled: !hasDate, onClick: () => controller.setSelection({ column: 'date', direction: 'desc' }) },
-    { label: 'Date: oldest first', icon: <SortIcon direction="asc" />, disabled: !hasDate, onClick: () => controller.setSelection({ column: 'date', direction: 'asc' }) },
-  ];
+  const take = (matches: (label: string) => boolean) => {
+    const index = remaining.findIndex(action => matches(action.label.toLowerCase()));
+    return index < 0 ? undefined : remaining.splice(index, 1)[0];
+  };
+  const menu: StandardCardAction[] = [];
+  const importAction = take(label => label.includes('import'));
+  if (importAction || onImport) menu.push(importAction ?? { label: 'Import', icon: <PlusIcon />, onClick: onImport! });
+
+  const filteredExport = take(label => label.includes('export') && !label.includes('all') && !label.includes('backup'));
+  if (filteredExport || onExportFiltered || data?.length) {
+    menu.push(filteredExport ?? {
+      label: 'Export filtered',
+      icon: <ExportIcon />,
+      onClick: onExportFiltered ?? (() => exportRows(`${exportFilename}-filtered`, data ?? [])),
+    });
+  }
+
+  const allExport = take(label => label.includes('export') && label.includes('all'));
+  if (allExport || onExportAll || allRows?.length) {
+    menu.push(allExport ?? {
+      label: 'Export all',
+      icon: <ExportIcon />,
+      onClick: onExportAll ?? (() => exportRows(`${exportFilename}-all`, allRows ?? [])),
+    });
+  }
+
+  const batchEdit = take(label => label.includes('batch'));
+  if (batchEdit || onBatchEdit) menu.push(batchEdit ?? { label: 'Batch edit', onClick: onBatchEdit! });
+
+  const modifyAction = take(label => label.includes('modify'));
+  if (modifyAction || onModify) {
+    menu.push(modifyAction ?? { label: modifying ? 'Done modifying' : 'Modify', onClick: onModify! });
+  }
+
+  menu.push(...remaining);
+  if (hasDate) menu.push(
+    { label: 'Date: newest first', icon: <SortIcon direction="desc" />, onClick: () => controller.setSelection({ column: 'date', direction: 'desc' }) },
+    { label: 'Date: oldest first', icon: <SortIcon direction="asc" />, onClick: () => controller.setSelection({ column: 'date', direction: 'asc' }) },
+  );
   const card = <TableSortContext.Provider value={controller}><StandardCard {...props} className={`table-card ${props.className ?? ''}`} title={title} actions={menu} headerEnd={props.headerEnd ?? headerExtra} summary={props.summary ?? (data ? <SummaryChip label="Filtered" value={data.length} /> : undefined)}>{children}</StandardCard></TableSortContext.Provider>;
   return style ? <div style={style}>{card}</div> : card;
 }

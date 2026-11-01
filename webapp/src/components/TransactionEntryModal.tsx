@@ -190,8 +190,10 @@ function emptyRow(
 }
 
 function TransferFeeField({ side, direction, amount, onChange, disabled }: { side: LinkSideConfig; direction: 'in' | 'out'; amount: number; onChange: (side: LinkSideConfig) => void; disabled?: boolean }) {
-  const qseDefault = useWorkbookStore(state => state.workbook.settings.depositFee);
-  const psxDefault = usePSXWorkbookStore(state => state.workbook.settings.depositFee);
+  const qseWorkbook = useWorkbookStore(state => state.workbook);
+  const psxWorkbook = usePSXWorkbookStore(state => state.workbook);
+  const qseDefault = qseWorkbook.brokerProfiles?.find((p) => p.id === side.ref)?.settings.depositFee ?? qseWorkbook.settings.depositFee;
+  const psxDefault = psxWorkbook.brokerProfiles?.find((p) => p.id === side.ref)?.settings.depositFee ?? psxWorkbook.settings.depositFee;
   if (!['qse', 'psx', 'funds'].includes(side.module)) return null;
   const fee = side.fee ?? (direction === 'in' ? side.module === 'qse' ? qseDefault : side.module === 'psx' ? psxDefault : 0 : 0);
   return <Field label={side.module.toUpperCase() + ' transfer fee'} title="Starts from this module's saved deposit fee. Amount is gross; deposits receive gross minus fee, withdrawals cost gross plus fee.">
@@ -507,6 +509,8 @@ export function TransactionEntryModal({
   const addBankTransactions = useBankWorkbookStore((s) => s.addTransactions);
   const addCashEntry = useCashWorkbookStore((s) => s.addEntry);
   const cashDefaultCurrency = useCashWorkbookStore((s) => s.workbook.settings.defaultCurrency);
+  const qseWorkbook = useWorkbookStore((s) => s.workbook);
+  const psxWorkbook = usePSXWorkbookStore((s) => s.workbook);
   const addRentalEntry = useRentalsWorkbookStore((s) => s.addEntry);
   const addPersonalLoanRepayment = usePersonalLoansWorkbookStore((s) => s.addRepayment);
   const updatePersonalLoanRepayment = usePersonalLoansWorkbookStore((s) => s.updateRepayment);
@@ -516,6 +520,8 @@ export function TransactionEntryModal({
   const addQSETransfer = useWorkbookStore((s) => s.addTransfer);
   const addPSXTransfer = usePSXWorkbookStore((s) => s.addTransfer);
   const addFundsTransfer = useFundsWorkbookStore((s) => s.addTransfer);
+  const fundsDefaultCurrency = useFundsWorkbookStore((s) => s.workbook.settings.defaultCurrency);
+  const fundsLegacyTransferCurrency = useFundsWorkbookStore((s) => s.workbook.settings.legacyTransferCurrency ?? s.workbook.settings.defaultCurrency);
   const addCreditCardTransaction = useCreditCardWorkbookStore((s) => s.addTransaction);
   const updateSubscription = useSubscriptionsWorkbookStore((s) => s.updateEntry);
   const bankAccounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
@@ -542,9 +548,30 @@ export function TransactionEntryModal({
     ? { module: 'personalLoans', ref: editPersonalLoanPayment.loanId, currencyCode: editingLoan?.currencyCode }
     : undefined;
   const linkIsFrom = editLink?.recordId === editLink?.link.fromRecordId;
-  const linkFinance = editLink ? linkIsFrom ? editLink.link.from : editLink.link.to : undefined;
+  const enrichLinkSide = (side: LinkSideConfig, recordId: string): LinkSideConfig => {
+    const record = getLinkedSideRecord(side, recordId);
+    if ((side.module === 'qse' || side.module === 'psx') && !side.ref) {
+      return record && 'brokerId' in record && record.brokerId ? { ...side, ref: record.brokerId } : side;
+    }
+    if (side.module === 'funds' && !side.currencyCode) {
+      const recordCurrency = record && 'currencyCode' in record ? record.currencyCode : undefined;
+      return { ...side, currencyCode: recordCurrency || fundsLegacyTransferCurrency };
+    }
+    return side;
+  };
+  const rawLinkFinance = editLink ? linkIsFrom ? editLink.link.from : editLink.link.to : undefined;
+  // Recover legacy exchange broker refs and Funds transfer currencies from
+  // the linked side record before rendering the locked edit form.
+  const linkFinance = rawLinkFinance && editLink ? enrichLinkSide(rawLinkFinance, editLink.recordId) : rawLinkFinance;
   const [linkSnapshot] = useState(() => editLink ? [structuredClone(getLinkedSideRecord(editLink.link.from, editLink.link.fromRecordId)), structuredClone(getLinkedSideRecord(editLink.link.to, editLink.link.toRecordId))] : []);
-  const baseFinance = linkFinance ?? (editTransfer ? { module: editTransfer.module, fee: editTransfer.record.fee } : editFinance ?? defaultFinance);
+  const rawBaseFinance = linkFinance ?? (editTransfer ? { module: editTransfer.module, ref: editTransfer.record.brokerId, fee: editTransfer.record.fee, ...(editTransfer.module === 'funds' ? { currencyCode: editTransfer.record.currencyCode ?? fundsLegacyTransferCurrency } : {}) } : editFinance ?? defaultFinance);
+  // QSE/PSX transfer ownership and currency both come from the selected
+  // broker profile, never from whichever exchange profile happens to be active.
+  const baseFinance: LinkSideConfig | undefined = rawBaseFinance?.module === 'qse'
+    ? { ...rawBaseFinance, ref: rawBaseFinance.ref ?? qseWorkbook.activeBrokerId, currencyCode: qseWorkbook.brokerProfiles.find((p) => p.id === (rawBaseFinance.ref ?? qseWorkbook.activeBrokerId))?.settings.currency ?? qseWorkbook.settings.currency }
+    : rawBaseFinance?.module === 'psx'
+      ? { ...rawBaseFinance, ref: rawBaseFinance.ref ?? psxWorkbook.activeBrokerId, currencyCode: psxWorkbook.brokerProfiles.find((p) => p.id === (rawBaseFinance.ref ?? psxWorkbook.activeBrokerId))?.settings.currency ?? psxWorkbook.settings.currency }
+      : rawBaseFinance;
   const resolvedDefaultFinance: LinkSideConfig = baseFinance
     ? (baseFinance.module === 'cash' && !baseFinance.currencyCode ? { ...baseFinance, currencyCode: cashDefaultCurrency } : baseFinance)
     : { module: 'cash', currencyCode: cashDefaultCurrency };
@@ -566,7 +593,11 @@ export function TransactionEntryModal({
       const link = editLink.link, own = linkSnapshot[linkIsFrom ? 0 : 1];
       const direction = linkIsFrom ? 'out' : 'in';
       return [{ ...base, finance: resolveTransferSide(linkFinance, direction, editLink.recordId), linked: true,
-        other: resolveTransferSide(linkIsFrom ? link.to : link.from, linkIsFrom ? 'in' : 'out', linkIsFrom ? link.toRecordId : link.fromRecordId),
+        other: resolveTransferSide(
+          enrichLinkSide(linkIsFrom ? link.to : link.from, linkIsFrom ? link.toRecordId : link.fromRecordId),
+          linkIsFrom ? 'in' : 'out',
+          linkIsFrom ? link.toRecordId : link.fromRecordId,
+        ),
         direction, amount: own && 'gross' in own ? own.gross : own && 'amount' in own ? Math.abs(own.amount) : linkIsFrom ? link.fromAmount : link.toAmount,
         toAmount: linkIsFrom ? link.toAmount : link.fromAmount, toAmountTouched: true,
         date: own?.date ?? link.date, time: own && 'time' in own ? own.time : link.time ?? base.time,
@@ -657,11 +688,12 @@ export function TransactionEntryModal({
     if (editTransfer) {
       const row = valid[0], { module, record } = editTransfer;
       const store = module === 'qse' ? useWorkbookStore.getState() : module === 'psx' ? usePSXWorkbookStore.getState() : useFundsWorkbookStore.getState();
-      const current = store.workbook.transfers.find(item => item.id === record.id);
+      const profileTransfers = 'brokerProfiles' in store.workbook ? store.workbook.brokerProfiles?.flatMap((profile) => profile.data?.transfers ?? []) : undefined;
+      const current = store.workbook.transfers.find(item => item.id === record.id) ?? profileTransfers?.find(item => item.id === record.id);
       if (!current || JSON.stringify(current) !== JSON.stringify(record)) return toast('This transfer changed. Reopen its editor.');
       const choice = await resolveLinkedEdit(module, record.id);
       if (choice === 'cancel') return;
-      store.updateTransfer(record.id, { date: row.date, time: row.time, timezone: row.timezone, gross: Math.abs(row.amount), fee: row.finance.fee ?? record.fee, type: row.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', description: row.description.trim() || undefined });
+      store.updateTransfer(record.id, { date: row.date, time: row.time, timezone: row.timezone, gross: Math.abs(row.amount), fee: row.finance.fee ?? record.fee, type: row.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', ...(module === 'funds' ? { currencyCode: row.finance.currencyCode ?? fundsDefaultCurrency } : {}), description: row.description.trim() || undefined });
       if (choice === 'both') {
         const result = propagateLinkedEdit(module, record.id, { date: row.date, time: row.time, timezone: row.timezone, amount: Math.abs(row.amount), direction: row.direction, note: row.description.trim() || undefined });
         if (result.error) { toast(result.error); return; }
@@ -796,13 +828,13 @@ export function TransactionEntryModal({
           break;
         }
         case 'qse':
-          addQSETransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: resolveTransferSide(r.finance, r.direction).fee ?? 0, description: r.description.trim() || undefined });
+          addQSETransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: resolveTransferSide(r.finance, r.direction).fee ?? 0, description: r.description.trim() || undefined, brokerId: r.finance.ref });
           break;
         case 'psx':
-          addPSXTransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: resolveTransferSide(r.finance, r.direction).fee ?? 0, description: r.description.trim() || undefined });
+          addPSXTransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: resolveTransferSide(r.finance, r.direction).fee ?? 0, description: r.description.trim() || undefined, brokerId: r.finance.ref });
           break;
         case 'funds':
-          addFundsTransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', gross: Math.abs(r.amount), fee: resolveTransferSide(r.finance, r.direction).fee ?? 0, description: r.description.trim() || undefined });
+          addFundsTransfer({ id: uid(), date: r.date, time: r.time, timezone: r.timezone, type: r.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', currencyCode: r.finance.currencyCode ?? fundsDefaultCurrency, gross: Math.abs(r.amount), fee: resolveTransferSide(r.finance, r.direction).fee ?? 0, description: r.description.trim() || undefined });
           break;
         case 'creditCard': {
           // User-reported (2026-09-14): "no choice of expense or payment,

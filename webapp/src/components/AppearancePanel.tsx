@@ -76,6 +76,17 @@ export function AppearanceFields() {
       </button>
       <ToggleChip checked={!!appearance.fabAlwaysOpen} onChange={next => updateAppearance({ fabAlwaysOpen: next })}  label={<>Keep quick-actions panel always open
       </>} />
+      <button
+        className="btn secondary small"
+        type="button"
+        onClick={() => {
+          if (window.confirm('Reset all appearance preferences to the current app defaults?')) {
+            useAppearanceStore.getState().resetToDefaults();
+          }
+        }}
+      >
+        Reset appearance to app defaults
+      </button>
     </div>
   );
 }

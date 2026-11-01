@@ -1,8 +1,10 @@
 import { StatCard2 } from '../../../components/StatCard2';
+import { SummarySection, SummarySections, SummaryValue } from '../../../components/SummaryGroupCard';
 import { RecordRow } from '../../../components/RecordRow';
 import { Pagination } from '../../../components/Pagination';
 import { usePagination } from '../../../hooks/usePagination';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
+import { useTablePagination } from '../../../hooks/useTablePagination';
 import { MarketPriceHistory } from './MarketPriceHistory';
 import { PriceInput } from "../../../components/ui/PriceInput";
 import { useEffect, useMemo, useState, type ComponentProps } from 'react';
@@ -32,7 +34,6 @@ import { useAppearanceStore } from '../../../store/appearanceStore';
 import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
 import type { PricePoint } from '../../../types/workbook';
 import { usePSXDerived } from '../hooks/usePSXDerived';
-import { gridAutoStyle } from '../../../lib/gridStyle';
 
 function DetailCard({section,title,children,...props}: ComponentProps<typeof StandardCard> & {section:string}) {
   return section === 'all' ? <StandardCard title={title} {...props}>{children}</StandardCard>
@@ -154,6 +155,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
   const recentSortValue = (p: (typeof recentRows)[number], col: RecentCol): number | string =>
     col === 'price' ? p.price : (p.time ?? p.date);
   const { sorted: sortedRecent, Th: RecentTh } = useSortableRows(recentRows, recentSortValue, 'when', 'desc');
+  const { rows: priceHistoryPageRows, controls: priceHistoryPagination } = useTablePagination(sortedRecent);
 
   // README item 1 of the same batch: see the identical comment in QSE's
   // PositionDetail.tsx.
@@ -237,9 +239,17 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
     setPriceInput(String(val));
   };
   void commitPrice;
-  const comparisonValues=lastSellPrice>0?[lastBuyPrice,lastSellPrice,mp,be]:[lastBuyPrice,mp,be];
-  const comparisonLabels=lastSellPrice>0?['Latest buy','Latest sell','Market price','Break-even (fees)']:['Latest buy','Market price','Break-even (fees)'];
-  const comparisonTerms=lastSellPrice>0?['Latest executed buy price','Latest executed sell price','Current market price','Break-even price including fees']:['Latest executed buy price','Current market price','Break-even price including fees'];
+  const recordedPrices=(workbook.priceHistory[ticker]??[]).filter(point=>Number.isFinite(point.price)&&point.price>0);
+  const latestPriceDate=recordedPrices.map(point=>point.date).sort().at(-1);
+  const latestDayPrices=latestPriceDate?recordedPrices.filter(point=>point.date===latestPriceDate).map(point=>point.price):[];
+  const baseComparisonValues=lastSellPrice>0?[lastBuyPrice,lastSellPrice,mp,be]:[lastBuyPrice,mp,be];
+  const baseComparisonLabels=lastSellPrice>0?['Latest buy','Latest sell','Market price','Break-even (fees)']:['Latest buy','Market price','Break-even (fees)'];
+  const baseComparisonTerms=lastSellPrice>0?['Latest executed buy price','Latest executed sell price','Current market price','Break-even price including fees']:['Latest executed buy price','Current market price','Break-even price including fees'];
+  const dailyBounds=latestDayPrices.length?[Math.min(...latestDayPrices),Math.max(...latestDayPrices)]:[];
+  const lifetimeBounds=recordedPrices.length?[Math.min(...recordedPrices.map(point=>point.price)),Math.max(...recordedPrices.map(point=>point.price))]:[];
+  const comparisonValues=[...baseComparisonValues,...dailyBounds,...lifetimeBounds];
+  const comparisonLabels=[...baseComparisonLabels,...(dailyBounds.length?['Latest day low','Latest day high']:[]),...(lifetimeBounds.length?['Lifetime low','Lifetime high']:[])];
+  const comparisonTerms=[...baseComparisonTerms,...(dailyBounds.length?['Lowest recorded price on ' + latestPriceDate,'Highest recorded price on ' + latestPriceDate]:[]),...(lifetimeBounds.length?['Lowest recorded price in history','Highest recorded price in history']:[])];
   const comparisonLow=Math.min(...comparisonValues),comparisonHigh=Math.max(...comparisonValues),comparisonPadding=Math.max((comparisonHigh-comparisonLow)*.15,comparisonHigh*.02,workbook.settings.tick);
   const profitableShares=mp>0&&['all','current','position'].includes(section)?[...(usingLots?lotRows:reportOpenLots)].filter(lot=>mp>=breakEvenPrice(lot.remainingShares*(lot.buyPrice+lot.buyFeeTotal/lot.originalShares),lot.remainingShares,workbook.settings.feePct,workbook.settings.tick,calcFee)).reduce((sum,lot)=>sum+lot.remainingShares,0):0;
   const netValue=mp>0?grossValue-estSellFee:NaN;
@@ -263,7 +273,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
               <section className="current-position-section"><h4>Cost basis</h4><div className="current-position-metrics"><div className="current-position-metric current-position-primary current-position-break-even"><Tooltip text="The selling price per share required to recover the invested capital and estimated sell fees."><span className="clickable">Break-even / share</span></Tooltip><strong>{fmtPSXPrice(be)}</strong><small>Including sell fees</small></div><div className="current-position-metric"><Tooltip text="Average acquisition cost per share, including buy fees."><span className="clickable">Average cost / share</span></Tooltip><strong>{fmtPSXPrice(avg)}</strong><small>After buy fees</small></div><div className="current-position-metric"><Tooltip text="PSX same-day netting waives commission and SST on the smaller matched leg; government levies still apply."><span className="clickable">Same-day break-even</span></Tooltip><strong>{fmtPSXPrice(beSameDay)}</strong><small>With same-day netting</small></div></div></section>
               <section className="current-position-section"><h4>Performance</h4><div className="current-position-metrics"><div className="current-position-metric current-position-primary"><span>Unrealized P/L</span><strong className={Number.isFinite(netProfit)?netProfit>=0?'text-profit':'text-loss':undefined}>{Number.isFinite(netProfit)?`${netProfit>=0?'▲':'▼'} ${fmtMoney(netProfit,currency)} · ${((netProfit/invested)*100).toFixed(1)}%`:'—'}</strong></div><div className="current-position-metric"><span>Realized P/L</span><strong className={(position?.realized||0)>=0?'text-profit':'text-loss'}>{fmtMoney(position?.realized||0,currency)}</strong></div><div className="current-position-metric"><span>Net P/L</span><strong className={Number.isFinite(netProfit)?(position?.realized||0)+netProfit>=0?'text-profit':'text-loss':undefined}>{Number.isFinite(netProfit)?fmtMoney((position?.realized||0)+netProfit,currency):'—'}</strong></div>{grossValue>0&&<div className="current-position-metric"><span>Estimated CGT</span><strong>{fmtMoney(estCGT,currency)}</strong><small>{workbook.settings.filerStatus==='filer'?`${workbook.settings.cgtFilerPct}% filer rate`:`${workbook.settings.cgtNonFilerPct}% non-filer rate`}</small></div>}</div></section>
               <section className="current-position-section"><h4>Valuation</h4><div className="current-position-metrics"><div className="current-position-metric current-position-primary"><span>Net liquidation value</span><strong className={Number.isFinite(netProfit)?netProfit>=0?'text-profit':'text-loss':undefined}>{Number.isFinite(netValue)?`${netProfit>=0?'▲':'▼'} ${fmtMoney(netValue,currency)}`:'—'}</strong><small>After estimated sell fees</small></div><div className="current-position-metric"><span>Market value</span><strong>{mp>0?fmtMoney(grossValue,currency):'—'}</strong></div><div className="current-position-metric"><span>Net invested</span><strong>{fmtMoney(invested,currency)}</strong><small>Including buy fees</small></div></div></section>
-              <section className="current-position-section current-position-comparison"><h4>Price comparison</h4><CompactChart height={lastSellPrice > 0 ? 220 : 180}><Bar data={{labels:comparisonLabels,datasets:[{data:comparisonValues,backgroundColor:lastSellPrice>0?[STOCK_BUY_COLOR,STOCK_SELL_COLOR,'#a78bfa','#c9a35a']:[STOCK_BUY_COLOR,'#a78bfa','#c9a35a'],maxBarThickness:20}]}} options={{maintainAspectRatio:false,indexAxis:'y',interaction:{mode:'nearest',axis:'y',intersect:false},plugins:{legend:{display:false},datalabels:{display:true,formatter:value=>fmtPSXPrice(Number(value))},tooltip:{callbacks:{title:items=>comparisonTerms[items[0]?.dataIndex]||'',label:context=>fmtPSXPrice(Number(context.raw))}}},scales:{x:{min:Math.max(0,comparisonLow-comparisonPadding),max:comparisonHigh+comparisonPadding,ticks:{callback:value=>fmtPSXPrice(Number(value))}},y:{ticks:{autoSkip:false}}}}}/></CompactChart></section>
+              <section className="current-position-section current-position-comparison"><h4>Price comparison</h4><CompactChart height={Math.max(180, comparisonLabels.length * 36)}><Bar data={{labels:comparisonLabels,datasets:[{data:comparisonValues,backgroundColor:comparisonValues.map((_,index)=>{const baseCount=lastSellPrice>0?4:3;const baseColors=lastSellPrice>0?[STOCK_BUY_COLOR,STOCK_SELL_COLOR,'#a78bfa','#c9a35a']:[STOCK_BUY_COLOR,'#a78bfa','#c9a35a'];return index<baseCount?baseColors[index]:index<baseCount+dailyBounds.length?'#38bdf8':'#64748b';}),maxBarThickness:20}]}} options={{maintainAspectRatio:false,indexAxis:'y',interaction:{mode:'nearest',axis:'y',intersect:false},plugins:{legend:{display:false},datalabels:{display:true,formatter:value=>fmtPSXPrice(Number(value))},tooltip:{callbacks:{title:items=>comparisonTerms[items[0]?.dataIndex]||'',label:context=>fmtPSXPrice(Number(context.raw))}}},scales:{x:{min:Math.max(0,comparisonLow-comparisonPadding),max:comparisonHigh+comparisonPadding,ticks:{callback:value=>fmtPSXPrice(Number(value))}},y:{ticks:{autoSkip:false}}}}}/></CompactChart></section>
               <section className="current-position-section" style={hueStyle(statusHue||HUES[6])}><h4>Suggestions</h4><div className="current-position-metrics"><div className="current-position-metric current-position-primary"><span>Status</span><strong className={`pill ${statusClass} current-position-status`}>{statusLabel}</strong></div><div className="current-position-metric"><span>Exit targets</span><strong className="current-position-targets">+1% {fmtPSXPrice(exitTarget(1))}<br/>+2% {fmtPSXPrice(exitTarget(2))}<br/>+5% {fmtPSXPrice(exitTarget(5))}</strong></div></div></section>
               <section className="current-position-section" style={hueStyle(HUES[6])}><h4>Planned activity</h4><div className="current-position-metrics"><div className="current-position-metric"><span>Pending / planned</span><strong>{pendingPlans.length} / {openPlans.length}</strong></div><div className="current-position-metric"><span>Buy cost including fees</span><strong>{fmtMoney(plannedBuyCost,currency)}</strong></div><div className="current-position-metric"><span>Net sell proceeds</span><strong>{fmtMoney(plannedSellProceeds,currency)}</strong></div><div className="current-position-metric current-position-primary"><span>Cash required</span><strong>{fmtMoney(plannedBuyCost-plannedSellProceeds,currency)}</strong></div><div className="current-position-metric"><span>Projected shares</span><strong>{fmt(shares+plannedLegs.reduce((sum,leg)=>sum+(leg.action==='BUY'?leg.shares:-leg.shares),0),0)}</strong></div></div></section>
             </div>
@@ -273,33 +283,20 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
 
         {(section === 'all' || section === 'all-time') && position && (position.buyCount > 0 || position.sellCount > 0) && (
           <DetailCard section={section} title={<span>All-time stats <StatSourceBadge source="official" /></span>} className="mb-12">
-            <div className="grid-auto" style={gridAutoStyle(100, 8)}>
-              <div className="stat-card card" style={hueStyle(HUES[0])}>
-                <div className="label">Bought / Sold</div>
-                <div className="value">{fmt(position.totalBoughtShares, 0)} / {fmt(position.totalSoldShares, 0)}</div>
-                <div className="sub">{position.buyCount} buys · {position.sellCount} sells</div>
-              </div>
-              {position.sellCount > 0 && (
-                <div className="stat-card card" style={hueStyle(HUES[7])}>
-                  <div className="label">Sell price</div>
-                  <Tooltip text="Weighted average, and most recent, sell price for this ticker.">
-                    <div className="value">{fmtPSXPrice(avgSellPrice)}</div>
-                  </Tooltip>
-                  <div className="sub">avg · last {fmtPSXPrice(lastSellPrice)}</div>
-                </div>
-              )}
-              <div className="stat-card card" style={hueStyle(position.realized >= 0 ? 'var(--profit)' : 'var(--loss)')}>
-                <div className="label">Realized P/L</div>
-                <div className="value">{fmtMoney(position.realized, currency)}</div>
-              </div>
-              <div className="stat-card card" style={hueStyle(HUES[4])}><div className="label">Fees paid</div><div className="value">{fmtMoney(position.buyFees + position.sellFees, currency)}</div></div>
-              <div className="stat-card card" style={hueStyle(HUES[3])}>
-                <div className="label">Trade dates</div>
-                <div className="value fs-14">{position.firstDate}</div>
-                <div className="sub">to {position.lastDate}</div>
-              </div>
-              {!isOpen && <div className="stat-card card" style={hueStyle(HUES[6])}><div className="label">Held</div><div className="value">{holdingDays}d</div></div>}
-            </div>
+            <SummarySections className="stock-all-time-summary">
+              <SummarySection title="Trading activity">
+                <SummaryValue label="Bought / sold" value={`${fmt(position.totalBoughtShares, 0)} / ${fmt(position.totalSoldShares, 0)}`} primary detail={`${position.buyCount} buys · ${position.sellCount} sells`} />
+                {position.sellCount > 0 && <SummaryValue label={<Tooltip text="Weighted average, and most recent, sell price for this ticker.">Sell price</Tooltip>} value={fmtPSXPrice(avgSellPrice)} detail={`Latest ${fmtPSXPrice(lastSellPrice)}`} />}
+                <SummaryValue label="Trade dates" value={position.firstDate} detail={`to ${position.lastDate}`} />
+                {!isOpen && <SummaryValue label="Holding period" value={`${holdingDays} days`} />}
+              </SummarySection>
+              <SummarySection title="Returns & fees">
+                <SummaryValue label="Realized P/L" value={fmtMoney(position.realized, currency)} tone={position.realized >= 0 ? 'positive' : 'negative'} primary />
+                <SummaryValue label="Fees paid" value={fmtMoney(position.buyFees + position.sellFees, currency)} />
+                {(position.unmatchedSellShares ?? 0) > 0 && <SummaryValue label="Unmatched sells" value={fmt(position.unmatchedSellShares ?? 0, 0)} detail={`${position.unmatchedSellTransactions ?? 1} transaction(s) require reconciliation`} tone="negative" />}
+                {(position.unmatchedSellFees ?? 0) > 0 && <SummaryValue label="Fees on unmatched sells" value={fmtMoney(position.unmatchedSellFees ?? 0, currency)} detail="Allocated to excess SELL shares; excluded from realized P/L" tone="negative" />}
+              </SummarySection>
+            </SummarySections>
           </DetailCard>
         )}
 
@@ -408,7 +405,7 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
                 <table>
                   <thead><tr><RecentTh col="when">When</RecentTh><RecentTh col="price">Price</RecentTh><th></th></tr></thead>
                   <tbody>
-                    {sortedRecent.map((p) => {
+                    {priceHistoryPageRows.map((p) => {
                       const rawIndex = rawHistory.indexOf(p);
                       return editPriceIndex === rawIndex && editPriceRow ? (
                         <RecordRow market="psx" record={p} onCancel={cancelEditPrice} key={rawIndex}>
@@ -433,7 +430,8 @@ export function PositionDetail({ ticker, section = 'all', fromDate = '', toDate 
                   </tbody>
                 </table>
               </div>
-              <button className="btn secondary small mt-sm" onClick={exportPriceHistory}>Export price history CSV</button>
+              {priceHistoryPagination}
+            <button className="btn secondary small mt-sm" onClick={exportPriceHistory}>Export price history CSV</button>
             </details>
           </DetailCard>
         )}

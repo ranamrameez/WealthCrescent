@@ -93,7 +93,10 @@ it('edits the exchange fee through the same transfer form opened from the bank s
   await waitFor(() => expect(close).toHaveBeenCalledOnce());
   expect(useWorkbookStore.getState().workbook.transfers[0]).toMatchObject({ gross: 6100, fee: 12 });
   expect(useBankWorkbookStore.getState().workbook.transactions[0].amount).toBe(-6100);
-  expect(useInterEntityTransfersStore.getState().workbook.entries[0]).toMatchObject({ fromAmount: 6100, toAmount: 6100 });
+  expect(useInterEntityTransfersStore.getState().workbook.entries[0]).toMatchObject({
+    fromAmount: 6100, toAmount: 6100,
+    to: { module: 'qse', ref: 'qse-the-group' },
+  });
 });
 it('keeps the entered time when the date changes and defaults new rows to outgoing', () => {
   useBankWorkbookStore.getState().setWorkbook({

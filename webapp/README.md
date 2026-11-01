@@ -14,10 +14,14 @@ FinanceManager live link:
 > backlog/status doc for the project — keep it in sync with reality, not just with
 > `CLAUDE.md` (which is continuity notes for an AI session, not a substitute for this).
 >
-> **Also (2026-08-23): tested changes are auto-committed and pushed without asking first,
-> and the modules in `MODULES_PLAN.md` are being built in suggested order without waiting
-> for per-step confirmation** — both by explicit user instruction. See `USER_MANUAL.md` for
-> end-user-facing docs (kept up to date alongside this file).
+> **Delivery workflow (updated 2026-10-31):** make small, focused commits and push regularly
+> on the active feature branch; keep this README, `USER_MANUAL.md`, `CLAUDE.md`, and
+> `SESSION_HANDOFF.md` current; never push directly to `main`; and do not merge until the
+> latest application-code head passes the full test suite and production build/type-check.
+
+## Current session handoff
+
+For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) before continuing. **Latest handoff: 2026-10-31 — PR #44 merged** (`fix/trade-entry-validation-and-transactions-ui`) into `main` as `d1c3c4c33776dc871cf15f044353359a71c18986`. The merged scope, CI evidence, PSO reconciliation correction (122 BUY vs 132 SELL, 10 unmatched), and remaining manual browser-verification note are recorded in the handoff.
 
 ## Cost-basis worked examples (canonical — keep in sync with tests)
 
@@ -178,6 +182,18 @@ guess — matching the user's own words: *"I may sell in bulk completely differe
 from the lot system."*
 
 ## Done
+
+- **Transaction-page cost-basis consistency slice (2026-10-29, merged in PR #31; full CI green):** QSE/PSX inline SELL P/L now uses the weighted-average engine when Average cost is selected; FIFO/Lowest cost first uses the configured lot method. Open/Closed lot-attribution reports are hidden under Average cost rather than presenting incompatible lot math. The independent page-local lot-match selector was removed. Regression coverage includes weighted-average SELL P/L and unmatched oversells. The production build and full test suite passed in [PR #31](https://github.com/ranamrameez/WealthCrescent/pull/31).
+
+- **CI regression fixes (2026-10-29):** fixed uncontrolled PriceInput resetting to its original default on blur; flushed queued local workbook writes after account-switch/logout resets; preserved intentionally merged-away bundled categories through category normalization; aligned bank navigation tests with the current behavior of showing pending transactions in the ledger. Full validation is in PR #28.
+
+
+
+- Added a data-preserving **Reset all settings to app defaults** action on Account. It resets QSE/PSX broker settings, module preference settings, enabled-currency filters, module visibility, and appearance while preserving financial records and user-created entities; regression test added.
+
+
+- Appearance preferences now include an explicit **Reset appearance to app defaults** action. The reset is persisted locally and restores all appearance fields to `DEFAULT_APPEARANCE`; regression coverage added. This is the first small slice of the broader app-defaults/user-overrides work, not the global settings reset.
+
 
 - **PSX Market Prices API integration (2026-10-22, implemented locally).** All documented
   PSX dataset families have lazy sections and paginated reusable tables. Sector cards
@@ -10245,7 +10261,26 @@ from the lot system."*
   must remain positive, card identity and provenance are protected, stale edits are rejected,
   and linked transactions remain read-only in this flow.
 
+
+- **Broker profiles per exchange (2026-10-29; implementation in progress).** Added a broker-profile data model with separate transaction, transfer, adjustment, dividend, and trade-plan histories plus per-profile settings; old exchange-wide records migrate into the original default profile. QSE starts with **The Group**. PSX starts with **JS Zindagi** active and **AL Habib Capital Markets** as a second profile. The shared broker selector is exposed in the stock top bar and side menu, and a Brokers page supports adding, renaming, switching, archiving history-bearing profiles, and deleting empty profiles. PSX commission defaults are sourced from [Zindigi's stock-fee page](https://zindigi.pk/features/stocks/) (PKR 0.05/share up to PKR 25; 0.20% above PKR 25; same-day paired trades commission only on the higher-value side) and [AHCML's published account-opening tariff](https://ahcml.com/assets/uploads/Normal_AOF.pdf) (PKR 0.03/share up to PKR 20; 0.15% above PKR 20.01). AHCML's accessible tariff is not a complete, clearly current itemization of every levy; levy settings remain editable and must be reconciled against current contract notes. **Validation (2026-10-29):** the Node 24 production build and focused broker-profile/PSX-fee regression tests passed on the feature branch. The formerly tracked full-suite regressions were subsequently fixed by PR #28; its final CI passed all 134 test files and the production build. Browser/Firebase round-trip verification for broker profiles remains outstanding.
+
+- Added version tracking for application defaults on broker profiles. When a newer app-default version is introduced, profiles with differing values offer an explicit choice to apply current defaults or keep the user's custom settings; applying defaults preserves transaction history.
+
+- **Stock-trade FAB save recovery (2026-10-29).** The shared Buy/sell stock popup closes only after the QSE/PSX transaction-store update succeeds. If the synchronous update throws, the form preserves entered values and shows a retryable error. Added a QSE regression test for saved trade data and the success callback. The original callback behavior was already present on current main; this slice ports the missing error recovery and regression test from PR #23.
+
+## Done
+
+- **Persisted QSE/PSX transaction ordering (2026-10-30, PR #36 merged):** `globalTransactionIndex` is the canonical accounting order across all trades; `perTickerIndex` is derived from that same order for each ticker. Reordering trades swaps global positions and recalculates per-ticker positions in one shared helper, so the two indexes cannot drift. Legacy `transactionIndex` and `seq` are compatibility mirrors only. Legacy workbooks are migrated and all store add/edit/delete/plan-execution paths keep indexes synchronized. QSE/PSX tables expose cross-date move controls without changing effective trade dates. PR #36 merged as `e4aef0bcd2ccf20e2cd7c73a3fe98cc293943be8` after full tests and production build passed in Actions run #94. The combined cash ledger still displays mixed trade/transfer/adjustment events chronologically; unified mixed-event ordering remains a separate unresolved design item.
+
+- **PR #44 — shared finance UI and trade-entry safeguards (2026-10-31, merged):** Squash-merged from `fix/trade-entry-validation-and-transactions-ui` into `main` as `d1c3c4c33776dc871cf15f044353359a71c18986`. This standardizes functional section-card actions, shared pagination across finance/trading ledgers, credit-card running limit columns, Funds/Brokers peer navigation, expanded primary sections, inline summary subsections, all-time stock-detail defaults, daily/lifetime price bounds, QSE/PSX sell and price-deviation safeguards, FAB save verification, and legacy oversell reconciliation. Unmatched SELL fees are allocated proportionally, excluded from realized P/L, and displayed in QSE/PSX warnings and all-time summaries. Application-code head `18348fa258be95767b209b8585b575a8acdd2cf8` passed the full test suite and type-check/production build in Actions run #41201015866; later branch commits were documentation-only. PSO regression remains 122 BUY / 132 SELL with 10 unmatched SELL shares and no fictitious realized profit. Interactive browser checks were not completed in the connected session; verify the affected flows in the deployed UI when convenient. See `SESSION_HANDOFF.md` for the full review and validation record.
+
 ## Pending
+
+
+
+- **Remaining cost-basis dependency audit (after PR #31):** continue beyond the QSE/PSX transaction pages. Verify Dashboard, Position Detail, analytics/time series, exports, charts, and strategy/advisory surfaces against the configured method. Canonical synchronized global/per-ticker transaction ordering was merged in PR #36 and passed CI. The separate mixed-event cash ledger still displays by effective date and needs its own design/tests if it must follow global accounting order. Do not merge stale PR #22. See `SESSION_HANDOFF.md` and `audit.md`.
+
+- **App defaults / user overrides (partially implemented; 2026-10-29):** PRs #25–#27 are merged. Appearance reset and Account-page reset-all-settings restore settings/UI preferences to current built-in defaults while preserving financial records. Broker profiles carry an app-default version and users with differing settings can choose to apply the newer broker defaults or keep custom values. Remaining: decide/build a maintainable admin-facing source of truth/editor and broaden versioned default-change suggestions beyond broker profiles if required; browser/live-account verification is still outstanding. Do not describe the entire admin-managed defaults system as complete. See [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md).
 
 - **Activate PSX market cache:** merge the PSX rules fragment into existing rules, deploy
   `fetchPsxMarketData`, run the first refresh and verify the shared reference/cache paths.
@@ -10253,22 +10288,8 @@ from the lot system."*
   bootstrap was rejected with HTTP 401 before any mutation. Local UI uses bundled
   references and any existing cached prices until deployment/population is completed.
 
-- **Verification baseline (2026-10-15):** the full suite previously had eight
-  failures reproduced on unchanged HEAD: planControls accessible names,
-  sharedExchangeDerived identity, two categoryMerge cases, resetLocalData timing,
-  PriceInput PSX rounding, and two bankNavigation visibility cases. These remain
-  separate from the table-card changes. Production build and the focused table/QSE
-  checks pass; the final ledger layout has ten passing page tests.
-
-- Explicit application type-check (`tsc -p tsconfig.app.json --noEmit`, 2026-10-04)
-  still reports errors in CashPage, PlanningPage, and RentalsPage. The current build
-  command checks the root references file, so a successful production build alone
-  does not establish that every application TypeScript file passes.
-
-- Verification follow-up (2026-09-29): the full suite currently has eight failures across
-  resetLocalData, categoryMerge, planControls, useUrlTransactionFilters, and bankNavigation.
-  Dashboard regression tests pass. Repository lint also reports existing hook-rule errors
-  in TransactionEntryModal; these broader checks need a separate cleanup.
+- **Verification baseline (updated 2026-10-29):** PR #28 fixed the tracked full-suite regressions. Its final CI passed the production build and all 134 test files; the post-merge Pages workflow succeeded. PR #30 and PR #31 also passed their production-build and full-test-suite checks. This supersedes the stale 2026-10-15 and 2026-09-29 failure counts above. It does not establish that every app-wide calculation surface or live Firebase/browser workflow has been audited.
+- Explicit application type-check (`tsc -p tsconfig.app.json --noEmit`) and lint remain separate checks; do not infer their status from the production build alone.
 
 - Batch editing follow-ups: extend the shared grid to other modules; design explicit
   linked-side and recurring/generated-plan editing; add clipboard range paste and
@@ -11602,3 +11623,17 @@ Done: Cash and Rentals transaction batch editors reuse formula entry, dirty-colu
 Done: EMI, Funds/brokers, and Subscriptions detail sections now use the shared Banking-based template. Cash and Rentals expose separate Summary sections. Personal Loans no longer renders its section stack twice when batch editors close. See MODULE_TEMPLATE.md for migration coverage.
 
 Pending: extend batch editing to the remaining ledgers and audit their date/filter behavior independently of the section-layout migration. Stock Exchanges are excluded.
+
+PR #36 follow-up: QSE batch editor validation/reorder fixes were committed on `feat/persisted-trade-accounting-order` after the prior CI run. See audit/handoff. Fresh CI is still required.
+
+## Mutual Funds date and amount correction (2026-10-30)
+
+- **Implemented on `fix/mutual-funds-ledger-sync-main`; validation pending:** Balance History displays the effective date and sorts by that date (time is only a same-day tie-breaker). Editing an Invest/Withdraw transaction's Amount recalculates units from its NAV. Regression tests cover stale timestamp ordering, latest NAV synchronization after an effective-date edit, and amount-to-units conversion.
+- Keep Invest and Withdraw as separate transaction actions (BUY/SELL); P&L remains derived from contributed/withdrawn capital and NAV performance. Do not add a separate P&L transaction type.
+- **Not included:** transfer-to-Funds cash-on-hand reconciliation. The existing Funds transfer model has no per-fund uninvested-cash account, so counting transfers as invested value would risk double-counting after a BUY. Track that as a separate accounting-model task; do not silently fold transfers into holdings/NAV.
+- PR #36 is merged into `main` after Actions run #94 passed tests and production build. Broker-profile work is now in main-targeted PR #39; Mutual Funds work is being rebased onto current `main` in PR #40. Merge only after the latest head SHA has a green full-test and production-build run.
+
+
+## Broker-profile isolation — PR #43 latest validation (2026-10-30)
+
+PR #43 latest head `dcf3181a0a8955417c4049089f4735685c25a8ec` passed Actions run #112 (full tests + production build). Manual backup/export migration review and browser verification remain required before merge.

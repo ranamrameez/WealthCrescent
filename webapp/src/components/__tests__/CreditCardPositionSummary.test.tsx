@@ -19,7 +19,7 @@ it('scopes actual and expected debt to the selected card, carrying history and e
     {id:'other',cardId:'b',date:'2026-10-15',kind:'charge',amount:900,description:'Other card plan'},
   ]});
   const {container}=render(<CreditCardPositionSummary card={card} filters={{period:'custom',fromDate:'2026-10-01',toDate:'2026-10-31',accountId:'all',direction:'all',source:'all',category:'all'}} />);
-  const groups=[...container.querySelectorAll('.account-summary-card')];
+  const groups=[...container.querySelectorAll('.current-position-section')];
   const actual=groups.find(group=>group.querySelector('h4')?.textContent==='Outstanding card debt')!;
   const expected=groups.find(group=>group.querySelector('h4')?.textContent==='Expected card debt')!;
   expect(actual.textContent).toContain(fmtMoney(150,'QAR'));

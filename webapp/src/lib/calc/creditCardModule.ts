@@ -117,6 +117,25 @@ export function outstandingBalanceByCard(card: CreditCard, transactions: CreditC
   return balanceAsOf(card, transactions.filter((t) => t.cardId === card.id), '9999-12-31');
 }
 
+/** Running consumed-credit balance after each transaction, keyed by transaction
+ * id. It uses the full chronological card ledger (including opening debt), so
+ * table filters and display sorting never reset or reorder the financial effect. */
+export function creditCardRunningBalances(card: CreditCard, transactions: CreditCardTransaction[]): Map<string, number> {
+  const ordered = transactions
+    .map((transaction, index) => ({ transaction, index }))
+    .filter(({ transaction }) => transaction.cardId === card.id)
+    .sort((a, b) => a.transaction.date.localeCompare(b.transaction.date)
+      || (a.transaction.seq ?? 0) - (b.transaction.seq ?? 0)
+      || a.index - b.index);
+  let balance = card.openingBalance ?? 0;
+  const result = new Map<string, number>();
+  for (const { transaction } of ordered) {
+    balance = Math.max(0, balance + (transaction.kind === 'payment' ? -transaction.amount : transaction.amount));
+    result.set(transaction.id, balance);
+  }
+  return result;
+}
+
 export interface CreditCardStatement {
   /** Exclusive lower bound of THIS CYCLE — the one containing `asOfDate`,
    * whether or not it has actually closed yet (see `currentStatement`'s

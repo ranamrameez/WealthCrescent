@@ -2,15 +2,16 @@ import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { CreditCardPositionSummary } from '../../../components/CreditCardPositionSummary';
 import { DateValue } from '../../../components/DateValue';
+import { useTablePagination } from '../../../hooks/useTablePagination';
 import { ToggleChip } from '../../../components/ui/ToggleChip';
 import { EntityEditorModal } from '../../../components/EntityEditorModal';
 import { planOccurrences, occurrenceCompleted } from '../../../lib/calc/planOccurrences';
 import { BackButton } from '../../../components/BackButton';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CreditCardVisual } from '../../../components/CreditCardVisual';
-import { SummaryGroupCard, SummaryMetric } from '../../../components/SummaryGroupCard';
+import { SummarySection, SummarySections, SummaryValue } from '../../../components/SummaryGroupCard';
 import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu';
 import { TopBarControls, TopBarSelect } from '../../../components/TopBarControls';
 import { StandardCard, SummaryChip } from '../../../components/StandardCard';
@@ -18,9 +19,8 @@ import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
 import { AnalyticsChartEnhancer } from '../../../components/AnalyticsChartCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
-import { ArrowLeftIcon, ArrowRightIcon, EditIcon, ListIcon, PlusIcon, SaveIcon, TransferIcon, TrashIcon } from '../../../components/icons';
+import { EditIcon, ListIcon, PlusIcon, SaveIcon, TransferIcon, TrashIcon } from '../../../components/icons';
 import { Modal } from '../../../components/Modal';
-import { StandardButton } from '../../../components/standard';
 import { FabPanel } from '../../../components/ui/Fab';
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
 import { CreditCardTransactionsBatchEditor } from '../../../components/LazyFinanceBatchEditors';
@@ -42,7 +42,6 @@ import { usePageTopBarChips, usePageTopBarRightSlot } from '../../../hooks/usePa
 import { useUrlTransactionFilters, type TransactionPageFilters } from '../../../hooks/useUrlTransactionFilters';
 import { getLastTransferSource, rememberTransferSource } from '../../../hooks/useLastTransferSource';
 import { categoryName, UNCATEGORIZED_ID } from '../../../lib/categories';
-import { gridAutoStyle } from '../../../lib/gridStyle';
 import { dlBarV, dlDoughnut } from '../../../lib/chartLabels';
 import { applyChartTheme } from '../../../lib/chartSetup';
 import { cssVar, tickerColor } from '../../../lib/cssVar';
@@ -52,6 +51,7 @@ import { type PlanningHorizonDays } from '../../../lib/calc/plannedBalance';
 import { useCategoryStore } from '../../../store/categoryStore';
 import {
   creditCardMonthlyHistory,
+  creditCardRunningBalances,
   creditCardCycleHistory,
   activeCycleStatement,
   latestClosedStatement,
@@ -451,14 +451,11 @@ function CreditCardTransactionEditModal({
 
 function TransactionsTable({ card, filters, showActions = false }: { card: CreditCard; filters: TransactionPageFilters; showActions?: boolean }) {
   const dateSort = useDateTableSort();
-  useEffect(() => setPage(1), [dateSort.selection]);
   const transactions = useCreditCardWorkbookStore((s) => s.workbook.transactions);
   const deleteTransaction = useCreditCardWorkbookStore((s) => s.deleteTransaction);
   const categories = useCategoryStore((s) => s.workbook.categories);
   const [detail, setDetail] = useState<CreditCardTransaction | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<CreditCardTransaction | null>(null);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
   const cardTxs = useMemo(
     () => [...transactions].filter((t) => t.cardId === card.id).sort((a, b) => b.date.localeCompare(a.date) || (b.seq ?? 0) - (a.seq ?? 0)),
     [transactions, card.id],
@@ -473,10 +470,11 @@ function TransactionsTable({ card, filters, showActions = false }: { card: Credi
     return true;
   }), [cardTxs, filters, categories]);
   const filtered = dateSort.rows(dateSortInput, { date: row => row });
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const safePage = Math.min(page, pageCount);
-  const pageRows = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
-  useEffect(() => setPage(1), [filters.fromDate, filters.toDate, filters.direction, filters.category, filters.source, pageSize]);
+  const { rows: pageRows, controls: paginationControls } = useTablePagination(filtered);
+  // Running utilization is calculated from the complete chronological ledger,
+  // never from the filtered/sorted page, so a date filter cannot reset the
+  // opening balance or change the limit usage shown on an individual row.
+  const runningConsumedById = useMemo(() => creditCardRunningBalances(card, cardTxs), [card, cardTxs]);
 
   if (!cardTxs.length) return <p className="text-muted m-0">No transactions yet.</p>;
   return (
@@ -484,7 +482,7 @@ function TransactionsTable({ card, filters, showActions = false }: { card: Credi
     <div className="section-toolbar"><span className="text-muted">Central filters apply to this ledger: {filtered.length} of {cardTxs.length} transactions</span></div>
     <div className="table-responsive">
       <table>
-        <thead><tr><dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th><th>Type</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr></thead>
+        <thead><tr><dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th><th>Type</th><th>Description</th><th>Category</th><th>Amount</th><th>Consumed limit</th><th>Allowed limit</th><th>Available limit</th><th></th></tr></thead>
         <tbody>
           {pageRows.map((t) => (
             <RecordRow onEdit={() => setEditingTransaction(t)}    record={t}  key={t.id} className="clickable" >
@@ -493,6 +491,9 @@ function TransactionsTable({ card, filters, showActions = false }: { card: Credi
               <td className="cell-clip" title={t.description}>{t.description}</td>
               <td>{categoryName(t.categoryID, categories)}</td>
               <td>{fmtMoney(t.amount, card.currencyCode)}</td>
+              <td>{fmtMoney(runningConsumedById.get(t.id) ?? 0, card.currencyCode)}</td>
+              <td>{card.creditLimit == null ? '—' : fmtMoney(card.creditLimit, card.currencyCode)}</td>
+              <td>{card.creditLimit == null ? '—' : fmtMoney(Math.max(0, card.creditLimit - (runningConsumedById.get(t.id) ?? 0)), card.currencyCode)}</td>
               <td onClick={(e) => e.stopPropagation()}>
                 {showActions && <IconButton label="Edit" icon={<EditIcon size={12} />} align="right" onClick={() => setEditingTransaction(t)} />}
                 {showActions && <IconButton
@@ -506,14 +507,11 @@ function TransactionsTable({ card, filters, showActions = false }: { card: Credi
               </td>
             </RecordRow>
           ))}
-          {!pageRows.length && <tr><td colSpan={6} className="text-muted">No transactions match these filters.</td></tr>}
+          {!pageRows.length && <tr><td colSpan={9} className="text-muted">No transactions match these filters.</td></tr>}
         </tbody>
       </table>
     </div>
-      <div className="pagination-bar">
-        <div className="text-muted">{filtered.length ? `Showing ${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, filtered.length)} of ${filtered.length}` : 'No rows'}</div>
-        <div className="pagination-actions"><span className="text-muted">Page {safePage} of {pageCount}</span><Field label="Rows" width={78}><Select value={String(pageSize)} onChange={(event) => setPageSize(Number(event.target.value))}><option value="25">25</option><option value="50">50</option><option value="100">100</option></Select></Field><StandardButton tone="secondary" size="small" icon={<ArrowLeftIcon />} disabled={safePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</StandardButton><StandardButton tone="secondary" size="small" icon={<ArrowRightIcon />} disabled={safePage >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Next</StandardButton></div>
-      </div>
+      {paginationControls}
       {editingTransaction && <CreditCardTransactionEditModal transaction={editingTransaction} onClose={() => setEditingTransaction(null)} />}
       {detail && (
         <RecordDetailModal
@@ -633,16 +631,18 @@ function CreditCardAnalyticsSection({ card, transactions }: { card: CreditCard; 
 
   return <>
     <div className="account-summary-grid mb-md">
-      <SummaryGroupCard title="Credit utilization" hue={utilization !== null && utilization > 80 ? 'var(--loss)' : 'var(--accent)'} tooltip="Current outstanding balance as a percentage of the configured credit limit.">
-        <SummaryMetric label="Used of limit" value={utilization === null ? 'Limit not set' : `${utilization.toFixed(1)}%`} tone={utilization !== null && utilization > 80 ? 'pill-negative' : 'pill-positive'} large />
-        <SummaryMetric label="Outstanding" value={fmtMoney(periodEndActual, card.currencyCode)} tone="pill-negative" />
-        {card.creditLimit ? <SummaryMetric label="Available" value={fmtMoney(Math.max(0, card.creditLimit - Math.max(0, periodEndActual)), card.currencyCode)} tone="pill-positive" /> : null}
-      </SummaryGroupCard>
-      <SummaryGroupCard title="Payment coverage" hue={paymentCoverage !== null && paymentCoverage < 100 ? 'var(--gold)' : 'var(--profit)'} tooltip="Payments divided by charges across the visible card history. This is a trend signal, not a statement amount.">
-        <SummaryMetric label="Paid vs spent" value={paymentCoverage === null ? 'No charges yet' : `${paymentCoverage.toFixed(1)}%`} tone={paymentCoverage !== null && paymentCoverage < 100 ? 'pill-negative' : 'pill-positive'} large />
-        <SummaryMetric label="Total spent" value={fmtMoney(totalSpent, card.currencyCode)} tone="pill-negative" />
-        <SummaryMetric label="Total paid" value={fmtMoney(totalPaid, card.currencyCode)} tone="pill-positive" />
-      </SummaryGroupCard>
+      <SummarySections className="account-summary-sections">
+        <SummarySection title="Credit utilization">
+          <SummaryValue label="Used of limit" value={utilization === null ? 'Limit not set' : `${utilization.toFixed(1)}%`} primary tone={utilization !== null && utilization > 80 ? 'negative' : 'positive'} />
+          <SummaryValue label="Outstanding" value={fmtMoney(periodEndActual, card.currencyCode)} tone="negative" />
+          {card.creditLimit ? <SummaryValue label="Available" value={fmtMoney(Math.max(0, card.creditLimit - Math.max(0, periodEndActual)), card.currencyCode)} tone="positive" /> : null}
+        </SummarySection>
+        <SummarySection title="Payment coverage">
+          <SummaryValue label="Paid vs spent" value={paymentCoverage === null ? 'No charges yet' : `${paymentCoverage.toFixed(1)}%`} primary tone={paymentCoverage !== null && paymentCoverage < 100 ? 'negative' : 'positive'} />
+          <SummaryValue label="Total spent" value={fmtMoney(totalSpent, card.currencyCode)} tone="negative" />
+          <SummaryValue label="Total paid" value={fmtMoney(totalPaid, card.currencyCode)} tone="positive" />
+        </SummarySection>
+      </SummarySections>
     </div>
     <div className="analytics-grid">
     <AnalyticsChartEnhancer />
@@ -794,31 +794,32 @@ export function CreditCardDetailPage() {
         hue={card.color}
         summary={<SummaryChip label="Outstanding" value={fmtMoney(balance, card.currencyCode)} />}
       >
-        <CreditCardPositionSummary card={card} filters={filters} /><div className="grid-auto" style={gridAutoStyle(300, 12)}>
-          <SummaryGroupCard title="Locked billing cycle" hue="var(--loss)" tooltip="The completed billing cycle. New purchases cannot change these bill figures; eligible payments reduce what remains due.">
+        <CreditCardPositionSummary card={card} filters={filters} />
+        <SummarySections className="credit-card-cycle-summary">
+          <SummarySection title="Locked billing cycle">
             {statement ? <>
-              <SummaryMetric label="Remaining total due" value={fmtMoney(statement.remainingStatementBalance, card.currencyCode)} tone={statement.remainingStatementBalance > 0 ? 'pill-negative' : 'pill-positive'} large />
-              <SummaryMetric label="Original bill" value={fmtMoney(statement.statementBalance, card.currencyCode)} />
-              <SummaryMetric label="Paid after billing" value={fmtMoney(statement.paymentsAfterClose, card.currencyCode)} tone="pill-positive" />
-              <SummaryMetric label="Minimum still due" value={fmtMoney(statement.remainingMinimumDue, card.currencyCode)} tone={statement.remainingMinimumDue > 0 ? 'pill-negative' : 'pill-positive'} />
-              <SummaryMetric label="Minimum date" value={statement.minDueDate ?? 'Not set'} />
-              <SummaryMetric label="Full-payment date" value={statement.dueDate ?? 'Not set'} />
-              {markup > 0 && <SummaryMetric label="Markup if carried" value={fmtMoney(markup, card.currencyCode)} tone="pill-negative" />}
-              <SummaryMetric label="Cycle" value={<><DateValue value={statement.cycleStart} /> {'\u2192'} <DateValue value={statement.cycleEnd} /></>} />
+              <SummaryValue label="Remaining total due" value={fmtMoney(statement.remainingStatementBalance, card.currencyCode)} tone={statement.remainingStatementBalance > 0 ? 'negative' : 'positive'} primary />
+              <SummaryValue label="Original bill" value={fmtMoney(statement.statementBalance, card.currencyCode)} />
+              <SummaryValue label="Paid after billing" value={fmtMoney(statement.paymentsAfterClose, card.currencyCode)} tone="positive" />
+              <SummaryValue label="Minimum still due" value={fmtMoney(statement.remainingMinimumDue, card.currencyCode)} tone={statement.remainingMinimumDue > 0 ? 'negative' : 'positive'} />
+              <SummaryValue label="Minimum date" value={statement.minDueDate ?? 'Not set'} />
+              <SummaryValue label="Full-payment date" value={statement.dueDate ?? 'Not set'} />
+              {markup > 0 && <SummaryValue label="Markup if carried" value={fmtMoney(markup, card.currencyCode)} tone="negative" />}
+              <SummaryValue label="Cycle" value={<><DateValue value={statement.cycleStart} /> {'\u2192'} <DateValue value={statement.cycleEnd} /></>} />
             </> : <p className="text-muted m-0">Add the last billing date in Card details.</p>}
-          </SummaryGroupCard>
-          <SummaryGroupCard title="Open billing cycle" hue="var(--accent)" tooltip="Activity accumulating since the last billing cut-off. It belongs to the next bill and does not alter the locked cycle.">
+          </SummarySection>
+          <SummarySection title="Open billing cycle">
             {openCycle ? <>
-              <SummaryMetric label="Net new balance" value={fmtMoney(openCycleNet, card.currencyCode)} tone={openCycleNet > 0 ? 'pill-negative' : 'pill-positive'} large />
-              <SummaryMetric label="Spent" value={fmtMoney(openCycle.chargesThisCycle, card.currencyCode)} tone="pill-negative" />
-              <SummaryMetric label="Paid" value={fmtMoney(openCycle.paymentsThisCycle, card.currencyCode)} tone="pill-positive" />
-              <SummaryMetric label="Current outstanding" value={fmtMoney(balance, card.currencyCode)} tone={balance > 0 ? 'pill-negative' : 'pill-positive'} />
-              {card.creditLimit ? <SummaryMetric label="Available credit" value={fmtMoney(Math.max(0, card.creditLimit - Math.max(0, balance)), card.currencyCode)} tone="pill-positive" /> : null}
-              <SummaryMetric label="Next billing date" value={openCycle.cycleEnd} />
-              <SummaryMetric label="Cycle" value={<><DateValue value={openCycle.cycleStart} /> {'\u2192'} <DateValue value={openCycle.cycleEnd} /></>} />
+              <SummaryValue label="Net new balance" value={fmtMoney(openCycleNet, card.currencyCode)} tone={openCycleNet > 0 ? 'negative' : 'positive'} primary />
+              <SummaryValue label="Spent" value={fmtMoney(openCycle.chargesThisCycle, card.currencyCode)} tone="negative" />
+              <SummaryValue label="Paid" value={fmtMoney(openCycle.paymentsThisCycle, card.currencyCode)} tone="positive" />
+              <SummaryValue label="Current outstanding" value={fmtMoney(balance, card.currencyCode)} tone={balance > 0 ? 'negative' : 'positive'} />
+              {card.creditLimit ? <SummaryValue label="Available credit" value={fmtMoney(Math.max(0, card.creditLimit - Math.max(0, balance)), card.currencyCode)} tone="positive" /> : null}
+              <SummaryValue label="Next billing date" value={openCycle.cycleEnd} />
+              <SummaryValue label="Cycle" value={<><DateValue value={openCycle.cycleStart} /> {'\u2192'} <DateValue value={openCycle.cycleEnd} /></>} />
             </> : <p className="text-muted m-0">Add the last billing date in Card details.</p>}
-          </SummaryGroupCard>
-        </div>
+          </SummarySection>
+        </SummarySections>
       </StandardCard></div>
 
       {statement && (
@@ -868,22 +869,26 @@ export function CreditCardDetailPage() {
       {batchEditOpen && <CreditCardTransactionsBatchEditor card={card} rows={visibleTransactions} onClose={() => setBatchEditOpen(false)} />}
 
       <div id="card-history"><StandardCard title="Monthly history" hue={card.color} defaultOpen={false}>
-        <div className="account-summary-grid">{monthlyHistory.map((month) => <SummaryGroupCard key={month.month} title={month.month} hue={month.spent - month.paid > 0 ? 'var(--loss)' : 'var(--profit)'} tooltip="Calendar-month spending, payments, net change, and closing card balance.">
-          <SummaryMetric label="Closing balance" value={fmtMoney(month.balanceEnd, card.currencyCode)} tone={month.balanceEnd > 0 ? 'pill-negative' : 'pill-positive'} large />
-          <SummaryMetric label="Spent" value={fmtMoney(month.spent, card.currencyCode)} tone="pill-negative" />
-          <SummaryMetric label="Paid" value={fmtMoney(month.paid, card.currencyCode)} tone="pill-positive" />
-          <SummaryMetric label="Net change" value={fmtMoney(month.spent - month.paid, card.currencyCode)} tone={month.spent - month.paid > 0 ? 'pill-negative' : 'pill-positive'} />
-        </SummaryGroupCard>)}</div>
+        <SummarySections className="account-summary-sections">
+          {monthlyHistory.map((month) => <SummarySection key={month.month} title={month.month}>
+            <SummaryValue label="Closing balance" value={fmtMoney(month.balanceEnd, card.currencyCode)} primary tone={month.balanceEnd > 0 ? 'negative' : 'positive'} />
+            <SummaryValue label="Spent" value={fmtMoney(month.spent, card.currencyCode)} tone="negative" />
+            <SummaryValue label="Paid" value={fmtMoney(month.paid, card.currencyCode)} tone="positive" />
+            <SummaryValue label="Net change" value={fmtMoney(month.spent - month.paid, card.currencyCode)} tone={month.spent - month.paid > 0 ? 'negative' : 'positive'} />
+          </SummarySection>)}
+        </SummarySections>
       </StandardCard></div>
 
       <div id="card-cycles"><StandardCard title="Billing cycle history" hue={card.color} defaultOpen={false}>
-        <div className="account-summary-grid">{cycleHistory.map((cycle) => <SummaryGroupCard key={`${cycle.cycleStart}-${cycle.cycleEnd}`} title={`${cycle.cycleStart} → ${cycle.cycleEnd}`} hue={cycle.remainingStatementBalance > 0 ? 'var(--loss)' : 'var(--profit)'} tooltip="Locked statement cycle. Payments through the final due date reduce this cycle; later payments belong to the next active cycle.">
-          <SummaryMetric label="Remaining total due" value={fmtMoney(cycle.remainingStatementBalance, card.currencyCode)} tone={cycle.remainingStatementBalance > 0 ? 'pill-negative' : 'pill-positive'} large />
-          <SummaryMetric label="Original bill" value={fmtMoney(cycle.statementBalance, card.currencyCode)} />
-          <SummaryMetric label="Paid after billing" value={fmtMoney(cycle.paymentsAfterClose, card.currencyCode)} tone="pill-positive" />
-          <SummaryMetric label="Minimum still due" value={fmtMoney(cycle.remainingMinimumDue, card.currencyCode)} tone={cycle.remainingMinimumDue > 0 ? 'pill-negative' : 'pill-positive'} />
-          <SummaryMetric label="Full-payment date" value={cycle.dueDate ?? 'Not set'} />
-        </SummaryGroupCard>)}</div>
+        <SummarySections className="account-summary-sections">
+          {cycleHistory.map((cycle) => <SummarySection key={`${cycle.cycleStart}-${cycle.cycleEnd}`} title={`${cycle.cycleStart} → ${cycle.cycleEnd}`}>
+            <SummaryValue label="Remaining total due" value={fmtMoney(cycle.remainingStatementBalance, card.currencyCode)} primary tone={cycle.remainingStatementBalance > 0 ? 'negative' : 'positive'} />
+            <SummaryValue label="Original bill" value={fmtMoney(cycle.statementBalance, card.currencyCode)} />
+            <SummaryValue label="Paid after billing" value={fmtMoney(cycle.paymentsAfterClose, card.currencyCode)} tone="positive" />
+            <SummaryValue label="Minimum still due" value={fmtMoney(cycle.remainingMinimumDue, card.currencyCode)} tone={cycle.remainingMinimumDue > 0 ? 'negative' : 'positive'} />
+            <SummaryValue label="Full-payment date" value={cycle.dueDate ?? 'Not set'} />
+          </SummarySection>)}
+        </SummarySections>
       </StandardCard></div>
 
       <div id="card-analytics"><StandardCard title="Analytics" hue={card.color} defaultOpen={false}>
@@ -1026,6 +1031,7 @@ function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: Pl
   );
   const dateSortInput = useMemo(() => [...plans].sort((a, b) => a.date.localeCompare(b.date)), [plans]);
   const sorted = dateSort.rows(dateSortInput, { date: row => row });
+  const { rows: pageRows, controls: paginationControls } = useTablePagination(sorted);
 
   const markDone = async (p: PlannedCreditCardTransaction & { planId?: string }) => {
     const occurrenceDate = p.date;
@@ -1056,7 +1062,7 @@ function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: Pl
         <table>
           <thead><tr><dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th><th>Type</th><th>Description</th><th>Amount</th><th>Repeats / status</th><th></th></tr></thead>
           <tbody>
-            {sorted.map((p) => (
+            {pageRows.map((p) => (
               <RecordRow onEdit={() => setEditingPlan(allPlans.find((plan) => plan.id === (p.planId ?? p.id)) ?? p)}    record={p}  key={p.id}>
                 <td><DateValue value={p.date} /></td>
                 <td className={p.kind === 'payment' ? 'pill pill-positive' : 'pill pill-negative'} style={{ display: 'inline-block' }}>{KIND_LABELS[p.kind]}</td>
@@ -1083,6 +1089,7 @@ function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: Pl
           </tbody>
         </table>
       </div>
+      {paginationControls}
       {editingPlan && (
         <Modal title="Edit plan" onClose={() => setEditingPlan(null)}>
           <AddCardPlanForm cardId={card.id} plan={editingPlan} onSaved={() => setEditingPlan(null)} />

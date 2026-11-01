@@ -3,10 +3,10 @@ import { sortTransactionsChronological } from './sortTransactions';
 
 const EPSILON = 1e-7;
 
-/** Weighted-average-cost position rollup per ticker. Pending and invalid
- * oversell transactions are excluded from accounting; this app does not
- * model short positions, so a SELL larger than the currently-held quantity
- * cannot legitimately create zero-cost profit. */
+/** Weighted-average-cost position rollup per ticker. Pending transactions are
+ * excluded. For legacy oversells, only the quantity backed by tracked holdings
+ * closes; unmatched shares/fees are exposed separately and never create
+ * zero-cost realized profit. New oversells are blocked by trade-entry forms. */
 export function computePositions(transactions: Transaction[], calcFee: FeeCalculator): Position[] {
   const byTicker: Record<string, Position> = {};
   const sorted = sortTransactionsChronological(transactions.filter((t) => !t.isPending));
@@ -20,13 +20,6 @@ export function computePositions(transactions: Transaction[], calcFee: FeeCalcul
     if (tx.date < p.firstDate) p.firstDate = tx.date;
     if (tx.date > p.lastDate) p.lastDate = tx.date;
 
-    if (tx.action === 'SELL' && tx.shares > p.shares + EPSILON) {
-      // Short accounting is not supported. Never convert unmatched shares
-      // into fictitious realized profit or cash; the invalid transaction is
-      // ignored consistently by the other accounting ledgers.
-      continue;
-    }
-
     const amount = tx.shares * tx.price;
     const isBuy = tx.action === 'BUY';
     const fee = calcFee(amount, isBuy, { shares: tx.shares, tx });
@@ -38,14 +31,20 @@ export function computePositions(transactions: Transaction[], calcFee: FeeCalcul
       p.totalBoughtShares += tx.shares;
       p.buyCount += 1;
     } else {
+      const matchedShares = Math.min(tx.shares, p.shares);
+      const unmatchedShares = Math.max(0, tx.shares - matchedShares);
       const avg = p.shares > 0 ? p.invested / p.shares : 0;
-      const costRemoved = avg * tx.shares;
-      p.realized += amount - fee - costRemoved;
+      const costRemoved = avg * matchedShares;
+      const matchedFee = tx.shares > 0 ? fee * matchedShares / tx.shares : 0;
+      p.realized += matchedShares * tx.price - matchedFee - costRemoved;
       p.invested -= costRemoved;
-      p.shares -= tx.shares;
+      p.shares -= matchedShares;
       p.sellFees += fee;
       p.totalSoldShares += tx.shares;
       p.sellCount += 1;
+      p.unmatchedSellShares = (p.unmatchedSellShares ?? 0) + unmatchedShares;
+      p.unmatchedSellFees = (p.unmatchedSellFees ?? 0) + (fee - matchedFee);
+      p.unmatchedSellTransactions = (p.unmatchedSellTransactions ?? 0) + (unmatchedShares > EPSILON ? 1 : 0);
       if (p.shares < EPSILON) p.shares = 0;
       if (p.shares === 0) p.invested = 0;
     }

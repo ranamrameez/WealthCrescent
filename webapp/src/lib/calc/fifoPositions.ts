@@ -19,6 +19,9 @@ interface TickerState {
   sellFees: number;
   totalBoughtShares: number;
   totalSoldShares: number;
+  unmatchedSellShares: number;
+  unmatchedSellFees: number;
+  unmatchedSellTransactions: number;
   buyCount: number;
   sellCount: number;
   firstDate: string;
@@ -120,9 +123,10 @@ export function consumeLotsForSell<T extends { remainingShares: number; buyPrice
  * recommended default for the official numbers. */
 export type LotMatchOrder = 'fifo' | 'lowestCostFirst';
 
-/** FIFO/specific-lot accounting. Pending orders are excluded. Since this app
- * does not model short positions, an oversize SELL is invalid and is ignored
- * rather than allowing unmatched shares to become zero-cost realized profit. */
+/** FIFO/specific-lot accounting. Pending orders are excluded. For legacy
+ * oversells, only shares backed by open lots are matched; excess shares and
+ * their proportional fees are surfaced as reconciliation discrepancies, not
+ * zero-cost realized profit. New oversells are blocked at trade entry. */
 export function computeFIFOPositions(transactions: Transaction[], calcFee: FeeCalculator, matchOrder: LotMatchOrder = 'fifo'): FIFOResult {
   const byTicker: Record<string, TickerState> = {};
   const sorted = sortTransactionsChronological(transactions.filter((t) => !t.isPending));
@@ -131,15 +135,10 @@ export function computeFIFOPositions(transactions: Transaction[], calcFee: FeeCa
 
   for (const tx of sorted) {
     const t = tx.ticker;
-    if (!byTicker[t]) byTicker[t] = { lots: [], realized: 0, buyFees: 0, sellFees: 0, totalBoughtShares: 0, totalSoldShares: 0, buyCount: 0, sellCount: 0, firstDate: tx.date, lastDate: tx.date };
+    if (!byTicker[t]) byTicker[t] = { lots: [], realized: 0, buyFees: 0, sellFees: 0, totalBoughtShares: 0, totalSoldShares: 0, unmatchedSellShares: 0, unmatchedSellFees: 0, unmatchedSellTransactions: 0, buyCount: 0, sellCount: 0, firstDate: tx.date, lastDate: tx.date };
     const state = byTicker[t];
     if (tx.date < state.firstDate) state.firstDate = tx.date;
     if (tx.date > state.lastDate) state.lastDate = tx.date;
-
-    if (tx.action === 'SELL') {
-      const available = state.lots.reduce((sum, lot) => sum + lot.remainingShares, 0);
-      if (tx.shares > available + EPSILON) continue;
-    }
 
     const amount = tx.shares * tx.price;
     const isBuy = tx.action === 'BUY';
@@ -151,22 +150,31 @@ export function computeFIFOPositions(transactions: Transaction[], calcFee: FeeCa
       state.totalBoughtShares += tx.shares;
       state.buyCount += 1;
     } else {
-      const consumed = consumeLotsForSell(state.lots, tx.shares, matchOrder, tx.lotAllocations, tx.targetLotBuyId);
+      const available = state.lots.reduce((sum, lot) => sum + lot.remainingShares, 0);
+      const matchedShares = Math.min(tx.shares, available);
+      const unmatchedShares = Math.max(0, tx.shares - matchedShares);
+      const consumed = consumeLotsForSell(state.lots, matchedShares, matchOrder, tx.lotAllocations, tx.targetLotBuyId);
       const costRemoved = consumed.reduce((sum, { lot, take }) => sum + take * (lot.buyPrice + lot.buyFeeTotal / lot.originalShares), 0);
-      const realizedDelta = amount - fee - costRemoved;
+      const matchedFee = tx.shares > 0 ? fee * matchedShares / tx.shares : 0;
+      const realizedDelta = matchedShares * tx.price - matchedFee - costRemoved;
       state.realized += realizedDelta;
       state.sellFees += fee;
       state.totalSoldShares += tx.shares;
+      state.unmatchedSellShares += unmatchedShares;
+      state.unmatchedSellFees += fee - matchedFee;
+      state.unmatchedSellTransactions += unmatchedShares > EPSILON ? 1 : 0;
       state.sellCount += 1;
-      runningRealized += realizedDelta;
-      realizedSeries.push({ date: tx.date, value: runningRealized });
+      if (matchedShares > EPSILON) {
+        runningRealized += realizedDelta;
+        realizedSeries.push({ date: tx.date, value: runningRealized });
+      }
     }
   }
 
   const positions: Position[] = Object.entries(byTicker).map(([ticker, state]) => {
     const shares = state.lots.reduce((s, l) => s + l.remainingShares, 0);
     const invested = state.lots.reduce((s, l) => s + l.remainingShares * (l.buyPrice + l.buyFeeTotal / l.originalShares), 0);
-    return { ticker, shares, invested, buyFees: state.buyFees, sellFees: state.sellFees, realized: state.realized, totalBoughtShares: state.totalBoughtShares, totalSoldShares: state.totalSoldShares, buyCount: state.buyCount, sellCount: state.sellCount, firstDate: state.firstDate, lastDate: state.lastDate };
+    return { ticker, shares, invested, buyFees: state.buyFees, sellFees: state.sellFees, realized: state.realized, totalBoughtShares: state.totalBoughtShares, totalSoldShares: state.totalSoldShares, unmatchedSellShares: state.unmatchedSellShares, unmatchedSellFees: state.unmatchedSellFees, unmatchedSellTransactions: state.unmatchedSellTransactions, buyCount: state.buyCount, sellCount: state.sellCount, firstDate: state.firstDate, lastDate: state.lastDate };
   });
 
   const lotsByTicker: Record<string, FIFOLot[]> = {};

@@ -41,7 +41,9 @@ ask if something outside already-decided scope comes up. Also maintain a
 **user manual** (`webapp/USER_MANUAL.md`, end-user facing — how to use the
 app, not developer notes) continuously as features ship.
 
-**Latest user instruction (2026-10-15): Do not automatically push code. Keep changes local for review unless the user explicitly requests a commit or push. This supersedes the earlier auto-commit/push standing instruction.**
+**Latest user instruction (2026-10-31): Make small, focused commits and push them regularly on the existing feature branch; keep project documentation and the session handoff updated as work progresses. Never push directly to `main`. Before merging, verify the exact latest PR head with a successful type-check, production build, and full test suite; if code changes after validation, rerun the checks on the new head. This supersedes the 2026-10-15 instruction to keep changes local unless separately authorized.**
+
+**Latest session continuity (2026-10-31):** read [`webapp/SESSION_HANDOFF.md`](webapp/SESSION_HANDOFF.md) for the current state. PR #36's canonical `globalTransactionIndex` / `perTickerIndex` synchronization was merged and passed CI; the separate mixed-event cash ledger still needs its own ordering design. PR #44 (`fix/trade-entry-validation-and-transactions-ui`) was squash-merged into `main` as `d1c3c4c33776dc871cf15f044353359a71c18986`. It standardizes section-card actions, shared finance-table pagination, credit-card running limits, Funds/Brokers navigation, summary layouts, all-time stock-detail history, price bounds, QSE/PSX trade safeguards, FAB save verification, and legacy oversell reconciliation. Application-code head `18348fa258be95767b209b8585b575a8acdd2cf8` passed the full test suite and type-check/production build in Actions run #41201015866; subsequent commits before merge were documentation-only. PSO reconciliation is 122 BUY / 132 SELL, with 10 unmatched SELL shares and no fictitious realized profit. Interactive branch-level browser checks were not completed because the connected browser was read-only; see the handoff and do not claim otherwise. User-confirmed delivery rules: small focused commits, regular pushes on feature branches, keep project docs/handoff current, never push directly to `main`, and require successful full tests plus production build/type-check before merge.
 
 ## Current status (as of 2026-08-23)
 
@@ -8008,3 +8010,30 @@ RTDB security rules, not by hiding the config).
 
 ## Batch editing update (2026-09-27)
 Bank Account Transactions/Plans and Personal Loan Payments/Plans use the shared BatchEditGrid. See webapp/BATCH_EDIT.md for the assessed editing/link architecture and safety boundaries. Single-record forms remain unchanged. Linked rows and executed plans are locked; recurring/generated Bank plans use their existing workflows. New batch saves validate and check stale records before one workbook update. Future integrations should reuse this contract rather than add inline editing to normal rows.
+
+
+## Broker-profile isolation (2026-10-30)
+
+PR #41 carries the clean main-based broker-profile implementation. Keep QSE/PSX trades, transfers, adjustments, dividends, plans, fee settings and calculations isolated per broker profile; keep exchange market prices, price history and watchlists shared. Legacy PSX history migrates to JS Zindagi with financial fields preserved. Archived profiles are view-only; deactivated profiles cannot become active. See `webapp/SESSION_HANDOFF.md` and `webapp/audit.md`. Run #105 passed tests/build on the pre-documentation head; the latest head must pass CI again after the post-PR40 reconciliation. Backup/export migration review and browser checks remain required before merge. Never push directly to `main`.
+
+
+**Broker-profile delivery update (2026-10-31):** PR #43 is merged into `main`. The implementation is already delivered. Real legacy backup/export review and interactive browser verification remain manual follow-ups; do not claim they were completed.
+
+
+**Stale branch note (2026-10-31):** `feat/broker-profile-isolation-rebased` is 69 commits ahead / 34 behind `main` and has no matching open PR. Do not merge or continue on it; use the merged PR #43 implementation on `main`.
+
+
+## Funds cash reconciliation — issue #42 (2026-10-31)
+
+Implementation is merged into `main` through [PR #46](https://github.com/ranamrameez/WealthCrescent/pull/46), merge commit `b0986efa5f3610cf8031b02748f4233ffdfbd4ad`. Issue [#42](https://github.com/ranamrameez/WealthCrescent/issues/42) was automatically closed by the merge.
+
+The model is one portfolio-level Funds cash account per currency because Funds linked transfers do not identify a fund or broker. BUY moves money from cash into units; valid SELL returns proceeds; transfer fees are applied once; currencies remain separate. New/edited transfers persist `currencyCode`. A versioned metadata migration snapshots legacy Funds default currency without rewriting historical transfer rows; the UI warns users to review/assign explicit currencies. Funds Summary separates holdings from cash, and current/historical Net Worth includes both exactly once with a dedicated Funds cash inclusion toggle.
+
+**Broker-isolation guardrail:** QSE/PSX cash transfers remain owned by the selected broker profile, identified by broker ID and stored in that profile's `data.transfers`. The selected profile's own settings (including currency and deposit fee) drive transfer defaults and validation. Trades, transfers, adjustments, dividends, plans, settings and P/L stay scoped to that profile; only exchange market data, price history and watchlists remain shared. Funds cash is a separate Funds-module ledger and must not be conflated with QSE/PSX broker cash.
+
+Linked-transfer currency resolution uses the selected QSE/PSX broker profile's currency rather than the parent exchange default. Regression tests cover distinct currencies across non-active QSE/PSX profiles and profile-aware linked transfer routing.
+
+**CI validation:** GitHub Actions [run #314](https://github.com/ranamrameez/WealthCrescent/actions/runs/41208426730) passed on application-code head `4841fb6b3b0059738d7d3972804a37662196d869`: 138 test files / 1,100 tests, type-check and production build. The merged PR head was `66f2a28fe0b09384999062ce22f3a82ba5fa73bd`; commits after the validated code head were documentation-only. **Manual validation limitation:** a real legacy backup/export review and interactive browser smoke tests were not completed in this session. The merge was explicitly requested; do not claim those manual checks were performed. Record them as post-merge follow-up.
+
+
+**Documentation limitation:** root `README.md`, `USER_MANUAL.md`, `audit.md`, and `SESSION_HANDOFF.md` are updated for issue #42. `webapp/README.md` returned empty content from the repository file reader, so it was not overwritten; revisit it when its contents can be fetched safely.

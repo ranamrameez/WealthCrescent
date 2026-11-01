@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { TransactionsPage } from '../TransactionsPage';
+import { TransactionRows, TransactionsPage } from '../TransactionsPage';
 import { DividendsSection } from '../../components/DividendsSection';
 import { useWorkbookStore } from '../../../../store/workbookStore';
 import { createEmptyWorkbook } from '../../../../store/defaultWorkbook';
@@ -17,6 +17,8 @@ beforeEach(() => {
 afterEach(cleanup);
 function Controls() { const control = usePageTopBarStore(state => state.rightSlot); return <>{control}</>; }
 it('filters the trade list without discarding the historical buys used for closed trades', () => {
+  const current = useWorkbookStore.getState().workbook;
+  useWorkbookStore.setState({ workbook: { ...current, settings: { ...current.settings, costBasisMethod: 'fifo' } } });
   const { container } = render(<MemoryRouter initialEntries={['/transactions?section=list&qse-from=2026-10-05']}><Controls /><TransactionsPage /></MemoryRouter>);
   expect(screen.getByRole('button', { name: 'Filters (1)' })).toBeVisible();
   const details = screen.getByRole('button', { name: /Closed trades \(realized round-trips\)/ }).closest('section')!;
@@ -28,6 +30,14 @@ it('filters the trade list without discarding the historical buys used for close
   expect(screen.getByText('Export filtered')).toBeVisible();
   expect(screen.getByText('Batch edit')).toBeVisible();
   expect(screen.getByText('Modify')).toBeVisible();
+});
+
+it('hides incompatible lot attribution when Average cost is configured', () => {
+  const current = useWorkbookStore.getState().workbook;
+  useWorkbookStore.setState({ workbook: { ...current, settings: { ...current.settings, costBasisMethod: 'average' } } });
+  render(<MemoryRouter initialEntries={['/transactions?section=list']}><Controls /><TransactionsPage /></MemoryRouter>);
+  expect(screen.getByText(/Average cost blends all buys into one running cost basis/)).toBeVisible();
+  expect(screen.queryByRole('button', { name: /Closed trades \(realized round-trips\)/ })).toBeNull();
 });
 it('batch edits dividend estimates while leaving share balances unchanged', async () => {
   render(<MemoryRouter><DividendsSection /></MemoryRouter>);
@@ -96,7 +106,8 @@ it('uses Bank Account pagination and batches all filtered rows across pages', ()
 it('shows the complete filter set only in the central popup', () => {
   ledgerPage();
   fireEvent.click(screen.getByRole('button', { name: /^Filters/ }));
-  for (const label of ['Trade action', 'Group trades', 'Transfer type', 'Ledger type', 'Lot matching']) expect(screen.getByLabelText(label)).toBeVisible();
+  for (const label of ['Trade action', 'Group trades', 'Transfer type', 'Ledger type']) expect(screen.getByLabelText(label)).toBeVisible();
+  expect(screen.queryByLabelText('Lot matching')).toBeNull();
   expect(screen.getByRole('button', { name: 'This month' })).toBeVisible();
   fireEvent.change(screen.getByLabelText('Ledger type'), { target: { value: 'trade' } });
   fireEvent.click(screen.getByRole('button', { name: 'Done' }));
@@ -146,4 +157,47 @@ it('preserves user-entered descriptions in cash ledger details', () => {
   fireEvent.click(within(row).getByRole('button', { name: 'Expand details' }));
   expect(within(section).getByText('Description:')).toBeVisible();
   expect(within(section).getAllByText('SWIFT TR. FROM')).toHaveLength(2);
+});
+
+
+it('saves a trade from the shared FAB form and signals the modal to close only after success', async () => {
+  const onSaved = vi.fn();
+  render(<MemoryRouter><TransactionRows onSaved={onSaved} /></MemoryRouter>);
+  fireEvent.change(screen.getByPlaceholderText('Ticker'), { target: { value: 'QNBK' } });
+  fireEvent.change(screen.getByPlaceholderText('Shares'), { target: { value: '5' } });
+  fireEvent.change(screen.getByPlaceholderText('Price'), { target: { value: '12.5' } });
+  fireEvent.blur(screen.getByPlaceholderText('Shares'));
+  fireEvent.blur(screen.getByPlaceholderText('Price'));
+  fireEvent.click(screen.getByRole('button', { name: 'Save transaction' }));
+  await waitFor(() => expect(useWorkbookStore.getState().workbook.transactions).toHaveLength(3));
+  expect(useWorkbookStore.getState().workbook.transactions[2]).toMatchObject({
+    ticker: 'QNBK', action: 'BUY', shares: 5, price: 12.5,
+  });
+  expect(onSaved).toHaveBeenCalledTimes(1);
+});
+
+it('keeps the entered trade open for retry when the store save throws', async () => {
+  const onSaved = vi.fn();
+  const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const originalAddTransactions = useWorkbookStore.getState().addTransactions;
+  useWorkbookStore.setState({
+    addTransactions: (() => { throw new Error('simulated store failure'); }) as typeof originalAddTransactions,
+  });
+  try {
+    render(<MemoryRouter><TransactionRows onSaved={onSaved} /></MemoryRouter>);
+    fireEvent.change(screen.getByPlaceholderText('Ticker'), { target: { value: 'QNBK' } });
+    fireEvent.change(screen.getByPlaceholderText('Shares'), { target: { value: '5' } });
+    fireEvent.change(screen.getByPlaceholderText('Price'), { target: { value: '12.5' } });
+    fireEvent.blur(screen.getByPlaceholderText('Shares'));
+    fireEvent.blur(screen.getByPlaceholderText('Price'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save transaction' }));
+    await waitFor(() => expect(errorSpy).toHaveBeenCalledTimes(1));
+    expect(screen.getByPlaceholderText('Ticker')).toHaveValue('QNBK');
+    expect(screen.getByPlaceholderText('Shares')).toHaveValue('5');
+    expect(screen.getByPlaceholderText('Price')).toHaveValue('12.50');
+    expect(onSaved).not.toHaveBeenCalled();
+  } finally {
+    useWorkbookStore.setState({ addTransactions: originalAddTransactions });
+    errorSpy.mockRestore();
+  }
 });

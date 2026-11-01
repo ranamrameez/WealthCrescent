@@ -49,8 +49,20 @@ export function BatchEditGrid<T>({ title, description, rows, columns, getRowId, 
   const prepared = allRows.map((before, index) => {
     const isNew = added.includes(before);
     const cells = drafts[getRowId(before)] ?? {};
-    const dirtyKeys = columns.filter(c => c.key in cells && cells[c.key] !== cellValue(before, c)).map(c => c.key);
     const { after, errors: parseErrors } = parseBatchRow(before, cells, columns);
+    const dirtyKeys = columns.filter(c => c.key in cells && cells[c.key] !== cellValue(before, c)).map(c => c.key);
+    // Some reorderable datasets use a canonical hidden order key that is not
+    // shown as an editable column (QSE uses globalTransactionIndex). Preserve
+    // those internal reorder drafts as real changes so Save is enabled and the
+    // value reaches prepareBatch/onSave.
+    if (orderKey && !columns.some((column) => column.key === orderKey) && orderKey in cells) {
+      const rawOrder = Number(cells[orderKey]);
+      if (!Number.isFinite(rawOrder)) parseErrors[orderKey] = 'Enter a valid order index.';
+      else {
+        (after as unknown as Record<string, unknown>)[orderKey] = rawOrder;
+        if (rawOrder !== Number(before[orderKey])) dirtyKeys.push(orderKey);
+      }
+    }
     const errors: RowErrors = dirtyKeys.length || isNew ? { ...validateRow?.(after), ...parseErrors } : {};
     if (dirtyKeys.length || isNew) for (const c of columns) errors[c.key] ||= c.validator?.(after);
     if (dirtyKeys.length && rowReadOnly?.(before)) errors._row = rowReadOnly(before);

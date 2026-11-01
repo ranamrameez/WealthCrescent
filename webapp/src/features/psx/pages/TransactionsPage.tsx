@@ -5,7 +5,7 @@ import { PageHeading } from '../../../components/PageHeading';
 import { BackButton } from '../../../components/BackButton';
 import { PageFilters } from '../../../components/PageFilters';
 import { PriceInput } from "../../../components/ui/PriceInput";
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { PSX_TICKER_DATALIST_ID } from '../../../components/PSXTickerDatalist';
 import { TickerLogo } from '../../../components/TickerLogo';
@@ -19,11 +19,14 @@ import { TransactionEntryModal } from '../../../components/TransactionEntryModal
 import { RecordDetailModal } from '../../../components/RecordDetailModal';
 import { LotAllocationFields } from '../../../components/ui/LotAllocationFields';
 import { useSortableRows } from '../../../hooks/useSortableRows';
+import { useTablePagination } from '../../../hooks/useTablePagination';
 import { usePageFabActions } from '../../../hooks/usePageFabActions';
 import { fmt, fmtMoney, fmtPSXPrice } from '../../../lib/format';
 import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
 import { closedPLBySellTxId, computeClosedTrades, type LotMatchOrder } from '../../../lib/calc/closedTrades';
+import { computeAveragePLBySellTxId } from '../../../lib/calc/realizedPL';
 import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
+import { tradePriceDeviationPct, validateTransactionEdit, validateSellQuantities } from '../../../lib/calc/tradeValidation';
 import { isNettedLeg } from '../../../lib/calc/psxFees';
 import { transferRunningBalance } from '../../../lib/calc/transferBalance';
 import { FeeModeControl, feeModeFor } from '../../../components/ui/FeeModeControl';
@@ -41,6 +44,7 @@ import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
 import { useInterEntityTransfersStore } from '../../../store/interEntityTransfersStore';
 import { linkTargetPath, useLinkSideLabel } from '../../transfers/pages/TransferLinksPage';
 import type { Adjustment, Transaction, Transfer } from '../../../types/workbook';
+import { syncTransactionIndexes } from '../../../lib/seq';
 import { DividendsSection } from '../components/DividendsSection';
 import { usePSXDerived } from '../hooks/usePSXDerived';
 
@@ -50,10 +54,10 @@ function emptyRow(): Transaction {
   return { date: today(), ticker: '', action: 'BUY', shares: 0, price: 0, time: nowTime(defaultTimezoneForMarket('PSX')), timezone: defaultTimezoneForMarket('PSX') };
 }
 
-export function TransactionRows({ initial }: { initial?: Partial<Transaction> } = {}) {
+export function TransactionRows({ initial, onSaved }: { initial?: Partial<Transaction>; onSaved?: () => void } = {}) {
   const addTransactions = usePSXWorkbookStore((s) => s.addTransactions);
   const workbook = usePSXWorkbookStore((s) => s.workbook);
-  const { calcFee } = usePSXDerived();
+  const { calcFee, positions } = usePSXDerived();
   const ensureSignedIn = useEnsureSignedIn();
   // Partial Trade's "Sell this lot" (one click into this same Add-trade
   // flow, per the confirmed design) pre-fills ticker/action/shares/price
@@ -84,11 +88,38 @@ export function TransactionRows({ initial }: { initial?: Partial<Transaction> } 
       toast('Fill in at least one complete row.');
       return;
     }
+    const quantityError = validateSellQuantities(valid, Object.fromEntries(positions.map(position => [position.ticker, position.shares])));
+    if (quantityError) {
+      toast(`Cannot sell ${quantityError.requested} ${quantityError.ticker}: only ${fmt(quantityError.available, 0)} shares are available after the earlier rows.`);
+      return;
+    }
+    const threshold = workbook.settings.tradePriceDeviationPct ?? 10;
+    const deviations = valid.flatMap(row => {
+      const ticker = row.ticker.toUpperCase();
+      const marketPrice = workbook.marketPrices[ticker] ?? 0;
+      const deviation = tradePriceDeviationPct(row.price, marketPrice);
+      return deviation !== null && Math.abs(deviation) > threshold
+        ? [`${ticker}: entered ${fmtPSXPrice(row.price)} vs market ${fmtPSXPrice(marketPrice)} (${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%)`]
+        : [];
+    });
+    if (deviations.length && !(await confirmDialog(`${deviations.join('\\n')}\\n\\nThis exceeds your ${threshold}% warning threshold. Save these trades anyway?`, 'Trade prices differ from market prices?'))) return;
     if (!(await ensureSignedIn('Sign in to save your transactions.'))) return;
-    addTransactions(valid.map((r) => ({ ...r, ticker: r.ticker.toUpperCase() })));
+    try {
+      const beforeCount = usePSXWorkbookStore.getState().workbook.transactions.length;
+      addTransactions(valid.map((r) => ({ ...r, ticker: r.ticker.toUpperCase() })));
+      const afterCount = usePSXWorkbookStore.getState().workbook.transactions.length;
+      if (afterCount !== beforeCount + valid.length) throw new Error('Transaction store did not retain every submitted row.');
+    } catch (error) {
+      console.error('Failed to add PSX trade from the transaction form.', error);
+      toast('Could not save the trade. Your entries are still here; please try again.');
+      return;
+    }
     toast(`Added ${valid.length} transaction${valid.length > 1 ? 's' : ''}.`);
     setRows([emptyRow()]);
     setTimeTouched([false]);
+    // The shared FAB hosts this form in a modal. Close only after the
+    // store mutation succeeds; otherwise preserve the user's entered row.
+    onSaved?.();
   };
 
   return (
@@ -186,8 +217,9 @@ export function TransactionRows({ initial }: { initial?: Partial<Transaction> } 
         </button>
       </div>
       <p className="text-muted" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
-        Same-day round trips net automatically — the larger side pays full commission, the
-        smaller side pays levies only.
+        {workbook.settings.sameDayNettingRule === 'none'
+          ? 'This broker profile has no published same-day commission netting rule configured, so each trade is charged separately.'
+          : 'Same-day round trips net automatically — the higher-value side pays full commission, the other side pays applicable levies only.'}
         {/* Tooltip itself now renders an info-icon affordance (README item 89,
            2026-08-26), so this no longer needs its own manually-wrapped
            InfoIcon as children — that would now show two icons back to back. */}
@@ -298,7 +330,7 @@ function TransactionList() {
   // lot first" is a pure reporting convention in this ledger too, not a
   // real constraint. Offer cheapest-lot-first as a second, explicitly
   // comparison-only view (see `closedTrades.ts`'s `LotMatchOrder` comment).
-  const [ctMatchOrder, setCtMatchOrder] = useState<LotMatchOrder>('fifo');
+  const ctMatchOrder: LotMatchOrder = workbook.settings.costBasisMethod === 'lowestCostFirst' ? 'lowestCostFirst' : 'fifo';
 
   // Pending item 143 PSX fast-follow: manual lot allocation for the inline
   // edit-row SELL form — same gate/derivation as QSE's identical file. Lots
@@ -326,9 +358,10 @@ function TransactionList() {
   const filtered = indexed
     .filter((r) => filterTicker === 'ALL' || r.tx.ticker === filterTicker)
     .filter((r) => filterAction === 'ALL' || r.tx.action === filterAction);
-  type TxCol = 'date' | 'ticker' | 'action' | 'shares' | 'price' | 'amount' | 'fee';
+  type TxCol = 'order' | 'date' | 'ticker' | 'action' | 'shares' | 'price' | 'amount' | 'fee';
   const sortValue = (r: (typeof filtered)[number], col: TxCol): number | string => {
     switch (col) {
+      case 'order': return r.tx.globalTransactionIndex ?? r.tx.transactionIndex ?? Number.MAX_SAFE_INTEGER;
       case 'ticker': return r.tx.ticker;
       case 'action': return r.tx.action;
       case 'shares': return r.tx.shares;
@@ -338,7 +371,7 @@ function TransactionList() {
       default: return r.tx.date;
     }
   };
-  const { sorted, Th } = useSortableRows(filtered, sortValue, 'date', 'desc');
+  const { sorted, Th } = useSortableRows(filtered, sortValue, 'order', 'asc');
 
   const openSorted = useMemo(() => sorted.filter((r) => openTickers.has(r.tx.ticker)), [sorted, openTickers]);
   const closedSorted = useMemo(() => sorted.filter((r) => !openTickers.has(r.tx.ticker)), [sorted, openTickers]);
@@ -355,8 +388,10 @@ function TransactionList() {
       .sort((a, b) => b[0].localeCompare(a[0]))
       .map(([key, rows]) => ({ key, rows }));
   };
-  const openGroups = useMemo(() => groupRows(openSorted), [openSorted, groupBy]);
-  const closedGroups = useMemo(() => groupRows(closedSorted), [closedSorted, groupBy]);
+  const openPage = useTablePagination(openSorted);
+  const closedPage = useTablePagination(closedSorted);
+  const openGroups = groupRows(openPage.rows);
+  const closedGroups = groupRows(closedPage.rows);
 
   // User's own words: "Individual stock should be marker as open/close with
   // its own buy & selling price, B&S taxes, net Buy/sale, so that sold/
@@ -392,6 +427,7 @@ function TransactionList() {
     }
   };
   const { sorted: sortedClosedTrades, Th: CTTh } = useSortableRows(closedTrades, ctSortValue, 'sellDate', 'desc');
+  const closedTradesPage = useTablePagination(sortedClosedTrades);
 
   // User's own ask (2026-09-08): "show the sold price and PL w.r.t. that
   // lot's buy price... inline in the main trade row." Computed from the
@@ -403,8 +439,10 @@ function TransactionList() {
   // number, or this row's own pill and the table below could show two
   // contradicting figures for the identical sell.
   const sellPLById = useMemo(
-    () => closedPLBySellTxId(computeClosedTrades(workbook.transactions, calcFee, ctMatchOrder)),
-    [workbook.transactions, calcFee, ctMatchOrder],
+    () => (workbook.settings.costBasisMethod === 'average' || !workbook.settings.costBasisMethod)
+      ? computeAveragePLBySellTxId(workbook.transactions, calcFee)
+      : closedPLBySellTxId(computeClosedTrades(workbook.transactions, calcFee, ctMatchOrder)),
+    [workbook.transactions, workbook.settings.costBasisMethod, calcFee, ctMatchOrder],
   );
 
   // User's own words: "make separate sections for open and closed trades...
@@ -436,13 +474,25 @@ function TransactionList() {
     }
   };
   const { sorted: sortedOpenLots, Th: OLTh } = useSortableRows(openLots, olSortValue, 'buyDate', 'desc');
+  const openLotsPage = useTablePagination(sortedOpenLots);
 
   const startEdit = (i: number, tx: Transaction) => {
     setEditIndex(i);
     setEditRow({ ...tx });
   };
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (editIndex === null || !editRow) return;
+    const candidateTransactions = workbook.transactions.map((transaction, index) => index === editIndex ? editRow : transaction);
+    const quantityError = validateTransactionEdit(workbook.transactions, candidateTransactions);
+    if (quantityError) return toast(`Cannot save this edit: it would create ${fmt(quantityError.additionalUnmatchedShares, 0)} unmatched SELL shares for ${quantityError.ticker}.`);
+    const marketPrice = workbook.marketPrices[editRow.ticker.toUpperCase()] ?? 0;
+    const deviation = tradePriceDeviationPct(editRow.price, marketPrice);
+    const threshold = workbook.settings.tradePriceDeviationPct ?? 10;
+    if (deviation !== null && Math.abs(deviation) > threshold) {
+      const accepted = await confirmDialog(`Entered ${fmtPSXPrice(editRow.price)}; saved market price is ${fmtPSXPrice(marketPrice)} (${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%). This exceeds your ${threshold}% warning threshold. Save anyway?`, 'Trade price differs from market price?');
+      if (!accepted) return;
+    }
+    if (!(await ensureSignedIn('Sign in to save changes.'))) return;
     updateTransaction(editIndex, editRow);
     toast('Transaction updated.');
     setEditIndex(null);
@@ -460,6 +510,27 @@ function TransactionList() {
   };
 
   const setWorkbook = usePSXWorkbookStore((s) => s.setWorkbook);
+  const transactionOrderRows = useMemo(
+    () => [...workbook.transactions].sort((a, b) => (a.globalTransactionIndex ?? a.transactionIndex ?? Number.MAX_SAFE_INTEGER) - (b.globalTransactionIndex ?? b.transactionIndex ?? Number.MAX_SAFE_INTEGER)),
+    [workbook.transactions],
+  );
+  const reorderTransaction = async (pair: [{ id: string; order: number }, { id: string; order: number }]) => {
+    if (!(await ensureSignedIn('Sign in to reorder transactions.'))) return;
+    const current = usePSXWorkbookStore.getState().workbook;
+    const a = current.transactions.find(tx => tx.id === pair[0].id);
+    const b = current.transactions.find(tx => tx.id === pair[1].id);
+    const aIndex = a?.globalTransactionIndex ?? a?.transactionIndex;
+    const bIndex = b?.globalTransactionIndex ?? b?.transactionIndex;
+    if (!a || !b || !Number.isInteger(aIndex) || !Number.isInteger(bIndex)) return toast('Transactions changed or accounting order is missing. Reload and try again.');
+    const swapped = current.transactions.map(tx => tx.id === a.id
+      ? { ...tx, globalTransactionIndex: bIndex, transactionIndex: bIndex }
+      : tx.id === b.id
+        ? { ...tx, globalTransactionIndex: aIndex, transactionIndex: aIndex }
+        : tx);
+    const transactions = syncTransactionIndexes(swapped);
+    usePSXWorkbookStore.getState().setWorkbook({ ...current, transactions });
+    toast('Transaction accounting order updated.');
+  };
   const clearAll = async () => {
     const ok = await confirmDialog(
       'This clears all transactions, prices and watchlist entries in this browser.',
@@ -470,7 +541,8 @@ function TransactionList() {
     toast('All transaction data cleared.');
   };
 
-  const renderTable = (groups: typeof openGroups, emptyMessage: string) => (
+  const renderTable = (groups: typeof openGroups, emptyMessage: string, controls: ReactNode) => (
+    <>
     <div className="table-scroll">
       <table>
         <thead>
@@ -483,7 +555,7 @@ function TransactionList() {
             <Th col="amount">Amount</Th>
             <Th col="fee">Fee</Th>
             <th>
-              <Tooltip text="Realized profit/loss for a SELL row, matched against your still-open buy lot(s) for this ticker — follows whichever Match order (FIFO or cheapest-lot-first) is picked in the Closed trades section below, since it's the same figure shown per-row here. Blank on a BUY row (nothing realized yet).">
+              <Tooltip text="Realized profit/loss for a SELL row using the configured cost-basis method: weighted-average cost under Average cost, or the configured lot-matching method under FIFO/Lowest cost first. Blank on a BUY row (nothing realized yet).">
                 P/L
               </Tooltip>
             </th>
@@ -560,7 +632,7 @@ function TransactionList() {
                   </Fragment>
                 ) : (
                   <RecordRow market="psx" onEdit={() => startEdit(i, tx)}    record={{ tx, i }}  key={i}  className="clickable">
-                    <td><DateValue value={tx.date} /></td>
+                    <td><DateValue value={tx.date} />{' '}<ReorderButtons rows={transactionOrderRows} index={transactionOrderRows.findIndex(row => row.id === tx.id)} instantOf={row => dateOnlyMs(row.date)} idOf={row => row.id!} orderOf={row => row.globalTransactionIndex ?? row.transactionIndex} allowAcrossInstants onMove={reorderTransaction} /></td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <TickerLogo ticker={tx.ticker} size="sm" exchange="psx" /><Link to={`/psx/stock/${tx.ticker}`}>{tx.ticker}</Link>
                       {tx.isPending && (
@@ -580,7 +652,7 @@ function TransactionList() {
                           <span className="text-muted clickable">{' '}(override)</span>
                         </Tooltip>
                       ) : (
-                        isNettedLeg(workbook.transactions, tx) && (
+                        isNettedLeg(workbook.transactions, tx, workbook.settings.sameDayNettingRule) && (
                           <Tooltip
                             text={tx.manualSameDay ? 'Manually marked as a same-day netted leg — government levies only.' : 'Same-day round trip — netted, government levies only.'}
                           >
@@ -626,6 +698,8 @@ function TransactionList() {
         </tbody>
       </table>
     </div>
+    {controls}
+    </>
   );
 
   return (
@@ -654,31 +728,25 @@ function TransactionList() {
         <summary className="summary-heading">
           Open positions — {openSorted.length} txns
         </summary>
-        {renderTable(openGroups, 'No transactions for a currently open position.')}
+        {renderTable(openGroups, 'No transactions for a currently open position.', openPage.controls)}
       </details>
 
       <details open>
         <summary className="summary-heading">
           Closed positions — {closedSorted.length} txns
         </summary>
-        {renderTable(closedGroups, 'No transactions for a fully closed position yet.')}
+        {renderTable(closedGroups, 'No transactions for a fully closed position yet.', closedPage.controls)}
       </details>
 
-      <div className="row gap-sm mb-sm mt-md" style={{ alignItems: 'center' }}>
-        <Tooltip text="Same-day netting decides a whole transaction's fee from that day's total buy vs. sell quantity — never from which lot a sale is later credited to here, so this is purely which STORY the Open trades and Closed trades sections below tell, not a real amount. FIFO (oldest lot first) is what most brokers default to. Cheapest-lot-first re-tells the same history against your lowest-cost lots instead — it never changes your real position, fees, or total P/L, only which lots count as still open vs. already sold.">
-          Match order
-        </Tooltip>
-        <button type="button" className={`chip${ctMatchOrder === 'fifo' ? ' active' : ''}`} onClick={() => setCtMatchOrder('fifo')}>
-          {ctMatchOrder === 'fifo' && <CheckIcon size={11} />}FIFO (oldest first)
-        </button>
-        <button type="button" className={`chip${ctMatchOrder === 'lowestCostFirst' ? ' active' : ''}`} onClick={() => setCtMatchOrder('lowestCostFirst')}>
-          {ctMatchOrder === 'lowestCostFirst' && <CheckIcon size={11} />}Cheapest lot first
-        </button>
-      </div>
 
+
+      {(workbook.settings.costBasisMethod === 'fifo' || workbook.settings.costBasisMethod === 'lowestCostFirst') ? <>
+      <p className="text-muted mb-sm mt-md">
+        Lot attribution follows the configured cost-basis method: {ctMatchOrder === 'lowestCostFirst' ? 'Lowest cost first' : 'FIFO'}.
+      </p>
       <details open>
         <summary className="summary-heading">
-          <Tooltip text="Each buy lot that hasn't been fully sold yet, matched against your real sells per the Match order picked above — the mirror image of Closed trades below, so it's always clear which shares are still open vs. already sold.">
+          <Tooltip text="Each buy lot that hasn't been fully sold yet, matched against your real sells using the configured cost-basis method. This is the open-lot side of the Closed trades report.">
             Open trades (not yet sold)
           </Tooltip>{' '}
           — {sortedOpenLots.length}
@@ -698,7 +766,7 @@ function TransactionList() {
               </tr>
             </thead>
             <tbody>
-              {sortedOpenLots.map((l, i) => (
+              {openLotsPage.rows.map((l, i) => (
                 <RecordRow market="psx" record={l} key={i}>
                   <td><TickerLogo ticker={l.ticker} size="sm" exchange="psx" /><Link to={`/psx/stock/${l.ticker}`}>{l.ticker}</Link></td>
                   <td>{l.buyDate}</td>
@@ -715,6 +783,7 @@ function TransactionList() {
             </tbody>
           </table>
         </div>
+        {openLotsPage.controls}
       </details>
 
       <details open className="mt-md">
@@ -743,7 +812,7 @@ function TransactionList() {
               </tr>
             </thead>
             <tbody>
-              {sortedClosedTrades.map((t, i) => (
+              {closedTradesPage.rows.map((t, i) => (
                 <RecordRow market="psx" record={t} key={i}>
                   <td><TickerLogo ticker={t.ticker} size="sm" exchange="psx" /><Link to={`/psx/stock/${t.ticker}`}>{t.ticker}</Link></td>
                   <td>{t.buyDate}</td>
@@ -764,7 +833,12 @@ function TransactionList() {
             </tbody>
           </table>
         </div>
+        {closedTradesPage.controls}
       </details>
+      </> : <p className="text-muted mb-sm mt-md">
+        Average cost blends all buys into one running cost basis, so individual open/closed lot attribution is not applicable. The transaction rows and portfolio calculations use weighted-average cost.
+      </p>}
+
 
       {detailTx && (
         <RecordDetailModal
@@ -784,7 +858,7 @@ function TransactionList() {
               value: fmtMoney(calcFee(detailTx.shares * detailTx.price, detailTx.action === 'BUY', { shares: detailTx.shares, tx: detailTx }), currency)
                 + (detailTx.feeOverride !== undefined
                   ? ' (manually overridden)'
-                  : isNettedLeg(workbook.transactions, detailTx)
+                  : isNettedLeg(workbook.transactions, detailTx, workbook.settings.sameDayNettingRule)
                     ? ` (netted${detailTx.manualSameDay ? ', manual' : ''} — same-day round trip)`
                     : ''),
             },
@@ -846,6 +920,7 @@ function TransfersSection() {
     [filteredTransfers],
   );
   const sorted = dateSort.rows(dateSortInput, { date: row => row });
+  const page = useTablePagination(sorted);
   const reorderTransfer = async (pair: [{ id: string; order: number }, { id: string; order: number }]) => {
     if (!(await ensureSignedIn('Sign in to reorder transfers.'))) return;
     for (const p of pair) updateTransfer(p.id, { seq: p.order });
@@ -877,7 +952,7 @@ function TransfersSection() {
             </tr>
           </thead>
           <tbody>
-            {sorted.map((t, i) => {
+            {page.rows.map((t) => {
               const link = linkByRecordId.get(t.id);
               const otherSide = link ? (link.from.module === 'psx' && link.fromRecordId === t.id ? link.to : link.from) : undefined;
               return (
@@ -886,7 +961,7 @@ function TransfersSection() {
                     <DateValue value={t.date} />{' '}
                     <ReorderButtons
                       rows={sorted}
-                      index={i}
+                      index={sorted.findIndex(row => row.id === t.id)}
                       instantOf={instantOf}
                       idOf={(row) => row.id}
                       orderOf={(row) => row.seq}
@@ -919,6 +994,7 @@ function TransfersSection() {
           </tbody>
         </table>
       </div>
+      {page.controls}
     </div>
       {editRow && <TransactionEntryModal editTransfer={{ module: 'psx', record: editRow }} onClose={() => setEditRow(null)} />}
     </>
@@ -943,6 +1019,7 @@ function AdjustmentsSection() {
     }
   };
   const { sorted, Th } = useSortableRows(indexed, sortValue, 'date', 'desc');
+  const page = useTablePagination(sorted);
 
   const startEdit = (i: number, a: Adjustment) => { setEditIndex(i); setEditRow({ ...a }); };
   const saveEdit = () => {
@@ -967,7 +1044,7 @@ function AdjustmentsSection() {
             </tr>
           </thead>
           <tbody>
-            {sorted.map(({ a, i }) =>
+            {page.rows.map(({ a, i }) =>
               editIndex === i && editRow ? (
                 <RecordRow market="psx" record={{ a, i }} onCancel={() => setEditIndex(null)} key={i}>
                   <td><input type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} className="w-130" /></td>
@@ -994,6 +1071,7 @@ function AdjustmentsSection() {
           </tbody>
         </table>
       </div>
+      {page.controls}
     </div>
   );
 }
@@ -1021,6 +1099,7 @@ function CashLedgerSection() {
   // there and flows through automatically.
   const dateSortInput = [...filtered].reverse();
   const sorted = dateSort.rows(dateSortInput, { date: row => ({ ...row, seq: ledger.indexOf(row) }) });
+  const page = useTablePagination(sorted);
 
   return (
     <div>
@@ -1046,7 +1125,7 @@ function CashLedgerSection() {
           </tr>
         </thead>
         <tbody>
-          {sorted.map((e, i) => (
+          {page.rows.map((e, i) => (
             <RecordRow market="psx" record={e} key={i}>
               <td><DateValue value={e.date} /></td>
               <td>{e.kind}</td>
@@ -1059,6 +1138,7 @@ function CashLedgerSection() {
         </tbody>
       </table>
       </div>
+      {page.controls}
     </div>
   );
 }

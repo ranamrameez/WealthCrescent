@@ -1,5 +1,6 @@
 import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
+import { useTablePagination } from '../../../hooks/useTablePagination';
 import { DateValue } from '../../../components/DateValue';
 import { ToggleChip } from '../../../components/ui/ToggleChip';
 import { QuickEntitySwitch } from '../../../components/QuickEntitySwitch';
@@ -18,14 +19,15 @@ import { EntityScopeMenu, selectedEntityValues } from '../../../components/Entit
 import { TopBarControls } from '../../../components/TopBarControls';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { Line } from 'react-chartjs-2';
-import { Card, CollapsibleCard, EntityCard, MoneyValue } from '../../../components/Card';
+import { Card, EntityCard, MoneyValue } from '../../../components/Card';
 import { Modal } from '../../../components/Modal';
 import { Notice } from '../../../components/Notice';
 import { TickerLogo } from '../../../components/TickerLogo';
-import { HUES, hueStyle } from '../../../lib/statCardHues';
+import { hueStyle } from '../../../lib/statCardHues';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { ArchiveIcon, CheckIcon, EditIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { StandardPageSections } from '../../../components/StandardPageSections';
+import { SummarySection, SummarySections, SummaryValue } from '../../../components/SummaryGroupCard';
 import { toast } from '../../../components/Toast';
 import { Tooltip } from '../../../components/Tooltip';
 import { Field, Select, TextInput } from '../../../components/ui/Field';
@@ -40,7 +42,7 @@ import { useLastCurrency } from '../../../hooks/useLastCurrency';
 import { usePrimaryCurrency } from '../../../hooks/usePrimaryCurrency';
 import { getMarketPrice } from '../../../lib/calc';
 import { pendingShareDeltaByTicker } from '../../../lib/calc/positions';
-import { balanceUpdateHistory, brokerTotalsByCurrency, contributionVsValueSeries, expectedPLRate, fundCategoryLabel, fundNetProfit, projectInvestmentReturn } from '../../../lib/calc/fundsModule';
+import { balanceUpdateHistory, brokerTotalsByCurrency, contributionVsValueSeries, expectedPLRate, fundCategoryLabel, fundNetProfit, fundsCashBalanceByCurrency, fundsCashLedgerByCurrency, projectInvestmentReturn, unitsFromAmount } from '../../../lib/calc/fundsModule';
 import { CategorySelect } from '../../../components/CategorySelect';
 import { useCategoryStore } from '../../../store/categoryStore';
 import { UNCATEGORIZED_ID } from '../../../lib/categories';
@@ -53,7 +55,6 @@ import {
   type FundSnapshotRow,
 } from '../../../lib/calc/fundsSnapshotImport';
 import { toCSV } from '../../../lib/csv';
-import { transferRunningBalance } from '../../../lib/calc/transferBalance';
 import { fmt, fmtMoney, fmtPrice } from '../../../lib/format';
 import { dlLine } from '../../../lib/chartLabels';
 import { applyChartTheme } from '../../../lib/chartSetup';
@@ -147,7 +148,7 @@ function BrokersList({ onSelect }: { onSelect: (broker: Broker) => void }) {
   );
   if (!brokers.length) return null;
   return (
-    <CollapsibleCard title="Brokers" defaultOpen={false}>
+    <div>
       {archivedCount > 0 && (
         <button className="btn secondary small mb-12" onClick={() => setShowArchived((v) => !v)}>
           {showArchived ? 'Hide' : 'Show'} closed ({archivedCount})
@@ -179,7 +180,7 @@ function BrokersList({ onSelect }: { onSelect: (broker: Broker) => void }) {
           );
         })}
       </div>
-    </CollapsibleCard>
+    </div>
   );
 }
 
@@ -481,14 +482,18 @@ function OverallSummary({ selectedIds }: { selectedIds?: string[] } = {}) {
   const scopedFunds = selectedIds ? funds.filter((fund) => selectedIds.includes(fund.id)) : funds;
   const { positions, workbook } = useFundsDerived();
 
-  const totals: Record<string, { invested: number; value: number; profit: number; expDaily: number; expMonthly: number }> = {};
+  const totals: Record<string, { invested: number; value: number; cash: number; profit: number; expDaily: number; expMonthly: number }> = {};
+  const includePortfolioCash = !selectedIds || selectedIds.length === funds.length;
+  const cashBalances = includePortfolioCash
+    ? fundsCashBalanceByCurrency(workbook.funds, workbook.transactions, workbook.transfers, workbook.settings.legacyTransferCurrency ?? workbook.settings.defaultCurrency)
+    : {};
   scopedFunds.forEach((fund) => {
     const p = positions.find((pos) => pos.ticker === fund.id);
     const invested = p?.invested ?? 0;
     const units = p?.shares ?? 0;
     const nav = getMarketPrice(fund.id, workbook.marketPrices, workbook.transactions);
     const value = units * nav;
-    if (!totals[fund.currencyCode]) totals[fund.currencyCode] = { invested: 0, value: 0, profit: 0, expDaily: 0, expMonthly: 0 };
+    if (!totals[fund.currencyCode]) totals[fund.currencyCode] = { invested: 0, value: 0, cash: 0, profit: 0, expDaily: 0, expMonthly: 0 };
     totals[fund.currencyCode].invested += invested;
     totals[fund.currencyCode].value += value;
     totals[fund.currencyCode].profit += fundNetProfit(p, value);
@@ -509,40 +514,31 @@ function OverallSummary({ selectedIds }: { selectedIds?: string[] } = {}) {
       totals[fund.currencyCode].expMonthly += rate?.monthlyAmount ?? 0;
     }
   });
+  Object.entries(cashBalances).forEach(([currency, cash]) => {
+    totals[currency] ??= { invested: 0, value: 0, cash: 0, profit: 0, expDaily: 0, expMonthly: 0 };
+    totals[currency].cash = cash;
+  });
   const codes = Object.keys(totals);
   if (!codes.length) return null;
 
   return (
-    <div className="grid-auto" style={{ ...gridAutoStyle(150, 8), marginBottom: 16 }}>
+    <SummarySections className="funds-overall-summary">
       {codes.map((code) => {
         const t = totals[code];
         const profitPct = t.invested > 0 ? (t.profit / t.invested) * 100 : 0;
         const expDailyPct = t.invested > 0 ? (t.expDaily / t.invested) * 100 : 0;
         const expMonthlyPct = t.invested > 0 ? (t.expMonthly / t.invested) * 100 : 0;
-        return (
-          <div key={code} className="card" style={{ padding: 12 }}>
-            <div className="text-muted" style={{ marginBottom: 6 }}>{code}</div>
-            <div className="grid-auto" style={gridAutoStyle(110, 8)}>
-              <div className="stat-card card" style={hueStyle(HUES[3])}><div className="label">Invested</div><MoneyValue n={t.invested} currency={code} /></div>
-              <div className="stat-card card" style={hueStyle(HUES[6])}><div className="label">Current value</div><MoneyValue n={t.value} currency={code} /></div>
-              <div className="stat-card card" style={hueStyle(t.profit >= 0 ? 'var(--profit)' : 'var(--loss)')}><div className="label">Net profit</div><MoneyValue n={t.profit} currency={code} after={` (${profitPct.toFixed(1)}%)`} /></div>
-              <div className="stat-card card" style={hueStyle(t.expDaily >= 0 ? 'var(--profit)' : 'var(--loss)')}>
-                <Tooltip text="An average of what your funds actually earned/lost per day, based on their real NAV/balance history — not a promise of future returns.">
-                  <div className="label clickable">Expected daily P/L</div>
-                </Tooltip>
-                <MoneyValue n={t.expDaily} currency={code} after={` (${expDailyPct.toFixed(2)}%)`} />
-              </div>
-              <div className="stat-card card" style={hueStyle(t.expMonthly >= 0 ? 'var(--profit)' : 'var(--loss)')}>
-                <Tooltip text="The same average daily rate, scaled to a typical calendar month.">
-                  <div className="label clickable">Expected monthly P/L</div>
-                </Tooltip>
-                <MoneyValue n={t.expMonthly} currency={code} after={` (${expMonthlyPct.toFixed(2)}%)`} />
-              </div>
-            </div>
-          </div>
-        );
+        return <SummarySection key={code} title={code}>
+          <SummaryValue label="Invested cost basis" value={<MoneyValue n={t.invested} currency={code} />} />
+          <SummaryValue label="Current holdings value" value={<MoneyValue n={t.value} currency={code} />} />
+          <SummaryValue label="Cash on hand" value={<MoneyValue n={t.cash} currency={code} />} />
+          <SummaryValue label="Total Funds value" value={<MoneyValue n={t.value + t.cash} currency={code} />} primary />
+          <SummaryValue label="Net profit" value={<MoneyValue n={t.profit} currency={code} after={` (${profitPct.toFixed(1)}%)`} />} tone={t.profit >= 0 ? 'positive' : 'negative'} />
+          <SummaryValue label={<Tooltip text="An average of what your funds actually earned/lost per day, based on their real NAV/balance history — not a promise of future returns.">Expected daily P/L</Tooltip>} value={<MoneyValue n={t.expDaily} currency={code} after={` (${expDailyPct.toFixed(2)}%)`} />} tone={t.expDaily >= 0 ? 'positive' : 'negative'} />
+          <SummaryValue label={<Tooltip text="The same average daily rate, scaled to a typical calendar month.">Expected monthly P/L</Tooltip>} value={<MoneyValue n={t.expMonthly} currency={code} after={` (${expMonthlyPct.toFixed(2)}%)`} />} tone={t.expMonthly >= 0 ? 'positive' : 'negative'} />
+        </SummarySection>;
       })}
-    </div>
+    </SummarySections>
   );
 }
 
@@ -699,6 +695,8 @@ function SnapshotImportSection() {
     () => (rows ? buildFundsImportPlan(rows, workbook.funds) : []),
     [rows, workbook.funds],
   );
+  const indexedPlan = useMemo(() => plan.map((row, index) => ({ row, index })), [plan]);
+  const { rows: pagePlanRows, controls: planPaginationControls } = useTablePagination(indexedPlan);
 
   const duplicateCodes = useMemo(() => {
     if (!rows) return [];
@@ -805,7 +803,7 @@ function SnapshotImportSection() {
                 </tr>
               </thead>
               <tbody>
-                {plan.map((p, i) => (
+                {pagePlanRows.map(({ row: p, index: i }) => (
                   <RecordRow market="funds" record={p} key={i}>
                     <td><TextInput value={p.row.bank} onChange={(e) => editRow(i, { bank: e.target.value })} className="w-140" /></td>
                     <td><TextInput value={p.row.code} onChange={(e) => editRow(i, { code: e.target.value.toUpperCase() })} className="w-90" /></td>
@@ -820,6 +818,7 @@ function SnapshotImportSection() {
               </tbody>
             </table>
           </div>
+          {planPaginationControls}
           <button className="btn" disabled={busy} onClick={runImport}>
             <PlusIcon />Import {plan.length} fund{plan.length === 1 ? '' : 's'}
           </button>
@@ -897,6 +896,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
   const [showAllUpdates, setShowAllUpdates] = useState(false);
   const dateSort2Input = showAllUpdates ? [...balanceRows].reverse() : balanceRows.slice(-8).reverse();
   const updateRows = dateSort2.rows(dateSort2Input, { date: row => row });
+  const { rows: pageUpdateRows, controls: updatePaginationControls } = useTablePagination(updateRows, 8);
   const rawPriceHistory = workbook.priceHistory[fund.id] ?? [];
   const [editUpdateIndex, setEditUpdateIndex] = useState<number | null>(null);
   const [editUpdateRow, setEditUpdateRow] = useState<{ date: string; price: number } | null>(null);
@@ -995,6 +995,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
   const dateSortInput = (typeFilter === 'all' ? allTxs : allTxs.filter((r) => r.t.action === typeFilter)).filter(row => (!fromDate || row.t.date >= fromDate) && (!toDate || row.t.date <= toDate) && filters.source !== 'statement-import')
     .sort((a, b) => b.t.date.localeCompare(a.t.date));
   const txs = dateSort.rows(dateSortInput, { date: row => row.t });
+  const { rows: pageTxs, controls: txPaginationControls } = useTablePagination(txs);
 
   /** README item 40: extends Banking's statement-export pattern (Done
    * item 58) to this module's own primary record — a fund's "statement"
@@ -1121,51 +1122,20 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
                 </div>
               </div>
             )}
-            <div className="grid-auto" style={{ ...gridAutoStyle(120, 8), marginTop: 12 }}>
-              <div className="stat-card card" style={hueStyle('var(--info)')}>
-                <div className="label">Units held</div>
-                <div className="value">{fmt(units, 2)}</div>
-                {!!pendingUnitDelta && (
-                  <div className="sub" title="Placed but not yet settled orders for this fund — units will change by this much once they clear.">
-                    {pendingUnitDelta > 0 ? '+' : ''}{fmt(pendingUnitDelta, 2)} pending
-                  </div>
-                )}
-              </div>
-              <div className="stat-card card" style={hueStyle('var(--accent)')}>
-                <Tooltip text="NAV = Net Asset Value, the price of one unit of this fund. This is the average price you paid per unit across all your purchases.">
-                  <div className="label clickable">Avg NAV cost</div>
-                </Tooltip>
-                <div className="value">{fmtPrice(avgNav)}</div>
-              </div>
-              <div className="stat-card card" style={hueStyle('var(--info)')}><div className="label">Invested</div><MoneyValue n={invested} currency={fund.currencyCode} /></div>
-              <div className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">Current value</div><MoneyValue n={currentValue} currency={fund.currencyCode} /></div>
-              <div className="stat-card card" style={hueStyle(profit >= 0 ? 'var(--profit)' : 'var(--loss)')}>
-                <Tooltip text="Realized profit from every past withdrawal/sell, plus unrealized profit on units still held — your true total gain, not just what's sitting in the fund right now.">
-                  <div className="label clickable">Net profit</div>
-                </Tooltip>
-                <MoneyValue n={profit} currency={fund.currencyCode} after={` (${profitPct.toFixed(1)}%)`} />
-              </div>
-              <div className="stat-card card" style={hueStyle(rate === null ? 'var(--accent)' : rate < 0 ? 'var(--loss)' : 'var(--profit)')}>
-                <Tooltip text="XIRR: your annualized rate of return, accounting for the exact dates and amounts of every purchase — a fairer comparison than a flat percentage when you've invested at different times.">
-                  <div className="label clickable">XIRR</div>
-                </Tooltip>
-                <div className="value">{rate !== null ? `${(rate * 100).toFixed(1)}%` : '—'}</div>
-              </div>
-              {/* User-requested (2026-09-03): "Display expected daily/monthly
-                  PL+PL%age... on each item page." */}
-              <div className="stat-card card" style={hueStyle(plRate && plRate.dailyAmount < 0 ? 'var(--loss)' : 'var(--profit)')}>
-                <Tooltip text="An average of what this fund actually earned/lost per day, based on its real NAV/balance history — not a promise of future returns.">
-                  <div className="label clickable">Expected daily P/L</div>
-                </Tooltip>
-                <div className="value">{plRate ? <>{fmtMoney(plRate.dailyAmount, fund.currencyCode)} <span style={{ fontSize: 12 }}>({plRate.dailyPct.toFixed(2)}%)</span></> : '—'}</div>
-              </div>
-              <div className="stat-card card" style={hueStyle(plRate && plRate.monthlyAmount < 0 ? 'var(--loss)' : 'var(--profit)')}>
-                <Tooltip text="The same average daily rate, scaled to a typical calendar month.">
-                  <div className="label clickable">Expected monthly P/L</div>
-                </Tooltip>
-                <div className="value">{plRate ? <>{fmtMoney(plRate.monthlyAmount, fund.currencyCode)} <span style={{ fontSize: 12 }}>({plRate.monthlyPct.toFixed(2)}%)</span></> : '—'}</div>
-              </div>
-            </div>
+            <SummarySections className="fund-detail-summary">
+              <SummarySection title="Position">
+                <SummaryValue label="Units held" value={fmt(units, 2)} primary detail={!!pendingUnitDelta ? `${pendingUnitDelta > 0 ? '+' : ''}${fmt(pendingUnitDelta, 2)} pending` : undefined} />
+                <SummaryValue label={<Tooltip text="NAV = Net Asset Value, the price of one unit of this fund. This is the average price you paid per unit across all your purchases.">Average NAV cost</Tooltip>} value={fmtPrice(avgNav)} />
+                <SummaryValue label="Invested" value={<MoneyValue n={invested} currency={fund.currencyCode} />} />
+                <SummaryValue label="Current value" value={<MoneyValue n={currentValue} currency={fund.currencyCode} />} primary />
+              </SummarySection>
+              <SummarySection title="Performance">
+                <SummaryValue label={<Tooltip text="Realized profit from every past withdrawal/sell, plus unrealized profit on units still held — your true total gain, not just what's sitting in the fund right now.">Net profit</Tooltip>} value={<MoneyValue n={profit} currency={fund.currencyCode} after={` (${profitPct.toFixed(1)}%)`} />} tone={profit >= 0 ? 'positive' : 'negative'} primary />
+                <SummaryValue label={<Tooltip text="XIRR: your annualized rate of return, accounting for the exact dates and amounts of every purchase — a fairer comparison than a flat percentage when you've invested at different times.">XIRR</Tooltip>} value={rate !== null ? `${(rate * 100).toFixed(1)}%` : '—'} tone={rate === null ? 'neutral' : rate >= 0 ? 'positive' : 'negative'} />
+                <SummaryValue label={<Tooltip text="An average of what this fund actually earned/lost per day, based on its real NAV/balance history — not a promise of future returns.">Expected daily P/L</Tooltip>} value={plRate ? fmtMoney(plRate.dailyAmount, fund.currencyCode) : '—'} detail={plRate ? `${plRate.dailyPct.toFixed(2)}%` : undefined} tone={plRate && plRate.dailyAmount < 0 ? 'negative' : 'positive'} />
+                <SummaryValue label={<Tooltip text="The same average daily rate, scaled to a typical calendar month.">Expected monthly P/L</Tooltip>} value={plRate ? fmtMoney(plRate.monthlyAmount, fund.currencyCode) : '—'} detail={plRate ? `${plRate.monthlyPct.toFixed(2)}%` : undefined} tone={plRate && plRate.monthlyAmount < 0 ? 'negative' : 'positive'} />
+              </SummarySection>
+            </SummarySections>
       </> },
 { key: 'analytics', label: 'Analytics', content: <>            {/* User-requested (2026-09-03): "add a chart to view periodic
                 growth with balance & PL indications over time." */}
@@ -1294,7 +1264,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
         <table>
           <thead><tr><dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th><th>Type</th><th>Units</th><th>NAV</th><th>Amount</th><th></th></tr></thead>
           <tbody>
-            {txs.map(({ t, i }) =>
+            {pageTxs.map(({ t, i }) =>
               editIndex === i && editRow ? (
                 <RecordRow market="funds" record={{ t, i }} onCancel={() => setEditIndex(null)} key={i}>
                   <td><input type="date" value={editRow.date} onChange={(e) => setEditRow({ ...editRow, date: e.target.value })} className="w-130" /></td>
@@ -1306,7 +1276,19 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
                   </td>
                   <td><input type="number" value={editRow.shares} onChange={(e) => setEditRow({ ...editRow, shares: Number(e.target.value) })} className="w-90" /></td>
                   <td><input type="number" step="0.0001" value={editRow.price} onChange={(e) => setEditRow({ ...editRow, price: Number(e.target.value) })} className="w-90" /></td>
-                  <td>{fmtMoney(editRow.shares * editRow.price, fund.currencyCode)}</td>
+                  <td>
+                    <input
+                      type="number"
+                      step="0.01"
+                      aria-label="Amount"
+                      value={(editRow.shares * editRow.price).toFixed(2)}
+                      className="w-110"
+                      onChange={(e) => {
+                        const amount = Number(e.target.value);
+                        setEditRow({ ...editRow, shares: unitsFromAmount(amount, editRow.price) });
+                      }}
+                    />
+                  </td>
                   <td>
                     <PendingToggle
                       checked={!!editRow.isPending}
@@ -1367,6 +1349,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
           </tbody>
         </table>
       </div>
+      {txPaginationControls}
       </> },
 { table: true, key: 'history', label: 'Balance history', defaultOpen: true, headerEnd: balanceRows.length > 0 ? <button className="btn secondary" onClick={exportBalanceHistory}>Export CSV</button> : undefined, content: <>
         {!balanceRows.length && <p className="text-muted">No balance/NAV updates recorded yet — use "Update balance or NAV" above.</p>}
@@ -1385,7 +1368,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
                   </tr>
                 </thead>
                 <tbody>
-                  {updateRows.map((r) => {
+                  {pageUpdateRows.map((r) => {
                     const rawIndex = rawPriceHistory.indexOf(r.point);
                     return editUpdateIndex === rawIndex && editUpdateRow ? (
                       <RecordRow market="funds" record={r} onCancel={() => { setEditUpdateIndex(null); setEditUpdateRow(null); }} key={rawIndex}>
@@ -1405,7 +1388,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
                     ) : (
                       <RecordRow market="funds" onEdit={() => startEditUpdate(rawIndex, r.point)}    record={r}  key={rawIndex}>
                         <td className="text-muted">{r.index}</td>
-                        <td>{r.time ? new Date(r.time).toLocaleString() : r.date}</td>
+                        <td>{r.date}</td>
                         <td>{fmtMoney(r.prevBalance, fund.currencyCode)}</td>
                         <td>{fmtPrice(r.prevNav)}</td>
                         <td>{fmtMoney(r.newBalance, fund.currencyCode)}</td>
@@ -1422,6 +1405,7 @@ function FundDetail({ fund, onSelect, onBack, onSelectBroker }: { fund: Fund; on
                 </tbody>
               </table>
             </div>
+            {showAllUpdates && updateRows.length > 8 ? updatePaginationControls : null}
           </>
         )}
       </> }]} >{editingFund && <EntityEditorModal title="Edit fund" onClose={() => setEditingFund(false)}><AddFundForm fund={fund} onSaved={() => setEditingFund(false)} /></EntityEditorModal>}{detailTx && (
@@ -1471,7 +1455,7 @@ function FundsTransfersSection() {
   const workbook = useFundsWorkbookStore((s) => s.workbook);
   const updateTransfer = useFundsWorkbookStore((s) => s.updateTransfer);
   const deleteTransfer = useFundsWorkbookStore((s) => s.deleteTransfer);
-  const currency = workbook.settings.defaultCurrency;
+  const currency = workbook.settings.legacyTransferCurrency ?? workbook.settings.defaultCurrency;
   const links = useInterEntityTransfersStore((s) => s.workbook.entries);
 
   const [editRow, setEditRow] = useState<Transfer | null>(null);
@@ -1481,7 +1465,14 @@ function FundsTransfersSection() {
   // missing it.
   const [typeFilter, setTypeFilter] = useState<'all' | Transfer['type']>('all');
 
-  const balances = useMemo(() => transferRunningBalance(workbook.transfers), [workbook.transfers]);
+  const cashLedgers = useMemo(
+    () => fundsCashLedgerByCurrency(workbook.funds, workbook.transactions, workbook.transfers, workbook.settings.legacyTransferCurrency ?? workbook.settings.defaultCurrency),
+    [workbook.funds, workbook.transactions, workbook.transfers, workbook.settings.defaultCurrency, workbook.settings.legacyTransferCurrency],
+  );
+  const balances = useMemo(
+    () => new Map(Object.values(cashLedgers).flat().filter((event) => event.kind === 'transfer' && event.sourceId).map((event) => [event.sourceId!, event.balance])),
+    [cashLedgers],
+  );
   const linkByRecordId = useMemo(() => {
     const map = new Map<string, (typeof links)[number]>();
     for (const l of links) {
@@ -1510,6 +1501,7 @@ function FundsTransfersSection() {
     [filteredTransfers],
   );
   const sorted = dateSort.rows(dateSortInput, { date: row => row });
+  const { rows: pageRows, controls: paginationControls, page, pageSize } = useTablePagination(sorted);
   const reorderTransfer = async (pair: [{ id: string; order: number }, { id: string; order: number }]) => {
     if (!(await ensureSignedIn('Sign in to reorder transfers.'))) return;
     for (const p of pair) updateTransfer(p.id, { seq: p.order });
@@ -1538,23 +1530,24 @@ function FundsTransfersSection() {
             <tr>
               <dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th>
               <th>Type</th>
+              <th>Currency</th>
               <th>Gross</th>
               <th>Fee</th>
-              <th>Balance</th>
+              <th>Cash balance</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {sorted.map((t, i) => {
+            {pageRows.map((t, i) => {
               const link = linkByRecordId.get(t.id);
               const otherSide = link ? (link.from.module === 'funds' && link.fromRecordId === t.id ? link.to : link.from) : undefined;
               return (
-                <RecordRow market="funds" onEdit={() => startEdit(t)}    record={t}  key={t.id}>
+                <RecordRow onEdit={() => startEdit(t)} record={t} key={t.id}>
                   <td>
                     <DateValue value={t.date} />{' '}
                     <ReorderButtons
                       rows={sorted}
-                      index={i}
+                      index={(page - 1) * pageSize + i}
                       instantOf={instantOf}
                       idOf={(row) => row.id}
                       orderOf={(row) => row.seq}
@@ -1569,11 +1562,12 @@ function FundsTransfersSection() {
                       </Link>
                     )}
                   </td>
-                  <td>{fmtMoney(t.gross, currency)}</td>
-                  <td>{fmtMoney(t.fee, currency)}</td>
+                  <td>{t.currencyCode ?? currency}</td>
+                  <td>{fmtMoney(t.gross, t.currencyCode ?? currency)}</td>
+                  <td>{fmtMoney(t.fee, t.currencyCode ?? currency)}</td>
                   <td>
-                    <Tooltip text="Running net cash contributed, in date order.">
-                      <span>{fmtMoney(balances.get(t.id) ?? 0, currency)}</span>
+                    <Tooltip text="Cash balance after this transfer, including BUY/SELL activity, in this currency.">
+                      <span>{fmtMoney(balances.get(t.id) ?? 0, t.currencyCode ?? currency)}</span>
                     </Tooltip>
                   </td>
                   <td>
@@ -1583,14 +1577,122 @@ function FundsTransfersSection() {
                 </RecordRow>
               );
             })}
-            {!sorted.length && <tr><td colSpan={6} className="text-muted">No transfers yet.</td></tr>}
+            {!sorted.length && <tr><td colSpan={7} className="text-muted">No transfers yet.</td></tr>}
           </tbody>
         </table>
       </div>
+      {paginationControls}
     </div>
       {editRow && <TransactionEntryModal editTransfer={{ module: 'funds', record: editRow }} onClose={() => setEditRow(null)} />}
     </>
   );
+}
+
+/** Full currency-specific Funds cash ledger. Deposits/withdrawals and
+ * fund BUY/SELL events share one chronological balance, so cash remaining
+ * after a purchase is visible and never confused with NAV-valued holdings. */
+function FundsCashLedgerSection() {
+  const workbook = useFundsWorkbookStore((state) => state.workbook);
+  const deleteTransfer = useFundsWorkbookStore((state) => state.deleteTransfer);
+  const links = useInterEntityTransfersStore((state) => state.workbook.entries);
+  const sideLabel = useLinkSideLabel();
+  const [currencyFilter, setCurrencyFilter] = useState('all');
+  const [kindFilter, setKindFilter] = useState<'all' | 'trade' | 'transfer'>('all');
+  const [editRow, setEditRow] = useState<Transfer | null>(null);
+  const ledgerByCurrency = useMemo(
+    () => fundsCashLedgerByCurrency(workbook.funds, workbook.transactions, workbook.transfers, workbook.settings.legacyTransferCurrency ?? workbook.settings.defaultCurrency),
+    [workbook.funds, workbook.transactions, workbook.transfers, workbook.settings.defaultCurrency],
+  );
+  const currencyCodes = Object.keys(ledgerByCurrency).sort();
+  const transferById = useMemo(() => new Map(workbook.transfers.map((transfer) => [transfer.id, transfer])), [workbook.transfers]);
+  const linkByRecordId = useMemo(() => {
+    const map = new Map<string, (typeof links)[number]>();
+    links.forEach((link) => {
+      if (link.from.module === 'funds') map.set(link.fromRecordId, link);
+      if (link.to.module === 'funds') map.set(link.toRecordId, link);
+    });
+    return map;
+  }, [links]);
+  const allRows = useMemo(
+    () => Object.values(ledgerByCurrency).flat().filter((event) =>
+      (currencyFilter === 'all' || event.currencyCode === currencyFilter)
+      && (kindFilter === 'all' || event.kind === kindFilter),
+    ),
+    [ledgerByCurrency, currencyFilter, kindFilter],
+  );
+  const dateSort = useDateTableSort();
+  const dateSortInput = useMemo(
+    () => [...allRows].sort((a, b) => b.date.localeCompare(a.date) || (b.time ?? '').localeCompare(a.time ?? '') || (b.seq ?? 0) - (a.seq ?? 0)),
+    [allRows],
+  );
+  const sorted = dateSort.rows(dateSortInput, { date: (event) => event });
+  const { rows: pageRows, controls } = useTablePagination(sorted);
+
+  return (<>
+    <p className="text-muted mb-12">
+      The running balance includes deposits and withdrawals plus the cash effect of every valid BUY/SELL.
+      Each currency has its own balance; fund units remain separate and are valued at NAV.
+    </p>
+    {workbook.transfers.some((transfer) => !transfer.currencyCode) && (
+      <Notice tone="warning" className="mb-12">
+        Older Funds transfers did not store a currency. They are kept in {workbook.settings.legacyTransferCurrency ?? workbook.settings.defaultCurrency}
+        using the one-time migration snapshot. Edit any row whose original currency was different to assign it explicitly.
+      </Notice>
+    )}
+    <PageFilters><div className="row gap-sm mb-sm">
+      <Field label="Currency" width={150}>
+        <Select value={currencyFilter} onChange={(event) => setCurrencyFilter(event.target.value)}>
+          <option value="all">All currencies</option>
+          {currencyCodes.map((code) => <option key={code} value={code}>{code}</option>)}
+        </Select>
+      </Field>
+      <Field label="Event" width={150}>
+        <Select value={kindFilter} onChange={(event) => setKindFilter(event.target.value as typeof kindFilter)}>
+          <option value="all">All events</option>
+          <option value="transfer">Deposits / withdrawals</option>
+          <option value="trade">BUY / SELL</option>
+        </Select>
+      </Field>
+    </div></PageFilters>
+    <div className="table-scroll mt-sm">
+      <table>
+        <thead><tr>
+          <dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th>
+          <th>Event</th><th>Details</th><th>Currency</th><th>Cash movement</th><th>Fee</th><th>Balance</th><th></th>
+        </tr></thead>
+        <tbody>
+          {pageRows.map((event) => {
+            const transfer = event.kind === 'transfer' && event.sourceId ? transferById.get(event.sourceId) : undefined;
+            const link = transfer ? linkByRecordId.get(transfer.id) : undefined;
+            const otherSide = link ? (link.from.module === 'funds' && link.fromRecordId === transfer?.id ? link.to : link.from) : undefined;
+            return <RecordRow market={event.kind === 'trade' ? 'funds' : undefined} onEdit={transfer ? () => setEditRow(transfer) : undefined} record={transfer ?? event} key={`${event.currencyCode}:${event.sourceId ?? event.date}:${event.kind}`}>
+              <td><DateValue value={event.date} /></td>
+              <td>{event.label}</td>
+              <td>
+                {event.kind === 'trade'
+                  ? (workbook.funds.find((fund) => fund.id === event.ticker)?.name ?? event.ticker ?? 'Fund trade')
+                  : (transfer?.description || 'Funds transfer')}
+                {link && otherSide && <Link to={linkTargetPath(otherSide)} className="pill-info ml-6" title="Linked — go to the other side">🔗 {sideLabel(link.from)} → {sideLabel(link.to)}</Link>}
+              </td>
+              <td>{event.currencyCode}</td>
+              <td>{fmtMoney(event.amount, event.currencyCode)}</td>
+              <td>{fmtMoney(event.fee, event.currencyCode)}</td>
+              <td>{fmtMoney(event.balance, event.currencyCode)}</td>
+              <td>
+                {transfer && <>
+                  <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => setEditRow(transfer)} />{' '}
+                  <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => confirmAndDeleteLinkable('funds', transfer.id, () => deleteTransfer(transfer.id))} />
+                </>}
+              </td>
+            </RecordRow>;
+          })}
+          {!sorted.length && <tr><td colSpan={8} className="text-muted">No Funds cash activity yet.</td></tr>}
+        </tbody>
+      </table>
+    </div>
+    {controls}
+    {editRow && <TransactionEntryModal editTransfer={{ module: 'funds', record: editRow }} onClose={() => setEditRow(null)} />}
+  </>);
 }
 
 /* ============================== Analytics ============================== */
@@ -1711,21 +1813,22 @@ export function FundsPage({
         />
       ) : (
         <StandardPageSections sections={[
-            { key: 'summary', label: 'Summary', content: <div className="stack-lg"><FundsScopeSummary ids={selectedIds} filters={filters} /><OverallSummary selectedIds={selectedIds} /></div> },
+            { key: 'summary', label: 'Summary', defaultOpen: true, content: <div className="stack-lg"><FundsScopeSummary ids={selectedIds} filters={filters} /><OverallSummary selectedIds={selectedIds} /></div> },
             { table: true, key: 'plans', label: 'Plans', content: <FundsScopePlans ids={selectedIds} filters={filters} /> },
             { table: true, key: 'transactions', label: 'Transactions', content: <FundsScopeTransactions ids={selectedIds} filters={filters} onSelect={id => setSelected(funds.find(fund => fund.id === id) ?? null)} /> },
             {
               key: 'funds',
               label: 'Funds',
-              content: (
-                <div>
-
-                  <BrokersList onSelect={setSelectedBroker} />
-                  <FundList onSelect={setSelected} selectedIds={selectedIds} />
-
-                </div>
-              ),
+              defaultOpen: true,
+              content: <FundList onSelect={setSelected} selectedIds={selectedIds} />,
             },
+            {
+              key: 'brokers',
+              label: 'Brokers',
+              defaultOpen: true,
+              content: <BrokersList onSelect={setSelectedBroker} />,
+            },
+            { table: true, key: 'cash-ledger', label: 'Cash ledger', content: <FundsCashLedgerSection /> },
             { table: true, key: 'transfers', label: 'Transfers', content: <FundsTransfersSection /> },
             { table: true, key: 'import', label: 'Import', content: <SnapshotImportSection /> },
             {

@@ -184,6 +184,9 @@ function AmountSettings() {
           <Field label="Default deposit fee" width={90}>
             <TextInput type="number" step="0.01" value={settings.depositFee} onChange={(e) => updateSettings({ depositFee: Number(e.target.value) })} />
           </Field>
+          <Field label="Price warning (%)" width={120} title="Ask for confirmation when a trade price differs from the saved market price by more than this percentage. Set 0 to warn on any difference.">
+            <TextInput type="number" min="0" max="100" step="0.5" value={settings.tradePriceDeviationPct ?? 10} onChange={(e) => updateSettings({ tradePriceDeviationPct: Math.min(100, Math.max(0, Number(e.target.value))) })} />
+          </Field>
         </div>
       </Card>
       <CostBasisSettings />

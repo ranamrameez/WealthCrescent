@@ -4,7 +4,9 @@
  * record instead of two independently-typed entries that can silently
  * drift apart (one side edited or deleted without the other).
  *
- * v1 scope: Cash <-> Bank, Bank <-> QSE, Bank <-> PSX. Extended
+ * v1 scope: Cash <-> Bank, Bank <-> QSE, Bank <-> PSX. QSE/PSX sides
+ * carry a broker-profile `ref` so transfers target an individual account,
+ * while exchange market data remains shared. Extended
  * 2026-08-23 to include Rentals (Bank/Cash <-> a specific property — a
  * rent payment in, or an expense paid out) since `RentalEntry` already had
  * a stable id and needed no retrofit, unlike Personal Loans (repayments
@@ -37,8 +39,8 @@ export const LINK_MODULES: LinkModule[] = ['cash', 'bank', 'qse', 'psx', 'rental
 export const LINK_MODULE_LABELS: Record<LinkModule, string> = {
   cash: 'Cash',
   bank: 'Banking',
-  qse: 'QSE (Stocks)',
-  psx: 'PSX (Stocks)',
+  qse: 'QSE broker account',
+  psx: 'PSX broker account',
   rentals: 'Rentals',
   personalLoans: 'Personal Loans',
   funds: 'Funds',
@@ -48,16 +50,17 @@ export const LINK_MODULE_LABELS: Record<LinkModule, string> = {
 
 export interface LinkSideConfig {
   module: LinkModule;
-  /** A `BankAccount.id` when `module === 'bank'`, a `Property.id` when
+  /** A broker profile id when `module === 'qse'` or `'psx'`, a `BankAccount.id` when `module === 'bank'`, a `Property.id` when
    * `module === 'rentals'`, a `PersonalLoan.id` when
    * `module === 'personalLoans'`, an `EMILoan.id` when `module === 'emi'`,
    * or a `CreditCard.id` when `module === 'creditCard'` — the sides with
    * more than one sub-entity to choose from. Ignored otherwise. */
   ref?: string;
   /** A `CashEntry.currencyCode` when `module === 'cash'` — the only side
-   * whose ledger record needs its own currency field (Bank/Rentals derive
-   * it from the account/property, QSE/PSX from the exchange's single
-   * settings.currency). */
+   * whose ledger record needs its own currency field. QSE/PSX currency is
+   * resolved from the selected broker profile's settings; Bank/Rentals
+   * derive it from the selected account/property. Funds stores it on each
+   * transfer because its portfolio can hold multiple currencies. */
   currencyCode?: string;
   /** The 1-indexed schedule month an EMI repayment applies to, when
    * `module === 'emi'` — resolved by the picker UI as "the next

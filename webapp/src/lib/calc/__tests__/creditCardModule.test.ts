@@ -6,6 +6,7 @@ import {
   computeMinimumDue,
   creditCardLiabilityByCurrency,
   creditCardMonthlyHistory,
+  creditCardRunningBalances,
   currentStatement,
   latestClosedStatement,
   markupThisCycle,
@@ -69,6 +70,20 @@ const tx = (over: Partial<CreditCardTransaction>): CreditCardTransaction => ({
   amount: 0,
   description: '',
   ...over,
+});
+
+describe('creditCardRunningBalances', () => {
+  it('tracks consumed credit chronologically from opening debt, independent of other cards', () => {
+    const first = tx({ id: 'charge-1', date: '2026-01-10', kind: 'charge', amount: 300, seq: 1 });
+    const payment = tx({ id: 'payment-1', date: '2026-01-11', kind: 'payment', amount: 100, seq: 2 });
+    const fee = tx({ id: 'fee-1', date: '2026-01-11', kind: 'fee', amount: 25, seq: 3 });
+    const otherCard = tx({ id: 'other-card', cardId: 'c2', date: '2026-01-12', amount: 900 });
+    const balances = creditCardRunningBalances(card({ openingBalance: 200 }), [fee, otherCard, payment, first]);
+    expect(balances.get('charge-1')).toBe(500);
+    expect(balances.get('payment-1')).toBe(400);
+    expect(balances.get('fee-1')).toBe(425);
+    expect(balances.has('other-card')).toBe(false);
+  });
 });
 
 describe('outstandingBalanceByCard', () => {

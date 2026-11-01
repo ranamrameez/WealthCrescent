@@ -157,6 +157,8 @@ export interface Category {
 
 export interface CategoriesWorkbook {
   categories: Category[];
+  /** Bundled app categories explicitly merged away by the owner. */
+  removedDefaultIds?: string[];
 }
 
 /** A user-configurable "bird's-eye view" bucket over the Category registry

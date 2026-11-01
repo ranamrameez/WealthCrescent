@@ -23,6 +23,7 @@ import { useEnabledCurrenciesStore } from '../../../store/enabledCurrenciesStore
 import { useCategoryStore } from '../../../store/categoryStore';
 import { useCategoryGroupStore } from '../../../store/categoryGroupStore';
 import { useAppearanceStore } from '../../../store/appearanceStore';
+import { resetAllSettingsToAppDefaults } from '../../../store/resetAllSettings';
 import { ModuleSelectionModal } from '../../../components/ModuleSelectionModal';
 import type { CategoryGroup } from '../../../types/finance';
 
@@ -515,6 +516,33 @@ export function AccountPage({ syncStatuses }: { syncStatuses: ModuleSyncStatus[]
             move data between devices.
           </p>
           <Link to="/app-data" className="btn secondary">Backup / restore all data →</Link>
+        </CollapsibleCard>
+
+        <CollapsibleCard title={<h3 className="m-0">Reset settings</h3>}>
+          <p className="text-muted mt-0">
+            Restore broker fees, module settings, currency filters, module visibility, and appearance to the current app defaults.
+            Your transactions, balances, accounts, properties, categories, plans, and other financial records are preserved.
+          </p>
+          <button
+            className="btn danger"
+            type="button"
+            onClick={async () => {
+              const ok = await confirmDialog(
+                'This restores customized settings across the app, including all broker fee profiles and appearance. Financial records and user-created entities are preserved. You can customize settings again afterward.',
+                'Reset all settings to app defaults?',
+              );
+              if (!ok) return;
+              try {
+                await resetAllSettingsToAppDefaults(user?.uid);
+                toast('All settings were reset to the current app defaults. Financial records were preserved.');
+              } catch (error) {
+                console.error('Settings reset completed locally but module visibility sync failed.', error);
+                toast('Settings were reset locally, but module visibility could not be synced to your account. Please retry while online.');
+              }
+            }}
+          >
+            Reset all settings to app defaults
+          </button>
         </CollapsibleCard>
       </div>
       {modulePickerOpen && <ModuleSelectionModal uid={user?.uid} onClose={() => setModulePickerOpen(false)} />}

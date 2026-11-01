@@ -1,7 +1,9 @@
 import type { PSXSettings, PSXWorkbook } from '../types/psxWorkbook';
+import { APP_DEFAULTS_VERSION } from './appDefaults';
 
 export const DEFAULT_PSX_SETTINGS: PSXSettings = {
   feePct: 0.20,
+  sameDayNettingRule: 'higherValueSide',
   lowPriceThreshold: 25,
   lowPriceFee: 0.05,
   sstPct: 15,
@@ -26,6 +28,7 @@ export const DEFAULT_PSX_SETTINGS: PSXSettings = {
   tick: 0.01,
   currency: 'PKR',
   depositFee: 0,
+  tradePriceDeviationPct: 10,
   cgtFilerPct: 15,
   // README item 5: real broker schedules charge non-filers a much higher
   // rate than filers (JS Bank: ~30%) — the legacy app defaulted both to
@@ -41,9 +44,54 @@ export const DEFAULT_PSX_SETTINGS: PSXSettings = {
   allInFeePct: 0,
 };
 
+const JS_ZINDIGI_PROFILE_ID = 'psx-js-zindigi';
+const AL_HABIB_PROFILE_ID = 'psx-al-habib-capital-markets';
+
+/** Build a new PSX broker profile from application defaults, never by copying
+ * whichever broker the user happens to have active. Recognized broker defaults
+ * are name-matched for seed/new profiles; every field remains user-editable. */
+export function createDefaultPSXBrokerSettings(brokerName: string): PSXSettings {
+  const normalized = brokerName.trim().toLocaleLowerCase();
+  if (normalized.includes('habib') || normalized === 'ahl') {
+    return {
+      ...DEFAULT_PSX_SETTINGS,
+      feePct: 0.15,
+      sameDayNettingRule: 'higherValueSide',
+      lowPriceThreshold: 20,
+      lowPriceFee: 0.03,
+    };
+  }
+  if (normalized.includes('zindigi') || normalized.includes('zindagi')) {
+    return { ...DEFAULT_PSX_SETTINGS, sameDayNettingRule: 'higherValueSide' };
+  }
+  // Unknown brokers start from generic app defaults but do not inherit a
+  // broker-specific intraday concession without confirmation.
+  return { ...DEFAULT_PSX_SETTINGS, sameDayNettingRule: 'none' };
+}
+
 export function createEmptyPSXWorkbook(): PSXWorkbook {
   return {
     settings: { ...DEFAULT_PSX_SETTINGS },
+    brokerProfiles: [
+      { id: JS_ZINDIGI_PROFILE_ID, name: 'JS Zindagi', settings: { ...DEFAULT_PSX_SETTINGS }, settingsDefaultsVersion: APP_DEFAULTS_VERSION },
+      {
+        id: AL_HABIB_PROFILE_ID,
+        name: 'AL Habib Capital Markets',
+        settingsDefaultsVersion: APP_DEFAULTS_VERSION,
+        settings: {
+          ...DEFAULT_PSX_SETTINGS,
+          // Published AHCML account-opening tariff: PKR 0.03/share up to
+          // PKR 20, then 0.15% of traded value above PKR 20. See README
+          // sources; other regulatory levies remain separately configurable.
+          feePct: 0.15,
+          sameDayNettingRule: 'higherValueSide',
+          lowPriceThreshold: 20,
+          lowPriceFee: 0.03,
+        },
+      },
+    ],
+    activeBrokerId: JS_ZINDIGI_PROFILE_ID,
+    brokerMigrationVersion: 1,
     transactions: [],
     transfers: [],
     adjustments: [],

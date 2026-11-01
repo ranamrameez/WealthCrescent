@@ -34,6 +34,8 @@ export function TopBar() {
   const category = categoryForPath(location.pathname);
   const qse=useWorkbookStore(s=>s.workbook);
   const psx=usePSXWorkbookStore(s=>s.workbook);
+  const setQseBroker=useWorkbookStore(s=>s.setActiveBroker);
+  const setPsxBroker=usePSXWorkbookStore(s=>s.setActiveBroker);
   const exchange=location.pathname.startsWith('/psx')?'psx':'qse';
   const stockWorkbook=exchange==='psx'?psx:qse;
   const stockOptions=[...new Set([...stockWorkbook.transactions.map(tx=>tx.ticker),...Object.keys(stockWorkbook.marketPrices)])].sort();
@@ -55,7 +57,22 @@ export function TopBar() {
           </button>
         ))}
       </div>
-      <div className="page-topbar-right">{category==='stocks' && !stockDetail && !location.pathname.startsWith('/market-prices') && <TopBarSelect label="Stock" className="account-switch-select" value="" options={[{value:'',label:'All stocks'},...stockOptions.map(ticker=>({value:ticker,label:ticker}))]} onChange={event=>{if(event.target.value){const path=`${exchange==='psx'?'/psx':''}/stock/${event.target.value}`;beginNavigation(path);navigate(path);}}} />}{rightSlot}</div>
+      <div className="page-topbar-right">
+        {category === 'stocks' && (
+          <TopBarSelect
+            label="Broker"
+            className="account-switch-select"
+            value={stockWorkbook.activeBrokerId ?? ''}
+            options={(stockWorkbook.brokerProfiles ?? []).filter((profile) => !profile.archived).map((profile) => ({
+              value: profile.id,
+              label: profile.accountLabel ? `${profile.name} · ${profile.accountLabel}` : profile.name,
+            }))}
+            onChange={(event) => (exchange === 'psx' ? setPsxBroker : setQseBroker)(event.target.value)}
+          />
+        )}
+        {category==='stocks' && !stockDetail && !location.pathname.includes('/market-prices') && <TopBarSelect label="Stock" className="account-switch-select" value="" options={[{value:'',label:'All stocks'},...stockOptions.map(ticker=>({value:ticker,label:ticker}))]} onChange={event=>{if(event.target.value){const path=`${exchange==='psx'?'/psx':''}/stock/${event.target.value}`;beginNavigation(path);navigate(path);}}} />}
+        {rightSlot}
+      </div>
     </div>
   );
 }

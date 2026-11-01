@@ -1,4 +1,8 @@
 export interface Transaction {
+  /** Broker/account profile that owns this trade. Missing on legacy imports;
+   * the workbook migration assigns those trades to the original default
+   * profile without changing their financial fields. */
+  brokerId?: string;
   /** Stable id, not the transaction's array position. Optional because
    * QSE/PSX transactions have historically been index-addressed (see
    * CLAUDE.md) — added specifically so a Trade Planner leg ("Mark as
@@ -9,20 +13,14 @@ export interface Transaction {
    * by `createWorkbookStore.ts`'s `normalize()`, same pattern as
    * `Transfer.id`. */
   id?: string;
-  /** User-reported (2026-08-27): "auto generate unique int ids for each
-   * single item so that even matching dates cannot stop us from loosing
-   * the correct order of the data." A monotonically increasing per-array
-   * counter assigned once at creation (`lib/seq.ts`'s `nextSeq`) — the
-   * definitive tie-breaker for two records at the exact same instant,
-   * used instead of implicitly relying on array position (which doesn't
-   * survive an edit, a delete-and-re-add, or an import reordering the
-   * array). `sortTransactionsChronological` still checks BUY-before-SELL
-   * first on a tied instant (a real financial-correctness rule, not an
-   * ordering preference — see that function's own comment), falling back
-   * to `seq` only when that domain rule doesn't fully resolve the tie
-   * (e.g. two same-day BUYs). Retrofitted onto existing data by
-   * `createWorkbookStore.ts`'s `normalize()`, same pattern as `id`. */
+  /** Legacy compatibility alias. For transactions this mirrors perTickerIndex; globalTransactionIndex now controls accounting order. Other record types still use seq as their own sequence. */
   seq?: number;
+  /** Canonical global accounting position across all transactions in this exchange workbook. Reordering the global sequence must also recalculate perTickerIndex. */
+  globalTransactionIndex?: number;
+  /** Canonical position within this ticker's own transaction sequence, derived from globalTransactionIndex order. */
+  perTickerIndex?: number;
+  /** @deprecated Compatibility alias for globalTransactionIndex while older exports/imports migrate. Never use as the ordering source. */
+  transactionIndex?: number;
   date: string;
   /** Pending item 41: optional time-of-day, "HH:MM" 24-hour, alongside
    * `date` — see `lib/datetime.ts`. Missing time backfills to noon for
@@ -145,6 +143,8 @@ export interface Transaction {
 }
 
 export interface Transfer {
+  /** Broker/account profile that owns this cash movement. */
+  brokerId?: string;
   /** Stable id, not the transfer's array position — needed so cross-entity
    * transfer links (README item 19) can reference a specific transfer that
    * survives other transfers being added/edited/deleted around it. */
@@ -157,6 +157,10 @@ export interface Transfer {
   time?: string;
   timezone?: string;
   type: 'DEPOSIT' | 'WITHDRAWAL';
+  /** Funds-only cash account currency. Optional for legacy QSE/PSX and
+   * historical Funds transfers; missing Funds values use the workbook's
+   * default currency until the user edits/assigns them. */
+  currencyCode?: string;
   gross: number;
   fee: number;
   /** Optional description entered through the centralized Transfers popup. */
@@ -166,6 +170,8 @@ export interface Transfer {
 }
 
 export interface Adjustment {
+  /** Broker/account profile that owns this adjustment. */
+  brokerId?: string;
   /** Stable id, not the adjustment's array position — added for the same
    * reason as `Transaction.id` (README item 51): every record type should
    * carry one, not just the ones a specific feature happened to need first.
@@ -234,6 +240,8 @@ export interface TradePlanLeg {
  * ahead of time, edit them, and convert individual legs into real
  * transactions ("Mark as done") without re-typing the same data. */
 export interface TradePlan {
+  /** Broker/account profile whose holdings this plan references. */
+  brokerId?: string;
   id: string;
   name: string;
   createdAt: string;
@@ -262,6 +270,8 @@ export interface WatchlistItem {
 }
 
 export interface Dividend {
+  /** Broker/account profile that owns this dividend record. */
+  brokerId?: string;
   /** Stable id — same reasoning as `Adjustment.id` above (README item 51). */
   id?: string;
   /** Same reasoning and retrofit pattern as `Transaction.seq` above. */
@@ -284,6 +294,8 @@ export interface QSESettings {
   tick: number;
   currency: string;
   depositFee: number;
+  /** Warn before saving a trade whose entered price differs from the stored market price by more than this percent. Defaults to 10%. */
+  tradePriceDeviationPct?: number;
   /** User-requested (2026-09-06): "let the user choose (checkboxes?) to
    * include the accounts in the Net calcs" — QSE is one portfolio with no
    * sub-accounts, so this is a whole-module on/off switch (same rationale
@@ -350,8 +362,38 @@ export interface Appearance {
   dateFormat?: 'DD-MMM-YYYY' | 'YYYY-MMM-DD' | 'DD-MM-YYYY' | 'MM-DD-YYYY' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'dddd, MMM DD, YYYY' | 'ddd, DD MMM, YYYY';
 }
 
+export interface BrokerPortfolioData {
+  transactions: Transaction[];
+  transfers: Transfer[];
+  adjustments: Adjustment[];
+  dividends: Dividend[];
+  tradePlans: TradePlan[];
+}
+
+export interface BrokerProfile<TSettings> {
+  id: string;
+  /** User-facing name, e.g. "The Group", "JS Zindagi", or "AL Habib Capital Markets". */
+  name: string;
+  /** Optional account label/last digits to distinguish multiple accounts at one broker. */
+  accountLabel?: string;
+  /** Fee/cost-basis settings are profile-specific, not exchange-global. */
+  settings: TSettings;
+  /** Application-default version last acknowledged by this user. Missing means a legacy profile. */
+  settingsDefaultsVersion?: number;
+  /** Independent account history. Market prices/watchlists remain exchange-wide. */
+  data?: BrokerPortfolioData;
+  /** Archived profiles are retained for history and remain view-only. */
+  archived?: boolean;
+  /** Deactivated profiles are hidden from normal activity pickers and only shown in the profile status section. */
+  deactivated?: boolean;
+}
+
 export interface Workbook {
   settings: QSESettings;
+  brokerProfiles: BrokerProfile<QSESettings>[];
+  activeBrokerId: string;
+  /** One-time legacy broker-profile migration marker. */
+  brokerMigrationVersion?: number;
   /** @deprecated appearance is now a global preference (see
    * store/appearanceStore.ts), not per-workbook — kept optional here only
    * so old exported/synced JSON still parses. */
@@ -396,6 +438,11 @@ export interface Position {
   realized: number;
   totalBoughtShares: number;
   totalSoldShares: number;
+  /** Historical SELL quantity that exceeded the shares tracked by this workbook.
+   * It is reported separately and never treated as zero-cost realized profit. */
+  unmatchedSellShares?: number;
+  unmatchedSellFees?: number;
+  unmatchedSellTransactions?: number;
   buyCount: number;
   sellCount: number;
   firstDate: string;
@@ -414,6 +461,12 @@ export interface CashLedgerEvent {
    * `Transaction.seq`'s doc comment) — the tie-breaker `buildCashLedger`
    * falls back to for two events of the SAME `kind` at the same instant. */
   seq?: number;
+  /** Canonical global accounting position for trade events. */
+  globalTransactionIndex?: number;
+  /** Canonical per-ticker accounting position for trade events. */
+  perTickerIndex?: number;
+  /** @deprecated Compatibility alias for older ledger consumers. */
+  transactionIndex?: number;
   kind: 'trade' | 'transfer' | 'adjustment';
   action: string;
   label: string;

@@ -15,7 +15,7 @@ vi.mock('../../../../components/Toast', () => ({ toast: vi.fn() }));
 beforeEach(() => {
   vi.mocked(confirmDialog).mockReset().mockResolvedValue(true);
   const workbook = createEmptyWorkbook();
-  workbook.transactions = [{ id: 'buy', seq: 1, date: '2026-10-01', ticker: 'QNBK', action: 'BUY', shares: 10, price: 12, feeOverride: 3 }, { id: 'sell', seq: 2, date: '2026-10-02', ticker: 'QNBK', action: 'SELL', shares: 2, price: 13 }];
+  workbook.transactions = [{ id: 'buy', seq: 1, perTickerIndex: 1, globalTransactionIndex: 1, transactionIndex: 1, date: '2026-10-01', ticker: 'QNBK', action: 'BUY', shares: 10, price: 12, feeOverride: 3 }, { id: 'sell', seq: 2, perTickerIndex: 2, globalTransactionIndex: 2, transactionIndex: 2, date: '2026-10-02', ticker: 'QNBK', action: 'SELL', shares: 2, price: 13 }];
   useWorkbookStore.setState({ workbook });
   useInterEntityTransfersStore.setState(state => ({ workbook: { ...state.workbook, entries: [] } }));
 });
@@ -51,7 +51,7 @@ it('imports validated CSV and skips duplicates despite different sequence number
   ]) });
   fireEvent.change(container.querySelector('input[type=file]')!, { target: { files: [file] } });
   await waitFor(() => expect(useWorkbookStore.getState().workbook.transactions).toHaveLength(3));
-  expect(useWorkbookStore.getState().workbook.transactions[2]).toMatchObject({ ticker: 'QIBK', shares: 5, seq: 3 });
+  expect(useWorkbookStore.getState().workbook.transactions[2]).toMatchObject({ ticker: 'QIBK', shares: 5, globalTransactionIndex: 3, perTickerIndex: 1, seq: 1 });
 });
 it('does not partially import a CSV containing an invalid row', async () => {
   const { container } = show();
@@ -84,7 +84,7 @@ it('persists sequence changes made with the batch reorder controls', async () =>
   fireEvent.click(screen.getByRole('button', { name: 'Move row 1 down' }));
   fireEvent.click(screen.getByText('Save all changes'));
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-  expect(useWorkbookStore.getState().workbook.transactions.find(row => row.id === 'buy')?.seq).toBe(2);
+  expect(useWorkbookStore.getState().workbook.transactions.find(row => row.id === 'buy')).toMatchObject({ globalTransactionIndex: 2, perTickerIndex: 2, seq: 2 });
 });
 it('locks linked transfers in the batch editor', () => {
   const transfer = { id: 'transfer', date: '2026-10-01', type: 'DEPOSIT' as const, gross: 100, fee: 0, seq: 1 };
@@ -97,7 +97,7 @@ it('locks linked transfers in the batch editor', () => {
   expect(screen.queryByRole('button', { name: 'Delete row 1' })).toBeNull();
 });
 it('assigns added rows a sequence beyond records hidden by the filter', async () => {
-  useWorkbookStore.getState().updateTransaction(1, { seq: 100 });
+  useWorkbookStore.getState().updateTransaction(1, { globalTransactionIndex: 100 });
   show(); batch();
   fireEvent.click(screen.getByRole('button', { name: 'Add row' }));
   fireEvent.change(screen.getByLabelText('Row 2, Ticker'), { target: { value: 'qibk' } });
@@ -105,7 +105,7 @@ it('assigns added rows a sequence beyond records hidden by the filter', async ()
   fireEvent.change(screen.getByLabelText('Row 2, Price'), { target: { value: '8' } });
   fireEvent.click(screen.getByText('Save all changes'));
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-  expect(useWorkbookStore.getState().workbook.transactions.find(row => row.ticker === 'QIBK')).toMatchObject({ seq: 101, shares: 3 });
+  expect(useWorkbookStore.getState().workbook.transactions.find(row => row.ticker === 'QIBK')).toMatchObject({ globalTransactionIndex: 101, perTickerIndex: 1, seq: 1, shares: 3 });
 });
 it('imports mixed ledger records into their owning collections and skips duplicate trades', async () => {
   const rows = useWorkbookStore.getState().workbook.transactions.map(row => ({ ...row, id: row.id!, kind: 'trade' as const }));

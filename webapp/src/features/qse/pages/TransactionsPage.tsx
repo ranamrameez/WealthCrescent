@@ -27,7 +27,9 @@ import { useSortableRows } from '../../../hooks/useSortableRows';
 import { usePageFabActions } from '../../../hooks/usePageFabActions';
 import { fmt, fmtMoney, fmtQSEPrice } from '../../../lib/format';
 import { closedPLBySellTxId, computeClosedTrades, type LotMatchOrder } from '../../../lib/calc/closedTrades';
+import { computeAveragePLBySellTxId } from '../../../lib/calc/realizedPL';
 import { computeFIFOPositions, type FIFOLot } from '../../../lib/calc/fifoPositions';
+import { tradePriceDeviationPct, validateTransactionEdit, validateSellQuantities } from '../../../lib/calc/tradeValidation';
 import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
 import { transferRunningBalance } from '../../../lib/calc/transferBalance';
 import { Field } from '../../../components/ui/Field';
@@ -53,10 +55,10 @@ function emptyRow(): Transaction {
   return { date: today(), ticker: '', action: 'BUY', shares: 0, price: 0, time: nowTime(defaultTimezoneForMarket('QSE')), timezone: defaultTimezoneForMarket('QSE') };
 }
 
-export function TransactionRows({ initial }: { initial?: Partial<Transaction> } = {}) {
+export function TransactionRows({ initial, onSaved }: { initial?: Partial<Transaction>; onSaved?: () => void } = {}) {
   const addTransactions = useWorkbookStore((s) => s.addTransactions);
   const workbook = useWorkbookStore((s) => s.workbook);
-  const { calcFee } = useQSEDerived();
+  const { calcFee, positions } = useQSEDerived();
   const ensureSignedIn = useEnsureSignedIn();
   // Pending item 143 (closed 2026-09-19): manual multi-lot Specific
   // Identification, gated the same way `targetLotBuyId` already is — inert
@@ -95,11 +97,38 @@ export function TransactionRows({ initial }: { initial?: Partial<Transaction> } 
       toast('Fill in at least one complete row.');
       return;
     }
+    const quantityError = validateSellQuantities(valid, Object.fromEntries(positions.map(position => [position.ticker, position.shares])));
+    if (quantityError) {
+      toast(`Cannot sell ${quantityError.requested} ${quantityError.ticker}: only ${fmt(quantityError.available, 0)} shares are available after the earlier rows.`);
+      return;
+    }
+    const threshold = workbook.settings.tradePriceDeviationPct ?? 10;
+    const deviations = valid.flatMap(row => {
+      const ticker = row.ticker.toUpperCase();
+      const marketPrice = workbook.marketPrices[ticker] ?? 0;
+      const deviation = tradePriceDeviationPct(row.price, marketPrice);
+      return deviation !== null && Math.abs(deviation) > threshold
+        ? [`${ticker}: entered ${fmtQSEPrice(row.price)} vs market ${fmtQSEPrice(marketPrice)} (${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%)`]
+        : [];
+    });
+    if (deviations.length && !(await confirmDialog(`${deviations.join('\\n')}\\n\\nThis exceeds your ${threshold}% warning threshold. Save these trades anyway?`, 'Trade prices differ from market prices?'))) return;
     if (!(await ensureSignedIn('Sign in to save your transactions.'))) return;
-    addTransactions(valid.map((r) => ({ ...r, ticker: r.ticker.toUpperCase() })));
+    try {
+      const beforeCount = useWorkbookStore.getState().workbook.transactions.length;
+      addTransactions(valid.map((r) => ({ ...r, ticker: r.ticker.toUpperCase() })));
+      const afterCount = useWorkbookStore.getState().workbook.transactions.length;
+      if (afterCount !== beforeCount + valid.length) throw new Error('Transaction store did not retain every submitted row.');
+    } catch (error) {
+      console.error('Failed to add QSE trade from the transaction form.', error);
+      toast('Could not save the trade. Your entries are still here; please try again.');
+      return;
+    }
     toast(`Added ${valid.length} transaction${valid.length > 1 ? 's' : ''}.`);
     setRows([emptyRow()]);
     setTimeTouched([false]);
+    // The shared FAB hosts this form in a modal. Close only after the
+    // store mutation succeeds; otherwise preserve the user's entered row.
+    onSaved?.();
   };
 
   return (
@@ -285,7 +314,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   // pure reporting convention here, not a real constraint — offer the
   // cheapest-lot-first alternative as a second, explicitly comparison-only
   // view (see `closedTrades.ts`'s own `LotMatchOrder` doc comment).
-  const ctMatchOrder: LotMatchOrder = pageFilters.matchOrder === 'lowestCostFirst' ? 'lowestCostFirst' : 'fifo';
+  const ctMatchOrder: LotMatchOrder = workbook.settings.costBasisMethod === 'lowestCostFirst' ? 'lowestCostFirst' : 'fifo';
 
   // Pending item 143: manual lot allocation for the inline edit-row SELL
   // form — same gate as `TransactionRows`' add-row copy above. Lots are
@@ -315,18 +344,19 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
     .filter((r) => filterTicker === 'ALL' || r.tx.ticker === filterTicker)
     .filter((r) => filterAction === 'ALL' || r.tx.action === filterAction)
     .filter(r => matchesQseFilters(r.tx, pageFilters));
-  type TxCol = 'date' | 'ticker' | 'action' | 'shares' | 'price' | 'amount';
+  type TxCol = 'order' | 'date' | 'ticker' | 'action' | 'shares' | 'price' | 'amount';
   const sortValue = (r: (typeof filtered)[number], col: TxCol): number | string => {
     switch (col) {
+      case 'order': return r.tx.globalTransactionIndex ?? r.tx.transactionIndex ?? Number.MAX_SAFE_INTEGER;
       case 'ticker': return r.tx.ticker;
       case 'action': return r.tx.action;
       case 'shares': return r.tx.shares;
       case 'price': return r.tx.price;
       case 'amount': return r.tx.shares * r.tx.price;
-      default: return `${toInstantMs(r.tx.date, r.tx.time, r.tx.timezone)} ${String(r.tx.seq ?? 0).padStart(12, '0')}`;
+      default: return r.tx.date;
     }
   };
-  const { sorted, Th, dateSort } = useSortableRows(filtered, sortValue, 'date', 'desc');
+  const { sorted, Th, dateSort } = useSortableRows(filtered, sortValue, 'order', 'asc');
 
   const openSorted = useMemo(() => sorted.filter((r) => openTickers.has(r.tx.ticker)), [sorted, openTickers]);
   const closedSorted = useMemo(() => sorted.filter((r) => !openTickers.has(r.tx.ticker)), [sorted, openTickers]);
@@ -393,8 +423,10 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   // number, or this row's own pill and the table below could show two
   // contradicting figures for the identical sell.
   const sellPLById = useMemo(
-    () => closedPLBySellTxId(computeClosedTrades(workbook.transactions, calcFee, ctMatchOrder)),
-    [workbook.transactions, calcFee, ctMatchOrder],
+    () => (workbook.settings.costBasisMethod === 'average' || !workbook.settings.costBasisMethod)
+      ? computeAveragePLBySellTxId(workbook.transactions, calcFee)
+      : closedPLBySellTxId(computeClosedTrades(workbook.transactions, calcFee, ctMatchOrder)),
+    [workbook.transactions, workbook.settings.costBasisMethod, calcFee, ctMatchOrder],
   );
 
   // User's own words: "make separate sections for open and closed trades...
@@ -439,6 +471,16 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   };
   const saveEdit = async () => {
     if (editIndex === null || !editRow) return;
+    const candidateTransactions = workbook.transactions.map((transaction, index) => index === editIndex ? editRow : transaction);
+    const quantityError = validateTransactionEdit(workbook.transactions, candidateTransactions);
+    if (quantityError) return toast(`Cannot save this edit: it would create ${fmt(quantityError.additionalUnmatchedShares, 0)} unmatched SELL shares for ${quantityError.ticker}.`);
+    const marketPrice = workbook.marketPrices[editRow.ticker.toUpperCase()] ?? 0;
+    const deviation = tradePriceDeviationPct(editRow.price, marketPrice);
+    const threshold = workbook.settings.tradePriceDeviationPct ?? 10;
+    if (deviation !== null && Math.abs(deviation) > threshold) {
+      const accepted = await confirmDialog(`Entered ${fmtQSEPrice(editRow.price)}; saved market price is ${fmtQSEPrice(marketPrice)} (${deviation > 0 ? '+' : ''}${deviation.toFixed(1)}%). This exceeds your ${threshold}% warning threshold. Save anyway?`, 'Trade price differs from market price?');
+      if (!accepted) return;
+    }
     if (!(await ensureSignedIn('Sign in to save changes.'))) return;
     updateTransaction(editIndex, editRow);
     toast('Transaction updated.');
@@ -457,6 +499,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   };
 
   const setWorkbook = useWorkbookStore((s) => s.setWorkbook);
+  const transactionOrderRows = useMemo(() => [...workbook.transactions].sort((a, b) => (a.globalTransactionIndex ?? a.transactionIndex ?? Number.MAX_SAFE_INTEGER) - (b.globalTransactionIndex ?? b.transactionIndex ?? Number.MAX_SAFE_INTEGER)), [workbook.transactions]);
   const clearAll = async () => {
     const ok = await confirmDialog(
       'This clears all transactions, prices and watchlist entries in this browser.',
@@ -480,7 +523,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
             <Th col="price">Price</Th>
             <Th col="amount">Amount</Th>
             <th>
-              <Tooltip text="Realized profit/loss for a SELL row, matched against your still-open buy lot(s) for this ticker — follows whichever Match order (FIFO or cheapest-lot-first) is picked in the Closed trades section below, since it's the same figure shown per-row here. Blank on a BUY row (nothing realized yet).">
+              <Tooltip text="Realized profit/loss for a SELL row using the configured cost-basis method: weighted-average cost under Average cost, or the configured lot-matching method under FIFO/Lowest cost first. Blank on a BUY row (nothing realized yet).">
                 P/L
               </Tooltip>
             </th>
@@ -542,7 +585,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
                   </Fragment>
                 ) : (
                   <RecordRow market="qse" onEdit={() => startEdit(i, tx)}    record={{ tx, i }}  key={i}  className="clickable">
-                    <td><DateValue value={tx.date} />{modifying && <span onClick={event => event.stopPropagation()}><QseReorder kind="transactions" row={tx} rows={sorted.map(row => row.tx)} /></span>}</td>
+                    <td><DateValue value={tx.date} />{modifying && <span onClick={event => event.stopPropagation()}><QseReorder kind="transactions" row={tx} rows={transactionOrderRows} /></span>}</td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <TickerLogo ticker={tx.ticker} size="sm" exchange="qse" /><Link to={`/stock/${tx.ticker}`}>{tx.ticker}</Link>
                       {tx.isPending && (
@@ -613,6 +656,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
         {closedPage.controls}
       </details>
 
+      {(workbook.settings.costBasisMethod === 'fifo' || workbook.settings.costBasisMethod === 'lowestCostFirst') ? <>
       <QseRecordCard dateSort={openDateSort} title="Open trades (not yet sold)" kind="transactions" rows={workbook.transactions.filter(tx => sortedOpenLots.some(row => row.buyId === tx.id))} allRecords={workbook.transactions.filter(tx => openLots.some(row => row.buyId === tx.id))} modifying={modifying} onModify={() => setModifying(value => !value)} exportData={{ rows: sortedOpenLots, allRows: openLots }}>
         <div className="table-scroll">
           <table>
@@ -690,6 +734,10 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
         </div>
         {closedTradesPage.controls}
       </QseRecordCard>
+      </> : <p className="text-muted mt-md">
+        Average cost blends all buys into one running cost basis, so individual open/closed lot attribution is not applicable. The transaction rows and portfolio calculations use weighted-average cost.
+      </p>}
+
 
       {detailTx && (
         <RecordDetailModal

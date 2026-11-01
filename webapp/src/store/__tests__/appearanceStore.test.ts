@@ -62,3 +62,12 @@ it('migrates the old transfer description default to Transfer without changing a
   const second = await import('../appearanceStore');
   expect(second.useAppearanceStore.getState().appearance.transferDefaultDescription).toBe('Own wording');
 });
+
+
+it('resets every appearance preference to the current app defaults and persists the reset', async () => {
+  const { DEFAULT_APPEARANCE, useAppearanceStore } = await import('../appearanceStore');
+  useAppearanceStore.getState().update({ theme: 'dark', fontSize: 'xl', density: 'console', colorTheme: 'forest', fabAlwaysOpen: true, dateFormat: 'MM/DD/YYYY' });
+  useAppearanceStore.getState().resetToDefaults();
+  expect(useAppearanceStore.getState().appearance).toEqual(DEFAULT_APPEARANCE);
+  expect(JSON.parse(localStorage.getItem(key)!)).toEqual(DEFAULT_APPEARANCE);
+});

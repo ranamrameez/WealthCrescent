@@ -3,7 +3,7 @@ import fixture from './fixtures/qse-workbook-backup.json';
 import type { Transaction, Transfer, Adjustment } from '../../../types/workbook';
 import { makeQSEFeeCalculator, breakEvenPrice, roundTick } from '../fees';
 import { computePositions } from '../positions';
-import { computeRealizedPLTimeSeries } from '../realizedPL';
+import { computeAveragePLBySellTxId, computeRealizedPLTimeSeries } from '../realizedPL';
 import { buildCashLedger, totalTransferFees } from '../cashLedger';
 import { cashSummary } from '../cashSummary';
 
@@ -112,16 +112,18 @@ describe('computePositions (weighted-average cost)', () => {
     expect(pos.realized).toBeCloseTo(40 / 3, 5);
   });
 
-  it('does not manufacture profit from an oversell', () => {
+  it('matches the available shares in a legacy oversell and flags the excess', () => {
     const oversell: Transaction[] = [
       { date: '2026-08-24', ticker: 'OVER', action: 'BUY', shares: 10, price: 10, seq: 1 },
       { date: '2026-08-25', ticker: 'OVER', action: 'SELL', shares: 15, price: 10, seq: 2 },
     ];
     const [pos] = computePositions(oversell, () => 0);
-    expect(pos.shares).toBe(10);
-    expect(pos.invested).toBe(100);
+    expect(pos.shares).toBe(0);
+    expect(pos.invested).toBe(0);
     expect(pos.realized).toBe(0);
-    expect(pos.totalSoldShares).toBe(0);
+    expect(pos.totalSoldShares).toBe(15);
+    expect(pos.unmatchedSellShares).toBe(5);
+    expect(pos.unmatchedSellTransactions).toBe(1);
   });
 
   it('excludes pending trades from positions', () => {
@@ -182,5 +184,37 @@ describe('cashSummary', () => {
     expect(summary.totalRewards).toBeCloseTo(0.34 + 0.21 + 0.34 + 2.54 + 1.1, 2);
     expect(summary.transferFees).toBeCloseTo(40, 5);
     expect(Number.isFinite(summary.netWorth)).toBe(true);
+  });
+});
+
+describe('computeAveragePLBySellTxId', () => {
+  it('uses weighted-average basis for the matching SELL row', () => {
+    const rows: Transaction[] = [
+      { id: 'buy-1', date: '2026-01-01', ticker: 'TEST', action: 'BUY', shares: 10, price: 10 },
+      { id: 'buy-2', date: '2026-01-02', ticker: 'TEST', action: 'BUY', shares: 10, price: 20 },
+      { id: 'sell-1', date: '2026-01-03', ticker: 'TEST', action: 'SELL', shares: 10, price: 30 },
+    ];
+    const bySell = computeAveragePLBySellTxId(rows, () => 0);
+    expect(bySell['sell-1']).toEqual({ netPL: 150, shares: 10 });
+  });
+
+  it('does not create realized P/L for an unmatched oversell', () => {
+    const rows: Transaction[] = [
+      { id: 'oversell', date: '2026-01-01', ticker: 'TEST', action: 'SELL', shares: 10, price: 30 },
+    ];
+    expect(computeAveragePLBySellTxId(rows, () => 0)).toEqual({});
+  });
+});
+
+describe('persisted transaction accounting order', () => {
+  it('uses transactionIndex for positions even when the order crosses trade dates', () => {
+    const rows: Transaction[] = [
+      { id: 'buy-later-date', date: '2026-10-27', ticker: 'ORDER', action: 'BUY', shares: 10, price: 10, transactionIndex: 1 },
+      { id: 'sell-earlier-date', date: '2026-10-18', ticker: 'ORDER', action: 'SELL', shares: 10, price: 12, transactionIndex: 2 },
+    ];
+    const [position] = computePositions(rows, () => 0);
+    expect(position.shares).toBe(0);
+    expect(position.invested).toBe(0);
+    expect(position.realized).toBe(20);
   });
 });

@@ -118,6 +118,19 @@ function FeeSettings() {
             <option value="simple">Simple (one all-in %)</option>
           </Select>
         </Field>
+        <Field
+          label="Same-day commission rule"
+          width={230}
+          title="Use the rule published by this broker. Higher-value side only is documented by JS Zindigi; choose separate charges when your broker's tariff does not confirm netting."
+        >
+          <Select
+            value={settings.sameDayNettingRule ?? 'higherValueSide'}
+            onChange={(e) => updateSettings({ sameDayNettingRule: e.target.value as 'higherValueSide' | 'none' })}
+          >
+            <option value="higherValueSide">Higher-value side only</option>
+            <option value="none">Charge each trade separately</option>
+          </Select>
+        </Field>
         {feeMode === 'simple' && (
           <Field label="All-in commission %" width={130} title="Your broker's total effective rate — commission, SST, and levies combined into one number, applied to the charged side of every trade. The netted side of a same-day pair pays nothing extra.">
             <TextInput type="number" step="0.001" value={settings.allInFeePct ?? 0} onChange={(e) => updateSettings({ allInFeePct: Number(e.target.value) })} />
@@ -131,8 +144,9 @@ function FeeSettings() {
         </p>
       ) : (
         <p className="text-muted" style={{ marginTop: -4 }}>
-          Government levies (PSX/NCCPL/SECP/CVT) default to 0 since they vary by broker — check your
-          account statement and fill in what your broker actually charges.
+          Levies and taxes are stored per broker profile. JS Zindagi's initial levy estimate is calibrated
+          against prior statements; AL Habib's published form does not provide every levy amount clearly.
+          Reconcile these fields with that broker's latest contract note and edit them if needed.
         </p>
       )}
       <div className="row" style={{ gap: 12, opacity: feeMode === 'simple' ? 0.5 : 1 }}>
@@ -310,6 +324,9 @@ function AmountSettings() {
           </Field>
           <Field label="Default deposit fee" width={90}>
             <TextInput type="number" step="0.01" value={settings.depositFee} onChange={(e) => updateSettings({ depositFee: Number(e.target.value) })} />
+          </Field>
+          <Field label="Price warning (%)" width={120} title="Ask for confirmation when a trade price differs from the saved market price by more than this percentage. Set 0 to warn on any difference.">
+            <TextInput type="number" min="0" max="100" step="0.5" value={settings.tradePriceDeviationPct ?? 10} onChange={(e) => updateSettings({ tradePriceDeviationPct: Math.min(100, Math.max(0, Number(e.target.value))) })} />
           </Field>
         </div>
       </Card>

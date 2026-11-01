@@ -1,3 +1,4 @@
+import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
@@ -6,11 +7,11 @@ import { FinancePlanEditor } from '../../../components/FinancePlanEditor';
 import { EntityEditorModal } from '../../../components/EntityEditorModal';
 import { PageHeading } from '../../../components/PageHeading';
 import { BalanceSummaryCards } from '../../../components/BalanceSummaryCards';
+import { SummarySection, SummarySections, SummaryValue } from '../../../components/SummaryGroupCard';
 import { planOccurrences, occurrenceCompleted } from '../../../lib/calc/planOccurrences';
 import { BackButton } from '../../../components/BackButton';
 import type { User } from 'firebase/auth';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { EntityCard, MoneyValue } from '../../../components/Card';
@@ -23,7 +24,7 @@ import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
 import { AnalyticsChartEnhancer } from '../../../components/AnalyticsChartCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
-import { ArchiveIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, BankIcon, CheckIcon, EditIcon, ListIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
+import { ArchiveIcon, ArrowUpIcon, BankIcon, CheckIcon, EditIcon, ListIcon, PlusIcon, RestoreIcon, SaveIcon, StarIcon, TransferIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { StandardButton } from '../../../components/standard';
 import { Modal } from '../../../components/Modal';
 import { BankPlansBatchEditor, BankTransactionsBatchEditor } from '../../../components/LazyFinanceBatchEditors';
@@ -77,7 +78,7 @@ import { useInterEntityTransfersStore } from '../../../store/interEntityTransfer
 import { linkTargetPath, useLinkSideLabel } from '../../transfers/pages/TransferLinksPage';
 import { CreditCardsTab } from './CreditCardsSection';
 import { CreditCardVisual } from '../../../components/CreditCardVisual';
-import { SummaryGroupCard, SummaryMetric } from '../../../components/SummaryGroupCard';
+
 import type { Bank, BankAccount, BankTransaction } from '../../../types/bankWorkbook';
 import type { PlannedBankTransaction } from '../../../types/plannedBank';
 import { gridAutoStyle } from '../../../lib/gridStyle';
@@ -659,18 +660,15 @@ export function BankDetailPage() {
             { label: 'Full bank name', value: bank.name },
             { label: 'Notes', value: bank.notes },
           ]} />
-          <div className="row mt-md" style={{ gap: 16 }}>
-            {Object.keys(totals).length ? (
-              Object.entries(totals).map(([currency, total]) => (
-                <div key={currency} className="stat-card card" style={hueStyle(bank.color ?? 'var(--accent)')}>
-                  <div className="label">Total ({currency})</div>
-                  <MoneyValue n={total} currency={currency} />
-                </div>
-              ))
-            ) : (
-              <p className="text-muted">No accounts linked yet.</p>
-            )}
-          </div>
+          {Object.keys(totals).length ? (
+            <SummarySections className="bank-detail-summary">
+              <SummarySection title="Balances by currency">
+                {Object.entries(totals).map(([currency, total]) => (
+                  <SummaryValue key={currency} label={currency} value={<MoneyValue n={total} currency={currency} />} primary tone={total >= 0 ? 'positive' : 'negative'} />
+                ))}
+              </SummarySection>
+            </SummarySections>
+          ) : <p className="text-muted">No accounts linked yet.</p>}
           <div className="mt-md">
             <BankingScopeSummary accounts={linkedAccounts} filters={filters} />
           </div>
@@ -939,26 +937,10 @@ export function AccountDetailPage() {
     return before.length ? before[before.length - 1].balance : account.openingBalance;
   }, [account, allLedger, filters.fromDate]);
   const periodCurrentBalance = allLedger.filter(row => !row.tx.isPending && (!filters.toDate || row.tx.date <= filters.toDate)).at(-1)?.balance ?? account?.openingBalance ?? 0;
-  const pendingNet = filteredLedger.filter(({ tx }) => tx.isPending).reduce((sum, row) => sum + row.tx.amount, 0);
   const pendingInflow = filteredLedger.filter(({ tx }) => tx.isPending && tx.amount >= 0).reduce((sum, row) => sum + row.tx.amount, 0);
   const pendingOutflow = filteredLedger.filter(({ tx }) => tx.isPending && tx.amount < 0).reduce((sum, row) => sum + row.tx.amount, 0);
-  const plannedNet = planOccurrences(plannedEntries, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters)).filter((plan) => plan.accountId === account?.id && !plan.executed && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
   const plannedInflow = planOccurrences(plannedEntries, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters)).filter((plan) => plan.accountId === account?.id && !plan.executed && plan.amount >= 0 && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
   const plannedOutflow = planOccurrences(plannedEntries, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters)).filter((plan) => plan.accountId === account?.id && !plan.executed && plan.amount < 0 && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
-  const balanceChange = periodCurrentBalance - periodStartBalance;
-  const balanceChangePercent = periodStartBalance === 0 ? null : (balanceChange / Math.abs(periodStartBalance)) * 100;
-  const summaryMetric = (label: string, value: string, tone = 'pill-info', large = false, suffix?: ReactNode) => {
-    const isFlow = /inflow|outflow/i.test(label);
-    const numericValue = Number(value.replace(/[^0-9.-]/g, ''));
-    const hasValue = Number.isFinite(numericValue) && numericValue !== 0;
-    const indicator = hasValue && tone === 'pill-positive'
-      ? (isFlow ? <span aria-hidden>↘</span> : <span aria-hidden>▲</span>)
-      : hasValue && tone === 'pill-negative'
-        ? (isFlow ? <span aria-hidden>↗</span> : <span aria-hidden>▼</span>)
-        : null;
-    return <SummaryMetric label={label} value={<>{indicator}{value}</>} tone={tone} large={large} suffix={suffix} tooltip={`${label} for the selected period.`} />;
-  };
-  const summaryCard = (title: string, metrics: ReactNode, tooltip: string, className = '') => <SummaryGroupCard title={title} tooltip={tooltip} className={className}>{metrics}</SummaryGroupCard>;
   const upcoming = useMemo(
     () => account
       ? planOccurrences(plannedEntries, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters))
@@ -1065,35 +1047,16 @@ export function AccountDetailPage() {
       label: 'Account summary',
       hue: account.color,
       summary: <span className="text-muted">{periodSummary}</span>,
-      content: <div className="account-summary-grid">
-        {summaryCard('Actual balance', <>
-          {summaryMetric('Current balance', fmtMoney(periodCurrentBalance, account.currencyCode), periodCurrentBalance >= 0 ? 'pill-positive' : 'pill-negative', true)}
-          {summaryMetric('Start balance', fmtMoney(periodStartBalance, account.currencyCode))}
-          {summaryMetric('Change', fmtMoney(balanceChange, account.currencyCode), balanceChange >= 0 ? 'pill-positive' : 'pill-negative', false, <small className="summary-percent" title="Change as a percentage of the period start balance">{balanceChangePercent === null ? '—' : ` (${balanceChangePercent.toFixed(1)}%)`}</small>)}
-        </>, 'Actual cleared account balance over the selected period.', 'account-summary-card-balance')}
-        {summaryCard('Expected Final balance', <>
-          {summaryMetric('Expected Net Balance', fmtMoney(periodCurrentBalance + pendingNet + plannedNet, account.currencyCode), periodCurrentBalance + pendingNet + plannedNet >= 0 ? 'pill-positive' : 'pill-negative', true)}
-          {summaryMetric('Total expected flow', fmtMoney(pendingNet + plannedNet, account.currencyCode), pendingNet + plannedNet >= 0 ? 'pill-positive' : 'pill-negative')}
-          {summaryMetric('Expected inflow', fmtMoney(pendingInflow + plannedInflow, account.currencyCode), 'pill-positive')}
-          {summaryMetric('Expected outflow', fmtMoney(pendingOutflow + plannedOutflow, account.currencyCode), 'pill-negative')}
-          {summaryMetric('Change', fmtMoney(pendingNet + plannedNet, account.currencyCode), pendingNet + plannedNet >= 0 ? 'pill-positive' : 'pill-negative')}
-        </>, 'Pending and planned money expected to change the account balance.',)}
-        {(pendingNet !== 0 || pendingInflow !== 0 || pendingOutflow !== 0) && summaryCard('Pending', <>
-          {summaryMetric('Net pending', fmtMoney(pendingNet, account.currencyCode), pendingNet >= 0 ? 'pill-positive' : 'pill-negative', true)}
-          {summaryMetric('Inflow', fmtMoney(pendingInflow, account.currencyCode), 'pill-positive')}
-          {summaryMetric('Outflow', fmtMoney(pendingOutflow, account.currencyCode), 'pill-negative')}
-        </>, 'Transactions marked pending and not yet cleared.')}
-        {(plannedNet !== 0 || plannedInflow !== 0 || plannedOutflow !== 0) && summaryCard('Planned', <>
-          {summaryMetric('Net planned', fmtMoney(plannedNet, account.currencyCode), plannedNet >= 0 ? 'pill-positive' : 'pill-negative', true)}
-          {summaryMetric('Inflow', fmtMoney(plannedInflow, account.currencyCode), 'pill-positive')}
-          {summaryMetric('Outflow', fmtMoney(plannedOutflow, account.currencyCode), 'pill-negative')}
-        </>, 'Future plans that have not been executed.')}
-        {summaryCard('Actual flow', <>
-          {summaryMetric('Net flow', fmtMoney(analytics.netFlow, account.currencyCode), analytics.netFlow >= 0 ? 'pill-positive' : 'pill-negative', true)}
-          {summaryMetric('Inflow', fmtMoney(analytics.deposits, account.currencyCode), 'pill-positive')}
-          {summaryMetric('Outflow', fmtMoney(analytics.withdrawals, account.currencyCode), 'pill-negative')}
-        </>, 'Cleared deposits and withdrawals in the selected period.')}
-      </div>,
+      content: <BalanceSummaryCards currency={account.currencyCode} summary={{
+        start: periodStartBalance,
+        current: periodCurrentBalance,
+        inflow: analytics.deposits,
+        outflow: -analytics.withdrawals,
+        pendingInflow,
+        pendingOutflow,
+        plannedInflow,
+        plannedOutflow,
+      }} />,
     },
     {
       key: 'details',
@@ -1298,7 +1261,6 @@ function EditTransactionModal({ tx, onClose }: { tx: BankTransaction; onClose: (
  * (README Done item 224) here too. */
 function TransactionsList({ account, ledger, allLedgerCount, showActions }: { account: BankAccount; ledger: ReturnType<typeof accountRunningLedger>; allLedgerCount: number; showActions: boolean }) {
   const dateSort = useDateTableSort();
-  useEffect(() => setPage(1), [dateSort.selection]);
   const dateFormat = useAppearanceStore((state) => state.appearance.dateFormat ?? 'DD-MMM-YYYY');
   const updateTransaction = useBankWorkbookStore((state) => state.updateTransaction);
   const deleteTransaction = useBankWorkbookStore((state) => state.deleteTransaction);
@@ -1308,16 +1270,9 @@ function TransactionsList({ account, ledger, allLedgerCount, showActions }: { ac
   const sideLabel = useLinkSideLabel();
   const [editingTx, setEditingTx] = useState<BankTransaction | null>(null);
   const [detailTx, setDetailTx] = useState<BankTransaction | null>(null);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
-
   const dateSortInput = useMemo(() => [...ledger].reverse(), [ledger]);
   const sorted = dateSort.rows(dateSortInput, { date: row => row.tx });
-  const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
-  const safePage = Math.min(page, pageCount);
-  const pageRows = useMemo(() => sorted.slice((safePage - 1) * pageSize, safePage * pageSize), [sorted, safePage, pageSize]);
-  useEffect(() => setPage(1), [ledger, pageSize]);
-  useEffect(() => { if (page > pageCount) setPage(pageCount); }, [page, pageCount]);
+  const { rows: pageRows, controls: paginationControls, page, pageSize } = useTablePagination(sorted);
 
   const linkByRecordId = useMemo(() => {
     const map = new Map<string, (typeof links)[number]>();
@@ -1343,7 +1298,7 @@ function TransactionsList({ account, ledger, allLedgerCount, showActions }: { ac
           const link = linkByRecordId.get(tx.id);
           const otherSide = link ? (link.from.module === 'bank' && link.fromRecordId === tx.id ? link.to : link.from) : undefined;
           return <RecordRow financeModule="bank" onEdit={() => setEditingTx(tx)}    record={{ tx, balance }}  key={tx.id}  className="clickable">
-            <td className="text-muted">{tx.serialNumber ?? '—'}{showActions && <> {' '}<span onClick={(event) => event.stopPropagation()}><ReorderButtons rows={sorted} index={(safePage - 1) * pageSize + index} instantOf={instantOf} idOf={(row) => row.tx.id} orderOf={(row) => row.tx.serialNumber} onMove={reorder} /></span></>}</td>
+            <td className="text-muted">{tx.serialNumber ?? '—'}{showActions && <> {' '}<span onClick={(event) => event.stopPropagation()}><ReorderButtons rows={sorted} index={(page - 1) * pageSize + index} instantOf={instantOf} idOf={(row) => row.tx.id} orderOf={(row) => row.tx.serialNumber} onMove={reorder} /></span></>}</td>
             <td>{formatDate(tx.date, dateFormat)}</td>
             <td className="cell-clip" title={tx.description} onClick={(event) => event.stopPropagation()}>{tx.description}{tx.isPending && <span className="pill-warn ml-6">Pending</span>}{link && <Link to={linkTargetPath(otherSide!)} className="pill-info ml-6">🔗 {sideLabel(link.from)} → {sideLabel(link.to)}</Link>}</td>
             <td><span className="pill-info">{categoryName(tx.categoryID, categories)}</span></td>
@@ -1360,17 +1315,7 @@ function TransactionsList({ account, ledger, allLedgerCount, showActions }: { ac
         {!sorted.length && <tr><td colSpan={showActions ? 8 : 7} className="text-muted">{allLedgerCount ? 'No transactions match the page filters.' : 'No transactions for this account yet.'}</td></tr>}
       </tbody>
     </table></div>
-    <div className="pagination-bar">
-      <div className="text-muted">{sorted.length ? `Showing ${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, sorted.length)} of ${sorted.length}` : 'No rows'}</div>
-      <div className="pagination-actions">
-          <span className="text-muted">Page {safePage} of {pageCount}</span>
-        <Field label="Rows" width={78}><Select value={String(pageSize)} onChange={(event)=>setPageSize(Number(event.target.value))}><option value="25">25</option><option value="50">50</option><option value="100">100</option></Select></Field>
-        <div className="d-flex justify-content-center" >
-          <StandardButton tone="secondary" size="small" icon={<ArrowLeftIcon />} disabled={safePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</StandardButton>
-          <StandardButton tone="secondary" size="small" icon={<ArrowRightIcon />} disabled={safePage >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Next</StandardButton>
-        </div>
-      </div>
-    </div>
+    {paginationControls}
     {editingTx && <EditTransactionModal tx={editingTx} onClose={() => setEditingTx(null)} />}
     {detailTx && <RecordDetailModal title={detailTx.amount >= 0 ? 'Deposit' : 'Withdrawal'} onClose={() => setDetailTx(null)} fields={[
       { label: '#', value: detailTx.serialNumber ?? '—' }, { label: 'Date', value: formatDate(detailTx.date, dateFormat) }, { label: 'Time', value: detailTx.time ?? '— (defaults to noon)' },
@@ -1590,31 +1535,25 @@ function bankingTransactionActions(
 
 function BankingScopeTransactions({ accounts, filters }: { accounts: BankAccount[]; filters: BankingFilters }) {
   const dateSort = useDateTableSort();
-  useEffect(() => setPage(1), [dateSort.selection]);
   const navigate = useNavigate();
   const transactions = useBankWorkbookStore((state) => state.workbook.transactions);
   const categories = useCategoryStore((state) => state.workbook.categories);
   const dateFormat = useAppearanceStore((state) => state.appearance.dateFormat ?? 'DD-MMM-YYYY');
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+
   const accountById = useMemo(() => new Map(accounts.map((account) => [account.id, account])), [accounts]);
   const { rows } = useMemo(
     () => bankingTransactionRows(accounts, transactions, filters, categories),
     [accounts, transactions, filters, categories],
   );
-  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
-  const safePage = Math.min(page, pageCount);
-  const pageRows = dateSort.rows(rows, { date: row => row }).slice((safePage - 1) * pageSize, safePage * pageSize);
-  useEffect(() => {
-    setPage(1);
-  }, [filters.period, filters.fromDate, filters.toDate, filters.direction, filters.category, filters.source, filters.accountId, pageSize]);
+  const sortedRows = dateSort.rows(rows, { date: row => row });
+  const { rows: pageRows, controls: paginationControls } = useTablePagination(sortedRows);
   return <><div className="table-responsive"><table>
     <thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Account</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th></tr></thead>
     <tbody>{pageRows.map((tx) => { const account = accountById.get(tx.accountId)!; return <RecordRow financeModule="bank" record={tx} onOpen={() => navigate(`/bank/account/${account.id}`)} key={tx.id} className="clickable" >
       <td>{formatDate(tx.date, dateFormat)}</td><td>{accountDisplayName(account)}</td><td>{tx.description}</td><td><span className="pill-info">{categoryName(tx.categoryID, categories)}</span></td>
       <td className={tx.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(tx.amount, account.currencyCode)}</td><td>{tx.isPending ? <span className="pill-warn">Pending</span> : 'Cleared'}</td>
     </RecordRow>;})}{!rows.length && <tr><td colSpan={6} className="text-muted">No transactions match the selected filters.</td></tr>}</tbody>
-  </table></div><div className="pagination-bar"><span className="text-muted">{rows.length ? `Showing ${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, rows.length)} of ${rows.length}` : 'No rows'}</span><div className="pagination-actions"><Field label="Rows" width={78}><Select value={String(pageSize)} onChange={(event) => setPageSize(Number(event.target.value))}><option value="25">25</option><option value="50">50</option><option value="100">100</option></Select></Field><StandardButton tone="secondary" size="small" icon={<ArrowLeftIcon />} disabled={safePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</StandardButton><StandardButton tone="secondary" size="small" icon={<ArrowRightIcon />} disabled={safePage >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Next</StandardButton></div></div></>;
+  </table></div>{paginationControls}</>;
 }
 
 /* ============================== Statement import ============================== */
@@ -1954,6 +1893,7 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
   );
   const dateSortInput = useMemo(() => [...plans].sort((a, b) => a.date.localeCompare(b.date)), [plans]);
   const sorted = dateSort.rows(dateSortInput, { date: row => row });
+  const { rows: pageRows, controls: paginationControls } = useTablePagination(sorted);
 
   const markDone = async (p: PlannedBankTransaction & { planId?: string }) => {
     const occurrenceDate = p.date;
@@ -1992,7 +1932,7 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
             <tr><dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th><th>Description</th><th>Amount</th><th>Category</th><th>Repeats / status</th><th></th></tr>
           </thead>
           <tbody>
-            {sorted.map((p) => (
+            {pageRows.map((p) => (
               <RecordRow financeModule="bank" onEdit={() => setEditingPlan(allPlans.find((plan) => plan.id === (p.planId ?? p.id)) ?? p)}    record={p}  key={p.id}>
                 <td>{formatDate(p.date, dateFormat)}</td>
                 <td><Link to={`/planning?plan=${encodeURIComponent(p.planId ?? p.id)}`} className="plan-link">{p.description}</Link></td>
@@ -2019,6 +1959,7 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
           </tbody>
         </table>
       </div>
+      {paginationControls}
       {editingPlan && (
         <FinancePlanEditor reference={{ module: "bank", id: editingPlan.id }} onClose={() => setEditingPlan(null)} />
       )}
@@ -2351,6 +2292,7 @@ export function BankPage({
     {
       key: 'banks',
       label: 'Banks',
+      defaultOpen: true,
       actions: bankActions,
       content: <BanksList showArchived={showArchivedBanks} />,
     },
