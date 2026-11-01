@@ -121,6 +121,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
   const importFile = async (file: File) => {
     try {
       const current = recordsFor(kind);
+      const brokerId = useWorkbookStore.getState().workbook.activeBrokerId;
       const xlsx = /\.xlsx$/i.test(file.name);
       const table = xlsx ? readStatementXlsx(new Uint8Array(await file.arrayBuffer())) : parseCSV(await file.text());
       const isStatement = xlsx || table.some(row => row[0]?.trim().toLowerCase() === 'date' && row[1]?.trim().toLowerCase() === 'type' && row[2]?.trim().toLowerCase() === 'count');
@@ -129,14 +130,14 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
       if (isStatement) {
         if (kind !== 'ledger' && kind !== 'transactions') throw new Error('Import The Group statements from Cash ledger or Trade list.');
         if (!(await confirmDialog(
-          'The Group Excel statement contains rounded cash amounts instead of exact figures. Importing rounded numbers may produce incorrect balances, fees, profit/loss and other calculations. Use an exact statement where available and verify the imported figures. Rounded rewards will be excluded; existing exact rewards are retained. Continue to review this import?',
+          'The Group Excel statement contains rounded cash amounts instead of exact figures. Importing rounded numbers may produce incorrect balances, fees, profit/loss and other calculations. Use an exact statement where available and verify the imported figures. Rounded rewards are excluded; existing exact rewards are retained. Statement sequence and uniquely matched price corrections will be applied after review. Continue to review this import?',
           'Warning: rounded statement figures',
         ))) return;
-        const existing = recordsFor('ledger').filter(row => row.kind === 'trade' || row.kind === 'transfer') as StatementRecord[];
+        const existing = recordsFor('ledger').filter(row => row.kind !== 'dividend') as StatementRecord[];
         const result = parseTheGroupStatement(table, existing);
-        statementWarning = result.warning;
+        statementWarning = result.warning + (kind === 'transactions' ? ' Trade list imports trades only. Use Cash ledger to reconcile transfers and existing reward sequence as well.' : '');
         const records = kind === 'transactions' ? result.records.filter(row => row.kind === 'trade') : result.records;
-        const keys = ['id', 'kind', 'date', 'ticker', 'action', 'shares', 'price', 'type', 'gross', 'fee', 'description', 'time', 'timezone'];
+        const keys = ['id', 'kind', 'date', 'ticker', 'action', 'shares', 'price', 'type', 'gross', 'fee', 'description', 'time', 'timezone', 'amount', 'note', 'feeOverride', 'targetLotBuyId', 'accountingOrder'];
         importTable = [keys, ...records.map(row => keys.map(key => String((row as unknown as Record<string, unknown>)[key] ?? '')))];
       }
       const [headers, ...data] = importTable;
@@ -161,6 +162,10 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
           else if (c.type === 'boolean') { if (value && !['true', 'false', '1', '0'].includes(value.toLowerCase())) throw new Error(`Row ${index + 2}: invalid boolean.`); row.isPending = value === '1' || value.toLowerCase() === 'true'; }
           else if (value) Object.assign(row, { [c.key]: c.key === 'kind' ? value.toLowerCase() : ['ticker', 'action', 'type'].includes(c.key) ? value.toUpperCase() : value });
         }
+        if (isStatement) {
+          const orderColumn = headers.indexOf('accountingOrder');
+          row.accountingOrder = Number(cells[orderColumn]);
+        }
         const trade = kind === 'transactions' || kind === 'ledger' && row.kind === 'trade';
         if (trade) {
           const lotColumn = headers.findIndex(header => header.trim().toLowerCase() === 'targetlotbuyid');
@@ -175,7 +180,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
         if (error) throw new Error(`Row ${index + 2}: ${error}`);
         if (kind === 'ledger') {
           const nativeKind = row.kind === 'trade' ? 'transactions' : row.kind === 'transfer' ? 'transfers' : row.kind === 'dividend' ? 'dividends' : 'adjustments';
-          return { ...Object.fromEntries([['id', row.id], ['kind', row.kind], ...qseColumns(nativeKind).filter(c => c.key !== 'seq' && c.key !== 'accountingOrder' && row[c.key] !== undefined).map(c => [c.key, row[c.key]])]), ...(trade && row.targetLotBuyId ? { targetLotBuyId: row.targetLotBuyId } : {}), ...(trade && row.feeOverride !== undefined ? { feeOverride: row.feeOverride } : {}) } as Row;
+          return { ...Object.fromEntries([['id', row.id], ['kind', row.kind], ...qseColumns(nativeKind).filter(c => c.key !== 'seq' && c.key !== 'accountingOrder' && row[c.key] !== undefined).map(c => [c.key, row[c.key]])]), ...(isStatement ? { accountingOrder: row.accountingOrder } : {}), ...(trade && row.targetLotBuyId ? { targetLotBuyId: row.targetLotBuyId } : {}), ...(trade && row.feeOverride !== undefined ? { feeOverride: row.feeOverride } : {}) } as Row;
         }
         return row;
       });
@@ -195,7 +200,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
           if (kind === 'ledger' && before.kind !== row.kind) throw new Error('An imported ID cannot change its source type.');
           const merged = { ...before, ...row };
           if (locked(before) && (before.gross !== merged.gross || before.type !== merged.type || before.date !== merged.date)) throw new Error('Use single Modify to change the amount, direction or date of a linked transfer. Fee and description corrections can be imported safely.');
-          if (signature(before) !== signature(merged) || before.targetLotBuyId !== merged.targetLotBuyId || before.feeOverride !== merged.feeOverride) updates.push(merged);
+          if (signature(before) !== signature(merged) || before.targetLotBuyId !== merged.targetLotBuyId || before.feeOverride !== merged.feeOverride || isStatement && before.accountingOrder !== merged.accountingOrder) updates.push(merged);
         } else {
           const sig = signature(row);
           if (isStatement || explicitIds.has(row.id) || !seen.has(sig)) { additions.push(row); seen.add(sig); }
@@ -205,7 +210,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
       if (!(await confirmDialog(`Add ${additions.length} records; update ${updates.length} matching IDs; skip ${parsed.length - additions.length - updates.length} unchanged records. Existing records are retained.${statementWarning ? '\n' + statementWarning : ''}`, `Import QSE ${kind}?`))) return;
       if (!(await ensureSignedIn('Sign in to import records.'))) return;
       const latest = recordsFor(kind);
-      if (JSON.stringify(latest) !== JSON.stringify(current)) throw new Error('Records changed during import. Please try again.');
+      if (useWorkbookStore.getState().workbook.activeBrokerId !== brokerId || JSON.stringify(latest) !== JSON.stringify(current)) throw new Error('Records changed during import. Please try again.');
       let seq = Math.max(0, ...latest.map(row => row.seq || 0));
       commit([...latest.map(row => updates.find(update => update.id === row.id) ?? row), ...additions.map(row => ({ ...row, seq: ++seq, timestamp: new Date().toISOString() }))]);
       toast(`Imported ${additions.length} records; updated ${updates.length}.${statementWarning ? ' ' + statementWarning : ''}`);

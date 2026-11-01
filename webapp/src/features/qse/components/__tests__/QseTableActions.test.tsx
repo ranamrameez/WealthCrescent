@@ -181,3 +181,32 @@ it('warns about rounded Excel figures before import confirmation and lets the us
   await waitFor(() => expect(useWorkbookStore.getState().workbook.transactions).toHaveLength(3));
   expect(vi.mocked(confirmDialog).mock.calls.map(call => call[1])).toEqual(['Warning: rounded statement figures', 'Import QSE transactions?']);
 });
+it('imports statement sequence and price corrections while keeping precise rewards and repeated imports unchanged', async () => {
+  const wb = createEmptyWorkbook();
+  wb.transactions = [{ id: 'buy', date: '2026-11-01', ticker: 'MARK', action: 'BUY', shares: 10, price: 1.8, feeOverride: 0.02 }, { id: 'sale', date: '2026-11-01', ticker: 'MARK', action: 'SELL', shares: 10, price: 1.836 }];
+  wb.adjustments = [{ id: 'reward', date: '2026-11-01', amount: 0.34, note: 'Trading Reward' }];
+  useWorkbookStore.setState({workbook:wb});
+  const {container} = render(<QseRecordActions kind="ledger" rows={[]} modifying={false} onModify={() => {}} />);
+  const file = new File([], 'statement.csv');
+  Object.defineProperty(file, 'text', {value:async()=>toCSV([
+    ['Date','Type','Count','Unit','Price','Amount'],
+    ['01/11/2026','Buy',10,'Rayyan B',1.8,-18],
+    ['01/11/2026','Sell',10,'Rayyan B',1.835,18],
+    ['01/11/2026','Trading Reward','','','',0],
+    ['02/11/2026','Trading Reward','','','',40],
+  ])});
+  const input = container.querySelector('input[type=file]')!;
+  fireEvent.change(input,{target:{files:[file]}});
+  await waitFor(()=>expect(useWorkbookStore.getState().workbook.transactions.find(r=>r.id==='sale')?.price).toBe(1.835));
+  const after = structuredClone(useWorkbookStore.getState().workbook);
+  expect(after.transactions).toHaveLength(2);
+  expect(after.transactions.find(r=>r.id==='buy')).toMatchObject({accountingOrder:1,feeOverride:0.02});
+  expect(after.transactions.find(r=>r.id==='sale')).toMatchObject({accountingOrder:2});
+  expect(after.adjustments).toHaveLength(1);
+  expect(after.adjustments[0]).toMatchObject({id:'reward',amount:0.34,accountingOrder:3});
+  vi.mocked(confirmDialog).mockClear();
+  fireEvent.change(input,{target:{files:[file]}});
+  await waitFor(()=>expect(confirmDialog).toHaveBeenCalledTimes(1));
+  await new Promise(resolve=>setTimeout(resolve,20));
+  expect(useWorkbookStore.getState().workbook).toEqual(after);
+});
