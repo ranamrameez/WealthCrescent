@@ -6,3 +6,4 @@ dist/
 # Local audits and account statements must stay out of the repository.
 webapp/audit/
 .npm-cache/
+.ignore
