@@ -496,7 +496,7 @@ export function NetWorthPage({
 
   return (
     <div className="standard-page">
-      <h1>Dashboard</h1>
+      <div className="page-heading"><h1>Dashboard</h1><span className="text-muted">Selected range: {rangeLabel}</span></div>
       <StandardPageSections sections={[{ key: 'summary', label: 'Overall summary', defaultOpen: true, unframed: true, content: <div><h2>Overall summary</h2><div className="grid-auto" style={{ ...gridAutoStyle(320, 16), marginBottom: 16, alignItems: 'start' }}>
         {preferredCurrencyOptions.map(({ code: preferredCurrency }) => {
           const sum = (values: Record<string, number>) => {
@@ -887,10 +887,10 @@ export function NetWorthPage({
             if (event.target.value !== 'custom') { next.delete('from'); next.delete('to'); }
             setScopeParams(next);
           }}>{DASHBOARD_PERIODS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-          <label className="field"><span>From</span><input type="date" aria-label="From date" max={todayISO} value={dashboardRange.from} disabled={dashboardRange.period !== 'custom'} onChange={event => {
+          <label className="field"><span>From</span><input type="date" aria-label="From date" max={dashboardRange.to} value={dashboardRange.from} disabled={dashboardRange.period !== 'custom'} onChange={event => {
             const next = new URLSearchParams(scopeParams); next.set('period', 'custom'); next.set('from', event.target.value); setScopeParams(next);
           }} /></label>
-          <label className="field"><span>To</span><input type="date" aria-label="To date" max={todayISO} value={dashboardRange.to} disabled={dashboardRange.period !== 'custom'} onChange={event => {
+          <label className="field"><span>To</span><input type="date" aria-label="To date" min={dashboardRange.from} max={todayISO} value={dashboardRange.to} disabled={dashboardRange.period !== 'custom'} onChange={event => {
             const next = new URLSearchParams(scopeParams); next.set('period', 'custom'); next.set('to', event.target.value); setScopeParams(next);
           }} /></label>
         </div>
