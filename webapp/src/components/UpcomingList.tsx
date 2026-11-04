@@ -28,6 +28,14 @@ export function UpcomingList({
   emptyText?: string;
 }) {
   const shown = limit ? items.slice(0, limit) : items;
+  const today = new Date();
+  const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  const dueLabel = (date: string) => {
+    const [year, month, day] = date.split('-').map(Number);
+    const dueUtc = Date.UTC(year, month - 1, day);
+    const days = Math.round((dueUtc - todayUtc) / 86400000);
+    return days === 0 ? 'Due Today' : days === 1 ? 'Happening tomorrow' : `Happening in ${days} days`;
+  };
   if (!shown.length) return <p className="text-muted mt-0">{emptyText}</p>;
 
   return (
@@ -43,7 +51,7 @@ export function UpcomingList({
           }}
         >
           <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
-            <span className="text-muted" style={{ marginRight: 8 }}>{item.date}</span>
+            <span className="text-muted" style={{ marginRight: 8 }}>{item.date} · {dueLabel(item.date)}</span>
             {item.label}
             <span className="text-muted" style={{ marginLeft: 8 }}>({MODULE_LABELS[item.module]})</span>
 
