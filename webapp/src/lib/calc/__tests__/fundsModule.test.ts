@@ -33,6 +33,16 @@ describe('fundsValueByCurrency', () => {
     expect(result.USD).toBeCloseTo(1200 + 1000, 5);
   });
 
+  it('uses shared stock-engine lifecycle and excludes pending units after an oversell', () => {
+    const txs: Transaction[] = [
+      { id: 'buy-1', date: '2026-01-01', ticker: 'f1', action: 'BUY', shares: 10, price: 10 },
+      { id: 'sell-1', date: '2026-01-02', ticker: 'f1', action: 'SELL', shares: 12, price: 12 },
+      { id: 'buy-2', date: '2026-01-03', ticker: 'f1', action: 'BUY', shares: 5, price: 13 },
+      { id: 'pending-buy', date: '2026-01-04', ticker: 'f1', action: 'BUY', shares: 100, price: 13, isPending: true },
+    ];
+    expect(fundsValueByCurrency([funds[0]], txs, { f1: 13 })).toEqual({ USD: 65 });
+  });
+
   it('returns an empty object for no funds', () => {
     expect(fundsValueByCurrency([], [], {})).toEqual({});
   });
