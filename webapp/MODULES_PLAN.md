@@ -99,6 +99,9 @@ riskier to get wrong:
 
 This is a suggestion, not a mandate — reorder freely if priorities change.
 
+> **Architecture supersession note (2026-11-04):** the earlier v1 exclusions below are historical context, not the current budget-planning direction. The user has since approved a unified category-based + project-based budget model, implemented through the central `CalculationEngine`. Preserve `FinancePlanGroup` and all existing planned-payment records. The approved architecture, service boundaries and app-only auto-pay lifecycle are specified in `docs/CALCULATION_ENGINE_ARCHITECTURE.md`; that document takes precedence where this older module proposal conflicts. Auto-pay remains application-only: it creates pending in-app ledger records and does not call banks or payment providers.
+
+
 ---
 
 ## 1. Cash — ✅ built 2026-08-23
