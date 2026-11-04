@@ -113,6 +113,23 @@ describe('contributionVsValueSeries', () => {
     ]);
   });
 
+  it('uses the shared lifecycle engine for partial oversells and later re-entry', () => {
+    const txs: Transaction[] = [
+      { id: 'buy-1', date: '2026-01-01', ticker: 'f1', action: 'BUY', shares: 10, price: 10 },
+      { id: 'sell-1', date: '2026-01-02', ticker: 'f1', action: 'SELL', shares: 12, price: 12 },
+      { id: 'buy-2', date: '2026-01-03', ticker: 'f1', action: 'BUY', shares: 5, price: 13 },
+    ];
+    const series = contributionVsValueSeries('f1', txs, {});
+    expect(series).toEqual([
+      { date: '2026-01-01', invested: 100, value: 100 },
+      // Only the 10 shares that existed are matched; the extra 2 SELL
+      // shares cannot create negative units or fictitious proceeds.
+      { date: '2026-01-02', invested: -20, value: 0 },
+      // The later BUY starts a fresh lifecycle and reopens exactly 5 units.
+      { date: '2026-01-03', invested: 45, value: 65 },
+    ]);
+  });
+
   it('reduces invested and units on a SELL, and returns empty for a fund with no history', () => {
     const txs: Transaction[] = [
       { date: '2026-01-01', ticker: 'f1', action: 'BUY', shares: 100, price: 10 },
@@ -227,6 +244,23 @@ describe('balanceUpdateHistory', () => {
     const rows = balanceUpdateHistory('f1', txs, priceHistory);
     expect(rows.map(row => row.date)).toEqual(['2026-01-10', '2026-02-10']);
     expect(rows.map(row => row.newBalance)).toEqual([1100, 1200]);
+  });
+
+  it('never reports negative units after an oversell and starts a fresh balance on re-entry', () => {
+    const txs: Transaction[] = [
+      { id: 'buy-1', date: '2026-01-01', ticker: 'f1', action: 'BUY', shares: 10, price: 10 },
+      { id: 'sell-1', date: '2026-01-02', ticker: 'f1', action: 'SELL', shares: 12, price: 12 },
+      { id: 'buy-2', date: '2026-01-03', ticker: 'f1', action: 'BUY', shares: 5, price: 13 },
+    ];
+    const priceHistory: Record<string, PricePoint[]> = {
+      f1: [
+        { date: '2026-01-01', price: 10 },
+        { date: '2026-01-02', price: 12 },
+        { date: '2026-01-03', price: 13 },
+      ],
+    };
+    const rows = balanceUpdateHistory('f1', txs, priceHistory);
+    expect(rows.map(row => row.newBalance)).toEqual([100, 0, 65]);
   });
 
   it('hand-traced: 100 units bought at NAV 10, two later NAV updates, no further cash flow', () => {
