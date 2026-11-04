@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
+import { Chart, Doughnut } from 'react-chartjs-2';
 import { useSearchParams } from 'react-router-dom';
 import { RecordRow } from './RecordRow';
 import { useDateTableSort } from '../hooks/useDateTableSort';
@@ -14,6 +15,8 @@ import { FinancePlanGroupEditor } from './FinancePlanGroupEditor';
 import { EntityActions } from './EntityEditorModal';
 import { PlanFinanceEditor } from './PlanFinanceEditor';
 import { SummaryGroupCard, SummaryMetric } from './SummaryGroupCard';
+import { ChartCard } from '../features/qse/components/ChartCard';
+import { HUES } from '../lib/statCardHues';
 import { StandardButton } from './standard';
 import { Pagination } from './Pagination';
 import { confirmDialog } from './ConfirmDialog';
@@ -96,7 +99,47 @@ export function FinancePlansHierarchy({ filters, controls, overview, embedded = 
   };
   const sorted = dateSort.rows(rows, { date: row => row.plan });
   const pageCount = Math.max(1, Math.ceil(sorted.length / 50)), safePage = Math.min(page, pageCount - 1);
-  const items = <><div className="table-scroll"><table><thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Item</th><th>Finance</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead><tbody>{sorted.slice(safePage * 50, (safePage + 1) * 50).map(row => <RecordRow onEdit={!row.plan.executed ? () => edit(row) : undefined} record={row} key={`${row.module}:${row.plan.id}`}><td><DateValue value={row.plan.date}/></td><td>{planDescription(row.plan)}</td><td>{finance(row)?.name ?? `Cash (${currency(row)})`}</td><td>{fmtMoney(signedPlanAmount(row.plan), currency(row))}</td><td>{row.plan.executed ? 'Fulfilled' : 'Planned'}</td><td>{!row.plan.executed && <div className="row gap-sm"><StandardButton tone="secondary" size="small" onClick={() => edit(row)}>Edit item / finance</StandardButton><StandardButton tone="danger" size="small" onClick={() => void removePayment(row)}>Delete payment</StandardButton></div>}</td></RecordRow>)}</tbody></table>{!rows.length && <p className="text-muted">{selected?.length ? 'No payments match this period. Change the date filters to see other payments.' : 'No payments yet. Add the first payment to this plan.'}</p>}</div><Pagination page={safePage} pageCount={pageCount} total={rows.length} onChange={setPage}/></>;
+  const today = new Date().toISOString().slice(0, 10);
+  const statusOf = (row: PlanRecord) => row.plan.executed ? 'Paid' : row.plan.date <= today ? 'Pending' : 'Planned';
+  const analytics = useMemo(() => {
+    const byCurrency = new Map<string, { status: Record<string, number>; categories: Map<string, number>; finances: Map<string, number> }>();
+    rows.forEach(row => {
+      const code = currency(row);
+      if (!code) return;
+      const current = byCurrency.get(code) ?? { status: {}, categories: new Map<string, number>(), finances: new Map<string, number>() };
+      const amount = Math.abs(signedPlanAmount(row.plan));
+      const status = statusOf(row);
+      current.status[status] = (current.status[status] ?? 0) + amount;
+      const category = ('category' in row.plan ? row.plan.category : undefined) || 'Uncategorized';
+      current.categories.set(category, (current.categories.get(category) ?? 0) + amount);
+      const financeName = finance(row)?.name ?? `Cash (${code})`;
+      current.finances.set(financeName, (current.finances.get(financeName) ?? 0) + amount);
+      byCurrency.set(code, current);
+    });
+    return [...byCurrency.entries()];
+  }, [rows, accounts, cardAccounts, properties]);
+  const charts = <div className="stack-lg">
+    {analytics.map(([code, data]) => {
+      const categoryRows = [...data.categories.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+      const financeRows = [...data.finances.entries()].sort((a, b) => b[1] - a[1]);
+      const statusLabels = ['Planned', 'Pending', 'Paid'].filter(label => (data.status[label] ?? 0) > 0);
+      return <div key={code}>
+        <h4>{code} budget status and allocation</h4>
+        <div className="grid-auto" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 16 }}>
+          <ChartCard flat title="Status split" empty={!statusLabels.length}>
+            <div style={{ height: 220 }}><Doughnut data={{ labels: statusLabels, datasets: [{ data: statusLabels.map(label => data.status[label]), backgroundColor: HUES }] }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }} /></div>
+          </ChartCard>
+          <ChartCard flat title="Budget by category" empty={!categoryRows.length}>
+            <div style={{ height: Math.max(220, categoryRows.length * 34) }}><Chart type="bar" data={{ labels: categoryRows.map(([label]) => label), datasets: [{ label: 'Planned amount', data: categoryRows.map(([, amount]) => amount), backgroundColor: HUES[0] }] }} options={{ indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }} /></div>
+          </ChartCard>
+          <ChartCard flat title="Budget by finance" empty={!financeRows.length}>
+            <div style={{ height: Math.max(220, financeRows.length * 34) }}><Chart type="bar" data={{ labels: financeRows.map(([label]) => label), datasets: [{ label: 'Planned amount', data: financeRows.map(([, amount]) => amount), backgroundColor: HUES[1] }] }} options={{ indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }} /></div>
+          </ChartCard>
+        </div>
+      </div>;
+    })}
+  </div>;
+  const items = <><div className="table-scroll"><table><thead><tr><dateSort.Th rows={rows} column="date">Date</dateSort.Th><th>Item</th><th>Finance</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead><tbody>{sorted.slice(safePage * 50, (safePage + 1) * 50).map(row => <RecordRow onEdit={!row.plan.executed ? () => edit(row) : undefined} record={row} key={`${row.module}:${row.plan.id}`}><td><DateValue value={row.plan.date}/></td><td>{planDescription(row.plan)}</td><td>{finance(row)?.name ?? `Cash (${currency(row)})`}</td><td>{fmtMoney(signedPlanAmount(row.plan), currency(row))}</td><td>{statusOf(row)}</td><td>{!row.plan.executed && <div className="row gap-sm"><StandardButton tone="secondary" size="small" onClick={() => edit(row)}>Edit item / finance</StandardButton><StandardButton tone="danger" size="small" onClick={() => void removePayment(row)}>Delete payment</StandardButton></div>}</td></RecordRow>)}</tbody></table>{!rows.length && <p className="text-muted">{selected?.length ? 'No payments match this period. Change the date filters to see other payments.' : 'No payments yet. Add the first payment to this plan.'}</p>}</div><Pagination page={safePage} pageCount={pageCount} total={rows.length} onChange={setPage}/>{charts}</>;
   const removeGroup = async () => {
     if (!selectedGroup || !await ensureSignedIn('Sign in to delete this plan.')) return;
     if (!await confirmDialog('Delete this plan and all its unfulfilled planned payments? Actual transactions will be kept.')) return;
