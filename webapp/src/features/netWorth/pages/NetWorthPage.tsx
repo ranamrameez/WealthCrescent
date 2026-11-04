@@ -448,6 +448,8 @@ export function NetWorthPage({
   // Ordered by the user's own Primary/Secondary/Other ranking (2026-09-16),
   // not alphabetically — see `useCurrencyRankComparator`'s own doc comment.
   const ownCurrencies = [...new Set([...rows, ...rangeStartRows, ...rangeEndRows].map((r) => r.currency))].sort(currencyRank);
+  const trendCurrentRows = ownCurrencies.map(currency => rows.find(row => row.currency === currency) ?? { currency, assets: 0, liabilities: 0, net: 0, breakdown: [] });
+  const activityCurrencies = [...new Set(activities.map(activity => activity.currencyCode))].sort(currencyRank);
   const missingFxCurrencies = rangeEndRows.filter(row => convertAmount(row.net, row.currency, preferredCurrency, rates) === null).map(row => row.currency);
 
   // README Pending item 64: an on-demand snapshot (see
@@ -736,7 +738,7 @@ export function NetWorthPage({
       }] : []), ...(sectionVisible('analytics') ? [{ unframed: true,
         key: 'analytics',
         label: 'Analytics',
-        content: <div><h2>Analytics & insights</h2><NetWorthAnalyticsSection ownCurrencies={ownCurrencies} activities={activities} categories={categories} groups={categoryGroups} emiLoans={netWorthAsOfInputs.emiLoans} currentRows={rows} periodEndRows={rangeEndRows} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} rangeStartDate={rangeStartDate} rangeEndDate={rangeEndDate} rangeLabel={rangeLabel} setDrilldown={setDrilldown} splitData={splitData} preferredCurrency={preferredCurrency} missingFxCurrencies={missingFxCurrencies} rentalsNet={selectedModules.includes('rentals') ? rentalsNetForRange : {}} /></div>,
+        content: <div><h2>Analytics & insights</h2><NetWorthAnalyticsSection ownCurrencies={ownCurrencies} activities={activities} categories={categories} groups={categoryGroups} emiLoans={netWorthAsOfInputs.emiLoans} currentRows={rows} periodEndRows={rangeEndRows} activityCurrencies={activityCurrencies} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} rangeStartDate={rangeStartDate} rangeEndDate={rangeEndDate} rangeLabel={rangeLabel} setDrilldown={setDrilldown} splitData={splitData} preferredCurrency={preferredCurrency} missingFxCurrencies={missingFxCurrencies} rentalsNet={selectedModules.includes('rentals') ? rentalsNetForRange : {}} /></div>,
       }] : [])]} />
 
       {/* User-requested (2026-08-26): subscription renewal/expiry alerts on
@@ -948,17 +950,17 @@ function NetWorthInsightsSection({ rows, activities, fromDate, toDate, rangeLabe
   </div>;
 }
 
-function NetWorthAnalyticsSection({ ownCurrencies, activities, categories, groups, emiLoans, currentRows, periodEndRows, netWorthAsOfInputs, todayISODate, rangeStartDate, rangeEndDate, rangeLabel, setDrilldown, splitData, preferredCurrency, missingFxCurrencies, rentalsNet }: {
+function NetWorthAnalyticsSection({ ownCurrencies, activities, categories, groups, emiLoans, currentRows, periodEndRows, activityCurrencies, netWorthAsOfInputs, todayISODate, rangeStartDate, rangeEndDate, rangeLabel, setDrilldown, splitData, preferredCurrency, missingFxCurrencies, rentalsNet }: {
   ownCurrencies: string[]; activities: BudgetActivity[]; categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories'];
   groups: ReturnType<typeof useCategoryGroupStore.getState>['workbook']['groups']; emiLoans: Parameters<typeof projectedNetWorthTrend>[0]['emiLoans'];
-  currentRows: CurrencyNetWorth[]; periodEndRows: CurrencyNetWorth[]; netWorthAsOfInputs: NetWorthAsOfInputs; todayISODate: string;
+  currentRows: CurrencyNetWorth[]; periodEndRows: CurrencyNetWorth[]; activityCurrencies: string[]; netWorthAsOfInputs: NetWorthAsOfInputs; todayISODate: string;
   rangeStartDate: string; rangeEndDate: string; rangeLabel: string; setDrilldown: (d: Drilldown) => void;
   splitData: Array<{ currency: string; converted: number }>; preferredCurrency: string; missingFxCurrencies: string[]; rentalsNet: Record<string, number>;
 }) {
   return <div>
     <NetWorthInsightsSection rows={periodEndRows} activities={activities} fromDate={rangeStartDate} toDate={rangeEndDate} rangeLabel={rangeLabel} missingFxCurrencies={missingFxCurrencies} />
-    <NetWorthMonthlySection ownCurrencies={ownCurrencies} activities={activities} emiLoans={emiLoans} currentRows={currentRows} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISODate} rangeStartDate={rangeStartDate} rangeEndDate={rangeEndDate} setDrilldown={setDrilldown} />
-    <CategoryGroupsSection ownCurrencies={ownCurrencies} activities={activities} categories={categories} groups={groups} fromDate={rangeStartDate} toDate={rangeEndDate} rangeLabel={rangeLabel} setDrilldown={setDrilldown} />
+    <NetWorthMonthlySection ownCurrencies={ownCurrencies} activityCurrencies={activityCurrencies} activities={activities} emiLoans={emiLoans} currentRows={trendCurrentRows} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISODate} rangeStartDate={rangeStartDate} rangeEndDate={rangeEndDate} setDrilldown={setDrilldown} />
+    <CategoryGroupsSection ownCurrencies={activityCurrencies} activities={activities} categories={categories} groups={groups} fromDate={rangeStartDate} toDate={rangeEndDate} rangeLabel={rangeLabel} setDrilldown={setDrilldown} />
     {splitData.length > 1 && <ChartCard title={`Capital split by currency at period end (converted to ${preferredCurrency})`} empty={false}><div style={{ height: 220 }}><Doughnut data={{ labels: splitData.map((item) => item.currency), datasets: [{ data: splitData.map((item) => item.converted), backgroundColor: HUES }] }} options={{ plugins: { datalabels: dlDoughnut((value) => fmtMoney(value, preferredCurrency)) } }} /></div></ChartCard>}
     {Object.keys(rentalsNet).length > 0 && <div className="mt-12"><div className="label mb-sm">Rental net income in selected period (informational — not included above)</div><div className="text-muted mb-sm">Property values aren't tracked, and deposited rental income already lands in Cash/Bank; counting it again would double-count it.</div><div className="row" style={{ gap: 12 }}>{Object.entries(rentalsNet).map(([code, amount]) => <div key={code} className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">{code}</div><MoneyValue n={amount} currency={code} /></div>)}</div></div>}
   </div>;
@@ -1145,6 +1147,7 @@ function IncludeInNetWorthControls({
  * user actually holds (`ownCurrencies`), no currency picker at all. */
 function NetWorthMonthlySection({
   ownCurrencies,
+  activityCurrencies,
   activities,
   emiLoans,
   currentRows,
@@ -1155,6 +1158,7 @@ function NetWorthMonthlySection({
   setDrilldown,
 }: {
   ownCurrencies: string[];
+  activityCurrencies: string[];
   activities: ReturnType<typeof collectBudgetActivities>;
   emiLoans: Parameters<typeof projectedNetWorthTrend>[0]['emiLoans'];
   currentRows: Parameters<typeof projectedNetWorthTrend>[0]['currentRows'];
@@ -1179,7 +1183,8 @@ function NetWorthMonthlySection({
     [months, nowMonth, todayISODate, currentRows, activities, emiLoans, netWorthAsOfInputs],
   );
 
-  if (!ownCurrencies.length) return null;
+  if (!ownCurrencies.length && !activityCurrencies.length) return null;
+  const monthlyCurrencies = [...new Set([...ownCurrencies, ...activityCurrencies])];
 
   return (
     <div className="mb-md">
@@ -1199,7 +1204,7 @@ function NetWorthMonthlySection({
          page width, only falling back to horizontal scroll if it still
          doesn't fit. */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {ownCurrencies.map((currency) => (
+        {monthlyCurrencies.map((currency) => (
           <MonthlySummaryTable
             key={currency}
             currency={currency}
