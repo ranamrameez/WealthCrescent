@@ -447,7 +447,7 @@ export function NetWorthPage({
 
   // Ordered by the user's own Primary/Secondary/Other ranking (2026-09-16),
   // not alphabetically — see `useCurrencyRankComparator`'s own doc comment.
-  const ownCurrencies = [...new Set(rows.map((r) => r.currency))].sort(currencyRank);
+  const ownCurrencies = [...new Set([...rows, ...rangeStartRows, ...rangeEndRows].map((r) => r.currency))].sort(currencyRank);
   const missingFxCurrencies = rangeEndRows.filter(row => convertAmount(row.net, row.currency, preferredCurrency, rates) === null).map(row => row.currency);
 
   // README Pending item 64: an on-demand snapshot (see
@@ -598,7 +598,7 @@ export function NetWorthPage({
           </div>
         </section>;
         })}
-      </div></div> }, ...(sectionVisible('currencies') ? [{ key: 'currencies', label: 'Per currency summary', defaultOpen: true, unframed: true, content: (<div><h2>Per currency summary</h2><div className="grid-auto" style={{ ...gridAutoStyle(360, 12), marginBottom: 16 }}>
+      </div></div> }, ...(sectionVisible('currencies') ? [{ key: 'currencies', label: 'Per currency summary', defaultOpen: true, unframed: true, content: (<div><h2>Current balances by currency</h2><div className="grid-auto" style={{ ...gridAutoStyle(360, 12), marginBottom: 16 }}>
         {[...rows].sort((a, b) => currencyRank(a.currency, b.currency)).map((r) => {
           const converted = convertAmount(r.net, r.currency, preferredCurrency, rates);
           const todayFlowC = todayFlow[r.currency] ?? 0;
@@ -1172,7 +1172,8 @@ function NetWorthMonthlySection({
     const endOffset = monthsBetween(nowMonth, rangeEndDate.slice(0, 7));
     return monthRange(startOffset, endOffset);
   }, [nowMonth, rangeStartDate, rangeEndDate]);
-  const monthly = useMemo(() => monthlyIncomeExpense(activities, months), [activities, months]);
+  const rangeActivities = useMemo(() => activities.filter(activity => activity.date >= rangeStartDate && activity.date <= rangeEndDate), [activities, rangeStartDate, rangeEndDate]);
+  const monthly = useMemo(() => monthlyIncomeExpense(rangeActivities, months), [rangeActivities, months]);
   const trend = useMemo(
     () => projectedNetWorthTrend({ months, currentMonth: nowMonth, todayISODate, currentRows, activities, emiLoans, netWorthAsOfInputs }),
     [months, nowMonth, todayISODate, currentRows, activities, emiLoans, netWorthAsOfInputs],
@@ -1182,6 +1183,7 @@ function NetWorthMonthlySection({
 
   return (
     <div className="mb-md">
+      <p className="text-muted">Cash-flow totals and category insights use the exact selected dates. Net-worth trend points show each completed month-end balance (and today's balance for the current month).</p>
       <div className="grid-auto" style={{ ...gridAutoStyle(380, 16), marginBottom: 16 }}>
         {ownCurrencies.map((currency) => (
           <NetWorthComboChart key={currency} currency={currency} months={months} trend={trend} />
@@ -1205,7 +1207,7 @@ function NetWorthMonthlySection({
             nowMonth={nowMonth}
             monthly={monthly}
             trend={trend}
-            activities={activities}
+            activities={rangeActivities}
             currentRows={currentRows}
             netWorthAsOfInputs={netWorthAsOfInputs}
             setDrilldown={setDrilldown}
