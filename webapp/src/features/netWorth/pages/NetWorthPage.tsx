@@ -509,12 +509,12 @@ export function NetWorthPage({
           const grandTotal = net.total, unconverted = net.missing;
           const debts = sum(Object.fromEntries(rows.map(r => [r.currency, r.liabilities])));
           const totalDebts = debts.total, debtsUnconverted = debts.missing;
-          const todayFlowTotal = sum(todayFlow), monthFlowTotal = sum(monthFlow);
-          const previous = sum(lastMonthByCurrency);
-          const lastMonthUnconverted = previous.anyUnconverted;
-          const netWorthDelta = hasLastMonthData ? grandTotal - previous.total : null;
+          const todayFlowTotal = sum(todayFlow), periodFlowTotal = sum(periodFlow);
+          const previous = sum(rangeStartByCurrency);
+          const periodEnd = sum(rangeEndByCurrency);
+          const netWorthDelta = hasRangeBaseline ? periodEnd.total - previous.total : null;
           const netWorthDeltaPct = netWorthDelta !== null && previous.total !== 0 ? netWorthDelta / Math.abs(previous.total) * 100 : null;
-          const plannedTotal = sum(plannedMonthByCurrency);
+          const plannedTotal = sum(plannedPeriodByCurrency);
           return <Card key={preferredCurrency}>
           <h3 className="mt-0">Overall summary — {preferredCurrency}</h3>
           <div className="mt-12">
@@ -550,46 +550,46 @@ export function NetWorthPage({
               })}
             />
             <StatCard
-              label="This month's net flow"
-              value={fmtMoney(monthFlowTotal.total, preferredCurrency)}
-              hue={monthFlowTotal.total >= 0 ? 'var(--profit)' : 'var(--loss)'}
-              title={monthFlowTotal.anyUnconverted ? 'Some currencies excluded — no rate available.' : undefined}
-              labelTitle="Net money moved in/out of Cash and Bank since the 1st of this month, converted to the preferred currency."
+              label="Period net flow"
+              value={fmtMoney(periodFlowTotal.total, preferredCurrency)}
+              hue={periodFlowTotal.total >= 0 ? 'var(--profit)' : 'var(--loss)'}
+              title={periodFlowTotal.anyUnconverted ? 'Some currencies excluded — no rate available.' : undefined}
+              labelTitle={`Net cleared Cash and Bank movement from ${rangeStartDate} through ${rangeEndDate}, converted to the preferred currency.`}
               onClick={() => setDrilldown({
                 kind: 'breakdown',
-                title: "This month's net flow, by currency",
-                explanation: `Each currency's own real (unconverted) net Cash+Bank movement from ${monthStart} through ${todayISO}, converted above to ${preferredCurrency} for the headline figure. Click that currency's own card further down the page for the real itemized transactions.`,
-                rows: Object.entries(monthFlow).map(([code, amount]) => ({ label: code, currency: code, amount })),
+                title: `Period net flow (${rangeLabel}), by currency`,
+                explanation: `Each currency's own real (unconverted) net Cash+Bank movement from ${rangeStartDate} through ${rangeEndDate}, converted above to ${preferredCurrency} for the headline figure. Click that currency's own card further down the page for the real itemized transactions.`,
+                rows: Object.entries(periodFlow).map(([code, amount]) => ({ label: code, currency: code, amount })),
               })}
             />
             <StatCard
-              label="Planned month-end change"
+              label="Planned activity in period"
               value={fmtMoney(plannedTotal.total, preferredCurrency)}
               hue={(plannedTotal.total) >= 0 ? 'var(--profit)' : 'var(--loss)'}
-              title={plannedTotal.anyUnconverted ? `Excludes ${plannedTotal.missing.join(', ')} — no rate available.` : "Planned income and expenses for the current month, converted to this currency. Linked transfers are excluded."}
+              title={plannedTotal.anyUnconverted ? `Excludes ${plannedTotal.missing.join(', ')} — no rate available.` : `Unexecuted planned income and expenses from ${rangeStartDate} through ${rangeEndDate}. Linked transfers are excluded.`}
             />
             {netWorthDelta !== null ? (
               <StatCard
-                label="This month's change"
+                label="Net worth change in period"
                 value={`${netWorthDelta >= 0 ? '+' : ''}${fmtMoney(netWorthDelta, preferredCurrency)}`}
-                sub={netWorthDeltaPct !== null ? `${netWorthDeltaPct >= 0 ? '+' : ''}${netWorthDeltaPct.toFixed(1)}% vs. last month` : undefined}
+                sub={netWorthDeltaPct !== null ? `${netWorthDeltaPct >= 0 ? '+' : ''}${netWorthDeltaPct.toFixed(1)}% vs. period start` : undefined}
                 hue={netWorthDelta >= 0 ? 'var(--profit)' : 'var(--loss)'}
-                title={lastMonthUnconverted ? 'Some currencies excluded from last month\'s total — no rate available.' : undefined}
-                labelTitle="Your real net worth right now minus your real net worth at the end of last month — the whole picture (assets and liabilities across every module), not just cash moved."
+                title={previous.anyUnconverted || periodEnd.anyUnconverted ? 'Some currencies excluded from the period comparison — no rate available.' : undefined}
+                labelTitle={`Net worth at ${rangeEndDate} minus net worth at the end of the day before ${rangeStartDate}.`}
                 onClick={() => setDrilldown({
                   kind: 'breakdown',
-                  title: "This month's change, by currency",
-                  explanation: `Each currency's own real net worth right now vs. its own real net worth at the end of last month, converted above to ${preferredCurrency}. Click that currency's own "Δ vs. last month" chip further down for a module-by-module breakdown of what changed.`,
-                  rows: rows.map((r) => ({ label: r.currency, currency: r.currency, amount: r.net - (lastMonthByCurrency[r.currency] ?? r.net) })),
+                  title: `Net worth change (${rangeLabel}), by currency`,
+                  explanation: `Each currency's real net worth at ${rangeEndDate} compared with ${rangeBaselineDate}, converted above to ${preferredCurrency}.`,
+                  rows: rangeEndRows.map((r) => ({ label: r.currency, currency: r.currency, amount: r.net - (rangeStartByCurrency[r.currency] ?? 0) })),
                 })}
               />
             ) : (
               <StatCard
-                label="This month's change"
+                label="Net worth change in period"
                 value="—"
-                sub="Not enough history yet"
+                sub="No verified opening baseline for this range"
                 hue={HUES[4]}
-                labelTitle="Needs at least one full prior month of real data to compare against."
+                labelTitle="A period change is shown only when there is real account history before the selected start date."
               />
             )}
           </div>
