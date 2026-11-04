@@ -25,6 +25,9 @@ import { toast } from '../../../components/Toast';
 import { ChartCard } from '../../qse/components/ChartCard';
 import { type CurrencyNetWorth, type FlowActivityItem, type NetWorthBreakdownEntry } from '../../../lib/calc/netWorth';
 import { collectBudgetActivities, monthlyIncomeExpense, monthRange, monthsBetween, currentMonth as currentMonthOf, type MonthlyIncomeExpense, type BudgetActivity } from '../../../lib/calc/budgetPlanner';
+import { activitiesForGroup } from '../../../lib/calc/categoryGroups';
+import { useCategoryGroupStore } from '../../../store/categoryGroupStore';
+import { netIncomeByCurrency as rentalsNetIncomeByCurrency } from '../../../lib/calc/rentalsModule';
 import { endOfMonthAsOf, projectedNetWorthTrend, type MonthlyNetWorthPoint } from '../../../lib/calc/netWorthTrend';
 import { earliestActivityDate, netWorthAsOfDate, type NetWorthAsOfInputs } from '../../../lib/calc/netWorthAsOf';
 import { UpcomingList } from '../../../components/UpcomingList';
@@ -438,6 +441,7 @@ export function NetWorthPage(_legacySyncProps: {
   const rangeStartDate = dashboardRange.from;
   const rangeEndDate = dashboardRange.to;
   const rangeLabel = dashboardRange.label;
+  const rentalsNetForRange = rentalsNetIncomeByCurrency(rentals.settings.properties, rentals.entries.filter(entry => entry.date >= rangeStartDate && entry.date <= rangeEndDate));
   const rangeBaselineDate = shiftISODate(rangeStartDate, -1);
   const hasRangeBaseline = !!earliestActivity && earliestActivity <= rangeBaselineDate;
   const rangeStartRows = netWorthAsOfDate(rangeBaselineDate, netWorthAsOfInputs);
