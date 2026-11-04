@@ -409,53 +409,28 @@ export function NetWorthPage({
   };
 
   const todayISO = today();
-  const monthStart = `${todayISO.slice(0, 7)}-01`;
   const todayFlow = flowByCurrency(includedCash, includedAccounts, bank.transactions, todayISO, todayISO);
-  const monthFlow = flowByCurrency(includedCash, includedAccounts, bank.transactions, monthStart, todayISO);
-  const plannedMonthByCurrency = useMemo(() => {
+  const earliestActivity = earliestActivityDate(netWorthAsOfInputs);
+  const earliestDashboardDate = [earliestActivity, ...activities.map(activity => activity.date)].filter((date): date is string => !!date).sort()[0];
+  const dashboardRange = resolveDashboardRange(scopeParams.get('period') ?? '30d', scopeParams.get('from'), scopeParams.get('to'), earliestDashboardDate, todayISO);
+  const rangeStartDate = dashboardRange.from;
+  const rangeEndDate = dashboardRange.to;
+  const rangeLabel = dashboardRange.label;
+  const rangeBaselineDate = shiftISODate(rangeStartDate, -1);
+  const hasRangeBaseline = !!earliestActivity && earliestActivity <= rangeBaselineDate;
+  const rangeStartRows = netWorthAsOfDate(rangeBaselineDate, netWorthAsOfInputs);
+  const rangeEndRows = rangeEndDate === todayISO ? rows : netWorthAsOfDate(rangeEndDate, netWorthAsOfInputs);
+  const rangeStartByCurrency = Object.fromEntries(rangeStartRows.map(row => [row.currency, row.net]));
+  const rangeStartBreakdownByCurrency = Object.fromEntries(rangeStartRows.map(row => [row.currency, row.breakdown]));
+  const rangeEndByCurrency = Object.fromEntries(rangeEndRows.map(row => [row.currency, row.net]));
+  const periodFlow = flowByCurrency(includedCash, includedAccounts, bank.transactions, rangeStartDate, rangeEndDate);
+  const plannedPeriodByCurrency = useMemo(() => {
     const totals: Record<string, number> = {};
-    activities.filter((activity) => !activity.executed && activity.date.startsWith(todayISO.slice(0, 7))).forEach((activity) => {
+    activities.filter(activity => !activity.executed && activity.date >= rangeStartDate && activity.date <= rangeEndDate).forEach(activity => {
       totals[activity.currencyCode] = (totals[activity.currencyCode] ?? 0) + activity.amount;
     });
     return totals;
-  }, [activities, todayISO]);
-  // User-requested (2026-09-09): "month Intial minus last balance can tell
-  // the Net Worth while current - previous month worth can tell a month's
-  // positive/-negative impact + number + percentage." Distinct from
-  // `monthFlowTotal` above — that's CASH FLOW (Cash/Bank money in/out this
-  // month); this is the real NET WORTH itself (assets minus liabilities,
-  // every module) at the end of last month vs. right now, so it also
-  // captures things flow doesn't: a stock's price move, an EMI loan's
-  // principal paydown, a Fund's NAV change. Reuses `netWorthAsOfDate` —
-  // the same real (not projected) past-month computation the Monthly
-  // Summary table below already uses — rather than a new calc path.
-  // `null` (not 0) when there's no real prior-month data to compare
-  // against yet (a brand-new account this month), so the UI can render
-  // "not enough history yet" instead of a misleading "+100%".
-  const lastMonthEndDate = (() => {
-    const d = new Date(`${monthStart}T00:00:00Z`);
-    d.setUTCMonth(d.getUTCMonth() - 1);
-    return endOfMonthAsOf(d.toISOString().slice(0, 7));
-  })();
-  const earliestActivity = earliestActivityDate(netWorthAsOfInputs);
-  const hasLastMonthData = !!earliestActivity && earliestActivity <= lastMonthEndDate;
-  // Per-currency version of the same figure — user-reported (2026-09-09):
-  // "Per currency stats are missing like Today's net flow, This month's
-  // net flow, This month's change" — the converted-to-preferred-currency
-  // totals above were the only place these showed; each currency's own
-  // section (below) never got them, unlike Assets/Liabilities/Net which
-  // already show there in real, unconverted terms.
-  const lastMonthByCurrency: Record<string, number> = {};
-  // The full per-module breakdown for last month, not just the net figure
-  // — feeds the "This month's change" drill-down popup's Then/Now/Δ table
-  // (2026-09-16, see `Drilldown`'s own doc comment).
-  const lastMonthBreakdownByCurrency: Record<string, NetWorthBreakdownEntry[]> = {};
-  if (hasLastMonthData) {
-    netWorthAsOfDate(lastMonthEndDate, netWorthAsOfInputs).forEach((r) => {
-      lastMonthByCurrency[r.currency] = r.net;
-      lastMonthBreakdownByCurrency[r.currency] = r.breakdown;
-    });
-  }
+  }, [activities, rangeStartDate, rangeEndDate]);
 
   // Item 4: "capital split per currency" — each currency's net worth
   // converted to the preferred currency for a like-for-like comparison
