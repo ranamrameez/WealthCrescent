@@ -1246,10 +1246,10 @@ function NetWorthMonthlySection({
  * do I make one" answer lives on `/account` instead, linked from the
  * section's own intro line. */
 function CategoryGroupsSection({
-  ownCurrencies, activities, categories, groups, nowMonth, setDrilldown,
+  ownCurrencies, activities, categories, groups, fromDate, toDate, rangeLabel, setDrilldown,
 }: {
   ownCurrencies: string[]; activities: BudgetActivity[]; categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories'];
-  groups: ReturnType<typeof useCategoryGroupStore.getState>['workbook']['groups']; nowMonth: string;
+  groups: ReturnType<typeof useCategoryGroupStore.getState>['workbook']['groups']; fromDate: string; toDate: string; rangeLabel: string;
   setDrilldown: (d: Drilldown) => void;
 }) {
   if (!groups.length) return null;
@@ -1258,14 +1258,14 @@ function CategoryGroupsSection({
     <div className="mb-md">
       <h3>By category group</h3>
       <p className="text-muted" style={{ marginTop: 0, marginBottom: 12 }}>
-        {monthLabel(nowMonth)}'s net total for each group you've configured — a positive number
-        means that group's own activity added money this month, negative means it took money out.
+        Net total from {fromDate} through {toDate} ({rangeLabel}) for each group you've configured — a positive number
+        means that group's own activity added money during the selected range, negative means it took money out.
         Manage which categories belong to a group on the{' '}
         <Link to="/account">Account page</Link>.
       </p>
       <div className="grid-auto" style={{ ...gridAutoStyle(260, 12) }}>
         {groups.map((g) => {
-          const items = activitiesForGroup(activities, g, categories).filter((a) => a.date.slice(0, 7) === nowMonth);
+          const items = activitiesForGroup(activities, g, categories).filter((a) => a.date >= fromDate && a.date <= toDate);
           const byCurrency: Record<string, number> = {};
           items.forEach((a) => { byCurrency[a.currencyCode] = (byCurrency[a.currencyCode] ?? 0) + a.amount; });
           const currenciesHere = ownCurrencies.filter((c) => byCurrency[c] !== undefined);
@@ -1273,7 +1273,7 @@ function CategoryGroupsSection({
             <Card key={g.id}>
               <div className="label mb-sm">{g.name}</div>
               {currenciesHere.length === 0 ? (
-                <div className="text-muted">No activity this month.</div>
+                <div className="text-muted">No activity in this range.</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {currenciesHere.map((c) => (
@@ -1282,11 +1282,11 @@ function CategoryGroupsSection({
                       className={`pill clickable ${byCurrency[c] >= 0 ? 'pill-positive' : 'pill-negative'}`}
                       onClick={() => setDrilldown({
                         kind: 'flow',
-                        title: `${g.name} — ${monthLabel(nowMonth)}, ${c}`,
-                        explanation: `Every real and planned entry this month whose category is in the "${g.name}" group.`,
+                        title: `${g.name} — ${rangeLabel}, ${c}`,
+                        explanation: `Every real and planned entry from ${fromDate} through ${toDate} whose category is in the "${g.name}" group.`,
                         currency: c,
-                        from: `${nowMonth}-01`,
-                        to: nowMonth,
+                        from: fromDate,
+                        to: toDate,
                         items: items.filter((a) => a.currencyCode === c).map((a) => ({
                           module: a.module.charAt(0).toUpperCase() + a.module.slice(1),
                           date: a.date, description: a.description, amount: a.amount, accountName: a.sourceLabel,
