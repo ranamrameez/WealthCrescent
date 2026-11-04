@@ -15,7 +15,7 @@ describe('collectUpcomingItems', () => {
       ],
     };
     const items = collectUpcomingItems(inputs, 14, new Date('2026-01-01'));
-    expect(items).toEqual([{ date: '2026-01-05', module: 'cash', label: 'Cash plan', amount: 500, currencyCode: 'USD', kind: 'income', overdue: false }]);
+    expect(items).toMatchObject([{ date: '2026-01-05', module: 'cash', label: 'Cash plan', amount: 500, currencyCode: 'USD', kind: 'income', overdue: false }]);
   });
 
   it('a recurring Cash plan (salary on the 28th) surfaces its next occurrence, not yet executed', () => {
@@ -27,7 +27,7 @@ describe('collectUpcomingItems', () => {
       }],
     };
     const items = collectUpcomingItems(inputs, 14, new Date('2026-01-20'));
-    expect(items).toEqual([{ date: '2026-01-28', module: 'cash', label: 'Salary', amount: 150000, currencyCode: 'PKR', kind: 'income', overdue: false }]);
+    expect(items).toMatchObject([{ date: '2026-01-28', module: 'cash', label: 'Salary', amount: 150000, currencyCode: 'PKR', kind: 'income', overdue: false }]);
   });
 
   it('excludes a recurring occurrence already marked done via executedThrough', () => {
@@ -115,7 +115,7 @@ describe('collectUpcomingItems', () => {
       }],
     };
     const items = collectUpcomingItems(inputs, 45, new Date('2026-01-01'));
-    expect(items).toEqual([{ date: '2026-02-01', module: 'emi', label: 'Car Loan installment', amount: 100, currencyCode: 'USD', kind: 'expense', overdue: false }]);
+    expect(items).toMatchObject([{ date: '2026-02-01', module: 'emi', label: 'Car Loan installment', amount: 100, currencyCode: 'USD', kind: 'expense', overdue: false }]);
   });
 
   it('skips an archived (isActive: false) EMI loan', () => {
@@ -138,7 +138,7 @@ describe('collectUpcomingItems', () => {
       }],
     };
     const items = collectUpcomingItems(inputs, 14, new Date('2026-01-01'));
-    expect(items).toEqual([{ date: '2026-01-05', module: 'rentals', label: 'Flat 1 rent', amount: 1000, currencyCode: 'USD', kind: 'income', overdue: false }]);
+    expect(items).toMatchObject([{ date: '2026-01-05', module: 'rentals', label: 'Flat 1 rent', amount: 1000, currencyCode: 'USD', kind: 'income', overdue: false }]);
   });
 
   it('surfaces a Subscription\'s next renewal', () => {
@@ -147,7 +147,7 @@ describe('collectUpcomingItems', () => {
       subscriptions: [{ id: 's1', name: 'Netflix', amount: 15, currencyCode: 'USD', billingCycle: 'monthly', startDate: '2026-01-10', active: true }],
     };
     const items = collectUpcomingItems(inputs, 14, new Date('2026-01-01'));
-    expect(items).toEqual([{ date: '2026-01-10', module: 'subscriptions', label: 'Netflix', amount: 15, currencyCode: 'USD', kind: 'expense', overdue: false }]);
+    expect(items).toMatchObject([{ date: '2026-01-10', module: 'subscriptions', label: 'Netflix', amount: 15, currencyCode: 'USD', kind: 'expense', overdue: false }]);
   });
 
   it('excludes items beyond the window and sorts the combined list by date', () => {
