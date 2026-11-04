@@ -66,8 +66,8 @@ it('applies the URL-backed custom date range to flow figures and exposes the sel
 
   fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
   const modal = document.querySelector<HTMLElement>('.modal-box')!;
-  expect(within(modal).getByLabelText('From date')).toHaveValue(todayISO);
-  expect(within(modal).getByLabelText('To date')).toHaveValue(todayISO);
+  expect((within(modal).getByLabelText('From date') as HTMLInputElement).value).toBe(todayISO);
+  expect((within(modal).getByLabelText('To date') as HTMLInputElement).value).toBe(todayISO);
   expect(within(modal).getByText(new RegExp(todayISO))).toBeTruthy();
 });
 
