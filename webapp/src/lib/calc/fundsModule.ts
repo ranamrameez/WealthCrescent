@@ -199,7 +199,7 @@ export function contributionVsValueSeries(
   // negative units after an oversell and ignores persisted same-day order.
   const txs = sortTransactionsChronological(
     transactions.filter(transaction => transaction.ticker === fundId && !transaction.isPending),
-  );
+  ).map((transaction, index) => transaction.id ? transaction : { ...transaction, id: `fund:${fundId}:legacy:${index}` });
   const navHistory = getDailyPriceHistory(fundId, priceHistory);
   const priceByDate: Record<string, number> = {};
   const explicitNavDates = new Set(navHistory.map(point => point.date));
@@ -418,7 +418,8 @@ export function balanceUpdateHistory(
   // Editing a historical date must therefore move the point chronologically,
   // even though its original timestamp remains unchanged.
   const raw = [...getPriceHistory(fundId, priceHistory)].sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''));
-  const txs = sortTransactionsChronological(transactions.filter(transaction => transaction.ticker === fundId && !transaction.isPending));
+  const txs = sortTransactionsChronological(transactions.filter(transaction => transaction.ticker === fundId && !transaction.isPending))
+    .map((transaction, index) => transaction.id ? transaction : { ...transaction, id: `fund:${fundId}:legacy:${index}` });
 
   let prevBalance = 0;
   let prevNav = 0;
