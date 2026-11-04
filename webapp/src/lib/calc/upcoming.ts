@@ -111,7 +111,7 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
     if (!currencyCode) return;
     const add = (date: string, id: string) => {
       if (!inWindow(date, todayStr, windowEndStr)) return;
-      items.push({ id, date, module: 'creditCards', label: plan.description, amount: Math.abs(plan.amount), currencyCode, kind: 'expense', overdue: false, href: `/bank/card/${plan.cardId}` });
+      items.push({ id, date, module: 'creditCards', label: plan.description, amount: Math.abs(plan.amount), currencyCode, kind: 'expense', overdue: false });
     };
     if (plan.recurrence) {
       recurrenceOccurrencesWithin(plan.recurrence, todayStr, windowEndStr)
@@ -146,14 +146,13 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
       currencyCode: plan.finance?.currencyCode ?? property.currencyCode,
       kind: plan.type === 'RENT_INCOME' ? 'income' : 'expense',
       overdue: false,
-      href: `/rentals?property=${encodeURIComponent(property.id)}`,
     });
   });
   activeProperties.forEach(property => {
     const proposal = proposeRentCollection(property, today);
     if (!proposal || !inWindow(proposal.dueDate, todayStr, windowEndStr)) return;
     if (plannedRentalKeys.has(`${property.id}@${proposal.dueDate}`)) return;
-    items.push({ id: `${property.id}@${proposal.dueDate}`, date: proposal.dueDate, module: 'rentals', label: `${property.name} rent`, amount: proposal.amount, currencyCode: property.currencyCode, kind: 'income', overdue: false, href: `/rentals?property=${encodeURIComponent(property.id)}` });
+    items.push({ id: `${property.id}@${proposal.dueDate}`, date: proposal.dueDate, module: 'rentals', label: `${property.name} rent`, amount: proposal.amount, currencyCode: property.currencyCode, kind: 'income', overdue: false });
   });
 
   inputs.subscriptions.filter(subscription => subscription.active).forEach(subscription => {
