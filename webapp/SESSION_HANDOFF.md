@@ -1,3 +1,99 @@
+# WealthCrescent — Session Handoff (refreshed 2026-11-04, continuation checkpoint)
+
+## 2026-11-04 — Budget planning, dashboard, upcoming and accounting continuation
+
+### Exact repository state at handoff
+
+- **Working branch:** `fix/net-worth-dashboard-parity-and-accounting`
+- **Latest branch commit at this checkpoint:** `1cf181cdba2a4f61936c0842be2f573dc78093ec` — `refactor(upcoming): keep renewal dates separate from alert reminders`.
+- **Base / current `main`:** `e545273018b08eebd9f95328b766c7cb2764c5af` (PR #50 documentation follow-up, after PR #49's Net Worth dashboard rebuild).
+- **Branch comparison:** 35 commits ahead, 0 behind `main`; merge base is exactly the current `main` SHA above. The branch has 17 changed application files in the comparison.
+- **PR status:** no open PR exists for this branch at this checkpoint. Do not assume PR #48/#49/#50 is the active PR: #49 and #50 are closed/merged; this branch still needs its own review/PR after validation.
+- **CI status:** no pull-request workflow runs were returned for head `1cf181cdba2a4f61936c0842be2f573dc78093ec`. No fresh type-check, production build, full test suite, or interactive browser smoke test has been run in this continuation. Do not describe this branch as validated.
+- **No merge or direct-main push has occurred.** Continue on this feature branch, preserve its commits, and never push directly to `main`.
+
+### What is already on this branch — inspect before changing
+
+The branch contains 35 focused commits. The notable work includes:
+
+1. **Upcoming / reminders**
+   - Future-only active obligations are collected across module plan stores, with stable row identity and routing to the correct module dashboard.
+   - Upcoming and subscription reminders are consolidated into dated items to reduce duplicate presentation.
+   - Reminder lead-time alerts fire on their own scheduled calendar day (not all 1/2/3-day reminders together).
+   - Latest commit separates renewal dates from alert-reminder dates; preserve that distinction.
+   - Relevant files: `lib/calc/upcoming.ts`, `lib/calc/subscriptionsModule.ts`, `hooks/useUpcomingItems.ts`, `components/UpcomingList.tsx`, and their tests.
+
+2. **Dashboard / date navigation**
+   - `/dashboard` is the canonical app homepage; `/` and `/net-worth` redirect to it, while the Net Worth dashboard is reused at the canonical route.
+   - Shared date-range navigation was extracted to `components/DateRangeWidget.tsx` and integrated into the pinned top bar.
+   - Net Worth uses account-style presets and URL-backed date navigation; manual Snapshot controls and duplicate renewal alerts were removed.
+   - Lifetime recent transactions were added across modules; inspect broker-profile aggregation carefully before extending it.
+   - Relevant files: `App.tsx`, `DateRangeWidget.tsx`, `TopBarControls.tsx`, `NetWorthPage.tsx`, `NetWorthRecentTransactions.tsx`.
+
+3. **Planning / finance summaries**
+   - Planning can render embedded editable plan ledgers in the standard section-card pattern.
+   - Plan status/category/finance allocation charts were added.
+   - Dashboard work includes editable multi-finance budget presentation and lifetime activity.
+   - These are useful incremental improvements, **not yet a complete unified budget engine**. Do not infer that category targets, rollover, project budgets, goals/sinking funds, partial-payment reconciliation, or all forecasting scenarios are already implemented.
+
+4. **Funds and financial integrity**
+   - Fund summaries were aligned to central stock position totals and historical units now use the central stock accounting engine.
+   - Same-day execution price handling and stable legacy execution identities were addressed; regression tests cover oversells and lifecycle-safe valuations.
+   - Keep the merged stock calculation engine and broker-profile isolation intact. Never move broker-owned trades/transfers/settings/P&L to an exchange-wide shared scope.
+   - Preserve the rule that unmatched SELL quantities and their fees are flagged/reconciled, never assigned invented BUY cost basis or fictitious realized profit.
+
+### User's latest product direction: WealthCrescent is a finance + budget-planning system
+
+The user explicitly clarified that budget planning is a core product capability and should support practical real-world planning scenarios, not just a list of payment reminders. The previous session researched common patterns in YNAB, Actual Budget, Monarch Money and PocketSmith. Useful concepts to consider (research context, not yet approved implementation requirements):
+
+- Category/envelope budgets with allocated amounts, available/remaining balances, rollover and weekly/monthly/yearly/custom target periods.
+- Project/goal budgets that group multiple planned payments across dates, categories, modules and financial accounts.
+- Recurring schedules with flexible frequency, expected amount/range, end date, skip/complete actions and optional matching to actual ledger entries.
+- Split transactions and partial payments with allocations that reconcile exactly to the parent transaction amount.
+- Savings goals/sinking funds, cash-flow projections, actual-vs-planned reporting and what-if scenarios.
+- Rules/automation for categorization and recurring transaction handling, while preserving explicit user confirmation where financial records are uncertain.
+
+A possible direction discussed was one unified budget domain supporting multiple budget modes (category/envelope, project/goal, recurring/periodic, savings/sinking fund, cash-flow). This remains a **proposal**, not an approved schema. The previous assistant asked whether the user approves supporting both category-based and project-based budgets in one unified engine; the user had not answered before this handoff request. Ask this one design approval question before committing to that architecture, unless the user explicitly says to proceed.
+
+### Proposed architecture to evaluate after approval — do not blindly implement
+
+- A parent Budget with one or more child budget items/allocations. Budget items may point to a module/entity, account/finance, category, currency, expected amount/range, due date and recurrence.
+- Link allocations to actual existing ledger transactions; do not duplicate/copy financial transactions into the budget store.
+- Derive Planned / Pending / Partially paid / Paid / Overdue / Skipped / Cancelled from actual linked records and remaining amount. Keep labels such as “Due Today” or “Happening in X days” separate from lifecycle status.
+- Normalize activity from Cash, Banking, Cards, Rentals, EMI/Loans, Subscriptions, Funds, QSE and PSX for reporting without losing source module IDs or broker profile ownership.
+- Keep currency totals separate unless the user explicitly enables a sourced FX conversion. Do not double-count internal transfers or credit-card repayments; distinguish investment contributions from consumption.
+- Use the central calculation engine as the single source of financial calculations; UI components must not independently recompute balances, budgets, P/L or forecasts.
+- Rental income and expenses should both participate in period flow; do not reduce Rentals to a special net-only treatment.
+- Forecasts must be based on real historical balances/transactions and clearly label estimates; never invent historical snapshots or settlement dates.
+
+### Previously specified dashboard / planning UX contract
+
+Keep these requirements in scope when reviewing the branch and planning future work:
+
+1. Overall section: per-currency grouped stat cards and chart.
+2. Per Currency section: assets, liabilities, net worth, module contributors/changes, Planned vs Reality and chart.
+3. Monthly navigator.
+4. Plans table with all relevant actions, including Modify.
+5. Recent Transactions across all modules, lifetime, newest first, 25 per page by default.
+6. Insights, followed by Upcoming.
+7. Monthly summaries should use a timeline-style widget rather than an excessively wide table.
+8. Use the reusable date-range widget consistently across pages, with backward/forward navigation and URL-backed state where appropriate.
+9. Clicking a module should open its module dashboard; exchanges should have their own dashboards.
+10. Upcoming should contain future unresolved items only; completed/deleted/stale items must not reappear. Alerts are separate, date-accurate and deduplicated.
+11. Use the standard app section-card patterns; avoid cards nested inside cards. Do not reintroduce a manual Snapshot button.
+
+### Next-session execution order
+
+1. Re-read root `CLAUDE.md`, this handoff, `webapp/MODULES_PLAN.md`, `webapp/README.md` (if its contents can be retrieved), `webapp/USER_MANUAL.md`, `webapp/audit.md`, and the relevant dashboard/planning guides before editing.
+2. Refresh live `main`, this branch head, PR list and Actions. Confirm the branch remains 35 ahead / 0 behind (or record the new state); never rely on the SHA in this handoff if the remote moved.
+3. Review the full 35-commit history and all 17 changed files against current `main`. Preserve the already-merged PR #48 stock engine, PR #41/#43 broker-profile isolation, PR #46 Funds cash ledger, and PR #49 Net Worth dashboard work. Do not restore older branch versions over newer main code.
+4. Audit the existing implementation and tests before designing a unified budget schema. Explicitly distinguish working features from proposals and gaps. Resolve the category-budget + project-budget design approval first.
+5. Fix any correctness regressions in Upcoming, reminder timing, funds valuation, date navigation, and cross-broker recent activity. Keep stable IDs, chronology and profile ownership.
+6. Run the complete webapp test suite, both TypeScript checks/type-check, and production build on the exact final branch head. If application code changes after validation, rerun all required checks. Add regression tests for every financial or date calculation fix.
+7. Perform interactive browser smoke tests with representative multi-currency, multi-broker and partial-month data when an interactive preview is available. If unavailable, record that as not done; do not claim visual verification.
+8. Update `webapp/README.md` Done/Pending and `webapp/USER_MANUAL.md` only for behavior that actually ships and is verified. The GitHub file reader returned an empty content body for `webapp/README.md` at this checkpoint (blob SHA `e5fd4b52dbb9b3cba23c4f174c555bfff8e5c305`); do not overwrite it with an empty replacement. Retry a safe retrieval method before editing it.
+9. Once review and checks are complete, create/update a PR from this branch to `main`; keep the PR focused and do not merge until the exact PR head passes all required checks.
+
 # WealthCrescent — Session Handoff (refreshed 2026-11-04)
 
 ## 2026-11-04 — Net Worth dashboard rebuild, PR #49 merged
