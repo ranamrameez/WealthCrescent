@@ -438,13 +438,14 @@ export function NetWorthPage({
   const rangeEndBreakdownByCurrency = Object.fromEntries(rangeEndRows.map(row => [row.currency, row.breakdown]));
   const periodFlow = flowByCurrency(includedCash, includedAccounts, bank.transactions, rangeStartDate, rangeEndDate);
   const rentalsNetForRange = rentalsNetIncomeByCurrency(rentals.settings.properties, rentals.entries.filter(entry => entry.date >= rangeStartDate && entry.date <= rangeEndDate));
-  const plannedPeriodByCurrency = useMemo(() => {
+  const plannedUpcomingByCurrency = useMemo(() => {
     const totals: Record<string, number> = {};
-    activities.filter(activity => !activity.executed && activity.date >= rangeStartDate && activity.date <= rangeEndDate).forEach(activity => {
+    const upcomingEndDate = shiftISODate(todayISO, 29);
+    activities.filter(activity => !activity.executed && activity.date >= todayISO && activity.date <= upcomingEndDate).forEach(activity => {
       totals[activity.currencyCode] = (totals[activity.currencyCode] ?? 0) + activity.amount;
     });
     return totals;
-  }, [activities, rangeStartDate, rangeEndDate]);
+  }, [activities, todayISO]);
 
   // Item 4: "capital split per currency" — each currency's net worth
   // converted to the preferred currency for a like-for-like comparison
@@ -535,7 +536,7 @@ export function NetWorthPage({
           const periodEnd = sum(rangeEndByCurrency);
           const netWorthDelta = hasRangeBaseline ? periodEnd.total - previous.total : null;
           const netWorthDeltaPct = netWorthDelta !== null && previous.total !== 0 ? netWorthDelta / Math.abs(previous.total) * 100 : null;
-          const plannedTotal = sum(plannedPeriodByCurrency);
+          const plannedTotal = sum(plannedUpcomingByCurrency);
           return <section key={preferredCurrency}>
           <h3 className="mt-0">Overall summary — {preferredCurrency}</h3>
           <div className="mt-12">
@@ -584,10 +585,10 @@ export function NetWorthPage({
               })}
             />
             <StatCard
-              label="Planned activity in period"
+              label="Upcoming planned activity (30 days)"
               value={fmtMoney(plannedTotal.total, preferredCurrency)}
               hue={(plannedTotal.total) >= 0 ? 'var(--profit)' : 'var(--loss)'}
-              title={plannedTotal.anyUnconverted ? `Excludes ${plannedTotal.missing.join(', ')} — no rate available.` : `Unexecuted planned income and expenses from ${rangeStartDate} through ${rangeEndDate}. Linked transfers are excluded.`}
+              title={plannedTotal.anyUnconverted ? `Excludes ${plannedTotal.missing.join(', ')} — no rate available.` : `Unexecuted planned income and expenses from ${todayISO} through ${shiftISODate(todayISO, 29)}. Linked transfers are excluded.`}
             />
             {netWorthDelta !== null ? (
               <StatCard
@@ -750,7 +751,7 @@ export function NetWorthPage({
       </div></div>) }] : []), ...(sectionVisible('plans') ? [{ unframed: true,
         key: 'plans',
         label: 'Plans',
-        content: <div><h2>Plans</h2><NetWorthPlanningReality activities={activities} selectedModules={selectedModules} currencies={ownCurrencies} currentRows={rows} emiLoans={netWorthAsOfInputs.emiLoans} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} /></div>,
+        content: <div><h2>Plans</h2><p className="text-muted">Forward-looking projections use their own horizon controls; the reporting range above applies to historical figures and insights.</p><NetWorthPlanningReality activities={activities} selectedModules={selectedModules} currencies={ownCurrencies} currentRows={rows} emiLoans={netWorthAsOfInputs.emiLoans} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} /></div>,
       }] : []), ...(sectionVisible('analytics') ? [{ unframed: true,
         key: 'analytics',
         label: 'Analytics',
