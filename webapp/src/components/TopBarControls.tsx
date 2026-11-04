@@ -30,11 +30,10 @@ export function TopBarControls({ children, activeCount, onReset }: { children: R
   const filterControls = controls.filter(child =>
     !switches.includes(child)
     && child !== explicitDate
-    && child !== transaction
     && !(isValidElement(child) && child.type === 'button'),
   );
   const fields = filterControls.map(child => isValidElement<{ inline?: boolean }>(child)
-    && (child.type === EntityScopeMenu) ? cloneElement(child, { inline: true }) : child);
+    && (child.type === TransactionFilterMenu || child.type === EntityScopeMenu) ? cloneElement(child, { inline: true }) : child);
   const count = activeCount ?? transactionProps?.activeCount ?? 0;
   const reset = onReset ?? transactionProps?.onClear;
 
