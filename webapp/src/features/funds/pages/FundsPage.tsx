@@ -1,3 +1,4 @@
+import { useUrlEntitySelection } from '../../../hooks/useUrlEntitySelection';
 import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { useTablePagination } from '../../../hooks/useTablePagination';
@@ -1782,11 +1783,11 @@ export function FundsPage({
   cloudEmpty: boolean;
   uploadLocalToCloud: () => Promise<void>;
 }) {
-  const [selected, setSelected] = useState<Fund | null>(null);
-  const [selectedBroker, setSelectedBroker] = useState<Broker | null>(null);
   const funds = useFundsWorkbookStore((s) => s.workbook.funds);
   const brokers = useFundsWorkbookStore((s) => s.workbook.brokers);
+  const [selected, setSelected] = useUrlEntitySelection('fund', funds, 'broker');
   const liveSelected = selected ? funds.find((f) => f.id === selected.id) ?? null : null;
+  const [selectedBroker, setSelectedBroker] = useUrlEntitySelection('broker', brokers, 'fund');
   const liveSelectedBroker = selectedBroker ? brokers.find((b) => b.id === selectedBroker.id) ?? null : null;
   const [params] = useSearchParams();
   const selectedIds = selectedEntityValues(params, funds.map((fund) => fund.id));

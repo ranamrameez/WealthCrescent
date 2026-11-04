@@ -6,12 +6,13 @@ import { DateRangeWidget } from './DateRangeWidget';
 import type { TransactionPageFilters } from '../hooks/useUrlTransactionFilters';
 import { FilterIcon } from './icons';
 import { EntityScopeMenu } from './EntityScopeMenu';
+import { StandardDropdown } from './ui/StandardDropdown';
 
 export function TopBarControls({ children, activeCount, onReset }: { children: ReactNode; activeCount?: number; onReset?: () => void }) {
   const [open, setOpen] = useState(false);
   const controls = Children.toArray(children);
   const switches = controls.filter(child => isValidElement<{ className?: string; label?: string }>(child)
-    && (child.type === QuickEntitySwitch || (child.type === TopBarSelect && (
+    && (child.type === QuickEntitySwitch || child.type === StandardDropdown || child.type === SearchableEntitySwitch || (child.type === TopBarSelect && (
       child.props.className?.includes('account-switch-select')
       || /^Switch /.test(child.props.label ?? '')
       || ['Stock exchange', 'Stock', 'Switch card', 'Bank', 'Account', 'Currency'].includes(child.props.label ?? '')
@@ -52,10 +53,10 @@ export function TopBarControls({ children, activeCount, onReset }: { children: R
   );
 }
 
-export function QuickEntitySwitch({ label, value, options, onChange, searchable = false }: {
-  label: string; value: string; options: EntitySwitchOption[]; onChange: (value: string) => void; searchable?: boolean;
+export function QuickEntitySwitch({ label, value, options, onChange, searchable = false, isTypeable, onFavoriteToggle }: {
+  label: string; value: string; options: EntitySwitchOption[]; onChange: (value: string) => void; searchable?: boolean; isTypeable?: boolean; onFavoriteToggle?: (value: string) => void | Promise<void>;
 }) {
-  if (searchable) return <SearchableEntitySwitch label={label} value={value} options={options} onChange={onChange} />;
+  if (searchable || isTypeable !== undefined || onFavoriteToggle) return <SearchableEntitySwitch label={label} value={value} options={options} onChange={onChange} isTypeable={isTypeable ?? searchable} onFavoriteToggle={onFavoriteToggle} />;
   return <TopBarSelect label={label} className="account-switch-select" value={value} options={options} onChange={event => onChange(event.target.value)} />;
 }
 

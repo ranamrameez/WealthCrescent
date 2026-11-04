@@ -22,7 +22,7 @@ export type CategoryKey = 'netWorth' | 'stocks' | 'funds' | 'bank' | 'cash' | 'p
 // "Transfers" FAB (`components/ui/Fab.tsx`'s `FabPanel`) reachable from
 // every module page.
 export const CATEGORIES: { key: CategoryKey; label: string; to: string; icon: ReactNode }[] = [
-  { key: 'netWorth', label: 'Dashboard', to: '/net-worth', icon: <DashboardIcon /> },
+  { key: 'netWorth', label: 'Dashboard', to: '/dashboard', icon: <DashboardIcon /> },
   { key: 'stocks', label: 'Stock Exchanges', to: '/qse', icon: <StocksIcon /> },
   { key: 'funds', label: 'Funds', to: '/funds', icon: <FundsIcon /> },
   { key: 'bank', label: 'Banking', to: '/bank', icon: <BankIcon /> },
@@ -50,7 +50,7 @@ export function categoryForPath(pathname: string): CategoryKey | null {
   if (pathname.startsWith('/account')) return null;
   if (pathname.startsWith('/app-data')) return null;
   if (pathname.startsWith('/legal')) return null;
-  if (pathname.startsWith('/net-worth')) return 'netWorth';
+  if (pathname === '/' || pathname === '/dashboard' || pathname.startsWith('/net-worth')) return 'netWorth';
   if (pathname.startsWith('/funds')) return 'funds';
   if (pathname.startsWith('/bank')) return 'bank';
   if (pathname.startsWith('/cash')) return 'cash';

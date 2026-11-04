@@ -1,3 +1,4 @@
+import { useUrlEntitySelection } from '../../../hooks/useUrlEntitySelection';
 import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
@@ -862,8 +863,8 @@ export function SubscriptionsPage({
   cloudEmpty: boolean;
   uploadLocalToCloud: () => Promise<void>;
 }) {
-  const [selected, setSelected] = useState<Subscription | null>(null);
   const subs = useSubscriptionsWorkbookStore((s) => s.workbook.entries);
+  const [selected, setSelected] = useUrlEntitySelection('subscription', subs);
   const liveSelected = selected ? subs.find((s) => s.id === selected.id) ?? null : null;
   const [params] = useSearchParams();
   const selectedIds = selectedEntityValues(params, subs.map((s) => s.id));

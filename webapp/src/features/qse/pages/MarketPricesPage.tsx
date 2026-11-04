@@ -1,3 +1,4 @@
+import { TickerLogo } from '../../../components/TickerLogo';
 import { RecordRow } from '../../../components/RecordRow';
 import { useMemo,useState } from 'react';
 import { Link,useSearchParams } from 'react-router-dom';
@@ -51,10 +52,10 @@ export function MarketPricesPage() {
   const choose=(value:string)=>{const next=new URLSearchParams(params);next.set('ticker',value);setParams(next);setPage(1);};
   const change=(patch:Record<string,string>)=>{const next=new URLSearchParams(params);for(const [key,value]of Object.entries(patch)){if(value)next.set(key,value);else next.delete(key);}setParams(next);setPage(1);};
   const reset=()=>change({from:'',to:'',source:'',flags:'',group:'',q:'',size:'',period:''});
-  const options=[...(['Opened','Fav','Closed','All Others'] as const).flatMap(label=>tickers.filter(symbol=>label==='Opened'?opened.has(symbol):label==='Fav'?favourites.has(symbol):label==='Closed'?closed.has(symbol):other.has(symbol)).map(symbol=>({value:symbol,label:symbol+' - '+(tickerNames[symbol] || 'QSE ticker')+(favourites.has(symbol)?' \u2605':''),group:label})))];
+  const options=[...(['Opened','Fav','Closed','All Others'] as const).flatMap(label=>tickers.filter(symbol=>label==='Opened'?opened.has(symbol):label==='Fav'?favourites.has(symbol):label==='Closed'?closed.has(symbol):other.has(symbol)).map(symbol=>({value:symbol,label:symbol+' - '+(tickerNames[symbol] || 'QSE ticker'),icon:<TickerLogo ticker={symbol} exchange="qse" size="sm" />,isFavorite:favourites.has(symbol),group:label})))];
   const activeFilters=Number(!!from||!!to)+Number(source!=='all')+Number(flags)+Number(group!=='all')+Number(!!search)+Number(pageSize!==25);
   const controls=useMemo(()=><TopBarControls activeCount={activeFilters} onReset={reset}>
-    <QuickEntitySwitch label="Ticker" searchable value={ticker} options={options} onChange={choose}/>
+    <QuickEntitySwitch label="Ticker" isTypeable value={ticker} options={options} onChange={choose} onFavoriteToggle={ready ? toggle : undefined}/>
     <div className="market-filter-grid">
       <label>From date (Qatar)<DateInput aria-label="From date" value={from} onChange={event=>change({from:event.target.value,period:''})}/></label>
       <label>To date (Qatar)<DateInput aria-label="To date" value={to} onChange={event=>change({to:event.target.value,period:''})}/></label>
@@ -64,7 +65,7 @@ export function MarketPricesPage() {
       <label>Find ticker cards<input aria-label="Find ticker cards" value={search} placeholder="Symbol or name" onChange={event=>change({q:event.target.value})}/></label>
       <TopBarSelect label="Updates per page" value={String(pageSize)} options={[10,25,50,100].map(size=>({value:String(size),label:String(size)}))} onChange={event=>change({size:event.target.value==='25'?'':event.target.value})}/>
     </div>
-  </TopBarControls>,[params.toString(),ticker,options.map(option=>option.group+option.value+option.label).join('|'),source,from,to,flags,group,search,pageSize]);
+  </TopBarControls>,[ready,params.toString(),ticker,options.map(option=>option.group+option.value+option.label+String(option.isFavorite)).join('|'),source,from,to,flags,group,search,pageSize]);
   usePageTopBarRightSlot(controls);
   type Column='date'|'price'|'high'|'low'|'source'|'change';
   const {sorted,Th}=useSortableRows<MarketRow,Column>(rows,(row,column)=>column==='date'?row.time || row.date:column==='price'?row.price:column==='high'?row.dayHigh ?? -Infinity:column==='low'?row.dayLow ?? -Infinity:column==='source'?row.source:row.deltaPct ?? -Infinity,'date','desc');

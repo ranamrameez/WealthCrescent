@@ -1,3 +1,4 @@
+import { useUrlEntitySelection } from '../../../hooks/useUrlEntitySelection';
 import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
@@ -1275,9 +1276,9 @@ export function EMIPage({
   cloudEmpty: boolean;
   uploadLocalToCloud: () => Promise<void>;
 }) {
-  const [selected, setSelected] = useState<EMILoan | null>(null);
   const [editOnOpen, setEditOnOpen] = useState(false);
   const loans = useEMIWorkbookStore((s) => s.workbook.entries);
+  const [selected, setSelected] = useUrlEntitySelection('loan', loans);
   const liveSelected = selected ? loans.find((l) => l.id === selected.id) ?? null : null;
   const [params] = useSearchParams();
   const selectedIds = selectedEntityValues(params, loans.map((loan) => loan.id));

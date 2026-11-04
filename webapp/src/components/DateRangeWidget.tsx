@@ -68,6 +68,7 @@ export function DateRangeWidget({ value, onChange }: {
 
   return (
     <div className="topbar-date-range" role="group" aria-label="Reporting period" style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+      <div className="topbar-period-navigation">
       <button type="button" className="btn secondary small" aria-label="Previous period" title="Previous period" disabled={value.period === 'all'} onClick={() => shift(-1)}>‹</button>
       <select
         className="topbar-select"
@@ -80,6 +81,7 @@ export function DateRangeWidget({ value, onChange }: {
         {PRESETS.map(preset => <option key={preset.value} value={preset.value}>{preset.label}</option>)}
       </select>
       <button type="button" className="btn secondary small" aria-label="Next period" title="Next period" disabled={value.period === 'all' || isCurrent} onClick={() => shift(1)}>›</button>
+      </div>
       {value.period === 'custom' && (
         <div className="topbar-date-range-custom" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <input aria-label="From date" type="date" value={value.fromDate} max={value.toDate || today} onChange={event => onChange({ period: 'custom', fromDate: event.target.value })} />
