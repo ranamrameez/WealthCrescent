@@ -21,7 +21,7 @@ FinanceManager live link:
 
 ## Current session handoff
 
-For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) before continuing. **Latest handoff: 2026-10-31 — PR #44 merged** (`fix/trade-entry-validation-and-transactions-ui`) into `main` as `d1c3c4c33776dc871cf15f044353359a71c18986`. The merged scope, CI evidence, PSO reconciliation correction (122 BUY vs 132 SELL, 10 unmatched), and remaining manual browser-verification note are recorded in the handoff.
+For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) before continuing. **Latest handoff: 2026-11-04 — PR #49, Net Worth dashboard rebuild, ready to merge after green CI.** Actions run #394 passed 142 test files / 1,132 tests, both TypeScript checks and the production build on application-code head `7cd07ca0c050446ad2b941ce3ec2c384af935b45`. Manual browser review remains outstanding; details are recorded in [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) and [`docs/net-worth-dashboard.md`](docs/net-worth-dashboard.md).
 
 ## Cost-basis worked examples (canonical — keep in sync with tests)
 
@@ -10276,7 +10276,7 @@ from the lot system."*
 
 ## Pending
 
-
+- **Net Worth dashboard rebuild — PR #49 (2026-11-04, ready to merge):** the app home page now has URL-backed 7d/30d/90d/6m/12m/YTD/all/custom ranges. Period movement and historical analytics use the selected dates; current net worth remains a live snapshot. Monthly flow/category/rental totals are clipped to exact dates; historical and activity-only currencies are retained in per-currency summaries and monthly tables; per-currency asset/liability/activity insights and missing-FX warnings are added; and the section layout uses collapsible plain headers without nested card shells. **Automated verification passed:** Actions run #394 passed 142 test files / 1,132 tests, both TypeScript checks and the production build on application-code head `7cd07ca0c050446ad2b941ce3ec2c384af935b45`. Keep this item Pending until PR #49 is merged; manual browser review with representative multi-currency data remains a post-merge follow-up. See `SESSION_HANDOFF.md` and `docs/net-worth-dashboard.md`.
 
 - **Remaining cost-basis dependency audit (after PR #31):** continue beyond the QSE/PSX transaction pages. Verify Dashboard, Position Detail, analytics/time series, exports, charts, and strategy/advisory surfaces against the configured method. Canonical synchronized global/per-ticker transaction ordering was merged in PR #36 and passed CI. The separate mixed-event cash ledger still displays by effective date and needs its own design/tests if it must follow global accounting order. Do not merge stale PR #22. See `SESSION_HANDOFF.md` and `audit.md`.
 

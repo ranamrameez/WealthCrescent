@@ -56,6 +56,69 @@ it('centralizes URL-backed section and source filters and restores defaults', ()
   fireEvent.click(within(modal).getByRole('button', { name: 'Done' }));
   expect(document.querySelector('.modal-box')).toBeNull();
 });
+
+it('applies the URL-backed custom date range to flow figures and exposes the selected dates', () => {
+  const todayISO = new Date().toISOString().slice(0, 10);
+  show(`/net-worth?period=custom&from=${todayISO}&to=${todayISO}`);
+  const summary = screen.getByRole('heading', { name: 'Overall summary — USD' }).parentElement!;
+  expect(summary.textContent).toContain('Period net flow');
+  expect(summary.textContent).toContain('100.00');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+  const modal = document.querySelector<HTMLElement>('.modal-box')!;
+  expect((within(modal).getByLabelText('From date') as HTMLInputElement).value).toBe(todayISO);
+  expect((within(modal).getByLabelText('To date') as HTMLInputElement).value).toBe(todayISO);
+  expect(within(modal).getByText(new RegExp(todayISO))).toBeTruthy();
+});
+
+it('preserves a selected preset when switching to a custom range', () => {
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const fromDate = new Date(todayISO + 'T00:00:00Z');
+  fromDate.setUTCDate(fromDate.getUTCDate() - 89);
+  const expectedFrom = fromDate.toISOString().slice(0, 10);
+  show('/net-worth?period=90d');
+  fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+  const modal = document.querySelector<HTMLElement>('.modal-box')!;
+  fireEvent.change(within(modal).getByLabelText('Period'), { target: { value: 'custom' } });
+  expect((within(modal).getByLabelText('From date') as HTMLInputElement).value).toBe(expectedFrom);
+  expect((within(modal).getByLabelText('To date') as HTMLInputElement).value).toBe(todayISO);
+});
+
+it('excludes transactions outside the selected range while retaining the live balance', () => {
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const oldDate = new Date(todayISO + 'T00:00:00Z');
+  oldDate.setUTCDate(oldDate.getUTCDate() - 40);
+  const oldISO = oldDate.toISOString().slice(0, 10);
+  useCashWorkbookStore.setState(state => ({
+    workbook: {
+      ...state.workbook,
+      entries: [...state.workbook.entries, {
+        id: 'cash-old', date: oldISO, currencyCode: 'USD', amount: 900,
+        isDeposit: true, note: 'Older deposit', source: 'manual',
+      }],
+    },
+  }));
+  show(`/net-worth?period=custom&from=${todayISO}&to=${todayISO}`);
+  const summary = screen.getByRole('heading', { name: 'Overall summary — USD' }).parentElement!;
+  const periodFlow = [...summary.querySelectorAll('.stat-card')].find(card => card.textContent?.includes('Period net flow'));
+  expect(periodFlow?.textContent).toContain('100.00');
+  expect(summary.textContent).toContain('1,100.00');
+});
+
+it('renders the dashboard sections without nesting cards and provides period insights', () => {
+  const todayISO = new Date().toISOString().slice(0, 10);
+  show(`/net-worth?section=analytics&period=custom&from=${todayISO}&to=${todayISO}`);
+  expect(document.querySelector('.standard-card .card')).toBeNull();
+  expect(screen.getByRole('heading', { name: new RegExp('Insights') })).toBeTruthy();
+  expect(screen.getAllByText(/Largest asset:/).length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/Recorded net activity:/).length).toBeGreaterThan(0);
+  const analytics = document.querySelector<HTMLElement>('[data-page-section="analytics"]')!;
+  fireEvent.click(within(analytics).getByRole('button', { name: 'Hide section' }));
+  expect(screen.queryByRole('heading', { name: new RegExp('Insights') })).toBeNull();
+  fireEvent.click(within(analytics).getByRole('button', { name: 'Show section' }));
+  expect(screen.getByRole('heading', { name: new RegExp('Insights') })).toBeTruthy();
+});
+
 it('restores hidden sections from a deep link and opens exchange rates only from the FAB', () => {
   show('/net-worth?show-currencies=false&show-plans=false&show-analytics=false');
   expect(document.querySelectorAll('.standard-section-anchor')).toHaveLength(1);
