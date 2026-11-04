@@ -15,7 +15,7 @@ describe('collectUpcomingItems', () => {
       ],
     };
     const items = collectUpcomingItems(inputs, 14, new Date('2026-01-01'));
-    expect(items).toMatchObject([{ date: '2026-01-05', module: 'cash', label: 'Cash plan', amount: 500, currencyCode: 'USD', kind: 'income', overdue: false }]);
+    expect(items).toMatchObject([{ date: '2026-01-05', module: 'cash', label: 'Cash plan', amount: 500, currencyCode: 'USD', kind: 'income', overdue: false, dueLabel: 'Happening in 4 days' }]);
   });
 
   it('a recurring Cash plan (salary on the 28th) surfaces its next occurrence, not yet executed', () => {
