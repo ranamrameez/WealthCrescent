@@ -38,7 +38,7 @@ import type { TransactionPageFilters } from '../hooks/useUrlTransactionFilters';
 const EMPTY_GROUPS: FinancePlanGroup[] = [];
 
 /** Named plans own many payments; legacy recurring/module-generated plans remain available. */
-export function FinancePlansHierarchy({ filters, controls, overview }: { filters: TransactionPageFilters; controls: ReactNode; overview?: ReactNode }) {
+export function FinancePlansHierarchy({ filters, controls, overview, embedded = false }: { filters: TransactionPageFilters; controls: ReactNode; overview?: ReactNode; embedded?: boolean }) {
   const dateSort = useDateTableSort();
   const ensureSignedIn = useEnsureSignedIn();
   const cash = usePlannedCashWorkbookStore(s => s.workbook.entries);
@@ -80,7 +80,7 @@ export function FinancePlansHierarchy({ filters, controls, overview }: { filters
     setParams(previous => { const next = new URLSearchParams(previous); if (nextKey) next.set('plan', nextKey); else next.delete('plan'); next.delete('section'); return next; });
   };
   const switching = <div className="topbar-controls"><QuickEntitySwitch label="Plan" value={key ?? ''} options={[{ value: '', label: 'All plans' }, ...[...grouped.entries()].map(([id, group]) => ({ value: id, label: title(id, group) }))]} onChange={id => navigate(id || undefined)}/>{controls}</div>;
-  usePageTopBarRightSlot(switching);
+  usePageTopBarRightSlot(embedded ? null : switching);
   const summary = <div className="account-summary-grid">{[...new Set(rows.map(currency))].map(code => {
     const scoped = rows.filter(row => currency(row) === code);
     return <SummaryGroupCard key={code} title={`${code} planned activity`}><SummaryMetric label="Expected receipts" value={fmtMoney(scoped.filter(row => !row.plan.executed && signedPlanAmount(row.plan) > 0).reduce((sum, row) => sum + signedPlanAmount(row.plan), 0), code)}/><SummaryMetric label="Expected payments" value={fmtMoney(scoped.filter(row => !row.plan.executed && signedPlanAmount(row.plan) < 0).reduce((sum, row) => sum - signedPlanAmount(row.plan), 0), code)}/><SummaryMetric label="Fulfilled items" value={scoped.filter(row => row.plan.executed).length}/></SummaryGroupCard>;
@@ -114,6 +114,14 @@ export function FinancePlansHierarchy({ filters, controls, overview }: { filters
       { key: 'summary', label: 'Plan summary', defaultOpen: false, content: <div className="stack-lg"><PlanningPositionSummary filters={filters} scope={selected}/>{summary}</div> },
     ]}>{dialogs}{linkOpen && <PlanFinanceEditor records={selected} onClose={() => setLinkOpen(false)}/>}<EntityActions actions={[{ label: 'Add plan', onClick: () => setGroupEditor({}) }, ...(selectedGroup ? [{ label: 'Add payment', onClick: () => setEditor({ initialGroupId: selectedGroup.id }) }] : [])]}/></ModuleDetailTemplate>;
   }
+  if (embedded) {
+    return <>
+      <EntityActions actions={[{ label: 'Add plan', onClick: () => setGroupEditor({}) }]} />
+      {items}
+      {dialogs}
+    </>;
+  }
+
   return <>
     <EntityActions actions={[{ label: 'Add plan', onClick: () => setGroupEditor({}) }]}/>
     <StandardCard title="Plans" headerEnd={<StandardButton size="small" onClick={() => setGroupEditor({})}>Create plan</StandardButton>}><div className="entity-card-grid">{[...grouped.entries()].map(([id, group]) => <EntityCard key={id} title={title(id, group)} subtitle={id.startsWith('group:') ? `${group.length} payments` : id.startsWith('series:') ? 'Recurring plan' : group.length > 1 ? `${group.length} items` : 'One-off plan'} onClick={() => navigate(id)}/>)}</div>{!grouped.size && <p className="text-muted">Create a plan, then add its payments with individual dates and amounts.</p>}</StandardCard>
