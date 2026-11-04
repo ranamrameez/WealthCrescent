@@ -1,3 +1,40 @@
+## 2026-11-05 — Latest validated source checkpoint (read this first)
+
+Financial correctness / completing CalculationEngine remains the priority. All source from this continuation is now saved in focused local commits on fix/net-worth-dashboard-parity-and-accounting. Latest application head: ede55d7b (theme profiles); financial query/read-model head: 9dc4f20e. Earlier entries below are historical checkpoints and may mention work that is now committed or defects that are now fixed.
+
+### Completed and verified
+
+- Final full suite: **158 files / 1,210 tests passed**, 296.77 seconds, webapp/recent-engine-full-suite.log.
+- Final production build and both TypeScript projects: **passed**, webapp/recent-engine-build.log.
+- Recent Activity migration: 5 files / 23 focused tests passed, webapp/recent-activity-validation.log. The later full suite includes the final active-broker currency assertion too.
+- NetWorthRecentTransactions is now render-only through useRecentTransactions -> recentActivityService -> CalculationEngine.recentActivity. Funds/QSE/PSX withdrawal fees reconcile with native cash ledgers through shared transferCashAmount; migrated legacy card records are not repeated; archived/deactivated broker history is retained; active native data/currency overrides stale profile snapshots; EMI paid outflow includes its additional fine. Trade values are explicitly labeled before trading fees and are not presented as combined cash flow.
+- NetWorthPage now uses engine/service report, headline, per-currency, Insights, category, monthly, forecast, inclusion and local FX interfaces. No runtime private calculator or financial-store imports remain in that page; appearance state is presentation-only.
+- Shared charts, dropdown/finder/mobile topbar/reporting controls and theme changes are committed too, preserving the user's earlier requests. See SHARED_UI_COMPONENTS.md for their contract. Required final browser acceptance remains outstanding.
+
+### Local commits in order after user skills head ce3e4be8
+
+1. da797287 — recurrence calendar anchoring / old daily schedules.
+2. 35b8a80c — executed-only fallback prices and shared chronology.
+3. bf9524b2 — explicit recurring activity windows / exact forecast cutoffs.
+4. 24dfdeb7 — durable audit and continuation checkpoint.
+5. c75d4449 — shared chart renderers and pointer interaction.
+6. 72a14c24 — shared entity dropdown/finder, mobile topbar and reporting controls.
+7. 53042101 — Planning engine queries / authenticated commands.
+8. 9dc4f20e — central valuation, dashboard and recent-activity models/services/tests.
+9. ede55d7b — distinct theme surfaces and chart treatment.
+
+### Delivery state / next work
+
+- Existing draft PR #51 remains the target. No duplicate PR, merge or main push.
+- Git fetch succeeds. Three Git push attempts (including per-command HTTP/1.1) failed with RPC/curl 52 Empty reply from server. A verified fetch still showed remote ce3e4be8, so **do not claim these local commits are pushed**. No approval review rejected the actions; this is a transport failure.
+- The GitHub connector provides create_tree/create_commit/update_ref and can be used as a safe publication fallback if Git transport remains unavailable. Preserve the remote parent/history, use an expected-head lease and a fast-forward update only. Connector-created commit IDs may differ; compare final trees before reconciling local refs, and retain a backup of local commits. Never force over someone else's work.
+- This documentation update is the only remaining working-tree work at this checkpoint; commit it after verifying git status. Do not stage unrelated user changes.
+- Next implementation slice: continue app-wide financial query/command migration (Bank/Cash/Cards/Funds/EMI/Personal Loans/Rentals/Subscriptions/exchange consumers). Their tested pure calculators already exist behind CalculationEngine; remaining UI-local financial derivation and direct persistence must move to services. Do not label the full architecture complete just because the dashboard and current suite pass.
+- Unified category/project allocation and payment lifecycle remain pending. Transaction-safe multi-workbook persistence is still a prerequisite for scheduled app-only auto-pay; no scheduler is implemented/enabled.
+- Start a fresh Vite server for final browser checks; the prior process ended with the environment restart. Preserve the user's tab and inspect a separate review tab. Complete chart hover/cursor, mobile topbar, theme light/dark and finder navigation checks. Remote CI must validate the exact final published head before any merge.
+
+---
+
 ## 2026-11-05 — Authoritative continuation checkpoint
 
 **Priority:** complete financial correctness / CalculationEngine before resuming appearance work. The user's shared charts, standard dropdown, mobile topbar, dashboard and theme requests remain authorized and are preserved in the working tree. The user explicitly asks that this handoff remain current for another chat.
@@ -5,9 +42,9 @@
 ### Repository and delivery state
 
 - Workspace: D:/Coding/WealthCrescent. Working branch: fix/net-worth-dashboard-parity-and-accounting.
-- Current local HEAD: bf9524b27cfeb9ef91b4fa13af0ae15758bc9186.
+- Last focused calculation commit: bf9524b27cfeb9ef91b4fa13af0ae15758bc9186. Documentation checkpoint commit: 24dfdeb7.
 - Three focused calculation commits are now local: da797287 (month-end/leap-year recurrence and old daily schedules); 35b8a80c (executed-only, chronologically ordered fallback prices); bf9524b2 (explicit recurring activity windows and exact forecast cutoffs/new currencies/future loans).
-- These three commits have **not been pushed yet**. The last verified remote PR is existing draft #51; last verified remote head was 5d5ca1c48e5b68d0faa0039c1ebeb307deef8211. Re-fetch before pushing and keep the same PR. No merge and no main push.
+- Existing draft PR #51 remains the target. A fresh fetch verified remote head ce3e4be8 (user-added skills), and local HEAD was four commits ahead / zero behind before the push attempt. Push the existing branch only; inspect its actual completion before claiming success. No merge and no main push.
 - There are 96 modified/untracked tracked-workspace paths at this checkpoint, covering prior UI work plus financial query migration/tests/docs. Do not reset them. Some new files are untracked and must be included in appropriate commits. Preserve user-provided AGENTS.md / .agents skills; do not sweep them into implementation commits.
 
 ### Financial work now in the working tree
@@ -29,7 +66,7 @@
 - A full-suite run concurrent with a build reported timeouts in Bank navigation, QSE transactions, BatchEditGrid and FinancePlanGroups, then its process disappeared without a completion footer. **Do not report that run as passing.** All four files passed in isolation afterward: 37 tests (engine-failed-review.log).
 - Most recent focused engine/dashboard/service checkpoint: **8 files / 61 tests passed** (engine-complete-dashboard-tests.log). Covers native inclusion authorization, stale/deleted-source preservation, historical capital split, pending-safe monthly/category/Insight details, exact forecast horizons and recurring source expansion.
 - **Most recent production build passed**, including both TypeScript projects (engine-dashboard-final-build.log). This includes the final dashboard service/FX extraction.
-- **Final full suite currently running alone with one worker**, output: webapp/engine-verified-full-suite.log. Tool execution session at launch: 10356 (may no longer exist after a chat/environment restart; inspect the log footer first). Command from webapp/: node node_modules/vitest/vitest.mjs run --maxWorkers=1. No source edits since launching it; documentation updates only. Record its exact footer when complete.
+- **Final full suite PASSED: 156 test files / 1,205 tests**, output webapp/engine-verified-full-suite.log, duration 503.53 seconds. Command from webapp/: node node_modules/vitest/vitest.mjs run --maxWorkers=1. This validates the current working-tree source through the dashboard service/FX extraction. Later source changes require new relevant verification and the required final checks.
 - No new exact-head remote CI result or final browser acceptance is claimed. Tests use fixtures, not reconciliation of every private user ledger against statements.
 
 ### Prior UI work to preserve and finish after the financial priority
@@ -42,7 +79,7 @@
 
 ### Next actions, in order
 
-1. Read the final full-suite footer and resolve failures. Rerun only affected checks after fixes, then the required final suite/build if source changes.
+1. Preserve the successful checkpoint above. The next source change is the Recent Transactions migration below; run its focused tests, then required final suite/build on the resulting code.
 2. Migrate NetWorthRecentTransactions to a pure engine model and service subscription. **Confirmed pending defect:** its Funds and QSE/PSX withdrawal rows use -(gross - fee), while native ledgers use -(gross + fee). It also assembles financial signs in the component and omits archived/deactivated broker history from a view labeled lifetime. Add native-ledger reconciliation tests, preserve broker isolation, and inspect active-profile data freshness before fixing. Then inspect any remaining dashboard financial derivation. Continue the wider engine/service migration from the explicit pending list in CALCULATION_ENGINE_AUDIT.md; do not call the whole architecture complete.
 3. Commit the coherent tested query/model work and retained UI work in focused groups. Some files mix financial and visual changes, especially NetWorthPage.tsx and main.css; inspect hunks. Do not lose untracked dependencies.
 4. Update validation/docs with final results; push the existing branch (never main), refresh PR #51 and verify CI on the exact pushed head. Keep it draft until acceptance is met.

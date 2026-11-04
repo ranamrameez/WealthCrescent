@@ -8072,3 +8072,7 @@ The user explicitly prioritizes financial correctness over visuals. Preserve the
 ### 2026-11-05 continuation checkpoint
 
 Read SESSION_HANDOFF.md's new authoritative top section. Local head bf9524b27cfeb9ef91b4fa13af0ae15758bc9186 contains three focused pure-calculation fixes; not pushed yet. Larger dashboard/Planning/service/UI changes remain in the working tree. Dashboard financial stores/calculators and local FX persistence now cross services; recent-transactions child and wider migration remain pending. Focused 8-file / 61-test checkpoint and production build/both TS checks passed; final one-worker full suite is running separately in engine-verified-full-suite.log. Record the actual final footer before making any full-suite claim. The user explicitly requests durable docs so another chat can continue. No merge; same draft PR #51.
+
+### 2026-11-05 final local source checkpoint
+
+All continuation source is saved through local ede55d7b; financial models/services are in 9dc4f20e. Final full suite: 158 files / 1,210 tests; build and both TS projects passed. Recent Transactions migration is now complete for this slice (the older pending finding is historical). Git push repeatedly fails with RPC/curl 52; remote remained ce3e4be8 at last verification. Read the latest SESSION_HANDOFF top section for exact commit order, logs, publication fallback and next wider engine migration. PR #51 stays draft; no merge/main push.

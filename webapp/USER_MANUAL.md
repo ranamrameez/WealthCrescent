@@ -1113,3 +1113,7 @@ A period change can show unavailable when exchange rates or dated opening-balanc
 ### Dashboard reporting consistency (2026-11-05)
 
 Insights and monthly/category drilldowns exclude pending activity just like their displayed totals. The capital-split chart reflects the selected period-end date; current net worth remains live. Planning forecasts include recurring plans throughout the chosen 30/90/365-day horizon and stop at the exact displayed end date. A planned currency can appear even when it has no current balance. Dashboard inclusion controls now include native credit cards.
+
+### Recent source records (2026-11-05)
+
+Recent Transactions retains archived broker history, includes transfer fees in withdrawal outflows, and shows an EMI payment plus its separately recorded fine as the amount paid. Trade rows show recorded trade value before trading fees. This is a lifetime list of native source records; linked records can appear on both sides and must not be summed as a combined cash-flow report.

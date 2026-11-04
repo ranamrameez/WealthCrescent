@@ -24,7 +24,7 @@ Financial correctness takes priority over the shared-chart, navigation and theme
 
 ## Remaining architecture work
 
-- NetWorthPage now obtains financial inputs, activity queries, inclusion controls, headline/report/Insight/category/monthly/forecast read models and local FX persistence through services. Its recent-transactions child still needs inspection/migration; the entire dashboard subtree is not yet claimed render-only.
+- NetWorthPage and NetWorthRecentTransactions now obtain financial models and writes through services. The wider app still needs the same migration; do not claim app-wide render-only completion.
 - Cash, Bank, Cards, Funds, EMI, Personal Loans, Rentals, Subscriptions and exchange feature consumers still require application query/command migration. Existing pure calculators remain authoritative implementation details during that work.
 - Category/project allocation and payment lifecycle capabilities must be completed against the approved architecture; no duplicate budgeting system or guessed settlement semantics should be introduced.
 - Transaction-safe multi-workbook persistence remains a prerequisite for app-only auto-pay. No scheduler is enabled against the existing whole-workbook set() sync.
@@ -42,6 +42,16 @@ See SESSION_HANDOFF.md for exact completed test/build results. Focused valuation
 - Native dashboard sources, inclusion controls/commands and local FX persistence now cross an application-service boundary. Native card inclusion is exposed alongside legacy banking controls.
 - Most recent focused checkpoint: 8 files / 61 tests passed. Production build and both TypeScript checks passed. A full suite is running separately; SESSION_HANDOFF.md records its log and must be updated with its completed result.
 
-### Next confirmed defect — Recent Transactions (not fixed yet)
+### Historical finding — Recent Transactions (now fixed in the checkpoint below)
 
 The renderer calculates Funds and QSE/PSX withdrawal amounts as -(gross - fee), while the native cash ledger records -(gross + fee). Its migration to a pure read model/service is the next financial slice; include native-ledger fee reconciliation and retained archived broker history tests. This is explicitly pending, not part of the validated corrections above.
+
+### Completed full-suite checkpoint — 2026-11-05
+
+The isolated final run passed **156 test files / 1,205 tests** in 503.53 seconds (engine-verified-full-suite.log). The production build and both TypeScript projects also passed (engine-dashboard-final-build.log). This validates the working-tree checkpoint before the next Recent Transactions migration; it does not claim all architecture work or that pending child-view defect is complete.
+
+## Completed Recent Activity checkpoint — 2026-11-05
+
+Recent Activity now uses a pure CalculationEngine read model and service snapshot. Transfer fees share the native cash-ledger function; archived/deactivated brokers remain in lifetime history; active data/currency takes precedence over stale profile snapshots; migrated card records are not repeated; EMI paid amounts include fines. The list labels trade values before fees and warns against summing linked source records as cash flow.
+
+Final full suite passed **158 files / 1,210 tests** (recent-engine-full-suite.log). Production build and both TypeScript projects passed (recent-engine-build.log). Source is saved in focused local commits through ede55d7b; Git transport publication is failing, and remote CI/browser acceptance is not claimed.
