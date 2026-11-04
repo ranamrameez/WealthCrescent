@@ -1,6 +1,10 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
+
+// This behavior test does not exercise chart rendering. Keep Chart.js out of
+// jsdom so its responsive observer cannot touch a canvas after React cleanup.
+vi.mock('react-chartjs-2', () => ({ Chart: () => null, Doughnut: () => null }));
 import { FinancePlansHierarchy } from '../FinancePlansHierarchy';
 import { usePlannedCashWorkbookStore } from '../../store/plannedCashWorkbookStore';
 import { usePlannedBankWorkbookStore } from '../../store/plannedBankWorkbookStore';
@@ -51,6 +55,7 @@ it('creates an empty named plan, adds multiple payments, and edits and deletes t
   await waitFor(() => expect(usePlannedBankWorkbookStore.getState().workbook.entries).toHaveLength(2));
   expect(usePlannedBankWorkbookStore.getState().workbook.entries.map(plan => [plan.groupId, plan.amount])).toEqual([[group.id, -100], [group.id, -50]]);
   expect(useBankWorkbookStore.getState().workbook.transactions).toEqual([]);
+  expect(readPlanGroups()).toHaveLength(1);
   fireEvent.click(screen.getByRole('button', { name: 'Edit plan' }));
   fireEvent.change(screen.getByLabelText('Plan name'), { target: { value: 'Kitchen' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
