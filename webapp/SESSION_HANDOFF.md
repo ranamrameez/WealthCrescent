@@ -7,12 +7,17 @@
 - **UI is render-only.** Every UI component/page obtains required read data and dispatches writes through application-service/function boundaries. No component-local calculations, business rules, direct store mutations, Firebase/localStorage persistence or direct imports of calculation modules. Formatting values for display is allowed; calculating financial meaning is not.
 - These requirements apply to every component, including cards, tables, forms, dialogs, dashboard widgets, charts and page-level hooks. Hooks may adapt service subscriptions/loading/error state but must not become alternate calculation/business layers.
 
-### Architecture document and first commit
+### Architecture document and implementation started
 
-- Added `webapp/docs/CALCULATION_ENGINE_ARCHITECTURE.md` with the target layers, engine/service responsibilities, unified category + project budget direction, app-only auto-pay lifecycle, migration rules and required verification.
+- Added `webapp/docs/CALCULATION_ENGINE_ARCHITECTURE.md` with target layers, engine/service responsibilities, unified category + project budget direction, app-only auto-pay lifecycle, migration rules and required verification.
 - Updated root `CLAUDE.md` to make these user-approved constraints mandatory for future sessions.
-- Initial documentation commit: `7ff4c6e6df9ec04e830b22e8fdae926eef4a79ad` (architecture document), followed by `661aff729e51fe54bbef608cbaa067fd7881b8c7` (repository-wide agent instructions).
-- Both commits are on the existing branch `fix/net-worth-dashboard-parity-and-accounting`; no application code has been changed yet in this architecture slice. No main-branch push or merge.
+- Added `webapp/src/lib/calc/CalculationEngine.ts` as the first public calculation facade. It groups and delegates to the existing stock, portfolio, cash, bank, card, budget, planning, recurrence, upcoming, net-worth, EMI, rental and subscription calculation modules. It deliberately reuses the existing implementations rather than cloning or changing financial logic.
+- Exported the facade from `webapp/src/lib/calc/index.ts`.
+- Added `webapp/src/lib/calc/__tests__/CalculationEngine.test.ts` to assert that the facade delegates to the exact existing stock, portfolio, budget-activity and upcoming implementations.
+- Commits on this branch: `7ff4c6e6df9ec04e830b22e8fdae926eef4a79ad` (architecture document), `661aff729e51fe54bbef608cbaa067fd7881b8c7` (agent rules), `310a00008439271c4c61e0e190bf48004901a076` (CalculationEngine facade), `bcef2aa210ca842c6f6b23f4d2fb9fe2eada15c3` (public export), `29dfb7af5943433dabedf445b1f2bacc42a40230` (facade contract test), and `1fea6abf45354c3a43da395fd490098245298976` (checkpoint docs).
+- **Important: this is only the foundation, not completion of the architecture.** Existing components and feature hooks still import calculators and stores directly. The next implementation step is to establish application query/command services, then migrate all UI consumers incrementally. Auto-pay backend processing has not been implemented.
+- At latest verification, branch head was `1fea6abf45354c3a43da395fd490098245298976`; branch was 49 commits ahead / 0 behind `main`, with 23 changed files. Re-fetch before further work.
+- No local type-check, test suite or production build has been run in this environment; the facade contract test is added but unverified. Do not treat this code slice as validated. No main-branch push or merge.
 
 ### Code review findings that shape implementation
 
