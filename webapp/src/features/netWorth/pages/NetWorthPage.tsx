@@ -1208,6 +1208,8 @@ function NetWorthMonthlySection({
             monthly={monthly}
             trend={trend}
             activities={rangeActivities}
+            rangeStartDate={rangeStartDate}
+            rangeEndDate={rangeEndDate}
             currentRows={currentRows}
             netWorthAsOfInputs={netWorthAsOfInputs}
             setDrilldown={setDrilldown}
@@ -1412,10 +1414,10 @@ function netWorthBreakdownForMonth(
 }
 
 function MonthlySummaryTable({
-  currency, months: initialMonths, nowMonth, monthly, trend, activities, currentRows, netWorthAsOfInputs, setDrilldown,
+  currency, months: initialMonths, nowMonth, monthly, trend, activities, rangeStartDate, rangeEndDate, currentRows, netWorthAsOfInputs, setDrilldown,
 }: {
   currency: string; months: string[]; nowMonth: string; monthly: MonthlyIncomeExpense[]; trend: MonthlyNetWorthPoint[];
-  activities: BudgetActivity[]; currentRows: CurrencyNetWorth[]; netWorthAsOfInputs: NetWorthAsOfInputs;
+  activities: BudgetActivity[]; rangeStartDate: string; rangeEndDate: string; currentRows: CurrencyNetWorth[]; netWorthAsOfInputs: NetWorthAsOfInputs;
   setDrilldown: (d: Drilldown) => void;
 }) {
   const monthSort = useDateTableSort();
@@ -1426,6 +1428,14 @@ function MonthlySummaryTable({
 
   const statusFor = (m: string): 'Actual' | 'Current' | 'Projected' =>
     m < nowMonth ? 'Actual' : m === nowMonth ? 'Current' : 'Projected';
+  const monthFrom = (month: string) => {
+    const start = month + '-01';
+    return start < rangeStartDate ? rangeStartDate : start;
+  };
+  const monthTo = (month: string) => {
+    const end = endOfMonthAsOf(month);
+    return end > rangeEndDate ? rangeEndDate : end;
+  };
 
   return (
     <TableCard dateSort={monthSort} rows={months.map(month => ({ month, ...monthlyByMonth.get(month), ...trendByMonth.get(month) }))} title={<h3 className="m-0">Monthly summary — {currency}</h3>}>
@@ -1462,8 +1472,8 @@ function MonthlySummaryTable({
                       title: `Inflow — ${monthLabel(m)}, ${currency}`,
                       explanation: 'Every real and planned entry that added money this month, in this currency — Cash/Bank/Rentals combined, excluding any linked inter-account transfer.',
                       currency,
-                      from: `${m}-01`,
-                      to: endOfMonthAsOf(m),
+                      from: monthFrom(m),
+                      to: monthTo(m),
                       items: monthlyFlowItems(activities, m, currency).filter((it) => it.amount >= 0),
                     })}
                   >
@@ -1489,8 +1499,8 @@ function MonthlySummaryTable({
                       title: `Outflow — ${monthLabel(m)}, ${currency}`,
                       explanation: 'Every real and planned entry that took money out this month, in this currency — Cash/Bank/Rentals combined, excluding any linked inter-account transfer.',
                       currency,
-                      from: `${m}-01`,
-                      to: endOfMonthAsOf(m),
+                      from: monthFrom(m),
+                      to: monthTo(m),
                       items: monthlyFlowItems(activities, m, currency).filter((it) => it.amount < 0),
                     })}
                   >
@@ -1517,8 +1527,8 @@ function MonthlySummaryTable({
                       title: `Net flow — ${monthLabel(m)}, ${currency}`,
                       explanation: 'Every real and planned entry this month, in this currency, that makes up Inflow minus Outflow — Cash/Bank/Rentals combined, excluding any linked inter-account transfer.',
                       currency,
-                      from: `${m}-01`,
-                      to: endOfMonthAsOf(m),
+                      from: monthFrom(m),
+                      to: monthTo(m),
                       items: monthlyFlowItems(activities, m, currency),
                     })}
                   >
