@@ -119,7 +119,7 @@ function resolveDashboardRange(periodValue: string, fromValue: string | null, to
   else if (period === '6m') from = shiftISODateMonths(todayISO, -6);
   else if (period === '1y') from = shiftISODateMonths(todayISO, -12);
   else if (period === 'ytd') from = todayISO.slice(0, 4) + '-01-01';
-  else if (period === 'all') from = earliestDate ?? todayISO;
+  else if (period === 'all') from = earliestDate && earliestDate <= todayISO ? earliestDate : todayISO;
   else if (period === 'custom') {
     const requestedFrom = isValidISODate(fromValue) ? fromValue : shiftISODate(todayISO, -29);
     const requestedTo = isValidISODate(toValue) ? toValue : todayISO;
