@@ -423,6 +423,7 @@ export function NetWorthPage({
   const rangeStartByCurrency = Object.fromEntries(rangeStartRows.map(row => [row.currency, row.net]));
   const rangeStartBreakdownByCurrency = Object.fromEntries(rangeStartRows.map(row => [row.currency, row.breakdown]));
   const rangeEndByCurrency = Object.fromEntries(rangeEndRows.map(row => [row.currency, row.net]));
+  const rangeEndBreakdownByCurrency = Object.fromEntries(rangeEndRows.map(row => [row.currency, row.breakdown]));
   const periodFlow = flowByCurrency(includedCash, includedAccounts, bank.transactions, rangeStartDate, rangeEndDate);
   const plannedPeriodByCurrency = useMemo(() => {
     const totals: Record<string, number> = {};
@@ -599,10 +600,11 @@ export function NetWorthPage({
         {[...rows].sort((a, b) => currencyRank(a.currency, b.currency)).map((r) => {
           const converted = convertAmount(r.net, r.currency, preferredCurrency, rates);
           const todayFlowC = todayFlow[r.currency] ?? 0;
-          const monthFlowC = monthFlow[r.currency] ?? 0;
-          const lastMonthC = lastMonthByCurrency[r.currency];
-          const deltaC = lastMonthC !== undefined ? r.net - lastMonthC : null;
-          const deltaPctC = deltaC !== null && lastMonthC !== 0 ? (deltaC / Math.abs(lastMonthC)) * 100 : null;
+          const periodFlowC = periodFlow[r.currency] ?? 0;
+          const rangeStartC = rangeStartByCurrency[r.currency] ?? 0;
+          const rangeEndC = rangeEndByCurrency[r.currency] ?? 0;
+          const deltaC = hasRangeBaseline ? rangeEndC - rangeStartC : null;
+          const deltaPctC = deltaC !== null && rangeStartC !== 0 ? (deltaC / Math.abs(rangeStartC)) * 100 : null;
           return (
             <details key={r.currency} open className="card" style={{ padding: 16 }}>
               <summary style={{ cursor: 'pointer', fontWeight: 700, fontSize: 16 }}>
@@ -670,24 +672,24 @@ export function NetWorthPage({
                     Today {todayFlowC >= 0 ? '+' : ''}{fmtMoney(todayFlowC, r.currency)}
                   </span>
                 </Tooltip>
-                <Tooltip text="Net money moved in/out of Cash and Bank since the 1st of this month, in this currency. Click for the real transactions.">
+                <Tooltip text={`Net cleared Cash and Bank movement from ${rangeStartDate} through ${rangeEndDate}, in this currency. Click for the real transactions.`}>
                   <span
-                    className={`pill clickable ${monthFlowC >= 0 ? 'pill-positive' : 'pill-negative'}`}
+                    className={`pill clickable ${periodFlowC >= 0 ? 'pill-positive' : 'pill-negative'}`}
                     onClick={() => setDrilldown({
                       kind: 'flow',
-                      title: `This month's ${r.currency} Cash+Bank activity`,
-                      explanation: 'Every real Cash entry and Bank transaction from the 1st of this month through today, in this currency.',
+                      title: `${r.currency} Cash+Bank activity (${rangeLabel})`,
+                      explanation: `Every cleared Cash entry and Bank transaction from ${rangeStartDate} through ${rangeEndDate}, in this currency.`,
                       currency: r.currency,
-                      from: monthStart,
-                      to: todayISO,
-                      items: flowActivity(includedCash, includedAccounts, bank.transactions, r.currency, monthStart, todayISO),
+                      from: rangeStartDate,
+                      to: rangeEndDate,
+                      items: flowActivity(includedCash, includedAccounts, bank.transactions, r.currency, rangeStartDate, rangeEndDate),
                     })}
                   >
-                    This month {monthFlowC >= 0 ? '+' : ''}{fmtMoney(monthFlowC, r.currency)}
+                    Period {periodFlowC >= 0 ? '+' : ''}{fmtMoney(periodFlowC, r.currency)}
                   </span>
                 </Tooltip>
                 {deltaC !== null ? (
-                  <Tooltip text="This currency's real net worth right now minus its real net worth at the end of last month. Click for a module-by-module breakdown of what changed.">
+                  <Tooltip text={`This currency's real net worth at ${rangeEndDate} minus its net worth at ${rangeBaselineDate}. Click for a module-by-module breakdown of what changed.`}>
                     <span
                       className={`pill clickable ${deltaC >= 0 ? 'pill-positive' : 'pill-negative'}`}
                       onClick={() => setDrilldown({
@@ -699,13 +701,13 @@ export function NetWorthPage({
                         previous: lastMonthBreakdownByCurrency[r.currency] ?? [],
                       })}
                     >
-                      Δ vs. last month {deltaC >= 0 ? '+' : ''}{fmtMoney(deltaC, r.currency)}
+                      Δ in period {deltaC >= 0 ? '+' : ''}{fmtMoney(deltaC, r.currency)}
                       {deltaPctC !== null ? ` (${deltaPctC >= 0 ? '+' : ''}${deltaPctC.toFixed(1)}%)` : ''}
                     </span>
                   </Tooltip>
                 ) : (
                   <span className="pill" style={{ background: 'var(--panel-2)', color: 'var(--muted)' }}>
-                    Δ vs. last month — not enough history
+                    Δ in period — no verified baseline
                   </span>
                 )}
               </div>
