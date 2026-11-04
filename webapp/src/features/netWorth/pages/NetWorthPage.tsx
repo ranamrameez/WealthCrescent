@@ -738,7 +738,7 @@ export function NetWorthPage({
       }] : []), ...(sectionVisible('analytics') ? [{ unframed: true,
         key: 'analytics',
         label: 'Analytics',
-        content: <div><h2>Analytics & insights</h2><NetWorthAnalyticsSection ownCurrencies={ownCurrencies} activities={activities} categories={categories} groups={categoryGroups} emiLoans={netWorthAsOfInputs.emiLoans} currentRows={rows} periodEndRows={rangeEndRows} activityCurrencies={activityCurrencies} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} rangeStartDate={rangeStartDate} rangeEndDate={rangeEndDate} rangeLabel={rangeLabel} setDrilldown={setDrilldown} splitData={splitData} preferredCurrency={preferredCurrency} missingFxCurrencies={missingFxCurrencies} rentalsNet={selectedModules.includes('rentals') ? rentalsNetForRange : {}} /></div>,
+        content: <div><h2>Analytics & insights</h2><NetWorthAnalyticsSection ownCurrencies={ownCurrencies} activities={activities} categories={categories} groups={categoryGroups} emiLoans={netWorthAsOfInputs.emiLoans} currentRows={trendCurrentRows} periodEndRows={rangeEndRows} activityCurrencies={activityCurrencies} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} rangeStartDate={rangeStartDate} rangeEndDate={rangeEndDate} rangeLabel={rangeLabel} setDrilldown={setDrilldown} splitData={splitData} preferredCurrency={preferredCurrency} missingFxCurrencies={missingFxCurrencies} rentalsNet={selectedModules.includes('rentals') ? rentalsNetForRange : {}} /></div>,
       }] : [])]} />
 
       {/* User-requested (2026-08-26): subscription renewal/expiry alerts on
