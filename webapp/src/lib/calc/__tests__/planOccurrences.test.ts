@@ -42,3 +42,11 @@ describe('recurring plan occurrences', () => {
     expect(activities.some(activity => activity.date === day && !activity.executed)).toBe(false);
   });
 });
+
+
+it('collects recurring activity for an explicitly requested future month, independent of the default 30-day preview', () => {
+  const activities = collectBudgetActivities({ cashEntries: [], plannedCash: [{ ...plan, date: '2026-01-31', recurrence: { cycle: 'monthly', startDate: '2026-01-31' } }],
+    bankAccounts: [], bankTransactions: [], plannedBank: [], rentalProperties: [], rentalEntries: [], plannedRentals: [], categories: [] },
+    { fromDate: '2026-03-01', toDate: '2026-03-31', asOf: new Date('2026-01-01') });
+  expect(activities.filter(activity => !activity.executed).map(activity => [activity.date, activity.amount])).toEqual([['2026-03-31', 100]]);
+});

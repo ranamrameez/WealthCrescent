@@ -27,6 +27,11 @@ import type { Property, RentalEntry } from '../../types/rentalsWorkbook';
 import type { PlannedRentalEntry } from '../../types/plannedRentals';
 import type { InterEntityTransfer } from '../../types/interEntityTransfer';
 
+export interface BudgetOccurrenceWindow { fromDate?: string; toDate?: string; asOf?: Date; horizonDays?: number | null; }
+function expandPlans<T extends Parameters<typeof planOccurrences>[0][number]>(plans: T[], window: BudgetOccurrenceWindow) {
+  return planOccurrences(plans, window.fromDate, window.toDate, window.asOf, window.horizonDays);
+}
+
 export type BudgetModule = 'cash' | 'bank' | 'rentals';
 
 export interface BudgetActivity {
@@ -95,7 +100,7 @@ function linkedRecordKeys(links: InterEntityTransfer[]): Set<string> {
  * restructure was deliberately scoped to the 3 primary record types, not
  * their Planned* counterparts (see `types/finance.ts`'s file-level
  * comment), so this is a real, documented asymmetry, not an oversight. */
-function normalizeCash(entries: CashEntry[], plans: PlannedCashEntry[], categories: Category[], linked: Set<string>): BudgetActivity[] {
+function normalizeCash(entries: CashEntry[], plans: PlannedCashEntry[], categories: Category[], linked: Set<string>, window: BudgetOccurrenceWindow): BudgetActivity[] {
   const real: BudgetActivity[] = entries
     .filter((e) => !linked.has(`cash:${e.id}`))
     .map((e) => ({
@@ -103,7 +108,7 @@ function normalizeCash(entries: CashEntry[], plans: PlannedCashEntry[], categori
       amount: e.isDeposit ? e.amount : -e.amount, currencyCode: e.currencyCode,
       category: categoryName(e.categoryID, categories), description: e.note || (e.isDeposit ? 'Cash in' : 'Cash out'), executed: true, isPending: e.isPending,
     }));
-  const planned: BudgetActivity[] = planOccurrences(plans).filter((p) => !p.executed).map((p) => ({
+  const planned: BudgetActivity[] = expandPlans(plans, window).filter((p) => !p.executed).map((p) => ({
     id: p.id, module: 'cash', sourceLabel: 'Cash', date: p.date,
     amount: p.type === 'IN' ? p.amount : -p.amount, currencyCode: p.currencyCode,
     category: p.category, description: p.note || (p.type === 'IN' ? 'Planned cash in' : 'Planned cash out'), executed: false,
@@ -111,7 +116,7 @@ function normalizeCash(entries: CashEntry[], plans: PlannedCashEntry[], categori
   return [...real, ...planned];
 }
 
-function normalizeBank(accounts: BankAccount[], transactions: BankTransaction[], plans: PlannedBankTransaction[], categories: Category[], linked: Set<string>): BudgetActivity[] {
+function normalizeBank(accounts: BankAccount[], transactions: BankTransaction[], plans: PlannedBankTransaction[], categories: Category[], linked: Set<string>, window: BudgetOccurrenceWindow): BudgetActivity[] {
   const accountById = new Map(accounts.map((a) => [a.id, a]));
   const real: BudgetActivity[] = transactions.flatMap((t) => {
     if (linked.has(`bank:${t.id}`)) return [];
@@ -123,7 +128,7 @@ function normalizeBank(accounts: BankAccount[], transactions: BankTransaction[],
       category: categoryName(t.categoryID, categories), description: t.description, executed: true, isPending: t.isPending,
     }];
   });
-  const planned: BudgetActivity[] = planOccurrences(plans).filter((p) => !p.executed).flatMap((p) => {
+  const planned: BudgetActivity[] = expandPlans(plans, window).filter((p) => !p.executed).flatMap((p) => {
     const account = accountById.get(p.accountId);
     if (!account) return [];
     return [{
@@ -136,7 +141,7 @@ function normalizeBank(accounts: BankAccount[], transactions: BankTransaction[],
   return [...real, ...planned];
 }
 
-function normalizeRentals(properties: Property[], entries: RentalEntry[], plans: PlannedRentalEntry[], categories: Category[], linked: Set<string>): BudgetActivity[] {
+function normalizeRentals(properties: Property[], entries: RentalEntry[], plans: PlannedRentalEntry[], categories: Category[], linked: Set<string>, window: BudgetOccurrenceWindow): BudgetActivity[] {
   const propertyById = new Map(properties.map((p) => [p.id, p]));
   const real: BudgetActivity[] = entries.flatMap((e) => {
     if (linked.has(`rentals:${e.id}`)) return [];
@@ -148,7 +153,7 @@ function normalizeRentals(properties: Property[], entries: RentalEntry[], plans:
       category: categoryName(e.categoryID, categories), description: e.note || (e.isDeposit ? 'Rent income' : 'Expense'), executed: true, isPending: e.isPending,
     }];
   });
-  const planned: BudgetActivity[] = planOccurrences(plans).filter((p) => !p.executed).flatMap((p) => {
+  const planned: BudgetActivity[] = expandPlans(plans, window).filter((p) => !p.executed).flatMap((p) => {
     const property = propertyById.get(p.propertyId);
     if (!property) return [];
     return [{
@@ -170,12 +175,12 @@ export function collectBudgetActivities(inputs: {
    * don't break, but every real caller should pass the live list (see
    * `linkedRecordKeys`'s own doc comment for why). */
   links?: InterEntityTransfer[];
-}): BudgetActivity[] {
+}, window: BudgetOccurrenceWindow = {}): BudgetActivity[] {
   const linked = linkedRecordKeys(inputs.links ?? []);
   return [
-    ...normalizeCash(inputs.cashEntries, inputs.plannedCash, inputs.categories, linked),
-    ...normalizeBank(inputs.bankAccounts, inputs.bankTransactions, inputs.plannedBank, inputs.categories, linked),
-    ...normalizeRentals(inputs.rentalProperties, inputs.rentalEntries, inputs.plannedRentals, inputs.categories, linked),
+    ...normalizeCash(inputs.cashEntries, inputs.plannedCash, inputs.categories, linked, window),
+    ...normalizeBank(inputs.bankAccounts, inputs.bankTransactions, inputs.plannedBank, inputs.categories, linked, window),
+    ...normalizeRentals(inputs.rentalProperties, inputs.rentalEntries, inputs.plannedRentals, inputs.categories, linked, window),
   ].sort((a, b) => a.date.localeCompare(b.date));
 }
 

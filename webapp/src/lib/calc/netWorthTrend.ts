@@ -91,6 +91,8 @@ export function projectedNetWorthTrend(params: {
   activities: BudgetActivity[];
   emiLoans: EMILoan[];
   netWorthAsOfInputs: NetWorthAsOfInputs;
+  /** Optional exact end of a day-based forecast; monthly reports omit it. */
+  projectionThroughDate?: string;
 }): MonthlyNetWorthPoint[] {
   const { months, currentMonth: nowMonth, todayISODate, currentRows, activities, netWorthAsOfInputs } = params;
   // Filtered here (not just relying on the caller), same self-contained
@@ -98,12 +100,12 @@ export function projectedNetWorthTrend(params: {
   // see `netWorthInclusion.ts`'s own doc comment for the full "let the
   // user choose which accounts count" feature this belongs to.
   const emiLoans = includedEmiLoans(params.emiLoans);
-  const currencies = currentRows.map((r) => r.currency);
+  const currencies = [...new Set([...currentRows.map(row => row.currency), ...activities.filter(activity => !activity.executed && !activity.isPending).map(activity => activity.currencyCode), ...emiLoans.map(loan => loan.currencyCode)])];
   // Explicit `asOf` derived from `todayISODate`, never `totalsByCurrency`'s
   // own `new Date()` default — keeps this pure/testable and avoids a real
   // (if usually invisible, since `todayISODate` is normally literally
   // today) mismatch between the two "today"s.
-  const emiToday = totalsByCurrency(emiLoans, new Date(todayISODate));
+  const emiToday = totalsByCurrency(emiLoans.filter(loan => loan.startDate <= todayISODate), new Date(todayISODate));
   const currentAssets = Object.fromEntries(currentRows.map((r) => [r.currency, r.assets]));
   const currentLiabilities = Object.fromEntries(currentRows.map((r) => [r.currency, r.liabilities]));
   const currentNet = Object.fromEntries(currentRows.map((r) => [r.currency, r.net]));
@@ -122,7 +124,7 @@ export function projectedNetWorthTrend(params: {
         assetsByCurrency[c] = row?.assets;
         liabilitiesByCurrency[c] = row?.liabilities;
       });
-    } else if (month === nowMonth) {
+    } else if (month === nowMonth && !params.projectionThroughDate) {
       // The month is still in progress — we can't know what the rest of it
       // holds, so use TODAY's already-known real figure directly (the exact
       // headline number shown elsewhere on the page) rather than
@@ -133,11 +135,13 @@ export function projectedNetWorthTrend(params: {
         liabilitiesByCurrency[c] = currentLiabilities[c];
       });
     } else {
-      const emiAtMonth = totalsByCurrency(emiLoans, new Date(endOfMonthAsOf(month)));
-      const emiCashOutflow = emiScheduledCashOutflowByCurrency(emiLoans, todayISODate, endOfMonthAsOf(month));
+      const monthEnd = endOfMonthAsOf(month);
+      const cutoff = params.projectionThroughDate && params.projectionThroughDate < monthEnd ? params.projectionThroughDate : monthEnd;
+      const emiAtMonth = totalsByCurrency(emiLoans.filter(loan => loan.startDate <= cutoff), new Date(cutoff));
+      const emiCashOutflow = emiScheduledCashOutflowByCurrency(emiLoans, todayISODate, cutoff);
       const flow: Record<string, number> = {};
       activities
-        .filter((a) => a.date > todayISODate && a.date.slice(0, 7) <= month && !a.sourceEmiLoanId)
+        .filter((a) => !a.executed && !a.isPending && a.date >= todayISODate && a.date <= cutoff && !a.sourceEmiLoanId)
         .forEach((a) => { flow[a.currencyCode] = (flow[a.currencyCode] ?? 0) + a.amount; });
       currencies.forEach((c) => {
         const assets = (currentAssets[c] ?? 0) + (flow[c] ?? 0) - (emiCashOutflow[c] ?? 0);
