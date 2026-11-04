@@ -95,7 +95,9 @@ function shiftISODate(value: string, days: number): string {
 }
 
 function isValidISODate(value: string | null): value is string {
-  return !!value && /^\\d{4}-\\d{2}-\\d{2}$/.test(value) && !Number.isNaN(new Date(value + 'T00:00:00Z').getTime());
+  if (!value || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
+  const date = new Date(value + 'T00:00:00Z');
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
 function resolveDashboardRange(periodValue: string, fromValue: string | null, toValue: string | null, earliestDate: string | undefined, todayISO: string) {
@@ -110,8 +112,10 @@ function resolveDashboardRange(periodValue: string, fromValue: string | null, to
   else if (period === 'ytd') from = todayISO.slice(0, 4) + '-01-01';
   else if (period === 'all') from = earliestDate ?? todayISO;
   else if (period === 'custom') {
-    from = isValidISODate(fromValue) ? fromValue : shiftISODate(todayISO, -29);
-    to = isValidISODate(toValue) ? (toValue > todayISO ? todayISO : toValue) : todayISO;
+    const requestedFrom = isValidISODate(fromValue) ? fromValue : shiftISODate(todayISO, -29);
+    const requestedTo = isValidISODate(toValue) ? toValue : todayISO;
+    from = requestedFrom > todayISO ? todayISO : requestedFrom;
+    to = requestedTo > todayISO ? todayISO : requestedTo;
     if (from > to) [from, to] = [to, from];
   }
   const label = period === 'custom' || period === 'all' ? from + ' – ' + to : (DASHBOARD_PERIODS.find(option => option.value === period)?.label ?? 'Last 30 days');
