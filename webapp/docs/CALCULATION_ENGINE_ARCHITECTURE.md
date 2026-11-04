@@ -30,6 +30,7 @@ Create one stable public facade (initially under `webapp/src/lib/calc/Calculatio
 
 Domain capabilities:
 - `stocks`: existing StockExchangeEngine implementation, including positions, cost basis, fees, cash ledger, realized P/L and reconciliation.
+- `funds`: NAV-based holdings and cash valuation, delegated to the same stock engine for position lifecycle and unmatched-SELL semantics.
 - `cash`, `bank`, `creditCards`: cleared/pending balances, ledgers, category and period summaries.
 - `budgets`: category and project budgets, allocations, actual-vs-budget, available-to-spend, rollover rules and currency-safe aggregation.
 - `plans`: recurring occurrences, planned vs pending vs settled lifecycle, due/overdue status and remaining amounts.
@@ -104,3 +105,11 @@ For each slice: relevant unit tests, component/service tests, TypeScript check, 
 - Added a service subscription/cache invalidation test and an engine regression assertion for the due label.
 - This is one migrated vertical slice only. PlanningPage, FinancePlansHierarchy, other UI consumers, plan write commands, and scheduled app-only auto-pay are still pending. Do not describe the architecture or auto-pay feature as complete.
 - Validation is pending on the exact final PR head. CI must run the complete webapp test suite and both TypeScript checks/production build. A passing CI run does not replace the required interactive UI review.
+
+
+## 2026-11-04 follow-up — Funds engine delegation
+
+- Added the `funds` namespace to the public `CalculationEngine` facade; FundsScope now calls the facade rather than importing the private Funds calculator directly.
+- Funds valuation, category allocation, and matched SELL quantities for the Funds cash ledger now use `calculateStockPortfolio` rather than a separate `computePositions` or hand-written oversell-matching pass.
+- Added a regression test for a partial oversell, a later re-entry, and a pending BUY; only the five actually held units contribute to current value.
+- This does not complete the UI service migration: FundsScope and other existing pages still need application query services before they are presentation-only.
