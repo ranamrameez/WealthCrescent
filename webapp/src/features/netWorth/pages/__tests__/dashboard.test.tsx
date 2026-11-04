@@ -37,7 +37,7 @@ it('shows converted overall summaries in both currencies before the per-currency
   expect(qar.textContent).toContain('400.00');
   const sections = document.querySelectorAll('.standard-section-anchor');
   expect(sections[0].textContent).toContain('Overall summary');
-  expect(sections[1].textContent).toContain('Current balances by currency');
+  expect(sections[1].textContent).toContain('Per currency summary');
   expect(screen.queryByLabelText('Show total in')).toBeNull();
 });
 it('centralizes URL-backed section and source filters and restores defaults', () => {
