@@ -9,6 +9,7 @@ import { selectedEntityValues } from '../../../components/EntityScopeMenu';
 import { PageFilterModal } from '../../../components/PageFilterModal';
 import { DateRangeWidget } from '../../../components/DateRangeWidget';
 import { FinancePlansHierarchy } from '../../../components/FinancePlansHierarchy';
+import { NetWorthRecentTransactions } from '../components/NetWorthRecentTransactions';
 import { TopBarControls } from '../../../components/TopBarControls';
 import { Chart, Doughnut } from 'react-chartjs-2';
 import { Card, CollapsibleCard, MoneyValue, StatCard } from '../../../components/Card';
@@ -725,8 +726,12 @@ export function NetWorthPage(_legacySyncProps: {
       </div>) }] : []), ...(sectionVisible('plans') ? [{ unframed: true, unframedHeader: true,
         key: 'plans',
         label: 'Plans',
-        content: <div><p className="text-muted">Forward-looking projections use their own horizon controls; the reporting range above applies to historical figures and insights.</p><NetWorthPlanningReality activities={activities} selectedModules={selectedModules} currencies={ownCurrencies} currentRows={rows} emiLoans={netWorthAsOfInputs.emiLoans} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} /></div>,
-      }] : []), ...(sectionVisible('analytics') ? [{ unframed: true, unframedHeader: true,
+        content: <div className="stack-lg">
+          <p className="text-muted">Forward-looking projections use the same plan records as Planning. Every payment can belong to a named budget, finance and category; totals remain separated by currency.</p>
+          <NetWorthPlanningReality activities={activities} selectedModules={selectedModules} currencies={ownCurrencies} currentRows={rows} emiLoans={netWorthAsOfInputs.emiLoans} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} />
+          <FinancePlansHierarchy filters={timeFilters} controls={<></>} embedded />
+        </div>,
+      }] : []), ...(sectionVisible('recent') ? [{ unframed: true, unframedHeader: true, key: 'recent', label: 'Recent transactions', content: <NetWorthRecentTransactions /> }] : []), ...(sectionVisible('analytics') ? [{ unframed: true, unframedHeader: true,
         key: 'analytics',
         label: 'Analytics',
         content: <NetWorthAnalyticsSection ownCurrencies={ownCurrencies} activities={activities} categories={categories} groups={categoryGroups} emiLoans={netWorthAsOfInputs.emiLoans} currentRows={trendCurrentRows} periodEndRows={periodInsightRows} activityCurrencies={activityCurrencies} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} rangeStartDate={rangeStartDate} rangeEndDate={rangeEndDate} rangeLabel={rangeLabel} setDrilldown={setDrilldown} splitData={splitData} preferredCurrency={preferredCurrency} missingFxCurrencies={missingFxCurrencies} rentalsNet={selectedModules.includes('rentals') ? rentalsNetForRange : {}} />,
