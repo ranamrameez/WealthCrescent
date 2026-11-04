@@ -42,7 +42,7 @@ it('shows converted overall summaries in both currencies before the per-currency
 });
 it('centralizes URL-backed section and source filters and restores defaults', () => {
   show();
-  fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Dashboard filters' }));
   const modal = document.querySelector<HTMLElement>('.modal-box')!;
   expect(within(modal).getByText('Include in Net Worth')).toBeTruthy();
   fireEvent.click(within(modal).getByRole('button', { name: 'Per currency summary' }));
@@ -64,7 +64,7 @@ it('applies the URL-backed custom date range to flow figures and exposes the sel
   expect(summary.textContent).toContain('Period net flow');
   expect(summary.textContent).toContain('100.00');
 
-  fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Dashboard filters' }));
   const modal = document.querySelector<HTMLElement>('.modal-box')!;
   expect((within(modal).getByLabelText('From date') as HTMLInputElement).value).toBe(todayISO);
   expect((within(modal).getByLabelText('To date') as HTMLInputElement).value).toBe(todayISO);
@@ -77,7 +77,7 @@ it('preserves a selected preset when switching to a custom range', () => {
   fromDate.setUTCDate(fromDate.getUTCDate() - 89);
   const expectedFrom = fromDate.toISOString().slice(0, 10);
   show('/net-worth?period=90d');
-  fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Dashboard filters' }));
   const modal = document.querySelector<HTMLElement>('.modal-box')!;
   fireEvent.change(within(modal).getByLabelText('Period'), { target: { value: 'custom' } });
   expect((within(modal).getByLabelText('From date') as HTMLInputElement).value).toBe(expectedFrom);
@@ -121,7 +121,8 @@ it('renders the dashboard sections without nesting cards and provides period ins
 
 it('restores hidden sections from a deep link and opens exchange rates only from the FAB', () => {
   show('/net-worth?show-currencies=false&show-plans=false&show-analytics=false');
-  expect(document.querySelectorAll('.standard-section-anchor')).toHaveLength(1);
+  expect(document.querySelectorAll('.standard-section-anchor')).toHaveLength(2);
+  expect(document.querySelector('[data-page-section="recent"]')).toBeTruthy();
   expect(screen.queryByText('Refresh rates')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Exchange rates' }));
   expect(within(document.querySelector<HTMLElement>('.modal-box')!).getByText('Refresh rates')).toBeTruthy();
