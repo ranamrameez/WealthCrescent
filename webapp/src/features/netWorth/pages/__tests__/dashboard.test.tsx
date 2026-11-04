@@ -112,6 +112,11 @@ it('renders the dashboard sections without nesting cards and provides period ins
   expect(screen.getByRole('heading', { name: new RegExp('Insights') })).toBeTruthy();
   expect(screen.getAllByText(/Largest asset:/).length).toBeGreaterThan(0);
   expect(screen.getAllByText(/Recorded net activity:/).length).toBeGreaterThan(0);
+  const analytics = document.querySelector<HTMLElement>('[data-page-section="analytics"]')!;
+  fireEvent.click(within(analytics).getByRole('button', { name: 'Hide section' }));
+  expect(screen.queryByRole('heading', { name: new RegExp('Insights') })).toBeNull();
+  fireEvent.click(within(analytics).getByRole('button', { name: 'Show section' }));
+  expect(screen.getByRole('heading', { name: new RegExp('Insights') })).toBeTruthy();
 });
 
 it('restores hidden sections from a deep link and opens exchange rates only from the FAB', () => {
