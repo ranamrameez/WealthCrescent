@@ -23,7 +23,7 @@ import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu
 import { TopBarControls } from '../../../components/TopBarControls';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { useUrlTransactionFilters, type TransactionPageFilters } from '../../../hooks/useUrlTransactionFilters';
-import { Bar, Doughnut } from 'react-chartjs-2';
+import { AppBar as Bar, AppDoughnut as Doughnut } from '../../../components/AppCharts';
 import { Card, EntityCard, MoneyValue } from '../../../components/Card';
 import { Notice } from '../../../components/Notice';
 import { confirmDialog } from '../../../components/ConfirmDialog';

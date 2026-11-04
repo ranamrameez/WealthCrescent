@@ -15,7 +15,7 @@ import { ModuleDetailTemplate } from '../../../components/ModuleDetailTemplate';
 import type { User } from 'firebase/auth';
 import { useMemo, useState, type ComponentProps } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Bar, Doughnut } from 'react-chartjs-2';
+import { AppBar as Bar, AppDoughnut as Doughnut } from '../../../components/AppCharts';
 import { Card, EntityCard, MoneyValue } from '../../../components/Card';
 import { CategorySelect } from '../../../components/CategorySelect';
 import { Notice } from '../../../components/Notice';

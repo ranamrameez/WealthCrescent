@@ -14,7 +14,7 @@ import { cashPeriodSummary } from '../../../lib/calc/cashModule';
 import type { User } from 'firebase/auth';
 import { useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Bar, Doughnut, Line } from 'react-chartjs-2';
+import { AppBar as Bar, AppDoughnut as Doughnut, AppLine as Line } from '../../../components/AppCharts';
 import { Card, EntityCard, MoneyValue } from '../../../components/Card';
 import { Notice } from '../../../components/Notice';
 import { confirmDialog } from '../../../components/ConfirmDialog';

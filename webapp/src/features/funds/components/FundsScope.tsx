@@ -2,7 +2,7 @@ import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { useTablePagination } from '../../../hooks/useTablePagination';
 import { DateValue } from '../../../components/DateValue';
-import { Line } from 'react-chartjs-2';
+import { AppLine as Line } from '../../../components/AppCharts';
 import { BalanceSummaryCards, type BalanceSummary } from '../../../components/BalanceSummaryCards';
 import { InvestmentPlans } from '../../../components/InvestmentPlans';
 import type { TransactionPageFilters } from '../../../hooks/useUrlTransactionFilters';

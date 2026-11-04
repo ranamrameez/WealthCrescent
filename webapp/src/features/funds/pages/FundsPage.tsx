@@ -18,7 +18,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { EntityScopeMenu, selectedEntityValues } from '../../../components/EntityScopeMenu';
 import { TopBarControls } from '../../../components/TopBarControls';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
-import { Line } from 'react-chartjs-2';
+import { AppLine as Line } from '../../../components/AppCharts';
 import { Card, EntityCard, MoneyValue } from '../../../components/Card';
 import { Modal } from '../../../components/Modal';
 import { Notice } from '../../../components/Notice';

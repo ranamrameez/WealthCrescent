@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { Chart, Doughnut } from 'react-chartjs-2';
+import { AppChart as Chart, AppDoughnut as Doughnut } from './AppCharts';
 import { useSearchParams } from 'react-router-dom';
 import { RecordRow } from './RecordRow';
 import { useDateTableSort } from '../hooks/useDateTableSort';

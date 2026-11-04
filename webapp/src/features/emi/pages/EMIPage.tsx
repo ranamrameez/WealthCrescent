@@ -19,7 +19,7 @@ import { TransactionFilterMenu } from '../../../components/TransactionFilterMenu
 import { TopBarControls } from '../../../components/TopBarControls';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
 import { useUrlTransactionFilters, type TransactionPageFilters } from '../../../hooks/useUrlTransactionFilters';
-import { Bar, Line } from 'react-chartjs-2';
+import { AppBar as Bar, AppLine as Line } from '../../../components/AppCharts';
 import { Card, EntityCard, MoneyValue } from '../../../components/Card';
 import { ModuleDetailTemplate } from '../../../components/ModuleDetailTemplate';
 import { Notice } from '../../../components/Notice';

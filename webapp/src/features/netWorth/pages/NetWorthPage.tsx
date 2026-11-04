@@ -11,7 +11,7 @@ import { DateRangeWidget } from '../../../components/DateRangeWidget';
 import { FinancePlansHierarchy } from '../../../components/FinancePlansHierarchy';
 import { NetWorthRecentTransactions } from '../components/NetWorthRecentTransactions';
 import { TopBarControls } from '../../../components/TopBarControls';
-import { Chart, Doughnut } from 'react-chartjs-2';
+import { AppChart as Chart, AppDoughnut as Doughnut } from '../../../components/AppCharts';
 import { Card, CollapsibleCard, MoneyValue, StatCard } from '../../../components/Card';
 import { StandardPageSections } from '../../../components/StandardPageSections';
 import { SummarySection, SummarySections, SummaryValue } from '../../../components/SummaryGroupCard';
