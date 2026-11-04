@@ -462,8 +462,9 @@ export function NetWorthPage({
   // not alphabetically — see `useCurrencyRankComparator`'s own doc comment.
   const ownCurrencies = [...new Set([...rows, ...rangeStartRows, ...rangeEndRows].map((r) => r.currency))].sort(currencyRank);
   const trendCurrentRows = ownCurrencies.map(currency => rows.find(row => row.currency === currency) ?? { currency, assets: 0, liabilities: 0, net: 0, breakdown: [] });
-  const currencySummaryRows = ownCurrencies.map(currency => rows.find(row => row.currency === currency) ?? { currency, assets: 0, liabilities: 0, net: 0, breakdown: [] });
   const activityCurrencies = [...new Set(activities.map(activity => activity.currencyCode))].sort(currencyRank);
+  const currencySummaryCurrencies = [...new Set([...ownCurrencies, ...Object.keys(todayFlow), ...Object.keys(periodFlow), ...Object.keys(plannedUpcomingByCurrency)])].sort(currencyRank);
+  const currencySummaryRows = currencySummaryCurrencies.map(currency => rows.find(row => row.currency === currency) ?? { currency, assets: 0, liabilities: 0, net: 0, breakdown: [] });
   const selectedRangeActivities = activities.filter(activity => activity.date >= rangeStartDate && activity.date <= rangeEndDate);
   const insightCurrencies = [...new Set([...rangeStartRows, ...rangeEndRows].map(row => row.currency).concat(selectedRangeActivities.map(activity => activity.currencyCode)))].sort(currencyRank);
   const periodInsightRows = insightCurrencies.map(currency => rangeEndRows.find(row => row.currency === currency) ?? { currency, assets: 0, liabilities: 0, net: 0, breakdown: [] });
