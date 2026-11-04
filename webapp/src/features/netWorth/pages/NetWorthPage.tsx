@@ -87,24 +87,26 @@ function isValidISODate(value: string | null): value is string {
 }
 
 function resolveDashboardRange(periodValue: string, fromValue: string | null, toValue: string | null, earliestDate: string | undefined, todayISO: string) {
-  const period = DASHBOARD_PERIODS.some(option => option.value === periodValue) ? periodValue : '30d';
+  const legacy: Record<string, string> = { '7d': 'custom', '30d': 'custom', '90d': 'custom', '6m': '6', '1y': '12' };
+  const period = legacy[periodValue] ?? (['since-month', '3', '6', '12', 'ytd', 'all', 'custom'].includes(periodValue) ? periodValue : 'since-month');
   let from = todayISO;
   let to = todayISO;
-  if (period === '7d') from = shiftISODate(todayISO, -6);
-  else if (period === '30d') from = shiftISODate(todayISO, -29);
-  else if (period === '90d') from = shiftISODate(todayISO, -89);
-  else if (period === '6m') from = shiftISODateMonths(todayISO, -6);
-  else if (period === '1y') from = shiftISODateMonths(todayISO, -12);
-  else if (period === 'ytd') from = todayISO.slice(0, 4) + '-01-01';
+  if (period === 'since-month') from = currentMonthRange().startDate;
+  else if (period === '3' || period === '6' || period === '12' || period === 'ytd') from = presetDateRange(period).startDate;
   else if (period === 'all') from = earliestDate && earliestDate <= todayISO ? earliestDate : todayISO;
   else if (period === 'custom') {
-    const requestedFrom = isValidISODate(fromValue) ? fromValue : shiftISODate(todayISO, -29);
+    const legacyDays = periodValue === '7d' ? 6 : periodValue === '30d' ? 29 : periodValue === '90d' ? 89 : null;
+    const requestedFrom = isValidISODate(fromValue) ? fromValue : legacyDays === null ? currentMonthRange().startDate : shiftISODate(todayISO, -legacyDays);
     const requestedTo = isValidISODate(toValue) ? toValue : todayISO;
     from = requestedFrom > todayISO ? todayISO : requestedFrom;
     to = requestedTo > todayISO ? todayISO : requestedTo;
     if (from > to) [from, to] = [to, from];
   }
-  const label = period === 'custom' || period === 'all' ? from + ' – ' + to : (DASHBOARD_PERIODS.find(option => option.value === period)?.label ?? 'Last 30 days');
+  const label = period === 'custom' || period === 'all' ? from + ' – ' + to
+    : period === 'since-month' ? 'This month'
+      : period === '3' ? 'Last 3 months'
+        : period === '6' ? 'Last 6 months'
+          : period === '12' ? 'Last 12 months' : 'Year to date';
   return { period, from, to, label };
 }
 
