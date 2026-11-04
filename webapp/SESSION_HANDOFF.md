@@ -418,3 +418,15 @@ Latest implementation details:
 - Unmatched SELL shares remain visible and receive no invented cost basis or realized profit; actual proceeds remain in cash and unmatched SELL fees are expensed separately.
 
 The current documentation/comment refresh is behavior-neutral. Verify the live PR head and Actions again before merge; any later application-code change requires a fresh full validation. No browser smoke test or real-backup review is claimed. No merge to `main` has been performed.
+
+
+## 2026-11-04 — Upcoming application-service migration checkpoint
+
+- **Working branch:** `fix/net-worth-dashboard-parity-and-accounting`; re-fetch the live head before continuing.
+- Added `webapp/src/services/finance/upcomingService.ts`. It owns subscriptions to the nine source workbooks, gathers current data, calls `CalculationEngine.upcoming.collectUpcomingItems`, and caches snapshots by source revision, horizon and calendar day.
+- Replaced `useUpcomingItems`' direct Zustand/calculator dependencies with a thin `useSyncExternalStore` adapter to the application service.
+- Moved due-timing label calculation into the calculation result. `UpcomingList` now renders the supplied `dueLabel`; it no longer derives day differences locally.
+- Added `upcomingService.test.ts` to check stable snapshots, store-change invalidation and the service-produced next-day label. Extended `upcoming.test.ts` to assert the engine-provided label.
+- Architecture checkpoint recorded in `webapp/docs/CALCULATION_ENGINE_ARCHITECTURE.md`.
+- This is a deliberately small first service migration. It does **not** complete the UI-only architecture: `PlanningPage`, `FinancePlansHierarchy`, other pages/components and plan writes still need migration. No auto-pay scheduler, execution history, pending-ledger command or settlement workflow has been implemented yet.
+- No local test/build was available through the connected GitHub workflow tools before opening a PR. The next action is to open a draft PR from this branch, inspect the exact-head full-test and build/type-check results, and fix failures before considering merge. Do not merge if any check is pending, missing, failing, or tied to an older head. No direct-main push.
