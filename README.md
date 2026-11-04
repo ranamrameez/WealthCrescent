@@ -108,7 +108,7 @@ auto-loading for future sessions, even though its content is almost entirely abo
 
 ## Project status
 
-Latest delivery update (2026-11-04): the central stock calculation engine from [PR #48](https://github.com/ranamrameez/WealthCrescent/pull/48) is merged into `main`. The Net Worth home-dashboard rebuild is in draft [PR #49](https://github.com/ranamrameez/WealthCrescent/pull/49), based on current `main`; it adds shared reporting ranges, exact-period figures, complete selected-range analytics, per-currency insights, and a flat card layout. The latest PR head still requires a green full test suite, type-check/production build, and manual dashboard review before merge. See `webapp/SESSION_HANDOFF.md` and `webapp/docs/net-worth-dashboard.md` for current scope and validation.
+Latest delivery update (2026-11-04): the central stock calculation engine from [PR #48](https://github.com/ranamrameez/WealthCrescent/pull/48) is merged into `main`. Net Worth home-dashboard rebuild [PR #49](https://github.com/ranamrameez/WealthCrescent/pull/49) is ready for merge after passing **142 test files / 1,132 tests**, both TypeScript checks, and the production build on application-code head `7cd07ca0c050446ad2b941ce3ec2c384af935b45`. It adds shared reporting ranges, exact-period figures, full selected-range analytics, per-currency insights, and collapsible flat sections. Interactive browser review and reconciliation against actual imported financial statements remain follow-ups. See `webapp/SESSION_HANDOFF.md` and `webapp/docs/net-worth-dashboard.md`.
 
 The web app (`webapp/`) is the primary platform under active development. Its own
 `webapp/README.md` is the real, continuously-updated Done/Pending backlog — this file
