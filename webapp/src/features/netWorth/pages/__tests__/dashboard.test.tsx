@@ -37,7 +37,7 @@ it('shows converted overall summaries in both currencies before the per-currency
   expect(qar.textContent).toContain('400.00');
   const sections = document.querySelectorAll('.standard-section-anchor');
   expect(sections[0].textContent).toContain('Overall summary');
-  expect(sections[1].textContent).toContain('Per currency summary');
+  expect(sections[1].textContent).toContain('Current balances by currency');
   expect(screen.queryByLabelText('Show total in')).toBeNull();
 });
 it('centralizes URL-backed section and source filters and restores defaults', () => {
@@ -56,6 +56,30 @@ it('centralizes URL-backed section and source filters and restores defaults', ()
   fireEvent.click(within(modal).getByRole('button', { name: 'Done' }));
   expect(document.querySelector('.modal-box')).toBeNull();
 });
+
+it('applies the URL-backed custom date range to flow figures and exposes the selected dates', () => {
+  const todayISO = new Date().toISOString().slice(0, 10);
+  show(`/net-worth?period=custom&from=${todayISO}&to=${todayISO}`);
+  const summary = screen.getByRole('heading', { name: 'Overall summary — USD' }).parentElement!;
+  expect(summary.textContent).toContain('Period net flow');
+  expect(summary.textContent).toContain('100.00');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+  const modal = document.querySelector<HTMLElement>('.modal-box')!;
+  expect(within(modal).getByLabelText('From date')).toHaveValue(todayISO);
+  expect(within(modal).getByLabelText('To date')).toHaveValue(todayISO);
+  expect(within(modal).getByText(new RegExp(todayISO))).toBeTruthy();
+});
+
+it('renders the dashboard sections without nesting cards and provides period insights', () => {
+  const todayISO = new Date().toISOString().slice(0, 10);
+  show(`/net-worth?section=analytics&period=custom&from=${todayISO}&to=${todayISO}`);
+  expect(document.querySelector('.standard-card .card')).toBeNull();
+  expect(screen.getByRole('heading', { name: new RegExp('Insights') })).toBeTruthy();
+  expect(screen.getByText(/Largest asset:/)).toBeTruthy();
+  expect(screen.getByText(/Recorded net activity:/)).toBeTruthy();
+});
+
 it('restores hidden sections from a deep link and opens exchange rates only from the FAB', () => {
   show('/net-worth?show-currencies=false&show-plans=false&show-analytics=false');
   expect(document.querySelectorAll('.standard-section-anchor')).toHaveLength(1);
