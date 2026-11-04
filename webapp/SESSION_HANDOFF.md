@@ -1,3 +1,37 @@
+## 2026-11-04 — Centralized CalculationEngine and app-only auto-pay (user-approved direction)
+
+### User's confirmed requirements
+
+- **Auto-pay means application-only ledger processing.** No bank APIs, payment-provider APIs, external money movement, or claim that money was transferred. On the due date, the app automatically creates a pending record in its own ledger; the user explicitly confirms settlement afterward.
+- **One centralized `CalculationEngine`.** Every financial calculation must go through this engine. Existing stock accounting (`stockCalculationEngine.ts` and `portfolioCalculationEngine.ts`) is the reference pattern and must remain correct; route it through the central public boundary rather than duplicating its logic.
+- **UI is render-only.** Every UI component/page obtains required read data and dispatches writes through application-service/function boundaries. No component-local calculations, business rules, direct store mutations, Firebase/localStorage persistence or direct imports of calculation modules. Formatting values for display is allowed; calculating financial meaning is not.
+- These requirements apply to every component, including cards, tables, forms, dialogs, dashboard widgets, charts and page-level hooks. Hooks may adapt service subscriptions/loading/error state but must not become alternate calculation/business layers.
+
+### Architecture document and first commit
+
+- Added `webapp/docs/CALCULATION_ENGINE_ARCHITECTURE.md` with the target layers, engine/service responsibilities, unified category + project budget direction, app-only auto-pay lifecycle, migration rules and required verification.
+- Updated root `CLAUDE.md` to make these user-approved constraints mandatory for future sessions.
+- Initial documentation commit: `7ff4c6e6df9ec04e830b22e8fdae926eef4a79ad` (architecture document), followed by `661aff729e51fe54bbef608cbaa067fd7881b8c7` (repository-wide agent instructions).
+- Both commits are on the existing branch `fix/net-worth-dashboard-parity-and-accounting`; no application code has been changed yet in this architecture slice. No main-branch push or merge.
+
+### Code review findings that shape implementation
+
+- The repo already has a strong stock calculation foundation: `stockCalculationEngine.ts` performs the consolidated stock accounting pass and `portfolioCalculationEngine.ts` assembles the portfolio calculation result. QSE/PSX derived hooks currently call `calculatePortfolio` directly; legacy wrappers such as `positions.ts`, `realizedPL.ts` and `closedTrades.ts` also call the stock engine directly. The central facade must become the only public entry point, then these consumers must migrate without changing accounting behavior.
+- Financial calculations are distributed across `lib/calc/**` (including `budgetPlanner.ts`, `plannedBalance.ts`, `upcoming.ts`, `bankModule.ts`, `cashModule.ts`, `creditCardModule.ts`, `netWorth.ts`, `netWorthTrend.ts`, `emiModule.ts`, `rentalPlanning.ts` and `subscriptionsModule.ts`). For example, `PlanningPage.tsx` and `NetWorthPage.tsx` currently call calculation helpers directly, and `BankPage.tsx` calls bank calculation helpers directly. These must be migrated behind CalculationEngine/application queries.
+- Components currently access Zustand stores and mutate them directly in several flows. `financePlans.ts` is a useful existing cross-module read/write helper but itself directly accesses the four planned-workbook stores; it needs to become a repository/service implementation, not remain a UI-facing shortcut.
+- Planned workbooks are separate Firebase paths: `users/{uid}/plannedCash`, `plannedBank`, `plannedCreditCard`, `plannedRentals`; actual module workbooks are stored separately. Existing `useWorkbookCloudSync` writes whole workbook documents after a debounce. Do not implement scheduled auto-pay by appending to arrays or by a browser timer. The backend repository needs a concurrency-safe, idempotent transaction strategy across plan occurrence/execution and the target native ledger.
+- Existing pending-ledger semantics are not identical across modules: Cash and Bank explicitly exclude `isPending` from cleared balances; credit-card planned records currently have no equivalent unified pending lifecycle. Auto-pay eligibility and native-ledger mapping must be defined per module before enabling it. First release should process eligible planned outflows only; rental income and forecast income are not auto-pay.
+- Existing recurrence identity and completion behavior in `planOccurrences.ts` must be reused; do not create a second recurrence implementation.
+
+### Approved implementation sequence
+
+1. Introduce a single public CalculationEngine facade and service/query/command boundaries. Add parity tests against existing calculators before migrating callers.
+2. Migrate calculation consumers and UI reads/writes incrementally, beginning with planning/payment flows. Keep all existing stores and persisted data compatible while services take ownership of access.
+3. Finalize the unified category + project budget model through CalculationEngine; preserve FinancePlanGroup and all existing native planned records with lossless mapping.
+4. Add payment execution identity/history and pending native-ledger mapping, then a scheduled Firebase Function only after transaction-safe idempotency and retry behavior are covered by tests.
+5. Migrate remaining modules (Cash, Bank, Cards, Rentals, EMI, Subscriptions, Net Worth, QSE and PSX) behind the same boundary. Preserve StockExchangeEngine results and broker-profile isolation.
+6. For every slice, run targeted tests, full tests as appropriate, TypeScript checks, production build and diff review against latest main. Never mark a slice complete without the checks for its exact head. Continue small focused commits on this branch; never push directly to main.
+
 # WealthCrescent — Session Handoff (refreshed 2026-11-04, continuation checkpoint)
 
 ## 2026-11-04 — Budget planning, dashboard, upcoming and accounting continuation
