@@ -8,7 +8,7 @@ import { useBankWorkbookStore } from '../../../../store/bankWorkbookStore';
 import { createEmptyBankWorkbook } from '../../../../store/defaultBankWorkbook';
 import { useEnabledCurrenciesStore } from '../../../../store/enabledCurrenciesStore';
 import { saveFxRates } from '../../../../lib/fx';
-import { presetDateRange } from '../../../../lib/dateRange';
+import { currentMonthRange, presetDateRange } from '../../../../lib/dateRange';
 
 vi.mock('react-chartjs-2', () => ({ Chart: () => <div>Trend chart</div>, Doughnut: () => <div>Allocation chart</div> }));
 vi.mock('../../../../lib/firebase/useEnsureSignedIn', () => ({ useEnsureSignedIn: () => async () => false }));
@@ -53,7 +53,10 @@ it('centralizes URL-backed section and source filters and restores defaults', ()
   const usd = screen.getByRole('heading', { name: 'Overall summary — USD' }).parentElement!;
   expect(usd.textContent).toContain('100.00');
   fireEvent.click(within(modal).getByRole('button', { name: 'Reset' }));
-  expect(screen.getByTestId('location').textContent).toBe('');
+  const resetParams = new URLSearchParams(screen.getByTestId('location').textContent ?? '');
+  expect(resetParams.get('period')).toBe('since-month');
+  expect(resetParams.get('from')).toBe(currentMonthRange().startDate);
+  expect(resetParams.get('to')).toBe('');
   fireEvent.click(within(modal).getByRole('button', { name: 'Done' }));
   expect(document.querySelector('.modal-box')).toBeNull();
 });
