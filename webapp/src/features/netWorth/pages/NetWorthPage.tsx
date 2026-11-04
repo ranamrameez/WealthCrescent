@@ -77,6 +77,46 @@ const DASHBOARD_MODULES = ['cash', 'bank', 'creditCards', 'personalLoans', 'emi'
 
 const today = () => new Date().toISOString().slice(0, 10);
 const monthLabel = (m: string) => new Date(`${m}-01`).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+const DASHBOARD_PERIODS = [
+  { value: '7d', label: 'Last 7 days' },
+  { value: '30d', label: 'Last 30 days' },
+  { value: '90d', label: 'Last 90 days' },
+  { value: '6m', label: 'Last 6 months' },
+  { value: '1y', label: 'Last 12 months' },
+  { value: 'ytd', label: 'Year to date' },
+  { value: 'all', label: 'All available history' },
+  { value: 'custom', label: 'Custom range' },
+] as const;
+
+function shiftISODate(value: string, days: number): string {
+  const date = new Date(value + 'T00:00:00Z');
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function isValidISODate(value: string | null): value is string {
+  return !!value && /^\\d{4}-\\d{2}-\\d{2}$/.test(value) && !Number.isNaN(new Date(value + 'T00:00:00Z').getTime());
+}
+
+function resolveDashboardRange(periodValue: string, fromValue: string | null, toValue: string | null, earliestDate: string | undefined, todayISO: string) {
+  const period = DASHBOARD_PERIODS.some(option => option.value === periodValue) ? periodValue : '30d';
+  let from = todayISO;
+  let to = todayISO;
+  if (period === '7d') from = shiftISODate(todayISO, -6);
+  else if (period === '30d') from = shiftISODate(todayISO, -29);
+  else if (period === '90d') from = shiftISODate(todayISO, -89);
+  else if (period === '6m') { const date = new Date(todayISO + 'T00:00:00Z'); date.setUTCMonth(date.getUTCMonth() - 6); from = date.toISOString().slice(0, 10); }
+  else if (period === '1y') { const date = new Date(todayISO + 'T00:00:00Z'); date.setUTCFullYear(date.getUTCFullYear() - 1); from = date.toISOString().slice(0, 10); }
+  else if (period === 'ytd') from = todayISO.slice(0, 4) + '-01-01';
+  else if (period === 'all') from = earliestDate ?? todayISO;
+  else if (period === 'custom') {
+    from = isValidISODate(fromValue) ? fromValue : shiftISODate(todayISO, -29);
+    to = isValidISODate(toValue) ? (toValue > todayISO ? todayISO : toValue) : todayISO;
+    if (from > to) [from, to] = [to, from];
+  }
+  const label = period === 'custom' || period === 'all' ? from + ' – ' + to : (DASHBOARD_PERIODS.find(option => option.value === period)?.label ?? 'Last 30 days');
+  return { period, from, to, label };
+}
 
 /** User-requested (2026-09-16): "For every calculated number, it should be
  * supported by a clickable pop-up view to display the related
