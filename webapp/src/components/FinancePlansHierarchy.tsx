@@ -160,7 +160,7 @@ export function FinancePlansHierarchy({ filters, controls, overview, embedded = 
   if (embedded) {
     return <>
       <EntityActions actions={[{ label: 'Add plan', onClick: () => setGroupEditor({}) }]} />
-      {items}
+      <StandardCard title="Plan payments and budget insights">{items}</StandardCard>
       {dialogs}
     </>;
   }
