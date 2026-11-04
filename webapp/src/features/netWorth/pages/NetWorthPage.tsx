@@ -923,17 +923,44 @@ export function NetWorthPage({
   );
 }
 
-function NetWorthAnalyticsSection({ ownCurrencies, activities, categories, groups, emiLoans, currentRows, netWorthAsOfInputs, todayISODate, setDrilldown, splitData, preferredCurrency, rentalsNet }: {
+function NetWorthInsightsSection({ rows, activities, fromDate, toDate, rangeLabel, missingFxCurrencies }: {
+  rows: CurrencyNetWorth[]; activities: BudgetActivity[]; fromDate: string; toDate: string; rangeLabel: string; missingFxCurrencies: string[];
+}) {
+  const recorded = activities.filter(activity => activity.executed && activity.date >= fromDate && activity.date <= toDate);
+  return <div className="mb-md">
+    <h3>Insights — {rangeLabel}</h3>
+    <div className="grid-auto" style={gridAutoStyle(260, 12)}>
+      {rows.map(row => {
+        const assets = row.breakdown.filter(item => item.amount > 0).sort((a, b) => b.amount - a.amount);
+        const liabilities = row.breakdown.filter(item => item.amount < 0).sort((a, b) => a.amount - b.amount);
+        const currencyActivity = recorded.filter(item => item.currencyCode === row.currency);
+        const netActivity = currencyActivity.reduce((total, item) => total + item.amount, 0);
+        return <Card key={row.currency}>
+          <h4 className="mt-0">{row.currency}</h4>
+          <p><strong>Largest asset:</strong> {assets[0] ? assets[0].module + ' — ' + fmtMoney(assets[0].amount, row.currency) : 'No positive balance recorded'}</p>
+          <p><strong>Largest liability:</strong> {liabilities[0] ? liabilities[0].module + ' — ' + fmtMoney(liabilities[0].amount, row.currency) : 'No liability recorded'}</p>
+          <p><strong>Recorded net activity:</strong> <span style={{ color: netActivity >= 0 ? 'var(--profit)' : 'var(--loss)' }}>{fmtMoney(netActivity, row.currency)}</span></p>
+          <p className="text-muted mb-0">{currencyActivity.length} cleared Cash, Bank or Rental entries in this range. Linked transfers are excluded.</p>
+        </Card>;
+      })}
+    </div>
+    {missingFxCurrencies.length > 0 && <Notice tone="warning" className="mt-12">Conversion is incomplete for {missingFxCurrencies.join(', ')}. Those currencies remain visible in their own sections but are excluded from converted totals and the capital-split chart.</Notice>}
+  </div>;
+}
+
+function NetWorthAnalyticsSection({ ownCurrencies, activities, categories, groups, emiLoans, currentRows, periodEndRows, netWorthAsOfInputs, todayISODate, rangeStartDate, rangeEndDate, rangeLabel, setDrilldown, splitData, preferredCurrency, missingFxCurrencies, rentalsNet }: {
   ownCurrencies: string[]; activities: BudgetActivity[]; categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories'];
   groups: ReturnType<typeof useCategoryGroupStore.getState>['workbook']['groups']; emiLoans: Parameters<typeof projectedNetWorthTrend>[0]['emiLoans'];
-  currentRows: CurrencyNetWorth[]; netWorthAsOfInputs: NetWorthAsOfInputs; todayISODate: string; setDrilldown: (d: Drilldown) => void;
-  splitData: Array<{ currency: string; converted: number }>; preferredCurrency: string; rentalsNet: Record<string, number>;
+  currentRows: CurrencyNetWorth[]; periodEndRows: CurrencyNetWorth[]; netWorthAsOfInputs: NetWorthAsOfInputs; todayISODate: string;
+  rangeStartDate: string; rangeEndDate: string; rangeLabel: string; setDrilldown: (d: Drilldown) => void;
+  splitData: Array<{ currency: string; converted: number }>; preferredCurrency: string; missingFxCurrencies: string[]; rentalsNet: Record<string, number>;
 }) {
   return <div>
-    <NetWorthMonthlySection ownCurrencies={ownCurrencies} activities={activities} emiLoans={emiLoans} currentRows={currentRows} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISODate} setDrilldown={setDrilldown} />
-    <CategoryGroupsSection ownCurrencies={ownCurrencies} activities={activities} categories={categories} groups={groups} nowMonth={currentMonthOf()} setDrilldown={setDrilldown} />
-    {splitData.length > 1 && <ChartCard title={`Capital split by currency (converted to ${preferredCurrency})`} empty={false}><div style={{ height: 220 }}><Doughnut data={{ labels: splitData.map((item) => item.currency), datasets: [{ data: splitData.map((item) => item.converted), backgroundColor: HUES }] }} options={{ plugins: { datalabels: dlDoughnut((value) => fmtMoney(value, preferredCurrency)) } }} /></div></ChartCard>}
-    {Object.keys(rentalsNet).length > 0 && <Card className="mt-12"><div className="label mb-sm">Rental net income (informational — not included above)</div><div className="text-muted mb-sm">Property values aren't tracked, and deposited rental income already lands in Cash/Bank; counting it again would double-count it.</div><div className="row" style={{ gap: 12 }}>{Object.entries(rentalsNet).map(([code, amount]) => <div key={code} className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">{code}</div><MoneyValue n={amount} currency={code} /></div>)}</div></Card>}
+    <NetWorthInsightsSection rows={periodEndRows} activities={activities} fromDate={rangeStartDate} toDate={rangeEndDate} rangeLabel={rangeLabel} missingFxCurrencies={missingFxCurrencies} />
+    <NetWorthMonthlySection ownCurrencies={ownCurrencies} activities={activities} emiLoans={emiLoans} currentRows={currentRows} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISODate} rangeStartDate={rangeStartDate} rangeEndDate={rangeEndDate} setDrilldown={setDrilldown} />
+    <CategoryGroupsSection ownCurrencies={ownCurrencies} activities={activities} categories={categories} groups={groups} fromDate={rangeStartDate} toDate={rangeEndDate} rangeLabel={rangeLabel} setDrilldown={setDrilldown} />
+    {splitData.length > 1 && <ChartCard title={`Capital split by currency at period end (converted to ${preferredCurrency})`} empty={false}><div style={{ height: 220 }}><Doughnut data={{ labels: splitData.map((item) => item.currency), datasets: [{ data: splitData.map((item) => item.converted), backgroundColor: HUES }] }} options={{ plugins: { datalabels: dlDoughnut((value) => fmtMoney(value, preferredCurrency)) } }} /></div></ChartCard>}
+    {Object.keys(rentalsNet).length > 0 && <div className="mt-12"><div className="label mb-sm">Rental net income in selected period (informational — not included above)</div><div className="text-muted mb-sm">Property values aren't tracked, and deposited rental income already lands in Cash/Bank; counting it again would double-count it.</div><div className="row" style={{ gap: 12 }}>{Object.entries(rentalsNet).map(([code, amount]) => <div key={code} className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">{code}</div><MoneyValue n={amount} currency={code} /></div>)}</div></div>}
   </div>;
 }
 
@@ -1116,16 +1143,6 @@ function IncludeInNetWorthControls({
  * table should show for all currencies in a grid instead of toggling" —
  * both the chart grid and the table grid render ONE item per currency the
  * user actually holds (`ownCurrencies`), no currency picker at all. */
-/** Earliest real calendar month across every dated record this page reads
- * — `earliestActivityDate` covers Cash/Bank/Personal Loans/EMI/Funds/QSE/
- * PSX, and Rentals (which never counts toward Net Worth itself, but its
- * dates still appear in the Income/Expense row via `activities`) is folded
- * in separately here since it isn't part of `NetWorthAsOfInputs`. */
-function floorMonthOf(inputs: NetWorthAsOfInputs, activities: BudgetActivity[]): string | undefined {
-  const dates = [earliestActivityDate(inputs), ...activities.map((a) => a.date)].filter((d): d is string => !!d);
-  return dates.length ? dates.reduce((min, d) => (d < min ? d : min)).slice(0, 7) : undefined;
-}
-
 function NetWorthMonthlySection({
   ownCurrencies,
   activities,
@@ -1133,6 +1150,8 @@ function NetWorthMonthlySection({
   currentRows,
   netWorthAsOfInputs,
   todayISODate,
+  rangeStartDate,
+  rangeEndDate,
   setDrilldown,
 }: {
   ownCurrencies: string[];
@@ -1141,21 +1160,18 @@ function NetWorthMonthlySection({
   currentRows: Parameters<typeof projectedNetWorthTrend>[0]['currentRows'];
   netWorthAsOfInputs: NetWorthAsOfInputs;
   todayISODate: string;
+  rangeStartDate: string;
+  rangeEndDate: string;
   setDrilldown: (d: Drilldown) => void;
 }) {
   const nowMonth = useMemo(() => currentMonthOf(), []);
-  // User-reported (2026-09-06): "monthly widgets are moving without a check
-  // of user's first date of transaction" — `windowStart` used to default to
-  // a hardcoded -3 and "◀ Earlier" could scroll indefinitely into the past,
-  // well before the user had any real data at all (which the phantom-
-  // opening-balance bug fixed in `netWorthAsOfDate` would then show as
-  // misleading nonzero figures). `floorWindowStart` is the earliest offset
-  // any real record justifies; the window never starts, nor scrolls,
-  // earlier than that.
-  const floorMonth = useMemo(() => floorMonthOf(netWorthAsOfInputs, activities), [netWorthAsOfInputs, activities]);
-  const floorWindowStart = floorMonth ? monthsBetween(nowMonth, floorMonth) : -3;
-  const [windowStart, setWindowStart] = useState(() => Math.max(-3, floorWindowStart));
-  const months = useMemo(() => monthRange(windowStart, windowStart + 5), [windowStart]);
+  // The same page-level range controls the monthly chart and table; no
+  // independent six-month slider can silently show a different period.
+  const months = useMemo(() => {
+    const startOffset = monthsBetween(nowMonth, rangeStartDate.slice(0, 7));
+    const endOffset = monthsBetween(nowMonth, rangeEndDate.slice(0, 7));
+    return monthRange(startOffset, endOffset);
+  }, [nowMonth, rangeStartDate, rangeEndDate]);
   const monthly = useMemo(() => monthlyIncomeExpense(activities, months), [activities, months]);
   const trend = useMemo(
     () => projectedNetWorthTrend({ months, currentMonth: nowMonth, todayISODate, currentRows, activities, emiLoans, netWorthAsOfInputs }),
@@ -1164,23 +1180,8 @@ function NetWorthMonthlySection({
 
   if (!ownCurrencies.length) return null;
 
-  const atFloor = windowStart <= floorWindowStart;
-
   return (
     <div className="mb-md">
-      <div className="row" style={{ gap: 8, marginBottom: 12 }}>
-        <button
-          className="btn secondary small"
-          disabled={atFloor}
-          title={atFloor ? 'No data before this — this is as far back as your earliest transaction goes.' : undefined}
-          onClick={() => setWindowStart((w) => Math.max(floorWindowStart, w - 1))}
-        >
-          ◀ Earlier
-        </button>
-        <button className="btn secondary small" onClick={() => setWindowStart(Math.max(-3, floorWindowStart))}>Today</button>
-        <button className="btn secondary small" onClick={() => setWindowStart((w) => w + 1)}>Later ▶</button>
-      </div>
-
       <div className="grid-auto" style={{ ...gridAutoStyle(380, 16), marginBottom: 16 }}>
         {ownCurrencies.map((currency) => (
           <NetWorthComboChart key={currency} currency={currency} months={months} trend={trend} />
