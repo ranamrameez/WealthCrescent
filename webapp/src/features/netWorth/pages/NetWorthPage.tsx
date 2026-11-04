@@ -110,6 +110,29 @@ function resolveDashboardRange(periodValue: string, fromValue: string | null, to
   return { period, from, to, label };
 }
 
+function sumActivitiesByCurrency(activities: BudgetActivity[], fromDate: string, toDate: string): Record<string, number> {
+  const totals: Record<string, number> = {};
+  activities.forEach(activity => {
+    if (!activity.executed || activity.isPending || activity.date < fromDate || activity.date > toDate) return;
+    totals[activity.currencyCode] = (totals[activity.currencyCode] ?? 0) + activity.amount;
+  });
+  return totals;
+}
+
+function activityFlowItems(activities: BudgetActivity[], currency: string, fromDate: string, toDate: string): FlowActivityItem[] {
+  const labels: Record<BudgetActivity['module'], string> = { cash: 'Cash', bank: 'Bank', rentals: 'Rentals' };
+  return activities
+    .filter(activity => activity.executed && !activity.isPending && activity.currencyCode === currency && activity.date >= fromDate && activity.date <= toDate)
+    .map(activity => ({
+      module: labels[activity.module],
+      date: activity.date,
+      description: activity.description,
+      amount: activity.amount,
+      accountName: activity.sourceLabel,
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
 /** User-requested (2026-09-16): "For every calculated number, it should be
  * supported by a clickable pop-up view to display the related
  * transactions." Three kinds, matching what's actually computable for each
@@ -395,7 +418,7 @@ export function NetWorthPage(_legacySyncProps: {
   };
 
   const todayISO = today();
-  const todayFlow = flowByCurrency(includedCash, includedAccounts, bank.transactions, todayISO, todayISO);
+  const todayFlow = sumActivitiesByCurrency(activities, todayISO, todayISO);
   const earliestActivity = earliestActivityDate(netWorthAsOfInputs);
   const earliestDashboardDate = [earliestActivity, ...activities.map(activity => activity.date)].filter((date): date is string => !!date).sort()[0];
   const dashboardRange = resolveDashboardRange(scopeParams.get('period') ?? '30d', scopeParams.get('from'), scopeParams.get('to'), earliestDashboardDate, todayISO);
@@ -410,8 +433,7 @@ export function NetWorthPage(_legacySyncProps: {
   const rangeStartBreakdownByCurrency = Object.fromEntries(rangeStartRows.map(row => [row.currency, row.breakdown]));
   const rangeEndByCurrency = Object.fromEntries(rangeEndRows.map(row => [row.currency, row.net]));
   const rangeEndBreakdownByCurrency = Object.fromEntries(rangeEndRows.map(row => [row.currency, row.breakdown]));
-  const periodFlow = flowByCurrency(includedCash, includedAccounts, bank.transactions, rangeStartDate, rangeEndDate);
-  const rentalsNetForRange = rentalsNetIncomeByCurrency(rentals.settings.properties, rentals.entries.filter(entry => entry.date >= rangeStartDate && entry.date <= rangeEndDate));
+  const periodFlow = sumActivitiesByCurrency(activities, rangeStartDate, rangeEndDate);
   const plannedUpcomingByCurrency = useMemo(() => {
     const totals: Record<string, number> = {};
     const upcomingEndDate = shiftISODate(todayISO, 29);
@@ -428,7 +450,7 @@ export function NetWorthPage(_legacySyncProps: {
   // A doughnut can't meaningfully show a negative slice, so a currency
   // with negative net worth is left out of the chart specifically — it's
   // still fully visible in the per-currency cards and breakdown below.
-  const splitData = rangeEndRows
+  const splitData = rows
     .map((r) => ({ currency: r.currency, converted: convertAmount(r.net, r.currency, preferredCurrency, rates) }))
     .filter((r): r is { currency: string; converted: number } => r.converted !== null && r.converted > 0);
 
@@ -440,7 +462,8 @@ export function NetWorthPage(_legacySyncProps: {
   const currencySummaryCurrencies = [...new Set([...ownCurrencies, ...Object.keys(todayFlow), ...Object.keys(periodFlow), ...Object.keys(plannedUpcomingByCurrency)])].sort(currencyRank);
   const currencySummaryRows = currencySummaryCurrencies.map(currency => rows.find(row => row.currency === currency) ?? { currency, assets: 0, liabilities: 0, net: 0, breakdown: [] });
   const selectedRangeActivities = activities.filter(activity => activity.date >= rangeStartDate && activity.date <= rangeEndDate);
-  const insightCurrencies = [...new Set([...rangeStartRows, ...rangeEndRows].map(row => row.currency).concat(selectedRangeActivities.map(activity => activity.currencyCode)))].sort(currencyRank);
+  const selectedRangeActualActivities = selectedRangeActivities.filter(activity => activity.executed && !activity.isPending);
+  const insightCurrencies = [...new Set([...rangeStartRows, ...rangeEndRows].map(row => row.currency).concat(selectedRangeActualActivities.map(activity => activity.currencyCode)))].sort(currencyRank);
   const periodInsightRows = insightCurrencies.map(currency => rangeEndRows.find(row => row.currency === currency) ?? { currency, assets: 0, liabilities: 0, net: 0, breakdown: [] });
   const missingFxCurrencies = [...new Set([...rangeStartRows, ...rangeEndRows].filter(row => row.net !== 0 && convertAmount(row.net, row.currency, preferredCurrency, rates) === null).map(row => row.currency))];
 
@@ -538,11 +561,11 @@ export function NetWorthPage(_legacySyncProps: {
               value={fmtMoney(todayFlowTotal.total, preferredCurrency)}
               hue={todayFlowTotal.total >= 0 ? 'var(--profit)' : 'var(--loss)'}
               title={todayFlowTotal.anyUnconverted ? 'Some currencies excluded — no rate available.' : undefined}
-              labelTitle="Net money moved in/out of Cash and Bank today, converted to the preferred currency."
+              labelTitle="Cleared Cash, Bank and Rental movement today, converted to the preferred currency."
               onClick={() => setDrilldown({
                 kind: 'breakdown',
                 title: "Today's net flow, by currency",
-                explanation: `Each currency's own real (unconverted) net Cash+Bank movement on ${todayISO}, converted above to ${preferredCurrency} for the headline figure. Click that currency's own card further down the page for the real itemized transactions.`,
+                explanation: `Each currency's own cleared (unconverted) net Cash, Bank and Rental movement on ${todayISO}, converted above to ${preferredCurrency} for the headline figure. Click that currency's own card further down the page for the real itemized transactions.`,
                 rows: Object.entries(todayFlow).map(([code, amount]) => ({ label: code, currency: code, amount })),
               })}
             />
@@ -551,11 +574,11 @@ export function NetWorthPage(_legacySyncProps: {
               value={fmtMoney(periodFlowTotal.total, preferredCurrency)}
               hue={periodFlowTotal.total >= 0 ? 'var(--profit)' : 'var(--loss)'}
               title={periodFlowTotal.anyUnconverted ? 'Some currencies excluded — no rate available.' : undefined}
-              labelTitle={`Net cleared Cash and Bank movement from ${rangeStartDate} through ${rangeEndDate}, converted to the preferred currency.`}
+              labelTitle={`Cleared Cash, Bank and Rental movement from ${rangeStartDate} through ${rangeEndDate}, converted to the preferred currency.`}
               onClick={() => setDrilldown({
                 kind: 'breakdown',
                 title: `Period net flow (${rangeLabel}), by currency`,
-                explanation: `Each currency's own real (unconverted) net Cash+Bank movement from ${rangeStartDate} through ${rangeEndDate}, converted above to ${preferredCurrency} for the headline figure. Click that currency's own card further down the page for the real itemized transactions.`,
+                explanation: `Each currency's own cleared (unconverted) net Cash, Bank and Rental movement from ${rangeStartDate} through ${rangeEndDate}, converted above to ${preferredCurrency} for the headline figure. Click that currency's own card further down the page for the real itemized transactions.`,
                 rows: Object.entries(periodFlow).map(([code, amount]) => ({ label: code, currency: code, amount })),
               })}
             />
@@ -652,33 +675,33 @@ export function NetWorthPage(_legacySyncProps: {
                  in the Net worth summary card, but in this currency's own
                  real, unconverted terms. */}
               <div className="row" style={{ gap: 6, marginTop: 10, alignItems: 'center' }}>
-                <Tooltip text="Net money moved in/out of Cash and Bank today, in this currency. Click for the real transactions.">
+                <Tooltip text="Cleared Cash, Bank and Rental movement today, excluding linked transfers and pending entries. Click for the real transactions.">
                   <span
                     className={`pill clickable ${todayFlowC >= 0 ? 'pill-positive' : 'pill-negative'}`}
                     onClick={() => setDrilldown({
                       kind: 'flow',
                       title: `Today's ${r.currency} Cash+Bank activity`,
-                      explanation: 'Every real Cash entry and Bank transaction dated today, in this currency — Cash counts a deposit as +, a withdrawal as −; Bank uses its own already-signed amount (a debit is negative).',
+                      explanation: 'Every cleared Cash, Bank and Rental entry dated today, in this currency. Linked transfers and pending entries are excluded.',
                       currency: r.currency,
                       from: todayISO,
                       to: todayISO,
-                      items: flowActivity(includedCash, includedAccounts, bank.transactions, r.currency, todayISO, todayISO),
+                      items: activityFlowItems(activities, r.currency, todayISO, todayISO),
                     })}
                   >
                     Today {todayFlowC >= 0 ? '+' : ''}{fmtMoney(todayFlowC, r.currency)}
                   </span>
                 </Tooltip>
-                <Tooltip text={`Net cleared Cash and Bank movement from ${rangeStartDate} through ${rangeEndDate}, in this currency. Click for the real transactions.`}>
+                <Tooltip text={`Cleared Cash, Bank and Rental movement from ${rangeStartDate} through ${rangeEndDate}, excluding linked transfers and pending entries. Click for the real transactions.`}>
                   <span
                     className={`pill clickable ${periodFlowC >= 0 ? 'pill-positive' : 'pill-negative'}`}
                     onClick={() => setDrilldown({
                       kind: 'flow',
                       title: `${r.currency} Cash+Bank activity (${rangeLabel})`,
-                      explanation: `Every cleared Cash entry and Bank transaction from ${rangeStartDate} through ${rangeEndDate}, in this currency.`,
+                      explanation: `Every cleared Cash, Bank and Rental entry from ${rangeStartDate} through ${rangeEndDate}, in this currency. Linked transfers and pending entries are excluded.`,
                       currency: r.currency,
                       from: rangeStartDate,
                       to: rangeEndDate,
-                      items: flowActivity(includedCash, includedAccounts, bank.transactions, r.currency, rangeStartDate, rangeEndDate),
+                      items: activityFlowItems(activities, r.currency, rangeStartDate, rangeEndDate),
                     })}
                   >
                     Period {periodFlowC >= 0 ? '+' : ''}{fmtMoney(periodFlowC, r.currency)}
