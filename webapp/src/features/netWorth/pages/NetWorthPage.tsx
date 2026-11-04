@@ -694,11 +694,11 @@ export function NetWorthPage({
                       className={`pill clickable ${deltaC >= 0 ? 'pill-positive' : 'pill-negative'}`}
                       onClick={() => setDrilldown({
                         kind: 'delta',
-                        title: `${r.currency}: last month vs. now, by module`,
-                        explanation: 'Every module\'s own real contribution at the end of last month vs. right now — this can move from a Cash/Bank deposit or withdrawal, but also a stock price change, an EMI paydown, or a Fund\'s NAV moving, none of which are "flow."',
+                        title: `${r.currency}: selected period change, by module`,
+                        explanation: `Every module's own real contribution at ${rangeEndDate} compared with ${rangeBaselineDate}. This includes balance and valuation changes, not just cash flow.`,
                         currency: r.currency,
-                        current: r.breakdown,
-                        previous: lastMonthBreakdownByCurrency[r.currency] ?? [],
+                        current: rangeEndBreakdownByCurrency[r.currency] ?? [],
+                        previous: rangeStartBreakdownByCurrency[r.currency] ?? [],
                       })}
                     >
                       Δ in period {deltaC >= 0 ? '+' : ''}{fmtMoney(deltaC, r.currency)}
