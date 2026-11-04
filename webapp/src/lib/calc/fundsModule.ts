@@ -223,7 +223,7 @@ export function contributionVsValueSeries(
       } else {
         // Unmatched SELL quantity is not an executed disposal and must not
         // reduce contributed capital or create a fictitious negative holding.
-        const matchedShares = fullCalculation.realizedBySellTxId[transaction.id]?.shares ?? 0;
+        const matchedShares = transaction.id ? fullCalculation.realizedBySellTxId[transaction.id]?.shares ?? 0 : 0;
         invested -= matchedShares * transaction.price;
       }
     });
