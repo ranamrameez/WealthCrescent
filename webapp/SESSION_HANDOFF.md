@@ -1,4 +1,20 @@
-# WealthCrescent — Session Handoff (refreshed 2026-10-31)
+# WealthCrescent — Session Handoff (refreshed 2026-11-04)
+
+## 2026-11-04 — Net Worth dashboard rebuild, PR #49 (in progress)
+
+- **PR #49:** [Rebuild Net Worth dashboard layout, date filters, and insights](https://github.com/ranamrameez/WealthCrescent/pull/49).
+- **Branch:** `fix/net-worth-dashboard-rebuild`, based on `main` at `c9aa3ed1f2da7858165dbbe67e27d5c209360f54`. No changes were made directly to `main`; the branch preserves the merged stock-calculation engine and broker-profile isolation.
+- **Latest application-code head:** `c548f3873f8bebb23fd22680ab0be2b9673e1fff`. The latest source change clamps all-history start dates to available past data. Re-fetch PR head and Actions before relying on any status.
+- **Scope:** `webapp/src/features/netWorth/pages/NetWorthPage.tsx` and its dashboard test. The dashboard now has URL-backed 7d/30d/90d/6m/12m/YTD/all/custom date ranges; period-based cleared Cash/Bank flow, unexecuted plans, net-worth change, exact-range category/rental/monthly flow; complete selected-range monthly history; historical/activity currency coverage; per-currency asset/liability/activity insights; and FX conversion warnings.
+- **UI:** the four dashboard sections render unframed, so their actual summary/chart/insight cards are siblings rather than nested inside another section card. The current net-worth headline remains a live balance; period movement is clearly labeled and calculated at exact period endpoints. Monthly net-worth chart points remain month-end/current-day snapshots, while flow totals and drilldowns are clipped to the exact selected dates.
+- **Calculation safeguards:** reuse `netWorthAsOfDate`, `flowByCurrency`, and existing budget activity collection. Pending Cash/Bank movements and linked transfers retain the existing helper semantics. No source transactions, balances, broker profiles, or financial records are rewritten. Missing FX is surfaced, not guessed. A period change is withheld without a real pre-period net-worth baseline.
+- **New guide:** `webapp/docs/net-worth-dashboard.md` records the date-filter, calculation, coverage, and verification contract.
+- **Tests:** two dashboard regression tests were added for custom date filtering/period flow, insights, and nested-card removal. Earlier CI runs caught actual defects: the first custom-date predicate rejected valid ISO dates; an analytics component referenced an out-of-scope variable; and an obsolete all-time rental total was left unused. These were corrected in later commits. Do not cite the earlier failed runs as validation. The last known full check was queued/running on the subsequent code head; verify the exact latest head's test and build jobs before marking ready.
+- **Still required:** full Vitest suite, both TypeScript projects, production build, full diff review, and interactive UI smoke test with representative multi-currency data and partial-month custom ranges. Automated CI does not prove the user's imported account data is complete or reconcile it against broker statements. Keep PR #49 draft until the exact latest application-code head is green and reviewed. Do not merge without those checks.
+- **Potential follow-up:** the dashboard reports per-currency contributors and recorded Cash/Bank/Rental activity. It does not yet provide a user-data import completeness audit or cross-check every QSE/PSX broker statement; do not claim that it does.
+
+---
+
 
 ## 2026-10-31 — Funds cash reconciliation / issue #42 (merged)
 
