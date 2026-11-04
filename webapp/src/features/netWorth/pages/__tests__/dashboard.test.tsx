@@ -71,10 +71,10 @@ it('applies the URL-backed custom date range to flow figures and exposes the sel
 
 it('preserves a selected preset when switching to a custom range', () => {
   const todayISO = new Date().toISOString().slice(0, 10);
-  show('/net-worth?period=3');
+  const expectedFrom = presetDateRange('3').startDate;
+  show(`/net-worth?period=3&from=${expectedFrom}&to=${todayISO}`);
   const dateRange = screen.getByLabelText('Date range');
   fireEvent.change(dateRange, { target: { value: 'custom' } });
-  const expectedFrom = presetDateRange('3').startDate;
   expect((screen.getByLabelText('From date') as HTMLInputElement).value).toBe(expectedFrom);
   expect((screen.getByLabelText('To date') as HTMLInputElement).value).toBe(todayISO);
 });
