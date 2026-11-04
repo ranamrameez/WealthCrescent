@@ -13,7 +13,9 @@ Cross-module UI, aggregation, filtering, ledger, and parity requirements are doc
 
 Repository-local skills live in [`.agents/skills/`](.agents/skills/README.md).
 They cover UI design, accessibility, React composition and performance, Vite,
-Vitest, Firebase authentication, and browser testing. They travel with the repo;
+Vitest, Firebase authentication, browser testing, financial reconciliation,
+variance analysis, research, backend architecture, security, analytics, and
+Chart.js dashboards. They travel with the repo;
 no global skill installation is needed. Start with [`AGENTS.md`](AGENTS.md) for
 project-specific constraints and when to use each skill.
 

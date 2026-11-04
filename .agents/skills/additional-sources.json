@@ -1,0 +1,116 @@
+{
+  "installed_on": "2026-11-04",
+  "skills": [
+    {
+      "name": "reconciliation",
+      "repo": "anthropics/knowledge-work-plugins",
+      "path": "finance/skills/reconciliation",
+      "ref": "d900840716eb262e1feb17c6f4406c9ce0e06bcf",
+      "source": "https://github.com/anthropics/knowledge-work-plugins/tree/d900840716eb262e1feb17c6f4406c9ce0e06bcf/finance/skills/reconciliation",
+      "purpose": "Statement, broker, and ledger reconciliation"
+    },
+    {
+      "name": "variance-analysis",
+      "repo": "anthropics/knowledge-work-plugins",
+      "path": "finance/skills/variance-analysis",
+      "ref": "d900840716eb262e1feb17c6f4406c9ce0e06bcf",
+      "source": "https://github.com/anthropics/knowledge-work-plugins/tree/d900840716eb262e1feb17c6f4406c9ce0e06bcf/finance/skills/variance-analysis",
+      "purpose": "Budget/actual and period-over-period drivers"
+    },
+    {
+      "name": "search-strategy",
+      "repo": "anthropics/knowledge-work-plugins",
+      "path": "enterprise-search/skills/search-strategy",
+      "ref": "d900840716eb262e1feb17c6f4406c9ce0e06bcf",
+      "source": "https://github.com/anthropics/knowledge-work-plugins/tree/d900840716eb262e1feb17c6f4406c9ce0e06bcf/enterprise-search/skills/search-strategy",
+      "purpose": "Research question decomposition and source search"
+    },
+    {
+      "name": "knowledge-synthesis",
+      "repo": "anthropics/knowledge-work-plugins",
+      "path": "enterprise-search/skills/knowledge-synthesis",
+      "ref": "d900840716eb262e1feb17c6f4406c9ce0e06bcf",
+      "source": "https://github.com/anthropics/knowledge-work-plugins/tree/d900840716eb262e1feb17c6f4406c9ce0e06bcf/enterprise-search/skills/knowledge-synthesis",
+      "purpose": "Evidence synthesis, citations, and confidence"
+    },
+    {
+      "name": "validate-data",
+      "repo": "anthropics/knowledge-work-plugins",
+      "path": "data/skills/validate-data",
+      "ref": "d900840716eb262e1feb17c6f4406c9ce0e06bcf",
+      "source": "https://github.com/anthropics/knowledge-work-plugins/tree/d900840716eb262e1feb17c6f4406c9ce0e06bcf/data/skills/validate-data",
+      "purpose": "Analytical QA, aggregation, filter and bias checks"
+    },
+    {
+      "name": "statistical-analysis",
+      "repo": "anthropics/knowledge-work-plugins",
+      "path": "data/skills/statistical-analysis",
+      "ref": "d900840716eb262e1feb17c6f4406c9ce0e06bcf",
+      "source": "https://github.com/anthropics/knowledge-work-plugins/tree/d900840716eb262e1feb17c6f4406c9ce0e06bcf/data/skills/statistical-analysis",
+      "purpose": "Trends, distributions, outliers, and uncertainty"
+    },
+    {
+      "name": "data-visualization",
+      "repo": "anthropics/knowledge-work-plugins",
+      "path": "data/skills/data-visualization",
+      "ref": "d900840716eb262e1feb17c6f4406c9ce0e06bcf",
+      "source": "https://github.com/anthropics/knowledge-work-plugins/tree/d900840716eb262e1feb17c6f4406c9ce0e06bcf/data/skills/data-visualization",
+      "purpose": "Chart selection, scales, accessibility, export figures"
+    },
+    {
+      "name": "build-dashboard",
+      "repo": "anthropics/knowledge-work-plugins",
+      "path": "data/skills/build-dashboard",
+      "ref": "d900840716eb262e1feb17c6f4406c9ce0e06bcf",
+      "source": "https://github.com/anthropics/knowledge-work-plugins/tree/d900840716eb262e1feb17c6f4406c9ce0e06bcf/data/skills/build-dashboard",
+      "purpose": "Chart.js charts, coordinated filters, analytical dashboards"
+    },
+    {
+      "name": "nodejs-backend-patterns",
+      "repo": "wshobson/agents",
+      "path": "plugins/javascript-typescript/skills/nodejs-backend-patterns",
+      "ref": "7e2fb559cf4b824b27f1fec49fe88f7511066d26",
+      "source": "https://github.com/wshobson/agents/tree/7e2fb559cf4b824b27f1fec49fe88f7511066d26/plugins/javascript-typescript/skills/nodejs-backend-patterns",
+      "purpose": "Node service validation, errors, jobs, and APIs"
+    },
+    {
+      "name": "architecture-patterns",
+      "repo": "wshobson/agents",
+      "path": "plugins/backend-development/skills/architecture-patterns",
+      "ref": "7e2fb559cf4b824b27f1fec49fe88f7511066d26",
+      "source": "https://github.com/wshobson/agents/tree/7e2fb559cf4b824b27f1fec49fe88f7511066d26/plugins/backend-development/skills/architecture-patterns",
+      "purpose": "Domain/application/repository boundaries"
+    },
+    {
+      "name": "security-best-practices",
+      "repo": "openai/skills",
+      "path": "skills/.curated/security-best-practices",
+      "ref": "49f948faa9258a0c61caceaf225e179651397431",
+      "source": "https://github.com/openai/skills/tree/49f948faa9258a0c61caceaf225e179651397431/skills/.curated/security-best-practices",
+      "purpose": "JavaScript/TypeScript secure coding and explicit reviews"
+    },
+    {
+      "name": "security-threat-model",
+      "repo": "openai/skills",
+      "path": "skills/.curated/security-threat-model",
+      "ref": "49f948faa9258a0c61caceaf225e179651397431",
+      "source": "https://github.com/openai/skills/tree/49f948faa9258a0c61caceaf225e179651397431/skills/.curated/security-threat-model",
+      "purpose": "Explicit repository-grounded AppSec threat modeling"
+    },
+    {
+      "name": "property-based-testing",
+      "repo": "trailofbits/skills",
+      "path": "plugins/property-based-testing/skills/property-based-testing",
+      "ref": "470419e16f97e112d01fc32f4898aea1755015d9",
+      "source": "https://github.com/trailofbits/skills/tree/470419e16f97e112d01fc32f4898aea1755015d9/plugins/property-based-testing/skills/property-based-testing",
+      "purpose": "Calculator/parser invariants and round-trip testing"
+    }
+  ],
+  "local_adaptations": {
+    "connector_link_relocation": [
+      "search-strategy",
+      "validate-data",
+      "build-dashboard"
+    ]
+  }
+}
