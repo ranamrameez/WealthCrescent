@@ -94,6 +94,15 @@ function shiftISODate(value: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+function shiftISODateMonths(value: string, months: number): string {
+  const date = new Date(value + 'T00:00:00Z');
+  const day = date.getUTCDate();
+  date.setUTCDate(1);
+  date.setUTCMonth(date.getUTCMonth() + months);
+  const lastDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
+  date.setUTCDate(Math.min(day, lastDay));
+  return date.toISOString().slice(0, 10);
+}
 function isValidISODate(value: string | null): value is string {
   if (!value || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
   const date = new Date(value + 'T00:00:00Z');
@@ -107,8 +116,8 @@ function resolveDashboardRange(periodValue: string, fromValue: string | null, to
   if (period === '7d') from = shiftISODate(todayISO, -6);
   else if (period === '30d') from = shiftISODate(todayISO, -29);
   else if (period === '90d') from = shiftISODate(todayISO, -89);
-  else if (period === '6m') { const date = new Date(todayISO + 'T00:00:00Z'); date.setUTCMonth(date.getUTCMonth() - 6); from = date.toISOString().slice(0, 10); }
-  else if (period === '1y') { const date = new Date(todayISO + 'T00:00:00Z'); date.setUTCFullYear(date.getUTCFullYear() - 1); from = date.toISOString().slice(0, 10); }
+  else if (period === '6m') from = shiftISODateMonths(todayISO, -6);
+  else if (period === '1y') from = shiftISODateMonths(todayISO, -12);
   else if (period === 'ytd') from = todayISO.slice(0, 4) + '-01-01';
   else if (period === 'all') from = earliestDate ?? todayISO;
   else if (period === 'custom') {
