@@ -479,40 +479,7 @@ export function NetWorthPage(_legacySyncProps: {
   const periodInsightRows = insightCurrencies.map(currency => rangeEndRows.find(row => row.currency === currency) ?? { currency, assets: 0, liabilities: 0, net: 0, breakdown: [] });
   const missingFxCurrencies = [...new Set([...rangeStartRows, ...rangeEndRows].filter(row => row.net !== 0 && convertAmount(row.net, row.currency, preferredCurrency, rates) === null).map(row => row.currency))];
 
-  // README Pending item 64: an on-demand snapshot (see
-  // types/netWorthSnapshot.ts's own doc comment for the locked design
-  // decisions). Kept as a manual save action, even though the "Net worth
-  // over time" chart that used to read from it is retired below (README
-  // Done item — see CLAUDE.md) in favor of the new real per-month
-  // computation, which needs no saved snapshot at all to work for any
-  // past month.
-  const snapshots = useNetWorthSnapshotsWorkbookStore((s) => s.workbook.entries);
-  const addSnapshot = useNetWorthSnapshotsWorkbookStore((s) => s.addEntry);
-  const updateSnapshot = useNetWorthSnapshotsWorkbookStore((s) => s.updateEntry);
   const ensureSignedIn = useEnsureSignedIn();
-  const { user } = useAuthState();
-  const todaysSnapshot = snapshots.find((s) => s.date === todayISO);
-
-  useEffect(() => {
-    if (!user || todaysSnapshot || !rows.length) return;
-    const byCurrency: Record<string, number> = {};
-    rows.forEach((r) => { byCurrency[r.currency] = r.net; });
-    addSnapshot({ id: crypto.randomUUID(), date: todayISO, byCurrency });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, todaysSnapshot, todayISO]);
-
-  const saveSnapshot = async () => {
-    if (!(await ensureSignedIn('Sign in to save a net worth snapshot.'))) return;
-    const byCurrency: Record<string, number> = {};
-    rows.forEach((r) => { byCurrency[r.currency] = r.net; });
-    if (todaysSnapshot) {
-      updateSnapshot(todaysSnapshot.id, { byCurrency });
-      toast('Updated today\'s net worth snapshot.');
-    } else {
-      addSnapshot({ id: crypto.randomUUID(), date: todayISO, byCurrency });
-      toast('Net worth snapshot saved.');
-    }
-  };
 
   // Shared sign-in gate for every "Include in Net Worth" checkbox below —
   // same pattern as the existing per-entity Archive/Restore toggles
@@ -552,9 +519,6 @@ export function NetWorthPage(_legacySyncProps: {
           <div className="mt-12">
             <StatCard label={`Estimated net worth (${preferredCurrency})`} value={fmtMoney(grandTotal, preferredCurrency)} hue={grandTotal >= 0 ? 'var(--profit)' : 'var(--loss)'} />
           </div>
-          <button type="button" className="btn secondary small mt-sm" onClick={saveSnapshot}>
-            {todaysSnapshot ? 'Update today\'s snapshot' : 'Save snapshot'}
-          </button>
           {unconverted.length > 0 && (
             <div className="text-muted mt-sm">
               No {preferredCurrency} rate available for {unconverted.join(', ')} — those currencies' totals
@@ -768,25 +732,6 @@ export function NetWorthPage(_legacySyncProps: {
         content: <NetWorthAnalyticsSection ownCurrencies={ownCurrencies} activities={activities} categories={categories} groups={categoryGroups} emiLoans={netWorthAsOfInputs.emiLoans} currentRows={trendCurrentRows} periodEndRows={periodInsightRows} activityCurrencies={activityCurrencies} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} rangeStartDate={rangeStartDate} rangeEndDate={rangeEndDate} rangeLabel={rangeLabel} setDrilldown={setDrilldown} splitData={splitData} preferredCurrency={preferredCurrency} missingFxCurrencies={missingFxCurrencies} rentalsNet={selectedModules.includes('rentals') ? rentalsNetForRange : {}} />,
       }] : [])]} />
 
-      {/* User-requested (2026-08-26): subscription renewal/expiry alerts on
-          the "homepage" — a compact list, not the full per-subscription
-          detail (which lives on the Subscriptions page itself). */}
-      {renewalsSoon.length > 0 && (
-        <Notice tone="warning" className="mb-md">
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>
-            {renewalsSoon.length} subscription{renewalsSoon.length > 1 ? 's' : ''} renewing in the next 14 days
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-            {renewalsSoon.map((r) => (
-              <span key={r.subscription.id}>
-                {r.subscription.name} — {fmtMoney(r.subscription.amount, r.subscription.currencyCode)} on {r.date}
-              </span>
-            ))}
-          </div>
-          <Link to="/subscriptions" className="text-muted" style={{ display: 'inline-block', marginTop: 6 }}>Manage subscriptions →</Link>
-        </Notice>
-      )}
-
       <CollapsibleCard title={<h3 className="m-0">Upcoming</h3>} className="mb-md" defaultOpen={upcomingItems.length > 0}>
         <UpcomingList items={upcomingItems} limit={8} emptyText="Nothing expected in the next 14 days." />
         <Link to="/planning" className="text-muted" style={{ display: 'block', marginTop: 10 }}>See all →</Link>
@@ -819,28 +764,6 @@ export function NetWorthPage(_legacySyncProps: {
           full — see `NetWorthMonthlySection` below. */}
       {/* Item 4: "add charts to view capital split per currency" —
           supplementary content, not part of the requested reordering. */}
-      {firebaseReady && cloudEmpty && (
-        <Notice tone="warning" className="mt-12">
-          <p className="mt-0">No net worth snapshots found in the cloud for this account. This won't upload automatically.</p>
-          <button
-            className="btn secondary"
-            onClick={async () => {
-              const ok = await confirmDialog(
-                'This will overwrite anything currently in the cloud (there is nothing there now, but confirming since this can\'t be undone).',
-                `Upload ${snapshots.length} local snapshot${snapshots.length === 1 ? '' : 's'} to the cloud?`,
-              );
-              if (!ok) return;
-              try {
-                await uploadLocalToCloud();
-              } catch (e) {
-                toast(e instanceof Error ? e.message : 'Something went wrong.');
-              }
-            }}
-          >
-            Upload local data to cloud ({snapshots.length} snapshot{snapshots.length === 1 ? '' : 's'})
-          </button>
-        </Notice>
-      )}
 
       <FabButton label="Exchange rates" onClick={() => setRatesOpen(true)}><CashIcon size={18} /></FabButton>
       {ratesOpen && <Modal title="Exchange rates" onClose={() => setRatesOpen(false)} widthClass="50">          <div className="text-muted">
