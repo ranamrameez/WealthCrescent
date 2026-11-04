@@ -4,11 +4,13 @@ import { calculatePortfolio } from '../portfolioCalculationEngine';
 import { calculateStockPortfolio } from '../stockCalculationEngine';
 import { collectBudgetActivities } from '../budgetPlanner';
 import { collectUpcomingItems } from '../upcoming';
+import { fundsValueByCurrency } from '../fundsModule';
 
 describe('CalculationEngine public boundary', () => {
   it('delegates stock and portfolio calculations to the existing stock accounting implementation', () => {
     expect(CalculationEngine.stock.calculateStockPortfolio).toBe(calculateStockPortfolio);
     expect(CalculationEngine.portfolio.calculatePortfolio).toBe(calculatePortfolio);
+    expect(CalculationEngine.funds.fundsValueByCurrency).toBe(fundsValueByCurrency);
   });
 
   it('exposes the existing unified planning and upcoming calculations without cloning their logic', () => {
