@@ -30,7 +30,7 @@ The default is the last 30 days. Invalid dates are rejected; future dates are cl
 
 ## Non-goals and safeguards
 
-- The filter does not edit transactions, balances, broker profiles, or source records.
+- The dashboard sections use plain collapsible headers and sibling content cards; there is no redundant outer section-card shell. The filter does not edit transactions, balances, broker profiles, or source records.
 - It does not merge QSE and PSX broker profiles or combine their cash ledgers.
 - It does not invent an opening balance when no verified baseline exists.
 - Do not add a second dashboard-only accounting engine. Reuse the central net-worth/as-of and cash-flow calculations.
