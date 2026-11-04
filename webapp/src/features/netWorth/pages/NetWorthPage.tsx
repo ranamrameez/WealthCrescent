@@ -913,7 +913,7 @@ export function NetWorthPage({
             const next = new URLSearchParams(scopeParams); next.set('period', 'custom'); next.set('to', event.target.value); setScopeParams(next);
           }} /></label>
         </div>
-        <p className="text-muted mt-0">{rangeLabel}. The selected range drives flow, planned activity, net-worth change and historical analytics. Current net worth remains a live balance.</p>
+        <p className="text-muted mt-0">{rangeLabel}. The selected range drives period flow, net-worth change and historical analytics. Current net worth stays live; upcoming plans keep their separate 30-day forward-looking horizon.</p>
         <h3>Sections</h3>
         <div className="filter-preset-row">{[{ key: 'currencies', label: 'Per currency summary' }, { key: 'plans', label: 'Plans' }, { key: 'analytics', label: 'Analytics' }].map(section => <IncludeChip key={section.key} label={section.label} checked={sectionVisible(section.key)} onToggle={() => toggleSection(section.key)} />)}</div>
         <h3>Sources</h3>
