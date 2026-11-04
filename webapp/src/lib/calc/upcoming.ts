@@ -24,6 +24,8 @@ export interface UpcomingItem {
   /** Kept for renderer compatibility. Upcoming is now future-only; overdue
    * obligations belong in Alerts and are never emitted by this collector. */
   overdue: false;
+  /** Human-readable due timing, calculated with the rest of the read model. */
+  dueLabel: string;
   href?: string;
 }
 
@@ -171,5 +173,11 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
       }));
   });
 
-  return items.sort((a, b) => a.date.localeCompare(b.date) || a.module.localeCompare(b.module) || a.id.localeCompare(b.id));
+  return items
+    .sort((a, b) => a.date.localeCompare(b.date) || a.module.localeCompare(b.module) || a.id.localeCompare(b.id))
+    .map(item => {
+      const days = Math.round((Date.parse(`${item.date}T00:00:00.000Z`) - Date.parse(`${todayStr}T00:00:00.000Z`)) / 86400000);
+      const dueLabel = days === 0 ? 'Due Today' : days === 1 ? 'Happening tomorrow' : `Happening in ${days} days`;
+      return { ...item, dueLabel };
+    });
 }
