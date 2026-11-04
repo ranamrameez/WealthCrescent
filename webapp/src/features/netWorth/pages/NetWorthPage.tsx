@@ -418,10 +418,22 @@ export function NetWorthPage(_legacySyncProps: {
   };
 
   const todayISO = today();
-  const todayFlow = sumActivitiesByCurrency(activities, todayISO, todayISO);
   const earliestActivity = earliestActivityDate(netWorthAsOfInputs);
   const earliestDashboardDate = [earliestActivity, ...activities.map(activity => activity.date)].filter((date): date is string => !!date).sort()[0];
-  const dashboardRange = resolveDashboardRange(scopeParams.get('period') ?? '30d', scopeParams.get('from'), scopeParams.get('to'), earliestDashboardDate, todayISO);
+  const legacyPeriod = timeFilters.period as string;
+  useEffect(() => {
+    if (!['7d', '30d', '90d', '6m', '1y'].includes(legacyPeriod)) return;
+    if (legacyPeriod === '6m' || legacyPeriod === '1y') {
+      const preset = legacyPeriod === '6m' ? '6' : '12';
+      const range = presetDateRange(preset);
+      setTimeFilters({ period: preset, fromDate: range.startDate, toDate: range.endDate });
+    } else {
+      const days = legacyPeriod === '7d' ? 6 : legacyPeriod === '30d' ? 29 : 89;
+      setTimeFilters({ period: 'custom', fromDate: shiftISODate(todayISO, -days), toDate: todayISO });
+    }
+  }, [legacyPeriod, setTimeFilters, todayISO]);
+  const dashboardRange = resolveDashboardRange(legacyPeriod, timeFilters.fromDate, timeFilters.toDate, earliestDashboardDate, todayISO);
+  const todayFlow = sumActivitiesByCurrency(activities, todayISO, todayISO);
   const rangeStartDate = dashboardRange.from;
   const rangeEndDate = dashboardRange.to;
   const rangeLabel = dashboardRange.label;
@@ -893,26 +905,9 @@ export function NetWorthPage(_legacySyncProps: {
 </Modal>}
       {filtersOpen && <PageFilterModal onClose={() => setFiltersOpen(false)} onReset={() => {
         const next = new URLSearchParams(scopeParams);
-        ['entities', 'show-currencies', 'show-plans', 'show-analytics', 'period', 'from', 'to'].forEach(key => next.delete(key));
+        ['entities', 'show-currencies', 'show-monthly', 'show-plans', 'show-recent', 'show-analytics', 'show-upcoming'].forEach(key => next.delete(key));
         setScopeParams(next);
       }}>
-        <h3 className="mt-0">Time range</h3>
-        <div className="filter-fields-grid">
-          <label className="field"><span>Period</span><select value={dashboardRange.period} onChange={event => {
-            const next = new URLSearchParams(scopeParams);
-            next.set('period', event.target.value);
-            if (event.target.value === 'custom') { next.set('from', dashboardRange.from); next.set('to', dashboardRange.to); }
-            else { next.delete('from'); next.delete('to'); }
-            setScopeParams(next);
-          }}>{DASHBOARD_PERIODS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-          <label className="field"><span>From</span><input type="date" aria-label="From date" max={dashboardRange.to} value={dashboardRange.from} disabled={dashboardRange.period !== 'custom'} onChange={event => {
-            const next = new URLSearchParams(scopeParams); next.set('period', 'custom'); next.set('from', event.target.value); setScopeParams(next);
-          }} /></label>
-          <label className="field"><span>To</span><input type="date" aria-label="To date" min={dashboardRange.from} max={todayISO} value={dashboardRange.to} disabled={dashboardRange.period !== 'custom'} onChange={event => {
-            const next = new URLSearchParams(scopeParams); next.set('period', 'custom'); next.set('to', event.target.value); setScopeParams(next);
-          }} /></label>
-        </div>
-        <p className="text-muted mt-0">{rangeLabel}. The selected range drives period flow, net-worth change and historical analytics. Current net worth stays live; upcoming plans keep their separate 30-day forward-looking horizon.</p>
         <h3>Sections</h3>
         <div className="filter-preset-row">{[{ key: 'currencies', label: 'Per currency summary' }, { key: 'plans', label: 'Plans' }, { key: 'analytics', label: 'Analytics' }].map(section => <IncludeChip key={section.key} label={section.label} checked={sectionVisible(section.key)} onToggle={() => toggleSection(section.key)} />)}</div>
         <h3>Sources</h3>
