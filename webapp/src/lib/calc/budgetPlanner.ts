@@ -51,6 +51,9 @@ export interface BudgetActivity {
    * below (its real counterpart is already included as `executed: true`,
    * so including both would double-count the same money movement). */
   executed: boolean;
+  /** Pending real records remain visible in the activity ledger but are excluded
+   * from cleared cash-flow totals and monthly actuals. */
+  isPending?: boolean;
   /** Passthrough of `PlannedBankTransaction.sourceEmiLoanId` — set only for
    * a not-yet-executed EMI "Link to bank" installment plan. Exists so
    * `netWorthTrend.ts`'s monthly projection can exclude these from its
@@ -98,7 +101,7 @@ function normalizeCash(entries: CashEntry[], plans: PlannedCashEntry[], categori
     .map((e) => ({
       id: e.id, module: 'cash', sourceLabel: 'Cash', date: e.date,
       amount: e.isDeposit ? e.amount : -e.amount, currencyCode: e.currencyCode,
-      category: categoryName(e.categoryID, categories), description: e.note || (e.isDeposit ? 'Cash in' : 'Cash out'), executed: true,
+      category: categoryName(e.categoryID, categories), description: e.note || (e.isDeposit ? 'Cash in' : 'Cash out'), executed: true, isPending: e.isPending,
     }));
   const planned: BudgetActivity[] = planOccurrences(plans).filter((p) => !p.executed).map((p) => ({
     id: p.id, module: 'cash', sourceLabel: 'Cash', date: p.date,
@@ -117,7 +120,7 @@ function normalizeBank(accounts: BankAccount[], transactions: BankTransaction[],
     return [{
       id: t.id, module: 'bank' as const, sourceLabel: account.name, date: t.date,
       amount: t.amount, currencyCode: account.currencyCode,
-      category: categoryName(t.categoryID, categories), description: t.description, executed: true,
+      category: categoryName(t.categoryID, categories), description: t.description, executed: true, isPending: t.isPending,
     }];
   });
   const planned: BudgetActivity[] = planOccurrences(plans).filter((p) => !p.executed).flatMap((p) => {
@@ -142,7 +145,7 @@ function normalizeRentals(properties: Property[], entries: RentalEntry[], plans:
     return [{
       id: e.id, module: 'rentals' as const, sourceLabel: property.name, date: e.date,
       amount: e.isDeposit ? e.amount : -e.amount, currencyCode: property.currencyCode,
-      category: categoryName(e.categoryID, categories), description: e.note || (e.isDeposit ? 'Rent income' : 'Expense'), executed: true,
+      category: categoryName(e.categoryID, categories), description: e.note || (e.isDeposit ? 'Rent income' : 'Expense'), executed: true, isPending: e.isPending,
     }];
   });
   const planned: BudgetActivity[] = planOccurrences(plans).filter((p) => !p.executed).flatMap((p) => {
@@ -193,7 +196,7 @@ export function monthlyIncomeExpense(activities: BudgetActivity[], months: strin
     const income: Record<string, number> = {};
     const expense: Record<string, number> = {};
     activities
-      .filter((a) => a.date.slice(0, 7) === month)
+      .filter((a) => !a.isPending && a.date.slice(0, 7) === month)
       .forEach((a) => {
         if (a.amount >= 0) income[a.currencyCode] = (income[a.currencyCode] || 0) + a.amount;
         else expense[a.currencyCode] = (expense[a.currencyCode] || 0) + -a.amount;
