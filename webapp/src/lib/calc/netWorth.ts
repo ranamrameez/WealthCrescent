@@ -7,6 +7,8 @@ export interface NetWorthInputs {
   psx: Record<string, number>;
   funds: Record<string, number>;
   personalLoansNet: Record<string, number>;
+  personalLoanAssets?: Record<string, number>;
+  personalLoanLiabilities?: Record<string, number>;
   emiOutstanding: Record<string, number>;
   creditCards: Record<string, number>;
 }
@@ -28,13 +30,13 @@ export function mergeCurrencyTotals(...maps: Record<string, number>[]): Record<s
 
 export function computeNetWorthByCurrency(inputs: NetWorthInputs): CurrencyNetWorth[] {
   const { cash, bank, qse, psx, funds, personalLoansNet, emiOutstanding, creditCards } = inputs;
-  const currencies = mergeCurrencyKeys(cash, bank, qse, psx, funds, personalLoansNet, emiOutstanding, creditCards);
+  const currencies = mergeCurrencyKeys(cash, bank, qse, psx, funds, personalLoansNet, emiOutstanding, creditCards, inputs.personalLoanAssets ?? {}, inputs.personalLoanLiabilities ?? {});
   return currencies.map((currency) => {
     const loanNet = personalLoansNet[currency] ?? 0;
     const emi = emiOutstanding[currency] ?? 0;
     const cardDebt = creditCards[currency] ?? 0;
-    const assets = (cash[currency] ?? 0) + (bank[currency] ?? 0) + (qse[currency] ?? 0) + (psx[currency] ?? 0) + (funds[currency] ?? 0) + Math.max(loanNet, 0);
-    const liabilities = emi + cardDebt + Math.max(-loanNet, 0);
+    const assets = (cash[currency] ?? 0) + (bank[currency] ?? 0) + (qse[currency] ?? 0) + (psx[currency] ?? 0) + (funds[currency] ?? 0) + (inputs.personalLoanAssets?.[currency] ?? Math.max(loanNet, 0));
+    const liabilities = emi + cardDebt + (inputs.personalLoanLiabilities?.[currency] ?? Math.max(-loanNet, 0));
     const breakdown: NetWorthBreakdownEntry[] = [
       { module: 'Cash', amount: cash[currency] ?? 0 },
       { module: 'Bank', amount: bank[currency] ?? 0 },
@@ -42,7 +44,10 @@ export function computeNetWorthByCurrency(inputs: NetWorthInputs): CurrencyNetWo
       { module: 'Stocks (PSX)', amount: psx[currency] ?? 0 },
       { module: 'Funds', amount: funds[currency] ?? 0 },
       { module: 'Credit cards', amount: cardDebt > 0 ? -cardDebt : 0 },
-      { module: 'Personal Loans (net)', amount: loanNet },
+      ...(inputs.personalLoanAssets || inputs.personalLoanLiabilities
+        ? [{ module: 'Personal Loans (receivable)', amount: inputs.personalLoanAssets?.[currency] ?? 0 },
+          { module: 'Personal Loans (owed)', amount: -(inputs.personalLoanLiabilities?.[currency] ?? 0) }]
+        : [{ module: 'Personal Loans (net)', amount: loanNet }]),
       { module: 'EMI/Loans (outstanding)', amount: emi > 0 ? -emi : 0 },
     ].filter((b) => b.amount !== 0);
     return { currency, assets, liabilities, net: assets - liabilities, breakdown };

@@ -98,7 +98,7 @@ it('excludes transactions outside the selected range while retaining the live ba
   }));
   show(`/net-worth?period=custom&from=${todayISO}&to=${todayISO}`);
   const summary = screen.getByRole('heading', { name: 'Overall summary — USD' }).parentElement!;
-  const periodFlow = [...summary.querySelectorAll('.stat-card')].find(card => card.textContent?.includes('Period net flow'));
+  const periodFlow = [...summary.querySelectorAll('.current-position-metric')].find(card => card.textContent?.includes('Period net flow'));
   expect(periodFlow?.textContent).toContain('100.00');
   expect(summary.textContent).toContain('1,100.00');
 });
@@ -119,7 +119,8 @@ it('renders the dashboard sections without nesting cards and provides period ins
 
 it('restores hidden sections from a deep link and opens exchange rates only from the FAB', () => {
   show('/net-worth?show-currencies=false&show-plans=false&show-analytics=false');
-  expect(document.querySelectorAll('.standard-section-anchor')).toHaveLength(2);
+  expect(document.querySelectorAll('.standard-section-anchor')).toHaveLength(3);
+  expect(document.querySelector('[data-page-section="upcoming"]')).toBeTruthy();
   expect(document.querySelector('[data-page-section="recent"]')).toBeTruthy();
   expect(screen.queryByText('Refresh rates')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Exchange rates' }));

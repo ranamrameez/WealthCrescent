@@ -16,4 +16,3 @@ export function signedPlanAmount(plan: FinancePlan) {
   if ('kind' in plan) return ['payment', 'refund'].includes(plan.kind) ? plan.amount : -plan.amount;
   return plan.type === 'IN' || plan.type === 'RENT_INCOME' ? plan.amount : -plan.amount;
 }
-

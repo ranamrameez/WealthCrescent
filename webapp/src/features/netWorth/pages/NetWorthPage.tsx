@@ -12,7 +12,7 @@ import { FinancePlansHierarchy } from '../../../components/FinancePlansHierarchy
 import { NetWorthRecentTransactions } from '../components/NetWorthRecentTransactions';
 import { TopBarControls } from '../../../components/TopBarControls';
 import { AppChart as Chart, AppDoughnut as Doughnut } from '../../../components/AppCharts';
-import { Card, CollapsibleCard, MoneyValue, StatCard } from '../../../components/Card';
+import { Card, MoneyValue } from '../../../components/Card';
 import { StandardPageSections } from '../../../components/StandardPageSections';
 import { SummarySection, SummarySections, SummaryValue } from '../../../components/SummaryGroupCard';
 import { Modal } from '../../../components/Modal';
@@ -24,20 +24,22 @@ import { CheckIcon, FilterIcon, CashIcon } from '../../../components/icons';
 import { toast } from '../../../components/Toast';
 import { ChartCard } from '../../qse/components/ChartCard';
 import { type CurrencyNetWorth, type FlowActivityItem, type NetWorthBreakdownEntry } from '../../../lib/calc/netWorth';
-import { collectBudgetActivities, monthlyIncomeExpense, monthRange, monthsBetween, currentMonth as currentMonthOf, type MonthlyIncomeExpense, type BudgetActivity } from '../../../lib/calc/budgetPlanner';
-import { activitiesForGroup } from '../../../lib/calc/categoryGroups';
-import { useCategoryGroupStore } from '../../../store/categoryGroupStore';
-import { netIncomeByCurrency as rentalsNetIncomeByCurrency } from '../../../lib/calc/rentalsModule';
-import { endOfMonthAsOf, projectedNetWorthTrend, type MonthlyNetWorthPoint } from '../../../lib/calc/netWorthTrend';
-import { earliestActivityDate, netWorthAsOfDate, type NetWorthAsOfInputs } from '../../../lib/calc/netWorthAsOf';
+import type { MonthlyIncomeExpense, BudgetActivity } from '../../../lib/calc/budgetPlanner';
+import type { MonthlyNetWorthPoint } from '../../../lib/calc/netWorthTrend';
+import type { NetWorthAsOfInputs } from '../../../lib/calc/netWorthAsOf';
 import { UpcomingList } from '../../../components/UpcomingList';
 import { useUpcomingItems } from '../../../hooks/useUpcomingItems';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
-import { useNetWorthSummary } from '../hooks/useNetWorthSummary';
-import { convertAmount, effectiveRate, fetchFxRates, isFxStale, loadCachedFxRates, saveFxRates, setCrossRate, type FxRates } from '../../../lib/fx';
+import { getDashboardReport, getCurrencyDashboardSummary, getBreakdownDelta, getMonthlyFlowItems as monthlyFlowItems, getNetWorthBreakdownForMonth as netWorthBreakdownForMonth, getCategoryGroupReport, getMonthlyNetFlow, getPlanningReality, getReportingMonths, getMonthlyIncomeExpense as monthlyIncomeExpense,
+  getNetWorthTrend as projectedNetWorthTrend, getMonthEnd as endOfMonthAsOf } from '../../../services/finance/dashboardService';
+import { useDashboardContext, useDashboardActivities } from '../../../hooks/useDashboard';
+import { useNetWorthInputs, useNetWorthSummary } from '../hooks/useNetWorthSummary';
+import { shiftISODate, activityFlowItems, getDashboardHeadline, getDashboardInsights, setNetWorthInclusion, type NetWorthInclusionGroup, type NetWorthInclusionOption } from '../../../services/finance/dashboardService';
+import type { FxRates } from '../../../lib/calc/currencyConversion';
+import { getDashboardFxRates as loadCachedFxRates, isDashboardFxStale as isFxStale, getDashboardEffectiveRate as effectiveRate, refreshDashboardFxRates, saveDashboardCrossRate } from '../../../services/finance/dashboardService';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { useUrlTransactionFilters } from '../../../hooks/useUrlTransactionFilters';
-import { currentMonthRange, presetDateRange } from '../../../lib/dateRange';
+import { presetDateRange } from '../../../lib/dateRange';
 import { fmtMoney } from '../../../lib/format';
 import { dlDoughnut, dlLine, withAlpha } from '../../../lib/chartLabels';
 import type { ChartDataset } from 'chart.js';
@@ -45,97 +47,17 @@ import { applyChartTheme } from '../../../lib/chartSetup';
 import { cssVar } from '../../../lib/cssVar';
 import { HUES, hueStyle } from '../../../lib/statCardHues';
 import { useAppearanceStore } from '../../../store/appearanceStore';
-import { useCategoryStore } from '../../../store/categoryStore';
 import { useLastCurrency } from '../../../hooks/useLastCurrency';
 import { usePrimaryCurrency } from '../../../hooks/usePrimaryCurrency';
 import { useCurrencyRankComparator } from '../../../hooks/useCurrencyRank';
 import { useEnabledCurrencies } from '../../../hooks/useEnabledCurrencies';
-import { useCashWorkbookStore } from '../../../store/cashWorkbookStore';
-import { usePlannedCashWorkbookStore } from '../../../store/plannedCashWorkbookStore';
-import { useBankWorkbookStore } from '../../../store/bankWorkbookStore';
-import { useCreditCardWorkbookStore } from '../../../store/creditCardWorkbookStore';
-import { usePlannedBankWorkbookStore } from '../../../store/plannedBankWorkbookStore';
-import { useRentalsWorkbookStore } from '../../../store/rentalsWorkbookStore';
-import { usePlannedRentalsWorkbookStore } from '../../../store/plannedRentalsWorkbookStore';
-import { useInterEntityTransfersStore } from '../../../store/interEntityTransfersStore';
-import { usePersonalLoansWorkbookStore } from '../../../store/personalLoansWorkbookStore';
-import { useEMIWorkbookStore } from '../../../store/emiWorkbookStore';
-import { useFundsWorkbookStore } from '../../../store/fundsWorkbookStore';
-import { useWorkbookStore } from '../../../store/workbookStore';
-import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
-import type { CashSettings } from '../../../types/cashWorkbook';
-import type { QSESettings } from '../../../types/workbook';
-import type { PSXSettings } from '../../../types/psxWorkbook';
-import type { BankAccount } from '../../../types/bankWorkbook';
-import type { PersonalLoan } from '../../../types/personalLoansWorkbook';
-import type { EMILoan } from '../../../types/emiWorkbook';
-import type { Fund, FundsWorkbook } from '../../../types/fundsWorkbook';
+import type { Category, CategoryGroup } from '../../../types/finance';
 import { gridAutoStyle } from '../../../lib/gridStyle';
 
 const DASHBOARD_MODULES = ['cash', 'bank', 'creditCards', 'personalLoans', 'emi', 'funds', 'qse', 'psx', 'rentals'];
 
 const today = () => new Date().toISOString().slice(0, 10);
 const monthLabel = (m: string) => new Date(`${m}-01`).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
-
-function shiftISODate(value: string, days: number): string {
-  const date = new Date(value + 'T00:00:00Z');
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
-
-function isValidISODate(value: string | null): value is string {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const date = new Date(value + 'T00:00:00Z');
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
-}
-
-function resolveDashboardRange(periodValue: string, fromValue: string | null, toValue: string | null, earliestDate: string | undefined, todayISO: string) {
-  const legacy: Record<string, string> = { '7d': 'custom', '30d': 'custom', '90d': 'custom', '6m': '6', '1y': '12' };
-  const period = legacy[periodValue] ?? (['since-month', '3', '6', '12', 'ytd', 'all', 'custom'].includes(periodValue) ? periodValue : 'since-month');
-  let from = todayISO;
-  let to = todayISO;
-  if (period === 'since-month') from = currentMonthRange().startDate;
-  else if (period === '3' || period === '6' || period === '12' || period === 'ytd') from = presetDateRange(period).startDate;
-  else if (period === 'all') from = earliestDate && earliestDate <= todayISO ? earliestDate : todayISO;
-  else if (period === 'custom') {
-    const legacyDays = periodValue === '7d' ? 6 : periodValue === '30d' ? 29 : periodValue === '90d' ? 89 : null;
-    const requestedFrom = isValidISODate(fromValue) ? fromValue : legacyDays === null ? currentMonthRange().startDate : shiftISODate(todayISO, -legacyDays);
-    const requestedTo = isValidISODate(toValue) ? toValue : todayISO;
-    from = requestedFrom > todayISO ? todayISO : requestedFrom;
-    to = requestedTo > todayISO ? todayISO : requestedTo;
-    if (from > to) [from, to] = [to, from];
-  }
-  const label = period === 'custom' || period === 'all' ? from + ' – ' + to
-    : period === 'since-month' ? 'This month'
-      : period === '3' ? 'Last 3 months'
-        : period === '6' ? 'Last 6 months'
-          : period === '12' ? 'Last 12 months' : 'Year to date';
-  return { period, from, to, label };
-}
-
-function sumActivitiesByCurrency(activities: BudgetActivity[], fromDate: string, toDate: string): Record<string, number> {
-  const totals: Record<string, number> = {};
-  activities.forEach(activity => {
-    if (!activity.executed || activity.isPending || activity.date < fromDate || activity.date > toDate) return;
-    totals[activity.currencyCode] = (totals[activity.currencyCode] ?? 0) + activity.amount;
-  });
-  return totals;
-}
-
-function activityFlowItems(activities: BudgetActivity[], currency: string, fromDate: string, toDate: string): FlowActivityItem[] {
-  const labels: Record<BudgetActivity['module'], string> = { cash: 'Cash', bank: 'Bank', rentals: 'Rentals' };
-  return activities
-    .filter(activity => activity.executed && !activity.isPending && activity.currencyCode === currency && activity.date >= fromDate && activity.date <= toDate)
-    .map(activity => ({
-      module: labels[activity.module],
-      date: activity.date,
-      description: activity.description,
-      amount: activity.amount,
-      accountName: activity.sourceLabel,
-    }))
-    .sort((a, b) => a.date.localeCompare(b.date));
-}
 
 /** User-requested (2026-09-16): "For every calculated number, it should be
  * supported by a clickable pop-up view to display the related
@@ -204,16 +126,13 @@ function NetWorthDrilldownModal({ drilldown, onClose }: { drilldown: Drilldown; 
         </>
       )}
       {drilldown.kind === 'delta' && (() => {
-        const modules = [...new Set([...drilldown.previous.map((b) => b.module), ...drilldown.current.map((b) => b.module)])];
+        const modules = getBreakdownDelta(drilldown.previous, drilldown.current);
         if (!modules.length) return <div className="text-muted">Neither month has any contribution yet.</div>;
         return (
           <table>
             <thead><tr><th>Module</th><th style={{ textAlign: 'right' }}>Last month</th><th style={{ textAlign: 'right' }}>Now</th><th style={{ textAlign: 'right' }}>Δ</th></tr></thead>
             <tbody>
-              {modules.map((m) => {
-                const prev = drilldown.previous.find((b) => b.module === m)?.amount ?? 0;
-                const now = drilldown.current.find((b) => b.module === m)?.amount ?? 0;
-                const delta = now - prev;
+              {modules.map(({ module: m, previous: prev, current: now, delta }) => {
                 return (
                   <RecordRow record={m} key={m}>
                     <td>{m}</td>
@@ -243,27 +162,7 @@ export function NetWorthPage(_legacySyncProps: {
   cloudEmpty: boolean;
   uploadLocalToCloud: () => Promise<void>;
 }) {
-  const cashEntries = useCashWorkbookStore((s) => s.workbook.entries);
-  const cashSettings = useCashWorkbookStore((s) => s.workbook.settings);
-  const updateCashSettings = useCashWorkbookStore((s) => s.updateSettings);
-  const plannedCash = usePlannedCashWorkbookStore((s) => s.workbook.entries);
-  const bank = useBankWorkbookStore((s) => s.workbook);
-  const updateBankAccount = useBankWorkbookStore((s) => s.updateAccount);
-  const creditCardsWb = useCreditCardWorkbookStore((s) => s.workbook);
-  const plannedBank = usePlannedBankWorkbookStore((s) => s.workbook.entries);
-  const rentals = useRentalsWorkbookStore((s) => s.workbook);
-  const plannedRentals = usePlannedRentalsWorkbookStore((s) => s.workbook.entries);
-  const links = useInterEntityTransfersStore((s) => s.workbook.entries);
-  const personalLoans = usePersonalLoansWorkbookStore((s) => s.workbook);
-  const updatePersonalLoan = usePersonalLoansWorkbookStore((s) => s.updateLoan);
-  const emiLoans = useEMIWorkbookStore((s) => s.workbook.entries);
-  const updateEmiLoan = useEMIWorkbookStore((s) => s.updateEntry);
-  const funds = useFundsWorkbookStore((s) => s.workbook);
-  const setFundsWorkbook = useFundsWorkbookStore((s) => s.setWorkbook);
-  const qse = useWorkbookStore((s) => s.workbook);
-  const updateQseSettings = useWorkbookStore((s) => s.updateSettings);
-  const psx = usePSXWorkbookStore((s) => s.workbook);
-  const updatePsxSettings = usePSXWorkbookStore((s) => s.updateSettings);
+  const { rentals, categories, categoryGroups, inclusionGroups } = useDashboardContext();
 
   // User-reported (2026-09-09): "Stocks Dashboard: Those Rail Cards should
   // actually be in main dashboard. They are more relevant here." The rail's
@@ -301,8 +200,6 @@ export function NetWorthPage(_legacySyncProps: {
   const moduleOptions = DASHBOARD_MODULES;
   const selectedModules = useMemo(() => selectedEntityValues(scopeParams, DASHBOARD_MODULES), [scopeParams]);
   const { rows, biggestExposureCurrency } = useNetWorthSummary(selectedModules);
-  const includedCash = useMemo(() => selectedModules.includes('cash') && cashSettings.includeInNetWorth !== false ? cashEntries : [], [selectedModules, cashSettings.includeInNetWorth, cashEntries]);
-  const includedAccounts = useMemo(() => bank.settings.accounts.filter(account => account.includeInNetWorth !== false && selectedModules.includes(account.isLiability ? 'creditCards' : 'bank')), [bank.settings.accounts, selectedModules]);
   const currencyRank = useCurrencyRankComparator();
   const primaryCurrency = usePrimaryCurrency();
   // Explicit user preference (Primary currency, set on the Account page)
@@ -323,34 +220,9 @@ export function NetWorthPage(_legacySyncProps: {
     </TopBarControls>,
   );
 
-  const categories = useCategoryStore((s) => s.workbook.categories);
-  const categoryGroups = useCategoryGroupStore((s) => s.workbook.groups);
-  // User-reported (2026-09-04): "Inter-account transfers are counting as
-  // income; bad idea" — `links` excludes both sides of any cross-entity
-  // linked transfer from the flow calculation entirely (see
-  // `budgetPlanner.ts`'s own `linkedRecordKeys` doc comment).
-  const activities = useMemo(
-    () => collectBudgetActivities({
-      cashEntries: includedCash, plannedCash: selectedModules.includes('cash') && cashSettings.includeInNetWorth !== false ? plannedCash : [],
-      bankAccounts: includedAccounts, bankTransactions: bank.transactions, plannedBank,
-      rentalProperties: selectedModules.includes('rentals') ? rentals.settings.properties : [], rentalEntries: rentals.entries, plannedRentals,
-      categories, links,
-    }),
-    [includedCash, includedAccounts, selectedModules, cashSettings.includeInNetWorth, plannedCash, bank, plannedBank, rentals, plannedRentals, categories, links],
-  );
+  const activities = useDashboardActivities(selectedModules);
 
-  const netWorthAsOfInputs: NetWorthAsOfInputs = useMemo(() => ({
-    cashEntries: includedCash, cashSettings,
-    bankAccounts: includedAccounts, bankTransactions: bank.transactions,
-    creditCards: selectedModules.includes('creditCards') ? creditCardsWb.cards : [], creditCardTransactions: creditCardsWb.transactions,
-    personalLoans: selectedModules.includes('personalLoans') ? personalLoans.loans : [], personalLoanRepayments: personalLoans.repayments,
-    emiLoans: selectedModules.includes('emi') ? emiLoans.filter(loan => loan.includeInNetWorth !== false) : [],
-    fundsFunds: selectedModules.includes('funds') ? funds.funds : [], fundsTransactions: selectedModules.includes('funds') ? funds.transactions : [], fundsTransfers: selectedModules.includes('funds') ? funds.transfers : [], fundsDefaultCurrency: funds.settings.legacyTransferCurrency ?? funds.settings.defaultCurrency, fundsIncludeCashInNetWorth: selectedModules.includes('funds') && funds.settings.includeCashInNetWorth !== false, fundsPriceHistory: selectedModules.includes('funds') ? funds.priceHistory : {},
-    qseTransactions: qse.transactions, qseTransfers: qse.transfers, qseAdjustments: qse.adjustments,
-    qsePriceHistory: qse.priceHistory, qseSettings: { ...qse.settings, includeInNetWorth: selectedModules.includes('qse') && qse.settings.includeInNetWorth !== false },
-    psxTransactions: psx.transactions, psxTransfers: psx.transfers, psxAdjustments: psx.adjustments,
-    psxPriceHistory: psx.priceHistory, psxSettings: { ...psx.settings, includeInNetWorth: selectedModules.includes('psx') && psx.settings.includeInNetWorth !== false },
-  }), [includedCash, includedAccounts, selectedModules, cashSettings, bank, creditCardsWb, personalLoans, emiLoans, funds, qse, psx]);
+  const netWorthAsOfInputs = useNetWorthInputs(selectedModules);
 
   const [rates, setRates] = useState<FxRates | null>(() => loadCachedFxRates());
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -374,8 +246,7 @@ export function NetWorthPage(_legacySyncProps: {
     setFetching(true);
     setFetchError(null);
     try {
-      const fresh = await fetchFxRates();
-      saveFxRates(fresh);
+      const fresh = await refreshDashboardFxRates();
       setRates(fresh);
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Could not reach the rate provider.');
@@ -408,22 +279,13 @@ export function NetWorthPage(_legacySyncProps: {
   };
 
   const applyCrossRate = () => {
-    const value = Number(crossRateValue);
-    if (!rateFrom || !rateTo || rateFrom === rateTo || !value || value <= 0) {
-      return toast('Pick two different currencies and a positive rate.');
-    }
-    const next = setCrossRate(rateFrom, rateTo, value, rates);
-    if (!next) {
-      return toast(`No known rate for ${rateFrom} yet — set its rate against USD first, or pick USD as one side.`);
-    }
-    saveFxRates(next);
-    setRates(next);
-    toast(`Rate saved: 1 ${rateFrom} = ${value} ${rateTo}.`);
+    try {
+      setRates(saveDashboardCrossRate(rateFrom, rateTo, crossRateValue, rates));
+      toast('Rate saved: 1 ' + rateFrom + ' = ' + crossRateValue + ' ' + rateTo + '.');
+    } catch (error) { toast(error instanceof Error ? error.message : 'Could not save exchange rate.'); }
   };
 
   const todayISO = today();
-  const earliestActivity = earliestActivityDate(netWorthAsOfInputs);
-  const earliestDashboardDate = [earliestActivity, ...activities.map(activity => activity.date)].filter((date): date is string => !!date).sort()[0];
   const legacyPeriod = timeFilters.period as string;
   useEffect(() => {
     if (!['7d', '30d', '90d', '6m', '1y'].includes(legacyPeriod)) return;
@@ -436,53 +298,12 @@ export function NetWorthPage(_legacySyncProps: {
       setTimeFilters({ period: 'custom', fromDate: shiftISODate(todayISO, -days), toDate: todayISO });
     }
   }, [legacyPeriod, setTimeFilters, todayISO]);
-  const dashboardRange = resolveDashboardRange(legacyPeriod, timeFilters.fromDate, timeFilters.toDate, earliestDashboardDate, todayISO);
-  const todayFlow = sumActivitiesByCurrency(activities, todayISO, todayISO);
-  const rangeStartDate = dashboardRange.from;
-  const rangeEndDate = dashboardRange.to;
-  const rangeLabel = dashboardRange.label;
-  const rentalsNetForRange = rentalsNetIncomeByCurrency(rentals.settings.properties, rentals.entries.filter(entry => entry.date >= rangeStartDate && entry.date <= rangeEndDate));
-  const rangeBaselineDate = shiftISODate(rangeStartDate, -1);
-  const hasRangeBaseline = !!earliestActivity && earliestActivity <= rangeBaselineDate;
-  const rangeStartRows = netWorthAsOfDate(rangeBaselineDate, netWorthAsOfInputs);
-  const rangeEndRows = rangeEndDate === todayISO ? rows : netWorthAsOfDate(rangeEndDate, netWorthAsOfInputs);
-  const rangeStartByCurrency = Object.fromEntries(rangeStartRows.map(row => [row.currency, row.net]));
-  const rangeStartBreakdownByCurrency = Object.fromEntries(rangeStartRows.map(row => [row.currency, row.breakdown]));
-  const rangeEndByCurrency = Object.fromEntries(rangeEndRows.map(row => [row.currency, row.net]));
-  const rangeEndBreakdownByCurrency = Object.fromEntries(rangeEndRows.map(row => [row.currency, row.breakdown]));
-  const periodFlow = sumActivitiesByCurrency(activities, rangeStartDate, rangeEndDate);
-  const plannedUpcomingByCurrency = useMemo(() => {
-    const totals: Record<string, number> = {};
-    const upcomingEndDate = shiftISODate(todayISO, 29);
-    activities.filter(activity => !activity.executed && activity.date >= todayISO && activity.date <= upcomingEndDate).forEach(activity => {
-      totals[activity.currencyCode] = (totals[activity.currencyCode] ?? 0) + activity.amount;
-    });
-    return totals;
-  }, [activities, todayISO]);
-
-  // Item 4: "capital split per currency" — each currency's net worth
-  // converted to the preferred currency for a like-for-like comparison
-  // (a currency that can't convert is omitted from the chart, same
-  // degradation as the grand total, rather than plotting a wrong number).
-  // A doughnut can't meaningfully show a negative slice, so a currency
-  // with negative net worth is left out of the chart specifically — it's
-  // still fully visible in the per-currency cards and breakdown below.
-  const splitData = rows
-    .map((r) => ({ currency: r.currency, converted: convertAmount(r.net, r.currency, preferredCurrency, rates) }))
-    .filter((r): r is { currency: string; converted: number } => r.converted !== null && r.converted > 0);
-
-  // Ordered by the user's own Primary/Secondary/Other ranking (2026-09-16),
-  // not alphabetically — see `useCurrencyRankComparator`'s own doc comment.
-  const ownCurrencies = [...new Set([...rows, ...rangeStartRows, ...rangeEndRows].map((r) => r.currency))].sort(currencyRank);
-  const trendCurrentRows = ownCurrencies.map(currency => rows.find(row => row.currency === currency) ?? { currency, assets: 0, liabilities: 0, net: 0, breakdown: [] });
-  const activityCurrencies = [...new Set(activities.map(activity => activity.currencyCode))].sort(currencyRank);
-  const currencySummaryCurrencies = [...new Set([...ownCurrencies, ...Object.keys(todayFlow), ...Object.keys(periodFlow), ...Object.keys(plannedUpcomingByCurrency)])].sort(currencyRank);
-  const currencySummaryRows = currencySummaryCurrencies.map(currency => rows.find(row => row.currency === currency) ?? { currency, assets: 0, liabilities: 0, net: 0, breakdown: [] });
-  const selectedRangeActivities = activities.filter(activity => activity.date >= rangeStartDate && activity.date <= rangeEndDate);
-  const selectedRangeActualActivities = selectedRangeActivities.filter(activity => activity.executed && !activity.isPending);
-  const insightCurrencies = [...new Set([...rangeStartRows, ...rangeEndRows].map(row => row.currency).concat(selectedRangeActualActivities.map(activity => activity.currencyCode)))].sort(currencyRank);
-  const periodInsightRows = insightCurrencies.map(currency => rangeEndRows.find(row => row.currency === currency) ?? { currency, assets: 0, liabilities: 0, net: 0, breakdown: [] });
-  const missingFxCurrencies = [...new Set([...rangeStartRows, ...rangeEndRows].filter(row => row.net !== 0 && convertAmount(row.net, row.currency, preferredCurrency, rates) === null).map(row => row.currency))];
+  const report = getDashboardReport({ inputs: netWorthAsOfInputs, rows, activities, rentals, todayISO, period: legacyPeriod,
+    fromDate: timeFilters.fromDate, toDate: timeFilters.toDate, preferredCurrency, rates });
+  const { todayFlow, periodFlow, plannedUpcomingByCurrency, rangeStartDate, rangeEndDate, rangeLabel, rangeBaselineDate,
+    unverifiedOpeningCurrencies, hasRangeBaseline, rangeStartByCurrency, rangeEndByCurrency, rangeStartBreakdownByCurrency, rangeEndBreakdownByCurrency,
+    splitData, activityCurrencies, trendCurrentRows, currencySummaryRows, periodInsightRows, missingFxCurrencies, rentalsNetForRange, periodDeltaRows } = report;
+  const ownCurrencies = [...report.ownCurrencies].sort(currencyRank);
 
   const ensureSignedIn = useEnsureSignedIn();
 
@@ -492,57 +313,41 @@ export function NetWorthPage(_legacySyncProps: {
   // the `ensureSignedIn` call at 7 different call sites.
   const toggleInclude = async (setter: () => void) => {
     if (!(await ensureSignedIn('Sign in to change what counts toward Net Worth.'))) return;
-    setter();
+    try { setter(); } catch (error) { toast(error instanceof Error ? error.message : 'Could not update inclusion.'); }
   };
 
   return (
     <div className="standard-page">
       <div className="page-heading"><h1>Dashboard</h1><span className="text-muted">Selected range: {rangeLabel}</span></div>
-      <StandardPageSections sections={[{ key: 'summary', label: 'Overall summary', defaultOpen: true, unframed: true, unframedHeader: true, content: <div className="grid-auto" style={{ ...gridAutoStyle(320, 16), marginBottom: 16, alignItems: 'start' }}>
+      <StandardPageSections sections={[{ key: 'summary', label: 'Overall summary', defaultOpen: true, unframed: true, unframedHeader: true, content: <SummarySections>
         {preferredCurrencyOptions.map(({ code: preferredCurrency }) => {
-          const sum = (values: Record<string, number>) => {
-            let total = 0;
-            const missing: string[] = [];
-            Object.entries(values).forEach(([code, amount]) => {
-              const converted = convertAmount(amount, code, preferredCurrency, rates);
-              if (converted === null) missing.push(code); else total += converted;
-            });
-            return { total, missing, anyUnconverted: missing.length > 0 };
-          };
-          const net = sum(Object.fromEntries(rows.map(r => [r.currency, r.net])));
+          const { net, debts, todayFlowTotal, periodFlowTotal, previous, periodEnd, netWorthDelta, netWorthDeltaPct, plannedTotal } = getDashboardHeadline({
+            currency: preferredCurrency, rates, rows, todayFlow, periodFlow, rangeStart: rangeStartByCurrency, rangeEnd: rangeEndByCurrency,
+            planned: plannedUpcomingByCurrency, hasRangeBaseline, unverifiedOpeningCurrencies,
+          });
           const grandTotal = net.total, unconverted = net.missing;
-          const debts = sum(Object.fromEntries(rows.map(r => [r.currency, r.liabilities])));
           const totalDebts = debts.total, debtsUnconverted = debts.missing;
-          const todayFlowTotal = sum(todayFlow), periodFlowTotal = sum(periodFlow);
-          const previous = sum(rangeStartByCurrency);
-          const periodEnd = sum(rangeEndByCurrency);
-          const netWorthDelta = hasRangeBaseline ? periodEnd.total - previous.total : null;
-          const netWorthDeltaPct = netWorthDelta !== null && previous.total !== 0 ? netWorthDelta / Math.abs(previous.total) * 100 : null;
-          const plannedTotal = sum(plannedUpcomingByCurrency);
-          return <section key={preferredCurrency}>
-          <h3 className="mt-0">Overall summary — {preferredCurrency}</h3>
-          <div className="mt-12">
-            <StatCard label={`Estimated net worth (${preferredCurrency})`} value={fmtMoney(grandTotal, preferredCurrency)} hue={grandTotal >= 0 ? 'var(--profit)' : 'var(--loss)'} />
-          </div>
+          return <SummarySection key={preferredCurrency} title={`Overall summary — ${preferredCurrency}`} className="summary-overview">
+            <SummaryValue primary detail="Current balance" label={`Estimated net worth (${preferredCurrency})`} value={fmtMoney(grandTotal, preferredCurrency)} tone={grandTotal >= 0 ? 'positive' : 'negative'} />
           {unconverted.length > 0 && (
-            <div className="text-muted mt-sm">
+            <div className="summary-note">
               No {preferredCurrency} rate available for {unconverted.join(', ')} — those currencies' totals
               aren't included above; see their own sections below for real figures.
             </div>
           )}
-          <div className="grid-auto" style={{ ...gridAutoStyle(140, 8), marginTop: 12 }}>
-            <StatCard
+
+            <SummaryValue
               label="Total debts"
               value={fmtMoney(totalDebts, preferredCurrency)}
-              hue={totalDebts > 0 ? 'var(--loss)' : HUES[4]}
+              tone={totalDebts > 0 ? 'negative' : 'neutral'}
               title={debtsUnconverted.length ? `Excludes ${debtsUnconverted.join(', ')} — no rate available.` : undefined}
             />
-            <StatCard
+            <SummaryValue
               label="Today's net flow"
               value={fmtMoney(todayFlowTotal.total, preferredCurrency)}
-              hue={todayFlowTotal.total >= 0 ? 'var(--profit)' : 'var(--loss)'}
+              tone={todayFlowTotal.total >= 0 ? 'positive' : 'negative'}
               title={todayFlowTotal.anyUnconverted ? 'Some currencies excluded — no rate available.' : undefined}
-              labelTitle="Cleared Cash, Bank and Rental movement today, converted to the preferred currency."
+              tooltip="Cleared Cash, Bank and Rental movement today, converted to the preferred currency."
               onClick={() => setDrilldown({
                 kind: 'breakdown',
                 title: "Today's net flow, by currency",
@@ -550,12 +355,12 @@ export function NetWorthPage(_legacySyncProps: {
                 rows: Object.entries(todayFlow).map(([code, amount]) => ({ label: code, currency: code, amount })),
               })}
             />
-            <StatCard
+            <SummaryValue
               label="Period net flow"
               value={fmtMoney(periodFlowTotal.total, preferredCurrency)}
-              hue={periodFlowTotal.total >= 0 ? 'var(--profit)' : 'var(--loss)'}
+              tone={periodFlowTotal.total >= 0 ? 'positive' : 'negative'}
               title={periodFlowTotal.anyUnconverted ? 'Some currencies excluded — no rate available.' : undefined}
-              labelTitle={`Cleared Cash, Bank and Rental movement from ${rangeStartDate} through ${rangeEndDate}, converted to the preferred currency.`}
+              tooltip={`Cleared Cash, Bank and Rental movement from ${rangeStartDate} through ${rangeEndDate}, converted to the preferred currency.`}
               onClick={() => setDrilldown({
                 kind: 'breakdown',
                 title: `Period net flow (${rangeLabel}), by currency`,
@@ -563,51 +368,46 @@ export function NetWorthPage(_legacySyncProps: {
                 rows: Object.entries(periodFlow).map(([code, amount]) => ({ label: code, currency: code, amount })),
               })}
             />
-            <StatCard
+            <SummaryValue
               label="Upcoming planned activity (30 days)"
               value={fmtMoney(plannedTotal.total, preferredCurrency)}
-              hue={(plannedTotal.total) >= 0 ? 'var(--profit)' : 'var(--loss)'}
+              tone={(plannedTotal.total) >= 0 ? 'positive' : 'negative'}
               title={plannedTotal.anyUnconverted ? `Excludes ${plannedTotal.missing.join(', ')} — no rate available.` : `Unexecuted planned income and expenses from ${todayISO} through ${shiftISODate(todayISO, 29)}. Linked transfers are excluded.`}
             />
             {netWorthDelta !== null ? (
-              <StatCard
+              <SummaryValue
                 label="Net worth change in period"
                 value={`${netWorthDelta >= 0 ? '+' : ''}${fmtMoney(netWorthDelta, preferredCurrency)}`}
-                sub={netWorthDeltaPct !== null ? `${netWorthDeltaPct >= 0 ? '+' : ''}${netWorthDeltaPct.toFixed(1)}% vs. period start` : undefined}
-                hue={netWorthDelta >= 0 ? 'var(--profit)' : 'var(--loss)'}
+                detail={netWorthDeltaPct !== null ? `${netWorthDeltaPct >= 0 ? '+' : ''}${netWorthDeltaPct.toFixed(1)}% vs. period start` : undefined}
+                tone={netWorthDelta >= 0 ? 'positive' : 'negative'}
                 title={previous.anyUnconverted || periodEnd.anyUnconverted ? 'Some currencies excluded from the period comparison — no rate available.' : undefined}
-                labelTitle={`Net worth at ${rangeEndDate} minus net worth at the end of the day before ${rangeStartDate}.`}
+                tooltip={`Net worth at ${rangeEndDate} minus net worth at the end of the day before ${rangeStartDate}.`}
                 onClick={() => setDrilldown({
                   kind: 'breakdown',
                   title: `Net worth change (${rangeLabel}), by currency`,
                   explanation: `Each currency's real net worth at ${rangeEndDate} compared with ${rangeBaselineDate}, converted above to ${preferredCurrency}.`,
-                  rows: rangeEndRows.map((r) => ({ label: r.currency, currency: r.currency, amount: r.net - (rangeStartByCurrency[r.currency] ?? 0) })),
+                  rows: periodDeltaRows,
                 })}
               />
             ) : (
-              <StatCard
+              <SummaryValue
                 label="Net worth change in period"
                 value="—"
-                sub="No verified opening baseline for this range"
-                hue={HUES[4]}
-                labelTitle="A period change is shown only when there is real account history before the selected start date."
+                detail={previous.anyUnconverted || periodEnd.anyUnconverted ? 'Exchange rates missing for this comparison' : 'No verified opening baseline for this range'}
+                tone="neutral"
+                tooltip="A period change is shown only when there is real account history before the selected start date."
               />
             )}
-          </div>
-        </section>;
+        </SummarySection>;
         })}
-      </div> }, ...(sectionVisible('currencies') ? [{ key: 'currencies', label: 'Per currency summary', defaultOpen: true, unframed: true, unframedHeader: true, content: (<div className="grid-auto" style={{ ...gridAutoStyle(360, 12), marginBottom: 16 }}>
+      </SummarySections> }, ...(sectionVisible('currencies') ? [{ key: 'currencies', label: 'Per currency summary', defaultOpen: false, unframed: true, unframedHeader: true, content: (<div className="grid-auto" style={{ ...gridAutoStyle(360, 12), marginBottom: 16 }}>
         {[...currencySummaryRows].sort((a, b) => currencyRank(a.currency, b.currency)).map((r) => {
-          const converted = convertAmount(r.net, r.currency, preferredCurrency, rates);
-          const todayFlowC = todayFlow[r.currency] ?? 0;
-          const periodFlowC = periodFlow[r.currency] ?? 0;
-          const rangeStartC = rangeStartByCurrency[r.currency] ?? 0;
-          const rangeEndC = rangeEndByCurrency[r.currency] ?? 0;
-          const deltaC = hasRangeBaseline ? rangeEndC - rangeStartC : null;
-          const deltaPctC = deltaC !== null && rangeStartC !== 0 ? (deltaC / Math.abs(rangeStartC)) * 100 : null;
+          const { converted, todayFlowC, periodFlowC, deltaC, deltaPctC } = getCurrencyDashboardSummary(r, {
+            currency: preferredCurrency, rates, todayFlow, periodFlow, rangeStart: rangeStartByCurrency, rangeEnd: rangeEndByCurrency, hasRangeBaseline, unverifiedOpeningCurrencies,
+          });
           return (
-            <details key={r.currency} open style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
-              <summary style={{ cursor: 'pointer', fontWeight: 700, fontSize: 16 }}>
+            <details key={r.currency} className="currency-overview">
+              <summary>
                 {r.currency} — {fmtMoney(r.net, r.currency)}
                 {converted !== null && r.currency !== preferredCurrency && (
                   <span className="text-muted" style={{ marginLeft: 8, fontWeight: 400 }}>
@@ -615,37 +415,28 @@ export function NetWorthPage(_legacySyncProps: {
                   </span>
                 )}
               </summary>
-              <div className="row" style={{ gap: 12, marginTop: 12 }}>
-                <div
-                  className="stat-card card clickable"
-                  style={hueStyle(r.assets >= 0 ? 'var(--profit)' : 'var(--loss)')}
-                  onClick={() => setDrilldown({
+              <div className="current-position-metrics">
+                <SummaryValue label="Assets" value={fmtMoney(r.assets, r.currency)} tone={r.assets >= 0 ? 'positive' : 'negative'} onClick={() => setDrilldown({
                     kind: 'breakdown',
                     title: `${r.currency} assets, by module`,
                     explanation: `Every module that currently holds a positive balance in ${r.currency} — Cash/Bank's own real balance, QSE/PSX's cash+portfolio value, Funds' current NAV × units held, or money others owe you (Personal Loans).`,
                     rows: r.breakdown.filter((b) => b.amount > 0).map((b) => ({ label: b.module, currency: r.currency, amount: b.amount })),
                   })}
-                ><div className="label">Assets</div><MoneyValue n={r.assets} currency={r.currency} /></div>
-                <div
-                  className="stat-card card clickable"
-                  style={hueStyle('var(--loss)')}
-                  onClick={() => setDrilldown({
+                />
+                <SummaryValue label="Liabilities" value={fmtMoney(r.liabilities, r.currency)} tone={'negative'} onClick={() => setDrilldown({
                     kind: 'breakdown',
                     title: `${r.currency} liabilities, by module`,
                     explanation: `Every module that currently reduces your ${r.currency} net worth — EMI/Loans' outstanding balance, a credit card's owed amount, or net money you owe (Personal Loans). Shown as negative, the same signed convention used everywhere else in this breakdown.`,
                     rows: r.breakdown.filter((b) => b.amount < 0).map((b) => ({ label: b.module, currency: r.currency, amount: b.amount })),
                   })}
-                ><div className="label">Liabilities</div><MoneyValue n={r.liabilities} currency={r.currency} /></div>
-                <div
-                  className="stat-card card clickable"
-                  style={hueStyle(r.net >= 0 ? 'var(--profit)' : 'var(--loss)')}
-                  onClick={() => setDrilldown({
+                />
+                <SummaryValue label="Net" value={fmtMoney(r.net, r.currency)} tone={r.net >= 0 ? 'positive' : 'negative'} onClick={() => setDrilldown({
                     kind: 'breakdown',
                     title: `${r.currency} net worth, by module`,
                     explanation: `Assets minus liabilities in ${r.currency}, every module that contributed anything — a positive row adds to net worth, a negative row (EMI/credit cards/net owed) subtracts from it.`,
                     rows: r.breakdown.map((b) => ({ label: b.module, currency: r.currency, amount: b.amount })),
                   })}
-                ><div className="label">Net</div><MoneyValue n={r.net} currency={r.currency} /></div>
+                />
               </div>
               {/* User-reported (2026-09-09): "Per currency stats are
                  missing like Today's net flow, This month's net flow,
@@ -714,9 +505,9 @@ export function NetWorthPage(_legacySyncProps: {
               {r.breakdown.length > 0 && (
                 <div className="mt-12">
                   <div className="text-muted" style={{ marginBottom: 4 }}>By account</div>
-                  <div className="grid-auto" style={gridAutoStyle(120, 6)}>
+                  <div className="summary-contributors">
                     {r.breakdown.map((b) => (
-                      <div key={b.module} className="stat-card card" style={hueStyle(b.amount >= 0 ? 'var(--profit)' : 'var(--loss)')}>
+                      <div key={b.module}>
                         <div className="label">{b.module}</div>
                         <MoneyValue n={b.amount} currency={r.currency} />
                       </div>
@@ -727,7 +518,9 @@ export function NetWorthPage(_legacySyncProps: {
             </details>
           );
         })}
-      </div>) }] : []), ...(sectionVisible('plans') ? [{ unframed: true, unframedHeader: true,
+      </div>) }] : []), { key: 'upcoming', label: 'Upcoming', defaultOpen: upcomingItems.length > 0, unframed: true, unframedHeader: true, content: <>        <UpcomingList items={upcomingItems} limit={8} emptyText="Nothing expected in the next 14 days." />
+        <Link to="/planning" className="text-muted" style={{ display: 'block', marginTop: 10 }}>See all →</Link>
+</> }, ...(sectionVisible('plans') ? [{ unframed: true, unframedHeader: true,
         key: 'plans',
         label: 'Plans',
         content: <div className="stack-lg">
@@ -741,10 +534,7 @@ export function NetWorthPage(_legacySyncProps: {
         content: <NetWorthAnalyticsSection ownCurrencies={ownCurrencies} activities={activities} categories={categories} groups={categoryGroups} emiLoans={netWorthAsOfInputs.emiLoans} currentRows={trendCurrentRows} periodEndRows={periodInsightRows} activityCurrencies={activityCurrencies} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} rangeStartDate={rangeStartDate} rangeEndDate={rangeEndDate} rangeLabel={rangeLabel} setDrilldown={setDrilldown} splitData={splitData} preferredCurrency={preferredCurrency} missingFxCurrencies={missingFxCurrencies} rentalsNet={selectedModules.includes('rentals') ? rentalsNetForRange : {}} />,
       }] : [])]} />
 
-      <CollapsibleCard title={<h3 className="m-0">Upcoming</h3>} className="mb-md" defaultOpen={upcomingItems.length > 0}>
-        <UpcomingList items={upcomingItems} limit={8} emptyText="Nothing expected in the next 14 days." />
-        <Link to="/planning" className="text-muted" style={{ display: 'block', marginTop: 10 }}>See all →</Link>
-      </CollapsibleCard>
+
 
 
       {/* User-reported (2026-09-06), correcting the previous round's own
@@ -851,16 +641,7 @@ export function NetWorthPage(_legacySyncProps: {
           setScopeParams(next);
         }} />)}</div>
         <h3>Include in Net Worth</h3>
-      <IncludeInNetWorthControls
-        cashSettings={cashSettings} updateCashSettings={updateCashSettings}
-        qseSettings={qse.settings} updateQseSettings={updateQseSettings}
-        psxSettings={psx.settings} updatePsxSettings={updatePsxSettings}
-        bankAccounts={bank.settings.accounts} updateBankAccount={updateBankAccount}
-        personalLoans={personalLoans.loans} updatePersonalLoan={updatePersonalLoan}
-        emiLoans={emiLoans} updateEmiLoan={updateEmiLoan}
-        funds={funds} setFundsWorkbook={setFundsWorkbook}
-        toggleInclude={toggleInclude}
-      />
+      <IncludeInNetWorthControls groups={inclusionGroups} onToggle={option => toggleInclude(() => setNetWorthInclusion(option, !option.included))} />
 
       </PageFilterModal>}
       {drilldown && <NetWorthDrilldownModal drilldown={drilldown} onClose={() => setDrilldown(null)} />}
@@ -871,21 +652,18 @@ export function NetWorthPage(_legacySyncProps: {
 function NetWorthInsightsSection({ rows, activities, fromDate, toDate, rangeLabel, missingFxCurrencies }: {
   rows: CurrencyNetWorth[]; activities: BudgetActivity[]; fromDate: string; toDate: string; rangeLabel: string; missingFxCurrencies: string[];
 }) {
-  const recorded = activities.filter(activity => activity.executed && activity.date >= fromDate && activity.date <= toDate);
+  const insights = getDashboardInsights(rows, activities, fromDate, toDate);
   return <div className="mb-md">
     <h3>Insights — {rangeLabel}</h3>
     <div className="grid-auto" style={gridAutoStyle(260, 12)}>
-      {rows.map(row => {
-        const assets = row.breakdown.filter(item => item.amount > 0).sort((a, b) => b.amount - a.amount);
-        const liabilities = row.breakdown.filter(item => item.amount < 0).sort((a, b) => a.amount - b.amount);
-        const currencyActivity = recorded.filter(item => item.currencyCode === row.currency);
-        const netActivity = currencyActivity.reduce((total, item) => total + item.amount, 0);
+      {insights.map(row => {
+        const { largestAsset, largestLiability, netActivity, clearedCount } = row;
         return <Card key={row.currency}>
           <h4 className="mt-0">{row.currency}</h4>
-          <p><strong>Largest asset:</strong> {assets[0] ? assets[0].module + ' — ' + fmtMoney(assets[0].amount, row.currency) : 'No positive balance recorded'}</p>
-          <p><strong>Largest liability:</strong> {liabilities[0] ? liabilities[0].module + ' — ' + fmtMoney(liabilities[0].amount, row.currency) : 'No liability recorded'}</p>
+          <p><strong>Largest asset:</strong> {largestAsset ? largestAsset.module + ' — ' + fmtMoney(largestAsset.amount, row.currency) : 'No positive balance recorded'}</p>
+          <p><strong>Largest liability:</strong> {largestLiability ? largestLiability.module + ' — ' + fmtMoney(largestLiability.amount, row.currency) : 'No liability recorded'}</p>
           <p><strong>Recorded net activity:</strong> <span style={{ color: netActivity >= 0 ? 'var(--profit)' : 'var(--loss)' }}>{fmtMoney(netActivity, row.currency)}</span></p>
-          <p className="text-muted mb-0">{currencyActivity.length} cleared Cash, Bank or Rental entries in this range. Linked transfers are excluded.</p>
+          <p className="text-muted mb-0">{clearedCount} cleared Cash, Bank or Rental entries in this range. Linked transfers are excluded.</p>
         </Card>;
       })}
     </div>
@@ -894,8 +672,8 @@ function NetWorthInsightsSection({ rows, activities, fromDate, toDate, rangeLabe
 }
 
 function NetWorthAnalyticsSection({ ownCurrencies, activities, categories, groups, emiLoans, currentRows, periodEndRows, activityCurrencies, netWorthAsOfInputs, todayISODate, rangeStartDate, rangeEndDate, rangeLabel, setDrilldown, splitData, preferredCurrency, missingFxCurrencies, rentalsNet }: {
-  ownCurrencies: string[]; activities: BudgetActivity[]; categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories'];
-  groups: ReturnType<typeof useCategoryGroupStore.getState>['workbook']['groups']; emiLoans: Parameters<typeof projectedNetWorthTrend>[0]['emiLoans'];
+  ownCurrencies: string[]; activities: BudgetActivity[]; categories: Category[];
+  groups: CategoryGroup[]; emiLoans: Parameters<typeof projectedNetWorthTrend>[0]['emiLoans'];
   currentRows: CurrencyNetWorth[]; periodEndRows: CurrencyNetWorth[]; activityCurrencies: string[]; netWorthAsOfInputs: NetWorthAsOfInputs; todayISODate: string;
   rangeStartDate: string; rangeEndDate: string; rangeLabel: string; setDrilldown: (d: Drilldown) => void;
   splitData: Array<{ currency: string; converted: number }>; preferredCurrency: string; missingFxCurrencies: string[]; rentalsNet: Record<string, number>;
@@ -915,20 +693,11 @@ function NetWorthPlanningReality({ activities, selectedModules, currencies, curr
 }) {
   const dateSort = useDateTableSort();
   const [horizonDays, setHorizonDays] = useState<30 | 90 | 365>(90);
-  const endDate = useMemo(() => {
-    const date = new Date(`${todayISODate}T00:00:00Z`);
-    date.setUTCDate(date.getUTCDate() + horizonDays);
-    return date.toISOString().slice(0, 10);
-  }, [todayISODate, horizonDays]);
-  const scopedActivities = useMemo(() => activities.filter((activity) => selectedModules.includes(activity.module)), [activities, selectedModules]);
-  const planned = useMemo(() => scopedActivities.filter((activity) => !activity.executed && activity.date >= todayISODate && activity.date <= endDate), [scopedActivities, todayISODate, endDate]);
-  const sortedPlanned = dateSort.rows(planned.slice().sort((a, b) => a.date.localeCompare(b.date)), { date: row => row });
+  const reality = useMemo(() => getPlanningReality({ activities, selectedModules, currencies, currentRows, emiLoans, netWorthAsOfInputs, todayISODate, horizonDays }),
+    [activities, selectedModules, currencies, currentRows, emiLoans, netWorthAsOfInputs, todayISODate, horizonDays]);
+  const { endDate, planned } = reality;
+  const sortedPlanned = dateSort.rows(planned, { date: row => row });
   const { rows: pagePlannedRows, controls: plannedPaginationControls } = useTablePagination(sortedPlanned);
-  const projectionMonths = useMemo(() => monthRange(0, Math.max(0, monthsBetween(currentMonthOf(), endDate.slice(0, 7)))), [endDate]);
-  const projection = useMemo(() => projectedNetWorthTrend({
-    months: projectionMonths, currentMonth: currentMonthOf(), todayISODate, currentRows, activities: scopedActivities,
-    emiLoans: selectedModules.includes('emi') ? emiLoans : [], netWorthAsOfInputs,
-  }).at(-1), [projectionMonths, todayISODate, currentRows, scopedActivities, selectedModules, emiLoans, netWorthAsOfInputs]);
 
   return <div>
     <div className="filter-preset-row mb-md">
@@ -936,13 +705,7 @@ function NetWorthPlanningReality({ activities, selectedModules, currencies, curr
       <span className="text-muted">Through {endDate}</span>
     </div>
     <div className="grid-auto" style={{ ...gridAutoStyle(360, 12), marginBottom: 16 }}>
-      {currencies.map((currency) => {
-        const current = currentRows.find((row) => row.currency === currency)?.net ?? 0;
-        const currencyPlans = planned.filter((activity) => activity.currencyCode === currency);
-        const inflow = currencyPlans.filter((activity) => activity.amount > 0).reduce((sum, activity) => sum + activity.amount, 0);
-        const outflow = currencyPlans.filter((activity) => activity.amount < 0).reduce((sum, activity) => sum + Math.abs(activity.amount), 0);
-        const projected = projection?.byCurrency[currency] ?? current;
-        const change = projected - current;
+      {reality.rows.map(({ currency, current, inflow, outflow, projected, change }) => {
         return <Card key={currency}>
           <h3 className="mt-0">{currency} planning reality</h3>
           <SummarySections className="account-summary-sections">
@@ -983,95 +746,16 @@ function IncludeChip({ label, checked, onToggle }: { label: string; checked: boo
 }
 
 /** Persistent inclusion controls, hosted in the central page filters popup. */
-function IncludeInNetWorthControls({
-  cashSettings, updateCashSettings,
-  qseSettings, updateQseSettings,
-  psxSettings, updatePsxSettings,
-  bankAccounts, updateBankAccount,
-  personalLoans, updatePersonalLoan,
-  emiLoans, updateEmiLoan,
-  funds, setFundsWorkbook,
-  toggleInclude,
-}: {
-  cashSettings: CashSettings; updateCashSettings: (patch: Partial<CashSettings>) => void;
-  qseSettings: QSESettings; updateQseSettings: (patch: Partial<QSESettings>) => void;
-  psxSettings: PSXSettings; updatePsxSettings: (patch: Partial<PSXSettings>) => void;
-  bankAccounts: BankAccount[]; updateBankAccount: (id: string, patch: Partial<BankAccount>) => void;
-  personalLoans: PersonalLoan[]; updatePersonalLoan: (id: string, patch: Partial<PersonalLoan>) => void;
-  emiLoans: EMILoan[]; updateEmiLoan: (id: string, patch: Partial<EMILoan>) => void;
-  funds: FundsWorkbook; setFundsWorkbook: (wb: FundsWorkbook) => void;
-  toggleInclude: (setter: () => void) => void;
-}) {
-  const toggleFund = (f: Fund) =>
-    toggleInclude(() => setFundsWorkbook({ ...funds, funds: funds.funds.map((x) => (x.id === f.id ? { ...x, includeInNetWorth: x.includeInNetWorth === false } : x)) }));
-
-  return (
-    <>
-          <p className="text-muted mt-0">
-            Unchecked items are left out of every total on this page — e.g. an EMI loan you closed
-            early that the schedule still thinks is owed.
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              <IncludeChip label="Cash" checked={cashSettings.includeInNetWorth !== false} onToggle={() => toggleInclude(() => updateCashSettings({ includeInNetWorth: cashSettings.includeInNetWorth === false }))} />
-              <IncludeChip label="Stock Exchanges (QSE)" checked={qseSettings.includeInNetWorth !== false} onToggle={() => toggleInclude(() => updateQseSettings({ includeInNetWorth: qseSettings.includeInNetWorth === false }))} />
-              <IncludeChip label="Stock Exchanges (PSX)" checked={psxSettings.includeInNetWorth !== false} onToggle={() => toggleInclude(() => updatePsxSettings({ includeInNetWorth: psxSettings.includeInNetWorth === false }))} />
-            </div>
-
-            {bankAccounts.length > 0 && (
-              <div>
-                <div className="text-muted" style={{ marginBottom: 6, fontWeight: 600 }}>Banking</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {bankAccounts.map((a) => (
-                    <IncludeChip key={a.id} label={`${a.name} (${a.currencyCode})`} checked={a.includeInNetWorth !== false} onToggle={() => toggleInclude(() => updateBankAccount(a.id, { includeInNetWorth: a.includeInNetWorth === false }))} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {personalLoans.length > 0 && (
-              <div>
-                <div className="text-muted" style={{ marginBottom: 6, fontWeight: 600 }}>Personal Loans</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {personalLoans.map((l) => (
-                    <IncludeChip key={l.id} label={`${l.person} (${l.currencyCode})`} checked={l.includeInNetWorth !== false} onToggle={() => toggleInclude(() => updatePersonalLoan(l.id, { includeInNetWorth: l.includeInNetWorth === false }))} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {emiLoans.length > 0 && (
-              <div>
-                <div className="text-muted" style={{ marginBottom: 6, fontWeight: 600 }}>EMI / Loans</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {emiLoans.map((l) => (
-                    <IncludeChip key={l.id} label={`${l.name} (${l.currencyCode})`} checked={l.includeInNetWorth !== false} onToggle={() => toggleInclude(() => updateEmiLoan(l.id, { includeInNetWorth: l.includeInNetWorth === false }))} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {(funds.funds.length > 0 || funds.transfers.length > 0) && (
-              <div>
-                <div className="text-muted" style={{ marginBottom: 6, fontWeight: 600 }}>Funds</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  <IncludeChip
-                    label="Funds cash"
-                    checked={funds.settings.includeCashInNetWorth !== false}
-                    onToggle={() => toggleInclude(() => setFundsWorkbook({
-                      ...funds,
-                      settings: { ...funds.settings, includeCashInNetWorth: funds.settings.includeCashInNetWorth === false },
-                    }))}
-                  />
-                  {funds.funds.map((f) => (
-                    <IncludeChip key={f.id} label={`${f.name} (${f.currencyCode})`} checked={f.includeInNetWorth !== false} onToggle={() => toggleFund(f)} />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-    </>
-  );
+function IncludeInNetWorthControls({ groups, onToggle }: { groups: NetWorthInclusionGroup[]; onToggle: (option: NetWorthInclusionOption) => void }) {
+  return <>
+    <p className="text-muted mt-0">Unchecked items are left out of every net-worth total. Archiving an item does not exclude its balance.</p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {groups.map(group => <div key={group.title}>
+        <div className="text-muted" style={{ marginBottom: 6, fontWeight: 600 }}>{group.title}</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{group.items.map(option => <IncludeChip key={option.module + ':' + (option.id ?? '')} label={option.label} checked={option.included} onToggle={() => onToggle(option)} />)}</div>
+      </div>)}
+    </div>
+  </>;
 }
 
 /** User-requested (2026-09-04): "Create a chart of this table as well on
@@ -1102,7 +786,7 @@ function NetWorthMonthlySection({
 }: {
   ownCurrencies: string[];
   activityCurrencies: string[];
-  activities: ReturnType<typeof collectBudgetActivities>;
+  activities: BudgetActivity[];
   emiLoans: Parameters<typeof projectedNetWorthTrend>[0]['emiLoans'];
   currentRows: Parameters<typeof projectedNetWorthTrend>[0]['currentRows'];
   netWorthAsOfInputs: NetWorthAsOfInputs;
@@ -1111,14 +795,10 @@ function NetWorthMonthlySection({
   rangeEndDate: string;
   setDrilldown: (d: Drilldown) => void;
 }) {
-  const nowMonth = useMemo(() => currentMonthOf(), []);
+  const nowMonth = todayISODate.slice(0, 7);
   // The same page-level range controls the monthly chart and table; no
   // independent six-month slider can silently show a different period.
-  const months = useMemo(() => {
-    const startOffset = monthsBetween(nowMonth, rangeStartDate.slice(0, 7));
-    const endOffset = monthsBetween(nowMonth, rangeEndDate.slice(0, 7));
-    return monthRange(startOffset, endOffset);
-  }, [nowMonth, rangeStartDate, rangeEndDate]);
+  const months = useMemo(() => getReportingMonths(rangeStartDate.slice(0, 7), rangeEndDate.slice(0, 7)), [rangeStartDate, rangeEndDate]);
   const rangeActivities = useMemo(() => activities.filter(activity => activity.date >= rangeStartDate && activity.date <= rangeEndDate), [activities, rangeStartDate, rangeEndDate]);
   const monthly = useMemo(() => monthlyIncomeExpense(rangeActivities, months), [rangeActivities, months]);
   const trend = useMemo(
@@ -1200,8 +880,8 @@ function NetWorthMonthlySection({
 function CategoryGroupsSection({
   ownCurrencies, activities, categories, groups, fromDate, toDate, rangeLabel, setDrilldown,
 }: {
-  ownCurrencies: string[]; activities: BudgetActivity[]; categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories'];
-  groups: ReturnType<typeof useCategoryGroupStore.getState>['workbook']['groups']; fromDate: string; toDate: string; rangeLabel: string;
+  ownCurrencies: string[]; activities: BudgetActivity[]; categories: Category[];
+  groups: CategoryGroup[]; fromDate: string; toDate: string; rangeLabel: string;
   setDrilldown: (d: Drilldown) => void;
 }) {
   if (!groups.length) return null;
@@ -1217,9 +897,7 @@ function CategoryGroupsSection({
       </p>
       <div className="grid-auto" style={{ ...gridAutoStyle(260, 12) }}>
         {groups.map((g) => {
-          const items = activitiesForGroup(activities, g, categories).filter((a) => a.date >= fromDate && a.date <= toDate);
-          const byCurrency: Record<string, number> = {};
-          items.forEach((a) => { byCurrency[a.currencyCode] = (byCurrency[a.currencyCode] ?? 0) + a.amount; });
+          const { byCurrency, details } = getCategoryGroupReport(activities, g, categories, fromDate, toDate);
           const currenciesHere = ownCurrencies.filter((c) => byCurrency[c] !== undefined);
           return (
             <Card key={g.id}>
@@ -1239,10 +917,7 @@ function CategoryGroupsSection({
                         currency: c,
                         from: fromDate,
                         to: toDate,
-                        items: items.filter((a) => a.currencyCode === c).map((a) => ({
-                          module: a.module.charAt(0).toUpperCase() + a.module.slice(1),
-                          date: a.date, description: a.description, amount: a.amount, accountName: a.sourceLabel,
-                        })),
+                        items: details[c] ?? [],
                       })}
                     >
                       {byCurrency[c] >= 0 ? '+' : ''}{fmtMoney(byCurrency[c], c)}
@@ -1305,7 +980,6 @@ function NetWorthComboChart({ currency, months, trend }: { currency: string; mon
 /** The scrollable multi-month summary table, moved from Budget Planner
  * (README item 107's original design, user-requested 2026-08-27) — now
  * rendered once per currency instead of behind a currency picker. */
-const BUDGET_MODULE_LABEL: Record<string, string> = { cash: 'Cash', bank: 'Bank', rentals: 'Rentals' };
 
 /** The Inflow/Outflow cells' itemized drill-down — every `BudgetActivity`
  * (real + planned, Cash+Bank+Rentals, already excluding linked-transfer
@@ -1319,47 +993,6 @@ const BUDGET_MODULE_LABEL: Record<string, string> = { cash: 'Cash', bank: 'Bank'
  * `monthlyIncomeExpense`, built on the same `activities` array) already
  * includes it — the itemized popup must always reconcile with the number
  * it was opened from. */
-function monthlyFlowItems(activities: BudgetActivity[], month: string, currency: string): FlowActivityItem[] {
-  return activities
-    .filter((a) => a.date.slice(0, 7) === month && a.currencyCode === currency)
-    .map((a) => ({
-      module: BUDGET_MODULE_LABEL[a.module] ?? a.module,
-      date: a.date,
-      description: a.description,
-      amount: a.amount,
-      accountName: a.sourceLabel,
-    }));
-}
-
-/** The Net worth row's per-module drill-down for one month — reuses
- * exactly the same source `projectedNetWorthTrend` itself reads for that
- * month (see that function's own doc comment for the past/current/future
- * split), so the popup's own numbers always match the figure it was
- * opened from: a completed month's `netWorthAsOfDate` breakdown, the
- * current month's already-known live breakdown, or (a future/projected
- * month, which has no real per-module breakdown to show — the projection
- * only ever tracks two combined totals, see `MonthlyNetWorthPoint`) a
- * synthetic 2-row Assets/Liabilities split built from the same numbers the
- * chart/table cell itself renders. */
-function netWorthBreakdownForMonth(
-  month: string, currency: string, nowMonth: string,
-  netWorthAsOfInputs: NetWorthAsOfInputs, currentRows: CurrencyNetWorth[], trendRow: MonthlyNetWorthPoint | undefined,
-): { rows: NetWorthBreakdownEntry[]; isProjected: boolean } {
-  if (month < nowMonth) {
-    const rows = netWorthAsOfDate(endOfMonthAsOf(month), netWorthAsOfInputs);
-    return { rows: rows.find((r) => r.currency === currency)?.breakdown ?? [], isProjected: false };
-  }
-  if (month === nowMonth) {
-    return { rows: currentRows.find((r) => r.currency === currency)?.breakdown ?? [], isProjected: false };
-  }
-  const assets = trendRow?.assetsByCurrency[currency];
-  const liabilities = trendRow?.liabilitiesByCurrency[currency];
-  if (assets === undefined && liabilities === undefined) return { rows: [], isProjected: true };
-  const rows: NetWorthBreakdownEntry[] = [];
-  if (assets) rows.push({ module: 'Assets (projected)', amount: assets });
-  if (liabilities) rows.push({ module: 'Liabilities (projected)', amount: -liabilities });
-  return { rows, isProjected: true };
-}
 
 function MonthlySummaryTable({
   currency, months: initialMonths, nowMonth, monthly, trend, activities, rangeStartDate, rangeEndDate, currentRows, netWorthAsOfInputs, setDrilldown,
@@ -1465,7 +1098,7 @@ function MonthlySummaryTable({
               </td>
               {months.map((m) => {
                 const row = monthlyByMonth.get(m);
-                const net = (row?.income[currency] ?? 0) - (row?.expense[currency] ?? 0);
+                const net = getMonthlyNetFlow(row, currency);
                 return (
                   <td
                     key={m}

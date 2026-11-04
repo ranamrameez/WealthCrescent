@@ -25,16 +25,19 @@ export function SummarySection({ title, children, className = '' }: { title: Rea
   </section>;
 }
 
-export function SummaryValue({ label, value, detail, primary = false, tone, className = '' }: {
+export function SummaryValue({ label, value, detail, primary = false, tone, className = '', tooltip, title, onClick }: {
   label: ReactNode; value: ReactNode; detail?: ReactNode; primary?: boolean;
-  tone?: 'positive' | 'negative' | 'neutral'; className?: string;
+  tone?: 'positive' | 'negative' | 'neutral'; className?: string; tooltip?: string; title?: string; onClick?: () => void;
 }) {
   const toneClass = tone === 'positive' ? 'text-profit' : tone === 'negative' ? 'text-loss' : '';
-  return <div className={`current-position-metric${primary ? ' current-position-primary' : ''} ${className}`.trim()}>
-    <span>{label}</span>
+  const content = <>
+    <span>{tooltip ? <Tooltip text={tooltip}><span>{label}</span></Tooltip> : label}</span>
     <strong className={toneClass || undefined}>{value}</strong>
     {detail != null && <small>{detail}</small>}
-  </div>;
+  </>;
+  const metricClass = `current-position-metric${primary ? ' current-position-primary' : ''} ${className}`.trim();
+  return onClick ? <button type="button" title={title} className={`${metricClass} summary-metric-action`} onClick={onClick}>{content}</button>
+    : <div title={title} className={metricClass}>{content}</div>;
 }
 
 export function SummaryGroupCard({ title, tooltip, children, className = '', hue }: {

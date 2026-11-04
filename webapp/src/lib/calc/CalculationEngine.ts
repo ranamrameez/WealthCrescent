@@ -26,8 +26,16 @@ import * as netWorthTrend from './netWorthTrend';
 import * as emi from './emiModule';
 import * as rentals from './rentalPlanning';
 import * as subscriptions from './subscriptionsModule';
-import * as recurrence from './recurrence';
 import * as planning from './planningReadModel';
+import * as recurrence from './recurrence';
+import * as currency from './currencyConversion';
+import * as dashboard from './dashboardReadModel';
+import * as valuation from './netWorthValuation';
+import * as personalLoans from './personalLoansModule';
+import * as transfers from './transferBalance';
+import * as rentalActuals from './rentalsModule';
+import * as categoryGroups from './categoryGroups';
+import * as recentActivity from './recentActivity';
 
 /**
  * Stable domain-oriented API. Keep all financial calculation entry points
@@ -53,6 +61,14 @@ export const CalculationEngine = Object.freeze({
   subscriptions,
   recurrence,
   planning,
+  categoryGroups,
+  rentalActuals,
+  transfers,
+  personalLoans,
+  valuation,
+  currency,
+  dashboard,
+  recentActivity,
 });
 
 export type CalculationEngineApi = typeof CalculationEngine;
