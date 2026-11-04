@@ -461,8 +461,12 @@ export function NetWorthPage({
   // not alphabetically — see `useCurrencyRankComparator`'s own doc comment.
   const ownCurrencies = [...new Set([...rows, ...rangeStartRows, ...rangeEndRows].map((r) => r.currency))].sort(currencyRank);
   const trendCurrentRows = ownCurrencies.map(currency => rows.find(row => row.currency === currency) ?? { currency, assets: 0, liabilities: 0, net: 0, breakdown: [] });
+  const currencySummaryRows = ownCurrencies.map(currency => rows.find(row => row.currency === currency) ?? { currency, assets: 0, liabilities: 0, net: 0, breakdown: [] });
   const activityCurrencies = [...new Set(activities.map(activity => activity.currencyCode))].sort(currencyRank);
-  const missingFxCurrencies = rangeEndRows.filter(row => convertAmount(row.net, row.currency, preferredCurrency, rates) === null).map(row => row.currency);
+  const selectedRangeActivities = activities.filter(activity => activity.date >= rangeStartDate && activity.date <= rangeEndDate);
+  const insightCurrencies = [...new Set([...rangeStartRows, ...rangeEndRows].map(row => row.currency).concat(selectedRangeActivities.map(activity => activity.currencyCode)))].sort(currencyRank);
+  const periodInsightRows = insightCurrencies.map(currency => rangeEndRows.find(row => row.currency === currency) ?? { currency, assets: 0, liabilities: 0, net: 0, breakdown: [] });
+  const missingFxCurrencies = [...new Set([...rangeStartRows, ...rangeEndRows].filter(row => row.net !== 0 && convertAmount(row.net, row.currency, preferredCurrency, rates) === null).map(row => row.currency))];
 
   // README Pending item 64: an on-demand snapshot (see
   // types/netWorthSnapshot.ts's own doc comment for the locked design
@@ -613,7 +617,7 @@ export function NetWorthPage({
         </section>;
         })}
       </div></div> }, ...(sectionVisible('currencies') ? [{ key: 'currencies', label: 'Per currency summary', defaultOpen: true, unframed: true, content: (<div><h2>Current balances by currency</h2><div className="grid-auto" style={{ ...gridAutoStyle(360, 12), marginBottom: 16 }}>
-        {[...rows].sort((a, b) => currencyRank(a.currency, b.currency)).map((r) => {
+        {[...currencySummaryRows].sort((a, b) => currencyRank(a.currency, b.currency)).map((r) => {
           const converted = convertAmount(r.net, r.currency, preferredCurrency, rates);
           const todayFlowC = todayFlow[r.currency] ?? 0;
           const periodFlowC = periodFlow[r.currency] ?? 0;
@@ -750,7 +754,7 @@ export function NetWorthPage({
       }] : []), ...(sectionVisible('analytics') ? [{ unframed: true,
         key: 'analytics',
         label: 'Analytics',
-        content: <div><h2>Analytics & insights</h2><NetWorthAnalyticsSection ownCurrencies={ownCurrencies} activities={activities} categories={categories} groups={categoryGroups} emiLoans={netWorthAsOfInputs.emiLoans} currentRows={trendCurrentRows} periodEndRows={rangeEndRows} activityCurrencies={activityCurrencies} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} rangeStartDate={rangeStartDate} rangeEndDate={rangeEndDate} rangeLabel={rangeLabel} setDrilldown={setDrilldown} splitData={splitData} preferredCurrency={preferredCurrency} missingFxCurrencies={missingFxCurrencies} rentalsNet={selectedModules.includes('rentals') ? rentalsNetForRange : {}} /></div>,
+        content: <div><h2>Analytics & insights</h2><NetWorthAnalyticsSection ownCurrencies={ownCurrencies} activities={activities} categories={categories} groups={categoryGroups} emiLoans={netWorthAsOfInputs.emiLoans} currentRows={trendCurrentRows} periodEndRows={periodInsightRows} activityCurrencies={activityCurrencies} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} rangeStartDate={rangeStartDate} rangeEndDate={rangeEndDate} rangeLabel={rangeLabel} setDrilldown={setDrilldown} splitData={splitData} preferredCurrency={preferredCurrency} missingFxCurrencies={missingFxCurrencies} rentalsNet={selectedModules.includes('rentals') ? rentalsNetForRange : {}} /></div>,
       }] : [])]} />
 
       {/* User-requested (2026-08-26): subscription renewal/expiry alerts on
@@ -791,7 +795,7 @@ export function NetWorthPage({
          line. */}
 
       {rows.length === 0 && (
-        <Card><div className="text-muted">No balances recorded yet across any account.</div></Card>
+        <Card><div className="text-muted">No current balances recorded across the selected sources. Historical positions and activity may still appear for the selected reporting range.</div></Card>
       )}
 
       {/* Grid of per-currency account summaries (user-specified order,
