@@ -11,7 +11,7 @@ import type { Subscription } from '../../types/subscriptionsWorkbook';
 import { recurrenceOccurrencesWithin } from './recurrence';
 import { emiSchedule, emiSummary, installmentDueDate } from './emiModule';
 import { proposeRentCollection } from './rentalPlanning';
-import { alertTriggerMs, generateRenewalOccurrences } from './subscriptionsModule';
+import { generateRenewalOccurrences } from './subscriptionsModule';
 
 export interface UpcomingItem {
   id: string;
@@ -25,7 +25,6 @@ export interface UpcomingItem {
    * obligations belong in Alerts and are never emitted by this collector. */
   overdue: false;
   href?: string;
-  reminder?: boolean;
 }
 
 export interface UpcomingInputs {
@@ -157,30 +156,6 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
   });
 
   inputs.subscriptions.filter(subscription => subscription.active).forEach(subscription => {
-    // Subscription reminders are rendered in this same Upcoming stream.
-    // This prevents the global alert popup and the dashboard from showing
-    // the same renewal twice, while preserving each configured lead time.
-    (subscription.alerts ?? []).forEach(alert => {
-      const triggerMs = alertTriggerMs(subscription, alert, today);
-      if (triggerMs == null) return;
-      const triggerDate = new Date(triggerMs);
-      const triggerDay = `${triggerDate.getFullYear()}-${String(triggerDate.getMonth() + 1).padStart(2, '0')}-${String(triggerDate.getDate()).padStart(2, '0')}`;
-      if (!inWindow(triggerDay, todayStr, windowEndStr)) return;
-      const reminderLabel = alert.daysBefore != null
-        ? alert.daysBefore === 0 ? 'Reminder · due today' : `Reminder · ${alert.daysBefore} days before renewal`
-        : 'Scheduled reminder';
-      items.push({
-        id: `${subscription.id}:alert:${alert.id}:${triggerDay}`,
-        date: triggerDay,
-        module: 'subscriptions',
-        label: `${subscription.name} · ${reminderLabel}`,
-        amount: subscription.amount,
-        currencyCode: subscription.currencyCode,
-        kind: 'expense',
-        overdue: false,
-        reminder: true,
-      });
-    });
     generateRenewalOccurrences(subscription, today)
       .filter(occurrence => inWindow(occurrence.date, todayStr, windowEndStr))
       .filter(occurrence => !plannedSubscriptionKeys.has(`${subscription.id}@${occurrence.date}`))
