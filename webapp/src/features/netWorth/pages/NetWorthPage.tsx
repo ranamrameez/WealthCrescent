@@ -211,10 +211,7 @@ function NetWorthDrilldownModal({ drilldown, onClose }: { drilldown: Drilldown; 
  * section visibility; saved inclusion settings retain their sign-in gate.
  * Exchange rates are a secondary action in a FAB popup. The legacy route is
  * retained for bookmarks. See docs/PAGE_TEMPLATE_GUIDE.md. */
-export function NetWorthPage({
-  cloudEmpty,
-  uploadLocalToCloud,
-}: {
+export function NetWorthPage(_legacySyncProps: {
   syncStatus: string;
   cloudEmpty: boolean;
   uploadLocalToCloud: () => Promise<void>;
@@ -229,7 +226,6 @@ export function NetWorthPage({
   const plannedBank = usePlannedBankWorkbookStore((s) => s.workbook.entries);
   const rentals = useRentalsWorkbookStore((s) => s.workbook);
   const plannedRentals = usePlannedRentalsWorkbookStore((s) => s.workbook.entries);
-  const subscriptions = useSubscriptionsWorkbookStore((s) => s.workbook.entries);
   const links = useInterEntityTransfersStore((s) => s.workbook.entries);
   const personalLoans = usePersonalLoansWorkbookStore((s) => s.workbook);
   const updatePersonalLoan = usePersonalLoansWorkbookStore((s) => s.updateLoan);
@@ -242,11 +238,6 @@ export function NetWorthPage({
   const psx = usePSXWorkbookStore((s) => s.workbook);
   const updatePsxSettings = usePSXWorkbookStore((s) => s.updateSettings);
 
-  // User-requested (2026-08-26): renewal/expiry alerts on the "homepage" —
-  // a 14-day glance window, broader than any one subscription's own
-  // configured alert lead time (which might be shorter, or unset), so this
-  // stays useful even for a subscription with no alerts configured at all.
-  const renewalsSoon = upcomingRenewals(subscriptions, 14);
   // User-reported (2026-09-09): "Stocks Dashboard: Those Rail Cards should
   // actually be in main dashboard. They are more relevant here." The rail's
   // own "Net worth" mini-card (DashboardRail.tsx) would just duplicate this
@@ -270,6 +261,7 @@ export function NetWorthPage({
   // a much more likely "the one they care about" than an arbitrary global
   // default — falling back to 'USD' only when there's no data yet to judge by.
   const [scopeParams, setScopeParams] = useSearchParams();
+  const { filters: timeFilters, setFilters: setTimeFilters } = useUrlTransactionFilters('since-month');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [ratesOpen, setRatesOpen] = useState(false);
   const sectionVisible = (key: string) => scopeParams.get(`show-${key}`) !== 'false';
@@ -298,7 +290,10 @@ export function NetWorthPage({
   const preferredCurrencyOptions = [...new Set([...enabledCurrencies.map(c => c.code), ...rows.map(r => r.currency)])].sort(currencyRank).map(code => ({ code }));
   // Page-wide controls share the pinned top bar with section navigation.
   usePageTopBarRightSlot(
-    <TopBarControls><button type="button" className="btn secondary small topbar-filter-btn" onClick={() => setFiltersOpen(true)}><FilterIcon size={14} /> Filters</button></TopBarControls>,
+    <TopBarControls>
+      <DateRangeWidget value={timeFilters} onChange={setTimeFilters} />
+      <button type="button" className="btn secondary small topbar-filter-btn" onClick={() => setFiltersOpen(true)}><FilterIcon size={14} /> Dashboard filters</button>
+    </TopBarControls>,
   );
 
   const categories = useCategoryStore((s) => s.workbook.categories);
