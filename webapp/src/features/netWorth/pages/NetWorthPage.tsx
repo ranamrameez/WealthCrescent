@@ -874,10 +874,26 @@ export function NetWorthPage({
 </Modal>}
       {filtersOpen && <PageFilterModal onClose={() => setFiltersOpen(false)} onReset={() => {
         const next = new URLSearchParams(scopeParams);
-        ['entities', 'show-currencies', 'show-plans', 'show-analytics'].forEach(key => next.delete(key));
+        ['entities', 'show-currencies', 'show-plans', 'show-analytics', 'period', 'from', 'to'].forEach(key => next.delete(key));
         setScopeParams(next);
       }}>
-        <h3 className="mt-0">Sections</h3>
+        <h3 className="mt-0">Time range</h3>
+        <div className="filter-fields-grid">
+          <label className="field"><span>Period</span><select value={dashboardRange.period} onChange={event => {
+            const next = new URLSearchParams(scopeParams);
+            next.set('period', event.target.value);
+            if (event.target.value !== 'custom') { next.delete('from'); next.delete('to'); }
+            setScopeParams(next);
+          }}>{DASHBOARD_PERIODS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+          <label className="field"><span>From</span><input type="date" aria-label="From date" max={todayISO} value={dashboardRange.from} disabled={dashboardRange.period !== 'custom'} onChange={event => {
+            const next = new URLSearchParams(scopeParams); next.set('period', 'custom'); next.set('from', event.target.value); setScopeParams(next);
+          }} /></label>
+          <label className="field"><span>To</span><input type="date" aria-label="To date" max={todayISO} value={dashboardRange.to} disabled={dashboardRange.period !== 'custom'} onChange={event => {
+            const next = new URLSearchParams(scopeParams); next.set('period', 'custom'); next.set('to', event.target.value); setScopeParams(next);
+          }} /></label>
+        </div>
+        <p className="text-muted mt-0">{rangeLabel}. The selected range drives flow, planned activity, net-worth change and historical analytics. Current net worth remains a live balance.</p>
+        <h3>Sections</h3>
         <div className="filter-preset-row">{[{ key: 'currencies', label: 'Per currency summary' }, { key: 'plans', label: 'Plans' }, { key: 'analytics', label: 'Analytics' }].map(section => <IncludeChip key={section.key} label={section.label} checked={sectionVisible(section.key)} onToggle={() => toggleSection(section.key)} />)}</div>
         <h3>Sources</h3>
         <div className="filter-preset-row">{moduleOptions.map(value => <IncludeChip key={value} label={value === 'creditCards' ? 'Credit cards' : value === 'personalLoans' ? 'Personal loans' : value.toUpperCase()} checked={selectedModules.includes(value)} onToggle={() => {
