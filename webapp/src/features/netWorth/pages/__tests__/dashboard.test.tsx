@@ -71,6 +71,27 @@ it('applies the URL-backed custom date range to flow figures and exposes the sel
   expect(within(modal).getByText(new RegExp(todayISO))).toBeTruthy();
 });
 
+it('excludes transactions outside the selected range while retaining the live balance', () => {
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const oldDate = new Date(todayISO + 'T00:00:00Z');
+  oldDate.setUTCDate(oldDate.getUTCDate() - 40);
+  const oldISO = oldDate.toISOString().slice(0, 10);
+  useCashWorkbookStore.setState(state => ({
+    workbook: {
+      ...state.workbook,
+      entries: [...state.workbook.entries, {
+        id: 'cash-old', date: oldISO, currencyCode: 'USD', amount: 900,
+        isDeposit: true, note: 'Older deposit', source: 'manual',
+      }],
+    },
+  }));
+  show(`/net-worth?period=custom&from=${todayISO}&to=${todayISO}`);
+  const summary = screen.getByRole('heading', { name: 'Overall summary — USD' }).parentElement!;
+  const periodFlow = [...summary.querySelectorAll('.stat-card')].find(card => card.textContent?.includes('Period net flow'));
+  expect(periodFlow?.textContent).toContain('100.00');
+  expect(summary.textContent).toContain('1,100.00');
+});
+
 it('renders the dashboard sections without nesting cards and provides period insights', () => {
   const todayISO = new Date().toISOString().slice(0, 10);
   show(`/net-worth?section=analytics&period=custom&from=${todayISO}&to=${todayISO}`);
