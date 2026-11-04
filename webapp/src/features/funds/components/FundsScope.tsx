@@ -8,7 +8,7 @@ import { InvestmentPlans } from '../../../components/InvestmentPlans';
 import type { TransactionPageFilters } from '../../../hooks/useUrlTransactionFilters';
 import { useFundsWorkbookStore } from '../../../store/fundsWorkbookStore';
 import { useCategoryStore } from '../../../store/categoryStore';
-import { contributionVsValueSeries, fundCategoryLabel, fundsValueByCurrency } from '../../../lib/calc/fundsModule';
+import { CalculationEngine } from '../../../lib/calc/CalculationEngine';
 import { fmtMoney } from '../../../lib/format';
 import { cssVar } from '../../../lib/cssVar';
 import { useAppearanceStore } from '../../../store/appearanceStore';
@@ -22,9 +22,9 @@ function useScope(ids: string[], filters: TransactionPageFilters) {
   const funds = workbook.funds.filter(fund => ids.includes(fund.id));
   const period = (date: string) => (!filters.fromDate || date >= filters.fromDate) && (!filters.toDate || date <= filters.toDate);
   const matches = (tx: Transaction) => period(tx.date) && (filters.direction === 'all' || (filters.direction === 'in' ? tx.action === 'BUY' : tx.action === 'SELL')) && filters.source !== 'statement-import'
-    && (filters.category === 'all' || fundCategoryLabel(funds.find(fund => fund.id === tx.ticker)!, categories) === filters.category);
+    && (filters.category === 'all' || CalculationEngine.funds.fundCategoryLabel(funds.find(fund => fund.id === tx.ticker)!, categories) === filters.category);
   const transactions = workbook.transactions.filter(tx => ids.includes(tx.ticker) && matches(tx));
-  const series = funds.map(fund => ({ fund, points: contributionVsValueSeries(fund.id, workbook.transactions.filter(tx => !tx.isPending), workbook.priceHistory) }));
+  const series = funds.map(fund => ({ fund, points: CalculationEngine.funds.contributionVsValueSeries(fund.id, workbook.transactions.filter(tx => !tx.isPending), workbook.priceHistory) }));
   return { workbook, funds, transactions, series, period };
 }
 
@@ -46,7 +46,7 @@ export function FundsScopeSummary({ ids, filters }: { ids: string[]; filters: Tr
     } else {
       // Live holdings value comes from the same central stock engine used by
       // Net Worth, broker totals and the Fund detail page.
-      sum.current = fundsValueByCurrency(currencyFunds, workbook.transactions, workbook.marketPrices)[currency] ?? 0;
+      sum.current = CalculationEngine.funds.fundsValueByCurrency(currencyFunds, workbook.transactions, workbook.marketPrices)[currency] ?? 0;
     }
     for (const tx of scoped) {
       const field = tx.isPending ? (tx.action === 'BUY' ? 'pendingInflow' : 'pendingOutflow') : (tx.action === 'BUY' ? 'inflow' : 'outflow');
