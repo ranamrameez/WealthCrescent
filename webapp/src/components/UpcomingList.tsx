@@ -32,7 +32,7 @@ export function UpcomingList({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {shown.map((item, i) => (
+      {shown.map(item => (
         <Link
           key={`${item.module}:${item.id}:${item.date}`}
           to={item.href ?? MODULE_LINK[item.module]}
