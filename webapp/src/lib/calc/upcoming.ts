@@ -59,7 +59,7 @@ function inWindow(date: string, today: string, end: string): boolean {
 export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, today: Date = new Date()): UpcomingItem[] {
   const todayStr = today.toISOString().slice(0, 10);
   const windowEndStr = addUtcDays(todayStr, windowDays);
-  const items: UpcomingItem[] = [];
+  const items: Array<Omit<UpcomingItem, 'dueLabel'>> = [];
   const plannedSubscriptionKeys = new Set<string>();
 
   const addRecurringKeys = <T extends { sourceSubscriptionId?: string; recurrence?: PlannedCashEntry['recurrence']; date: string }>(plans: T[]) => {
