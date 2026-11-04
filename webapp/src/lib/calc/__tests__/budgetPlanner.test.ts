@@ -27,7 +27,7 @@ describe('collectBudgetActivities', () => {
       cashEntries: [{ id: 'pending-cash', date: '2026-03-01', isDeposit: true, amount: 100, currencyCode: 'USD', source: 'manual', isPending: true }],
       plannedCash: [],
       bankAccounts: [{ id: 'a1', name: 'Checking', currencyCode: 'USD', openingBalance: 0 }],
-      bankTransactions: [{ id: 'pending-bank', accountId: 'a1', date: '2026-03-02', amount: -50, description: 'Pending debit', source: 'manual', isPending: true }],
+      bankTransactions: [{ id: 'pending-bank', accountId: 'a1', date: '2026-03-02', amount: -50, isDeposit: false, description: 'Pending debit', source: 'manual', isPending: true }],
       plannedBank: [],
       rentalProperties: [{ id: 'p1', name: 'Flat 1', currencyCode: 'USD' }],
       rentalEntries: [
