@@ -11,6 +11,7 @@
  * temporarily for compatibility and must be migrated incrementally.
  */
 import * as stock from './stockCalculationEngine';
+import * as funds from './fundsModule';
 import * as portfolio from './portfolioCalculationEngine';
 import * as cash from './cashModule';
 import * as bank from './bankModule';
@@ -35,6 +36,7 @@ import * as recurrence from './recurrence';
 export const CalculationEngine = Object.freeze({
   stock,
   portfolio,
+  funds,
   cash,
   bank,
   creditCards,
