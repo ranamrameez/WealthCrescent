@@ -23,7 +23,7 @@ The default is the last 30 days. Invalid dates are rejected; future dates are cl
 
 ## Coverage and insights
 
-- Currency coverage is the union of current, period-start, period-end, and activity currencies. Activity-only currencies remain available in the monthly income/expense tables even when they have no tracked net-worth position.
+- Currency coverage is the union of current, period-start, period-end, and activity currencies. Activity-only currencies remain available in the per-currency summary and monthly income/expense tables even when they have no tracked net-worth position.
 - Historical currencies are retained for monthly net-worth analytics; missing current values are represented as zero only where the account is genuinely absent from the current position set.
 - Insights are per currency, never comparing unlike currency amounts: largest positive asset contributor, largest liability contributor, cleared net activity in the selected range, and missing-FX conversion warnings.
 - A missing FX rate is not guessed. Such currencies remain visible in their own currency views and are called out as excluded from converted totals/charts.
