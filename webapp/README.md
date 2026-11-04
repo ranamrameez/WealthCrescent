@@ -21,167 +21,9 @@ FinanceManager live link:
 
 ## Current session handoff
 
-For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) before continuing. **Latest handoff: 2026-11-04 — PR #49 merged into `main`.** Merge commit `efaa8b2e4a6da1cd9b6ffdc2728afcf94fedc690`; PR-head Actions run #399 passed 142 test files / 1,132 tests, both TypeScript checks and the production build. Manual browser review remains outstanding; details are recorded in [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) and [`docs/net-worth-dashboard.md`](docs/net-worth-dashboard.md).
+For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) first. **Latest checkpoint: 2026-11-05 — financial correctness is the priority on the existing branch / draft PR #51.** Three focused calculation commits are local; the larger Planning/dashboard/service and shared UI continuation remains in the working tree. The handoff records exact local tests/build results and pending final-suite/browser/CI validation. Nothing has been merged to main in this continuation.
 
-## Cost-basis worked examples (canonical — keep in sync with tests)
-
-**Why this section exists.** The user gave several real worked examples across multiple
-sessions asking for the stock cost-basis engine (`lib/calc/fifoPositions.ts`,
-`lib/calc/closedTrades.ts`) to get lot attribution right, and directly called out
-(2026-09-18) that past sessions hadn't durably documented them: *"I have already given
-examples multiple times but maybe you didn't documented it. document examples from now
-onwards as well as test cases."* Every example below is a permanent Vitest regression case
-(see `lib/calc/__tests__/fifoPositions.test.ts`'s and `closedTrades.test.ts`'s own
-`describe('canonical worked examples ...')`/matching blocks) — if you change the lot-matching
-engine, re-run these first, and if a worked example here and its own test ever disagree,
-the test is the ground truth (this prose can drift; the test can't).
-
-### Two deliberately separate, both-correct views
-
-As of 2026-09-18 this app shows TWO different, both-correct cost-basis views for the same
-position, never blended into one number:
-
-- **Official** (`costBasisMethod: 'fifo'`, the recommended choice in Settings — Dashboard,
-  Portfolio, PositionDetail's real Open lots, Trade Transactions' Open/Closed trades):
-  consumes the OLDEST open lot first on an untargeted sell. This matches a real broker
-  statement — see "Why FIFO, not lowest-cost-first" below.
-- **Trader Strategy** (`lib/calc/partialTradeStrategy.ts`'s Partial Trade Advisor, the Trade
-  Strategy page): always uses `'lowestCostFirst'` (consumes the CHEAPEST open lot first)
-  regardless of the real `costBasisMethod` setting — a deliberate, permanent second view for
-  deciding which lot to sell next, not the official number.
-
-Both views can legitimately show different numbers for the identical position at the
-identical moment — that's the point, and every surface that could show either is labeled
-(`StatSourceBadge`: official / advisory / history) so it's never ambiguous which one you're
-looking at.
-
-**Manual, exact lot targeting always wins over either view's own default guess.** A sell can
-name exactly which lot(s) it drew from — `Transaction.targetLotBuyId` (one lot, set by the
-Trade Strategy page's "Sell this lot") or `Transaction.lotAllocations` (an arbitrary
-multi-lot split — "these N shares: X from this lot, Y from that lot," real Specific
-Identification, added 2026-09-18 per the user's own words: *"I am not bound to use 'Sell
-This Lot'. I may sell in bulk completely different figures from the lot system."*). Priority
-order in both `computeFIFOPositions` and `computeClosedTrades` (shared via
-`consumeLotsForSell` in `fifoPositions.ts`, so the two can never disagree — this also closed
-a previously-tracked gap, see the old Pending item 134): (1) `lotAllocations` in array order,
-each entry clamped to that lot's real remaining shares — a stale/unknown `buyId` silently
-contributes 0, **never reconsidering an already-closed lot**; (2) `targetLotBuyId` for any
-remainder; (3) the view's own default match order (FIFO or lowest-cost-first) over whatever's
-still open.
-
-**Split, never merged.** `computeClosedTrades()` already gives a sell that drew from more
-than one lot ONE reporting record PER LOT touched — each with its own real buy price/date/
-fees/net P&L — never one blended-average record, per the user's own explicit instruction
-(2026-09-18): *"merging a sale into one should be avoided. instead both Buy sell should be
-splitted. bcz buy price may differ for multiple stocks sold on a single price."*
-
-### Why FIFO, not lowest-cost-first, is the recommended official default
-
-Real-world research done 2026-09-18, at the user's own request (*"i maybe wrong. please
-study how exchanges handle the trades!"*), after an earlier session had (wrongly, without
-checking) recommended lowest-cost-first as "the closest match to a real broker statement":
-
-- **PSX (Pakistan) — a real regulatory mandate, not just convention.** NCCPL (National
-  Clearing Company of Pakistan), mandated by the Federal Board of Revenue under Section 37A
-  of the Income Tax Ordinance 2001, computes every investor's real Capital Gains Tax using
-  **mandatory chronological FIFO**, tracked per-lot through CDC — "holding period... is
-  calculated per lot, not per stock." A real PSX broker's own "Buy Average"/CGT figure is
-  genuine FIFO. [NCCPL — Capital Gain Tax (CGT)](https://www.nccpl.com.pk/cgt),
-  [NCCPL CGT regime (PDF)](https://www.nccpl.com.pk/storage/sections/files/01KAGRFYGNZJBV4XSSCB57MVBA.pdf),
-  [Chase Securities — Tax on Stock Market Gains in Pakistan](https://chasesecurities.com/tax-on-stock-market-gains-in-pakistan/)
-- **General/international brokerage practice.** The US IRS's own default cost-basis method
-  for stocks is FIFO unless a taxpayer elects otherwise; major brokers (Fidelity, Schwab,
-  E\*TRADE) default to FIFO too. "Specific Identification" is the real, recognized mechanism
-  for a trader to deliberately name which lot a sale drew from — matching this app's own
-  `targetLotBuyId`/`lotAllocations` design. [Cost basis methods – Bogleheads](https://www.bogleheads.org/wiki/Cost_basis_methods),
-  [Schwab — Know Your Cost Basis](https://www.schwab.com/learn/story/save-on-taxes-know-your-cost-basis)
-- **QSE (Qatar).** Individual capital gains on QSE-listed shares are tax-exempt for
-  residents — no local regulatory mandate exists, so FIFO is recommended via the same
-  general/international convention above. [Qatar — Individual — Income determination (PwC)](https://taxsummaries.pwc.com/qatar/individual/income-determination)
-- **Reconciling with an earlier finding** (the original 2026-09-17 IQCD investigation, see
-  Done item 336 below): `'lowestCostFirst'` landed numerically closer to the user's real
-  broker figure than plain oldest-first FIFO in that one case. This is NOT evidence
-  lowest-cost-first is "correct" — it's much more likely the user's own real broker trades
-  already used real-world Specific-ID-style targeting at the time of sale (a standard
-  brokerage feature), which only `targetLotBuyId`/`lotAllocations` (fed with the user's real
-  intent) can reconstruct — no single blanket guessing rule can. **The fix is capturing real
-  per-trade specific-lot data; the default fallback rule only matters for whatever's left
-  unspecified.**
-
-### Worked example 1 — the toy example (user's own words)
-
-> "buy 2 @10.1 2@10.15 3@10.18 1@10.4 sell all@10.18"
-
-Buy 2@10.10, 2@10.15, 3@10.18, 1@10.40 (in that chronological order); sell all 8 shares
-@10.18. Under FIFO, shares are consumed in buy order — 2, then 2, then 3, then 1 — because
-dates and prices happen to rise together here. **This example alone does not distinguish
-FIFO from lowest-cost-first** (both produce the identical result) — see worked example 2 for
-one that does.
-
-### Worked example 2 — minimal FIFO-vs-lowest-cost-first distinguishing case
-
-Buy 5 shares @12.00 on day 1 (pricier), buy 5 shares @10.00 on day 2 (cheaper but later),
-sell 5 shares. FIFO takes the day-1 lot (@12.00) since it's the oldest, leaving the cheaper
-day-2 lot (@10.00) open. Lowest-cost-first takes the day-2 lot (@10.00) instead, leaving the
-pricier day-1 lot (@12.00) open. Same real data, two internally-consistent, differently-
-purposed results — proving the two views genuinely diverge.
-
-### Worked example 3 — real IQCD (the original 2026-09-17 financial-loss report)
-
-50 shares bought @10.40 (older, expensive) + 14 shares bought @9.962 (newer, cheap). Under
-FIFO-as-official with NO manual targeting, FIFO alone drains the EXPENSIVE (oldest) lot
-first — the OPPOSITE of what "Sell this lot" (`targetLotBuyId`) is meant to achieve. This is
-why manual targeting still matters even with FIFO as the honest default: FIFO alone would
-"protect" the cheap lot by accident, not the expensive one a user actually wants to protect.
-
-### Worked example 4 — real QFLS (user's own full transaction table, verbatim)
-
-> "My earliest buy and sell should not impact other trades since i evenly bought and sold 14
-> shares."
-
-| Date | Action | Shares | Price | Amount |
-|---|---|---:|---:|---:|
-| 2026-06-22 | BUY | 14 | 14.11 | 197.54 QAR |
-| 2026-06-23 | SELL | 14 | 14.16 | 198.24 QAR |
-| 2026-08-06 | BUY | 25 | 13.66 | 341.50 QAR |
-| 2026-08-06 | BUY | 50 | 13.80 | 690.00 QAR |
-| 2026-08-09 | BUY | 49 | 13.52 | 662.48 QAR |
-| 2026-08-10 | BUY | 100 | 13.50 | 1,350.00 QAR |
-| 2026-09-08 | BUY | 16 | 12.46 | 199.36 QAR |
-| 2026-09-08 | BUY | 5 | 12.46 | 62.30 QAR |
-| 2026-09-13 | BUY | 10 | 12.42 | 124.20 QAR |
-| 2026-09-14 | SELL | 10 | 12.53 | 125.30 QAR |
-| 2026-09-14 | SELL | 21 | 12.53 | 263.13 QAR |
-
-The 06-22/06-23 round trip is an EXACT match (buy 14, sell 14) — it fully closes and is
-removed from the open-lot list before any later activity even starts, so it **cannot leak
-into anything below under any match order**, provably (this holds for FIFO, lowest-cost-
-first, or any real specific allocation — a fully-closed lot is gone from the array, period).
-
-The two 09-14 sells (31 shares total, once the round trip is closed) show the two views
-genuinely diverging on the SAME real data:
-
-- **Official (FIFO)**: consumes the OLDEST lots first — the two 08-06 lots (75 shares
-  combined, more than enough for 31) — so every lot from 08-09 onward (49@13.52, 100@13.50,
-  16@12.46, 5@12.46, 10@12.42) is completely untouched. (The exact split between the two
-  08-06 lots depends on which was entered first on that date — not disambiguated by the
-  table alone — but the aggregate 44 shares remaining across both, and every OTHER lot's
-  exact untouched count, hold regardless.)
-- **Trader Strategy (lowest-cost-first)**: consumes the NEWEST/cheapest lots first instead —
-  09-13's 10@12.42 fully, then both 09-08 lots (5+16=21 shares, exactly the remaining need
-  either way they tie) — leaving every 08-06/08-09/08-10 lot (the 4 priciest, 225 shares)
-  completely untouched.
-
-### Worked example 5 — synthetic `lotAllocations` (arbitrary split, matches neither preset)
-
-3 lots: A=10@10 (oldest AND cheapest), B=10@11, C=10@12. Sell 15 shares with an explicit
-`lotAllocations` of 5 from B + 10 from C — deliberately skipping A entirely, even though
-BOTH presets (FIFO and lowest-cost-first) would have picked A first. This proves the
-mechanism represents a genuinely arbitrary real composition, not just automating a smarter
-guess — matching the user's own words: *"I may sell in bulk completely different figures
-from the lot system."*
-
-## Done
+- **Planning service migration (2026-11-04, PR #51):** PlanningPage and FinancePlansHierarchy obtain activities, recurring items, summary amounts, statuses and chart data through cached application queries and CalculationEngine. Shared payment/group editors dispatch authenticated service commands for saves, deletions and finance relinking, retaining stale-edit and completed-history checks. Monthly category and module totals now stay separate by currency and follow category/direction filters. This is a feature-branch checkpoint, not a completed app-wide migration or auto-pay release.
 
 - **Transaction-page cost-basis consistency slice (2026-10-29, merged in PR #31; full CI green):** QSE/PSX inline SELL P/L now uses the weighted-average engine when Average cost is selected; FIFO/Lowest cost first uses the configured lot method. Open/Closed lot-attribution reports are hidden under Average cost rather than presenting incompatible lot math. The independent page-local lot-match selector was removed. Regression coverage includes weighted-average SELL P/L and unmatched oversells. The production build and full test suite passed in [PR #31](https://github.com/ranamrameez/WealthCrescent/pull/31).
 
@@ -10278,6 +10120,8 @@ from the lot system."*
 
 ## Pending
 
+- **PR #51 remaining architecture work:** migrate legacy module summaries/planning tools and other UI consumers; implement a transaction-safe multi-workbook repository before enabling scheduled app-only auto-pay, deterministic execution history, pending native-ledger creation and explicit settlement/void workflows. Existing whole-workbook cloud replacement must not race backend ledger writes. Keep the PR draft. Local Planning read/navigation/editor-cancel review is now available; complete dashboard/mobile and write-flow acceptance separately.
+
 
 
 - **Remaining cost-basis dependency audit (after PR #31):** continue beyond the QSE/PSX transaction pages. Verify Dashboard, Position Detail, analytics/time series, exports, charts, and strategy/advisory surfaces against the configured method. Canonical synchronized global/per-ticker transaction ordering was merged in PR #36 and passed CI. The separate mixed-event cash ledger still displays by effective date and needs its own design/tests if it must follow global accounting order. Do not merge stale PR #22. See `SESSION_HANDOFF.md` and `audit.md`.
@@ -11639,3 +11483,15 @@ PR #36 follow-up: QSE batch editor validation/reorder fixes were committed on `f
 ## Broker-profile isolation — PR #43 latest validation (2026-10-30)
 
 PR #43 latest head `dcf3181a0a8955417c4049089f4735685c25a8ec` passed Actions run #112 (full tests + production build). Manual backup/export migration review and browser verification remain required before merge.
+
+### Done — 2026-11-04 financial-engine correctness continuation
+
+- Central current/historical valuation and service-owned snapshots; historical dividends; gross personal-loan assets/debts; pending-safe fallback prices; validated FX and comparison coverage; calendar-anchored monthly/yearly recurrence. Dashboard headlines and flow details use the central engine. See [calculation audit](docs/CALCULATION_ENGINE_AUDIT.md).
+
+### Pending — correctness remains the active priority
+
+- Complete remaining UI/query/command migrations, category/project allocation and payment lifecycle work; establish transaction-safe persistence before scheduled app-only auto-pay. Finish final validation and manual review on the final head. PR #51 remains draft.
+
+### Done / Pending — 2026-11-05 continuation
+
+Dashboard financial source reads, inclusion writes and headline/report/Insight/category/monthly/forecast models now use application services and CalculationEngine. Fixed pending-count/detail mismatches, historical capital split, recurring forecast truncation, exact-day horizons and future-currency/loan handling. Most recent focused checkpoint: 8 files / 61 tests; production build and both TypeScript checks passed. Final full suite is running alone; do not claim it passed until its footer is recorded. Recent-transactions child, wider app migration, safe auto-pay persistence and final browser/CI acceptance remain pending.

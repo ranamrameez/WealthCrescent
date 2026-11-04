@@ -8059,3 +8059,16 @@ PR #48, branch `feat/unified-stock-calculation-engine`, has a validated applicat
 The exchange pipeline now owns cost-basis-dependent average cost, break-even and exit targets, plus method-independent market valuation and commission estimates. The shared `positionValuation.ts` helper is used by live portfolio, cash-summary fallback and historical P/L. Strategic Trades and historical analytics route their stock basis through `stockCalculationEngine.ts`. Same-day row arrows use one persisted sequence across trades, transfers, adjustments and dividends; the control/store mapping and recorded-time fallback were regression-tested.
 
 The latest docs/comment refresh is behavior-neutral. Before merging, verify Actions on the exact live PR head. No browser smoke test or real-backup review is claimed. Continue on the existing feature branch; never push directly to `main`.
+
+
+## Planning service continuation — 2026-11-04, PR #51
+
+Continue fix/net-worth-dashboard-parity-and-accounting and existing draft PR #51. PlanningPage/FinancePlansHierarchy now use planningService queries and CalculationEngine.planning; shared editors use authenticated save/relink/delete commands. Monthly category/module budgets keep currencies separate. See the latest SESSION_HANDOFF.md entry for validation and browser-review scope. Legacy module summary/planning children still need migration. Auto-pay, execution history, pending-ledger creation and settlement/void remain unimplemented; transaction-safe persistence is a prerequisite because current workbook sync uses whole-document replacement. Do not enable a naive array-appending scheduler or merge this incomplete feature.
+
+### 2026-11-04 active priority: correct figures / CalculationEngine
+
+The user explicitly prioritizes financial correctness over visuals. Preserve the uncommitted/shared UI continuation, but focus on the engine. Read webapp/docs/CALCULATION_ENGINE_AUDIT.md and the latest SESSION_HANDOFF top section. Central native valuation, dashboard headline queries and month-end recurrence now have concrete correctness fixes; broad UI/service migration and app-only auto-pay remain unfinished. Do not equate facade exports or green existing tests with complete architecture. Verify the final code head before merging; keep PR #51 draft meanwhile.
+
+### 2026-11-05 continuation checkpoint
+
+Read SESSION_HANDOFF.md's new authoritative top section. Local head bf9524b27cfeb9ef91b4fa13af0ae15758bc9186 contains three focused pure-calculation fixes; not pushed yet. Larger dashboard/Planning/service/UI changes remain in the working tree. Dashboard financial stores/calculators and local FX persistence now cross services; recent-transactions child and wider migration remain pending. Focused 8-file / 61-test checkpoint and production build/both TS checks passed; final one-worker full suite is running separately in engine-verified-full-suite.log. Record the actual final footer before making any full-suite claim. The user explicitly requests durable docs so another chat can continue. No merge; same draft PR #51.

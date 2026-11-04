@@ -1096,3 +1096,20 @@ Loading masks use small rounded stat placeholders and large 600px section cards 
 ## Stock broker profiles
 
 QSE and PSX portfolios are separated by broker profile. Each broker owns its own trades, cash transfers, adjustments, dividends, trade plans, settings and derived P/L. Select the broker profile before adding activity. A cash transfer linked to QSE or PSX must target the specific broker profile; its own currency and deposit-fee settings are used, not the parent exchange defaults. Market prices, price history and watchlists remain shared for the exchange. Archived profiles remain available as read-only history; deactivated profiles are hidden from normal activity and cannot be selected for new activity. Legacy PSX records are assigned to the default JS Zindigi/JS Zindagi profile during the versioned migration. Review your backup/export after migration before relying on the new profile separation.
+
+
+## Planning currency totals (PR #51)
+
+The Monthly Budget Plan keeps each currency separate in both Budget by category and Module plan details. The same category in QAR and PKR appears as two rows; amounts are not converted or added across currencies. Category and direction filters also apply to the monthly budget totals. Editing or relinking a payment checks whether it changed since you opened the editor. Reopen the editor if it reports a change.
+
+Auto-pay and its pending-payment/settlement controls are not available in this checkpoint.
+
+### Financial calculation clarification (2026-11-04)
+
+Net worth is valued from native actual ledgers through one calculation engine. Pending entries and future-dated actuals do not count as cleared balances at today's cutoff. Historical stock values include dividends recorded by that date; unfilled BUY prices do not replace an executed holding's fallback price. Personal-loan assets and debts appear separately before calculating net worth.
+
+A period change can show unavailable when exchange rates or dated opening-balance evidence are missing. This avoids reporting an unknown opening as new wealth. Current opening balances are still shown. Month-end recurring plans clamp to the last real day of a short month and return to their original billing day afterwards (January 31, February 28, March 31). Existing fulfilled snapshots remain intact.
+
+### Dashboard reporting consistency (2026-11-05)
+
+Insights and monthly/category drilldowns exclude pending activity just like their displayed totals. The capital-split chart reflects the selected period-end date; current net worth remains live. Planning forecasts include recurring plans throughout the chosen 30/90/365-day horizon and stop at the exact displayed end date. A planned currency can appear even when it has no current balance. Dashboard inclusion controls now include native credit cards.

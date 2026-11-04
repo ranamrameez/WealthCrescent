@@ -1,3 +1,63 @@
+## 2026-11-05 — Authoritative continuation checkpoint
+
+**Priority:** complete financial correctness / CalculationEngine before resuming appearance work. The user's shared charts, standard dropdown, mobile topbar, dashboard and theme requests remain authorized and are preserved in the working tree. The user explicitly asks that this handoff remain current for another chat.
+
+### Repository and delivery state
+
+- Workspace: D:/Coding/WealthCrescent. Working branch: fix/net-worth-dashboard-parity-and-accounting.
+- Current local HEAD: bf9524b27cfeb9ef91b4fa13af0ae15758bc9186.
+- Three focused calculation commits are now local: da797287 (month-end/leap-year recurrence and old daily schedules); 35b8a80c (executed-only, chronologically ordered fallback prices); bf9524b2 (explicit recurring activity windows and exact forecast cutoffs/new currencies/future loans).
+- These three commits have **not been pushed yet**. The last verified remote PR is existing draft #51; last verified remote head was 5d5ca1c48e5b68d0faa0039c1ebeb307deef8211. Re-fetch before pushing and keep the same PR. No merge and no main push.
+- There are 96 modified/untracked tracked-workspace paths at this checkpoint, covering prior UI work plus financial query migration/tests/docs. Do not reset them. Some new files are untracked and must be included in appropriate commits. Preserve user-provided AGENTS.md / .agents skills; do not sweep them into implementation commits.
+
+### Financial work now in the working tree
+
+- lib/calc/netWorthValuation.ts is the shared current/historical native-ledger valuation assembly. netWorthAsOf.ts delegates to it. It takes an explicit date; handles native inclusion and currencies; includes historical dividends; preserves stock accounting/cost-basis settings; splits personal-loan receivables/debts; and reports unverified undated openings.
+- services/finance/netWorthService.ts owns native store/feed access, live quote overlays, scoped input snapshots, caching and midnight invalidation. features/netWorth/hooks/useNetWorthSummary.ts is now a thin subscription adapter and also exposes useNetWorthInputs.
+- lib/calc/dashboardReadModel.ts now owns headline and per-currency summaries, historical report assembly, exact reporting ranges, cleared Insights, category totals/details, monthly drilldowns and planning reality. Capital split uses the selected period-end valuation; the current headline remains live. Drilldowns and totals exclude the same pending rows. Missing opening evidence / missing FX withhold period deltas.
+- services/finance/dashboardService.ts and hooks/useDashboard.ts own dashboard sources, recurring activity queries, inclusion option view models and authenticated narrow inclusion commands. Native credit cards now have inclusion controls. Commands read the latest workbook to retain unrelated edits and reject deleted sources. The original local FX cache/manual-rate behavior is behind this service too.
+- NetWorthPage.tsx no longer imports financial stores or runtime private calculators. Appearance state remains presentation-only. Its recent-transactions child still needs inspection/migration before describing the whole dashboard subtree as render-only.
+- CalculationEngine.ts adds valuation, dashboard, currency, personalLoans, transfers, rentalActuals and categoryGroups; it also exposes the earlier new Planning model. Do not commit the facade without its referenced new modules.
+- lib/calc/currencyConversion.ts holds pure conversion math; lib/fx.ts re-exports compatibility functions and rejects invalid cross-rates. Historical prices sort by date before time. Existing persisted actual transactions/fulfilled snapshots have not been rewritten.
+- budgetPlanner now accepts an optional explicit occurrence window. Dashboard queries expand recurring plans through 365 days (rather than silently truncating 90/365-day forecasts at 30 days). Planning queries expand the requested report window. Future projections use exact end dates, retain new currencies and do not amortize a future-start loan as if it already existed today.
+
+### Exact validation evidence
+
+- Earlier UI-only checkpoint: 153 files / 1,168 tests passed (final-ui-validation.log).
+- Financial domain checkpoint: 46 files / 635 tests passed (engine-domain-tests.log); before later dashboard extraction.
+- Calendar regression checkpoint: 8 files / 126 tests passed (engine-calendar-tests.log).
+- A full-suite run concurrent with a build reported timeouts in Bank navigation, QSE transactions, BatchEditGrid and FinancePlanGroups, then its process disappeared without a completion footer. **Do not report that run as passing.** All four files passed in isolation afterward: 37 tests (engine-failed-review.log).
+- Most recent focused engine/dashboard/service checkpoint: **8 files / 61 tests passed** (engine-complete-dashboard-tests.log). Covers native inclusion authorization, stale/deleted-source preservation, historical capital split, pending-safe monthly/category/Insight details, exact forecast horizons and recurring source expansion.
+- **Most recent production build passed**, including both TypeScript projects (engine-dashboard-final-build.log). This includes the final dashboard service/FX extraction.
+- **Final full suite currently running alone with one worker**, output: webapp/engine-verified-full-suite.log. Tool execution session at launch: 10356 (may no longer exist after a chat/environment restart; inspect the log footer first). Command from webapp/: node node_modules/vitest/vitest.mjs run --maxWorkers=1. No source edits since launching it; documentation updates only. Record its exact footer when complete.
+- No new exact-head remote CI result or final browser acceptance is claimed. Tests use fixtures, not reconciliation of every private user ledger against statements.
+
+### Prior UI work to preserve and finish after the financial priority
+
+- Shared AppCharts wrappers and appChartStyle/chartInteraction/chartThemeVisuals, nearest-x non-intersecting hover, cursor guideline, reduced motion, StockCharts adapters; feature renderer imports migrated. Theme profiles now vary surfaces, corners, elevation and chart treatment across all nine themes; final visual QA remains outstanding.
+- StandardDropdown supports section titles, icon + text + independent favorite action, isTypeable, keyboard navigation and a portalled accessible grid. Market ticker controls and entity switches use it. AppEntityFinder/navigationService supplies cross-module search and favorite navigation; Funds/EMI/Personal Loans/Subscriptions use URL-backed selection.
+- Mobile menu moved to the beginning of TopBar; sidebar drawer behavior, shared reporting/date/filter controls and QSE/PSX analytics URL ranges are implemented. Shared summary components compact the main dashboard, and CategoryNav recognizes /dashboard correctly.
+- Prior browser review covered Planning/navigation/editor open-cancel, ticker picker appearance and compact dashboard layout. No private financial records were saved during browser review. Required final browser checks still include charts/cursor interaction, mobile topbar, theme variants and cross-module finder navigation.
+- The old Vite process is no longer running after the environment update. Start a fresh dev server when needed, using the existing /WealthCrescent/ base. Preserve the user's open tab; use a separate review tab. CUA documentation must be refreshed on resumed computer-use work.
+
+### Next actions, in order
+
+1. Read the final full-suite footer and resolve failures. Rerun only affected checks after fixes, then the required final suite/build if source changes.
+2. Migrate NetWorthRecentTransactions to a pure engine model and service subscription. **Confirmed pending defect:** its Funds and QSE/PSX withdrawal rows use -(gross - fee), while native ledgers use -(gross + fee). It also assembles financial signs in the component and omits archived/deactivated broker history from a view labeled lifetime. Add native-ledger reconciliation tests, preserve broker isolation, and inspect active-profile data freshness before fixing. Then inspect any remaining dashboard financial derivation. Continue the wider engine/service migration from the explicit pending list in CALCULATION_ENGINE_AUDIT.md; do not call the whole architecture complete.
+3. Commit the coherent tested query/model work and retained UI work in focused groups. Some files mix financial and visual changes, especially NetWorthPage.tsx and main.css; inspect hunks. Do not lose untracked dependencies.
+4. Update validation/docs with final results; push the existing branch (never main), refresh PR #51 and verify CI on the exact pushed head. Keep it draft until acceptance is met.
+5. Complete browser review and then resume outstanding charts/dropdown/topbar/theme refinements. Scheduled app-only auto-pay still requires transaction-safe multi-workbook persistence before implementation; it is not implemented or enabled.
+
+---
+
+## 2026-11-04 — Financial correctness is the active priority
+
+The user's latest instruction prioritizes correct figures and completing CalculationEngine over further visual work. Continue the existing branch and draft PR #51; do not merge or create a duplicate PR. The current working tree also contains the earlier shared charts/dropdown/topbar/dashboard/theme work. Preserve it; resume the authorized visual work after the financial priority is handled.
+
+The new central valuation/query path and concrete accounting corrections are documented in [CALCULATION_ENGINE_AUDIT.md](docs/CALCULATION_ENGINE_AUDIT.md). Current and historical valuation now share one engine path; recorded dividends, gross personal-loan assets/debts, executed-only fallback prices, validated FX, opening-evidence coverage and month-end recurrence have explicit regression coverage. Dashboard headline calculations now come from the engine through service functions. Remaining secondary analytics/UI/service and auto-pay work is listed explicitly in that audit; do not claim engine architecture completion.
+
+Validation in this working session: earlier shared UI checkpoint passed 153 files / 1,168 tests; subsequent financial domain checkpoint passed 46 files / 635 tests; calendar-focused checkpoint passed 8 files / 126 tests. Later financial edits require the final full suite and production build now in progress. These are local results, not new exact-head CI evidence. No merge has occurred.
+
 ## 2026-11-04 — Centralized CalculationEngine and app-only auto-pay (user-approved direction)
 
 ### User's confirmed requirements
@@ -446,3 +506,16 @@ The current documentation/comment refresh is behavior-neutral. Verify the live P
 - **CI:** Actions run #421 passed on code head `8e17ce13c4378b362dee435c34f7fff69e4b8664`; Actions run #423 passed on documentation head `3662f3eade965a21069aeae1190b7e33e5127004`; Actions run #424 passed on exact head `aacb7c60bab1ca4d1df1597e59d388091bcd5621`. The successful exact-head run includes broker-profile/PSX-fee regressions, full Vitest suite (144 test files / 1,143 tests), TypeScript checks and production build. The subsequent commits `bed06c91ea469e9d016d1c09dd23e51038e1688e` and `ec7292b5c3e4bbb45ed99072da43a081c528ec31` are documentation-only; check the new workflow run for the resulting current head before any merge decision.
 - **Not complete:** app-wide UI/service migration; PlanningPage and FinancePlansHierarchy query/command migration; planned-payment write services; scheduled app-only auto-pay; deterministic occurrence execution history; pending-ledger creation; and explicit settlement workflow. No bank APIs, payment-provider APIs, or external money movement have been added.
 - **Manual UI verification remains outstanding.** The UI guidelines require a real rendered-page review; the connected browser surface available in this session is read-only and no branch preview was available. Do not claim visual acceptance. Keep the PR draft and do not merge until the exact current head is green and the required UI review has been completed. A passing automated build/test suite alone does not complete the requested auto-pay feature.
+
+
+## 2026-11-04 continuation — Planning read/write service slice
+
+Continue PR #51 on fix/net-worth-dashboard-parity-and-accounting; main is untouched. The fetched starting head was 5d5ca1c48e5b68d0faa0039c1ebeb307deef8211 and main was e545273018b08eebd9f95328b766c7cb2764c5af.
+
+Implemented planningService.ts, thin usePlanning adapters, and CalculationEngine.planning. PlanningPage/FinancePlansHierarchy read recurring items, activity, statuses, currency-safe summaries and chart data through that boundary. Shared payment/group/finance-link editors dispatch authenticated service commands; commands retain stale edits, recurrence exclusions, currency acknowledgement, inactive-finance rejection and fulfilled-history protection. Pure plan primitives were extracted from the store-facing financePlans module to keep engine imports pure. Shared date validation moved to lib/dateValidation.ts with a compatibility re-export.
+
+Regression coverage includes separate same-category/module currencies, filters, fulfilled recurrence snapshots, empty group selection, stable service snapshots/store invalidation, command authorization and stale writes; existing shared editor/group behavior tests remain relevant. Restored locked local dependencies with npm ci because the old installation lacked fflate. Vitest needs an unsandboxed run on this Windows machine because sandbox temporary-file renames fail. Build/type-check passed during development; final full-suite/build results will be recorded after completion.
+
+Local interactive review now works through the in-app browser and local Vite server. Checked Planning overview, category/module budget view switching, recurring-plan navigation and opening/cancelling an occurrence editor. Browser error log was empty at that checkpoint. No user financial records were saved or deleted. Other dashboard/mobile/write-flow acceptance is still outstanding.
+
+Next: introduce transaction-safe persistence before scheduled auto-pay. useWorkbookCloudSync currently writes whole workbooks with set(), so simply appending backend-created ledger entries can lose them to a stale client write. Scheduler, occurrence execution history, pending-ledger creation, settlement/void commands and the remaining UI/module service migration are still outstanding. Keep PR #51 draft; do not merge on this slice alone.

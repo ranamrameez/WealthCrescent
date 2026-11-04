@@ -118,3 +118,17 @@ For each slice: relevant unit tests, component/service tests, TypeScript check, 
 ## 2026-11-04 CI result
 
 GitHub Actions run #424 passed on PR #51 head `aacb7c60bab1ca4d1df1597e59d388091bcd5621`: 144 test files / 1,143 tests, broker-profile and PSX-fee regression tests, TypeScript checks, and production build. This validates the code and documentation at that head. Manual browser review is still outstanding, and the application-service migration plus scheduled app-only auto-pay remain incomplete.
+
+
+## 2026-11-04 continuation — Planning queries and commands
+
+- Added CalculationEngine.planning read models for activity filtering, monthly budgets and plan hierarchy/occurrences/status/analytics. Pure plan types and presentation primitives live in calc/financePlanModel.ts; the engine does not import store implementations.
+- Added planningService.ts and thin useSyncExternalStore adapters. Queries cache stable snapshots by source revision, filters, selected plan and UTC calendar date; subscribers refresh open-page day-dependent statuses each minute. Category/module aggregates now include currency in their identity.
+- PlanningPage and FinancePlansHierarchy no longer import stores or private calculators. The shared payment, group and finance-link editors read sources through the service and dispatch save/relink/delete commands. Authorization and existing stale-edit, active-source, recurrence and fulfilled-history checks run in the command boundary.
+- Legacy module summary children and embedded module planning tools still need their own query/command migration. Editor input initialization/preview helpers also remain incremental; this is not an app-wide render-only completion claim.
+- Cloud repository safety remains the next prerequisite for auto-pay: useWorkbookCloudSync currently replaces whole workbooks with set(). No scheduler or pending execution has been enabled against that unsafe persistence strategy.
+- Local browser review covered Planning overview, category/module budget switching, recurring plan navigation and opening/cancelling an occurrence editor; no financial records were saved during that review. This does not complete dashboard/mobile/write-flow acceptance. Validation results are recorded in SESSION_HANDOFF.md.
+
+## 2026-11-04 — Correctness-first valuation and calendar migration
+
+See [CALCULATION_ENGINE_AUDIT.md](CALCULATION_ENGINE_AUDIT.md) for corrected paths, fixture examples and explicit remaining work. Net-worth live queries now use a service-owned native/feed snapshot and the same deterministic engine assembly as historical queries. Dashboard headline/flow/calendar calculations are engine-owned. This extends the earlier facade and Planning migration; it does not complete all UI or scheduled auto-pay work.

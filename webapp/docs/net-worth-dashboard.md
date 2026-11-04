@@ -1,21 +1,21 @@
 # Net Worth dashboard — reporting and calculation contract
 
-The app home dashboard is `/net-worth`. Its reporting range is a page-level filter shared by the summary movement figures and historical analytics.
+The canonical app home dashboard is `/dashboard`; `/net-worth` remains a compatibility route. Its reporting range is a page-level filter shared by the summary movement figures and historical analytics.
 
 ## Date-range controls
 
 The URL query parameters are:
 
-- `period`: `7d`, `30d`, `90d`, `6m`, `1y`, `ytd`, `all`, or `custom`.
+- `period`: `since-month`, `3`, `6`, `12`, `ytd`, `all`, or `custom`. Legacy `7d`/`30d`/`90d`/`6m`/`1y` links are normalized.
 - `from` and `to`: ISO dates used when `period=custom`.
 
-The default is the last 30 days. Invalid dates are rejected; future dates are clamped to today; reversed custom ranges are normalized. Upcoming plans are not clipped to this historical range; they retain a forward-looking 30-day window. All-history starts at the earliest available date among the currently selected data sources and recorded dashboard activities.
+The default is This month (`since-month`). Invalid dates are rejected; future dates are clamped to today; reversed custom ranges are normalized. Upcoming plans are not clipped to this historical range; they retain a forward-looking 30-day window. All-history starts at the earliest available date among the currently selected data sources and recorded dashboard activities.
 
 ## Figure semantics
 
 - **Estimated net worth** and **current balances by currency** remain live current balances. A historical reporting filter must not make a current-position headline look historical.
-- **Net worth change in period** compares the central `netWorthAsOfDate` result at the selected end date with the result at the end of the day before the selected start date. It is withheld when there is no real pre-period baseline.
-- **Period net flow** is cleared Cash and Bank movement only, using the existing `flowByCurrency` calculation. Linked inter-account transfers and pending activity retain the semantics of that shared helper.
+- **Net worth change in period** compares the central `netWorthAsOfDate` result at the selected end date with the result at the end of the day before the selected start date. It is withheld when a real pre-period baseline, dated opening evidence or complete FX coverage is missing.
+- **Period net flow** is cleared Cash, Bank and Rental activity, excluding linked inter-account transfers and pending entries. The headline, Insights and itemized details share the same engine-selected population.
 - **Upcoming planned activity (30 days)** is a separate forward-looking figure, independent of the historical reporting range. The Plans section retains its own projection-horizon controls.
 - **Category-group totals**, **rental net income**, and **monthly income/expense totals** are clipped to the exact selected dates, including partial first/last months.
 - Monthly net-worth trend points are month-end snapshots for completed months and today's live balance for the current month. They are not falsely presented as exact daily snapshots; the UI labels this distinction.
@@ -39,3 +39,7 @@ The default is the last 30 days. Invalid dates are rejected; future dates are cl
 ## Verification
 
 Dashboard regression coverage lives in `src/features/netWorth/pages/__tests__/dashboard.test.tsx`. Before merging a dashboard change, run the full Vitest suite, both TypeScript projects, and the production Vite build on the exact PR head. Also review the rendered page with representative multi-currency data and custom partial-month ranges; automated tests do not validate a user's imported financial records.
+
+## Central calculation boundary (2026-11-05)
+
+NetWorthPage obtains native data and inclusion commands from dashboard/net-worth services. CalculationEngine owns valuation, reporting ranges, headline and per-currency summaries, Insights, category totals/details, monthly drilldowns and exact-day planning forecasts. Historical capital split uses the selected end date. The recent-transactions child and the wider app migration remain pending; see [calculation audit](CALCULATION_ENGINE_AUDIT.md) and [current handoff](../SESSION_HANDOFF.md).
