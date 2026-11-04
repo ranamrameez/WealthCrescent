@@ -13,6 +13,20 @@ import { useEMIWorkbookStore } from '../../../store/emiWorkbookStore';
 import { useFundsWorkbookStore } from '../../../store/fundsWorkbookStore';
 import { useWorkbookStore } from '../../../store/workbookStore';
 import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
+import type { Transaction, Transfer, Adjustment, Dividend } from '../../../types/workbook';
+
+type ExchangeWorkbook = {
+  settings: { currency: string };
+  activeBrokerId?: string;
+  transactions: Transaction[];
+  transfers: Transfer[];
+  adjustments: Adjustment[];
+  dividends: Dividend[];
+  brokerProfiles?: Array<{
+    id: string; name: string; settings: { currency: string }; archived?: boolean; deactivated?: boolean;
+    data?: { transactions: Transaction[]; transfers: Transfer[]; adjustments: Adjustment[]; dividends: Dividend[] };
+  }>;
+};
 
 interface RecentTransactionRow {
   id: string;
@@ -148,10 +162,10 @@ export function NetWorthRecentTransactions() {
       add({ id: `fund-dividend:${tx.id ?? index}`, date: tx.date, time: tx.time, module: `Funds · ${fund.name}`, description: 'Dividend', currency: fund.currencyCode, amount: tx.amount, href: '/funds' });
     });
 
-    const addExchange = (exchange: 'QSE' | 'PSX', workbook: typeof qse) => {
+    const addExchange = (exchange: 'QSE' | 'PSX', workbook: ExchangeWorkbook) => {
       const profiles = (workbook.brokerProfiles ?? []).filter(profile => !profile.archived && !profile.deactivated);
       const sources = profiles.length
-        ? profiles.map(profile => ({ id: profile.id, name: profile.name, currency: profile.settings.currency, data: profile.data }))
+        ? profiles.map(profile => ({ id: profile.id, name: profile.name, currency: profile.settings.currency, data: profile.data ?? (profile.id === workbook.activeBrokerId ? { transactions: workbook.transactions, transfers: workbook.transfers, adjustments: workbook.adjustments, dividends: workbook.dividends } : undefined) }))
         : [{ id: 'legacy', name: 'Account', currency: workbook.settings.currency, data: { transactions: workbook.transactions, transfers: workbook.transfers, adjustments: workbook.adjustments, dividends: workbook.dividends } }];
       sources.forEach(profile => {
         const data = profile.data;
