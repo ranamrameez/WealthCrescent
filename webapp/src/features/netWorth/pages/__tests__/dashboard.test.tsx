@@ -8,6 +8,7 @@ import { useBankWorkbookStore } from '../../../../store/bankWorkbookStore';
 import { createEmptyBankWorkbook } from '../../../../store/defaultBankWorkbook';
 import { useEnabledCurrenciesStore } from '../../../../store/enabledCurrenciesStore';
 import { saveFxRates } from '../../../../lib/fx';
+import { presetDateRange } from '../../../../lib/dateRange';
 
 vi.mock('react-chartjs-2', () => ({ Chart: () => <div>Trend chart</div>, Doughnut: () => <div>Allocation chart</div> }));
 vi.mock('../../../../lib/firebase/useEnsureSignedIn', () => ({ useEnsureSignedIn: () => async () => false }));
@@ -73,10 +74,7 @@ it('preserves a selected preset when switching to a custom range', () => {
   show('/net-worth?period=3');
   const dateRange = screen.getByLabelText('Date range');
   fireEvent.change(dateRange, { target: { value: 'custom' } });
-  const fromDate = new Date();
-  fromDate.setDate(1);
-  fromDate.setMonth(fromDate.getMonth() - 2);
-  const expectedFrom = new Date(fromDate.getFullYear(), fromDate.getMonth(), 1).toISOString().slice(0, 10);
+  const expectedFrom = presetDateRange('3').startDate;
   expect((screen.getByLabelText('From date') as HTMLInputElement).value).toBe(expectedFrom);
   expect((screen.getByLabelText('To date') as HTMLInputElement).value).toBe(todayISO);
 });
