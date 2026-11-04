@@ -113,3 +113,8 @@ For each slice: relevant unit tests, component/service tests, TypeScript check, 
 - Funds valuation, category allocation, and matched SELL quantities for the Funds cash ledger now use `calculateStockPortfolio` rather than a separate `computePositions` or hand-written oversell-matching pass.
 - Added a regression test for a partial oversell, a later re-entry, and a pending BUY; only the five actually held units contribute to current value.
 - This does not complete the UI service migration: FundsScope and other existing pages still need application query services before they are presentation-only.
+
+
+## 2026-11-04 CI result
+
+GitHub Actions run #424 passed on PR #51 head `aacb7c60bab1ca4d1df1597e59d388091bcd5621`: 144 test files / 1,143 tests, broker-profile and PSX-fee regression tests, TypeScript checks, and production build. This validates the code and documentation at that head. Manual browser review is still outstanding, and the application-service migration plus scheduled app-only auto-pay remain incomplete.
