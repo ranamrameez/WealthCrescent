@@ -120,11 +120,11 @@ On the **Account** page, **Reset all settings to app defaults** restores broker 
 
 ### Home Dashboard — Net Worth
 
-The sidebar's **Dashboard** opens the cross-module Net Worth home page. Its **Filters** panel has a shared reporting range: Last 7 days, Last 30 days, Last 90 days, Last 6 months, Last 12 months, Year to date, All available history, or a Custom date range. The selected period is stored in the page URL, so it can be bookmarked or shared.
+The sidebar's **Dashboard** opens the cross-module Net Worth home page. The pinned top bar's **Date range** control provides the reporting period and previous/next period navigation; choose a preset or **Custom** to enter exact dates. The selected range is stored in the page URL, so it can be bookmarked or shared. **Dashboard filters** opens the source and section filters separately.
 
 The **Estimated net worth** and per-currency balances remain your live current balances. **Period net flow** and **Net worth change in period** are historical measures: cleared Cash/Bank movement and the difference between real net worth at the period endpoints. **Upcoming planned activity (30 days)** is a separate forward-looking figure; the Plans section has its own projection-horizon controls. A period change is shown only when there is a real opening baseline before the selected start date.
 
-The Analytics section uses the same date range for monthly income/expense, category-group activity, rental net income, and the insight cards. The monthly cash-flow totals and their drill-downs respect the exact dates, including partial first and last months. Net-worth chart points are month-end balances for completed months and today's balance for the current month, not daily snapshots.
+The **Recent Transactions** section shows lifetime activity across modules, newest first, with pagination; it is independent of the historical reporting range. The Analytics section uses the selected date range for monthly income/expense, category-group activity, rental net income, and the insight cards. The monthly cash-flow totals and their drill-downs respect the exact dates, including partial first and last months. Net-worth chart points are month-end balances for completed months and today's balance for the current month, not daily snapshots.
 
 Insights are shown per currency so unlike currencies are never compared as if they were the same unit. They identify the largest asset and liability contributors and cleared activity for the period. If an FX rate is missing, that currency remains visible in its own section and the dashboard warns that it is excluded from converted totals/charts. The reporting filter does not edit or reconcile source transactions.
 
