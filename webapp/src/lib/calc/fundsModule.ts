@@ -5,6 +5,7 @@ import { buildCashLedger } from './cashLedger';
 import { sortTransactionsChronological } from './sortTransactions';
 import { categoryName } from '../categories';
 import { computePositions } from './positions';
+import { calculateStockPortfolio } from './stockCalculationEngine';
 import { getDailyPriceHistory, getMarketPrice, getPriceHistory } from './priceHistory';
 
 /** A fund's category label for display/grouping — prefers the shared
@@ -193,36 +194,41 @@ export function contributionVsValueSeries(
   transactions: Transaction[],
   priceHistory: Record<string, PricePoint[]>,
 ): ContributionPoint[] {
-  const txs = transactions.filter((t) => t.ticker === fundId).sort((a, b) => a.date.localeCompare(b.date));
+  // Funds use the same chronological position/lifecycle engine as QSE/PSX.
+  // Do not independently sum BUY minus SELL quantities here: that creates
+  // negative units after an oversell and ignores persisted same-day order.
+  const txs = sortTransactionsChronological(
+    transactions.filter(transaction => transaction.ticker === fundId && !transaction.isPending),
+  );
   const navHistory = getDailyPriceHistory(fundId, priceHistory);
-
   const priceByDate: Record<string, number> = {};
-  navHistory.forEach((p) => {
-    priceByDate[p.date] = p.price;
-  });
-  txs.forEach((t) => {
-    if (!(t.date in priceByDate)) priceByDate[t.date] = t.price;
+  navHistory.forEach(point => { priceByDate[point.date] = point.price; });
+  // When no explicit NAV exists for a transaction date, the last executed
+  // trade on that date is the implicit observation (using the shared order).
+  txs.forEach(transaction => {
+    if (!(transaction.date in priceByDate)) priceByDate[transaction.date] = transaction.price;
   });
 
-  const dates = [...new Set([...txs.map((t) => t.date), ...navHistory.map((p) => p.date)])].sort();
+  const dates = [...new Set([...txs.map(transaction => transaction.date), ...navHistory.map(point => point.date)])].sort();
   if (!dates.length) return [];
 
-  let units = 0;
+  const fullCalculation = calculateStockPortfolio(txs, calcFee, 'average');
   let invested = 0;
   let lastNav = 0;
-  return dates.map((date) => {
-    txs
-      .filter((t) => t.date === date)
-      .forEach((t) => {
-        if (t.action === 'BUY') {
-          units += t.shares;
-          invested += t.shares * t.price;
-        } else {
-          units -= t.shares;
-          invested -= t.shares * t.price;
-        }
-      });
+  return dates.map(date => {
+    txs.filter(transaction => transaction.date === date).forEach(transaction => {
+      if (transaction.action === 'BUY') {
+        invested += transaction.shares * transaction.price;
+      } else {
+        // Unmatched SELL quantity is not an executed disposal and must not
+        // reduce contributed capital or create a fictitious negative holding.
+        const matchedShares = fullCalculation.realizedBySellTxId[transaction.id]?.shares ?? 0;
+        invested -= matchedShares * transaction.price;
+      }
+    });
     if (priceByDate[date] !== undefined) lastNav = priceByDate[date];
+    const asOf = calculateStockPortfolio(txs.filter(transaction => transaction.date <= date), calcFee, 'average');
+    const units = asOf.positions.find(position => position.ticker === fundId)?.shares ?? 0;
     return { date, invested, value: units * lastNav };
   });
 }
@@ -407,18 +413,17 @@ export function balanceUpdateHistory(
   transactions: Transaction[],
   priceHistory: Record<string, PricePoint[]>,
 ): BalanceUpdateRow[] {
-  // `date` is the effective valuation date; `time` is audit/intraday metadata.
+  // Date is the effective valuation date; time is audit/intraday metadata.
   // Editing a historical date must therefore move the point chronologically,
   // even though its original timestamp remains unchanged.
   const raw = [...getPriceHistory(fundId, priceHistory)].sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''));
-  const txs = transactions.filter((t) => t.ticker === fundId);
+  const txs = sortTransactionsChronological(transactions.filter(transaction => transaction.ticker === fundId && !transaction.isPending));
 
   let prevBalance = 0;
   let prevNav = 0;
   return raw.map((point, i) => {
-    const units = txs
-      .filter((t) => t.date <= point.date)
-      .reduce((s, t) => s + (t.action === 'BUY' ? t.shares : -t.shares), 0);
+    const asOf = calculateStockPortfolio(txs.filter(transaction => transaction.date <= point.date), calcFee, 'average');
+    const units = asOf.positions.find(position => position.ticker === fundId)?.shares ?? 0;
     const newBalance = units * point.price;
     const newNav = point.price;
     const change = newBalance - prevBalance;
