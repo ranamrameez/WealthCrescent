@@ -42,14 +42,63 @@ describe('collectUpcomingItems', () => {
     expect(items).toEqual([]);
   });
 
-  it('a Bank plan resolves its currency from the account and flags overdue correctly', () => {
+  it('does not surface overdue one-off plans in Upcoming', () => {
     const inputs: UpcomingInputs = {
       ...emptyInputs(),
       bankAccounts: [{ id: 'a1', name: 'Checking', currencyCode: 'USD', openingBalance: 0 }],
       plannedBank: [{ id: 'b1', accountId: 'a1', date: '2025-12-20', description: 'Rent', amount: -800 }],
     };
     const items = collectUpcomingItems(inputs, 14, new Date('2026-01-01'));
-    expect(items).toEqual([{ date: '2025-12-20', module: 'bank', label: 'Rent', amount: 800, currencyCode: 'USD', kind: 'expense', overdue: true }]);
+    expect(items).toEqual([]);
+  });
+
+  it('excludes past and completed one-off plans from the future-only Upcoming list', () => {
+    const inputs: UpcomingInputs = {
+      ...emptyInputs(),
+      plannedCash: [
+        { id: 'past', date: '2025-12-20', type: 'OUT', amount: 50, currencyCode: 'USD' },
+        { id: 'done', date: '2026-01-05', type: 'OUT', amount: 75, currencyCode: 'USD', executed: true },
+        { id: 'future', date: '2026-01-08', type: 'IN', amount: 100, currencyCode: 'USD' },
+      ],
+    };
+    expect(collectUpcomingItems(inputs, 14, new Date('2026-01-01'))).toMatchObject([
+      { id: 'future', date: '2026-01-08', module: 'cash', overdue: false },
+    ]);
+  });
+
+  it('includes planned Rentals and Credit Card items, but ignores plans for deleted entities', () => {
+    const inputs: UpcomingInputs = {
+      ...emptyInputs(),
+      rentalProperties: [{ id: 'p1', name: 'Flat 1', currencyCode: 'QAR', monthlyRent: 1000 }],
+      plannedRentals: [
+        { id: 'r1', propertyId: 'p1', date: '2026-01-05', type: 'RENT_INCOME', amount: 1200 },
+        { id: 'r2', propertyId: 'deleted', date: '2026-01-06', type: 'RENT_INCOME', amount: 900 },
+      ],
+      creditCards: [{ id: 'cc1', name: 'Visa', currencyCode: 'QAR' }],
+      plannedCreditCards: [
+        { id: 'cc-plan', cardId: 'cc1', date: '2026-01-07', description: 'Card payment', amount: 300, kind: 'payment' },
+        { id: 'cc-deleted', cardId: 'gone', date: '2026-01-08', description: 'Old card', amount: 100, kind: 'charge' },
+      ],
+    };
+    expect(collectUpcomingItems(inputs, 14, new Date('2026-01-01'))).toMatchObject([
+      { id: 'r1', date: '2026-01-05', module: 'rentals', currencyCode: 'QAR', amount: 1200 },
+      { id: 'cc-plan', date: '2026-01-07', module: 'creditCards', currencyCode: 'QAR', amount: 300 },
+    ]);
+  });
+
+  it('does not duplicate a subscription renewal already represented by its generated plan', () => {
+    const inputs: UpcomingInputs = {
+      ...emptyInputs(),
+      subscriptions: [{ id: 's1', name: 'Netflix', amount: 15, currencyCode: 'USD', billingCycle: 'monthly', startDate: '2026-01-10', active: true }],
+      plannedBank: [{
+        id: 'generated', accountId: 'a1', date: '2026-01-10', description: 'Netflix', amount: -15,
+        sourceSubscriptionId: 's1',
+      }],
+      bankAccounts: [{ id: 'a1', name: 'Checking', currencyCode: 'USD', openingBalance: 0 }],
+    };
+    const items = collectUpcomingItems(inputs, 14, new Date('2026-01-01'));
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ id: 'generated', module: 'bank', date: '2026-01-10' });
   });
 
   it('drops a Bank plan whose account was deleted', () => {
