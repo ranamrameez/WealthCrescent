@@ -202,11 +202,12 @@ export function contributionVsValueSeries(
   );
   const navHistory = getDailyPriceHistory(fundId, priceHistory);
   const priceByDate: Record<string, number> = {};
+  const explicitNavDates = new Set(navHistory.map(point => point.date));
   navHistory.forEach(point => { priceByDate[point.date] = point.price; });
   // When no explicit NAV exists for a transaction date, the last executed
   // trade on that date is the implicit observation (using the shared order).
   txs.forEach(transaction => {
-    if (!(transaction.date in priceByDate)) priceByDate[transaction.date] = transaction.price;
+    if (!explicitNavDates.has(transaction.date)) priceByDate[transaction.date] = transaction.price;
   });
 
   const dates = [...new Set([...txs.map(transaction => transaction.date), ...navHistory.map(point => point.date)])].sort();
