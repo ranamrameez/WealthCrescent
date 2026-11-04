@@ -5,11 +5,12 @@
 ### Exact repository state at handoff
 
 - **Working branch:** `fix/net-worth-dashboard-parity-and-accounting`
-- **Latest branch HEAD after this handoff refresh:** `21d85f2fe96e006427deeaa44dfd5856c33b0208` (two documentation-only commits on top of application head `1cf181cdba2a4f61936c0842be2f573dc78093ec`). The latest application commit is `refactor(upcoming): keep renewal dates separate from alert reminders`.
+- **Latest application-code head:** `1cf181cdba2a4f61936c0842be2f573dc78093ec` — `refactor(upcoming): keep renewal dates separate from alert reminders`. Later commits on this branch are handoff-documentation-only; re-fetch the live branch tip before starting work.
 - **Base / current `main`:** `e545273018b08eebd9f95328b766c7cb2764c5af` (PR #50 documentation follow-up, after PR #49's Net Worth dashboard rebuild).
-- **Branch comparison after documentation commits:** 37 commits ahead, 0 behind `main`; merge base is exactly the current `main` SHA above. The comparison reports 19 changed files: 17 application files plus `webapp/SESSION_HANDOFF.md` and `CLAUDE.md`.
-- **PR status:** no open PR exists for this branch at this checkpoint. Do not assume PR #48/#49/#50 is the active PR: #49 and #50 are closed/merged; this branch still needs its own review/PR after validation.
-- **CI status:** no pull-request workflow runs were returned for application head `1cf181cdba2a4f61936c0842be2f573dc78093ec`. The two later commits only update handoff documentation; no fresh type-check, production build, full test suite, or interactive browser smoke test has been run for the application changes. Do not describe this branch as validated.
+- **Application diff:** 35 application commits ahead, 0 behind `main`; merge base is exactly the current `main` SHA above. The application comparison contains 17 changed files. Additional commits/files on the branch update the two handoff documents; re-fetch the live total ahead count and exact branch HEAD at session start.
+- **PR status:** no open PR exists for this branch at the last live check. Do not assume PR #48/#49/#50 is the active PR: #49 and #50 are closed/merged; this branch still needs its own review/PR after validation.
+ no open PR exists for this branch at this checkpoint. Do not assume PR #48/#49/#50 is the active PR: #49 and #50 are closed/merged; this branch still needs its own review/PR after validation.
+- **CI status:** no pull-request workflow runs were returned for application head `1cf181cdba2a4f61936c0842be2f573dc78093ec`. Subsequent commits only update handoff documentation; no fresh type-check, production build, full test suite, or interactive browser smoke test has been run for the application changes. Do not describe this branch as validated.
 - **No merge or direct-main push has occurred.** Continue on this feature branch, preserve its commits, and never push directly to `main`.
 
 ### What is already on this branch — inspect before changing
