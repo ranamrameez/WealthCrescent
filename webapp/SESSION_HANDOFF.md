@@ -1,6 +1,6 @@
 # WealthCrescent — Session Handoff (refreshed 2026-11-04)
 
-## 2026-11-04 — Net Worth dashboard rebuild, PR #49 (in progress)
+## 2026-11-04 — Net Worth dashboard rebuild, PR #49 (ready to merge after green CI)
 
 - **PR #49:** [Rebuild Net Worth dashboard layout, date filters, and insights](https://github.com/ranamrameez/WealthCrescent/pull/49).
 - **Branch:** `fix/net-worth-dashboard-rebuild`, based on `main` at `c9aa3ed1f2da7858165dbbe67e27d5c209360f54`. No changes were made directly to `main`; the branch preserves the merged stock-calculation engine and broker-profile isolation.
