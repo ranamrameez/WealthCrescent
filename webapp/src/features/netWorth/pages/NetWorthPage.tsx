@@ -903,7 +903,8 @@ export function NetWorthPage({
           <label className="field"><span>Period</span><select value={dashboardRange.period} onChange={event => {
             const next = new URLSearchParams(scopeParams);
             next.set('period', event.target.value);
-            if (event.target.value !== 'custom') { next.delete('from'); next.delete('to'); }
+            if (event.target.value === 'custom') { next.set('from', dashboardRange.from); next.set('to', dashboardRange.to); }
+            else { next.delete('from'); next.delete('to'); }
             setScopeParams(next);
           }}>{DASHBOARD_PERIODS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
           <label className="field"><span>From</span><input type="date" aria-label="From date" max={dashboardRange.to} value={dashboardRange.from} disabled={dashboardRange.period !== 'custom'} onChange={event => {
