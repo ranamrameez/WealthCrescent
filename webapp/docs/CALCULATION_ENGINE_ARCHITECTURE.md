@@ -94,3 +94,13 @@ The existing planned workbooks are stored separately at `users/{uid}/plannedCash
 ## Required verification
 
 For each slice: relevant unit tests, component/service tests, TypeScript check, production build, and regression tests for existing module behavior. Inspect the complete diff against the latest `main` and ensure no user changes were dropped. Commit small focused changes on the existing working branch; never push directly to `main`. Update this document and `webapp/SESSION_HANDOFF.md` at each meaningful checkpoint.
+
+
+## 2026-11-04 implementation checkpoint — Upcoming query boundary
+
+- Added `src/services/finance/upcomingService.ts` as the application-owned read boundary for the Upcoming list. It owns source-store subscriptions, gathers the module inputs, and calls `CalculationEngine.upcoming.collectUpcomingItems`.
+- Reduced `useUpcomingItems` to a `useSyncExternalStore` adapter. It no longer imports stores or calculation modules.
+- Moved the human-readable due-timing label into the calculation result; `UpcomingList` now renders the supplied label rather than calculating date differences.
+- Added a service subscription/cache invalidation test and an engine regression assertion for the due label.
+- This is one migrated vertical slice only. PlanningPage, FinancePlansHierarchy, other UI consumers, plan write commands, and scheduled app-only auto-pay are still pending. Do not describe the architecture or auto-pay feature as complete.
+- Validation is pending on the exact final PR head. CI must run the complete webapp test suite and both TypeScript checks/production build. A passing CI run does not replace the required interactive UI review.
