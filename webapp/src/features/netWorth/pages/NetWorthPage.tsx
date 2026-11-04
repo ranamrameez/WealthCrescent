@@ -497,7 +497,7 @@ export function NetWorthPage({
   return (
     <div className="standard-page">
       <h1>Dashboard</h1>
-      <StandardPageSections sections={[{ key: 'summary', label: 'Overall summary', defaultOpen: true, content: <div className="grid-auto" style={{ ...gridAutoStyle(320, 16), marginBottom: 16, alignItems: 'start' }}>
+      <StandardPageSections sections={[{ key: 'summary', label: 'Overall summary', defaultOpen: true, unframed: true, content: <div><h2>Overall summary</h2><div className="grid-auto" style={{ ...gridAutoStyle(320, 16), marginBottom: 16, alignItems: 'start' }}>
         {preferredCurrencyOptions.map(({ code: preferredCurrency }) => {
           const sum = (values: Record<string, number>) => {
             let total = 0;
@@ -518,7 +518,7 @@ export function NetWorthPage({
           const netWorthDelta = hasRangeBaseline ? periodEnd.total - previous.total : null;
           const netWorthDeltaPct = netWorthDelta !== null && previous.total !== 0 ? netWorthDelta / Math.abs(previous.total) * 100 : null;
           const plannedTotal = sum(plannedPeriodByCurrency);
-          return <Card key={preferredCurrency}>
+          return <section key={preferredCurrency}>
           <h3 className="mt-0">Overall summary — {preferredCurrency}</h3>
           <div className="mt-12">
             <StatCard label={`Estimated net worth (${preferredCurrency})`} value={fmtMoney(grandTotal, preferredCurrency)} hue={grandTotal >= 0 ? 'var(--profit)' : 'var(--loss)'} />
@@ -596,9 +596,9 @@ export function NetWorthPage({
               />
             )}
           </div>
-        </Card>;
+        </section>;
         })}
-      </div> }, ...(sectionVisible('currencies') ? [{ key: 'currencies', label: 'Per currency summary', defaultOpen: true, content: (      <div className="grid-auto" style={{ ...gridAutoStyle(360, 12), marginBottom: 16 }}>
+      </div></div> }, ...(sectionVisible('currencies') ? [{ key: 'currencies', label: 'Per currency summary', defaultOpen: true, unframed: true, content: (<div><h2>Per currency summary</h2><div className="grid-auto" style={{ ...gridAutoStyle(360, 12), marginBottom: 16 }}>
         {[...rows].sort((a, b) => currencyRank(a.currency, b.currency)).map((r) => {
           const converted = convertAmount(r.net, r.currency, preferredCurrency, rates);
           const todayFlowC = todayFlow[r.currency] ?? 0;
@@ -608,7 +608,7 @@ export function NetWorthPage({
           const deltaC = hasRangeBaseline ? rangeEndC - rangeStartC : null;
           const deltaPctC = deltaC !== null && rangeStartC !== 0 ? (deltaC / Math.abs(rangeStartC)) * 100 : null;
           return (
-            <details key={r.currency} open className="card" style={{ padding: 16 }}>
+            <details key={r.currency} open style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
               <summary style={{ cursor: 'pointer', fontWeight: 700, fontSize: 16 }}>
                 {r.currency} — {fmtMoney(r.net, r.currency)}
                 {converted !== null && r.currency !== preferredCurrency && (
@@ -729,14 +729,14 @@ export function NetWorthPage({
             </details>
           );
         })}
-      </div>) }] : []), ...(sectionVisible('plans') ? [{ table: true,
+      </div></div>) }] : []), ...(sectionVisible('plans') ? [{ unframed: true,
         key: 'plans',
         label: 'Plans',
-        content: <NetWorthPlanningReality activities={activities} selectedModules={selectedModules} currencies={ownCurrencies} currentRows={rows} emiLoans={netWorthAsOfInputs.emiLoans} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} />,
-      }] : []), ...(sectionVisible('analytics') ? [{ table: true,
+        content: <div><h2>Plans</h2><NetWorthPlanningReality activities={activities} selectedModules={selectedModules} currencies={ownCurrencies} currentRows={rows} emiLoans={netWorthAsOfInputs.emiLoans} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} /></div>,
+      }] : []), ...(sectionVisible('analytics') ? [{ unframed: true,
         key: 'analytics',
         label: 'Analytics',
-        content: <NetWorthAnalyticsSection ownCurrencies={ownCurrencies} activities={activities} categories={categories} groups={categoryGroups} emiLoans={netWorthAsOfInputs.emiLoans} currentRows={rows} periodEndRows={rangeEndRows} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} rangeStartDate={rangeStartDate} rangeEndDate={rangeEndDate} rangeLabel={rangeLabel} setDrilldown={setDrilldown} splitData={splitData} preferredCurrency={preferredCurrency} missingFxCurrencies={missingFxCurrencies} rentalsNet={selectedModules.includes('rentals') ? rentalsNetForRange : {}} />,
+        content: <div><h2>Analytics & insights</h2><NetWorthAnalyticsSection ownCurrencies={ownCurrencies} activities={activities} categories={categories} groups={categoryGroups} emiLoans={netWorthAsOfInputs.emiLoans} currentRows={rows} periodEndRows={rangeEndRows} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} rangeStartDate={rangeStartDate} rangeEndDate={rangeEndDate} rangeLabel={rangeLabel} setDrilldown={setDrilldown} splitData={splitData} preferredCurrency={preferredCurrency} missingFxCurrencies={missingFxCurrencies} rentalsNet={selectedModules.includes('rentals') ? rentalsNetForRange : {}} /></div>,
       }] : [])]} />
 
       {/* User-requested (2026-08-26): subscription renewal/expiry alerts on
