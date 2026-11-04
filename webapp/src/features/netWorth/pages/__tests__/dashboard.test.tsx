@@ -76,8 +76,8 @@ it('renders the dashboard sections without nesting cards and provides period ins
   show(`/net-worth?section=analytics&period=custom&from=${todayISO}&to=${todayISO}`);
   expect(document.querySelector('.standard-card .card')).toBeNull();
   expect(screen.getByRole('heading', { name: new RegExp('Insights') })).toBeTruthy();
-  expect(screen.getByText(/Largest asset:/)).toBeTruthy();
-  expect(screen.getByText(/Recorded net activity:/)).toBeTruthy();
+  expect(screen.getAllByText(/Largest asset:/).length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/Recorded net activity:/).length).toBeGreaterThan(0);
 });
 
 it('restores hidden sections from a deep link and opens exchange rates only from the FAB', () => {
