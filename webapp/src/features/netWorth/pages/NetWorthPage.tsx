@@ -425,6 +425,7 @@ export function NetWorthPage({
   const rangeEndByCurrency = Object.fromEntries(rangeEndRows.map(row => [row.currency, row.net]));
   const rangeEndBreakdownByCurrency = Object.fromEntries(rangeEndRows.map(row => [row.currency, row.breakdown]));
   const periodFlow = flowByCurrency(includedCash, includedAccounts, bank.transactions, rangeStartDate, rangeEndDate);
+  const rentalsNetForRange = rentalsNetIncomeByCurrency(rentals.settings.properties, rentals.entries.filter(entry => entry.date >= rangeStartDate && entry.date <= rangeEndDate));
   const plannedPeriodByCurrency = useMemo(() => {
     const totals: Record<string, number> = {};
     activities.filter(activity => !activity.executed && activity.date >= rangeStartDate && activity.date <= rangeEndDate).forEach(activity => {
@@ -440,13 +441,14 @@ export function NetWorthPage({
   // A doughnut can't meaningfully show a negative slice, so a currency
   // with negative net worth is left out of the chart specifically — it's
   // still fully visible in the per-currency cards and breakdown below.
-  const splitData = rows
+  const splitData = rangeEndRows
     .map((r) => ({ currency: r.currency, converted: convertAmount(r.net, r.currency, preferredCurrency, rates) }))
     .filter((r): r is { currency: string; converted: number } => r.converted !== null && r.converted > 0);
 
   // Ordered by the user's own Primary/Secondary/Other ranking (2026-09-16),
   // not alphabetically — see `useCurrencyRankComparator`'s own doc comment.
   const ownCurrencies = [...new Set(rows.map((r) => r.currency))].sort(currencyRank);
+  const missingFxCurrencies = rangeEndRows.filter(row => convertAmount(row.net, row.currency, preferredCurrency, rates) === null).map(row => row.currency);
 
   // README Pending item 64: an on-demand snapshot (see
   // types/netWorthSnapshot.ts's own doc comment for the locked design
@@ -734,7 +736,7 @@ export function NetWorthPage({
       }] : []), ...(sectionVisible('analytics') ? [{ table: true,
         key: 'analytics',
         label: 'Analytics',
-        content: <NetWorthAnalyticsSection ownCurrencies={ownCurrencies} activities={activities} categories={categories} groups={categoryGroups} emiLoans={netWorthAsOfInputs.emiLoans} currentRows={rows} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} setDrilldown={setDrilldown} splitData={splitData} preferredCurrency={preferredCurrency} rentalsNet={selectedModules.includes('rentals') ? rentalsNet : {}} />,
+        content: <NetWorthAnalyticsSection ownCurrencies={ownCurrencies} activities={activities} categories={categories} groups={categoryGroups} emiLoans={netWorthAsOfInputs.emiLoans} currentRows={rows} periodEndRows={rangeEndRows} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} rangeStartDate={rangeStartDate} rangeEndDate={rangeEndDate} rangeLabel={rangeLabel} setDrilldown={setDrilldown} splitData={splitData} preferredCurrency={preferredCurrency} missingFxCurrencies={missingFxCurrencies} rentalsNet={selectedModules.includes('rentals') ? rentalsNetForRange : {}} />,
       }] : [])]} />
 
       {/* User-requested (2026-08-26): subscription renewal/expiry alerts on
