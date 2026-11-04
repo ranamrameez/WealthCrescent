@@ -26,7 +26,7 @@ function fundPositions(transactions: Transaction[]) {
 
 /** A fund's true Net P/L: realized profit locked in by every past sell/
  * withdrawal, PLUS unrealized profit on whatever units are still held.
- * `Position.invested` (from `computePositions`) is only the cost basis of
+ * `Position.invested` from the shared stock engine is only the cost basis of
  * the REMAINING position — a withdrawal reduces it, so `value - invested`
  * alone silently drops every past withdrawal's own profit. This is the
  * same `realizedPL + unrealizedPL` shape `cashSummary()`'s app-wide `netPL`
@@ -156,7 +156,7 @@ export function allocationByCategory(
   currencyCode: string,
   categories: Category[] = [],
 ): Record<string, number> {
-  const positions = computePositions(transactions, calcFee);
+  const positions = fundPositions(transactions);
   const out: Record<string, number> = {};
   funds
     .filter((f) => f.currencyCode === currencyCode)
