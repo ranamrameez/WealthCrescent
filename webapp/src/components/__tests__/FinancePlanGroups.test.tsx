@@ -17,6 +17,7 @@ import { groupFinancePlans } from '../../lib/financePlanHierarchy';
 import { flushLocalStorageWrites } from '../../lib/localStoragePersistence';
 import type { TransactionPageFilters } from '../../hooks/useUrlTransactionFilters';
 const mocks = vi.hoisted(() => ({ signedIn: true, confirm: vi.fn() }));
+vi.mock('../../lib/firebase/client', () => ({ auth: { get currentUser() { return mocks.signedIn ? { uid: 'test-user' } : null; } }, db: null, firebaseReady: false }));
 vi.mock('../../lib/firebase/useEnsureSignedIn', () => ({ useEnsureSignedIn: () => async () => mocks.signedIn }));
 vi.mock('../ConfirmDialog', () => ({ confirmDialog: mocks.confirm }));
 const filters: TransactionPageFilters = { period: 'custom', fromDate: '2026-10-01', toDate: '2026-12-31', direction: 'all', source: 'all', category: 'all', accountId: 'all' };

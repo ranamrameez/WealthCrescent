@@ -9,10 +9,9 @@ import type { PlannedRentalEntry } from '../types/plannedRentals';
 import type { FinancePlanGroup } from '../types/financePlanGroup';
 import { occurrenceCompleted } from './calc/planOccurrences';
 
-export type PlanModule = 'cash' | 'bank' | 'creditCard' | 'rentals';
-export type FinancePlan = PlannedCashEntry | PlannedBankTransaction | PlannedCreditCardTransaction | PlannedRentalEntry;
-export interface PlanReference { module: PlanModule; id: string }
-export interface PlanRecord { module: PlanModule; plan: FinancePlan }
+export { hasFulfilledPayments, planDescription, signedPlanAmount } from './calc/financePlanModel';
+export type { PlanModule, FinancePlan, PlanReference, PlanRecord } from './calc/financePlanModel';
+import { hasFulfilledPayments, planDescription, signedPlanAmount, type PlanModule, type FinancePlan, type PlanReference, type PlanRecord } from './calc/financePlanModel';
 export function readPlanGroups(): FinancePlanGroup[] { return usePlannedCashWorkbookStore.getState().workbook.planGroups ?? []; }
 
 export function savePlanGroup(group: FinancePlanGroup, expected?: FinancePlanGroup) {
@@ -23,10 +22,6 @@ export function savePlanGroup(group: FinancePlanGroup, expected?: FinancePlanGro
   if (!group.name.trim()) throw new Error('Enter a plan name.');
   const next = { ...group, name: group.name.trim(), notes: group.notes?.trim() || undefined };
   store.setWorkbook({ ...store.workbook, planGroups: current ? groups.map(item => item.id === group.id ? next : item) : [...groups, next] });
-}
-
-export function hasFulfilledPayments(plan: FinancePlan): boolean {
-  return !!(plan.executed || ('completedDates' in plan && plan.completedDates?.length) || ('executedThrough' in plan && plan.executedThrough));
 }
 
 export function deletePlanPayment(reference: PlanReference, occurrenceDate?: string) {
@@ -79,13 +74,6 @@ export function deleteFinancePlan(ref: PlanReference) {
     case 'rentals': usePlannedRentalsWorkbookStore.getState().deleteEntry(ref.id); break;
   }
 }
-export function planDescription(plan: FinancePlan) { return 'description' in plan ? plan.description : plan.note ?? plan.category ?? 'Plan'; }
-export function signedPlanAmount(plan: FinancePlan) {
-  if ('accountId' in plan) return plan.amount;
-  if ('kind' in plan) return ['payment', 'refund'].includes(plan.kind) ? plan.amount : -plan.amount;
-  return plan.type === 'IN' || plan.type === 'RENT_INCOME' ? plan.amount : -plan.amount;
-}
-
 /** Reassign expected activity without creating a real transaction or losing provenance. */
 export function assignPlanFinance(plan: FinancePlan, finance: {module: 'cash' | 'bank' | 'creditCard'; ref?: string; currencyCode: string}): FinancePlan {
   if ('propertyId' in plan) {

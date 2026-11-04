@@ -2,23 +2,16 @@ import { useState } from 'react';
 import { PlanEditorModal } from './PlanEditorModal';
 import { Field, Select } from './ui/Field';
 import { Notice } from './Notice';
-import { useBankWorkbookStore } from '../store/bankWorkbookStore';
-import { useCreditCardWorkbookStore } from '../store/creditCardWorkbookStore';
-import { useCashWorkbookStore } from '../store/cashWorkbookStore';
-import { useRentalsWorkbookStore } from '../store/rentalsWorkbookStore';
-import { useSubscriptionsWorkbookStore } from '../store/subscriptionsWorkbookStore';
 import { useEnabledCurrencies } from '../hooks/useEnabledCurrencies';
 import { useEnsureSignedIn } from '../lib/firebase/useEnsureSignedIn';
-import { assignPlanFinance, deleteFinancePlan, readFinancePlans, writeFinancePlan, type PlanRecord } from '../lib/financePlans';
+import { relinkPlannedPayments, type PlanRecord } from '../services/finance/planningService';
+import { usePlanningEditorSources } from '../hooks/usePlanning';
 import { toast } from './Toast';
 
 /** One finance selection updates a generated plan's unfulfilled children. */
 export function PlanFinanceEditor({ records, onClose }: { records: PlanRecord[]; onClose: () => void }) {
   const [snapshot] = useState(() => structuredClone(records.filter(row => !row.plan.executed)));
-  const accounts = useBankWorkbookStore(s => s.workbook.settings.accounts);
-  const cards = useCreditCardWorkbookStore(s => s.workbook.cards);
-  const properties = useRentalsWorkbookStore(s => s.workbook.settings.properties);
-  const defaultCurrency = useCashWorkbookStore(s => s.workbook.settings.defaultCurrency);
+  const { accounts, cards, properties, defaultCurrency } = usePlanningEditorSources();
   const [module,setModule] = useState<'cash'|'bank'|'creditCard'>('bank');
   const [ref,setRef] = useState('');
   const [currency,setCurrency] = useState(defaultCurrency);
@@ -49,18 +42,9 @@ export function PlanFinanceEditor({ records, onClose }: { records: PlanRecord[];
     setBusy(true);
     try {
       if (!(await ensureSignedIn('Sign in to link this plan.'))) return;
-      const current = readFinancePlans();
-      if (snapshot.some(row => JSON.stringify(current.find(item => item.module === row.module && item.plan.id === row.plan.id)?.plan) !== JSON.stringify(row.plan))) return toast('A plan item changed. Reopen the finance editor.');
-      const target = {module,ref,currencyCode:module === 'cash' ? currency : selected!.currencyCode};
-      if (snapshot.some(({plan})=>'propertyId' in plan && (module==='creditCard' || properties.find(p=>p.id===plan.propertyId)?.currencyCode!==target.currencyCode))) return toast('Rent plans link to Cash or a bank account in the property currency.');
-      const updated = snapshot.map(row => ({row,plan:assignPlanFinance(row.plan,target)}));
-      updated.forEach(({row,plan}) => { const destination='propertyId' in plan ? 'rentals' : module; writeFinancePlan(destination,plan,row.module === destination); if (row.module !== destination) deleteFinancePlan({module:row.module,id:row.plan.id}); });
-      for (const {plan} of snapshot) {
-        if ('propertyId' in plan && module!=='creditCard') useRentalsWorkbookStore.getState().updateProperty(plan.propertyId,{plannedFinance:{...target,module}});
-        if ('sourceSubscriptionId' in plan && plan.sourceSubscriptionId) useSubscriptionsWorkbookStore.getState().updateEntry(plan.sourceSubscriptionId,{paidVia:module==='cash' ? {module:'cash'} : {module,ref}});
-      }
+      relinkPlannedPayments(snapshot, module, ref, currency, currencyAcknowledged);
       onClose();
-    } finally { setBusy(false); }
+    } catch (error) { toast(error instanceof Error ? error.message : String(error)); } finally { setBusy(false); }
   };
   return <PlanEditorModal title="Link plan to finance" onClose={onClose}>
     <p className="text-muted">Choose one finance for all {snapshot.length} unfulfilled items. Dates, amounts, and fulfilled history are preserved. No currency conversion is performed.</p>

@@ -27,6 +27,7 @@ import * as emi from './emiModule';
 import * as rentals from './rentalPlanning';
 import * as subscriptions from './subscriptionsModule';
 import * as recurrence from './recurrence';
+import * as planning from './planningReadModel';
 
 /**
  * Stable domain-oriented API. Keep all financial calculation entry points
@@ -51,6 +52,7 @@ export const CalculationEngine = Object.freeze({
   rentals,
   subscriptions,
   recurrence,
+  planning,
 });
 
 export type CalculationEngineApi = typeof CalculationEngine;
