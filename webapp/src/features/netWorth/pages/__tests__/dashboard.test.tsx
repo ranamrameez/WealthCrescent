@@ -64,24 +64,21 @@ it('applies the URL-backed custom date range to flow figures and exposes the sel
   expect(summary.textContent).toContain('Period net flow');
   expect(summary.textContent).toContain('100.00');
 
-  fireEvent.click(screen.getByRole('button', { name: 'Dashboard filters' }));
-  const modal = document.querySelector<HTMLElement>('.modal-box')!;
-  expect((within(modal).getByLabelText('From date') as HTMLInputElement).value).toBe(todayISO);
-  expect((within(modal).getByLabelText('To date') as HTMLInputElement).value).toBe(todayISO);
-  expect(within(modal).getByText(new RegExp(todayISO))).toBeTruthy();
+  expect((screen.getByLabelText('From date') as HTMLInputElement).value).toBe(todayISO);
+  expect((screen.getByLabelText('To date') as HTMLInputElement).value).toBe(todayISO);
 });
 
 it('preserves a selected preset when switching to a custom range', () => {
   const todayISO = new Date().toISOString().slice(0, 10);
-  const fromDate = new Date(todayISO + 'T00:00:00Z');
-  fromDate.setUTCDate(fromDate.getUTCDate() - 89);
-  const expectedFrom = fromDate.toISOString().slice(0, 10);
-  show('/net-worth?period=90d');
-  fireEvent.click(screen.getByRole('button', { name: 'Dashboard filters' }));
-  const modal = document.querySelector<HTMLElement>('.modal-box')!;
-  fireEvent.change(within(modal).getByLabelText('Period'), { target: { value: 'custom' } });
-  expect((within(modal).getByLabelText('From date') as HTMLInputElement).value).toBe(expectedFrom);
-  expect((within(modal).getByLabelText('To date') as HTMLInputElement).value).toBe(todayISO);
+  show('/net-worth?period=3');
+  const dateRange = screen.getByLabelText('Date range');
+  fireEvent.change(dateRange, { target: { value: 'custom' } });
+  const fromDate = new Date();
+  fromDate.setDate(1);
+  fromDate.setMonth(fromDate.getMonth() - 2);
+  const expectedFrom = new Date(fromDate.getFullYear(), fromDate.getMonth(), 1).toISOString().slice(0, 10);
+  expect((screen.getByLabelText('From date') as HTMLInputElement).value).toBe(expectedFrom);
+  expect((screen.getByLabelText('To date') as HTMLInputElement).value).toBe(todayISO);
 });
 
 it('excludes transactions outside the selected range while retaining the live balance', () => {
