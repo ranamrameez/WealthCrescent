@@ -4,7 +4,6 @@ import type { Position, PricePoint, Transaction, Transfer } from '../../types/wo
 import { buildCashLedger } from './cashLedger';
 import { sortTransactionsChronological } from './sortTransactions';
 import { categoryName } from '../categories';
-import { computePositions } from './positions';
 import { calculateStockPortfolio } from './stockCalculationEngine';
 import { getDailyPriceHistory, getMarketPrice, getPriceHistory } from './priceHistory';
 
@@ -18,6 +17,12 @@ export function fundCategoryLabel(fund: Fund, categories: Category[]): string {
 }
 
 const calcFee = () => 0; // NAV is already net of fund fees — see FundsWorkbook's doc comment
+
+/** Funds are stock-like positions: use the shared StockExchangeEngine for
+ * holdings, lifecycle and oversell semantics instead of a parallel rollup. */
+function fundPositions(transactions: Transaction[]) {
+  return calculateStockPortfolio(transactions.filter(transaction => !transaction.isPending), calcFee, 'average').positions;
+}
 
 /** A fund's true Net P/L: realized profit locked in by every past sell/
  * withdrawal, PLUS unrealized profit on whatever units are still held.
@@ -43,7 +48,7 @@ export function fundsValueByCurrency(
   transactions: Transaction[],
   marketPrices: Record<string, number>,
 ): Record<string, number> {
-  const positions = computePositions(transactions, calcFee);
+  const positions = fundPositions(transactions);
   const out: Record<string, number> = {};
   funds.forEach((fund) => {
     const position = positions.find((p) => p.ticker === fund.id);
@@ -72,21 +77,15 @@ export type FundsCashLedgerEvent = ReturnType<typeof buildCashLedger>[number] & 
  * cash proceeds mirror the units actually removed; a wholly unmatched SELL
  * still contributes no cash. */
 function matchedFundsCashTransactions(transactions: Transaction[]): Transaction[] {
-  const heldByFund = new Map<string, number>();
-  const valid: Transaction[] = [];
-  sortTransactionsChronological(transactions.filter((transaction) => !transaction.isPending)).forEach((transaction) => {
-    const held = heldByFund.get(transaction.ticker) ?? 0;
-    if (transaction.action === 'BUY') {
-      heldByFund.set(transaction.ticker, held + transaction.shares);
-      valid.push(transaction);
-      return;
-    }
-    const matchedShares = Math.min(transaction.shares, held);
-    if (matchedShares <= 1e-7) return;
-    heldByFund.set(transaction.ticker, Math.max(0, held - matchedShares));
-    valid.push(matchedShares === transaction.shares ? transaction : { ...transaction, shares: matchedShares });
+  const ordered = sortTransactionsChronological(transactions.filter(transaction => !transaction.isPending))
+    .map((transaction, index) => transaction.id ? transaction : { ...transaction, id: `fund:cash:legacy:${index}` });
+  const matchedBySell = calculateStockPortfolio(ordered, calcFee, 'average').realizedBySellTxId;
+  return ordered.flatMap(transaction => {
+    if (transaction.action === 'BUY') return [transaction];
+    const matchedShares = transaction.id ? matchedBySell[transaction.id]?.shares ?? 0 : 0;
+    if (matchedShares <= 1e-7) return [];
+    return [{ ...transaction, shares: Math.min(transaction.shares, matchedShares) }];
   });
-  return valid;
 }
 
 export function fundsCashLedgerByCurrency(
