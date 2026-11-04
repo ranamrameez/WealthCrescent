@@ -3,11 +3,11 @@ import { fmtMoney } from '../lib/format';
 import type { UpcomingItem } from '../lib/calc/upcoming';
 
 const MODULE_LABELS: Record<UpcomingItem['module'], string> = {
-  cash: 'Cash', bank: 'Banking', emi: 'EMI/Loans', rentals: 'Rentals', subscriptions: 'Subscriptions',
+  cash: 'Cash', bank: 'Banking', creditCards: 'Credit cards', emi: 'EMI/Loans', rentals: 'Rentals', subscriptions: 'Subscriptions',
 };
 
 const MODULE_LINK: Record<UpcomingItem['module'], string> = {
-  cash: '/cash', bank: '/bank', emi: '/emi-loans', rentals: '/rentals', subscriptions: '/subscriptions',
+  cash: '/cash', bank: '/bank', creditCards: '/bank', emi: '/emi-loans', rentals: '/rentals', subscriptions: '/subscriptions',
 };
 
 /** Shared row-list renderer for `collectUpcomingItems()`'s output — used by
@@ -34,19 +34,19 @@ export function UpcomingList({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {shown.map((item, i) => (
         <Link
-          key={i}
-          to={MODULE_LINK[item.module]}
+          key={`${item.module}:${item.id}:${item.date}`}
+          to={item.href ?? MODULE_LINK[item.module]}
           style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8,
             textDecoration: 'none', color: 'inherit', padding: '6px 8px', borderRadius: 6,
-            background: item.overdue ? 'color-mix(in srgb, var(--loss) 12%, transparent)' : 'transparent',
+            background: 'transparent',
           }}
         >
           <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
             <span className="text-muted" style={{ marginRight: 8 }}>{item.date}</span>
             {item.label}
             <span className="text-muted" style={{ marginLeft: 8 }}>({MODULE_LABELS[item.module]})</span>
-            {item.overdue && <span className="pill-negative" style={{ marginLeft: 8 }}>Overdue</span>}
+
           </span>
           <span className={item.kind === 'income' ? 'pill-positive' : 'pill-negative'} style={{ flexShrink: 0 }}>
             {item.kind === 'income' ? '+' : '-'}{fmtMoney(item.amount, item.currencyCode)}
