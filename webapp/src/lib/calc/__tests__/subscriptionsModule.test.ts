@@ -161,6 +161,25 @@ describe('dueSubscriptionAlerts', () => {
     expect(due[0].subscription.id).toBe('s1');
   });
 
+  it('does not replay earlier lead-time reminders together with the reminder scheduled for today', () => {
+    const s = sub({
+      id: 's1',
+      startDate: '2026-01-01',
+      billingCycle: 'monthly',
+      alerts: [
+        { id: 'one-day', daysBefore: 1 },
+        { id: 'two-days', daysBefore: 2 },
+        { id: 'three-days', daysBefore: 3 },
+      ],
+    });
+    const onThreeDaysBefore = dueSubscriptionAlerts([s], new Date('2026-01-29T10:00:00'));
+    expect(onThreeDaysBefore.map(row => row.alert.id)).toEqual(['three-days']);
+    const onTwoDaysBefore = dueSubscriptionAlerts([s], new Date('2026-01-30T10:00:00'));
+    expect(onTwoDaysBefore.map(row => row.alert.id)).toEqual(['two-days']);
+    const onOneDayBefore = dueSubscriptionAlerts([s], new Date('2026-01-31T10:00:00'));
+    expect(onOneDayBefore.map(row => row.alert.id)).toEqual(['one-day']);
+  });
+
   it('excludes an alert whose trigger instant is still in the future', () => {
     const s = sub({ startDate: '2026-01-01', billingCycle: 'monthly', alerts: [{ id: 'a1', daysBefore: 3 }] });
     // Next occurrence from 2026-01-10 is 2026-02-01, so the trigger is 2026-01-29 — still ahead of asOf.
