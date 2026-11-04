@@ -7,12 +7,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { selectedEntityValues } from '../../../components/EntityScopeMenu';
 import { PageFilterModal } from '../../../components/PageFilterModal';
+import { DateRangeWidget } from '../../../components/DateRangeWidget';
+import { FinancePlansHierarchy } from '../../../components/FinancePlansHierarchy';
 import { TopBarControls } from '../../../components/TopBarControls';
 import { Chart, Doughnut } from 'react-chartjs-2';
 import { Card, CollapsibleCard, MoneyValue, StatCard } from '../../../components/Card';
 import { StandardPageSections } from '../../../components/StandardPageSections';
 import { SummarySection, SummarySections, SummaryValue } from '../../../components/SummaryGroupCard';
-import { confirmDialog } from '../../../components/ConfirmDialog';
 import { Modal } from '../../../components/Modal';
 import { Notice } from '../../../components/Notice';
 import { Tooltip } from '../../../components/Tooltip';
@@ -21,23 +22,18 @@ import { FabButton } from '../../../components/ui/Fab';
 import { CheckIcon, FilterIcon, CashIcon } from '../../../components/icons';
 import { toast } from '../../../components/Toast';
 import { ChartCard } from '../../qse/components/ChartCard';
-import { netIncomeByCurrency as rentalsNetIncomeByCurrency } from '../../../lib/calc/rentalsModule';
-import { flowActivity, flowByCurrency, type CurrencyNetWorth, type FlowActivityItem, type NetWorthBreakdownEntry } from '../../../lib/calc/netWorth';
+import { type CurrencyNetWorth, type FlowActivityItem, type NetWorthBreakdownEntry } from '../../../lib/calc/netWorth';
 import { collectBudgetActivities, monthlyIncomeExpense, monthRange, monthsBetween, currentMonth as currentMonthOf, type MonthlyIncomeExpense, type BudgetActivity } from '../../../lib/calc/budgetPlanner';
-import { activitiesForGroup } from '../../../lib/calc/categoryGroups';
-import { useCategoryGroupStore } from '../../../store/categoryGroupStore';
 import { endOfMonthAsOf, projectedNetWorthTrend, type MonthlyNetWorthPoint } from '../../../lib/calc/netWorthTrend';
 import { earliestActivityDate, netWorthAsOfDate, type NetWorthAsOfInputs } from '../../../lib/calc/netWorthAsOf';
-import { upcomingRenewals } from '../../../lib/calc/subscriptionsModule';
 import { UpcomingList } from '../../../components/UpcomingList';
 import { useUpcomingItems } from '../../../hooks/useUpcomingItems';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
-import { useSubscriptionsWorkbookStore } from '../../../store/subscriptionsWorkbookStore';
 import { useNetWorthSummary } from '../hooks/useNetWorthSummary';
 import { convertAmount, effectiveRate, fetchFxRates, isFxStale, loadCachedFxRates, saveFxRates, setCrossRate, type FxRates } from '../../../lib/fx';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
-import { useAuthState } from '../../../lib/firebase/useAuthState';
-import { firebaseReady } from '../../../lib/firebase/client';
+import { useUrlTransactionFilters } from '../../../hooks/useUrlTransactionFilters';
+import { currentMonthRange, presetDateRange } from '../../../lib/dateRange';
 import { fmtMoney } from '../../../lib/format';
 import { dlDoughnut, dlLine, withAlpha } from '../../../lib/chartLabels';
 import type { ChartDataset } from 'chart.js';
@@ -55,7 +51,6 @@ import { usePlannedCashWorkbookStore } from '../../../store/plannedCashWorkbookS
 import { useBankWorkbookStore } from '../../../store/bankWorkbookStore';
 import { useCreditCardWorkbookStore } from '../../../store/creditCardWorkbookStore';
 import { usePlannedBankWorkbookStore } from '../../../store/plannedBankWorkbookStore';
-import { useNetWorthSnapshotsWorkbookStore } from '../../../store/netWorthSnapshotsWorkbookStore';
 import { useRentalsWorkbookStore } from '../../../store/rentalsWorkbookStore';
 import { usePlannedRentalsWorkbookStore } from '../../../store/plannedRentalsWorkbookStore';
 import { useInterEntityTransfersStore } from '../../../store/interEntityTransfersStore';
@@ -77,16 +72,6 @@ const DASHBOARD_MODULES = ['cash', 'bank', 'creditCards', 'personalLoans', 'emi'
 
 const today = () => new Date().toISOString().slice(0, 10);
 const monthLabel = (m: string) => new Date(`${m}-01`).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
-const DASHBOARD_PERIODS = [
-  { value: '7d', label: 'Last 7 days' },
-  { value: '30d', label: 'Last 30 days' },
-  { value: '90d', label: 'Last 90 days' },
-  { value: '6m', label: 'Last 6 months' },
-  { value: '1y', label: 'Last 12 months' },
-  { value: 'ytd', label: 'Year to date' },
-  { value: 'all', label: 'All available history' },
-  { value: 'custom', label: 'Custom range' },
-] as const;
 
 function shiftISODate(value: string, days: number): string {
   const date = new Date(value + 'T00:00:00Z');
@@ -94,15 +79,7 @@ function shiftISODate(value: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-function shiftISODateMonths(value: string, months: number): string {
-  const date = new Date(value + 'T00:00:00Z');
-  const day = date.getUTCDate();
-  date.setUTCDate(1);
-  date.setUTCMonth(date.getUTCMonth() + months);
-  const lastDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
-  date.setUTCDate(Math.min(day, lastDay));
-  return date.toISOString().slice(0, 10);
-}
+
 function isValidISODate(value: string | null): value is string {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(value + 'T00:00:00Z');
