@@ -122,7 +122,7 @@ On the **Account** page, **Reset all settings to app defaults** restores broker 
 
 The sidebar's **Dashboard** opens the cross-module Net Worth home page. Its **Filters** panel has a shared reporting range: Last 7 days, Last 30 days, Last 90 days, Last 6 months, Last 12 months, Year to date, All available history, or a Custom date range. The selected period is stored in the page URL, so it can be bookmarked or shared.
 
-The **Estimated net worth** and per-currency balances remain your live current balances. **Period net flow**, **Planned activity in period**, and **Net worth change in period** are separate measures: cleared Cash/Bank movement, unexecuted plans, and the difference between the real net worth at the period endpoints. A period change is shown only when there is a real opening baseline before the selected start date.
+The **Estimated net worth** and per-currency balances remain your live current balances. **Period net flow** and **Net worth change in period** are historical measures: cleared Cash/Bank movement and the difference between real net worth at the period endpoints. **Upcoming planned activity (30 days)** is a separate forward-looking figure; the Plans section has its own projection-horizon controls. A period change is shown only when there is a real opening baseline before the selected start date.
 
 The Analytics section uses the same date range for monthly income/expense, category-group activity, rental net income, and the insight cards. The monthly cash-flow totals and their drill-downs respect the exact dates, including partial first and last months. Net-worth chart points are month-end balances for completed months and today's balance for the current month, not daily snapshots.
 
