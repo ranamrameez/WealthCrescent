@@ -48,11 +48,13 @@ export function DateRangeWidget({ value, onChange }: {
       return;
     }
     if (period === 'custom') {
-      onChange({ period, fromDate: value.fromDate || currentMonthRange().startDate, toDate: value.toDate || today });
+      const currentTo = value.toDate && value.toDate < today ? value.toDate : today;
+      const currentFrom = value.fromDate || currentMonthRange().startDate;
+      onChange({ period, fromDate: currentFrom > currentTo ? currentTo : currentFrom, toDate: currentTo });
       return;
     }
     const range = period === 'since-month' ? currentMonthRange() : presetDateRange(period);
-    onChange({ period, fromDate: range.startDate, toDate: range.endDate });
+    onChange({ period, fromDate: range.startDate, toDate: range.endDate > today ? today : range.endDate });
   };
 
   const shift = (amount: number) => {
