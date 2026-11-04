@@ -231,3 +231,23 @@ html[data-color="material-teal"] .navbtn.active {
   background:var(--accent-soft);
   color:var(--accent);
 }
+
+
+/* Shared-component visual treatment: shape, surfaces and chart depth. */
+html[data-color="material-teal"] {
+  --summary-radius: 20px;
+  --summary-surface: color-mix(in srgb,var(--accent) 4%,var(--panel));
+  --summary-border: 1px solid transparent;
+  --summary-shadow: var(--shadow-card);
+  --navigation-radius: 24px;
+  --dropdown-radius: 20px;
+  --dropdown-item-radius: 12px;
+  --chart-tension: 0.24;
+  --chart-bar-radius: 8;
+  --chart-fill-opacity: 0.55;
+  --chart-line-width: 2.5;
+  --chart-grid-opacity: 0.12;
+  --chart-tooltip-radius: 12;
+  --chart-shadow-blur: 8;
+  --chart-shadow-opacity: 0.12;
+}
