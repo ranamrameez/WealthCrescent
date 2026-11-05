@@ -90,6 +90,8 @@ it.each(['/bank/account/a1', '/bank/bank/b1'])('keeps plan creation in the FAB w
   expect(screen.getByRole('button', { name: 'Save plan' })).toBeTruthy();
 });
 
+// Three lazy-editor cycles need a total budget that covers the bounded
+// five-second finder for each cycle on a cold Windows/CI worker.
 it('keeps one live section stack after repeatedly closing batch edit', async () => {
   const { container } = show('/bank/account/a1?section=transactions');
   for (let i = 0; i < 3; i++) {
@@ -103,4 +105,4 @@ it('keeps one live section stack after repeatedly closing batch edit', async () 
     expect(container.querySelectorAll('.standard-section-anchor')).toHaveLength(5);
     expect(screen.getAllByText('Future cleared payment')).toHaveLength(1);
   }
-});
+}, 15000);

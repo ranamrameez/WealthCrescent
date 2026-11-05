@@ -15,6 +15,7 @@ import * as funds from './fundsModule';
 import * as portfolio from './portfolioCalculationEngine';
 import * as cash from './cashModule';
 import * as bank from './bankModule';
+import * as bankReadModels from './bankReadModel';
 import * as creditCards from './creditCardModule';
 import * as budgets from './budgetPlanner';
 import * as plannedBalances from './plannedBalance';
@@ -47,7 +48,7 @@ export const CalculationEngine = Object.freeze({
   portfolio,
   funds,
   cash,
-  bank,
+  bank: Object.freeze({ ...bank, ...bankReadModels }),
   creditCards,
   budgets,
   plannedBalances,

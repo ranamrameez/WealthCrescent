@@ -1,3 +1,5 @@
+import { bankTransactionMatchesFilters as transactionMatchesFilters, bankPlanMatchesFilters } from '../../../services/finance/bankService';
+import { useBankDirectory, useBankAccount, useBankingScopeSummary, useBankAccountAnalytics } from '../../../hooks/useBankQueries';
 import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
@@ -55,8 +57,7 @@ import { recurrenceLabel } from '../../../lib/recurrenceLabel';
 import { hueStyle } from '../../../lib/statCardHues';
 import { categoryName, UNCATEGORIZED_ID } from '../../../lib/categories';
 import { useCategoryStore } from '../../../store/categoryStore';
-import { accountBalance, accountPendingBalance, accountRunningLedger, bankAnalyticsFromLedger, bankTotalsByCurrency, budgetVsActual } from '../../../lib/calc/bankModule';
-import { outstandingBalanceByCard } from '../../../lib/calc/creditCardModule';
+import { accountRunningLedger, budgetVsActual } from '../../../lib/calc/bankModule';
 import { type PlanningHorizonDays } from '../../../lib/calc/plannedBalance';
 import { dlBarV, dlDoughnut } from '../../../lib/chartLabels';
 import { applyChartTheme } from '../../../lib/chartSetup';
@@ -507,15 +508,8 @@ export function AddAccountForm({ onSaved, initialCurrency, initialBankId, accoun
  * first thing on the page after the title, not nested one level down
  * inside a specific tab. */
 function BanksList({ showArchived = false }: { showArchived?: boolean }) {
-  const banks = useBankWorkbookStore((s) => s.workbook.settings.banks ?? []);
-  const accounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
-  const transactions = useBankWorkbookStore((s) => s.workbook.transactions);
+  const { banks, visibleBanks, bankMetrics } = useBankDirectory(showArchived);
   const navigate = useNavigate();
-  const visibleBanks = useMemo(
-    () => (showArchived ? banks : banks.filter((bank) => bank.isActive !== false))
-      .sort((a, b) => Number(!!b.isFavorite) - Number(!!a.isFavorite)),
-    [banks, showArchived],
-  );
 
   if (!banks.length) return <p className="text-muted">No banks yet. Use Actions → Add a bank.</p>;
   if (!visibleBanks.length) return <p className="text-muted">No active banks to show.</p>;
@@ -523,9 +517,9 @@ function BanksList({ showArchived = false }: { showArchived?: boolean }) {
   return (
     <div className="entity-card-grid">
       {visibleBanks.map((bank) => {
-        const totals = bankTotalsByCurrency(bank.id, accounts, transactions);
+        const totals = bankMetrics.get(bank.id)?.totals ?? {};
         const currencies = Object.keys(totals);
-        const accountCount = accounts.filter((account) => account.bankId === bank.id).length;
+        const accountCount = bankMetrics.get(bank.id)?.accountCount ?? 0;
         return (
           <EntityCard
             key={bank.id}
@@ -560,34 +554,18 @@ export function BankDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const banks = useBankWorkbookStore((s) => s.workbook.settings.banks ?? []);
+  const { banks, transactions, categories, bankMetrics, accountMetrics, cardMetrics } = useBankDirectory();
   const bank = banks.find((b) => b.id === id);
-  const accounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
-  const transactions = useBankWorkbookStore((s) => s.workbook.transactions);
   const updateBank = useBankWorkbookStore((s) => s.updateBank);
   const deleteBank = useBankWorkbookStore((s) => s.deleteBank);
   const ensureSignedIn = useEnsureSignedIn();
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
-  const categories = useCategoryStore((state) => state.workbook.categories);
-  const linkedAccounts = useMemo(
-    () => accounts.filter((a) => a.bankId === id && !a.migratedToCreditCardId),
-    [accounts, id],
-  );
-  const totals = useMemo(
-    () => (bank ? bankTotalsByCurrency(bank.id, accounts, transactions) : {}),
-    [bank, accounts, transactions],
-  );
-  const allCards = useCreditCardWorkbookStore((s) => s.workbook.cards);
-  const cardTransactions = useCreditCardWorkbookStore((s) => s.workbook.transactions);
-  const linkedCards = useMemo(() => allCards.filter((card) => card.bankId === id), [allCards, id]);
-  const categoryOptions = useMemo(
-    () => [...new Set(
-      transactions
-        .filter((tx) => linkedAccounts.some((account) => account.id === tx.accountId))
-        .map((tx) => categoryName(tx.categoryID, categories)),
-    )].sort(),
-    [transactions, linkedAccounts, categories],
-  );
+  const metadata = bankMetrics.get(id ?? '');
+  const linkedAccounts = metadata?.accounts ?? [];
+  const linkedCards = metadata?.cards ?? [];
+  const totals = metadata?.totals ?? {};
+  const categoryOptions = metadata?.categoryOptions ?? [];
+
   const accountOptions = useMemo(
     () => linkedAccounts.map((account) => ({ value: account.id, label: `${accountDisplayName(account)} (${account.currencyCode})` })),
     [linkedAccounts],
@@ -670,7 +648,7 @@ export function BankDetailPage() {
             </SummarySections>
           ) : <p className="text-muted">No accounts linked yet.</p>}
           <div className="mt-md">
-            <BankingScopeSummary accounts={linkedAccounts} filters={filters} />
+            <BankingScopeSummary accounts={linkedAccounts} filters={filters} bankId={bank.id} />
           </div>
         </div>
       ),
@@ -695,14 +673,14 @@ export function BankDetailPage() {
         <div>
           <div className="entity-card-grid">
             {linkedAccounts.map((account) => {
-              const balance = accountBalance(account, transactions);
+              const { balance, displayBalance } = accountMetrics.get(account.id) ?? { balance: 0, displayBalance: 0 };
               return (
                 <EntityCard
                   key={account.id}
                   title={accountDisplayName(account)}
                   subtitle={[account.accountType, account.branch].filter(Boolean).join(' · ') || undefined}
                   statLabel={account.isLiability ? 'Owed' : 'Balance'}
-                  stat={<MoneyValue n={account.isLiability ? Math.max(0, -balance) : balance} currency={account.currencyCode} />}
+                  stat={<MoneyValue n={displayBalance} currency={account.currencyCode} />}
                   hue={account.color ?? (account.isLiability ? (balance < 0 ? 'var(--loss)' : 'var(--profit)') : (balance >= 0 ? 'var(--profit)' : 'var(--loss)'))}
                   onClick={() => navigate(`/bank/account/${account.id}`)}
                 />
@@ -717,7 +695,7 @@ export function BankDetailPage() {
           ) : (
             <div className="entity-card-grid">
               {linkedCards.map((card) => {
-                const balance = Math.max(0, outstandingBalanceByCard(card, cardTransactions));
+                const balance = cardMetrics.get(card.id)?.balance ?? 0;
                 return (
                   <CreditCardVisual
                     key={card.id}
@@ -794,29 +772,9 @@ export function BankDetailPage() {
  * alone (no plain account in that currency yet), from an account alone, or
  * both; the divider only renders when a group actually has cards. */
 function AccountsList({ showArchived = false }: { showArchived?: boolean }) {
-  const accounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
-  const transactions = useBankWorkbookStore((s) => s.workbook.transactions);
+  const { accounts, visibleAccounts, currencyGroups, srNumOf, accountMetrics } = useBankDirectory(showArchived);
   const navigate = useNavigate();
   const { num } = useAmountFormat();
-
-  const visibleAccounts = useMemo(
-    () => (showArchived ? accounts : accounts.filter((account) => account.isActive !== false))
-      .filter((account) => !account.migratedToCreditCardId),
-    [accounts, showArchived],
-  );
-  const srNumOf = useMemo(() => new Map(accounts.map((account, index) => [account.id, index + 1])), [accounts]);
-  const currencyGroups = useMemo(() => {
-    const byCurrency = new Map<string, BankAccount[]>();
-    for (const account of visibleAccounts) {
-      const group = byCurrency.get(account.currencyCode) ?? [];
-      group.push(account);
-      byCurrency.set(account.currencyCode, group);
-    }
-    for (const group of byCurrency.values()) {
-      group.sort((a, b) => Number(!!b.isFavorite) - Number(!!a.isFavorite));
-    }
-    return [...byCurrency.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [visibleAccounts]);
 
   if (!accounts.some((account) => !account.migratedToCreditCardId)) {
     return <p className="text-muted">No accounts yet — use Actions → Add an account.</p>;
@@ -827,8 +785,7 @@ function AccountsList({ showArchived = false }: { showArchived?: boolean }) {
 
   return (
     <div>
-      {currencyGroups.map(([currency, group]) => {
-        const groupSum = group.reduce((sum, account) => sum + accountBalance(account, transactions), 0);
+      {currencyGroups.map(({ currency, accounts: group, total: groupSum }) => {
         return (
           <div key={currency} style={{ marginBottom: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -839,7 +796,7 @@ function AccountsList({ showArchived = false }: { showArchived?: boolean }) {
             </div>
             <div className="entity-card-grid">
               {group.map((account) => {
-                const balance = accountBalance(account, transactions);
+                const { balance, displayBalance } = accountMetrics.get(account.id) ?? { balance: 0, displayBalance: 0 };
                 return (
                   <EntityCard
                     key={account.id}
@@ -854,7 +811,7 @@ function AccountsList({ showArchived = false }: { showArchived?: boolean }) {
                       ) : undefined
                     }
                     statLabel={account.isLiability ? 'Owed' : 'Balance'}
-                    stat={<MoneyValue n={account.isLiability ? Math.max(0, -balance) : balance} currency={account.currencyCode} />}
+                    stat={<MoneyValue n={displayBalance} currency={account.currencyCode} />}
                     hue={account.color ?? (account.isLiability ? (balance < 0 ? 'var(--loss)' : 'var(--profit)') : (balance >= 0 ? 'var(--profit)' : 'var(--loss)'))}
                     onClick={() => navigate(`/bank/account/${account.id}`)}
                   />
@@ -889,17 +846,13 @@ export function AccountDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const accounts = useBankWorkbookStore((state) => state.workbook.settings.accounts);
-  const banks = useBankWorkbookStore((state) => state.workbook.settings.banks ?? []);
-  const account = accounts.find((item) => item.id === id);
-  const transactions = useBankWorkbookStore((state) => state.workbook.transactions);
   const updateAccount = useBankWorkbookStore((state) => state.updateAccount);
   const deleteAccount = useBankWorkbookStore((state) => state.deleteAccount);
   const ensureSignedIn = useEnsureSignedIn();
-  const plannedEntries = usePlannedBankWorkbookStore((state) => state.workbook.entries);
-  const categories = useCategoryStore((state) => state.workbook.categories);
   const { num } = useAmountFormat();
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
+  const { account, accounts, banks, categories, allLedger, filteredLedger, clearedLedger, pendingLedger, actualBalanceLedger, batchPlans, analytics, periodStartBalance, periodCurrentBalance,
+    pendingInflow, pendingOutflow, plannedInflow, plannedOutflow, upcoming, categoryOptions, currentBalance, displayBalance, pendingAmount } = useBankAccount(id, filters);
   const dateFormat = useAppearanceStore((state) => state.appearance.dateFormat ?? 'DD-MMM-YYYY');
 
   const [editAccountOpen, setEditAccountOpen] = useState(false);
@@ -916,41 +869,6 @@ export function AccountDetailPage() {
   }, [id]);
   const [addingPlan, setAddingPlan] = useState(false);
 
-  const allLedger = useMemo(() => account ? accountRunningLedger(account, transactions, true) : [], [account, transactions]);
-  const categoryOptions = useMemo(
-    () => [...new Set(allLedger.map((row) => categoryName(row.tx.categoryID, categories)))].sort(),
-    [allLedger, categories],
-  );
-  const filteredLedger = useMemo(() => allLedger.filter((row) => {
-    if ((filters.fromDate && row.tx.date < filters.fromDate) || (filters.toDate && row.tx.date > filters.toDate)) return false;
-    if (filters.direction === 'in' && row.tx.amount < 0) return false;
-    if (filters.direction === 'out' && row.tx.amount >= 0) return false;
-    if (filters.category !== 'all' && categoryName(row.tx.categoryID, categories) !== filters.category) return false;
-    if (filters.source !== 'all' && (row.tx.source ?? 'manual') !== filters.source) return false;
-    return true;
-  }), [allLedger, filters, categories]);
-  const clearedLedger = useMemo(() => filteredLedger.filter(({ tx }) => !tx.isPending), [filteredLedger]);
-  const analytics = useMemo(() => bankAnalyticsFromLedger(clearedLedger), [clearedLedger]);
-  const periodStartBalance = useMemo(() => {
-    if (!account) return 0;
-    const before = allLedger.filter(({ tx }) => !tx.isPending && filters.fromDate && tx.date < filters.fromDate);
-    return before.length ? before[before.length - 1].balance : account.openingBalance;
-  }, [account, allLedger, filters.fromDate]);
-  const periodCurrentBalance = allLedger.filter(row => !row.tx.isPending && (!filters.toDate || row.tx.date <= filters.toDate)).at(-1)?.balance ?? account?.openingBalance ?? 0;
-  const pendingInflow = filteredLedger.filter(({ tx }) => tx.isPending && tx.amount >= 0).reduce((sum, row) => sum + row.tx.amount, 0);
-  const pendingOutflow = filteredLedger.filter(({ tx }) => tx.isPending && tx.amount < 0).reduce((sum, row) => sum + row.tx.amount, 0);
-  const plannedInflow = planOccurrences(plannedEntries, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters)).filter((plan) => plan.accountId === account?.id && !plan.executed && plan.amount >= 0 && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
-  const plannedOutflow = planOccurrences(plannedEntries, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters)).filter((plan) => plan.accountId === account?.id && !plan.executed && plan.amount < 0 && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).reduce((sum, plan) => sum + plan.amount, 0);
-  const upcoming = useMemo(
-    () => account
-      ? planOccurrences(plannedEntries, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters))
-          .filter((plan) => plan.accountId === account.id && !plan.executed)
-          .filter((plan) => (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate))
-          .filter((plan) => filters.direction === 'all' || (filters.direction === 'in' ? plan.amount >= 0 : plan.amount < 0))
-          .sort((a, b) => a.date.localeCompare(b.date))
-      : [],
-    [plannedEntries, account, filters],
-  );
 
   usePageTopBarRightSlot(account ? (
     <TopBarControls>
@@ -999,16 +917,13 @@ export function AccountDetailPage() {
     toast(account.isActive === false ? 'Account reopened.' : 'Account closed.');
   };
 
-  const currentBalance = accountBalance(account, transactions);
-  const displayBalance = account.isLiability ? Math.max(0, -currentBalance) : currentBalance;
-  const pendingAmount = accountPendingBalance(account, transactions);
 
   const exportTransactions = () => {
     const header = ['#', 'Date', 'Description', 'Category', 'Amount', 'Balance', 'Source', 'Status'];
-    const body = [...filteredLedger].reverse().map(({ tx, balance }) => [
+    const body = [...filteredLedger].reverse().map(({ tx, balance, isFuture }) => [
       tx.serialNumber ?? '', tx.date, tx.description, categoryName(tx.categoryID, categories), tx.amount, balance,
       tx.source === 'statement-import' ? `Imported${tx.statementRef ? ` (${tx.statementRef})` : ''}` : 'Manual',
-      tx.isPending ? 'Pending' : 'Cleared',
+      tx.isPending ? 'Pending' : isFuture ? 'Future dated' : 'Cleared',
     ]);
     const blob = new Blob([toCSV([header, ...body])], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -1021,7 +936,7 @@ export function AccountDetailPage() {
   };
   const exportAllTransactions = () => {
     const header = ['#', 'Date', 'Description', 'Category', 'Amount', 'Balance', 'Source', 'Status'];
-    const body = [...allLedger].reverse().map(({ tx, balance }) => [tx.serialNumber ?? '', tx.date, tx.description, categoryName(tx.categoryID, categories), tx.amount, balance, tx.source === 'statement-import' ? `Imported${tx.statementRef ? ` (${tx.statementRef})` : ''}` : 'Manual', tx.isPending ? 'Pending' : 'Cleared']);
+    const body = [...allLedger].reverse().map(({ tx, balance, isFuture }) => [tx.serialNumber ?? '', tx.date, tx.description, categoryName(tx.categoryID, categories), tx.amount, balance, tx.source === 'statement-import' ? `Imported${tx.statementRef ? ` (${tx.statementRef})` : ''}` : 'Manual', tx.isPending ? 'Pending' : isFuture ? 'Future dated' : 'Cleared']);
     const blob = new Blob([toCSV([header, ...body])], { type: 'text/csv' });
     const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `${account.name.replace(/\s+/g, '_')}_all_transactions.csv`; anchor.click(); URL.revokeObjectURL(url);
     toast(`${body.length} transaction${body.length === 1 ? '' : 's'} downloaded.`);
@@ -1122,7 +1037,7 @@ export function AccountDetailPage() {
         <SummaryChip label="Withdrawals" value={fmtMoney(analytics.withdrawals, account.currencyCode)} />
         <SummaryChip label="Net" value={fmtMoney(analytics.netFlow, account.currencyCode)} />
       </>,
-      content: <AccountAnalyticsSection ledger={clearedLedger} pendingRows={filteredLedger.filter(({ tx }) => tx.isPending)} plans={upcoming} startingBalance={periodStartBalance} currencyCode={account.currencyCode} />,
+      content: <AccountAnalyticsSection ledger={clearedLedger} pendingRows={pendingLedger} plans={upcoming} startingBalance={periodStartBalance} balanceLedger={actualBalanceLedger} closingBalance={periodCurrentBalance} currencyCode={account.currencyCode} />,
     },
   ];
 
@@ -1132,7 +1047,7 @@ export function AccountDetailPage() {
       {account.migratedToCreditCardId && <Notice tone="info" className="mb-md">This account was migrated to a real Credit Card record — its transactions and balance now live there.{' '}<Link to={`/bank/card/${account.migratedToCreditCardId}`}>View the Credit Card →</Link></Notice>}
       <StandardPageSections key={`sections:${account.id}`} sections={sections} defaultKey="summary" />
       {batchEditor === 'transactions' && <BankTransactionsBatchEditor key={`batch-transactions:${account.id}`} account={account} rows={[...filteredLedger].reverse().map(row => row.tx)} onClose={() => setBatchEditor(null)} />}
-      {batchEditor === 'plans' && <BankPlansBatchEditor key={`batch-plans:${account.id}`} account={account} rows={plannedEntries.filter(plan => plan.accountId === account.id && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate)).sort((a, b) => a.date.localeCompare(b.date))} onClose={() => setBatchEditor(null)} />}
+      {batchEditor === 'plans' && <BankPlansBatchEditor key={`batch-plans:${account.id}`} account={account} rows={batchPlans} onClose={() => setBatchEditor(null)} />}
       {editAccountOpen && (
         <EntityEditorModal title="Edit account" onClose={() => setEditAccountOpen(false)}>
           <AddAccountForm account={account} onSaved={() => setEditAccountOpen(false)} />
@@ -1259,7 +1174,7 @@ function EditTransactionModal({ tx, onClose }: { tx: BankTransaction; onClose: (
 /** User-requested (2026-09-03): "add filters to other tables as well" —
  * extends the Type/Category filter treatment Cash's statement tables got
  * (README Done item 224) here too. */
-function TransactionsList({ account, ledger, allLedgerCount, showActions }: { account: BankAccount; ledger: ReturnType<typeof accountRunningLedger>; allLedgerCount: number; showActions: boolean }) {
+function TransactionsList({ account, ledger, allLedgerCount, showActions }: { account: BankAccount; ledger: Array<ReturnType<typeof accountRunningLedger>[number] & { isFuture?: boolean }>; allLedgerCount: number; showActions: boolean }) {
   const dateSort = useDateTableSort();
   const dateFormat = useAppearanceStore((state) => state.appearance.dateFormat ?? 'DD-MMM-YYYY');
   const updateTransaction = useBankWorkbookStore((state) => state.updateTransaction);
@@ -1294,13 +1209,13 @@ function TransactionsList({ account, ledger, allLedgerCount, showActions }: { ac
     <div className="table-responsive"><table>
       <thead><tr><th>#</th><dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th><th>Description</th><th>Category</th><th>Amount</th><th>Balance</th><th>Source</th>{showActions && <th></th>}</tr></thead>
       <tbody>
-        {pageRows.map(({ tx, balance }, index) => {
+        {pageRows.map(({ tx, balance, isFuture }, index) => {
           const link = linkByRecordId.get(tx.id);
           const otherSide = link ? (link.from.module === 'bank' && link.fromRecordId === tx.id ? link.to : link.from) : undefined;
           return <RecordRow financeModule="bank" onEdit={() => setEditingTx(tx)}    record={{ tx, balance }}  key={tx.id}  className="clickable">
             <td className="text-muted">{tx.serialNumber ?? '—'}{showActions && <> {' '}<span onClick={(event) => event.stopPropagation()}><ReorderButtons rows={sorted} index={(page - 1) * pageSize + index} instantOf={instantOf} idOf={(row) => row.tx.id} orderOf={(row) => row.tx.serialNumber} onMove={reorder} /></span></>}</td>
             <td>{formatDate(tx.date, dateFormat)}</td>
-            <td className="cell-clip" title={tx.description} onClick={(event) => event.stopPropagation()}>{tx.description}{tx.isPending && <span className="pill-warn ml-6">Pending</span>}{link && <Link to={linkTargetPath(otherSide!)} className="pill-info ml-6">🔗 {sideLabel(link.from)} → {sideLabel(link.to)}</Link>}</td>
+            <td className="cell-clip" title={tx.description} onClick={(event) => event.stopPropagation()}>{tx.description}{isFuture && <span className="pill-info ml-6">Future dated</span>}{tx.isPending && <span className="pill-warn ml-6">Pending</span>}{link && <Link to={linkTargetPath(otherSide!)} className="pill-info ml-6">🔗 {sideLabel(link.from)} → {sideLabel(link.to)}</Link>}</td>
             <td><span className="pill-info">{categoryName(tx.categoryID, categories)}</span></td>
             <td className={tx.amount >= 0 ? 'pill-positive' : 'pill-negative'}>{fmtMoney(tx.amount, account.currencyCode)}</td>
             <td>{fmtMoney(balance, account.currencyCode)}</td>
@@ -1346,133 +1261,43 @@ function TransactionsList({ account, ledger, allLedgerCount, showActions }: { ac
  * (Income/Expense/Net flow/Balance at month end, then one row per spend
  * category) — a chart's own hover tooltip is the only other way to read
  * an exact number today, and doesn't work at all on a touch device. */
-function AccountAnalyticsSection({ ledger, pendingRows, plans, startingBalance, currencyCode, fromDate, toDate }: { ledger: ReturnType<typeof accountRunningLedger>; pendingRows: ReturnType<typeof accountRunningLedger>; plans: PlannedBankTransaction[]; startingBalance: number; currencyCode: string; fromDate?: string; toDate?: string }) {
+function AccountAnalyticsSection({ ledger, pendingRows, plans, startingBalance, currencyCode, fromDate, toDate, balanceLedger, closingBalance }: { ledger: ReturnType<typeof accountRunningLedger>; pendingRows: ReturnType<typeof accountRunningLedger>; plans: PlannedBankTransaction[]; startingBalance: number; currencyCode: string; fromDate?: string; toDate?: string; balanceLedger?: ReturnType<typeof accountRunningLedger>; closingBalance?: number }) {
   const dateFormat = useAppearanceStore((state) => state.appearance.dateFormat ?? 'DD-MMM-YYYY');
-  const categories = useCategoryStore((state) => state.workbook.categories);
   useAppearanceStore((state) => state.appearance);
   applyChartTheme();
-
-  const analytics = useMemo(() => bankAnalyticsFromLedger(ledger), [ledger]);
-  const categoryTotals = useMemo(() => {
-    const totals: Record<string, number> = {};
-    for (const row of ledger) {
-      const name = categoryName(row.tx.categoryID, categories);
-      totals[name] = (totals[name] ?? 0) + Math.abs(row.tx.amount);
-    }
-    return Object.entries(totals).sort((a, b) => b[1] - a[1]);
-  }, [ledger, categories]);
-
+  const { categoryTotals, balanceDates, actualChartData, pendingChartData, plannedChartData, expectedChartData,
+    monthlyLabels, monthlyFlowByMonth, monthlyActualBalances, monthlyExpectedAdjustments, monthlyExpectedBalances, transactionBalances, referenceBalances,
+    periodEndActual, periodEndPending, periodEndPlanned, periodEndExpected, balanceMin, hasData } = useBankAccountAnalytics({ ledger, pendingRows, plans, startingBalance, balanceLedger, closingBalance });
+  if (!hasData) return <p className="text-muted m-0">No transactions match the page filters.</p>;
   const periodStartLabel = fromDate ? formatDate(fromDate, dateFormat) : 'Period start';
   const periodEndLabel = toDate ? formatDate(toDate, dateFormat) : 'Period end';
-  const balanceDates = [...new Set([...ledger.map((row) => row.tx.date), ...pendingRows.map((row) => row.tx.date), ...plans.map((plan) => plan.date)])].sort();
-  const comparisonLabels = ['Opening', ...balanceDates.map((date) => formatDate(date, dateFormat)), 'Closing'];
-  const pendingByDate = new Map<string, number>();
-  for (const row of pendingRows) pendingByDate.set(row.tx.date, (pendingByDate.get(row.tx.date) ?? 0) + row.tx.amount);
-  const plannedByDate = new Map<string, number>();
-  for (const plan of plans) plannedByDate.set(plan.date, (plannedByDate.get(plan.date) ?? 0) + plan.amount);
-  const actualBalanceByDate = balanceDates.map((date) => ledger.filter((row) => row.tx.date <= date).at(-1)?.balance ?? startingBalance);
-  const pendingFlowByDate = balanceDates.map((date) => pendingByDate.get(date) ?? 0);
-  const plannedFlowByDate = balanceDates.map((date) => plannedByDate.get(date) ?? 0);
-  let expectedRunning = startingBalance;
-  const expectedFlowByDate = balanceDates.map((_, index) => {
-    expectedRunning += pendingFlowByDate[index] + plannedFlowByDate[index] + (actualBalanceByDate[index] - (index > 0 ? actualBalanceByDate[index - 1] : startingBalance));
-    return expectedRunning;
-  });
-  const actualChartData = [startingBalance, ...actualBalanceByDate, actualBalanceByDate.at(-1) ?? startingBalance];
-  const pendingChartData = [0, ...pendingFlowByDate, 0];
-  const plannedChartData = [0, ...plannedFlowByDate, 0];
-  const expectedChartData = [startingBalance, ...expectedFlowByDate, expectedFlowByDate.at(-1) ?? startingBalance];
-  if (!ledger.length) return <p className="text-muted m-0">No transactions match the page filters.</p>;
-
+  const comparisonLabels = ['Opening', ...balanceDates.map(date => formatDate(date, dateFormat)), 'Closing'];
   const profit = cssVar('--profit') || '#3ecf8e';
   const loss = cssVar('--loss') || '#e5484d';
   const gridColor = chartAlpha(cssVar('--border') || '#94a3b8', .28);
   const axisOptions = { grid: { color: gridColor }, ticks: { color: cssVar('--muted') || '#94a3b8', autoSkip: true, maxTicksLimit: 6, maxRotation: 0 } };
-  const monthlyLabels = [...new Set([
-    ...analytics.monthlyFlow.map((flow) => flow.month),
-    ...pendingRows.map((row) => row.tx.date.slice(0, 7)),
-    ...plans.map((plan) => plan.date.slice(0, 7)),
-  ])].sort();
-  const monthlyFlowByMonth = new Map(analytics.monthlyFlow.map((flow) => [flow.month, flow]));
-  const monthlyActualBalances = monthlyLabels.map((month) => ledger.filter((row) => row.tx.date.slice(0, 7) <= month).at(-1)?.balance ?? startingBalance);
-  let expectedAdjustment = 0;
-  const monthlyExpectedAdjustments = monthlyLabels.map((month) => {
-    expectedAdjustment += pendingRows.filter((row) => row.tx.date.slice(0, 7) === month).reduce((sum, row) => sum + row.tx.amount, 0);
-    expectedAdjustment += plans.filter((plan) => plan.date.slice(0, 7) === month).reduce((sum, plan) => sum + plan.amount, 0);
-    return expectedAdjustment;
-  });
-  const balanceValues = [startingBalance, ...ledger.map((row) => row.balance)];
-  const balanceMin = Math.min(...balanceValues);
   const balanceAxis = { ...axisOptions, beginAtZero: false, min: balanceMin >= 0 ? 0 : undefined };
-  const periodEndActual = actualBalanceByDate.at(-1) ?? startingBalance;
-  const periodEndPending = pendingRows.reduce((sum, row) => sum + row.tx.amount, 0);
-  const periodEndPlanned = plans.reduce((sum, plan) => sum + plan.amount, 0);
-  const periodEndExpected = periodEndActual + periodEndPending + periodEndPlanned;
 
   return <div className="analytics-grid">
     <AnalyticsChartEnhancer />
-    <div className="analytics-chart chart-height-lg"><Tooltip text="Cleared balance by transaction date, with a separate start-to-end reference line."><h4 className="clickable">Balance over time</h4></Tooltip><div className="chart-canvas-wrap"><Line  data={({labels:[periodStartLabel, ...ledger.map((row)=>formatDate(row.tx.date,dateFormat)), periodEndLabel],datasets:[{type:'bar' as never,label:'Balance columns',data:[startingBalance, ...ledger.map((row)=>row.balance), ledger.at(-1)?.balance ?? startingBalance],backgroundColor:chartAlpha('#38bdf8',.18),borderColor:chartAlpha('#38bdf8',.5),borderWidth:1,borderRadius:4},{label:'Balance by transaction',data:[startingBalance, ...ledger.map((row)=>row.balance), ledger.at(-1)?.balance ?? startingBalance],borderColor:chartAlpha('#38bdf8',.9),backgroundColor:chartAlpha('#38bdf8',.2),fill:true,tension:.24,pointRadius:0,pointHoverRadius:4},{label:'Start → end balance',data:[startingBalance, ...ledger.map(()=>null), ledger.at(-1)?.balance ?? startingBalance],borderColor:chartAlpha('#a78bfa',.95),backgroundColor:'transparent',borderDash:[6,4],borderWidth:2,pointRadius:3,pointHoverRadius:5,spanGaps:true}]} as any)} options={{responsive:true,maintainAspectRatio:false,scales:{x:axisOptions,y:balanceAxis},interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,labels:{filter:(item)=>item.datasetIndex !== 0}},tooltip:{enabled:true,filter:(item)=>item.datasetIndex !== 0},datalabels:{display:false}}}} /></div></div>
-    <div className="analytics-chart chart-height-lg"><Tooltip text="Monthly deposits and withdrawals, with actual ending balance and the expected addition from pending and planned transactions stacked above it."><h4 className="clickable">Net Flows Over Time</h4></Tooltip><div className="chart-canvas-wrap"><Bar  data={({labels:monthlyLabels,datasets:[{label:'Deposits',data:monthlyLabels.map((month)=>monthlyFlowByMonth.get(month)?.income ?? 0),backgroundColor:chartAlpha(profit,.72),borderColor:chartAlpha(profit,.95),borderWidth:2,borderRadius:6},{label:'Withdrawals',data:monthlyLabels.map((month)=>monthlyFlowByMonth.get(month)?.expense ?? 0),backgroundColor:chartAlpha(loss,.72),borderColor:chartAlpha(loss,.95),borderWidth:2,borderRadius:6},{label:'Actual balance',data:monthlyActualBalances,backgroundColor:chartAlpha('#38bdf8',.42),borderColor:chartAlpha('#38bdf8',.85),borderWidth:1,borderRadius:4,stack:'balance'},{label:'Expected balance',data:monthlyExpectedAdjustments,backgroundColor:chartAlpha('#a78bfa',.5),borderColor:chartAlpha('#a78bfa',.9),borderWidth:1,borderRadius:4,stack:'balance'},{type:'line' as never,label:'Actual balance',data:monthlyActualBalances,borderColor:chartAlpha('#38bdf8',.95),backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.2}]} as any)} options={{interaction:{mode:'index',intersect:false},scales:{x:{...axisOptions,stacked:true},y:axisOptions},plugins:{legend:{labels:{filter:(item)=>item.datasetIndex !== 2}},tooltip:{filter:(item)=>item.datasetIndex !== 2,callbacks:{label:(item)=>item.datasetIndex===3 ? `Expected balance: ${fmtMoney(monthlyActualBalances[item.dataIndex]+monthlyExpectedAdjustments[item.dataIndex],currencyCode)}` : `${item.dataset.label}: ${fmtMoney(Number(item.raw),currencyCode)}`}},datalabels:dlBarV((v)=>fmtMoney(v,currencyCode))}}} /></div></div>
+    <div className="analytics-chart chart-height-lg"><Tooltip text="Cleared balance by transaction date, with a separate start-to-end reference line."><h4 className="clickable">Balance over time</h4></Tooltip><div className="chart-canvas-wrap"><Line  data={({labels:[periodStartLabel, ...ledger.map((row)=>formatDate(row.tx.date,dateFormat)), periodEndLabel],datasets:[{type:'bar' as never,label:'Balance columns',data:transactionBalances,backgroundColor:chartAlpha('#38bdf8',.18),borderColor:chartAlpha('#38bdf8',.5),borderWidth:1,borderRadius:4},{label:'Balance by transaction',data:transactionBalances,borderColor:chartAlpha('#38bdf8',.9),backgroundColor:chartAlpha('#38bdf8',.2),fill:true,tension:.24,pointRadius:0,pointHoverRadius:4},{label:'Start → end balance',data:referenceBalances,borderColor:chartAlpha('#a78bfa',.95),backgroundColor:'transparent',borderDash:[6,4],borderWidth:2,pointRadius:3,pointHoverRadius:5,spanGaps:true}]} as any)} options={{responsive:true,maintainAspectRatio:false,scales:{x:axisOptions,y:balanceAxis},interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,labels:{filter:(item)=>item.datasetIndex !== 0}},tooltip:{enabled:true,filter:(item)=>item.datasetIndex !== 0},datalabels:{display:false}}}} /></div></div>
+    <div className="analytics-chart chart-height-lg"><Tooltip text="Monthly deposits and withdrawals, with actual ending balance and the expected addition from pending and planned transactions stacked above it."><h4 className="clickable">Net Flows Over Time</h4></Tooltip><div className="chart-canvas-wrap"><Bar  data={({labels:monthlyLabels,datasets:[{label:'Deposits',data:monthlyLabels.map((month)=>monthlyFlowByMonth.get(month)?.income ?? 0),backgroundColor:chartAlpha(profit,.72),borderColor:chartAlpha(profit,.95),borderWidth:2,borderRadius:6},{label:'Withdrawals',data:monthlyLabels.map((month)=>monthlyFlowByMonth.get(month)?.expense ?? 0),backgroundColor:chartAlpha(loss,.72),borderColor:chartAlpha(loss,.95),borderWidth:2,borderRadius:6},{label:'Actual balance',data:monthlyActualBalances,backgroundColor:chartAlpha('#38bdf8',.42),borderColor:chartAlpha('#38bdf8',.85),borderWidth:1,borderRadius:4,stack:'balance'},{label:'Expected balance',data:monthlyExpectedAdjustments,backgroundColor:chartAlpha('#a78bfa',.5),borderColor:chartAlpha('#a78bfa',.9),borderWidth:1,borderRadius:4,stack:'balance'},{type:'line' as never,label:'Actual balance',data:monthlyActualBalances,borderColor:chartAlpha('#38bdf8',.95),backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.2}]} as any)} options={{interaction:{mode:'index',intersect:false},scales:{x:{...axisOptions,stacked:true},y:axisOptions},plugins:{legend:{labels:{filter:(item)=>item.datasetIndex !== 2}},tooltip:{filter:(item)=>item.datasetIndex !== 2,callbacks:{label:(item)=>item.datasetIndex===3 ? `Expected balance: ${fmtMoney(monthlyExpectedBalances[item.dataIndex],currencyCode)}` : `${item.dataset.label}: ${fmtMoney(Number(item.raw),currencyCode)}`}},datalabels:dlBarV((v)=>fmtMoney(v,currencyCode))}}} /></div></div>
     <div className="analytics-chart"><Tooltip text="Total transaction amount grouped by category."><h4 className="clickable">Transactions by category</h4></Tooltip><div className="chart-canvas-wrap"><Doughnut  data={({labels:categoryTotals.map(([name])=>name),datasets:[{label:'Spend',data:categoryTotals.map(([,amount])=>amount),backgroundColor:categoryTotals.map(([name])=>chartAlpha(tickerColor(name),.72)),borderColor:categoryTotals.map(([name])=>chartAlpha(tickerColor(name),.95)),borderWidth:2,hoverOffset:8}]} as any)} options={{responsive:true,maintainAspectRatio:false,cutout:'48%',rotation:-25,plugins:{legend:{display:true,position:'right',labels:{boxWidth:10,padding:8}},datalabels:dlDoughnut((v)=>fmtMoney(v, currencyCode))},layout:{padding:8}}} /></div></div>
     <div className="analytics-chart"><Tooltip text="Opening is the cleared balance immediately before this period. Closing is the last cleared balance; expected balance accumulates each pending and planned transaction on its own date."><h4 className="clickable">Actual vs Expected Balance (Pending &amp; Planned)</h4></Tooltip><div className="chart-canvas-wrap"><Bar  data={({labels:comparisonLabels,datasets:[{type:'bar' as never,label:'Actual balance',data:actualChartData,backgroundColor:chartAlpha('#38bdf8',.42),borderColor:chartAlpha('#38bdf8',.85),borderWidth:2,borderRadius:6,stack:'balance'},{type:'line' as never,label:'Actual balance',data:actualChartData,borderColor:chartAlpha('#38bdf8',.95),backgroundColor:'transparent',borderWidth:2,pointRadius:0,pointHoverRadius:4,tension:.2},{type:'line' as never,label:'Pending balance',data:pendingChartData,borderColor:chartAlpha('#f59e0b',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[5,4],pointRadius:0,pointHoverRadius:4,tension:.2},{type:'line' as never,label:'Planned balance',data:plannedChartData,borderColor:chartAlpha('#22c55e',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[8,3],pointRadius:0,pointHoverRadius:4,tension:.2},{type:'line' as never,label:'Expected balance',data:expectedChartData,borderColor:chartAlpha('#a78bfa',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[2,3],pointRadius:0,pointHoverRadius:4,tension:.2}]} as any)} options={{interaction:{mode:'index',intersect:false},scales:{x:{...axisOptions,stacked:true},y:{...axisOptions,beginAtZero:false}},plugins:{legend:{display:true,labels:{filter:(item)=>item.datasetIndex !== 0}},tooltip:{enabled:true,filter:(item)=>item.datasetIndex !== 0,callbacks:{title:(items)=>items[0]?.label ?? '',label:(item)=>`${item.dataset.label ?? 'Value'}: ${item.formattedValue}`}},datalabels:{display:false}}}} /></div></div>
-    <div className="analytics-chart"><Tooltip text="Actual, pending, planned, and combined expected amounts at the end of the selected period."><h4 className="clickable">Period-end balance summary</h4></Tooltip><div className="chart-canvas-wrap"><Doughnut  data={({labels:['Actual','Pending','Planned','Expected'],datasets:[{label:'Period end',data:[Math.abs(periodEndActual),Math.abs(periodEndPending),Math.abs(periodEndPlanned),Math.abs(periodEndExpected)],backgroundColor:['#38bdf8','#f59e0b','#22c55e','#a78bfa'].map((color)=>chartAlpha(color,.72)),borderColor:['#38bdf8','#f59e0b','#22c55e','#a78bfa'],borderWidth:2,hoverOffset:8}]} as any)} options={{responsive:true,maintainAspectRatio:false,cutout:'48%',plugins:{legend:{display:true,position:'right'},tooltip:{callbacks:{label:(item)=>`${item.label}: ${fmtMoney([periodEndActual,periodEndPending,periodEndPlanned,periodEndExpected][item.dataIndex],currencyCode)}`}},datalabels:dlDoughnut((v)=>fmtMoney(v,currencyCode))}}} /></div></div>
+    <div className="analytics-chart"><Tooltip text="Actual balance, separate pending/planned changes, and their combined expected balance. Signed values are compared against zero."><h4 className="clickable">Period-end balance comparison</h4></Tooltip><div className="chart-canvas-wrap"><Bar data={{labels:['Actual','Pending change','Planned change','Expected'],datasets:[{label:currencyCode,data:[periodEndActual,periodEndPending,periodEndPlanned,periodEndExpected],backgroundColor:['#38bdf8','#f59e0b','#22c55e','#a78bfa'].map(color=>chartAlpha(color,.72))}]}} options={{scales:{x:axisOptions,y:{...axisOptions,beginAtZero:true}},plugins:{legend:{display:false},tooltip:{callbacks:{label:item=>fmtMoney(Number(item.raw),currencyCode)}},datalabels:dlBarV(value=>fmtMoney(value,currencyCode))}}} /></div></div>
   </div>;
 }
 
 type BankingFilters = ReturnType<typeof useUrlTransactionFilters>['filters'];
 
-function transactionMatchesFilters(tx: BankTransaction, filters: BankingFilters, categories: ReturnType<typeof useCategoryStore.getState>['workbook']['categories']) {
-  if (filters.accountId !== 'all' && tx.accountId !== filters.accountId) return false;
-  if ((filters.fromDate && tx.date < filters.fromDate) || (filters.toDate && tx.date > filters.toDate)) return false;
-  if (filters.direction === 'in' && tx.amount < 0) return false;
-  if (filters.direction === 'out' && tx.amount >= 0) return false;
-  if (filters.category !== 'all' && categoryName(tx.categoryID, categories) !== filters.category) return false;
-  if (filters.source !== 'all' && (tx.source ?? 'manual') !== filters.source) return false;
-  return true;
-}
-
-function bankPlanMatchesFilters(plan: PlannedBankTransaction, filters: BankingFilters) {
-  return !plan.executed && filters.source !== 'statement-import'
-    && (filters.category === 'all' || (plan.category || 'Uncategorized') === filters.category)
-    && (filters.direction === 'all' || (filters.direction === 'in' ? plan.amount >= 0 : plan.amount < 0));
-}
-
-export function BankingScopeSummary({ accounts, filters, plansOverride, includeCards = true }: { accounts: BankAccount[]; filters: BankingFilters; plansOverride?: PlannedBankTransaction[]; includeCards?: boolean }) {
-  const transactions = useBankWorkbookStore((state) => state.workbook.transactions);
-  const creditCards = useCreditCardWorkbookStore((state) => state.workbook.cards);
-  const creditCardTransactions = useCreditCardWorkbookStore((state) => state.workbook.transactions);
-  const plans = usePlannedBankWorkbookStore((state) => state.workbook.entries);
-  const categories = useCategoryStore((state) => state.workbook.categories);
-  const scopedAccounts = useMemo(
-    () => filters.accountId === 'all' ? accounts : accounts.filter((account) => account.id === filters.accountId),
-    [accounts, filters.accountId],
-  );
-  const accountIds = useMemo(() => new Set(scopedAccounts.map((account) => account.id)), [scopedAccounts]);
-  const rows = transactions.filter((tx) => accountIds.has(tx.accountId) && transactionMatchesFilters(tx, filters, categories));
-  const visiblePlans = planOccurrences(plansOverride ?? plans, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters)).filter((plan) => accountIds.has(plan.accountId) && !plan.executed && (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate));
-  const scopedCards = includeCards && filters.accountId === 'all' ? creditCards.filter((card) => card.isActive !== false) : [];
-  const currencies = [...new Set([...scopedAccounts.map((account) => account.currencyCode), ...scopedCards.map((card) => card.currencyCode)])].sort();
-  if (!currencies.length) return <p className="text-muted m-0">No accounts or credit cards in this scope yet.</p>;
-  return <div className="stack-lg">{currencies.map((currency) => {
-    const currencyAccounts = scopedAccounts.filter((account) => account.currencyCode === currency);
-    const currencyIds = new Set(currencyAccounts.map((account) => account.id));
-    const currencyRows = rows.filter((tx) => currencyIds.has(tx.accountId));
-    const pendingInflow = currencyRows.filter(tx => tx.isPending && tx.amount >= 0).reduce((sum, tx) => sum + tx.amount, 0);
-    const pendingOutflow = currencyRows.filter(tx => tx.isPending && tx.amount < 0).reduce((sum, tx) => sum + tx.amount, 0);
-    const plannedInflow = visiblePlans.filter(plan => currencyIds.has(plan.accountId) && plan.amount >= 0).reduce((sum, plan) => sum + plan.amount, 0);
-    const plannedOutflow = visiblePlans.filter(plan => currencyIds.has(plan.accountId) && plan.amount < 0).reduce((sum, plan) => sum + plan.amount, 0);
-    const inflow = currencyRows.filter((tx) => !tx.isPending && tx.amount >= 0).reduce((sum, tx) => sum + tx.amount, 0);
-    const outflow = currencyRows.filter((tx) => !tx.isPending && tx.amount < 0).reduce((sum, tx) => sum + tx.amount, 0);
-    const actual = currencyAccounts.reduce((sum, account) => sum + accountBalance(account, transactions.filter(tx => !filters.toDate || tx.date <= filters.toDate)), 0);
-    const start = currencyAccounts.reduce((sum, account) => sum + accountBalance(account, transactions.filter(tx => filters.fromDate && tx.date < filters.fromDate)), 0);
-    const currencyCards = scopedCards.filter((card) => card.currencyCode === currency);
-    const cardOwed = currencyCards.reduce((sum, card) => sum + Math.max(0, outstandingBalanceByCard(card, creditCardTransactions)), 0);
-    const cardLimit = currencyCards.reduce((sum, card) => sum + Math.max(0, card.creditLimit ?? 0), 0);
-    const available = Math.max(0, cardLimit - cardOwed);
-    return <div key={currency}><h3>{currency}</h3><BalanceSummaryCards currency={currency} summary={{ start, current: actual, inflow, outflow, pendingInflow, pendingOutflow, plannedInflow, plannedOutflow }} />
-      {!!currencyCards.length && <div className="mt-12"><SummaryChip label="Card owed" value={fmtMoney(cardOwed, currency)} />{!!cardLimit && <SummaryChip label="Credit available" value={fmtMoney(available, currency)} />}</div>}
-    </div>;
-  })}</div>;
+export function BankingScopeSummary({ accounts, filters, plansOverride, includeCards = true, bankId }: { accounts: BankAccount[]; filters: BankingFilters; plansOverride?: PlannedBankTransaction[]; includeCards?: boolean; bankId?: string }) {
+  const summaries = useBankingScopeSummary(accounts.map(account => account.id), filters, plansOverride, includeCards, bankId);
+  if (!summaries.length) return <p className="text-muted m-0">No accounts or credit cards in this scope yet.</p>;
+  return <div className="stack-lg">{summaries.map(({ currency, start, actual, inflow, outflow, pendingInflow, pendingOutflow, plannedInflow, plannedOutflow, cardCount, cardOwed, cardLimit, available }) =>
+    <div key={currency}><h3>{currency}</h3><BalanceSummaryCards currency={currency} summary={{ start, current: actual, inflow, outflow, pendingInflow, pendingOutflow, plannedInflow, plannedOutflow }} />
+      {!!cardCount && <div className="mt-12"><SummaryChip label="Card owed" value={fmtMoney(cardOwed, currency)} />{!!cardLimit && <SummaryChip label="Credit available" value={fmtMoney(available, currency)} />}</div>}
+    </div>
+  )}</div>;
 }
 
 function BankingScopePlans({ accounts, filters }: { accounts: BankAccount[]; filters: BankingFilters }) {
