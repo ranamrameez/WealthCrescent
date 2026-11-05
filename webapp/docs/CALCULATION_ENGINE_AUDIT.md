@@ -55,3 +55,11 @@ The isolated final run passed **156 test files / 1,205 tests** in 503.53 seconds
 Recent Activity now uses a pure CalculationEngine read model and service snapshot. Transfer fees share the native cash-ledger function; archived/deactivated brokers remain in lifetime history; active data/currency takes precedence over stale profile snapshots; migrated card records are not repeated; EMI paid amounts include fines. The list labels trade values before fees and warns against summing linked source records as cash flow.
 
 Final full suite passed **158 files / 1,210 tests** (recent-engine-full-suite.log). Production build and both TypeScript projects passed (recent-engine-build.log). Source is saved in focused local commits through ede55d7b; Git transport publication is failing, and remote CI/browser acceptance is not claimed.
+
+## Banking read slice — 2026-11-05
+
+Account detail, directory/current bank totals, summaries and chart datasets now use CalculationEngine.bank read models and bankService. Historical card transactions respect the selected cutoff; independent card limits do not offset one another; issuer-specific views exclude other banks' cards; closed balances remain counted. Directory, bank and account views share the current cutoff. Future records remain visible and labeled while actual metrics exclude them. Charts retain native closing balances when flow filters hide unrelated entries; signed comparison bars replace misleading absolute-value slices.
+
+Focused checks passed 4 files / 47 tests, and production build/both TypeScript projects passed. Full suite is running in bank-query-full-suite.log. Legacy Bank editors/commands/AnalyticsTab budget logic remain pending. See the migration inventory and current handoff; do not claim full app-wide completion.
+
+Banking source is saved locally in e2647a7b. The full default-fork run hit a worker-termination failure without a completed footer; a single-thread-pool full run is in progress in bank-query-full-suite-threads.log. Focused 47 tests and build/TS remain the completed evidence for this source until that retry completes.

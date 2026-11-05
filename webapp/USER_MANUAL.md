@@ -1117,3 +1117,7 @@ Insights and monthly/category drilldowns exclude pending activity just like thei
 ### Recent source records (2026-11-05)
 
 Recent Transactions retains archived broker history, includes transfer fees in withdrawal outflows, and shows an EMI payment plus its separately recorded fine as the amount paid. Trade rows show recorded trade value before trading fees. This is a lifetime list of native source records; linked records can appear on both sides and must not be summed as a combined cash-flow report.
+
+### Banking balances and reports (2026-11-05)
+
+Bank, account-directory and account-detail balances now share a current cutoff. Future-dated records remain visible in the table and are labeled; they do not enter current actual balances/cleared flow. Account charts retain the real native closing balance when category/source filters hide unrelated flow rows. Bank-specific card summaries show that bank's cards, historical debt respects the selected end date, and available credit is summed independently per card. Closed records retain their balances.

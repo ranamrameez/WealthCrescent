@@ -8076,3 +8076,9 @@ Read SESSION_HANDOFF.md's new authoritative top section. Local head bf9524b27cfe
 ### 2026-11-05 final local source checkpoint
 
 All continuation source is saved through local ede55d7b; financial models/services are in 9dc4f20e. Final full suite: 158 files / 1,210 tests; build and both TS projects passed. Recent Transactions migration is now complete for this slice (the older pending finding is historical). Git push repeatedly fails with RPC/curl 52; remote remained ce3e4be8 at last verification. Read the latest SESSION_HANDOFF top section for exact commit order, logs, publication fallback and next wider engine migration. PR #51 stays draft; no merge/main push.
+
+### Active Banking continuation — 2026-11-05
+
+New Bank read models/services/hooks and BankPage integration are currently uncommitted. Focused 4-file / 47-test run plus production build/both TS projects passed. Final full suite is running separately in bank-query-full-suite.log (session 29212 at launch). Read the latest SESSION_HANDOFF top section and migration inventory. Preserve future-row table visibility; current actuals use a cutoff. Card summaries must isolate issuers and independent credit limits. Legacy AnalyticsTab/commands/currency-agnostic budget targets remain pending. Sandbox tests work with TEMP/TMP under webapp/node_modules/.cache/wealthcrescent-vitest-tmp; do not request elevated test execution merely because the default AppContainer temp rename fails. Publication still fails; no main push/merge.
+
+Banking source checkpoint saved as local e2647a7b. Final full-suite retry uses --pool=threads --maxWorkers=1 with workspace TEMP/TMP; default forks stalled during worker termination (no completed full result). Follow the latest SESSION_HANDOFF top section. A new connector read succeeds and verifies draft PR #51 still at ce3e4be8; publication can be retried safely without force.
