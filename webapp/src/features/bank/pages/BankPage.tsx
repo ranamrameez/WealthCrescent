@@ -1,4 +1,4 @@
-import { bankTransactionMatchesFilters as transactionMatchesFilters, bankPlanMatchesFilters } from '../../../services/finance/bankService';
+import { bankTransactionMatchesFilters as transactionMatchesFilters } from '../../../services/finance/bankService';
 import { useBankDirectory, useBankAccount, useBankingScopeSummary, useBankAccountAnalytics } from '../../../hooks/useBankQueries';
 import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
@@ -1853,42 +1853,14 @@ function AnalyticsTab({ bankId, filters }: { bankId?: string; filters: BankingFi
     [allAccounts, bankId],
   );
   const transactions = useBankWorkbookStore((s) => s.workbook.transactions);
-  const plannedEntries = usePlannedBankWorkbookStore((s) => s.workbook.entries);
   const budgets = useBankWorkbookStore((s) => s.workbook.settings.budgets);
   const setBudget = useBankWorkbookStore((s) => s.setBudget);
   const ensureSignedIn = useEnsureSignedIn();
   const categoryList = useCategoryStore((s) => s.workbook.categories);
   const account = (filters.accountId !== 'all' ? accounts.find((item) => item.id === filters.accountId) : undefined) ?? accounts[0];
 
-  const allLedger = useMemo(
-    () => account ? accountRunningLedger(account, transactions, true) : [],
-    [account, transactions],
-  );
-  const filteredLedger = useMemo(() => allLedger.filter((row) => {
-    if ((filters.fromDate && row.tx.date < filters.fromDate) || (filters.toDate && row.tx.date > filters.toDate)) return false;
-    if (filters.direction === 'in' && row.tx.amount < 0) return false;
-    if (filters.direction === 'out' && row.tx.amount >= 0) return false;
-    if (filters.category !== 'all' && categoryName(row.tx.categoryID, categoryList) !== filters.category) return false;
-    if (filters.source !== 'all' && (row.tx.source ?? 'manual') !== filters.source) return false;
-    return true;
-  }), [allLedger, filters, categoryList]);
-  const clearedLedger = useMemo(() => filteredLedger.filter(({ tx }) => !tx.isPending), [filteredLedger]);
-  const pendingRows = useMemo(() => filteredLedger.filter(({ tx }) => tx.isPending), [filteredLedger]);
-  const periodStartBalance = useMemo(() => {
-    if (!account) return 0;
-    const before = allLedger.filter(({ tx }) => !tx.isPending && filters.fromDate && tx.date < filters.fromDate);
-    return before.length ? before[before.length - 1].balance : account.openingBalance;
-  }, [account, allLedger, filters.fromDate]);
-  const upcoming = useMemo(
-    () => account
-      ? planOccurrences(plannedEntries, filters.fromDate, filters.toDate, new Date(), null).filter(plan => bankPlanMatchesFilters(plan, filters))
-          .filter((plan) => plan.accountId === account.id && !plan.executed)
-          .filter((plan) => (!filters.fromDate || plan.date >= filters.fromDate) && (!filters.toDate || plan.date <= filters.toDate))
-          .filter((plan) => filters.direction === 'all' || (filters.direction === 'in' ? plan.amount >= 0 : plan.amount < 0))
-          .sort((a, b) => a.date.localeCompare(b.date))
-      : [],
-    [plannedEntries, account, filters],
-  );
+  const { clearedLedger, pendingLedger: pendingRows, periodStartBalance, upcoming,
+    actualBalanceLedger, periodCurrentBalance } = useBankAccount(account?.id, filters);
 
   const thisMonth = today().slice(0, 7);
   const budgetRows = useMemo(
@@ -1906,6 +1878,8 @@ function AnalyticsTab({ bankId, filters }: { bankId?: string; filters: BankingFi
         pendingRows={pendingRows}
         plans={upcoming}
         startingBalance={periodStartBalance}
+        balanceLedger={actualBalanceLedger}
+        closingBalance={periodCurrentBalance}
         currencyCode={account.currencyCode}
         fromDate={filters.fromDate}
         toDate={filters.toDate}

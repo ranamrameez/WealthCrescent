@@ -1,6 +1,6 @@
 ## Banking analytics continuation — 2026-11-05
 
-Legacy AnalyticsTab now delegates ledger/date/pending/plan reads to useBankAccount -> bankService -> CalculationEngine.bank, including full native balance history and closing balance for chart reconciliation. Its former inline ledger/filter/recurrence path is removed. Focused engine/navigation checks passed 2 files / 18 tests. Build is running in bank-analytics-boundary-build.log; inspect completion before claiming success.
+Legacy AnalyticsTab now delegates ledger/date/pending/plan reads to useBankAccount -> bankService -> CalculationEngine.bank, including full native balance history and closing balance for chart reconciliation. Its former inline ledger/filter/recurrence path is removed. Focused engine/navigation checks passed 2 files / 18 tests. Production build and both TypeScript projects passed (bank-analytics-boundary-build.log), after removing the unused filter import.
 
 Remaining in this tab: first-account fallback for aggregate scope, unscoped legacy budget comparison/editor, direct source metadata/budget subscriptions and commands. These are not fixed by this narrow read-path migration. Do not infer a currency for legacy targets. Category compatibility checks passed 23 tests and its production build/both TS projects passed. Category compatibility source is committed as 348bd812. Banking analytics and documentation updates remain working-tree changes until committed.
 

@@ -110,4 +110,4 @@ Required before release: focused regressions for subsequent edits; complete full
 
 ### Banking analytics continuation
 
-The legacy tab now uses the existing account query for ledger, cleared/pending populations, plans, opening and closing balances. Eighteen focused engine/navigation tests pass. Remaining: aggregate scope still selects a first account, and legacy budget ownership/commands require migration. Build validation is in bank-analytics-boundary-build.log.
+The legacy tab now uses the existing account query for ledger, cleared/pending populations, plans, opening and closing balances. Eighteen focused engine/navigation tests pass. Remaining: aggregate scope still selects a first account, and legacy budget ownership/commands require migration. Production build and both TypeScript projects passed; evidence: bank-analytics-boundary-build.log.
