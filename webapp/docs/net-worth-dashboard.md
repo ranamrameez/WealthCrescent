@@ -42,4 +42,8 @@ Dashboard regression coverage lives in `src/features/netWorth/pages/__tests__/da
 
 ## Central calculation boundary (2026-11-05)
 
-NetWorthPage obtains native data and inclusion commands from dashboard/net-worth services. CalculationEngine owns valuation, reporting ranges, headline and per-currency summaries, Insights, category totals/details, monthly drilldowns and exact-day planning forecasts. Historical capital split uses the selected end date. The recent-transactions child and the wider app migration remain pending; see [calculation audit](CALCULATION_ENGINE_AUDIT.md) and [current handoff](../SESSION_HANDOFF.md).
+NetWorthPage obtains native data and inclusion commands from dashboard/net-worth services. CalculationEngine owns valuation, reporting ranges, headline and per-currency summaries, Insights, category totals/details, monthly drilldowns and exact-day planning forecasts. Historical capital split uses the selected end date. Recent transactions also use an engine/service read model. The wider app migration and dashboard visual acceptance remain pending; see [calculation audit](CALCULATION_ENGINE_AUDIT.md) and [current handoff](../SESSION_HANDOFF.md).
+
+## Outstanding dashboard and UI delivery
+
+The calculation migration does not complete the planned dashboard redesign. Follow [the delivery checklist](DELIVERY_CHECKLIST.md) for visual hierarchy, responsive review, shared charts/topbar/filters, dropdown navigation and theme acceptance.

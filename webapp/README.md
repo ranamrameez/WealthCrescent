@@ -11503,3 +11503,7 @@ Latest validated checkpoint (2026-11-05): **158 files / 1,210 tests passed**, pl
 ### Banking read-model continuation — 2026-11-05
 
 Engine/service-backed account, directory, summary and chart reads correct historical card cutoffs, independent available credit, issuer isolation, archive totals and filtered chart endpoints. Future records remain visible and labeled without entering current actual metrics. Focused 47-test checkpoint and production build/both TS projects passed; final full suite is in progress. Banking commands/legacy budget logic and wider app migration remain pending. [Migration inventory](docs/CALCULATION_ENGINE_MIGRATION_INVENTORY.md) lists remaining declared calculator/store imports without claiming they are all bugs.
+
+## Current delivery scope (2026-11-05)
+
+See [the detailed delivery checklist](docs/DELIVERY_CHECKLIST.md) for completed implementation, pending work, planned dependencies, dashboard/app UI acceptance and validation evidence. General app categories coexist with custom categories; existing personal labels keep their IDs, and older name-only records retain compatibility mappings. The app-wide engine migration and dashboard/UI acceptance are not complete.

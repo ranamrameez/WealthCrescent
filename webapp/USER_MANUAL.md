@@ -1121,3 +1121,7 @@ Recent Transactions retains archived broker history, includes transfer fees in w
 ### Banking balances and reports (2026-11-05)
 
 Bank, account-directory and account-detail balances now share a current cutoff. Future-dated records remain visible in the table and are labeled; they do not enter current actual balances/cleared flow. Account charts retain the real native closing balance when category/source filters hide unrelated flow rows. Bank-specific card summaries show that bank's cards, historical debt respects the selected end date, and available credit is summed independently per card. Closed records retain their balances.
+
+## Current delivery scope (2026-11-05)
+
+See [the detailed delivery checklist](docs/DELIVERY_CHECKLIST.md) for completed implementation, pending work, planned dependencies, dashboard/app UI acceptance and validation evidence. General app categories coexist with custom categories; existing personal labels keep their IDs, and older name-only records retain compatibility mappings. The app-wide engine migration and dashboard/UI acceptance are not complete.

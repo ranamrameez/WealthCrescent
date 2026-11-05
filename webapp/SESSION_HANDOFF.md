@@ -1,3 +1,17 @@
+## Banking analytics continuation — 2026-11-05
+
+Legacy AnalyticsTab now delegates ledger/date/pending/plan reads to useBankAccount -> bankService -> CalculationEngine.bank, including full native balance history and closing balance for chart reconciliation. Its former inline ledger/filter/recurrence path is removed. Focused engine/navigation checks passed 2 files / 18 tests. Build is running in bank-analytics-boundary-build.log; inspect completion before claiming success.
+
+Remaining in this tab: first-account fallback for aggregate scope, unscoped legacy budget comparison/editor, direct source metadata/budget subscriptions and commands. These are not fixed by this narrow read-path migration. Do not infer a currency for legacy targets. Category compatibility checks passed 23 tests and its production build/both TS projects passed. Category compatibility source is committed as 348bd812. Banking analytics and documentation updates remain working-tree changes until committed.
+
+## Current evidence correction — 2026-11-05
+
+The Banking thread-pool retry has ended with a worker-response timeout; it is not still running and is not a passing full suite. See bank-query-full-suite-threads.log. Earlier running-status entries below are historical. Category general-default/custom migration and legacy name mapping follow-up are currently uncommitted. Final category compatibility checks passed 3 files / 23 tests. Production build and both TypeScript projects passed (category-defaults-build.log). The detailed [delivery checklist](docs/DELIVERY_CHECKLIST.md) is the current complete scope index, including small UI acceptance tasks and dependencies.
+
+## Scope clarification — 2026-11-05
+
+See [current delivery checklist](docs/DELIVERY_CHECKLIST.md) for dashboard redesign, all-app charts, shared topbar/filters, dropdown navigation, themes, categories and engine/payment work. Dashboard and UI acceptance are still outstanding. Category defaults are being corrected to general-purpose labels; existing personal labels retain their IDs as custom categories.
+
 ## Latest Banking checkpoint — source committed; full regression retry running
 
 Banking source is committed locally as e2647a7b: calc/bankReadModel.ts, services/finance/bankService.ts, hooks/useBankQueries.ts, model/service tests, CalculationEngine.ts, BankPage.tsx and its navigation test. Account detail, bank/account directory, scope summaries and account-chart calculations now use engine/service models. Corrections: historical card-debt cutoff; per-card available credit; closed balances retained; future records stay visible/labeled but do not become current actuals; native chart closing balance survives flow filters; signed comparison bars; issuer-specific card scope and cache keys, including card-only banks; non-mutating bank sorting and archive-safe directory totals.
