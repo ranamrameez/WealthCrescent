@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getBankDirectory, getBankAccount, getBankingScopeSummary, subscribeBankQueries } from './bankService';
+import { saveLegacyBankBudget, getBankAnalyticsAccounts, getBankDirectory, getBankAccount, getBankingScopeSummary, subscribeBankQueries } from './bankService';
 import { useCreditCardWorkbookStore } from '../../store/creditCardWorkbookStore';
 import { useBankWorkbookStore } from '../../store/bankWorkbookStore';
 const filters = { fromDate: '', toDate: '', direction: 'all', category: 'all', source: 'all', accountId: 'all' };
@@ -50,4 +50,22 @@ it('keeps bank ownership in the scope cache key for banks that only have cards',
     expect(first[0].cardOwed).toBe(10); expect(second[0].cardOwed).toBe(90);
     expect(getBankingScopeSummary([], filters, [], true, 'b1')).toBe(first);
   } finally { store.setWorkbook(original); }
+});
+
+const bankAuth = vi.hoisted(() => ({ currentUser: null as null | { uid: string } }));
+vi.mock('../../lib/firebase/client', () => ({ auth: bankAuth }));
+it('validates legacy target commands and preserves unrelated targets on rename', () => {
+  const store = useBankWorkbookStore.getState(), original = store.workbook;
+  try {
+    expect(() => saveLegacyBankBudget('Food', 10)).toThrow('Sign in');
+    bankAuth.currentUser = { uid: 'test' };
+    expect(() => saveLegacyBankBudget('Food', Infinity)).toThrow('finite');
+    store.setWorkbook({ ...original, settings: { ...original.settings, budgets: { Food: 100, Rent: 200 } } });
+    expect(() => saveLegacyBankBudget('Rent', 50, 'Food')).toThrow('already exists');
+    saveLegacyBankBudget('Dining', 120, 'Food');
+    expect(useBankWorkbookStore.getState().workbook.settings.budgets).toEqual({ Dining: 120, Rent: 200 });
+    expect(() => saveLegacyBankBudget('Other', 50, 'Food')).toThrow('no longer exists');
+    const scope = getBankAnalyticsAccounts(undefined, 'all');
+    expect(getBankAnalyticsAccounts(undefined, 'all')).toBe(scope);
+  } finally { bankAuth.currentUser = null; store.setWorkbook(original); }
 });

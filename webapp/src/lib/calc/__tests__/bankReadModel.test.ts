@@ -116,3 +116,25 @@ it('scopes a bank-only card summary to its issuer even when the bank has no ordi
   expect(result).toHaveLength(1);
   expect(result[0]).toMatchObject({ currency: 'QAR', cardCount: 1, cardOwed: 40, cardLimit: 100, available: 60 });
 });
+
+
+it('selects every native account in scope without falling back from a missing selection', () => {
+  const accounts = [
+    { id: 'usd', name: 'USD', currencyCode: 'USD', openingBalance: 0, bankId: 'one' },
+    { id: 'qar', name: 'QAR', currencyCode: 'QAR', openingBalance: 0, bankId: 'two' },
+    { id: 'legacy', name: 'Legacy card', currencyCode: 'USD', openingBalance: 100, migratedToCreditCardId: 'card' },
+  ];
+  expect(CalculationEngine.bank.bankAnalyticsAccounts(accounts, undefined, 'all').map(a => a.id)).toEqual(['usd', 'qar']);
+  expect(CalculationEngine.bank.bankAnalyticsAccounts(accounts, 'two', 'all').map(a => a.id)).toEqual(['qar']);
+  expect(CalculationEngine.bank.bankAnalyticsAccounts(accounts, 'one', 'qar')).toEqual([]);
+  expect(CalculationEngine.bank.bankAnalyticsAccounts(accounts, undefined, 'deleted')).toEqual([]);
+});
+
+it('uses filtered cleared spending while retaining legacy targets without a currency comparison', () => {
+  const rows = CalculationEngine.bank.bankLegacyBudgetRows([
+    { tx: { id: 'expense', accountId: 'a', date: '2026-01-01', amount: -20, description: '', source: 'manual', isDeposit: false, categoryID: 'food' }, balance: 80 },
+    { tx: { id: 'pending', accountId: 'a', date: '2026-01-01', amount: -50, description: '', source: 'manual', isDeposit: false, categoryID: 'food', isPending: true }, balance: 80 },
+  ], { Food: 100 }, [{ id: 'food', name: 'Food', serialNumber: 1 }]);
+  expect(rows).toEqual([{ category: 'Food', budget: 100, actual: 20 }]);
+  expect(rows[0]).not.toHaveProperty('remaining');
+});

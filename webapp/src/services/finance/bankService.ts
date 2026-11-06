@@ -1,3 +1,4 @@
+import { auth } from '../../lib/firebase/client';
 import { CalculationEngine } from '../../lib/calc/CalculationEngine';
 import type { BankingReadFilters } from '../../lib/calc/bankReadModel';
 import type { PlannedBankTransaction } from '../../types/plannedBank';
@@ -9,7 +10,7 @@ const listeners = new Set<() => void>();
 const accounts = new Map<string, ReturnType<typeof buildAccount>>();
 const summaries = new Map<string, ReturnType<typeof CalculationEngine.bank.bankingScopeSummary>>();
 const directories = new Map<string, ReturnType<typeof CalculationEngine.bank.bankDirectoryReadModel>>();
-function invalidate() { accounts.clear(); summaries.clear(); directories.clear(); listeners.forEach(listener => listener()); }
+function invalidate() { accounts.clear(); summaries.clear(); directories.clear(); analyticsScopes.clear(); listeners.forEach(listener => listener()); }
 for (const source of [useBankWorkbookStore, useCreditCardWorkbookStore, usePlannedBankWorkbookStore, useCategoryStore]) source.subscribe(invalidate);
 let timer: ReturnType<typeof setInterval> | undefined;
 export function subscribeBankQueries(listener: () => void) {
@@ -21,8 +22,9 @@ function buildAccount(id: string | undefined, filters: BankingReadFilters, date:
   const bank = useBankWorkbookStore.getState().workbook;
   const categories = useCategoryStore.getState().workbook.categories;
   const account = bank.settings.accounts.find(item => item.id === id);
-  return { account, accounts: bank.settings.accounts, banks: bank.settings.banks ?? [], categories,
-    ...CalculationEngine.bank.bankAccountReadModel(account, bank.transactions, usePlannedBankWorkbookStore.getState().workbook.entries, categories, filters, new Date(date + 'T00:00:00.000Z')),
+  const model = CalculationEngine.bank.bankAccountReadModel(account, bank.transactions, usePlannedBankWorkbookStore.getState().workbook.entries, categories, filters, new Date(date + 'T00:00:00.000Z'));
+  return { legacyBudgetRows: CalculationEngine.bank.bankLegacyBudgetRows(model.clearedLedger, bank.settings.budgets ?? {}, categories), account, accounts: bank.settings.accounts, banks: bank.settings.banks ?? [], categories,
+    ...model,
   };
 }
 export function getBankAccount(id: string | undefined, filters: BankingReadFilters) {
@@ -52,4 +54,28 @@ export function getBankDirectory(showArchived = false) {
   const bank = useBankWorkbookStore.getState().workbook, cards = useCreditCardWorkbookStore.getState().workbook;
   const value = CalculationEngine.bank.bankDirectoryReadModel(bank.settings.banks ?? [], bank.settings.accounts, bank.transactions, cards.cards, cards.transactions, getBankCategories(), new Date(date + 'T00:00:00.000Z'), showArchived);
   if (directories.size >= 8) directories.clear(); directories.set(key, value); return value;
+}
+
+const analyticsScopes = new Map<string, ReturnType<typeof CalculationEngine.bank.bankAnalyticsAccounts>>();
+export function getBankAnalyticsAccounts(bankId: string | undefined, accountId: string) {
+  const key = JSON.stringify([bankId, accountId]);
+  const cached = analyticsScopes.get(key); if (cached) return cached;
+  const result = CalculationEngine.bank.bankAnalyticsAccounts(useBankWorkbookStore.getState().workbook.settings.accounts, bankId, accountId);
+  if (analyticsScopes.size >= 32) analyticsScopes.clear();
+  analyticsScopes.set(key, result); return result;
+}
+
+export function saveLegacyBankBudget(category: string, amount: number, originalCategory?: string) {
+  if (!auth?.currentUser) throw new Error('Sign in to save a budget target.');
+  const name = category.trim();
+  if (!name || !Number.isFinite(amount) || amount <= 0) throw new Error('Enter a category and a positive finite target.');
+  const store = useBankWorkbookStore.getState();
+  const budgets = { ...store.workbook.settings.budgets };
+  if (originalCategory && originalCategory !== name) {
+    if (!Object.hasOwn(budgets, originalCategory)) throw new Error('This target no longer exists. Reopen the editor.');
+    if (Object.hasOwn(budgets, name)) throw new Error('A target already exists for this category.');
+    delete budgets[originalCategory];
+  }
+  budgets[name] = amount;
+  store.setWorkbook({ ...store.workbook, settings: { ...store.workbook.settings, budgets } });
 }

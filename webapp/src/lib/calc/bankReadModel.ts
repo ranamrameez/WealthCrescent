@@ -159,3 +159,23 @@ export function bankDirectoryReadModel(banks: Bank[], accounts: BankAccount[], t
     srNumOf: new Map(accounts.map((account, index) => [account.id, index + 1])),
   };
 }
+
+/** An explicit missing selection stays empty; all means every native account. */
+export function bankAnalyticsAccounts(accounts: BankAccount[], bankId: string | undefined, accountId: string) {
+  return accounts.filter(account => !account.migratedToCreditCardId
+    && (!bankId || account.bankId === bankId)
+    && (accountId === 'all' || account.id === accountId));
+}
+
+/** Legacy targets have no currency/account ownership: never subtract from actuals. */
+export function bankLegacyBudgetRows(ledger: BankLedgerRow[], targets: Record<string, number>, categories: Category[]) {
+  const actuals = new Map<string, number>();
+  for (const { tx } of ledger) {
+    if (tx.isPending || tx.amount >= 0) continue;
+    const category = categoryName(tx.categoryID, categories);
+    actuals.set(category, (actuals.get(category) ?? 0) - tx.amount);
+  }
+  return [...new Set([...Object.keys(targets), ...actuals.keys()])].sort().map(category => ({
+    category, budget: targets[category] ?? 0, actual: actuals.get(category) ?? 0,
+  }));
+}

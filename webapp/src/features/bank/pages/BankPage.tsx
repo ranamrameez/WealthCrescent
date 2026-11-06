@@ -1,5 +1,6 @@
+import { saveLegacyBankBudget } from '../../../services/finance/bankService';
 import { bankTransactionMatchesFilters as transactionMatchesFilters } from '../../../services/finance/bankService';
-import { useBankDirectory, useBankAccount, useBankingScopeSummary, useBankAccountAnalytics } from '../../../hooks/useBankQueries';
+import { useBankAnalyticsAccounts, useBankDirectory, useBankAccount, useBankingScopeSummary, useBankAccountAnalytics } from '../../../hooks/useBankQueries';
 import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
@@ -57,7 +58,7 @@ import { recurrenceLabel } from '../../../lib/recurrenceLabel';
 import { hueStyle } from '../../../lib/statCardHues';
 import { categoryName, UNCATEGORIZED_ID } from '../../../lib/categories';
 import { useCategoryStore } from '../../../store/categoryStore';
-import { accountRunningLedger, budgetVsActual } from '../../../lib/calc/bankModule';
+import { accountRunningLedger } from '../../../lib/calc/bankModule';
 import { type PlanningHorizonDays } from '../../../lib/calc/plannedBalance';
 import { dlBarV, dlDoughnut } from '../../../lib/chartLabels';
 import { applyChartTheme } from '../../../lib/chartSetup';
@@ -1847,26 +1848,20 @@ function PlanningAccountSection({
  * monthly category targets (persisted in `settings.budgets`) compared
  * against this month's actual spend for the selected account. */
 function AnalyticsTab({ bankId, filters }: { bankId?: string; filters: BankingFilters }) {
-  const allAccounts = useBankWorkbookStore((s) => s.workbook.settings.accounts);
-  const accounts = useMemo(
-    () => allAccounts.filter((account) => !account.migratedToCreditCardId && (!bankId || account.bankId === bankId)),
-    [allAccounts, bankId],
-  );
-  const transactions = useBankWorkbookStore((s) => s.workbook.transactions);
-  const budgets = useBankWorkbookStore((s) => s.workbook.settings.budgets);
-  const setBudget = useBankWorkbookStore((s) => s.setBudget);
+  const accounts = useBankAnalyticsAccounts(bankId, filters.accountId);
+  if (!accounts.length) return <p className="text-muted">No bank accounts match this scope. Adjust the account filter to see analytics.</p>;
+  return <div>{accounts.map(account => <section key={account.id} aria-label={accountDisplayName(account)}>
+    <h3>{accountDisplayName(account)} · {account.currencyCode}</h3>
+    <BankAccountAnalyticsTab account={account} filters={filters} />
+  </section>)}</div>;
+}
+
+function BankAccountAnalyticsTab({ account, filters }: { account: BankAccount; filters: BankingFilters }) {
   const ensureSignedIn = useEnsureSignedIn();
-  const categoryList = useCategoryStore((s) => s.workbook.categories);
-  const account = (filters.accountId !== 'all' ? accounts.find((item) => item.id === filters.accountId) : undefined) ?? accounts[0];
 
   const { clearedLedger, pendingLedger: pendingRows, periodStartBalance, upcoming,
-    actualBalanceLedger, periodCurrentBalance } = useBankAccount(account?.id, filters);
+    actualBalanceLedger, periodCurrentBalance, legacyBudgetRows: budgetRows } = useBankAccount(account?.id, filters);
 
-  const thisMonth = today().slice(0, 7);
-  const budgetRows = useMemo(
-    () => (account ? budgetVsActual(transactions, [account.id], budgets ?? {}, thisMonth, categoryList) : []),
-    [account, transactions, budgets, thisMonth, categoryList],
-  );
   const [budgetEditor, setBudgetEditor] = useState<{ category: string; amount: number; originalCategory?: string } | null>(null);
 
   if (!account) return <p className="text-muted">Add a bank account first to see analytics.</p>;
@@ -1884,24 +1879,23 @@ function AnalyticsTab({ bankId, filters }: { bankId?: string; filters: BankingFi
         fromDate={filters.fromDate}
         toDate={filters.toDate}
       />
-      <TableCard rows={budgetRows} title={<h3 className="m-0">Budget — {thisMonth}</h3>} className="mt-md">
+      <TableCard rows={budgetRows} title={<h3 className="m-0">Legacy targets and filtered spending</h3>} className="mt-md">
         <p className="text-muted mt-0">
-          Monthly spend targets for {accountDisplayName(account)}. Account selection and period come from the same centralized Filters control used by the charts.
+          Legacy targets have no assigned currency or account. They are shown without conversion or a remaining-budget comparison. Actual spending follows this account’s filters.
         </p>
         <div>
           <table>
-            <thead><tr><th>Category</th><th>Budget</th><th>Actual</th><th>Remaining</th><th></th></tr></thead>
+            <thead><tr><th>Category</th><th>Target (unassigned)</th><th>Actual ({account.currencyCode})</th><th></th></tr></thead>
             <tbody>
               {budgetRows.map((row) => (
                 <RecordRow financeModule="bank" onEdit={() => setBudgetEditor({ category: row.category, amount: row.budget, originalCategory: row.category })}    record={row}  key={row.category}>
                   <td>{row.category}</td>
-                  <td>{row.budget > 0 ? fmtMoney(row.budget, account.currencyCode) : '—'}</td>
-                  <td className={row.budget > 0 && row.actual > row.budget ? 'pill-negative' : ''}>{fmtMoney(row.actual, account.currencyCode)}</td>
-                  <td className={row.budget > 0 ? (row.budget - row.actual >= 0 ? 'pill-positive' : 'pill-negative') : ''}>{row.budget > 0 ? fmtMoney(row.budget - row.actual, account.currencyCode) : '—'}</td>
+                  <td>{row.budget > 0 ? row.budget.toLocaleString() : '—'}</td>
+                  <td>{fmtMoney(row.actual, account.currencyCode)}</td>
                   <td><IconButton label="Edit budget" icon={<EditIcon size={13} />} align="right" onClick={() => setBudgetEditor({ category: row.category, amount: row.budget, originalCategory: row.category })} /></td>
                 </RecordRow>
               ))}
-              {!budgetRows.length && <tr><td colSpan={5} className="text-muted">No spend or budget targets for this account yet.</td></tr>}
+              {!budgetRows.length && <tr><td colSpan={4} className="text-muted">No spend or budget targets for this account yet.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -1917,8 +1911,8 @@ function AnalyticsTab({ bankId, filters }: { bankId?: string; filters: BankingFi
                 const category = budgetEditor.category.trim();
                 if (!category || budgetEditor.amount <= 0) return toast('Enter a category and target.');
                 if (!(await ensureSignedIn('Sign in to save a budget target.'))) return;
-                if (budgetEditor.originalCategory && budgetEditor.originalCategory !== category) setBudget(budgetEditor.originalCategory, 0);
-                setBudget(category, budgetEditor.amount);
+                try { saveLegacyBankBudget(category, budgetEditor.amount, budgetEditor.originalCategory); }
+                catch (error) { return toast(error instanceof Error ? error.message : 'Could not save target.'); }
                 setBudgetEditor(null);
                 toast('Budget target saved.');
               }}><SaveIcon size={13} />Save budget</button>

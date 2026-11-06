@@ -1,5 +1,5 @@
 import { useMemo, useSyncExternalStore } from 'react';
-import { getBankDirectory, getBankAccount, getBankingScopeSummary, getBankCategories, getBankAccountAnalytics, subscribeBankQueries } from '../services/finance/bankService';
+import { getBankAnalyticsAccounts, getBankDirectory, getBankAccount, getBankingScopeSummary, getBankCategories, getBankAccountAnalytics, subscribeBankQueries } from '../services/finance/bankService';
 import type { BankingReadFilters } from '../lib/calc/bankReadModel';
 import type { PlannedBankTransaction } from '../types/plannedBank';
 export function useBankAccount(id: string | undefined, filters: BankingReadFilters) { return useSyncExternalStore(subscribeBankQueries, () => getBankAccount(id, filters)); }
@@ -13,3 +13,5 @@ export function useBankAccountAnalytics(input: Parameters<typeof getBankAccountA
 }
 
 export function useBankDirectory(showArchived = false) { return useSyncExternalStore(subscribeBankQueries, () => getBankDirectory(showArchived)); }
+
+export function useBankAnalyticsAccounts(bankId: string | undefined, accountId: string) { return useSyncExternalStore(subscribeBankQueries, () => getBankAnalyticsAccounts(bankId, accountId)); }
