@@ -48,6 +48,7 @@ export function getNetWorthInputs(): NetWorthValuationInputs {
     creditCards: cards.cards, creditCardTransactions: cards.transactions,
     personalLoans: personal.loans, personalLoanRepayments: personal.repayments,
     emiLoans: useEMIWorkbookStore.getState().workbook.entries,
+    emiRepayments: useEMIWorkbookStore.getState().workbook.repayments,
     fundsFunds: funds.funds, fundsTransactions: funds.transactions, fundsTransfers: funds.transfers,
     fundsDefaultCurrency: funds.settings.legacyTransferCurrency ?? funds.settings.defaultCurrency,
     fundsIncludeCashInNetWorth: funds.settings.includeCashInNetWorth === true,

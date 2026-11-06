@@ -35,6 +35,8 @@ export interface PlannedCashEntry {
   /** True once "Mark as done" created a real `CashEntry` from this plan.
    * Only meaningful when `recurrence` is unset. */
   executed?: boolean;
+  /** Retains fulfilled series history while suppressing unresolved future occurrences. */
+  cancelled?: boolean;
   /** Set for a recurring plan — see this interface's own doc comment. */
   recurrence?: RecurrenceRule;
   /** The last occurrence date already turned into a real `CashEntry`, for
@@ -51,6 +53,9 @@ export interface PlannedCashEntry {
    * lets regeneration replace only this subscription's own not-yet-executed
    * plans, same pattern as EMI/Loans' `sourceEmiLoanId`. */
   sourceSubscriptionId?: string;
+  /** Retained when a loan installment is explicitly routed to this finance. */
+  sourceEmiLoanId?: string;
+  sourceEmiMonth?: number;
 }
 
 export interface PlannedCashSettings {

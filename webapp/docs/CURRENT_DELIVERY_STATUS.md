@@ -3,8 +3,10 @@
 Updated 2026-11-06. This is the concise status index; SESSION_HANDOFF.md records exact checkpoint evidence, DELIVERY_CHECKLIST.md retains detailed scope/history, and CALCULATION_ENGINE_ARCHITECTURE.md remains the architecture contract. Historical notes do not override the current status here.
 
 ## Delivery and data safety
+- Latest working EMI repair: recorded-versus-estimated balances, save-time linked-plan refresh, booking/first-installment dates, advance/price basis, month intervals and schedule-only bigger installments. See EMI_INSTALLMENT_MODEL.md. Focused acceptance: 10 files / 139 tests passed; final production build is being checked. Existing inconsistent/future-dated private records are preserved for review. No actual loan/payment was changed in browser.
+- Source provenance/lifecycle continuation: explicit EMI/subscription provenance survives manual fulfillment; cancelled source series retain fulfilled history and suppress unresolved occurrences. Six files / 50 tests and both TypeScript projects/production build passed before the EMI slice.
 - Existing branch: fix/net-worth-dashboard-parity-and-accounting; draft PR 51 only. Nothing merged/deployed by this work.
-- Published checkpoint: 128d1391639ee46c6a7b807275b4332726d3a03b; Actions 444 passed 170 files / 1,297 tests and build. Earlier 321b18ac passed 167 files / 1,271 tests in Actions 441.
+- Published checkpoint: 7ac9cf8b054931a86191afc40c85fd4a269ec2be passed Actions 445. Previous 128d1391639ee46c6a7b807275b4332726d3a03b / Actions 444 passed 170 files / 1,297 tests and build. Earlier 321b18ac passed 167 files / 1,271 tests in Actions 441.
 - Current working continuation hardens collection-aware movement/allocation identity and explicit link matching. Five focused files / 44 tests and final production build/both TS projects passed; resulting published-head CI remains required.
 - No private backup imported, no real user ledger created/settled/deleted, no private proof screenshots uploaded. The only committed sample images are the user's approved stock UI references in docs/ui-samples.
 

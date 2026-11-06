@@ -18,6 +18,8 @@ export function prepareManualPlanFulfillment(reference: PlanReference, plan: Fin
   const occurrence = planOccurrences([plan],occurrenceDate,occurrenceDate,new Date(actualDate+'T00:00:00Z'),null)[0];
   if (!occurrence || occurrence.executed) throw new Error('This occurrence is already completed or excluded.');
   const planLink: PlanLink = { module: reference.module, planId: plan.id, occurrenceDate, groupId: plan.groupId };
+  if('sourceEmiLoanId' in plan && typeof plan.sourceEmiLoanId==='string' && plan.sourceEmiLoanId)planLink.source={module:'emi',id:plan.sourceEmiLoanId};
+  else if('sourceSubscriptionId' in plan && typeof plan.sourceSubscriptionId==='string' && plan.sourceSubscriptionId)planLink.source={module:'subscription',id:plan.sourceSubscriptionId};
   const id = 'plan:' + reference.module + ':' + encodeURIComponent(plan.id) + ':' + occurrenceDate;
   const common = { id, date: actualDate, source: 'manual' as const, categoryID, planLink };
   const result = reference.module === 'cash' && 'currencyCode' in plan && 'type' in plan

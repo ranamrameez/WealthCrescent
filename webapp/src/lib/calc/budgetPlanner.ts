@@ -70,6 +70,7 @@ export interface BudgetActivity {
    * EMI schedule's own liability reduction — counting both would double-
    * count the payment, see that file's own doc comment). */
   sourceEmiLoanId?: string;
+  sourceSubscriptionId?: string;
 }
 
 /** User-reported (2026-09-04): "Inter-account transfers are counting as
@@ -108,14 +109,14 @@ function normalizeCash(entries: CashEntry[], plans: PlannedCashEntry[], categori
   const real: BudgetActivity[] = entries
     .filter((e) => !linked.has(`cash:${e.id}`))
     .map((e) => ({
-      id: e.id, module: 'cash', sourceLabel: 'Cash', sourceId: 'cash', planGroupId: e.planLink?.groupId, date: e.date,
+      id: e.id, module: 'cash', sourceLabel: 'Cash', sourceId: 'cash', planGroupId: e.planLink?.groupId, date: e.date, sourceEmiLoanId: e.planLink?.source?.module==='emi'?e.planLink.source.id:undefined, sourceSubscriptionId: e.planLink?.source?.module==='subscription'?e.planLink.source.id:undefined,
       amount: e.isDeposit ? e.amount : -e.amount, currencyCode: e.currencyCode,
       categoryId: e.categoryID, category: categoryName(e.categoryID, categories), description: e.note || (e.isDeposit ? 'Cash in' : 'Cash out'), executed: true, isPending: e.isPending,
     }));
   const planned: BudgetActivity[] = expandPlans(plans, window).filter((p) => !p.executed).map((p) => ({
     id: p.id, module: 'cash', sourceLabel: 'Cash', sourceId: 'cash', date: p.date,
     amount: p.type === 'IN' ? p.amount : -p.amount, currencyCode: p.currencyCode,
-    planGroupId: p.groupId, category: p.category, description: p.note || (p.type === 'IN' ? 'Planned cash in' : 'Planned cash out'), executed: false,
+    planGroupId: p.groupId, sourceSubscriptionId: p.sourceSubscriptionId, sourceEmiLoanId: p.sourceEmiLoanId, category: p.category, description: p.note || (p.type === 'IN' ? 'Planned cash in' : 'Planned cash out'), executed: false,
   }));
   return [...real, ...planned];
 }
@@ -127,7 +128,7 @@ function normalizeBank(accounts: BankAccount[], transactions: BankTransaction[],
     const account = accountById.get(t.accountId);
     if (!account) return [];
     return [{
-      id: t.id, module: 'bank' as const, sourceLabel: account.name, sourceId: account.id, planGroupId: t.planLink?.groupId, date: t.date,
+      id: t.id, module: 'bank' as const, sourceLabel: account.name, sourceId: account.id, planGroupId: t.planLink?.groupId, date: t.date, sourceEmiLoanId: t.planLink?.source?.module==='emi'?t.planLink.source.id:undefined, sourceSubscriptionId: t.planLink?.source?.module==='subscription'?t.planLink.source.id:undefined,
       amount: t.amount, currencyCode: account.currencyCode,
       categoryId: t.categoryID, category: categoryName(t.categoryID, categories), description: t.description, executed: true, isPending: t.isPending,
     }];
@@ -139,7 +140,7 @@ function normalizeBank(accounts: BankAccount[], transactions: BankTransaction[],
       id: p.id, module: 'bank' as const, sourceLabel: account.name, sourceId: account.id, date: p.date,
       amount: p.amount, currencyCode: account.currencyCode,
       planGroupId: p.groupId, category: p.category, description: p.description, executed: false,
-      sourceEmiLoanId: p.sourceEmiLoanId,
+      sourceEmiLoanId: p.sourceEmiLoanId, sourceSubscriptionId: p.sourceSubscriptionId,
     }];
   });
   return [...real, ...planned];

@@ -1,4 +1,4 @@
-import { emiScheduledCashOutflowByCurrency, totalsByCurrency } from './emiModule';
+import { projectedEmiByCurrency, totalsByCurrency } from './emiModule';
 import { netWorthAsOfDate, type NetWorthAsOfInputs } from './netWorthAsOf';
 import { includedEmiLoans } from './netWorthInclusion';
 import type { CurrencyNetWorth } from './netWorth';
@@ -105,7 +105,7 @@ export function projectedNetWorthTrend(params: {
   // own `new Date()` default — keeps this pure/testable and avoids a real
   // (if usually invisible, since `todayISODate` is normally literally
   // today) mismatch between the two "today"s.
-  const emiToday = totalsByCurrency(emiLoans.filter(loan => loan.startDate <= todayISODate), new Date(todayISODate));
+  const emiToday = totalsByCurrency(emiLoans.filter(loan => loan.startDate <= todayISODate), new Date(todayISODate), netWorthAsOfInputs.emiRepayments);
   const currentAssets = Object.fromEntries(currentRows.map((r) => [r.currency, r.assets]));
   const currentLiabilities = Object.fromEntries(currentRows.map((r) => [r.currency, r.liabilities]));
   const currentNet = Object.fromEntries(currentRows.map((r) => [r.currency, r.net]));
@@ -137,15 +137,15 @@ export function projectedNetWorthTrend(params: {
     } else {
       const monthEnd = endOfMonthAsOf(month);
       const cutoff = params.projectionThroughDate && params.projectionThroughDate < monthEnd ? params.projectionThroughDate : monthEnd;
-      const emiAtMonth = totalsByCurrency(emiLoans.filter(loan => loan.startDate <= cutoff), new Date(cutoff));
-      const emiCashOutflow = emiScheduledCashOutflowByCurrency(emiLoans, todayISODate, cutoff);
+      const projection = projectedEmiByCurrency(emiLoans, netWorthAsOfInputs.emiRepayments, todayISODate, cutoff);
+      const emiCashOutflow = projection.cashOutflow;
       const flow: Record<string, number> = {};
       activities
         .filter((a) => !a.executed && !a.isPending && a.date >= todayISODate && a.date <= cutoff && !a.sourceEmiLoanId)
         .forEach((a) => { flow[a.currencyCode] = (flow[a.currencyCode] ?? 0) + a.amount; });
       currencies.forEach((c) => {
         const assets = (currentAssets[c] ?? 0) + (flow[c] ?? 0) - (emiCashOutflow[c] ?? 0);
-        const liabilities = (currentLiabilities[c] ?? 0) - (emiToday[c]?.outstanding ?? 0) + (emiAtMonth[c]?.outstanding ?? 0);
+        const liabilities = (currentLiabilities[c] ?? 0) - (emiToday[c]?.outstanding ?? 0) + (projection.outstanding[c] ?? 0);
         assetsByCurrency[c] = assets;
         liabilitiesByCurrency[c] = liabilities;
         byCurrency[c] = assets - liabilities;

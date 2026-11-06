@@ -35,12 +35,7 @@ const linkModule = (module: MovementModule): LinkModule => module === 'creditCar
 export function collectMovementActivities(input: MovementInputs, modules: readonly string[], window: BudgetOccurrenceWindow = {}, sourcePolicy: 'dashboard' | 'all-ledgers' = 'dashboard'): MovementActivity[] {
   const { native, categories } = input;
   const rows: MovementActivity[] = collectBudgetActivities({ ...input.base, links: [] }, window)
-    .map(item => {
-      const plans = item.module === 'cash' ? input.base.plannedCash : item.module === 'bank' ? input.base.plannedBank : input.base.plannedRentals;
-      const plan = !item.executed ? plans.find(plan => plan.id === item.id || plan.id + '@' + item.date === item.id) : undefined;
-      const subscription = plan && 'sourceSubscriptionId' in plan && plan.sourceSubscriptionId;
-      return { ...item, recordType: item.executed?'entry':'plan', movementKind: item.sourceEmiLoanId ? 'financing' : item.module === 'rentals' || subscription ? 'operating' : 'unclassified' };
-    });
+    .map(item => ({ ...item, recordType: item.executed?'entry':'plan', movementKind: item.sourceEmiLoanId?'financing':item.module==='rentals' || item.sourceSubscriptionId?'operating':'unclassified' }));
   const add = (row: MovementActivity) => { if (Number.isFinite(row.amount) && row.date && row.currencyCode) rows.push(row); };
   const cards = new Map(native.cards.cards.map(card => [card.id,card]));
   for (const tx of native.cards.transactions) {
@@ -48,14 +43,14 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
     add({ id: tx.id, recordType: 'card-transaction', module: 'creditCards', sourceId: card.id, sourceLabel: card.name, date: tx.date,
       amount: tx.kind === 'payment' || tx.kind === 'cashAdvance' ? tx.amount : -tx.amount,
       currencyCode: card.currencyCode, categoryId: tx.categoryID, category: categoryName(tx.categoryID,categories), description: tx.description || tx.kind, executed: true, planGroupId: tx.planLink?.groupId,
-      movementKind: tx.kind === 'payment' ? 'transfer' : tx.kind === 'cashAdvance' ? 'financing' : 'operating' });
+      movementKind: tx.kind === 'payment' ? 'transfer' : tx.kind === 'cashAdvance' || tx.planLink?.source?.module==='emi' ? 'financing' : 'operating' });
   }
   for (const plan of planOccurrences(input.plannedCards,window.fromDate,window.toDate,window.asOf,window.horizonDays)) {
     const card = cards.get(plan.cardId); if (!card || plan.executed) continue;
     add({ id: plan.id, recordType: 'plan', module: 'creditCards', sourceId: card.id, sourceLabel: card.name, date: plan.date,
       amount: plan.kind === 'payment' || plan.kind === 'cashAdvance' ? plan.amount : -plan.amount,
       currencyCode: card.currencyCode, category: plan.category, description: plan.description, executed: false, planGroupId: plan.groupId,
-      movementKind: plan.kind === 'payment' ? 'transfer' : plan.kind === 'cashAdvance' ? 'financing' : 'operating' });
+      movementKind: plan.kind === 'payment' ? 'transfer' : plan.kind === 'cashAdvance' || plan.sourceEmiLoanId ? 'financing' : 'operating' });
   }
   const loans = new Map(native.personalLoans.loans.map(loan => [loan.id,loan]));
   for (const tx of native.personalLoans.repayments) {

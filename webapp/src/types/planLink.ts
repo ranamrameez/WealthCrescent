@@ -4,4 +4,5 @@ export interface PlanLink {
   planId: string;
   occurrenceDate: string;
   groupId?: string;
+  source?: { module: 'emi' | 'subscription'; id: string };
 }

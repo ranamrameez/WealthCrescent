@@ -28,6 +28,8 @@ export interface PlannedCreditCardTransaction {
   /** True once "Mark as done" created a real `CreditCardTransaction` from
    * this plan. Only meaningful when `recurrence` is unset. */
   executed?: boolean;
+  /** Retains fulfilled series history while suppressing unresolved future occurrences. */
+  cancelled?: boolean;
   /** Same recurrence mechanism as `PlannedBankTransaction`/
    * `PlannedCashEntry` — `date` stays equal to `recurrence.startDate` when
    * set. */
@@ -45,6 +47,9 @@ export interface PlannedCreditCardTransaction {
    * generated, not-yet-executed plans instead of piling up duplicates.
    * Same field name/meaning as `PlannedBankTransaction.sourceSubscriptionId`. */
   sourceSubscriptionId?: string;
+  /** Retained when a loan installment is explicitly routed to this finance. */
+  sourceEmiLoanId?: string;
+  sourceEmiMonth?: number;
 }
 
 export interface PlannedCreditCardSettings {

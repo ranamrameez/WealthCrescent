@@ -5,6 +5,15 @@ import { isPlanDue, plannedCashProjection } from '../plannedBalance';
 
 const plan = { id: 'salary', date: '2026-01-28', type: 'IN' as const, amount: 100, currencyCode: 'USD', recurrence: { cycle: 'monthly' as const, startDate: '2026-01-28' } };
 
+it('retains completed dates in cancelled series without forecasting or settling unresolved dates',()=>{
+  const cancelled={...plan,cancelled:true,completedDates:['2026-02-28']};
+  expect(planOccurrences([cancelled],'2026-01-01','2026-04-30').map(row=>[row.date,row.executed])).toEqual([['2026-02-28',true]]);
+  expect(isPlanDue(cancelled,new Date('2026-03-01'),null)).toBe(false);
+  expect(plannedCashProjection([], [cancelled],new Date('2026-03-01'),30)).toEqual({});
+  const legacy={...plan,cancelled:true,executedThrough:'2026-02-28'};
+  expect(planOccurrences([legacy],'2026-01-01','2026-03-31').map(row=>row.date)).toEqual(['2026-01-28','2026-02-28']);
+});
+
 describe('recurring plan occurrences', () => {
   it('gives every date a unique row and preserves an early completion', () => {
     const completed = { ...plan, completedDates: ['2026-10-28'] };

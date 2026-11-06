@@ -1,4 +1,5 @@
 import type { EMILoan, EMIRepayment } from '../../types/emiWorkbook';
+import { validBatchDate } from '../dateValidation';
 
 export interface EMIScheduleRow {
   month: number;
@@ -112,7 +113,7 @@ export function emiSchedule(loan: EMILoan): { emi: number; rows: EMIScheduleRow[
     return { emi: customPayment ?? installment, rows };
   }
 
-  const r = (loan.annualRatePct ?? 0) / 12 / 100;
+  const r = (loan.annualRatePct ?? 0) * (loan.installmentIntervalMonths ?? 1) / 12 / 100;
   const emi = r === 0 ? loan.principal / n : (loan.principal * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
   let balance = loan.principal;
   const rows: EMIScheduleRow[] = [];
@@ -219,11 +220,13 @@ export function emiSummary(loan: EMILoan, asOf: Date = new Date()): EMISummary {
  * this also naturally clamps a day that doesn't exist in the target month
  * (e.g. day 31 landing in February) to that month's actual last day. */
 export function installmentDueDate(loan: EMILoan, month: number): string {
-  const [startYear, startMonth1, startDay] = loan.startDate.split('-').map(Number);
-  const totalMonths0 = startYear * 12 + (startMonth1 - 1) + month;
+  const anchor = loan.firstInstallmentDate ?? loan.startDate;
+  const [startYear, startMonth1, startDay] = anchor.split('-').map(Number);
+  const interval = loan.installmentIntervalMonths ?? 1;
+  const totalMonths0 = startYear * 12 + (startMonth1 - 1) + (loan.firstInstallmentDate ? month - 1 : month) * interval;
   const targetYear = Math.floor(totalMonths0 / 12);
   const targetMonth0 = ((totalMonths0 % 12) + 12) % 12;
-  const wantedDay = loan.paymentDayOfMonth ?? startDay;
+  const wantedDay = loan.firstInstallmentDate && month === 1 ? startDay : loan.paymentDayOfMonth ?? startDay;
   const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth0 + 1, 0)).getUTCDate();
   const day = Math.min(wantedDay, daysInTargetMonth);
   return `${targetYear}-${String(targetMonth0 + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -276,7 +279,7 @@ export function markupRateEquivalents(loan: EMILoan): MarkupRateEquivalents {
   if (loan.repaymentMode === 'fixedTotal') {
     if (!(loan.principal > 0) || !(loan.tenureMonths > 0)) return { annual: 0, monthly: 0 };
     const total = loan.totalToReturn ?? loan.principal;
-    const markupPerMonth = (total - loan.principal) / loan.tenureMonths;
+    const markupPerMonth = (total - loan.principal) / (loan.tenureMonths * (loan.installmentIntervalMonths ?? 1));
     const monthly = (markupPerMonth / loan.principal) * 100;
     return { annual: monthly * 12, monthly };
   }
@@ -331,7 +334,7 @@ export function whatIfExtraPayment(loan: EMILoan, extraPerMonth: number): WhatIf
     return { months, totalInterest, interestSaved: baseTotalInterest - totalInterest, monthsSaved: loan.tenureMonths - months, newEndDate: installmentDueDate(loan, months) };
   }
 
-  const r = (loan.annualRatePct ?? 0) / 12 / 100;
+  const r = (loan.annualRatePct ?? 0) * (loan.installmentIntervalMonths ?? 1) / 12 / 100;
   const payment = base.emi + extraPerMonth;
   let balance = loan.principal;
   let totalInterest = 0;
@@ -416,7 +419,7 @@ export function generateBigEmiOverrides(loan: EMILoan, fromMonth: number, opts: 
         if (loan.repaymentMode === 'fixedTotal') {
           overrides[n] = balanceBeforeFinal;
         } else {
-          const r = (loan.annualRatePct ?? 0) / 12 / 100;
+          const r = (loan.annualRatePct ?? 0) * (loan.installmentIntervalMonths ?? 1) / 12 / 100;
           overrides[n] = balanceBeforeFinal + balanceBeforeFinal * r;
         }
       }
@@ -434,21 +437,155 @@ export interface EMITotals {
   paidSoFar: number;
 }
 
+export function normalizeEmiTerms(input: EMILoan, amountBasis: 'financed' | 'price' = 'financed'): EMILoan {
+  const advance = input.bookingAmount ?? 0;
+  if (!Number.isFinite(advance) || advance < 0) throw new Error('Booking amount must be zero or positive.');
+  const principal = amountBasis === 'price' ? input.principal - advance : input.principal;
+  if (!Number.isFinite(principal) || principal <= 0) throw new Error('Financed amount must be positive after the booking amount.');
+  if (!input.name.trim()) throw new Error('Enter a loan name.');
+  if (!Number.isInteger(input.tenureMonths) || input.tenureMonths < 1 || input.tenureMonths > 1200) throw new Error('Enter 1 to 1,200 installments.');
+  const interval = input.installmentIntervalMonths ?? 1;
+  if (!Number.isInteger(interval) || interval < 1 || interval > 12) throw new Error('Installment interval must be 1 to 12 months.');
+  for (const date of [input.startDate, input.bookingDate, input.firstInstallmentDate].filter((date): date is string => date !== undefined)) {
+    if (!validBatchDate(date)) throw new Error('Enter valid booking and installment dates.');
+  }
+  if (input.firstInstallmentDate && input.firstInstallmentDate < (input.bookingDate ?? input.startDate)) throw new Error('First installment cannot precede booking.');
+  if (input.repaymentMode === 'fixedTotal' && (!Number.isFinite(input.totalToReturn) || input.totalToReturn! < principal)) throw new Error('Total installment repayments must cover the financed amount.');
+  if (input.repaymentMode === 'interest' && (!Number.isFinite(input.annualRatePct ?? 0) || (input.annualRatePct ?? 0) < 0)) throw new Error('Enter a valid interest rate.');
+  if (input.customMonthlyPayment != null && (!Number.isFinite(input.customMonthlyPayment) || input.customMonthlyPayment <= 0)) throw new Error('Regular installment must be positive.');
+  if (input.paymentDayOfMonth != null && (!Number.isInteger(input.paymentDayOfMonth) || input.paymentDayOfMonth < 1 || input.paymentDayOfMonth > 31)) throw new Error('Payment day must be between 1 and 31.');
+  if (!validBatchDate(installmentDueDate(input, input.tenureMonths))) throw new Error('The schedule ends outside supported calendar dates.');
+  for (const [month, amount] of Object.entries(input.installmentOverrides ?? {})) {
+    if (amount == null) continue; // RTDB can encode numeric maps as sparse arrays.
+    if (!Number.isInteger(Number(month)) || Number(month) < 1 || !Number.isFinite(amount) || amount < 0) throw new Error('Installment overrides must have valid numbers and nonnegative amounts.');
+  }
+  return { ...input, name: input.name.trim(), lender: input.lender.trim(), principal,
+    purchasePrice: amountBasis === 'price' ? input.principal : input.purchasePrice != null ? principal + advance : undefined };
+}
+
+export interface EmiLinkedPlan {
+  module: 'bank' | 'cash' | 'creditCard';
+  plan: { id: string; date: string; amount: number; sourceEmiMonth?: number; executed?: boolean; cancelled?: boolean; recurrence?: unknown };
+}
+
+/** Refresh only open intent. Existing identities/routing/category/project metadata
+ * survive; fulfilled records and actual repayment dates are never rewritten. */
+export function refreshEmiLinkedPlans(loan: EMILoan, plans: readonly EmiLinkedPlan[], repayments: readonly EMIRepayment[], asOf: string) {
+  const schedule = emiSchedule(loan).rows;
+  const settled = new Set(repayments.filter(payment => payment.loanId === loan.id && payment.date <= asOf).map(payment => payment.month));
+  const covered = new Set<number>(settled);
+  const changes: { module: EmiLinkedPlan['module']; id: string; remove?: boolean; date?: string; amount?: number }[] = [];
+  for (const { module, plan } of plans) {
+    const month = plan.sourceEmiMonth;
+    if (month == null || !Number.isInteger(month) || month < 1) throw new Error('A linked EMI plan has no valid installment number. Review it before changing this loan.');
+    if (plan.executed || plan.cancelled) { covered.add(month); continue; }
+    if (plan.recurrence) throw new Error('A linked EMI plan has its own recurrence. Review it before changing this loan.');
+    const row = schedule.find(row => row.month === month);
+    if (settled.has(month) || !row) { changes.push({ module, id: plan.id, remove: true }); continue; }
+    if (covered.has(month)) throw new Error('Duplicate linked plans exist for one EMI installment. Review them before changing this loan.');
+    covered.add(month);
+    changes.push({ module, id: plan.id, date: installmentDueDate(loan, month), amount: module === 'bank' ? -row.emi : row.emi });
+  }
+  const missing = schedule.filter(row => !covered.has(row.month) && installmentDueDate(loan, row.month) >= asOf)
+    .map(row => ({ month: row.month, date: installmentDueDate(loan, row.month), amount: -row.emi }));
+  return { changes, missing };
+}
+
+/** Ledger reconciliation is deliberately separate from the contractual schedule.
+ * A due date or an installment override is not evidence of payment. Interest
+ * loans retain their scheduled principal estimate until an accrual ledger exists.
+ */
+export function emiRepaymentSummary(loan: EMILoan, repayments: readonly EMIRepayment[], asOf: string) {
+  const scheduled = emiSummary(loan, new Date(`${asOf}T12:00:00Z`));
+  const own = repayments.filter(payment => payment.loanId === loan.id);
+  const recorded = own.filter(payment => payment.date <= asOf);
+  const recordedPaid = recorded.reduce((total, payment) => total + payment.amount, 0);
+  const recordedFines = recorded.reduce((total, payment) => total + (payment.fine ?? 0), 0);
+  const obligation = loan.totalToReturn ?? loan.principal;
+  const fixed = loan.repaymentMode === 'fixedTotal';
+  const recordedBalance = fixed && (loan.balanceTracking === 'recorded' || (loan.balanceTracking !== 'scheduled' && own.length > 0));
+  const paidMonths = new Set(recorded.map(payment => payment.month));
+  const unpaidRows = scheduled.rows.filter(row => !paidMonths.has(row.month));
+  const mismatches = own.filter(payment => {
+    const override = loan.installmentOverrides?.[payment.month];
+    return override != null && Math.abs(override - payment.amount) > 0.005;
+  }).map(payment => ({ id: payment.id, month: payment.month, recordedAmount: payment.amount, scheduledAmount: loan.installmentOverrides![payment.month] }));
+  return {
+    ...scheduled,
+    outstanding: recordedBalance ? Math.max(0, obligation - recordedPaid) : scheduled.outstanding,
+    paidSoFar: recordedBalance ? recordedPaid : scheduled.paidSoFar,
+    balanceBasis: recordedBalance ? 'recorded' as const : 'schedule' as const,
+    recordedPaid, recordedFines,
+    overpayment: fixed ? Math.max(0, recordedPaid - obligation) : 0,
+    scheduledOutstanding: scheduled.outstanding,
+    scheduledPaid: scheduled.paidSoFar,
+    futureRecordedCount: own.filter(payment => payment.date > asOf).length,
+    mismatches,
+    nextUnpaidDueDate: unpaidRows.length ? installmentDueDate(loan, unpaidRows[0].month) : null,
+    unrecordedDueCount: unpaidRows.filter(row => installmentDueDate(loan, row.month) <= asOf).length,
+  };
+}
+
+export function emiPeriodSummary(loans: readonly EMILoan[], repayments: readonly EMIRepayment[], filters: { fromDate: string; toDate: string; direction: string; source: string }, today: string) {
+  const end = filters.toDate && filters.toDate < today ? filters.toDate : today;
+  const before = filters.fromDate ? new Date(`${filters.fromDate}T12:00:00Z`) : null;
+  before?.setUTCDate(before.getUTCDate() - 1);
+  const openingDate = before?.toISOString().slice(0, 10);
+  const within = (date: string) => (!filters.fromDate || date >= filters.fromDate) && (!filters.toDate || date <= filters.toDate);
+  let start = 0, current = 0, inflow = 0, outflow = 0, plannedOutflow = 0;
+  for (const loan of loans) {
+    const own = repayments.filter(payment => payment.loanId === loan.id);
+    if (openingDate && loan.startDate <= openingDate) start += emiRepaymentSummary(loan, own, openingDate).outstanding;
+    if (loan.startDate <= end) current += emiRepaymentSummary(loan, own, end).outstanding;
+    if (filters.direction !== 'out' && within(loan.startDate) && loan.startDate <= today) inflow += loan.repaymentMode === 'fixedTotal' ? loan.totalToReturn ?? loan.principal : loan.principal;
+    if (filters.direction !== 'in') {
+      outflow -= own.filter(payment => payment.date <= end && within(payment.date) && (filters.source === 'all' || (payment.source ?? 'manual') === filters.source)).reduce((total, payment) => total + payment.amount, 0);
+      if (filters.source !== 'statement-import') {
+        const settled = new Set(own.filter(payment => payment.date <= today).map(payment => payment.month));
+        plannedOutflow -= emiSchedule(loan).rows.filter(row => !settled.has(row.month) && within(installmentDueDate(loan, row.month))).reduce((total, row) => total + row.emi, 0);
+      }
+    }
+  }
+  return { start, current, inflow, outflow, pendingInflow: 0, pendingOutflow: 0, plannedInflow: 0, plannedOutflow };
+}
+
 /** Aggregate stats across every loan, grouped by currency — feeds the
  * main EMI/Loans landing page's summary cards (README item 23 / user
  * feedback: every module needs an overall-stats view, not just per-loan
  * detail). Never blended across currencies, same rule as every other
  * module's totals. */
-export function totalsByCurrency(loans: EMILoan[], asOf: Date = new Date()): Record<string, EMITotals> {
+export function totalsByCurrency(loans: EMILoan[], asOf: Date = new Date(), repayments?: readonly EMIRepayment[]): Record<string, EMITotals> {
   const out: Record<string, EMITotals> = {};
   loans.forEach((loan) => {
-    const sum = emiSummary(loan, asOf);
+    const sum = repayments === undefined ? emiSummary(loan, asOf) : emiRepaymentSummary(loan, repayments, asOf.toISOString().slice(0, 10));
     if (!out[loan.currencyCode]) out[loan.currencyCode] = { monthlyInstallment: 0, outstanding: 0, paidSoFar: 0 };
     out[loan.currencyCode].monthlyInstallment += sum.emi;
     out[loan.currencyCode].outstanding += sum.outstanding;
     out[loan.currencyCode].paidSoFar += sum.paidSoFar;
   });
   return out;
+}
+
+/** Forecast starts from recorded fixed-total debt, then applies future scheduled
+ * payments once. Past unpaid installments remain debt; advance payment cannot
+ * drive future liabilities/cash payments below zero. Legacy callers without a
+ * ledger retain their existing schedule-only contract. */
+export function projectedEmiByCurrency(loans: EMILoan[], repayments: readonly EMIRepayment[] | undefined, today: string, cutoff: string) {
+  const outstanding: Record<string, number> = {}, cashOutflow: Record<string, number> = {};
+  for (const loan of loans.filter(loan => loan.startDate <= cutoff)) {
+    let cash = emiScheduledCashOutflowByCurrency([loan], today, cutoff)[loan.currencyCode] ?? 0;
+    let balance: number;
+    if (repayments !== undefined && emiRepaymentSummary(loan, repayments, today).balanceBasis === 'recorded') {
+      const opening = loan.startDate > today ? loan.totalToReturn ?? loan.principal : emiRepaymentSummary(loan, repayments, today).outstanding;
+      const settled = new Set(repayments.filter(payment => payment.loanId === loan.id && payment.date <= today).map(payment => payment.month));
+      cash = emiSchedule(loan).rows.filter(row => !settled.has(row.month) && installmentDueDate(loan, row.month) > today && installmentDueDate(loan, row.month) <= cutoff).reduce((total, row) => total + row.emi, 0);
+      cash = Math.min(opening, cash);
+      balance = opening - cash;
+    } else balance = emiSummary(loan, new Date(`${cutoff}T12:00:00Z`)).outstanding;
+    outstanding[loan.currencyCode] = (outstanding[loan.currencyCode] ?? 0) + balance;
+    cashOutflow[loan.currencyCode] = (cashOutflow[loan.currencyCode] ?? 0) + cash;
+  }
+  return { outstanding, cashOutflow };
 }
 
 /**

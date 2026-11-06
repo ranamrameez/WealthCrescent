@@ -101,10 +101,11 @@ export function planWithinHorizon(
  * (b) is meaningless for a recurring plan, which never sets `executed` in
  * the first place. */
 export function isPlanDue(
-  p: { executed?: boolean; recurrence?: RecurrenceRule; executedThrough?: string; completedDates?: string[]; date: string },
+  p: { executed?: boolean; cancelled?: boolean; recurrence?: RecurrenceRule; executedThrough?: string; completedDates?: string[]; date: string },
   asOf: Date,
   horizonDays: PlanningHorizonDays,
 ): boolean {
+  if(p.cancelled)return false;
   if (!p.recurrence) {
     if (p.executed) return false;
     return horizonDays == null || withinHorizon(p.date, asOf, horizonDays);

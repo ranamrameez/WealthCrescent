@@ -16,6 +16,8 @@ export interface PlannedRentalEntry {
   note?: string;
   /** True once "Mark as done" created a real `RentalEntry` from this plan. */
   executed?: boolean;
+  /** Retains fulfilled series history while suppressing unresolved future occurrences. */
+  cancelled?: boolean;
   /** Set when this plan was auto-generated from a property's lease info
    * (`lib/calc/rentalPlanning.ts`) rather than typed in by hand — lets
    * regenerating find and replace a property's own still-pending

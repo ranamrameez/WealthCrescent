@@ -13,7 +13,7 @@ import type { CashEntry, CashSettings } from '../../types/cashWorkbook';
 import type { BankAccount, BankTransaction } from '../../types/bankWorkbook';
 import type { CreditCard, CreditCardTransaction } from '../../types/creditCard';
 import type { PersonalLoan, PersonalLoanRepayment } from '../../types/personalLoansWorkbook';
-import type { EMILoan } from '../../types/emiWorkbook';
+import type { EMILoan, EMIRepayment } from '../../types/emiWorkbook';
 import type { Fund } from '../../types/fundsWorkbook';
 import type { Adjustment, Dividend, PricePoint, QSESettings, Transaction, Transfer } from '../../types/workbook';
 import type { PSXSettings } from '../../types/psxWorkbook';
@@ -35,6 +35,7 @@ export interface NetWorthValuationInputs {
   personalLoans: PersonalLoan[];
   personalLoanRepayments: PersonalLoanRepayment[];
   emiLoans: EMILoan[];
+  emiRepayments?: EMIRepayment[];
   fundsFunds: Fund[];
   fundsTransactions: Transaction[];
   fundsTransfers: Transfer[];
@@ -104,7 +105,7 @@ export function calculateNetWorth(inputs: NetWorthValuationInputs, options: NetW
   }
   const personalLoansNet = mergeCurrencyTotals(personalLoanAssets, Object.fromEntries(Object.entries(personalLoanLiabilities).map(([code, value]) => [code, -value])));
   const emiOutstanding: Record<string, number> = {};
-  if (enabled('emi')) for (const [code, totals] of Object.entries(totalsByCurrency(includedEmiLoans(inputs.emiLoans).filter(loan => loan.startDate <= date), new Date(date + 'T00:00:00.000Z')))) emiOutstanding[code] = totals.outstanding;
+  if (enabled('emi')) for (const [code, totals] of Object.entries(totalsByCurrency(includedEmiLoans(inputs.emiLoans).filter(loan => loan.startDate <= date), new Date(date + 'T00:00:00.000Z'), inputs.emiRepayments))) emiOutstanding[code] = totals.outstanding;
   const fundsTransactions = through(inputs.fundsTransactions);
   const funds = enabled('funds') ? mergeCurrencyTotals(
     fundsValueByCurrency(includedFunds(inputs.fundsFunds), fundsTransactions, prices(fundsTransactions, inputs.fundsPriceHistory, inputs.fundsMarketPrices)),

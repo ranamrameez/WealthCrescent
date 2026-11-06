@@ -21,6 +21,8 @@ export interface PlannedBankTransaction {
   /** True once "Mark as done" created a real `BankTransaction` from this
    * plan. Only meaningful when `recurrence` is unset. */
   executed?: boolean;
+  /** Retains fulfilled series history while suppressing unresolved future occurrences. */
+  cancelled?: boolean;
   /** See `PlannedCashEntry`'s doc comment — identical meaning. */
   recurrence?: RecurrenceRule;
   executedThrough?: string;

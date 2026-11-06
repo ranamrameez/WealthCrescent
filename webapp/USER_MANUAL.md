@@ -1158,3 +1158,10 @@ Dashboard actual movement totals now cover the same included sources in the head
 
 ### Currency budgets in Planning
 Use Currency budgets to add a native-currency monthly limit, optional categories and a named plan. Choose reset, positive-surplus carry or full-balance carry. Modify exposes Month limit for an override to just one month, and definition editing for scope/start/end changes. The monthly table and chart show the same cleared records. Select a record to review/allocate it; split portions across budgets, or explicitly identify a positive receipt as a refund. Empty splits restore automatic matching. Unknown or multiply-matching records remain unallocated. Native transactions are not changed by allocation. Budget balances include earlier days of their calendar months through the selected end date and all native sources, independently of Net Worth inclusion. Pending/planned values do not become cleared usage.
+
+
+### EMI balances, booking and schedule changes
+
+Loan editing separates booking/agreement date, advance/booking amount, first installment date and months between installments. Choose total price before booking to subtract the advance once, or financed principal when the entered amount already excludes it. Booking metadata does not create a real Cash/Bank transaction. Fixed-total installment repayment totals exclude booking; existing historical booking records need explicit review before reclassifying them.
+
+Saving refreshes open linked installments while preserving completed history. Bigger-installment generation changes plans only; it does not record repayments. Recorded-balance tracking requires complete fixed-total repayment history and excludes future-dated records and fines. Schedule estimates assume on-time payment and are labelled; interest-loan balances remain estimates. Existing future-dated or inconsistent records stay visible for review.

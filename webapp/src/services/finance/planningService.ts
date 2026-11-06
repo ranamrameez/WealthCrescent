@@ -129,6 +129,7 @@ export function savePlannedPayment(input: PlannedPaymentInput) {
   if (rental && module !== 'rentals' && (module === 'creditCard' || properties.find(item => item.id === rental.propertyId)?.currencyCode !== effectiveCurrency)) throw new Error('Rent plans link to Cash or a bank account in the property currency.');
   if (recurrence && (module === 'rentals' || (recurrence.endDate && recurrence.endDate < date) || (recurrence.cycle === 'custom' && !(recurrence.customDays && recurrence.customDays > 0)))) throw new Error('Check the recurrence dates and interval.');
   if (reference && !original) throw new Error('This plan no longer exists.');
+  if (original?.cancelled) throw new Error('Cancelled series history is kept. Create a new plan to restart payments.');
   if (original?.executed) throw new Error('Fulfilled plans cannot be reassigned.');
   if (occurrenceDate && original && 'recurrence' in original && CalculationEngine.occurrences.occurrenceCompleted(original, occurrenceDate)) throw new Error('Fulfilled items cannot be reassigned.');
   if (groupId && !readPlanGroups().some(group => group.id === groupId)) throw new Error('The parent plan no longer exists. Choose another plan.');
@@ -165,7 +166,7 @@ export function relinkPlannedPayments(snapshot: PlanRecord[], module: 'cash' | '
   const selected = options.find(item => item.id === ref && item.isActive !== false);
   const targetCurrency = module === 'cash' ? currency : selected?.currencyCode;
   if (!snapshot.length) throw new Error('There are no unfulfilled items to relink.');
-  if (snapshot.some(row => row.plan.executed)) throw new Error('Fulfilled items cannot be relinked.');
+  if (snapshot.some(row => row.plan.executed || row.plan.cancelled)) throw new Error('Fulfilled items cannot be relinked.');
   if (module !== 'cash' && !selected) throw new Error('Choose an active finance.');
   if (!targetCurrency) throw new Error('Choose a currency.');
   const sourceCurrency = (row: PlanRecord) => {

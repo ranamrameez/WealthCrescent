@@ -230,3 +230,8 @@ Linked EMI/UI-order correction: 24 focused tests and production build/both TS ch
 Actions 437 passed on 1427d3c5: 165 files / 1,250 tests and full build/TS. New Analytics consistency slice uses cleared actuals only for monthly widget/table/drilldowns; pending/plans remain separate in their own views. Focused 22 tests passed; resulting-source build/full CI pending at documentation time.
 
 Actual-only monthly Analytics: 22 focused tests, production build/both TS checks passed; browser verified matching native-currency actual totals. Resulting-head full CI remains required.
+
+
+## EMI correctness continuation — 2026-11-06
+
+Implemented recorded-versus-estimated balances, native repayment input for valuation/forecasts, save-time linked Bank/Cash/Card plan refresh, explicit first installment and booking dates, booking/price basis, month intervals and schedule-only bigger installments. See EMI_INSTALLMENT_MODEL.md for semantics and remaining migration/actual-interest/booking-linkage work. No historical backup records were rewritten. Browser reviewed reported-loan totals and cancelled its editor without saving. Acceptance and final-head publication evidence are in SESSION_HANDOFF.md; wider architecture/UI/auto-pay scope remains open.

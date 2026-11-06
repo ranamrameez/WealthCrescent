@@ -50,6 +50,13 @@ describe('priceAsOfDate', () => {
 });
 
 describe('netWorthAsOfDate', () => {
+  it('values fixed-total EMI from native dated repayments when the ledger is supplied', () => {
+    const inputs = { ...emptyInputs(), emiLoans: [{ id: 'property', name: 'Property', lender: 'Seller', currencyCode: 'PKR', principal: 10000, totalToReturn: 10000, repaymentMode: 'fixedTotal' as const, tenureMonths: 10, startDate: '2026-01-01' }], emiRepayments: [
+      { id: 'paid', loanId: 'property', month: 1, date: '2026-02-01', amount: 2000 },
+      { id: 'future', loanId: 'property', month: 9, date: '2027-01-01', amount: 1000 },
+    ] };
+    expect(netWorthAsOfDate('2026-11-06', inputs).find(row => row.currency === 'PKR')?.liabilities).toBe(8000);
+  });
   it('sums Cash and Bank balances as of a past date, ignoring later activity', () => {
     const inputs = {
       ...emptyInputs(),

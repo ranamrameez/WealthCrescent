@@ -62,13 +62,13 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
   const items: Array<Omit<UpcomingItem, 'dueLabel'>> = [];
   const plannedSubscriptionKeys = new Set<string>();
 
-  const addRecurringKeys = <T extends { sourceSubscriptionId?: string; recurrence?: PlannedCashEntry['recurrence']; date: string }>(plans: T[]) => {
+  const addRecurringKeys = <T extends { sourceSubscriptionId?: string; recurrence?: PlannedCashEntry['recurrence']; date: string; cancelled?: boolean; executed?: boolean; completedDates?: string[]; executedThrough?: string }>(plans: T[]) => {
     plans.forEach(plan => {
       if (!plan.sourceSubscriptionId) return;
       const dates = plan.recurrence
         ? recurrenceOccurrencesWithin(plan.recurrence, todayStr, windowEndStr)
         : [plan.date];
-      dates.filter(date => inWindow(date, todayStr, windowEndStr)).forEach(date => {
+      dates.filter(date => (!plan.cancelled || (plan.recurrence ? occurrenceCompleted(plan,date) : plan.executed)) && inWindow(date, todayStr, windowEndStr)).forEach(date => {
         plannedSubscriptionKeys.add(`${plan.sourceSubscriptionId}@${date}`);
       });
     });
@@ -78,6 +78,7 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
   addRecurringKeys(inputs.plannedCreditCards ?? []);
 
   inputs.plannedCash.forEach(plan => {
+    if(plan.cancelled)return;
     const label = plan.category?.trim() || plan.note?.trim() || 'Cash plan';
     const add = (date: string, id: string) => {
       if (!inWindow(date, todayStr, windowEndStr)) return;
@@ -93,6 +94,7 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
   const activeAccounts = inputs.bankAccounts.filter(account => account.isActive !== false);
   const currencyByAccount = new Map(activeAccounts.map(account => [account.id, account.currencyCode]));
   inputs.plannedBank.forEach(plan => {
+    if(plan.cancelled)return;
     const currencyCode = currencyByAccount.get(plan.accountId);
     if (!currencyCode) return;
     const add = (date: string, id: string) => {
@@ -109,6 +111,7 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
   const activeCards = (inputs.creditCards ?? []).filter(card => card.isActive !== false);
   const currencyByCard = new Map(activeCards.map(card => [card.id, card.currencyCode]));
   (inputs.plannedCreditCards ?? []).forEach(plan => {
+    if(plan.cancelled)return;
     const currencyCode = currencyByCard.get(plan.cardId);
     if (!currencyCode) return;
     const add = (date: string, id: string) => {
@@ -133,7 +136,7 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
     // plans can carry a stale installment index; never rewrite it or infer settlement.
     // Keep partial, differently dated/currency, completed or stale-source plans distinct.
     const representedByBank = inputs.plannedBank.some(plan =>
-      !plan.executed && !plan.recurrence && plan.sourceEmiLoanId === loan.id
+      !plan.executed && !plan.cancelled && !plan.recurrence && plan.sourceEmiLoanId === loan.id
       && plan.date === due
       && currencyByAccount.get(plan.accountId) === loan.currencyCode
       && plan.amount < 0 && Math.abs(-plan.amount - next.emi) < 0.000001);
@@ -146,7 +149,7 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
   const plannedRentalKeys = new Set<string>();
   (inputs.plannedRentals ?? []).forEach(plan => {
     const property = propertyById.get(plan.propertyId);
-    if (!property || plan.executed || !inWindow(plan.date, todayStr, windowEndStr)) return;
+    if (!property || plan.executed || plan.cancelled || !inWindow(plan.date, todayStr, windowEndStr)) return;
     plannedRentalKeys.add(`${plan.propertyId}@${plan.date}`);
     items.push({
       id: plan.id,

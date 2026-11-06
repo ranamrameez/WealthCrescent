@@ -6,6 +6,18 @@ export interface EMILoan {
   principal: number;
   tenureMonths: number;
   startDate: string;
+  /** Explicit first due date. Absent preserves legacy startDate + one month. */
+  firstInstallmentDate?: string;
+  bookingDate?: string;
+  /** Metadata only: financed principal already excludes this amount. */
+  bookingAmount?: number;
+  purchasePrice?: number;
+  /** Calendar months between installments; tenureMonths remains the legacy
+   * field name for the number of installments. Absent = monthly. */
+  installmentIntervalMonths?: number;
+  /** Explicit actual-ledger versus on-time schedule estimate. Legacy loans
+   * with a repayment ledger use recorded; legacy loans without one estimate. */
+  balanceTracking?: 'recorded' | 'scheduled';
   repaymentMode: 'interest' | 'fixedTotal';
   annualRatePct?: number; // used when repaymentMode === 'interest'
   totalToReturn?: number; // used when repaymentMode === 'fixedTotal'

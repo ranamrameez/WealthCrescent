@@ -144,3 +144,13 @@ it('does not hide a trade that shares a linked transfer ID in the same broker',(
   expect(report(f,'investment').rows[0].outflow).toBe(-50);
   expect(report(f).count).toBe(1);
 });
+it('classifies explicit fulfilled source provenance without guessing from descriptions or categories',()=>{
+  const f=fixture();f.base.bankAccounts.push({id:'bank',name:'Checking',currencyCode:'USD',openingBalance:0});
+  f.base.cashEntries.push({id:'subscription',date:'2026-01-02',amount:20,isDeposit:false,currencyCode:'USD',source:'manual',planLink:{module:'cash',planId:'subscription-plan',occurrenceDate:'2026-01-02',source:{module:'subscription',id:'subscription'}}});
+  f.base.bankTransactions.push({id:'loan',accountId:'bank',date:'2026-01-02',amount:-100,isDeposit:false,source:'manual',description:'Installment',planLink:{module:'bank',planId:'loan-plan',occurrenceDate:'2026-01-02',source:{module:'emi',id:'loan'}}},{id:'legacy',accountId:'bank',date:'2026-01-02',amount:-30,isDeposit:false,source:'manual',description:'Installment'});
+  f.native.cards.cards.push({id:'card',name:'Card',currencyCode:'USD'});
+  f.native.cards.transactions.push({id:'card-loan',cardId:'card',date:'2026-01-02',kind:'charge',amount:50,description:'Installment',planLink:{module:'creditCard',planId:'card-plan',occurrenceDate:'2026-01-02',source:{module:'emi',id:'loan'}}});
+  expect(report(f,'operating').rows[0].outflow).toBe(-20);
+  expect(report(f,'financing').rows[0].outflow).toBe(-150);
+  expect(report(f).rows[0].groups.find(group=>group.key==='unclassified')?.outflow).toBe(-30);
+});

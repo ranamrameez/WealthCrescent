@@ -101,3 +101,12 @@ it('uses native bank/card signs and rejects inactive sources before creating act
   const report = getMoneyMovementReport(getNativeMovementActivities(['bank','creditCards']),plan.date,plan.date,plan.date,'plan','actual');
   expect(report.rows[0].groups[0]).toMatchObject({ key: 'goal', net: -18 });
 });
+it('preserves subscription/loan identity when their plans are explicitly fulfilled',()=>{
+  const subscription={...plan,sourceSubscriptionId:'membership'};
+  usePlannedCashWorkbookStore.getState().setWorkbook({...originalPlans,entries:[subscription]});
+  fulfillManualPlan(reference,plan.date,live('cash','bill'));
+  expect(useCashWorkbookStore.getState().workbook.entries[0].planLink?.source).toEqual({module:'subscription',id:'membership'});
+  const prepared=CalculationEngine.manualPayments.prepareManualPlanFulfillment(reference,{...plan,sourceEmiLoanId:'loan',sourceEmiMonth:99},plan.date,plan.date);
+  expect(prepared.result.record.planLink?.source).toEqual({module:'emi',id:'loan'});
+  expect(prepared.updated).toMatchObject({sourceEmiMonth:99}); // Preserve the source index; do not rewrite stale metadata.
+});
