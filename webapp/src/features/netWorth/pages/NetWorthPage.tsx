@@ -31,9 +31,9 @@ import type { NetWorthAsOfInputs } from '../../../lib/calc/netWorthAsOf';
 import { UpcomingList } from '../../../components/UpcomingList';
 import { useUpcomingItems } from '../../../hooks/useUpcomingItems';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
-import { getDashboardReport, getCurrencyDashboardSummary, getBreakdownDelta, getMonthlyFlowItems as monthlyFlowItems, getNetWorthBreakdownForMonth as netWorthBreakdownForMonth, getCategoryGroupReport, getMonthlyNetFlow, getMonthlyPlanReport, getMonthlyStatCards, getModuleBreakdownChart, getClearedRangeActivities, getMoneyMovementReport, type FlowDimension, type FlowPopulation, getReportingMonths, getMonthlyIncomeExpense as monthlyIncomeExpense,
+import { getDashboardReport, getCurrencyDashboardSummary, getBreakdownDelta, getMonthlyFlowItems as monthlyFlowItems, getNetWorthBreakdownForMonth as netWorthBreakdownForMonth, getCategoryGroupReport, getMonthlyNetFlow, getMonthlyPlanReport, getMonthlyStatCards, getModuleBreakdownChart, getClearedRangeActivities, getMoneyMovementReport, type FlowDimension, type FlowPopulation, type MovementKind, getReportingMonths, getMonthlyIncomeExpense as monthlyIncomeExpense,
   getNetWorthTrend as projectedNetWorthTrend, getMonthEnd as endOfMonthAsOf } from '../../../services/finance/dashboardService';
-import { useDashboardContext, useDashboardActivities } from '../../../hooks/useDashboard';
+import { useDashboardContext, useDashboardActivities, useNativeMovementActivities } from '../../../hooks/useDashboard';
 import { useNetWorthInputs, useNetWorthSummary } from '../hooks/useNetWorthSummary';
 import { shiftISODate, activityFlowItems, getDashboardHeadline, getDashboardInsights, setNetWorthInclusion, type NetWorthInclusionGroup, type NetWorthInclusionOption } from '../../../services/finance/dashboardService';
 import type { FxRates } from '../../../lib/calc/currencyConversion';
@@ -403,7 +403,7 @@ export function NetWorthPage(_legacySyncProps: {
         </SummarySection>;
         })}
       </SummarySections> }, { key: 'movement', icon: <CashIcon size={16} />, label: 'Money in / out', defaultOpen: false,
-        content: <MoneyMovementSection activities={activities} from={rangeStartDate} to={rangeEndDate} today={todayISO} setDrilldown={setDrilldown} /> }, ...(sectionVisible('currencies') ? [{ key: 'currencies', icon: <CashIcon size={16} />, label: 'Per currency summary', defaultOpen: false,  content: (<div className="grid-auto" style={{ ...gridAutoStyle(360, 12), marginBottom: 16 }}>
+        content: <MoneyMovementSection selectedModules={selectedModules} from={rangeStartDate} to={rangeEndDate} today={todayISO} setDrilldown={setDrilldown} /> }, ...(sectionVisible('currencies') ? [{ key: 'currencies', icon: <CashIcon size={16} />, label: 'Per currency summary', defaultOpen: false,  content: (<div className="grid-auto" style={{ ...gridAutoStyle(360, 12), marginBottom: 16 }}>
         {[...currencySummaryRows].sort((a, b) => currencyRank(a.currency, b.currency)).map((r) => {
           const { converted, todayFlowC, periodFlowC, deltaC, deltaPctC } = getCurrencyDashboardSummary(r, {
             currency: preferredCurrency, rates, todayFlow, periodFlow, rangeStart: rangeStartByCurrency, rangeEnd: rangeEndByCurrency, hasRangeBaseline, unverifiedOpeningCurrencies,
@@ -1157,14 +1157,17 @@ function ModuleBalanceChart({ row }: { row: CurrencyNetWorth }) {
   return <ChartCard flat title={row.currency + ' current balance by module'}><div style={{ height: 200 }}><Chart type="bar" data={{ labels: chart.labels, datasets: [{ label: 'Current balance (' + row.currency + ')', data: chart.amounts, backgroundColor: HUES[0] }] }} options={{ indexAxis: 'y', plugins: { legend: { display: false } } }} /></div></ChartCard>;
 }
 
-function MoneyMovementSection({ activities, from, to, today, setDrilldown }: { activities: BudgetActivity[]; from: string; to: string; today: string; setDrilldown: (value: Drilldown) => void }) {
+function MoneyMovementSection({ selectedModules, from, to, today, setDrilldown }: { selectedModules: readonly string[]; from: string; to: string; today: string; setDrilldown: (value: Drilldown) => void }) {
   const [dimension,setDimension] = useState<FlowDimension>('category');
   const [population,setPopulation] = useState<FlowPopulation>('actual');
-  const report = getMoneyMovementReport(activities,from,to,today,dimension,population);
+  const [kind,setKind] = useState<MovementKind | 'all'>('all');
+  const activities = useNativeMovementActivities(selectedModules,{ fromDate: from, toDate: to });
+  const report = getMoneyMovementReport(activities,from,to,today,dimension,population,kind);
   return <div className="money-movement-report">
-    <p className="text-muted">{from} – {to}. Cash, Bank and Rentals; explicit linked-transfer legs are excluded. Inflow/outflow describes account movement, not a complete classification of earned income or consumption. Other native modules are not yet included.</p>
+    <p className="text-muted">{from} – {to}. Cash, Bank, Rentals, cards, recorded loan repayments, Funds and all exchange brokers. Investments and financing are separate from income/spending. Unclassified account records stay visible. Internal transfers are excluded from the combined view.</p>
     <div className="row mb-md"><Field label="Activity"><Select value={population} onChange={event => setPopulation(event.target.value as FlowPopulation)}><option value="actual">Cleared actual</option><option value="pending">Pending</option><option value="planned">Remaining plans</option></Select></Field>
-      <Field label="Break down by"><Select value={dimension} onChange={event => setDimension(event.target.value as FlowDimension)}><option value="category">Category</option><option value="module">Module</option><option value="source">Account / source</option><option value="plan">Plan group</option></Select></Field></div>
+      <Field label="Break down by"><Select value={dimension} onChange={event => setDimension(event.target.value as FlowDimension)}><option value="category">Category</option><option value="module">Module</option><option value="source">Account / source</option><option value="plan">Plan group</option><option value="kind">Movement kind</option></Select></Field>
+      <Field label="Movement kind"><Select value={kind} onChange={event => setKind(event.target.value as MovementKind | 'all')}><option value="all">All except internal transfers</option><option value="operating">Income / spending</option><option value="financing">Financing</option><option value="investment">Investments</option><option value="unclassified">Unclassified movement</option><option value="transfer">Internal transfer legs</option></Select></Field></div>
     {report.rows.map(row => <div key={row.currency} className="mb-md"><SummarySections><SummarySection title={row.currency + ' · ' + population}>
       <SummaryValue primary label="Net movement" value={fmtMoney(row.net,row.currency)} />
       <SummaryValue label="Money in" value={fmtMoney(row.inflow,row.currency)} tone="positive" />
@@ -1177,6 +1180,7 @@ function MoneyMovementSection({ activities, from, to, today, setDrilldown }: { a
     <div className="table-scroll"><table><caption>{row.currency} — same records as chart; select a row for contributing activity</caption><thead><tr><th>{dimension}</th><th>Money in</th><th>Money out</th><th>Net</th></tr></thead><tbody>{row.groups.map(group => <RecordRow key={group.key} record={group} onOpen={() => setDrilldown({ kind: 'flow', title: group.label + ' · ' + row.currency, explanation: population + ' activity from ' + from + ' through ' + to + '. Unallocated means no explicit plan link.', currency: row.currency, from, to, items: group.items })}><td>{group.label}</td><td>{fmtMoney(group.inflow,row.currency)}</td><td>{fmtMoney(group.outflow,row.currency)}</td><td>{fmtMoney(group.net,row.currency)}</td></RecordRow>)}</tbody></table></div>
     </div>)}
     {!report.rows.length && <p className="text-muted">No matching {population} activity in this period and source scope.</p>}
+    <p className="text-muted">Loan contracts, amortization schedules and subscription renewals are not actual payments. Generated subscription plans appear under their paying source. Internal transfer details show recorded legs; gross amounts are not income or spending.</p>
     {dimension === 'plan' && <p className="text-muted">Actual records remain unallocated unless a plan link exists; no allocation is inferred from matching labels or amounts.</p>}
   </div>;
 }

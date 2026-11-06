@@ -1143,3 +1143,7 @@ Money in/out shows the selected date range and currently covers Cash, Bank and R
 Upcoming shows one reminder when a bank plan explicitly represents the same loan installment on the same due date, in the same currency and full amount. Partial or unlinked plans remain distinct. This display deduplication never marks a payment settled or rewrites the loan schedule.
 
 Analytics monthly inflow/outflow widgets and tables show cleared actual activity only, through today and within the selected dates. Pending records and remaining plans are separate in Plans and Money in/out. Net worth snapshot means completed month-end for historical months or today for the current month.
+
+
+### Dashboard movement coverage — 2026-11-06
+Money in/out now includes cards, recorded loan repayments, Funds and all exchange brokers as well as Cash/Bank/Rentals. Choose Movement kind to separate income/spending, financing, investments, unclassified movement and internal transfer legs. Combined movement excludes internal transfers. Explicit rental/loan links count their domain record once. Unknown account movement is not silently classified as earnings; contracts and renewal schedules are not actual payments. Actual, pending and remaining plans stay separate. Older Analytics/Plans/headline flow views retain their stated Cash/Bank/Rentals coverage until their migration is complete.

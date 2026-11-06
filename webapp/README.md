@@ -11521,3 +11521,7 @@ See [the detailed delivery checklist](docs/DELIVERY_CHECKLIST.md) for completed 
 - Actions #436: build passed; full suite had one outdated section-order assertion (1,248 passed, 1 failed). Expected ordering updated. Upcoming now avoids duplicate full linked EMI/bank reminders using explicit occurrence identity while retaining partial/unlinked cases. Focused 24 tests passed; resulting-head build/full CI must be verified.
 
 - Published head 1427d3c5 passed full Actions #437 (165 files / 1,250 tests plus build/TS). Monthly Analytics is being aligned to cleared actuals only so widget/table/drilldown agree with actual movement; plans remain separately labelled. Current slice validation: 22 focused tests passed; build pending in current handoff.
+
+
+### Dashboard movement coverage — 2026-11-06
+Money in/out now includes cards, recorded loan repayments, Funds and all exchange brokers as well as Cash/Bank/Rentals. Choose Movement kind to separate income/spending, financing, investments, unclassified movement and internal transfer legs. Combined movement excludes internal transfers. Explicit rental/loan links count their domain record once. Unknown account movement is not silently classified as earnings; contracts and renewal schedules are not actual payments. Actual, pending and remaining plans stay separate. Older Analytics/Plans/headline flow views retain their stated Cash/Bank/Rentals coverage until their migration is complete.

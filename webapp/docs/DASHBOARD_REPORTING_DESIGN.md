@@ -1,3 +1,15 @@
+## Native movement adapters — 2026-11-06
+
+Baseline c1cd12e9 passed Actions 438 on its exact head: 165 files / 1,251 tests, broker/PSX-fee regressions, both TypeScript projects and production build. No merge or deployment. This supersedes older pending-CI statements below.
+
+Current continuation adds a deterministic CalculationEngine.movements read model and cached dashboard service/subscription for Cash, Bank, Rentals, native credit cards, recorded personal-loan/EMI repayments, Funds and every exchange broker. Cards distinguish charge/fee/markup from repayment transfer and cash-advance financing. Loan contracts/schedules are not fabricated cash receipts; EMI fines are explicit separate expenses with no guessed interest allocation. Funds trades are investment movement; exchange trades reuse broker-local fee calculators and split fees from gross consideration. NAV remains net of fund fees. Funding transfers are separate from spending. Dividends and native adjustments remain distinct. Active broker arrays override stale snapshots, archived profiles remain included unless excluded, and currencies never sum together.
+
+Explicit Rental/loan-to-Cash/Bank links choose the domain record once; internal account/card/investment transfer legs are excluded from the combined view and available separately. Same names/dates/amounts never imply a link. Generated subscription plans appear under their paying source; renewals are not actual payments. Card and personal-loan plans are included without rewriting native records. Unknown Cash/Bank movement remains Unclassified rather than pretending it is earned income. Existing historical Analytics/Plans/headline flows still have their documented Cash/Bank/Rentals scope; broader movement totals must not be presented as identical to those narrower views until migration.
+
+Validation: 4 focused files / 37 tests passed, including 10 new accounting/adapter tests. Browser verified kind filter, empty financing view, native-currency charts and matching tables. No real records were written/imported/deleted; no private screenshot or backup published. Production build and both TypeScript projects passed (native-movement-build.log). The initial build caught incomplete test fixtures; those fields and the recurrence fixture were corrected before this passing build. New resulting-head full CI remains required.
+
+Next work: migrate monthly comparisons/widgets to the canonical movement population with shared controls; preserve explicit allocation links into actual native records; currency-owned unified budgets/remaining/rollover; remaining UI service migration and transaction-safe multi-workbook repositories before opt-in pending-only backend auto-pay/history/settlement/void. Full theme/mobile/chart/finder acceptance remains required. Keep existing PR 51 draft.
+
 # Dashboard reporting design — 2026-11-06
 
 ## User contract

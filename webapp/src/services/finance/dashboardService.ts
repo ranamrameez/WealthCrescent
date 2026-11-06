@@ -16,6 +16,7 @@ import { useRentalsWorkbookStore } from '../../store/rentalsWorkbookStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useCategoryGroupStore } from '../../store/categoryGroupStore';
 import { useInterEntityTransfersStore } from '../../store/interEntityTransfersStore';
+import { usePlannedCreditCardWorkbookStore } from '../../store/plannedCreditCardWorkbookStore';
 import { getNetWorthInputs } from './netWorthService';
 
 /** Query functions for a dashboard reporting snapshot. No persistence or UI dependencies. */
@@ -54,8 +55,9 @@ export interface NetWorthInclusionGroup { title: string; items: NetWorthInclusio
 const listeners = new Set<() => void>();
 let context: ReturnType<typeof buildDashboardContext> | undefined;
 const activities = new Map<string, ReturnType<typeof CalculationEngine.dashboard.dashboardActivities>>();
-function invalidateDashboard() { context = undefined; activities.clear(); listeners.forEach(listener => listener()); }
-for (const source of [useCashWorkbookStore, useBankWorkbookStore, useCreditCardWorkbookStore, usePersonalLoansWorkbookStore, useEMIWorkbookStore, useFundsWorkbookStore, useWorkbookStore, usePSXWorkbookStore, usePlannedCashWorkbookStore, usePlannedBankWorkbookStore, usePlannedRentalsWorkbookStore, useRentalsWorkbookStore, useCategoryStore, useCategoryGroupStore, useInterEntityTransfersStore]) source.subscribe(invalidateDashboard);
+const movements = new Map<string, ReturnType<typeof CalculationEngine.movements.collectMovementActivities>>();
+function invalidateDashboard() { context = undefined; activities.clear(); movements.clear(); listeners.forEach(listener => listener()); }
+for (const source of [useCashWorkbookStore, useBankWorkbookStore, useCreditCardWorkbookStore, usePersonalLoansWorkbookStore, useEMIWorkbookStore, useFundsWorkbookStore, useWorkbookStore, usePSXWorkbookStore, usePlannedCashWorkbookStore, usePlannedBankWorkbookStore, usePlannedRentalsWorkbookStore, useRentalsWorkbookStore, useCategoryStore, useCategoryGroupStore, useInterEntityTransfersStore, usePlannedCreditCardWorkbookStore]) source.subscribe(invalidateDashboard);
 let calendarTimer: ReturnType<typeof setInterval> | undefined;
 export function subscribeDashboard(listener: () => void) {
   listeners.add(listener);
@@ -186,9 +188,28 @@ export function getMonthlyStatCards(...args: Parameters<typeof CalculationEngine
 export function getModuleBreakdownChart(...args: Parameters<typeof CalculationEngine.dashboard.moduleBreakdownChart>) { return CalculationEngine.dashboard.moduleBreakdownChart(...args); }
 
 export type { FlowDimension, FlowPopulation } from '../../lib/calc/dashboardReadModel';
-export function getMoneyMovementReport(activities: Parameters<typeof CalculationEngine.dashboard.moneyMovementReport>[0], from: string, to: string, today: string, dimension: Parameters<typeof CalculationEngine.dashboard.moneyMovementReport>[4], population: Parameters<typeof CalculationEngine.dashboard.moneyMovementReport>[5]) {
+export function getMoneyMovementReport(activities: Parameters<typeof CalculationEngine.dashboard.moneyMovementReport>[0], from: string, to: string, today: string, dimension: Parameters<typeof CalculationEngine.dashboard.moneyMovementReport>[4], population: Parameters<typeof CalculationEngine.dashboard.moneyMovementReport>[5], kind: Parameters<typeof CalculationEngine.dashboard.moneyMovementReport>[7] = 'all') {
   const names = Object.fromEntries((usePlannedCashWorkbookStore.getState().workbook.planGroups ?? []).map(group => [group.id, group.name]));
-  return CalculationEngine.dashboard.moneyMovementReport(activities,from,to,today,dimension,population,names);
+  return CalculationEngine.dashboard.moneyMovementReport(activities,from,to,today,dimension,population,names,kind);
 }
 
 export function getClearedRangeActivities(...args: Parameters<typeof CalculationEngine.dashboard.clearedRangeActivities>) { return CalculationEngine.dashboard.clearedRangeActivities(...args); }
+
+export function getNativeMovementActivities(modules: readonly string[], window?: { fromDate: string; toDate: string }) {
+  const today = new Date().toISOString().slice(0,10);
+  const key = JSON.stringify([today,[...modules].sort(),window]);
+  const cached = movements.get(key); if (cached) return cached;
+  const cash = useCashWorkbookStore.getState().workbook, bank = useBankWorkbookStore.getState().workbook;
+  const rentals = useRentalsWorkbookStore.getState().workbook, qse = useWorkbookStore.getState().workbook, psx = usePSXWorkbookStore.getState().workbook;
+  const categories = getDashboardContext().categories, links = useInterEntityTransfersStore.getState().workbook.entries;
+  const result = CalculationEngine.movements.collectMovementActivities({
+    native: { cash: cash.entries, bank, rentals, cards: useCreditCardWorkbookStore.getState().workbook,
+      personalLoans: usePersonalLoansWorkbookStore.getState().workbook, emi: useEMIWorkbookStore.getState().workbook, funds: useFundsWorkbookStore.getState().workbook, qse, psx },
+    base: { cashEntries: cash.settings.includeInNetWorth === false ? [] : cash.entries, plannedCash: cash.settings.includeInNetWorth === false ? [] : usePlannedCashWorkbookStore.getState().workbook.entries,
+      bankAccounts: bank.settings.accounts.filter(account => !account.migratedToCreditCardId && account.includeInNetWorth !== false), bankTransactions: bank.transactions, plannedBank: usePlannedBankWorkbookStore.getState().workbook.entries,
+      rentalProperties: rentals.settings.properties, rentalEntries: rentals.entries, plannedRentals: usePlannedRentalsWorkbookStore.getState().workbook.entries, categories },
+    plannedCards: usePlannedCreditCardWorkbookStore.getState().workbook.entries, categories, links, qseSettings: qse.settings, psxSettings: psx.settings,
+  },modules,{ ...window, asOf: new Date(today + 'T00:00:00Z'), horizonDays: 365 });
+  if (movements.size >= 32) movements.clear(); movements.set(key,result); return result;
+}
+export type { MovementActivity, MovementKind } from '../../lib/calc/movementActivities';

@@ -145,5 +145,5 @@ it('renders a scoped money-in/out breakdown with accessible totals and group row
   show('/dashboard?section=movement');
   expect(screen.getAllByText('Net movement').length).toBeGreaterThan(0);
   expect(screen.getAllByText('Uncategorized').length).toBeGreaterThan(0);
-  expect(screen.getByText(/not a complete classification of earned income/)).toBeTruthy();
+  expect(screen.getByText(/Unclassified account records stay visible/)).toBeTruthy();
 });
