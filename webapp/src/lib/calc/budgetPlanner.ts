@@ -106,7 +106,7 @@ function normalizeCash(entries: CashEntry[], plans: PlannedCashEntry[], categori
   const real: BudgetActivity[] = entries
     .filter((e) => !linked.has(`cash:${e.id}`))
     .map((e) => ({
-      id: e.id, module: 'cash', sourceLabel: 'Cash', sourceId: 'cash', date: e.date,
+      id: e.id, module: 'cash', sourceLabel: 'Cash', sourceId: 'cash', planGroupId: e.planLink?.groupId, date: e.date,
       amount: e.isDeposit ? e.amount : -e.amount, currencyCode: e.currencyCode,
       category: categoryName(e.categoryID, categories), description: e.note || (e.isDeposit ? 'Cash in' : 'Cash out'), executed: true, isPending: e.isPending,
     }));
@@ -125,7 +125,7 @@ function normalizeBank(accounts: BankAccount[], transactions: BankTransaction[],
     const account = accountById.get(t.accountId);
     if (!account) return [];
     return [{
-      id: t.id, module: 'bank' as const, sourceLabel: account.name, sourceId: account.id, date: t.date,
+      id: t.id, module: 'bank' as const, sourceLabel: account.name, sourceId: account.id, planGroupId: t.planLink?.groupId, date: t.date,
       amount: t.amount, currencyCode: account.currencyCode,
       category: categoryName(t.categoryID, categories), description: t.description, executed: true, isPending: t.isPending,
     }];
@@ -150,7 +150,7 @@ function normalizeRentals(properties: Property[], entries: RentalEntry[], plans:
     const property = propertyById.get(e.propertyId);
     if (!property) return [];
     return [{
-      id: e.id, module: 'rentals' as const, sourceLabel: property.name, sourceId: property.id, date: e.date,
+      id: e.id, module: 'rentals' as const, sourceLabel: property.name, sourceId: property.id, planGroupId: e.planLink?.groupId, date: e.date,
       amount: e.isDeposit ? e.amount : -e.amount, currencyCode: property.currencyCode,
       category: categoryName(e.categoryID, categories), description: e.note || (e.isDeposit ? 'Rent income' : 'Expense'), executed: true, isPending: e.isPending,
     }];

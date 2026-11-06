@@ -9,6 +9,7 @@ import { createEmptyPlannedCashWorkbook } from '../../../../store/defaultPlanned
 
 vi.mock('react-chartjs-2', () => ({ Bar: () => null, Line: () => null, Doughnut: () => null }));
 vi.mock('../../../../lib/firebase/useEnsureSignedIn', () => ({ useEnsureSignedIn: () => async () => true }));
+vi.mock('../../../../lib/firebase/client', () => ({ auth: { currentUser: { uid: 'cash-planning-fixture' } }, db: null, firebaseReady: false }));
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -22,7 +23,7 @@ it('fulfills a future occurrence once and saves its own immutable amount and dat
   render(<MemoryRouter><PlanningTab plannedCloudEmpty={false} uploadPlannedLocalToCloud={async () => {}} showFab={false} /></MemoryRouter>);
   fireEvent.click(screen.getByRole('button', { name: 'Mark as done' }));
   await waitFor(() => expect(useCashWorkbookStore.getState().workbook.entries).toHaveLength(1));
-  expect(useCashWorkbookStore.getState().workbook.entries[0]).toMatchObject({ date: '2026-10-05', amount: 100 });
+  expect(useCashWorkbookStore.getState().workbook.entries[0]).toMatchObject({ date: '2026-10-05', amount: 100, planLink: { module: 'cash', planId: 'rent', occurrenceDate: '2026-10-28' } });
   const plans = usePlannedCashWorkbookStore.getState().workbook.entries;
   expect(plans.find(plan => plan.id === 'rent')).toMatchObject({ completedDates: ['2026-10-28'] });
   expect(plans.find(plan => plan.seriesId === 'rent')).toMatchObject({ date: '2026-10-28', amount: 100, executed: true, recurrence: undefined });

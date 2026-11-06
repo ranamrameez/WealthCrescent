@@ -47,7 +47,7 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
     const card = cards.get(tx.cardId); if (!card) continue;
     add({ id: tx.id, module: 'creditCards', sourceId: card.id, sourceLabel: card.name, date: tx.date,
       amount: tx.kind === 'payment' || tx.kind === 'cashAdvance' ? tx.amount : -tx.amount,
-      currencyCode: card.currencyCode, category: categoryName(tx.categoryID,categories), description: tx.description || tx.kind, executed: true,
+      currencyCode: card.currencyCode, category: categoryName(tx.categoryID,categories), description: tx.description || tx.kind, executed: true, planGroupId: tx.planLink?.groupId,
       movementKind: tx.kind === 'payment' ? 'transfer' : tx.kind === 'cashAdvance' ? 'financing' : 'operating' });
   }
   for (const plan of planOccurrences(input.plannedCards,window.fromDate,window.toDate,window.asOf,window.horizonDays)) {

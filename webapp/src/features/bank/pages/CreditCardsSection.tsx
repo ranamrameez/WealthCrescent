@@ -1,3 +1,4 @@
+import { fulfillManualPlan } from '../../../services/finance/manualPlanPaymentService';
 import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { CreditCardPositionSummary } from '../../../components/CreditCardPositionSummary';
@@ -5,7 +6,7 @@ import { DateValue } from '../../../components/DateValue';
 import { useTablePagination } from '../../../hooks/useTablePagination';
 import { ToggleChip } from '../../../components/ui/ToggleChip';
 import { EntityEditorModal } from '../../../components/EntityEditorModal';
-import { planOccurrences, occurrenceCompleted } from '../../../lib/calc/planOccurrences';
+import { planOccurrences } from '../../../lib/calc/planOccurrences';
 import { BackButton } from '../../../components/BackButton';
 import { useMemo, useState } from 'react';
 import { AppBar as Bar, AppDoughnut as Doughnut, AppLine as Line } from '../../../components/AppCharts';
@@ -1017,10 +1018,7 @@ function AddCardPlanForm({ cardId, onSaved, plan }: { cardId: string; onSaved?: 
 function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: PlanningHorizonDays }) {
   const dateSort = useDateTableSort();
   const allPlans = usePlannedCreditCardWorkbookStore((s) => s.workbook.entries);
-  const updatePlan = usePlannedCreditCardWorkbookStore((s) => s.updateEntry);
-  const addCompletedPlan = usePlannedCreditCardWorkbookStore((s) => s.addEntry);
   const deletePlan = usePlannedCreditCardWorkbookStore((s) => s.deleteEntry);
-  const addTransaction = useCreditCardWorkbookStore((s) => s.addTransaction);
   const ensureSignedIn = useEnsureSignedIn();
   const [editingPlan, setEditingPlan] = useState<PlannedCreditCardTransaction | null>(null);
   const asOf = useMemo(() => new Date(), []);
@@ -1034,26 +1032,14 @@ function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: Pl
   const { rows: pageRows, controls: paginationControls } = useTablePagination(sorted);
 
   const markDone = async (p: PlannedCreditCardTransaction & { planId?: string }) => {
-    const occurrenceDate = p.date;
     const planId = p.planId ?? p.id;
-    const source = allPlans.find((plan) => plan.id === planId);
-    if (!source || p.executed || (p.recurrence && occurrenceCompleted(source, occurrenceDate))) return toast('This occurrence is already completed.');
-    if (!occurrenceDate) return toast('This plan has no more occurrences left (past its end date).');
-    if (!(await ensureSignedIn('Sign in to save credit card transactions.'))) return;
-    const latestPlan = usePlannedCreditCardWorkbookStore.getState().workbook.entries.find(plan => plan.id === planId);
-    if (!latestPlan || latestPlan.executed || (p.recurrence && occurrenceCompleted(latestPlan, occurrenceDate))) return toast('This occurrence is already completed.');
-    addTransaction({
-      id: crypto.randomUUID(), cardId: p.cardId, date: p.recurrence ? today() : occurrenceDate, kind: p.kind,
-      description: p.description, amount: p.amount, source: 'manual',
-    });
-    if (p.recurrence) {
-      updatePlan(planId, { completedDates: [...(latestPlan.completedDates ?? []), occurrenceDate] });
-      addCompletedPlan({ ...source, id: crypto.randomUUID(), seriesId: planId, date: occurrenceDate, fulfilledDate: today(), recurrence: undefined, completedDates: undefined, executedThrough: undefined, executed: true });
-      toast(`Marked ${occurrenceDate} as done — added to this card's transactions. This plan keeps recurring.`);
-    } else {
-      updatePlan(planId, { executed: true });
-      toast('Marked as done — added to this card\'s transactions.');
-    }
+    const source = allPlans.find(plan=>plan.id === planId);
+    if (!source) return toast('This plan was removed.');
+    if (!await ensureSignedIn('Sign in to fulfill this planned payment.')) return;
+    try {
+      const result = fulfillManualPlan({ module: 'creditCard', id: planId },p.date,source);
+      toast(result.recurring ? 'Occurrence marked as done. This plan keeps recurring.' : 'Marked as done — added to the ledger.');
+    } catch (error) { toast(error instanceof Error ? error.message : String(error)); }
   };
 
   return (

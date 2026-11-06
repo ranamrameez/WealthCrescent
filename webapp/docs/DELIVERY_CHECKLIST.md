@@ -1,3 +1,13 @@
+## Manual fulfillment and explicit actual allocation — 2026-11-06
+
+Monthly movement source bedffd3549e305a189a1d253b2e2c0bdcebb6ac8 passed Actions 440 (build and full suite). No merge/deployment.
+
+New slice: Cash, Bank and native card Mark as done handlers dispatch fulfillManualPlan through an authenticated service. The deterministic engine validates occurrence/date/amount, builds the existing cleared manual record semantics, preserves month-end recurrence anchors and out-of-order completion snapshots, and attaches optional planLink {module, planId, occurrenceDate, groupId}. The service rechecks the reviewed source snapshot, requires an active bank/card source, rejects duplicate occurrence IDs/provenance, and rolls back both local workbooks if a write/marker fails. Bank/Cash/card reports carry the explicit group ID into actual plan breakdowns. Historical records remain unallocated; no amount/date/name matching or backfill. Category names are resolved against the live registry at the command boundary, preserving existing custom categories. Existing data shapes remain backward-compatible.
+
+Validation: focused engine/service/Planning/Cash UI regression run passed 4 files / 25 tests (manual-plan-final-tests.log). Production build and both TypeScript projects passed (manual-plan-build.log); later changes were test-fixture authentication and cleanup only and require new-head CI as usual. Cash component test actually exercises the explicit Mark as done workflow on local fixtures. Browser was not used to fulfill real user payments. The initial rollback fixture leaked its spy through Zustand snapshots; fixture cleanup now restores the action explicitly. This was a test isolation issue, not a passing run until corrected.
+
+Limits: local rollback/replay protection is not a remote atomic transaction. Whole-workbook sync still needs a transaction-safe repository before backend pending-only scheduling. No scheduler is enabled and no real money moves. Rental fulfillment/provenance migration, explicit EMI/subscription actual classification, unified category/project budgets/rollover, broader UI/service migration and full chart/theme/mobile/finder acceptance remain. Continue those tasks; PR 51 stays draft.
+
 ## Shared monthly movement population — 2026-11-06
 
 Source 6f8ed930c62885a89ef846838411a139d8a0fc09 passed Actions 439: 166 files / 1,261 tests, broker regressions, TypeScript checks and production build.

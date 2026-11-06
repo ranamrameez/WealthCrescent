@@ -1,3 +1,4 @@
+import { fulfillManualPlan } from '../../../services/finance/manualPlanPaymentService';
 import { saveLegacyBankBudget } from '../../../services/finance/bankService';
 import { bankTransactionMatchesFilters as transactionMatchesFilters } from '../../../services/finance/bankService';
 import { useBankAnalyticsAccounts, useBankDirectory, useBankAccount, useBankingScopeSummary, useBankAccountAnalytics } from '../../../hooks/useBankQueries';
@@ -11,7 +12,7 @@ import { EntityEditorModal } from '../../../components/EntityEditorModal';
 import { PageHeading } from '../../../components/PageHeading';
 import { BalanceSummaryCards } from '../../../components/BalanceSummaryCards';
 import { SummarySection, SummarySections, SummaryValue } from '../../../components/SummaryGroupCard';
-import { planOccurrences, occurrenceCompleted } from '../../../lib/calc/planOccurrences';
+import { planOccurrences } from '../../../lib/calc/planOccurrences';
 import { BackButton } from '../../../components/BackButton';
 import type { User } from 'firebase/auth';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -1705,10 +1706,7 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
   const dateSort = useDateTableSort();
   const dateFormat = useAppearanceStore((s) => s.appearance.dateFormat ?? 'DD-MMM-YYYY');
   const allPlans = usePlannedBankWorkbookStore((s) => s.workbook.entries);
-  const updatePlan = usePlannedBankWorkbookStore((s) => s.updateEntry);
-  const addCompletedPlan = usePlannedBankWorkbookStore((s) => s.addEntry);
   const deletePlan = usePlannedBankWorkbookStore((s) => s.deleteEntry);
-  const addTransaction = useBankWorkbookStore((s) => s.addTransaction);
   const ensureSignedIn = useEnsureSignedIn();
   const [editingPlan, setEditingPlan] = useState<PlannedBankTransaction | null>(null);
   const asOf = useMemo(() => new Date(), []);
@@ -1722,32 +1720,14 @@ function BankPlanList({ account, horizonDays, fromDate, toDate, showActions = tr
   const { rows: pageRows, controls: paginationControls } = useTablePagination(sorted);
 
   const markDone = async (p: PlannedBankTransaction & { planId?: string }) => {
-    const occurrenceDate = p.date;
     const planId = p.planId ?? p.id;
-    const source = allPlans.find((plan) => plan.id === planId);
-    if (!source || p.executed || (p.recurrence && occurrenceCompleted(source, occurrenceDate))) return toast('This occurrence is already completed.');
-    if (!occurrenceDate) return toast('This plan has no more occurrences left (past its end date).');
-    if (!(await ensureSignedIn('Sign in to save bank transactions.'))) return;
-    const latestPlan = usePlannedBankWorkbookStore.getState().workbook.entries.find(plan => plan.id === planId);
-    if (!latestPlan || latestPlan.executed || (p.recurrence && occurrenceCompleted(latestPlan, occurrenceDate))) return toast('This occurrence is already completed.');
-    addTransaction({
-      id: crypto.randomUUID(),
-      accountId: p.accountId,
-      date: p.recurrence ? today() : occurrenceDate,
-      description: p.description,
-      amount: p.amount,
-      isDeposit: p.amount >= 0,
-      category: p.category,
-      source: 'manual',
-    });
-    if (p.recurrence) {
-      updatePlan(planId, { completedDates: [...(latestPlan.completedDates ?? []), occurrenceDate] });
-      addCompletedPlan({ ...source, id: crypto.randomUUID(), seriesId: planId, date: occurrenceDate, fulfilledDate: today(), recurrence: undefined, completedDates: undefined, executedThrough: undefined, executed: true });
-      toast(`Marked ${occurrenceDate} as done — added to this account's transactions. This plan keeps recurring.`);
-    } else {
-      updatePlan(planId, { executed: true });
-      toast('Marked as done — added to this account\'s transactions.');
-    }
+    const source = allPlans.find(plan=>plan.id === planId);
+    if (!source) return toast('This plan was removed.');
+    if (!await ensureSignedIn('Sign in to fulfill this planned payment.')) return;
+    try {
+      const result = fulfillManualPlan({ module: 'bank', id: planId },p.date,source);
+      toast(result.recurring ? 'Occurrence marked as done. This plan keeps recurring.' : 'Marked as done — added to the ledger.');
+    } catch (error) { toast(error instanceof Error ? error.message : String(error)); }
   };
 
   return (

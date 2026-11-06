@@ -38,6 +38,7 @@ import * as rentalActuals from './rentalsModule';
 import * as categoryGroups from './categoryGroups';
 import * as recentActivity from './recentActivity';
 import * as movements from './movementActivities';
+import * as manualPayments from './manualPlanFulfillment';
 
 /**
  * Stable domain-oriented API. Keep all financial calculation entry points
@@ -72,6 +73,7 @@ export const CalculationEngine = Object.freeze({
   dashboard,
   recentActivity,
   movements,
+  manualPayments,
 });
 
 export type CalculationEngineApi = typeof CalculationEngine;
