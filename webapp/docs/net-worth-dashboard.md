@@ -58,7 +58,7 @@ Plans now has URL-backed plan-month (YYYY-MM) and plan-months (1/3/6/12). The wi
 
 Charts, monthly tables and dated remaining-plan rows share the service's scoped activity dataset. Cleared actuals stop at today; pending native rows and unexecuted plans remain separate. Values stay per currency; empty months remain represented. This is an activity report, not a claimed future net-worth balance. Current coverage is Cash/Bank/Rentals; integration of other native domains remains pending. The complete Planning editor is linked for writes.
 
-Only top-level dashboard sections collapse. Currency summaries, chart cards and monthly tables inside remain open. Main figures use larger highlighted values, supporting balances are smaller and additional stats compact. Modern/Compact stat presentation is independent of theme; references live in ../../docs/ui-samples/. Alerts can be dismissed with an accessible cross button.
+Only top-level dashboard sections collapse. Currency summaries, chart cards and monthly tables inside remain open. Main figures use larger highlighted values, supporting balances are smaller and additional stats compact. Comfortable/Compact/Console control density while theme tokens control visual treatment; references live in ../../docs/ui-samples/. Alerts can be dismissed with an accessible cross button.
 
 Research informing the design: [YNAB monthly income/expense comparison](https://support.ynab.com/en_us/income-v-expense-Byu1BYWRq) and [Actual date-filtered report cards](https://master.www.actualbudget.org/docs/reports/custom-reports/). These inform presentation only; native ledger semantics and CalculationEngine remain authoritative.
 

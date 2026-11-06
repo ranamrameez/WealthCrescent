@@ -100,3 +100,21 @@ it('monthly widgets preserve unknown net worth and match activity amounts withou
   expect(rows[0]).toEqual({ month: '2026-01', netWorth: null, income: 100, expense: 30, netFlow: 70 });
   expect(rows[1].netWorth).toBeNull(); expect(rows[1].netFlow).toBe(0);
 });
+
+it('reconciles movement groups to the same actual population without currency or lifecycle mixing', () => {
+  const input = [activity('in',100,true,{category:'Salary'}), activity('out',-30,true,{category:'Food'}), activity('pending',-500,true,{isPending:true}), activity('plan',-900,false,{planGroupId:'goal'}), activity('future',800,true,{date:'2026-02-01'}), activity('qar',200,true,{currencyCode:'QAR'})];
+  for (const dimension of ['category','module','source','plan'] as const) {
+    const result = engine.moneyMovementReport(input,'2026-01-01','2026-02-28','2026-01-31',dimension,'actual');
+    const usd = result.rows.find(row => row.currency === 'USD')!;
+    expect(usd.inflow).toBe(100); expect(usd.outflow).toBe(-30); expect(usd.net).toBe(70);
+    expect(usd.groups.reduce((sum,group) => sum + group.net,0)).toBe(usd.net);
+    expect(usd.groups.flatMap(group => group.items).reduce((sum,item) => sum + item.amount,0)).toBe(70);
+    if (dimension === 'plan') expect(usd.groups[0].label).toContain('Unallocated');
+  }
+  expect(engine.moneyMovementReport(input,'2026-01-01','2026-01-31','2026-01-31','plan','planned',{goal:'Renovation'}).rows[0].groups[0]).toMatchObject({label:'Renovation',outflow:-900});
+});
+it('keeps distinct source identities even when accounts share a display name', () => {
+  const input = [activity('a',5,true,{module:'bank',sourceLabel:'Checking',sourceId:'a'}), activity('b',8,true,{module:'bank',sourceLabel:'Checking',sourceId:'b'})];
+  const result = engine.moneyMovementReport(input,'2026-01-01','2026-01-31','2026-01-31','source','actual');
+  expect(result.rows[0].groups).toHaveLength(2); expect(result.rows[0].net).toBe(13);
+});

@@ -121,7 +121,8 @@ it('renders standard dashboard sections and provides period insights', () => {
 
 it('restores hidden sections from a deep link and opens exchange rates only from the FAB', () => {
   show('/net-worth?show-currencies=false&show-plans=false&show-analytics=false');
-  expect(document.querySelectorAll('.standard-section-anchor')).toHaveLength(3);
+  expect(document.querySelectorAll('.standard-section-anchor')).toHaveLength(4);
+  expect(document.querySelector('[data-page-section="movement"]')).toBeTruthy();
   expect(document.querySelector('[data-page-section="upcoming"]')).toBeTruthy();
   expect(document.querySelector('[data-page-section="recent"]')).toBeTruthy();
   expect(screen.queryByText('Refresh rates')).toBeNull();
@@ -137,4 +138,11 @@ it('uses calendar months for Plans and preserves a future month in its controls'
   expect(screen.getByText(/2028-02-01 – 2028-04-30/)).toBeTruthy();
   fireEvent.change(month, { target: { value: '2024-02' } });
   expect(screen.getByText(/2024-02-01 – 2024-04-30/)).toBeTruthy();
+});
+
+it('renders a scoped money-in/out breakdown with accessible totals and group rows', () => {
+  show('/dashboard?section=movement');
+  expect(screen.getAllByText('Net movement').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('Uncategorized').length).toBeGreaterThan(0);
+  expect(screen.getByText(/not a complete classification of earned income/)).toBeTruthy();
 });

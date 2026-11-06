@@ -184,3 +184,9 @@ export function getMonthlyPlanReport(...args: Parameters<typeof CalculationEngin
 
 export function getMonthlyStatCards(...args: Parameters<typeof CalculationEngine.dashboard.monthlyStatCards>) { return CalculationEngine.dashboard.monthlyStatCards(...args); }
 export function getModuleBreakdownChart(...args: Parameters<typeof CalculationEngine.dashboard.moduleBreakdownChart>) { return CalculationEngine.dashboard.moduleBreakdownChart(...args); }
+
+export type { FlowDimension, FlowPopulation } from '../../lib/calc/dashboardReadModel';
+export function getMoneyMovementReport(activities: Parameters<typeof CalculationEngine.dashboard.moneyMovementReport>[0], from: string, to: string, today: string, dimension: Parameters<typeof CalculationEngine.dashboard.moneyMovementReport>[4], population: Parameters<typeof CalculationEngine.dashboard.moneyMovementReport>[5]) {
+  const names = Object.fromEntries((usePlannedCashWorkbookStore.getState().workbook.planGroups ?? []).map(group => [group.id, group.name]));
+  return CalculationEngine.dashboard.moneyMovementReport(activities,from,to,today,dimension,population,names);
+}

@@ -138,7 +138,7 @@ Dashboard now uses the same StandardPageSections card headers/containers as the 
 
 Current verification is in dashboard-funds-focused.log; inspect completion before reporting a count. Production build must be rerun after correcting Testing Library role options in the test. Category service changes also remain in this working-tree continuation; its earlier 10 focused tests/build passed. No production deployment or merge.
 
-2026-11-06 user UI contract: see ../../docs/ui-samples/README.md. Modern/Compact presentation is independent of themes; only outer sections collapse; headline/support/extra hierarchy is required; alerts have dismiss controls. Month-based Plans uses exact calendar windows and per-currency local charts/tables. Coverage currently Cash/Bank/Rentals; other native-domain monthly coverage and linked-obligation deduplication remain pending.
+2026-11-06 user UI contract: see ../../docs/ui-samples/README.md. The existing Comfortable/Compact/Console modes control density; only outer sections collapse; headline/support/extra hierarchy is required; alerts have dismiss controls. Month-based Plans uses exact calendar windows and per-currency local charts/tables. Coverage currently Cash/Bank/Rentals; other native-domain monthly coverage and linked-obligation deduplication remain pending.
 
 ## Latest UI correction — existing modes only (2026-11-06)
 
@@ -150,3 +150,5 @@ Monthly Plans is implemented with per-currency charts, same-dataset accessible s
 MonthlyStatsWidget, local native module-balance chart and ValueChange arrows added; models/dashboard follow-up passed 18 tests. Full cash-flow design and remaining scope are in DASHBOARD_REPORTING_DESIGN.md. Latest source build pending in final-dashboard-release-build.log.
 
 Validated dashboard checkpoint: 79 focused tests before widget additions, 18 follow-up tests, production build/both TS checks passed. Browser verified monthly widgets, chart rendering and corrected Funds. Broader canonical cash-flow/plan allocation and native-domain adapters remain pending per DASHBOARD_REPORTING_DESIGN.md.
+
+Money in/out continuation: 36 focused tests, production build/both TS checks passed; browser verified the new section. Supported group dimensions and rows reconcile per currency. Coverage remains Cash/Bank/Rentals; full cards/investment/loan movement classification remains pending.

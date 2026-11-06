@@ -327,3 +327,26 @@ export function moduleBreakdownChart(row: CurrencyNetWorth) {
   const entries = row.breakdown.filter(item => item.amount !== 0);
   return { labels: entries.map(item => item.module), amounts: entries.map(item => item.amount) };
 }
+
+export type FlowDimension = 'category' | 'module' | 'source' | 'plan';
+export type FlowPopulation = 'actual' | 'pending' | 'planned';
+export function moneyMovementReport(activities: BudgetActivity[], from: string, to: string, today: string, dimension: FlowDimension, population: FlowPopulation, planNames: Record<string, string> = {}) {
+  const items = activities.filter(item => item.date >= from && item.date <= to && (
+    population === 'actual' ? item.executed && !item.isPending && item.date <= today : population === 'pending' ? !!item.isPending : !item.executed && !item.isPending));
+  const modules = { cash: 'Cash', bank: 'Bank', rentals: 'Rentals' };
+  const rows = [...new Set(items.map(item => item.currencyCode))].sort().map(currency => {
+    const native = items.filter(item => item.currencyCode === currency);
+    const buckets = new Map<string, { key: string; label: string; inflow: number; outflow: number; net: number; items: FlowActivityItem[] }>();
+    let inflow = 0, outflow = 0;
+    for (const item of native) {
+      const key = dimension === 'category' ? item.category || 'Uncategorized' : dimension === 'module' ? item.module : dimension === 'source' ? item.module + ':' + (item.sourceId ?? item.sourceLabel) : item.planGroupId || '__unallocated__';
+      const label = dimension === 'module' ? modules[item.module] : dimension === 'source' ? modules[item.module] + ' · ' + item.sourceLabel : dimension === 'plan' ? (item.planGroupId ? planNames[item.planGroupId] || 'Unnamed plan group' : 'Unallocated / no explicit plan link') : key;
+      const group = buckets.get(key) ?? { key, label, inflow: 0, outflow: 0, net: 0, items: [] };
+      group.inflow += Math.max(0,item.amount); group.outflow += Math.min(0,item.amount); group.net += item.amount;
+      group.items.push({ module: modules[item.module], accountName: item.sourceLabel, date: item.date, description: item.description, amount: item.amount });
+      buckets.set(key,group); inflow += Math.max(0,item.amount); outflow += Math.min(0,item.amount);
+    }
+    return { currency, inflow, outflow, net: inflow + outflow, groups: [...buckets.values()].sort((a,b) => a.outflow - b.outflow || b.inflow - a.inflow || a.label.localeCompare(b.label)) };
+  });
+  return { from, to, population, dimension, rows, count: items.length };
+}

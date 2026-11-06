@@ -2866,3 +2866,7 @@ html[data-density="console"] .summary-overview .current-position-primary strong 
 .value-change > svg { flex: 0 0 auto; }
 .monthly-stats-widget { margin-block: var(--section-content-gap); }
 .monthly-stats-widget .current-position-primary strong { font-size: clamp(24px,3vw,32px); }
+
+.money-movement-report .current-position-primary strong { font-size: clamp(26px,3vw,36px); }
+
+.chart-card-flat { margin-top: var(--section-content-gap, 16px); }

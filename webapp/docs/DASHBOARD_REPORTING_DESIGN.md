@@ -37,3 +37,7 @@ Implemented in the working tree: corrected legacy Funds cash opt-in semantics; b
 Current flow/plan activity coverage is Cash/Bank/Rentals. The full income/spending breakdown across cards, funds, loans, subscriptions and exchanges is NOT complete. Needed next: canonical movement view model with explicit link-based deduplication/classification; remaining native source adapters; actual-vs-pending-vs-planned category/module/account/plan query models; allocation coverage; dimension drilldowns; monthly comparisons; complete chart/browser acceptance and current-head CI. Upcoming still has a confirmed linked EMI/bank duplicate requiring explicit source-link handling.
 
 A balance composition chart is not a money-in/out report. The monthly stats widget's existing combined activity fields are labelled 'incl. plans'; replace with separated actual/pending/planned fields as the canonical report expands. Do not describe these checkpoints as full release completion.
+
+## Movement breakdown implementation checkpoint
+
+Money in/out is now implemented for Cash/Bank/Rentals with actual/pending/planned selection, category/module/account-source/plan-group grouping, per-currency totals and shared-data charts/tables with record details. Same-name accounts preserve source IDs. Plans carry explicit group identity; actual records without a link remain unallocated. This is native account movement, not a completed earned-income/spending classifier. Other native adapters, credit-card/payment semantics and complete plan allocation remain pending.
