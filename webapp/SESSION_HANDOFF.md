@@ -1,3 +1,13 @@
+## Collection-aware financial record identity — 2026-11-06
+
+Budget source 128d1391639ee46c6a7b807275b4332726d3a03b passed Actions 444: 170 files / 1,297 tests, broker regressions, both TypeScript projects and production build.
+
+New source tags movement rows by native collection and keys budget allocations by module/source/collection/record ID. A trade/dividend/transfer with the same imported ID remains distinct. Existing three-part allocation keys resolve read-only only when exactly one native collection owns the identity. Ambiguous legacy references stay unapplied with review issues and their possible records remain unallocated; no arbitrary collection is selected. Allocation edits write uniquely normalized keys while preserving all values/IDs and leaving native records unchanged.
+
+Explicit linked-transfer matching now checks the owning account/broker and only actual linkable native record kinds. It cannot hide a same-ID trade/fee/dividend or an unrelated planned row. Missing legacy source refs resolve only from one explicit record-ID candidate. Also fixed the Funds source-inclusion edge where a fund happened to have the ID cash.
+
+Validation: 5 focused files / 44 tests passed (budget-identity-tests.log), including linked-transfer/trade-ID collision and legacy alias tests. Final production build/both TS projects passed (budget-identity-final-build.log). This new head requires its own CI. Continue provenance/classification/schedule/trade adapters, budget import validation/parity, service migration and safe pending-only payment persistence/automation; no merge/deployment or real financial write.
+
 ## Currency-owned budget implementation — 2026-11-06
 
 Dashboard alignment 58f3017c850cbfe41d144ced93286e3339fb984f passed Actions 443 (tests/build). New budget source is ready for publication after 6 focused files / 40 tests and both TypeScript projects/production build passed (unified-budget-final-tests.log, unified-budget-build.log). Browser read-only reviewed the Planning Currency budgets section and opened/cancelled its editor; no real budget or allocation was saved. Fixture UI tests did exercise create, monthly override and partial allocation through the service.

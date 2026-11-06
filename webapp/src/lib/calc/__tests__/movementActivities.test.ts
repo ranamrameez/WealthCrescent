@@ -134,3 +134,13 @@ it('handles invalid, reversed and maximum-year monthly boundaries without loopin
   expect(query('2026-02-30','2026-03-31')).toEqual([]);
   expect(query('2026-03-01','2026-01-31')).toEqual([]);
 });
+it('does not hide a trade that shares a linked transfer ID in the same broker',()=>{
+  const f=fixture();f.native.qse.brokerProfiles=[];f.native.qse.settings={...f.qseSettings,feePct:0,minFee:0,currency:'USD'};f.qseSettings=f.native.qse.settings;
+  f.base.bankAccounts.push({id:'bank',name:'Checking',currencyCode:'USD',openingBalance:0});
+  f.base.bankTransactions.push({id:'bank-leg',accountId:'bank',date:'2026-01-02',amount:-100,isDeposit:false,source:'manual',description:'Broker funding'});
+  f.native.qse.transfers.push({id:'same',date:'2026-01-02',type:'DEPOSIT',gross:100,fee:0});
+  f.native.qse.transactions.push({id:'same',date:'2026-01-02',ticker:'ABC',action:'BUY',shares:10,price:5});
+  f.links.push({id:'link',date:'2026-01-02',from:{module:'bank',ref:'bank'},to:{module:'qse',ref:'legacy'},fromRecordId:'bank-leg',toRecordId:'same',fromAmount:100,toAmount:100});
+  expect(report(f,'investment').rows[0].outflow).toBe(-50);
+  expect(report(f).count).toBe(1);
+});

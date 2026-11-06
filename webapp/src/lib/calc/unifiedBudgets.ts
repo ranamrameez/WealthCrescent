@@ -1,6 +1,21 @@
 import type { BudgetDefinition, BudgetAllocation } from '../../types/budget';
 import { selectMovementActivities, type MovementActivity } from './movementActivities';
-export const budgetRecordKey = (record: Pick<MovementActivity,'module' | 'sourceId' | 'id'>) => JSON.stringify([record.module,record.sourceId ?? '',record.id]);
+export const budgetRecordKey = (record: Pick<MovementActivity,'module' | 'sourceId' | 'id' | 'recordType'>) => JSON.stringify(record.recordType?[record.module,record.sourceId ?? '',record.recordType,record.id]:[record.module,record.sourceId ?? '',record.id]);
+/** Read compatibility for the first optional allocation schema. Resolve an old
+ * three-part identity only when one native collection owns it; never guess. */
+export function normalizeBudgetAllocations(allocations:BudgetAllocation[], activities:MovementActivity[]):BudgetAllocation[] {
+  const keys=new Set(activities.map(budgetRecordKey));
+  const aliases=new Map<string,Set<string>>();
+  for(const record of activities) {
+    const legacy=JSON.stringify([record.module,record.sourceId ?? '',record.id]);
+    const values=aliases.get(legacy) ?? new Set<string>();values.add(budgetRecordKey(record));aliases.set(legacy,values);
+  }
+  return allocations.map(allocation=>{
+    if(keys.has(allocation.recordKey))return allocation;
+    const candidates=aliases.get(allocation.recordKey);
+    return candidates?.size===1?{...allocation,recordKey:[...candidates][0]}:allocation;
+  });
+}
 const validMonth = (value: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
 const monthIndex = (value: string) => Number(value.slice(0,4))*12+Number(value.slice(5,7))-1;
 const indexMonth = (index: number) => String(Math.floor(index/12)).padStart(4,'0')+'-'+String(index%12+1).padStart(2,'0');
@@ -28,6 +43,7 @@ function matches(budget: BudgetDefinition, record: MovementActivity) {
  * ordinary income is not a refund. All computations use native currencies. */
 export function unifiedBudgetReport(definitions: BudgetDefinition[], allocations: BudgetAllocation[], activities: MovementActivity[], fromMonth: string, toMonth: string, today: string) {
   if (!validMonth(fromMonth) || !validMonth(toMonth) || fromMonth > toMonth) throw new Error('Choose a valid monthly reporting range.');
+  allocations=normalizeBudgetAllocations(allocations,activities);
   const issues: BudgetIssue[] = [];
   const budgets: BudgetDefinition[] = [];
   const duplicateBudgetIds = new Set(definitions.filter((item,index)=>definitions.findIndex(other=>other.id === item.id) !== index).map(item=>item.id));
@@ -56,6 +72,12 @@ export function unifiedBudgetReport(definitions: BudgetDefinition[], allocations
     if (duplicateAllocationIds.has(allocation.id) || allocationIds.has(allocation.id)) { explicit.set(allocation.recordKey,explicit.get(allocation.recordKey) ?? []); issues.push({ code: 'duplicate-allocation', allocationId: allocation.id, message: 'Duplicate allocation identity.' }); continue; }
     allocationIds.add(allocation.id);
     explicit.set(allocation.recordKey,[...(explicit.get(allocation.recordKey) ?? []),allocation]);
+  }
+  // An ambiguous legacy identity is not permission to choose a collection or
+  // fall back to automatic allocation of the possibly intended records.
+  for(const allocation of allocations) if(!records.has(allocation.recordKey)) {
+    const candidates=[...records].filter(([,record])=>JSON.stringify([record.module,record.sourceId ?? '',record.id])===allocation.recordKey);
+    if(candidates.length>1)for(const [key] of candidates)explicit.set(key,explicit.get(key) ?? []);
   }
   const usage = new Map<string,BudgetUsageItem[]>();
   const unallocated: Array<{ recordKey: string; record: MovementActivity; amount: number; ambiguousBudgetIds: string[] }> = [];

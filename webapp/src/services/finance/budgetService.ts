@@ -27,7 +27,7 @@ function buildOverview(fromDate: string,toDate: string) {
   let fromMonth = validBatchDate(fromDate) ? fromDate.slice(0,7) : today().slice(0,7);
   let toMonth = validBatchDate(toDate) ? toDate.slice(0,7) : today().slice(0,7);
   if (fromMonth > toMonth) [fromMonth,toMonth]=[toMonth,fromMonth];
-  const budgets=workbook.budgets ?? [], allocations=workbook.budgetAllocations ?? [];
+  const budgets=workbook.budgets ?? [], allocations=CalculationEngine.budgets.normalizeBudgetAllocations(workbook.budgetAllocations ?? [],activities);
   const asOf=validBatchDate(toDate) && toDate<today()?toDate:today();
   const report=CalculationEngine.budgets.unifiedBudgetReport(budgets,allocations,activities,fromMonth,toMonth,asOf);
   const records=CalculationEngine.movements.selectMovementActivities(activities,fromMonth+'-01',CalculationEngine.netWorthTrend.endOfMonthAsOf(toMonth),asOf,'actual');
@@ -80,7 +80,8 @@ export function saveBudgetAllocations(record:MovementActivity,input:AllocationIn
   const key=CalculationEngine.budgets.budgetRecordKey(record);
   const current=activities.find(item=>CalculationEngine.budgets.budgetRecordKey(item)===key);
   if(!current || JSON.stringify(current)!==JSON.stringify(record))throw new Error('This record changed. Reopen its allocation editor.');
-  const before=(workbook.budgetAllocations ?? []).filter(item=>item.recordKey===key);
+  const normalized=CalculationEngine.budgets.normalizeBudgetAllocations(workbook.budgetAllocations ?? [],activities);
+  const before=normalized.filter(item=>item.recordKey===key);
   if(JSON.stringify(before)!==JSON.stringify(expected))throw new Error('These allocations changed. Reopen their editor.');
   if(!current.executed || current.isPending || current.movementKind==='transfer' || current.date>today())throw new Error('Only cleared actual movement can be allocated.');
   const targets=input.filter(item=>item.budgetId || item.amount.trim());
@@ -88,11 +89,11 @@ export function saveBudgetAllocations(record:MovementActivity,input:AllocationIn
   const amounts=targets.map(item=>({budgetId:item.budgetId,amount:resolveNumericInput(item.amount)}));
   if(amounts.some(item=>item.amount===null || !Number.isFinite(item.amount) || (item.amount ?? 0)<=0))throw new Error('Enter a positive allocation amount for each budget.');
   const next=CalculationEngine.budgets.buildBudgetAllocationDrafts(current,amounts.map(item=>({id:before.find(prior=>prior.budgetId===item.budgetId)?.id ?? crypto.randomUUID(),budgetId:item.budgetId,amount:item.amount!})),today());
-  const all=[...(workbook.budgetAllocations ?? []).filter(item=>item.recordKey!==key),...next];
+  const all=[...normalized.filter(item=>item.recordKey!==key),...next];
   const report=CalculationEngine.budgets.unifiedBudgetReport(workbook.budgets ?? [],all,activities,current.date.slice(0,7),current.date.slice(0,7),today());
   const issue=report.issues.find(issue=>issue.recordKey===key);
   if(issue)throw new Error(issue.message);
   usePlannedCashWorkbookStore.getState().setWorkbook({...workbook,budgetAllocations:all});
 }
 
-export function getBudgetRecordKey(record:Pick<MovementActivity,'module'|'sourceId'|'id'>) { return CalculationEngine.budgets.budgetRecordKey(record); }
+export function getBudgetRecordKey(record:Pick<MovementActivity,'module'|'sourceId'|'id'|'recordType'>) { return CalculationEngine.budgets.budgetRecordKey(record); }

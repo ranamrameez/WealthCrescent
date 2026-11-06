@@ -4,8 +4,8 @@ Updated 2026-11-06. This is the concise status index; SESSION_HANDOFF.md records
 
 ## Delivery and data safety
 - Existing branch: fix/net-worth-dashboard-parity-and-accounting; draft PR 51 only. Nothing merged/deployed by this work.
-- Published checkpoint: 58f3017c850cbfe41d144ced93286e3339fb984f; Actions 443 passed build/tests. Earlier 321b18ac passed 167 files / 1,271 tests in Actions 441.
-- Current working continuation adds currency-owned budgets, explicit allocations/refunds, monthly limits/overrides and rollover with a Planning UI. Six focused files / 40 tests and production build/both TypeScript projects passed; read-only browser editor review and fixture UI save checks passed. Verify resulting published head in CI.
+- Published checkpoint: 128d1391639ee46c6a7b807275b4332726d3a03b; Actions 444 passed 170 files / 1,297 tests and build. Earlier 321b18ac passed 167 files / 1,271 tests in Actions 441.
+- Current working continuation hardens collection-aware movement/allocation identity and explicit link matching. Five focused files / 44 tests and final production build/both TS projects passed; resulting published-head CI remains required.
 - No private backup imported, no real user ledger created/settled/deleted, no private proof screenshots uploaded. The only committed sample images are the user's approved stock UI references in docs/ui-samples.
 
 ## Completed implementation

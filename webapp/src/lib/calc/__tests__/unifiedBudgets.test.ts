@@ -81,3 +81,27 @@ it('does not automatically absorb unknown account movement into a broad budget',
   expect(report([budget('all')],[unknown]).totals[0].unallocatedOutflow).toBe(20);
   expect(report([budget('food',{categoryIds:['food']})],[unknown]).totals[0].allocatedOutflow).toBe(20);
 });
+it('keeps identical IDs in different native collections distinct',()=>{
+  const trade=record('same',-20,{module:'qse',sourceId:'broker',recordType:'trade'});
+  const fee=record('same',-3,{module:'qse',sourceId:'broker',recordType:'transfer-fee'});
+  expect(engine.budgetRecordKey(trade)).not.toBe(engine.budgetRecordKey(fee));
+  const result=report([budget('one')],[trade,fee]);
+  expect(result.rows[0].months[0].used).toBe(23);
+  expect(result.issues).toEqual([]);
+});
+it('reads unambiguous legacy allocation keys without mutating their stored values',()=>{
+  const trade=record('same',-20,{module:'qse',sourceId:'broker',recordType:'trade'});
+  const allocations=[{id:'legacy',budgetId:'one',recordKey:JSON.stringify(['qse','broker','same']),amount:10}];
+  const before=JSON.stringify(allocations);
+  const result=report([budget('one')],[trade],allocations);
+  expect(result.rows[0].months[0].used).toBe(10);
+  expect(result.totals[0].unallocatedOutflow).toBe(10);
+  expect(result.issues).toEqual([]);expect(JSON.stringify(allocations)).toBe(before);
+});
+it('does not guess which collection an ambiguous legacy allocation belonged to',()=>{
+  const one=record('same',-20,{module:'qse',sourceId:'broker',recordType:'trade'}),two=record('same',-3,{module:'qse',sourceId:'broker',recordType:'transfer-fee'});
+  const result=report([budget('one')],[one,two],[{id:'legacy',budgetId:'one',recordKey:JSON.stringify(['qse','broker','same']),amount:10}]);
+  expect(result.rows[0].months[0].used).toBe(0);
+  expect(result.totals[0].unallocatedOutflow).toBe(23);
+  expect(result.issues.map(issue=>issue.code)).toContain('orphan-allocation');
+});

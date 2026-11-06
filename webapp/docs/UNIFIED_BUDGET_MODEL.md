@@ -36,3 +36,5 @@ Status: implementation continuation, 2026-11-06. Builds on the approved category
 
 
 Implementation checkpoint: core/service/Planning UI and optional workbook fields now exist; 40 focused tests/build passed. Monthly limits can be overridden without changing defaults. Historical selected end dates cap actuals. Unknown movement requires a specific category/plan scope or explicit assignment; all-ledger budget balances are independent of Net Worth inclusion flags. Dedicated import/batch/export, record collection identity hardening and pending/planned reservations remain pending.
+
+Record identity now includes native collection. The first optional three-part allocation schema is read compatibly only when its explicit record ID resolves to one collection; ambiguous references remain unapplied/unallocated for review. Native record values are not changed.
