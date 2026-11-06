@@ -101,3 +101,36 @@ it('preserves inputs and reconciles all dimensions and item detail to the same p
   }
   expect(JSON.stringify(f)).toBe(before);
 });
+
+it('reconciles monthly widgets with the exact report population and partial-month dates', () => {
+  const f = fixture(); f.native.cards.cards.push({ id: 'c', name: 'Card', currencyCode: 'USD' });
+  f.native.cards.transactions.push(...[
+    { id: 'before', date: '2026-01-01', amount: 500 },
+    { id: 'inside', date: '2026-01-20', amount: 20 },
+    { id: 'future', date: '2026-02-01', amount: 900 },
+  ].map(tx=>({ ...tx, cardId: 'c', kind: 'charge' as const, description: 'Charge' })));
+  const data = collect(f);
+  const monthly = engine.movements.monthlyMovementReport(data,'2026-01-15','2026-03-05','2026-01-31','actual','operating');
+  expect(monthly.months).toEqual(['2026-01','2026-02','2026-03']);
+  expect(monthly.rows[0].months.map(row=>row.netFlow)).toEqual([-20,0,0]);
+  const total = engine.dashboard.moneyMovementReport(data,'2026-01-15','2026-03-05','2026-01-31','category','actual',{},'operating').rows[0];
+  expect(monthly.rows[0].months.reduce((sum,row)=>sum+row.netFlow,0)).toBe(total.net);
+  expect(monthly.rows[0].months.reduce((sum,row)=>sum+row.count,0)).toBe(1);
+});
+it('keeps monthly pending, planned and actual totals separate and preserves native currencies', () => {
+  const data = [
+    { id: 'actual', module: 'cash' as const, date: '2026-01-02', currencyCode: 'USD', amount: 10, sourceLabel: 'Cash', description: '', executed: true },
+    { id: 'pending', module: 'cash' as const, date: '2026-01-02', currencyCode: 'USD', amount: -30, sourceLabel: 'Cash', description: '', executed: true, isPending: true },
+    { id: 'plan', module: 'cash' as const, date: '2026-01-02', currencyCode: 'QAR', amount: -80, sourceLabel: 'Cash', description: '', executed: false },
+  ];
+  for (const [population,expected,currency] of [['actual',10,'USD'],['pending',-30,'USD'],['planned',-80,'QAR']] as const) {
+    const row = engine.movements.monthlyMovementReport(data,'2026-01-01','2026-01-31','2026-01-31',population).rows[0];
+    expect(row.currency).toBe(currency); expect(row.months[0].netFlow).toBe(expected);
+  }
+});
+it('handles invalid, reversed and maximum-year monthly boundaries without looping past the range', () => {
+  const query = (from: string,to: string) => engine.movements.monthlyMovementReport([],from,to,'9999-12-31','actual').months;
+  expect(query('9999-12-01','9999-12-31')).toEqual(['9999-12']);
+  expect(query('2026-02-30','2026-03-31')).toEqual([]);
+  expect(query('2026-03-01','2026-01-31')).toEqual([]);
+});

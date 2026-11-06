@@ -147,3 +147,34 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
     .filter(row => modules.includes(row.module) && included(row))
     .sort((a,b) => a.date.localeCompare(b.date) || a.module.localeCompare(b.module) || a.id.localeCompare(b.id));
 }
+
+export type MovementPopulation = 'actual' | 'pending' | 'planned';
+export function selectMovementActivities(activities: MovementActivity[], from: string, to: string, today: string, population: MovementPopulation, kind: MovementKind | 'all' = 'all') {
+  return activities.filter(item => (kind === 'all' ? item.movementKind !== 'transfer' : (item.movementKind ?? 'unclassified') === kind)
+    && item.date >= from && item.date <= to && (population === 'actual' ? item.executed && !item.isPending && item.date <= today : population === 'pending' ? !!item.isPending : !item.executed && !item.isPending));
+}
+/** Calendar rows include empty months; first/last rows respect exact partial-month bounds. */
+export function monthlyMovementReport(activities: MovementActivity[], from: string, to: string, today: string, population: MovementPopulation, kind: MovementKind | 'all' = 'all') {
+  const items = selectMovementActivities(activities,from,to,today,population,kind);
+  const months: string[] = [];
+  const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value + 'T00:00:00Z')) && new Date(value + 'T00:00:00Z').toISOString().slice(0,10) === value;
+  if (validDate(from) && validDate(to) && from <= to) {
+    const [year,month] = from.split('-').map(Number), [endYear,endMonth] = to.split('-').map(Number);
+    const count = (endYear-year)*12 + endMonth-month+1;
+    for (let index=0;index<count;index++) {
+      const offset = month-1+index;
+      months.push(String(year+Math.floor(offset/12)).padStart(4,'0') + '-' + String(offset%12+1).padStart(2,'0'));
+    }
+  }
+  const rows = [...new Set(items.map(item=>item.currencyCode))].sort().map(currency => {
+    const native = items.filter(item=>item.currencyCode === currency);
+    const monthly = months.map(month => {
+      const records = native.filter(item=>item.date.slice(0,7) === month);
+      const income = records.reduce((total,item)=>total+Math.max(0,item.amount),0);
+      const expense = records.reduce((total,item)=>total+Math.max(0,-item.amount),0);
+      return { month, income, expense, netFlow: income-expense, netWorth: null, count: records.length };
+    });
+    return { currency, months: monthly };
+  });
+  return { from, to, population, kind, months, rows };
+}

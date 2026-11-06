@@ -213,3 +213,5 @@ export function getNativeMovementActivities(modules: readonly string[], window?:
   if (movements.size >= 32) movements.clear(); movements.set(key,result); return result;
 }
 export type { MovementActivity, MovementKind } from '../../lib/calc/movementActivities';
+
+export function getMonthlyMovementReport(...args: Parameters<typeof CalculationEngine.movements.monthlyMovementReport>) { return CalculationEngine.movements.monthlyMovementReport(...args); }

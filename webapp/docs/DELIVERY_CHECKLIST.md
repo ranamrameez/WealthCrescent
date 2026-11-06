@@ -1,3 +1,13 @@
+## Shared monthly movement population — 2026-11-06
+
+Source 6f8ed930c62885a89ef846838411a139d8a0fc09 passed Actions 439: 166 files / 1,261 tests, broker regressions, TypeScript checks and production build.
+
+Next slice adds monthly movement widgets, a shared line chart and accessible monthly table inside Money in/out, using exactly the same engine selector as its category/module/account/plan report. Actual/pending/planned and movement-kind filters control both. Empty months remain present, currencies stay separate, exact first/last partial-month dates apply, and no missing net-worth snapshot is invented for movement-only cards. Shared MonthlyStatsWidget retains its existing snapshot-first behavior in historical Analytics, with movement-first presentation for this report. Existing narrower legacy flow views remain explicitly scoped pending their migration.
+
+Focused tests: 3 files / 35 passed; production build/both TS projects passed (monthly-native-movement-build.log). Browser verified matching monthly/section totals, native-currency widgets, line canvases and same-data tables. No private proof data or real record mutation. New published-head full CI remains required.
+
+Continue with plan-to-actual allocation linkage, unified currency-owned budgets and broader UI/services, then transaction-safe repositories and pending-only payment lifecycle. Auto-pay is not implemented/enabled; PR 51 stays draft and main untouched. Historical checkpoint entries below describe earlier states and do not override this status.
+
 ## Native movement adapters — 2026-11-06
 
 Baseline c1cd12e9 passed Actions 438 on its exact head: 165 files / 1,251 tests, broker/PSX-fee regressions, both TypeScript projects and production build. No merge or deployment. This supersedes older pending-CI statements below.

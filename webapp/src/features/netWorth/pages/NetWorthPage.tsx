@@ -31,7 +31,7 @@ import type { NetWorthAsOfInputs } from '../../../lib/calc/netWorthAsOf';
 import { UpcomingList } from '../../../components/UpcomingList';
 import { useUpcomingItems } from '../../../hooks/useUpcomingItems';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
-import { getDashboardReport, getCurrencyDashboardSummary, getBreakdownDelta, getMonthlyFlowItems as monthlyFlowItems, getNetWorthBreakdownForMonth as netWorthBreakdownForMonth, getCategoryGroupReport, getMonthlyNetFlow, getMonthlyPlanReport, getMonthlyStatCards, getModuleBreakdownChart, getClearedRangeActivities, getMoneyMovementReport, type FlowDimension, type FlowPopulation, type MovementKind, getReportingMonths, getMonthlyIncomeExpense as monthlyIncomeExpense,
+import { getDashboardReport, getCurrencyDashboardSummary, getBreakdownDelta, getMonthlyFlowItems as monthlyFlowItems, getNetWorthBreakdownForMonth as netWorthBreakdownForMonth, getCategoryGroupReport, getMonthlyNetFlow, getMonthlyPlanReport, getMonthlyStatCards, getModuleBreakdownChart, getClearedRangeActivities, getMoneyMovementReport, getMonthlyMovementReport, type FlowDimension, type FlowPopulation, type MovementKind, getReportingMonths, getMonthlyIncomeExpense as monthlyIncomeExpense,
   getNetWorthTrend as projectedNetWorthTrend, getMonthEnd as endOfMonthAsOf } from '../../../services/finance/dashboardService';
 import { useDashboardContext, useDashboardActivities, useNativeMovementActivities } from '../../../hooks/useDashboard';
 import { useNetWorthInputs, useNetWorthSummary } from '../hooks/useNetWorthSummary';
@@ -1163,6 +1163,7 @@ function MoneyMovementSection({ selectedModules, from, to, today, setDrilldown }
   const [kind,setKind] = useState<MovementKind | 'all'>('all');
   const activities = useNativeMovementActivities(selectedModules,{ fromDate: from, toDate: to });
   const report = getMoneyMovementReport(activities,from,to,today,dimension,population,kind);
+  const monthly = getMonthlyMovementReport(activities,from,to,today,population,kind);
   return <div className="money-movement-report">
     <p className="text-muted">{from} – {to}. Cash, Bank, Rentals, cards, recorded loan repayments, Funds and all exchange brokers. Investments and financing are separate from income/spending. Unclassified account records stay visible. Internal transfers are excluded from the combined view.</p>
     <div className="row mb-md"><Field label="Activity"><Select value={population} onChange={event => setPopulation(event.target.value as FlowPopulation)}><option value="actual">Cleared actual</option><option value="pending">Pending</option><option value="planned">Remaining plans</option></Select></Field>
@@ -1178,6 +1179,16 @@ function MoneyMovementSection({ selectedModules, from, to, today, setDrilldown }
       { label: 'Money out (' + row.currency + ')', data: row.groups.map(group => group.outflow), backgroundColor: HUES[1] },
     ] }} options={{ indexAxis: 'y', plugins: { legend: { display: true } } }} /></div></ChartCard>
     <div className="table-scroll"><table><caption>{row.currency} — same records as chart; select a row for contributing activity</caption><thead><tr><th>{dimension}</th><th>Money in</th><th>Money out</th><th>Net</th></tr></thead><tbody>{row.groups.map(group => <RecordRow key={group.key} record={group} onOpen={() => setDrilldown({ kind: 'flow', title: group.label + ' · ' + row.currency, explanation: population + ' activity from ' + from + ' through ' + to + '. Unallocated means no explicit plan link.', currency: row.currency, from, to, items: group.items })}><td>{group.label}</td><td>{fmtMoney(group.inflow,row.currency)}</td><td>{fmtMoney(group.outflow,row.currency)}</td><td>{fmtMoney(group.net,row.currency)}</td></RecordRow>)}</tbody></table></div>
+    </div>)}
+    {monthly.rows.map(row => <div key={'monthly-' + row.currency} className="mb-md">
+      <h3>{row.currency} · monthly {population} movement</h3>
+      <MonthlyStatsWidget currency={row.currency} rows={row.months} primary="movement" population={population} />
+      <ChartCard flat title={row.currency + ' — monthly ' + population + ' movement'}><div style={{ height: 240 }}><Chart type="line" data={{ labels: row.months.map(month=>month.month), datasets: [
+        { label: 'Inflow (' + row.currency + ')', data: row.months.map(month=>month.income), borderColor: HUES[2], backgroundColor: HUES[2] },
+        { label: 'Outflow (' + row.currency + ')', data: row.months.map(month=>month.expense), borderColor: HUES[1], backgroundColor: HUES[1] },
+        { label: 'Net movement (' + row.currency + ')', data: row.months.map(month=>month.netFlow), borderColor: HUES[0], backgroundColor: HUES[0] },
+      ] }} options={{ plugins: { legend: { display: true } } }} /></div></ChartCard>
+      <div className="table-scroll"><table><caption>{row.currency} — monthly totals for the same selected records; partial months use {from} through {to}</caption><thead><tr><th>Month</th><th>Inflow</th><th>Outflow</th><th>Net movement</th><th>Records</th></tr></thead><tbody>{row.months.map(month=><tr key={month.month}><td>{month.month}</td><td>{fmtMoney(month.income,row.currency)}</td><td>{fmtMoney(month.expense,row.currency)}</td><td>{fmtMoney(month.netFlow,row.currency)}</td><td>{month.count}</td></tr>)}</tbody></table></div>
     </div>)}
     {!report.rows.length && <p className="text-muted">No matching {population} activity in this period and source scope.</p>}
     <p className="text-muted">Loan contracts, amortization schedules and subscription renewals are not actual payments. Generated subscription plans appear under their paying source. Internal transfer details show recorded legs; gross amounts are not income or spending.</p>

@@ -1,4 +1,4 @@
-import { MOVEMENT_MODULE_LABELS, MOVEMENT_KIND_LABELS, type MovementActivity, type MovementKind } from './movementActivities';
+import { MOVEMENT_MODULE_LABELS, MOVEMENT_KIND_LABELS, selectMovementActivities, type MovementActivity, type MovementKind } from './movementActivities';
 import { projectedNetWorthTrend, endOfMonthAsOf, type MonthlyNetWorthPoint } from './netWorthTrend';
 import { earliestActivityDate, netWorthAsOfDate, type NetWorthAsOfInputs } from './netWorthAsOf';
 import { unverifiedOpeningCurrencies as openingGaps } from './netWorthValuation';
@@ -332,8 +332,7 @@ export function moduleBreakdownChart(row: CurrencyNetWorth) {
 export type FlowDimension = 'category' | 'module' | 'source' | 'plan' | 'kind';
 export type FlowPopulation = 'actual' | 'pending' | 'planned';
 export function moneyMovementReport(activities: MovementActivity[], from: string, to: string, today: string, dimension: FlowDimension, population: FlowPopulation, planNames: Record<string, string> = {}, kind: MovementKind | 'all' = 'all') {
-  const items = activities.filter(item => kind === 'all' ? item.movementKind !== 'transfer' : (item.movementKind ?? 'unclassified') === kind).filter(item => item.date >= from && item.date <= to && (
-    population === 'actual' ? item.executed && !item.isPending && item.date <= today : population === 'pending' ? !!item.isPending : !item.executed && !item.isPending));
+  const items = selectMovementActivities(activities,from,to,today,population,kind);
   const modules = MOVEMENT_MODULE_LABELS;
   const rows = [...new Set(items.map(item => item.currencyCode))].sort().map(currency => {
     const native = items.filter(item => item.currencyCode === currency);
