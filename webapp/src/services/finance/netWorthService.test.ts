@@ -1,3 +1,4 @@
+import { useFundsWorkbookStore } from '../../store/fundsWorkbookStore';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getNetWorthSummary, subscribeNetWorthSummary } from './netWorthService';
 import { useCashWorkbookStore } from '../../store/cashWorkbookStore';
@@ -45,4 +46,16 @@ describe('net-worth application query', () => {
     } finally { second(); }
     expect(vi.getTimerCount()).toBe(0);
   });
+});
+
+it('keeps a legacy holdings-only workbook from silently subtracting unfunded purchases', () => {
+  const store = useFundsWorkbookStore.getState(), original = store.workbook;
+  try {
+    const workbook = { ...original, settings: { defaultCurrency: 'USD', cashLedgerMigrationVersion: 1 }, funds: [{ id: 'fund', name: 'Fund', code: 'F', platform: '', currencyCode: 'PKR' }],
+      transactions: [{ id: 'buy', date: '2026-01-01', action: 'BUY' as const, ticker: 'fund', shares: 100, price: 10 }], transfers: [], marketPrices: { fund: 12 } };
+    store.setWorkbook(workbook);
+    expect(getNetWorthSummary(['funds'], '2026-01-31').rows.find(row => row.currency === 'PKR')?.net).toBe(1200);
+    store.setWorkbook({ ...workbook, settings: { ...workbook.settings, includeCashInNetWorth: true } });
+    expect(getNetWorthSummary(['funds'], '2026-01-31').rows.find(row => row.currency === 'PKR')?.net).toBe(200);
+  } finally { store.setWorkbook(original); }
 });

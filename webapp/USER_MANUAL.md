@@ -1129,3 +1129,11 @@ See [the detailed delivery checklist](docs/DELIVERY_CHECKLIST.md) for completed 
 ## Removing all financial app data
 
 On App Data, export a full backup first. Finish editing on other devices, then type DELETE ALL DATA in the removal section and choose Remove all app data. Review the signed-in account and confirm. This clears all financial modules, accounts, transactions, plans, transfers, custom categories and history from that account and this device, restoring app defaults. Your login account, appearance preferences and shared market data remain. The action cannot be undone from the app; restoring requires a backup. If cloud removal fails, an error is shown.
+
+The App Data topbar includes a Remove all app data section shortcut. Select it to reveal the warning and confirmation field. New custom categories require sign-in; use the existing category when its name is already listed.
+
+Legacy Funds workbooks without an explicit cash-inclusion setting contribute holdings value to the dashboard. The dashboard explains this and leaves Funds cash disabled until you reconcile deposits and withdrawals and explicitly enable it in Dashboard filters. No missing funding is invented. Dashboard exchange totals include every included broker account, independently of the selected trading-screen broker.
+
+Appearance retains the existing Comfortable, Compact and Console density modes. Their spacing follows the saved reference examples; no new mode is added. Dismiss an informational alert with its × button. Dashboard Plans lets you select a calendar month and compare 1, 3, 6 or 12 months; its currency-specific charts and tables distinguish cleared actual, pending and remaining planned activity. The selected month is retained in the URL.
+
+Analytics shows monthly stat widgets with dated balances and explicitly labelled activity totals. Each native-currency overview includes a current balance-by-module chart. Change indicators use arrows; missing baselines remain unavailable. These balance charts are distinct from income/spending reports.

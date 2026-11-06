@@ -29,7 +29,10 @@ export function earliestActivityDate(inputs: NetWorthAsOfInputs): string | undef
   const fundIds = new Set(scoped.fundsFunds.filter(fund => fund.includeInNetWorth !== false || scoped.fundsIncludeCashInNetWorth).map(fund => fund.id));
   const qse = scoped.qseSettings.includeInNetWorth !== false;
   const psx = scoped.psxSettings.includeInNetWorth !== false;
-  const dates: string[] = [
+  const brokerDates = [...(scoped.qseBrokers ?? []), ...(scoped.psxBrokers ?? [])].filter(broker => broker.settings.includeInNetWorth !== false).flatMap(broker => [
+    ...broker.transactions.filter(tx => !tx.isPending), ...broker.transfers, ...broker.adjustments, ...(broker.dividends ?? []),
+  ]).map(row => row.date);
+  const dates: string[] = [ ...brokerDates,
     ...scoped.cashEntries.filter(entry => !entry.isPending).map(entry => entry.date),
     ...scoped.bankTransactions.filter(tx => accountIds.has(tx.accountId) && !tx.isPending).map(tx => tx.date),
     ...scoped.creditCardTransactions.filter(tx => cardIds.has(tx.cardId)).map(tx => tx.date),

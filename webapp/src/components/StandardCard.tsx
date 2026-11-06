@@ -47,8 +47,8 @@ export function CardActionMenu({ actions, onAction }: { actions: StandardCardAct
   </div>;
 }
 
-export function StandardCard({ title, summary, actions=[], headerEnd, defaultOpen=true, open:controlledOpen, onToggle, children, className='', hue }: {
-  title:ReactNode; summary?:ReactNode; actions?:StandardCardAction[]; headerEnd?:ReactNode; defaultOpen?:boolean; open?:boolean; onToggle?:(open:boolean)=>void; children:ReactNode; className?:string; hue?:string;
+export function StandardCard({ title, summary, actions=[], headerEnd, defaultOpen=true, collapsible=true, open:controlledOpen, onToggle, children, className='', hue }: {
+  title:ReactNode; summary?:ReactNode; actions?:StandardCardAction[]; headerEnd?:ReactNode; defaultOpen?:boolean; collapsible?:boolean; open?:boolean; onToggle?:(open:boolean)=>void; children:ReactNode; className?:string; hue?:string;
 }) {
   const content = Children.toArray(children);
   const onlyChild = content.length === 1 && isValidElement(content[0]) ? content[0] : undefined;
@@ -61,7 +61,7 @@ export function StandardCard({ title, summary, actions=[], headerEnd, defaultOpe
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [fullScreen]);
-  const open=controlledOpen??internalOpen;
+  const open=collapsible ? (controlledOpen??internalOpen) : true;
   const toggle=()=>{const next=!open; if(onToggle)onToggle(next); else setInternalOpen(next);};
   const enterFullScreen = () => { setFullScreen(true); if (!open) { if (onToggle) onToggle(true); else setInternalOpen(true); } };
   return <>{fullScreen && <div className="standard-card-backdrop" onClick={() => setFullScreen(false)} />}
@@ -70,7 +70,7 @@ export function StandardCard({ title, summary, actions=[], headerEnd, defaultOpe
     style={hue ? ({ '--card-hue': hue } as CSSProperties) : undefined}
   >
     <header className="standard-card-header">
-      <button type="button" className="standard-card-toggle" aria-expanded={open} onClick={toggle}><span className={`standard-card-arrow${open?' open':''}`} aria-hidden>▸</span><span className="standard-card-title">{title}</span></button>
+      {collapsible ? <button type="button" className="standard-card-toggle" aria-expanded={open} onClick={toggle}><span className={`standard-card-arrow${open?' open':''}`} aria-hidden>▸</span><span className="standard-card-title">{title}</span></button> : <h3 className="standard-card-title m-0">{title}</h3>}
       <div className="standard-card-summary">{summary}</div>
       <div className="standard-card-actions" onClick={e=>e.stopPropagation()}>
         {headerEnd}

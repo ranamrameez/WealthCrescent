@@ -72,14 +72,14 @@ function buildDashboardContext() {
   const funds = useFundsWorkbookStore.getState().workbook;
   const option = (module: InclusionModule, id: string | undefined, label: string, included?: boolean): NetWorthInclusionOption => ({ module, id, label, included: included !== false });
   const inclusionGroups: NetWorthInclusionGroup[] = [
-    { title: 'Modules', items: [option('cash', undefined, 'Cash', inputs.cashSettings.includeInNetWorth), option('qse', undefined, 'Stock Exchanges (QSE)', inputs.qseSettings.includeInNetWorth), option('psx', undefined, 'Stock Exchanges (PSX)', inputs.psxSettings.includeInNetWorth)] },
+    { title: 'Modules', items: [option('cash', undefined, 'Cash', inputs.cashSettings.includeInNetWorth), option('qse', undefined, 'Stock Exchanges (QSE)', inputs.qseBrokers?.some(broker => broker.settings.includeInNetWorth !== false) ?? inputs.qseSettings.includeInNetWorth), option('psx', undefined, 'Stock Exchanges (PSX)', inputs.psxBrokers?.some(broker => broker.settings.includeInNetWorth !== false) ?? inputs.psxSettings.includeInNetWorth)] },
     { title: 'Banking', items: inputs.bankAccounts.filter(account => !account.migratedToCreditCardId).map(account => option('bank', account.id, account.name + ' (' + account.currencyCode + ')', account.includeInNetWorth)) },
     { title: 'Credit cards', items: inputs.creditCards.map(card => option('creditCards', card.id, card.name + ' (' + card.currencyCode + ')', card.includeInNetWorth)) },
     { title: 'Personal Loans', items: inputs.personalLoans.map(loan => option('personalLoans', loan.id, loan.person + ' (' + loan.currencyCode + ')', loan.includeInNetWorth)) },
     { title: 'EMI / Loans', items: inputs.emiLoans.map(loan => option('emi', loan.id, loan.name + ' (' + loan.currencyCode + ')', loan.includeInNetWorth)) },
-    { title: 'Funds', items: funds.funds.length || funds.transfers.length ? [option('fundsCash', undefined, 'Funds cash', funds.settings.includeCashInNetWorth), ...funds.funds.map(fund => option('funds', fund.id, fund.name + ' (' + fund.currencyCode + ')', fund.includeInNetWorth))] : [] },
+    { title: 'Funds', items: funds.funds.length || funds.transfers.length ? [option('fundsCash', undefined, 'Funds cash (only with reconciled funding)', funds.settings.includeCashInNetWorth === true), ...funds.funds.map(fund => option('funds', fund.id, fund.name + ' (' + fund.currencyCode + ')', fund.includeInNetWorth))] : [] },
   ];
-  return { inclusionGroups: inclusionGroups.filter(group => group.items.length),
+  return { fundsCashRequiresOptIn: funds.settings.includeCashInNetWorth === undefined && funds.transactions.length > 0, inclusionGroups: inclusionGroups.filter(group => group.items.length),
     rentals: useRentalsWorkbookStore.getState().workbook,
     categories: useCategoryStore.getState().workbook.categories,
     categoryGroups: useCategoryGroupStore.getState().workbook.groups,
@@ -87,9 +87,9 @@ function buildDashboardContext() {
 }
 export function getDashboardContext() { return context ??= buildDashboardContext(); }
 
-export function getDashboardActivities(selectedModules: readonly string[]) {
+export function getDashboardActivities(selectedModules: readonly string[], window?: { fromDate: string; toDate: string }) {
   const today = new Date().toISOString().slice(0, 10);
-  const key = JSON.stringify([today, [...selectedModules].sort()]);
+  const key = JSON.stringify([today, [...selectedModules].sort(), window]);
   const cached = activities.get(key); if (cached) return cached;
   const inputs = getNetWorthInputs(), view = getDashboardContext();
   const result = CalculationEngine.dashboard.dashboardActivities({
@@ -97,7 +97,7 @@ export function getDashboardActivities(selectedModules: readonly string[]) {
     bankAccounts: inputs.bankAccounts, bankTransactions: inputs.bankTransactions, plannedBank: usePlannedBankWorkbookStore.getState().workbook.entries,
     rentalProperties: view.rentals.settings.properties, rentalEntries: view.rentals.entries, plannedRentals: usePlannedRentalsWorkbookStore.getState().workbook.entries,
     categories: view.categories, links: useInterEntityTransfersStore.getState().workbook.entries,
-  }, inputs.cashSettings, selectedModules, new Date(today + 'T00:00:00.000Z'));
+  }, inputs.cashSettings, selectedModules, new Date(today + 'T00:00:00.000Z'), window);
   if (activities.size >= 32) activities.clear(); activities.set(key, result); return result;
 }
 
@@ -108,8 +108,14 @@ export function setNetWorthInclusion(option: Pick<NetWorthInclusionOption, 'modu
   const { module, id } = option;
   const patch = { includeInNetWorth: included };
   if (module === 'cash') return useCashWorkbookStore.getState().updateSettings(patch);
-  if (module === 'qse') return useWorkbookStore.getState().updateSettings(patch);
-  if (module === 'psx') return usePSXWorkbookStore.getState().updateSettings(patch);
+  if (module === 'qse' || module === 'psx') {
+    const store = module === 'qse' ? useWorkbookStore.getState() : usePSXWorkbookStore.getState();
+    const workbook = store.workbook;
+    // The dashboard toggle is exchange-wide; never leave hidden brokers included.
+    const next = { ...workbook, settings: { ...workbook.settings, ...patch }, brokerProfiles: workbook.brokerProfiles.map(profile => ({ ...profile, settings: { ...profile.settings, ...patch } })) };
+    if (module === 'qse') return useWorkbookStore.getState().setWorkbook(next as ReturnType<typeof useWorkbookStore.getState>['workbook']);
+    return usePSXWorkbookStore.getState().setWorkbook(next as ReturnType<typeof usePSXWorkbookStore.getState>['workbook']);
+  }
   if (module === 'fundsCash' || module === 'funds') {
     const store = useFundsWorkbookStore.getState(), workbook = store.workbook;
     if (module === 'fundsCash') return store.setWorkbook({ ...workbook, settings: { ...workbook.settings, includeCashInNetWorth: included } });
@@ -173,3 +179,8 @@ export function saveDashboardCrossRate(from: string, to: string, rawValue: strin
   if (!rates) throw new Error('No valid rate anchor for ' + from + ' — set its rate against USD first, or pick USD as one side.');
   saveFxRates(rates); return rates;
 }
+
+export function getMonthlyPlanReport(...args: Parameters<typeof CalculationEngine.dashboard.monthlyPlanReport>) { return CalculationEngine.dashboard.monthlyPlanReport(...args); }
+
+export function getMonthlyStatCards(...args: Parameters<typeof CalculationEngine.dashboard.monthlyStatCards>) { return CalculationEngine.dashboard.monthlyStatCards(...args); }
+export function getModuleBreakdownChart(...args: Parameters<typeof CalculationEngine.dashboard.moduleBreakdownChart>) { return CalculationEngine.dashboard.moduleBreakdownChart(...args); }

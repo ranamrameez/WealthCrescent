@@ -103,17 +103,19 @@ it('excludes transactions outside the selected range while retaining the live ba
   expect(summary.textContent).toContain('1,100.00');
 });
 
-it('renders the dashboard sections without nesting cards and provides period insights', () => {
+it('renders standard dashboard sections and provides period insights', () => {
   const todayISO = new Date().toISOString().slice(0, 10);
   show(`/net-worth?section=analytics&period=custom&from=${todayISO}&to=${todayISO}`);
-  expect(document.querySelector('.standard-card .card')).toBeNull();
+  expect(document.querySelector('[data-page-section="analytics"] .standard-card')).not.toBeNull();
   expect(screen.getByRole('heading', { name: new RegExp('Insights') })).toBeTruthy();
   expect(screen.getAllByText(/Largest asset:/).length).toBeGreaterThan(0);
   expect(screen.getAllByText(/Recorded net activity:/).length).toBeGreaterThan(0);
   const analytics = document.querySelector<HTMLElement>('[data-page-section="analytics"]')!;
-  fireEvent.click(within(analytics).getByRole('button', { name: 'Hide section' }));
+  expect(analytics.querySelectorAll('.standard-card-toggle')).toHaveLength(1);
+  expect(analytics.querySelector('details')).toBeNull();
+  fireEvent.click(within(analytics).getByRole('button', { name: /^Analytics$/ }));
   expect(screen.queryByRole('heading', { name: new RegExp('Insights') })).toBeNull();
-  fireEvent.click(within(analytics).getByRole('button', { name: 'Show section' }));
+  fireEvent.click(within(analytics).getByRole('button', { name: /^Analytics$/ }));
   expect(screen.getByRole('heading', { name: new RegExp('Insights') })).toBeTruthy();
 });
 
@@ -127,4 +129,12 @@ it('restores hidden sections from a deep link and opens exchange rates only from
   expect(within(document.querySelector<HTMLElement>('.modal-box')!).getByText('Refresh rates')).toBeTruthy();
   fireEvent.keyDown(document, { key: 'Escape' });
   expect(document.querySelector('.modal-box')).toBeNull();
+});
+
+it('uses calendar months for Plans and preserves a future month in its controls', () => {
+  show('/dashboard?section=plans&plan-month=2028-02&plan-months=3');
+  const month = screen.getByDisplayValue('2028-02');
+  expect(screen.getByText(/2028-02-01 – 2028-04-30/)).toBeTruthy();
+  fireEvent.change(month, { target: { value: '2024-02' } });
+  expect(screen.getByText(/2024-02-01 – 2024-04-30/)).toBeTruthy();
 });

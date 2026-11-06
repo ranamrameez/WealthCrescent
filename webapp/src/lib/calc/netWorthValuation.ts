@@ -19,7 +19,13 @@ import type { Adjustment, Dividend, PricePoint, QSESettings, Transaction, Transf
 import type { PSXSettings } from '../../types/psxWorkbook';
 
 
+export interface ExchangeValuationLedger<TSettings> {
+  settings: TSettings;
+  transactions: Transaction[]; transfers: Transfer[]; adjustments: Adjustment[]; dividends?: Dividend[];
+}
 export interface NetWorthValuationInputs {
+  qseBrokers?: ExchangeValuationLedger<QSESettings>[];
+  psxBrokers?: ExchangeValuationLedger<PSXSettings>[];
   cashEntries: CashEntry[];
   cashSettings: CashSettings;
   bankAccounts: BankAccount[];
@@ -105,19 +111,24 @@ export function calculateNetWorth(inputs: NetWorthValuationInputs, options: NetW
     inputs.fundsIncludeCashInNetWorth ? fundsCashBalanceByCurrency(inputs.fundsFunds, fundsTransactions, through(inputs.fundsTransfers), inputs.fundsDefaultCurrency) : {},
   ) : {};
   const exchange = (kind: 'qse' | 'psx'): Record<string, number> => {
-    const settings = inputs[kind === 'qse' ? 'qseSettings' : 'psxSettings'];
-    if (!enabled(kind) || settings.includeInNetWorth === false) return {};
-    const transactions = through(kind === 'qse' ? inputs.qseTransactions : inputs.psxTransactions);
-    const transfers = through(kind === 'qse' ? inputs.qseTransfers : inputs.psxTransfers);
-    const adjustments = through(kind === 'qse' ? inputs.qseAdjustments : inputs.psxAdjustments);
-    const dividends = through((kind === 'qse' ? inputs.qseDividends : inputs.psxDividends) ?? []);
-    if (!transactions.length && !transfers.length && !adjustments.length && !dividends.length) return {};
-    const calcFee = kind === 'qse' ? makeQSEFeeCalculator(inputs.qseSettings) : makePSXFeeCalculator(inputs.psxSettings, transactions);
-    const result = calculatePortfolio({ transactions, transfers, adjustments, dividends,
-      marketPrices: prices(transactions, kind === 'qse' ? inputs.qsePriceHistory : inputs.psxPriceHistory, kind === 'qse' ? inputs.qseMarketPrices : inputs.psxMarketPrices),
-      calcFee, costBasisMethod: settings.costBasisMethod ?? 'average', feePct: settings.feePct, tick: settings.tick,
-    });
-    return { [settings.currency]: result.cashSummary.netWorth };
+    if (!enabled(kind)) return {};
+    const fallback = kind === 'qse' ? { settings: inputs.qseSettings, transactions: inputs.qseTransactions, transfers: inputs.qseTransfers, adjustments: inputs.qseAdjustments, dividends: inputs.qseDividends } : { settings: inputs.psxSettings, transactions: inputs.psxTransactions, transfers: inputs.psxTransfers, adjustments: inputs.psxAdjustments, dividends: inputs.psxDividends };
+    const brokers = (kind === 'qse' ? inputs.qseBrokers : inputs.psxBrokers) ?? [fallback];
+    const totals: Record<string, number> = {};
+    for (const broker of brokers) {
+      const settings = broker.settings;
+      if (settings.includeInNetWorth === false) continue;
+      const transactions = through(broker.transactions), transfers = through(broker.transfers);
+      const adjustments = through(broker.adjustments), dividends = through(broker.dividends ?? []);
+      if (!transactions.length && !transfers.length && !adjustments.length && !dividends.length) continue;
+      const calcFee = kind === 'qse' ? makeQSEFeeCalculator(settings as QSESettings) : makePSXFeeCalculator(settings as PSXSettings, transactions);
+      const result = calculatePortfolio({ transactions, transfers, adjustments, dividends,
+        marketPrices: prices(transactions, kind === 'qse' ? inputs.qsePriceHistory : inputs.psxPriceHistory, kind === 'qse' ? inputs.qseMarketPrices : inputs.psxMarketPrices),
+        calcFee, costBasisMethod: settings.costBasisMethod ?? 'average', feePct: settings.feePct, tick: settings.tick,
+      });
+      totals[settings.currency] = (totals[settings.currency] ?? 0) + result.cashSummary.netWorth;
+    }
+    return totals;
   };
   const rows = computeNetWorthByCurrency({ cash, bank, qse: exchange('qse'), psx: exchange('psx'), funds, personalLoansNet, personalLoanAssets, personalLoanLiabilities, emiOutstanding, creditCards });
   const biggestExposureCurrency = [...rows].sort((a, b) => Math.abs(b.net) - Math.abs(a.net))[0]?.currency ?? 'USD';
@@ -129,6 +140,8 @@ export function calculateNetWorth(inputs: NetWorthValuationInputs, options: NetW
 export function scopeNetWorthInputs(inputs: NetWorthValuationInputs, selectedModules?: readonly string[]): NetWorthValuationInputs {
   const enabled = (module: string) => selectedModules === undefined || selectedModules.includes(module);
   return { ...inputs,
+    qseBrokers: enabled('qse') ? inputs.qseBrokers : [],
+    psxBrokers: enabled('psx') ? inputs.psxBrokers : [],
     cashEntries: enabled('cash') && inputs.cashSettings.includeInNetWorth !== false ? inputs.cashEntries : [],
     bankAccounts: includedBankAccounts(inputs.bankAccounts).filter(account => enabled(account.isLiability ? 'creditCards' : 'bank')),
     creditCards: enabled('creditCards') ? includedCreditCards(inputs.creditCards) : [],

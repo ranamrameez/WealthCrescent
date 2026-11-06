@@ -106,3 +106,5 @@ A runtime CalculationEngine facade import is counted too: UI should call a servi
 ## Immediate priorities
 
 Complete and validate the active Banking read slice recorded in SESSION_HANDOFF.md. Its remaining editors/commands and legacy AnalyticsTab are not covered by the read migration. Legacy BankSettings.budgets has no stored currency ownership; migrate those targets losslessly through the approved unified category/project budget model, without guessing their currency. Continue the remaining module service migrations while preserving the tested stock accounting and native ledger ownership. Auto-pay still requires transaction-safe persistence.
+
+2026-11-06 follow-up: CategorySelect no longer imports the category store; it subscribes and creates categories through categoryService. The original dated static counts above precede this migration.

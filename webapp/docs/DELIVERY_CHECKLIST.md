@@ -123,3 +123,30 @@ Banking continuation: aggregate analytics now renders all native accounts in sco
 Publication correction: source through 44018f7b is pushed to existing draft PR 51; GitHub Actions run 432 passed on that exact head. Later App Data and Banking changes described here are local until committed/pushed and revalidated. Browser acceptance remains outstanding after connection/CDP and Windows URL-verification failures. No merge/deployment.
 
 Publication checkpoint: Banking changes de314785 and App Data removal 46f039c5 are committed and pushed to draft PR 51. Local 27 focused tests and build/both TS checks passed. Actions 433 has passed build and broker regressions; full suite pending at documentation time. No production deployment or real deletion.
+
+## 2026-11-06 visible verification and category boundary
+
+App Data removal section was verified visually in the local in-app browser, including section navigation and disabled confirmation button. No real deletion. Full CI passed for 46f039c5 (#433) and 9bee76b2 (#434). Wider dashboard/charts/theme review remains pending. CategorySelect now reads/creates through categoryService with auth, blank-name and duplicate-name guards; 10 focused tests passed, build pending.
+
+## Dashboard Funds reconciliation and UI parity — 2026-11-06
+
+User reported incorrect PKR Funds and inconsistent dashboard UI. Read the supplied external backup locally without importing it, changing records or adding private data to source control. Confirmed cause: legacy Funds settings omitted includeCashInNetWorth, but the service treated omission as true. An incomplete funding-transfer history therefore generated negative cash that silently cancelled holdings. Missing legacy setting now means holdings-only; explicit true retains native cash including negative balances, and explicit false remains excluded. Fresh workbooks keep their documented explicit default. Dashboard inclusion checkbox uses the same effective policy and explains the funding requirement; no balancing deposits are invented.
+
+Separately confirmed dashboard exchange valuation read only the active broker arrays. It now values profile ledgers independently with each profile's own fees/cost basis/currency, uses current active arrays over stale profile data, retains archived/deactivated history unless excluded, and then aggregates currency totals. Historical dates/scope use the same profile inputs. The exchange-wide inclusion command updates every profile to match its dashboard label.
+
+Dashboard now uses the same StandardPageSections card headers/containers as the other modules, replacing its unframed Show/Hide controls. Existing report bounds, data and drilldowns remain intact. Browser verified native PKR Funds contribution against the supplied backup's holdings calculation and visually reviewed shared section controls. This does not reconcile external bank statements or endorse all dashboard figures. Remaining finding: Upcoming can display an EMI obligation alongside its linked bank plan; inspect explicit linkage before deduplicating. Other chart/theme/mobile acceptance and broader migration/payment work remain open.
+
+Current verification is in dashboard-funds-focused.log; inspect completion before reporting a count. Production build must be rerun after correcting Testing Library role options in the test. Category service changes also remain in this working-tree continuation; its earlier 10 focused tests/build passed. No production deployment or merge.
+
+2026-11-06 user UI contract: see ../../docs/ui-samples/README.md. Modern/Compact presentation is independent of themes; only outer sections collapse; headline/support/extra hierarchy is required; alerts have dismiss controls. Month-based Plans uses exact calendar windows and per-currency local charts/tables. Coverage currently Cash/Bank/Rentals; other native-domain monthly coverage and linked-obligation deduplication remain pending.
+
+## Latest UI correction — existing modes only (2026-11-06)
+
+User explicitly rejected extra modes. Removed the proposed statLayout field/control/root attribute entirely. Preserve Comfortable, Compact and Console. Approved screenshots remain in docs/ui-samples as reference material. Repaired the existing spacing tokens: Comfortable 16px vertical card padding, Compact 12px, Console 8px; visible heading/content gaps scale with the same modes. Theme surfaces, radius and elevation remain token-driven. Added existing semantic SVG icons to dashboard section headings without replacing accessible text labels. Informational notices have dismiss buttons. Only outer sections collapse; inner currency summaries/charts/tables stay open. Headline/support/extra hierarchy remains.
+
+Monthly Plans is implemented with per-currency charts, same-dataset accessible summary tables and dated plan rows, URL-backed calendar selection and exact-window recurrence. Source coverage remains Cash/Bank/Rentals; other native domains and linked EMI duplicate obligations remain pending. Tests passed 65 UI/theme/period checks plus 22 final month checks before this spacing/icon correction. Final combined focused checks passed 8 files / 79 tests (final-dashboard-repair-tests.log). Final production build is running in final-dashboard-repair-build.log. The earlier monthly build passed. Earlier entries describing Modern/Compact as a new preference are superseded by this correction.
+
+
+MonthlyStatsWidget, local native module-balance chart and ValueChange arrows added; models/dashboard follow-up passed 18 tests. Full cash-flow design and remaining scope are in DASHBOARD_REPORTING_DESIGN.md. Latest source build pending in final-dashboard-release-build.log.
+
+Validated dashboard checkpoint: 79 focused tests before widget additions, 18 follow-up tests, production build/both TS checks passed. Browser verified monthly widgets, chart rendering and corrected Funds. Broader canonical cash-flow/plan allocation and native-domain adapters remain pending per DASHBOARD_REPORTING_DESIGN.md.

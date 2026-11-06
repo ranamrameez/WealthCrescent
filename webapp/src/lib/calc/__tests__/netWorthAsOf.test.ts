@@ -285,3 +285,13 @@ it('reports missing opening evidence and excludes undated card debt from unsuppo
   expect(live.find(row => row.currency === 'USD')?.net).toBe(500);
   expect(live.find(row => row.currency === 'QAR')?.net).toBe(-200);
 });
+
+it('values broker ledgers independently and includes inactive-selection history', () => {
+  const inputs = { ...emptyInputs(), psxBrokers: [
+    { settings: { ...emptyInputs().psxSettings, currency: 'PKR' }, transactions: [], transfers: [{ id: 'one', date: '2020-01-01', type: 'DEPOSIT' as const, gross: 100, fee: 0 }], adjustments: [] },
+    { settings: { ...emptyInputs().psxSettings, currency: 'PKR' }, transactions: [], transfers: [{ id: 'two', date: '2020-01-01', type: 'DEPOSIT' as const, gross: 200, fee: 0 }], adjustments: [] },
+  ] };
+  expect(netWorthAsOfDate('2026-01-01', inputs).find(row => row.currency === 'PKR')?.net).toBe(300);
+  expect(earliestActivityDate(inputs)).toBe('2020-01-01');
+  expect(CalculationEngine.valuation.calculateNetWorth(inputs, { date: '2026-01-01', selectedModules: ['cash'] }).rows).toEqual([]);
+});

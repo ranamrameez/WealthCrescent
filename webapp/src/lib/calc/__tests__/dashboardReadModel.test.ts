@@ -72,3 +72,31 @@ it('uses the same pending-safe population for monthly totals, category totals an
   expect(group.byCurrency.USD).toBe(180);
   expect(group.details.USD.reduce((sum, item) => sum + item.amount, 0)).toBe(group.byCurrency.USD);
 });
+
+it('reports full calendar months with separate cleared, pending and planned populations', () => {
+  const report = engine.monthlyPlanReport([
+    activity('cleared', 100, true, { date: '2024-02-01' }),
+    activity('pending', -20, true, { date: '2024-02-10', isPending: true }),
+    activity('plan', -30, false, { date: '2024-02-29' }),
+    activity('future-real', 900, true, { date: '2024-02-29' }),
+    activity('outside', 500, false, { date: '2024-03-01' }),
+    activity('qar', 7, false, { date: '2024-02-20', currencyCode: 'QAR' }),
+  ], '2024-02', 1, '2024-02-15');
+  expect(report.fromDate).toBe('2024-02-01'); expect(report.toDate).toBe('2024-02-29');
+  expect(report.rows.find(row => row.currency === 'USD')?.months).toEqual([
+    { month: '2024-02', actualIn: 100, actualOut: 0, pendingIn: 0, pendingOut: -20, pendingNet: -20, plannedIn: 0, plannedOut: -30, plannedNet: -30 },
+  ]);
+  expect(report.rows.find(row => row.currency === 'QAR')?.months[0].plannedIn).toBe(7);
+});
+it('includes zero-activity months and normalizes unsupported timeline requests', () => {
+  const report = engine.monthlyPlanReport([activity('last', -10, false, { date: '2026-03-31' })], '2026-01', 3, '2026-01-01');
+  expect(report.months).toEqual(['2026-01','2026-02','2026-03']);
+  expect(report.rows[0].months.map(month => month.plannedNet)).toEqual([0,0,-10]);
+  expect(engine.monthlyPlanReport([], 'invalid', 900, '2026-01-01').months).toEqual(['2026-01']);
+});
+
+it('monthly widgets preserve unknown net worth and match activity amounts without mixing currencies', () => {
+  const rows = engine.monthlyStatCards(['2026-01','2026-02'], 'USD', [{ month: '2026-01', income: { USD: 100, QAR: 900 }, expense: { USD: 30 } }], []);
+  expect(rows[0]).toEqual({ month: '2026-01', netWorth: null, income: 100, expense: 30, netFlow: 70 });
+  expect(rows[1].netWorth).toBeNull(); expect(rows[1].netFlow).toBe(0);
+});

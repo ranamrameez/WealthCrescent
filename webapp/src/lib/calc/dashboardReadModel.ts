@@ -5,7 +5,7 @@ import { netIncomeByCurrency as rentalsNetIncomeByCurrency } from './rentalsModu
 import { activitiesForGroup } from './categoryGroups';
 import type { Category, CategoryGroup } from '../../types/finance';
 import type { RentalsWorkbook } from '../../types/rentalsWorkbook';
-import { collectBudgetActivities, type BudgetActivity } from './budgetPlanner';
+import { collectBudgetActivities, type BudgetActivity, type BudgetOccurrenceWindow } from './budgetPlanner';
 import type { CashSettings } from '../../types/cashWorkbook';
 import type { CurrencyNetWorth, FlowActivityItem, NetWorthBreakdownEntry } from './netWorth';
 import { convertAmount, type FxRates } from './currencyConversion';
@@ -131,13 +131,13 @@ export function dashboardInsights(rows: CurrencyNetWorth[], activities: BudgetAc
 }
 
 
-export function dashboardActivities(inputs: Parameters<typeof collectBudgetActivities>[0], cashSettings: CashSettings, selectedModules: readonly string[], asOf: Date) {
+export function dashboardActivities(inputs: Parameters<typeof collectBudgetActivities>[0], cashSettings: CashSettings, selectedModules: readonly string[], asOf: Date, window?: BudgetOccurrenceWindow) {
   const cashEnabled = selectedModules.includes('cash') && cashSettings.includeInNetWorth !== false;
   return collectBudgetActivities({ ...inputs,
     cashEntries: cashEnabled ? inputs.cashEntries : [], plannedCash: cashEnabled ? inputs.plannedCash : [],
     bankAccounts: inputs.bankAccounts.filter(account => !account.migratedToCreditCardId && account.includeInNetWorth !== false && selectedModules.includes(account.isLiability ? 'creditCards' : 'bank')),
     rentalProperties: selectedModules.includes('rentals') ? inputs.rentalProperties : [],
-  }, { asOf, horizonDays: 365 });
+  }, { asOf, horizonDays: 365, ...window });
 }
 
 
@@ -293,4 +293,37 @@ export function categoryGroupReport(activities: BudgetActivity[], group: Categor
 }
 export function monthlyNetFlow(monthly: import('./budgetPlanner').MonthlyIncomeExpense | undefined, currency: string) {
   return (monthly?.income[currency] ?? 0) - (monthly?.expense[currency] ?? 0);
+}
+
+export function monthlyPlanReport(activities: BudgetActivity[], fromMonth: string, monthCount: number, today: string) {
+  const start = /^\d{4}-(0[1-9]|1[0-2])$/.test(fromMonth) ? fromMonth : today.slice(0, 7);
+  const count = [1, 3, 6, 12].includes(monthCount) ? monthCount : 1;
+  const date = new Date(start + '-01T00:00:00Z'); date.setUTCMonth(date.getUTCMonth() + count - 1);
+  const months = reportingMonths(start, date.toISOString().slice(0, 7));
+  const fromDate = start + '-01', toDate = endOfMonthAsOf(months.at(-1)!);
+  const items = activities.filter(item => item.date >= fromDate && item.date <= toDate);
+  const currencies = [...new Set(items.map(item => item.currencyCode))].sort();
+  const rows = currencies.map(currency => ({ currency, months: months.map(month => {
+    const bucket = items.filter(item => item.currencyCode === currency && item.date.slice(0, 7) === month);
+    const actual = bucket.filter(item => item.executed && !item.isPending && item.date <= today);
+    const pending = bucket.filter(item => item.isPending);
+    const planned = bucket.filter(item => !item.executed && !item.isPending);
+    const inflow = (values: BudgetActivity[]) => values.reduce((sum, item) => sum + Math.max(0, item.amount), 0);
+    const outflow = (values: BudgetActivity[]) => values.reduce((sum, item) => sum + Math.min(0, item.amount), 0);
+    return { month, actualIn: inflow(actual), actualOut: outflow(actual), pendingIn: inflow(pending), pendingOut: outflow(pending), pendingNet: inflow(pending) + outflow(pending), plannedIn: inflow(planned), plannedOut: outflow(planned), plannedNet: inflow(planned) + outflow(planned) };
+  }) }));
+  return { fromDate, toDate, items, planned: items.filter(item => !item.executed && !item.isPending).sort((a,b) => a.date.localeCompare(b.date)), rows, months };
+}
+
+export function monthlyStatCards(months: string[], currency: string, monthly: { month: string; income: Record<string, number>; expense: Record<string, number> }[], trend: MonthlyNetWorthPoint[]) {
+  return months.map(month => {
+    const flow = monthly.find(row => row.month === month);
+    const snapshot = trend.find(row => row.month === month);
+    const income = flow?.income[currency] ?? 0, expense = flow?.expense[currency] ?? 0;
+    return { month, netWorth: snapshot?.byCurrency[currency] ?? null, income, expense, netFlow: income - expense };
+  });
+}
+export function moduleBreakdownChart(row: CurrencyNetWorth) {
+  const entries = row.breakdown.filter(item => item.amount !== 0);
+  return { labels: entries.map(item => item.module), amounts: entries.map(item => item.amount) };
 }

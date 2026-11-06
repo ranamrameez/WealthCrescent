@@ -1,3 +1,4 @@
+import type { BrokerProfile, BrokerPortfolioData, QSESettings } from '../../types/workbook';
 import { CalculationEngine } from '../../lib/calc/CalculationEngine';
 import type { NetWorthValuationInputs } from '../../lib/calc/netWorthValuation';
 import { useCashWorkbookStore } from '../../store/cashWorkbookStore';
@@ -20,6 +21,16 @@ const scopedInputs = new Map<string, NetWorthValuationInputs>();
 function invalidate() { inputSnapshot = undefined; scopedInputs.clear(); cache.clear(); listeners.forEach(listener => listener()); }
 for (const source of [useCashWorkbookStore, useBankWorkbookStore, useCreditCardWorkbookStore, usePersonalLoansWorkbookStore, useEMIWorkbookStore, useFundsWorkbookStore, useWorkbookStore, usePSXWorkbookStore, useQseFeed, usePsxFeed]) source.subscribe(invalidate);
 
+function brokerLedgers<T extends QSESettings>(workbook: { settings: T; brokerProfiles?: BrokerProfile<T>[]; activeBrokerId?: string; transactions: BrokerPortfolioData['transactions']; transfers: BrokerPortfolioData['transfers']; adjustments: BrokerPortfolioData['adjustments']; dividends?: BrokerPortfolioData['dividends'] }) {
+  if (!workbook.brokerProfiles?.length) return undefined;
+  return workbook.brokerProfiles.map(profile => {
+    const active = profile.id === workbook.activeBrokerId;
+    const data = active ? workbook : profile.data;
+    return { settings: active ? workbook.settings : profile.settings,
+      transactions: data?.transactions ?? [], transfers: data?.transfers ?? [], adjustments: data?.adjustments ?? [], dividends: data?.dividends ?? [] };
+  });
+}
+
 /** Gather native ledgers once. Feed overlays retain the exchange's existing quote policy. */
 export function getNetWorthInputs(): NetWorthValuationInputs {
   if (inputSnapshot) return inputSnapshot;
@@ -31,6 +42,7 @@ export function getNetWorthInputs(): NetWorthValuationInputs {
   const qse = applyLiveQse(useWorkbookStore.getState().workbook, useQseFeed.getState().points);
   const psx = applyLivePsx(usePSXWorkbookStore.getState().workbook, usePsxFeed.getState().points);
   inputSnapshot = {
+    qseBrokers: brokerLedgers(qse), psxBrokers: brokerLedgers(psx),
     cashEntries: cash.entries, cashSettings: cash.settings,
     bankAccounts: bank.settings.accounts, bankTransactions: bank.transactions,
     creditCards: cards.cards, creditCardTransactions: cards.transactions,
@@ -38,7 +50,7 @@ export function getNetWorthInputs(): NetWorthValuationInputs {
     emiLoans: useEMIWorkbookStore.getState().workbook.entries,
     fundsFunds: funds.funds, fundsTransactions: funds.transactions, fundsTransfers: funds.transfers,
     fundsDefaultCurrency: funds.settings.legacyTransferCurrency ?? funds.settings.defaultCurrency,
-    fundsIncludeCashInNetWorth: funds.settings.includeCashInNetWorth !== false,
+    fundsIncludeCashInNetWorth: funds.settings.includeCashInNetWorth === true,
     fundsMarketPrices: funds.marketPrices, fundsPriceHistory: funds.priceHistory,
     qseTransactions: qse.transactions, qseTransfers: qse.transfers, qseAdjustments: qse.adjustments,
     qseDividends: qse.dividends, qseSettings: qse.settings, qsePriceHistory: qse.priceHistory, qseMarketPrices: qse.marketPrices,

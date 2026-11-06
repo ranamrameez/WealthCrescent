@@ -30,7 +30,7 @@ The default is This month (`since-month`). Invalid dates are rejected; future da
 
 ## Non-goals and safeguards
 
-- The dashboard sections use plain collapsible headers and sibling content cards; there is no redundant outer section-card shell. The filter does not edit transactions, balances, broker profiles, or source records.
+- Dashboard sections use the same shared StandardPageSections card headers and collapse/fullscreen controls as other modules (2026-11-06 user-requested parity correction). The filter does not edit transactions, balances, broker profiles, or source records.
 - It does not merge QSE and PSX broker profiles or combine their cash ledgers.
 - It does not invent an opening balance when no verified baseline exists.
 - Do not add a second dashboard-only accounting engine. Reuse the central net-worth/as-of and cash-flow calculations.
@@ -47,3 +47,19 @@ NetWorthPage obtains native data and inclusion commands from dashboard/net-worth
 ## Outstanding dashboard and UI delivery
 
 The calculation migration does not complete the planned dashboard redesign. Follow [the delivery checklist](DELIVERY_CHECKLIST.md) for visual hierarchy, responsive review, shared charts/topbar/filters, dropdown navigation and theme acceptance.
+
+## Funds and broker compatibility correction (2026-11-06)
+
+Legacy missing Funds cash inclusion means holdings-only; explicit true/false remains authoritative. New workbook defaults remain explicit. Independent broker valuation uses each included profile and its own settings, rather than only the selected trading broker. Historical and current valuation share this path.
+
+## Month-based Plans (2026-11-06)
+
+Plans now has URL-backed plan-month (YYYY-MM) and plan-months (1/3/6/12). The window uses full calendar boundaries, including leap February; the selected start defaults to the page reporting range's first month. The independent plan month can be historical or future. Recurrence expands over the exact requested window, rather than clipping at today's default horizon.
+
+Charts, monthly tables and dated remaining-plan rows share the service's scoped activity dataset. Cleared actuals stop at today; pending native rows and unexecuted plans remain separate. Values stay per currency; empty months remain represented. This is an activity report, not a claimed future net-worth balance. Current coverage is Cash/Bank/Rentals; integration of other native domains remains pending. The complete Planning editor is linked for writes.
+
+Only top-level dashboard sections collapse. Currency summaries, chart cards and monthly tables inside remain open. Main figures use larger highlighted values, supporting balances are smaller and additional stats compact. Modern/Compact stat presentation is independent of theme; references live in ../../docs/ui-samples/. Alerts can be dismissed with an accessible cross button.
+
+Research informing the design: [YNAB monthly income/expense comparison](https://support.ynab.com/en_us/income-v-expense-Byu1BYWRq) and [Actual date-filtered report cards](https://master.www.actualbudget.org/docs/reports/custom-reports/). These inform presentation only; native ledger semantics and CalculationEngine remain authoritative.
+
+User correction: retain only the existing Comfortable, Compact and Console modes. The supplied Modern/Compact screenshots are reference examples for repairing these modes, not additional preferences. Symbol use means the existing semantic icons with visible labels, not decorative icons replacing financial meaning.
