@@ -55,7 +55,7 @@ export function resolveDashboardRange(periodValue: string, fromValue: string | n
   return { period, from, to, label };
 }
 
-export function sumActivitiesByCurrency(activities: BudgetActivity[], fromDate: string, toDate: string): Record<string, number> {
+export function sumActivitiesByCurrency(activities: MovementActivity[], fromDate: string, toDate: string): Record<string, number> {
   const totals: Record<string, number> = {};
   activities.forEach(activity => {
     if (!activity.executed || activity.isPending || activity.date < fromDate || activity.date > toDate) return;
@@ -64,8 +64,8 @@ export function sumActivitiesByCurrency(activities: BudgetActivity[], fromDate: 
   return totals;
 }
 
-export function activityFlowItems(activities: BudgetActivity[], currency: string, fromDate: string, toDate: string): FlowActivityItem[] {
-  const labels: Record<BudgetActivity['module'], string> = { cash: 'Cash', bank: 'Bank', rentals: 'Rentals' };
+export function activityFlowItems(activities: MovementActivity[], currency: string, fromDate: string, toDate: string): FlowActivityItem[] {
+  const labels = MOVEMENT_MODULE_LABELS;
   return activities
     .filter(activity => activity.executed && !activity.isPending && activity.currencyCode === currency && activity.date >= fromDate && activity.date <= toDate)
     .map(activity => ({
@@ -79,7 +79,7 @@ export function activityFlowItems(activities: BudgetActivity[], currency: string
 }
 
 
-export function plannedActivityByCurrency(activities: BudgetActivity[], fromDate: string, toDate: string) {
+export function plannedActivityByCurrency(activities: MovementActivity[], fromDate: string, toDate: string) {
   const totals: Record<string, number> = {};
   for (const activity of activities) {
     if (activity.executed || activity.date < fromDate || activity.date > toDate) continue;
@@ -120,7 +120,7 @@ export function dashboardHeadline(input: {
 
 
 /** Insights use the same cleared period population as headline flow and drilldown. */
-export function dashboardInsights(rows: CurrencyNetWorth[], activities: BudgetActivity[], fromDate: string, toDate: string) {
+export function dashboardInsights(rows: CurrencyNetWorth[], activities: MovementActivity[], fromDate: string, toDate: string) {
   return rows.map(row => {
     const currencyActivity = activityFlowItems(activities, row.currency, fromDate, toDate);
     return { currency: row.currency,
@@ -171,13 +171,15 @@ export function planningReality(input: Omit<Parameters<typeof projectedNetWorthT
   return { endDate, planned, rows };
 }
 
-export function dashboardReport(input: { inputs: NetWorthAsOfInputs; rows: CurrencyNetWorth[]; activities: BudgetActivity[]; rentals: RentalsWorkbook; todayISO: string; period: string; fromDate: string | null; toDate: string | null; preferredCurrency: string; rates: FxRates | null }) {
+export function dashboardReport(input: { inputs: NetWorthAsOfInputs; rows: CurrencyNetWorth[]; activities: BudgetActivity[]; movements?: MovementActivity[]; rentals: RentalsWorkbook; todayISO: string; period: string; fromDate: string | null; toDate: string | null; preferredCurrency: string; rates: FxRates | null }) {
   const { inputs: netWorthAsOfInputs, rows, activities, rentals, todayISO, period: legacyPeriod, preferredCurrency, rates } = input;
+  const movementSource: MovementActivity[] = input.movements ?? activities;
   const timeFilters = { fromDate: input.fromDate, toDate: input.toDate };
   const earliestActivity = earliestActivityDate(netWorthAsOfInputs);
-  const earliestDashboardDate = [earliestActivity, ...activities.map(activity => activity.date)].filter((date): date is string => !!date).sort()[0];
+  const earliestDashboardDate = [earliestActivity, ...movementSource.map(activity => activity.date)].filter((date): date is string => !!date).sort()[0];
   const dashboardRange = resolveDashboardRange(legacyPeriod, timeFilters.fromDate, timeFilters.toDate, earliestDashboardDate, todayISO);
-  const todayFlow = sumActivitiesByCurrency(activities, todayISO, todayISO);
+  const actualMovements = selectMovementActivities(movementSource,'0000-01-01',todayISO,todayISO,'actual');
+  const todayFlow = sumActivitiesByCurrency(actualMovements, todayISO, todayISO);
   const rangeStartDate = dashboardRange.from;
   const rangeEndDate = dashboardRange.to;
   const rangeLabel = dashboardRange.label;
@@ -191,8 +193,8 @@ export function dashboardReport(input: { inputs: NetWorthAsOfInputs; rows: Curre
   const rangeStartBreakdownByCurrency = Object.fromEntries(rangeStartRows.map(row => [row.currency, row.breakdown]));
   const rangeEndByCurrency = Object.fromEntries(rangeEndRows.map(row => [row.currency, row.net]));
   const rangeEndBreakdownByCurrency = Object.fromEntries(rangeEndRows.map(row => [row.currency, row.breakdown]));
-  const periodFlow = sumActivitiesByCurrency(activities, rangeStartDate, rangeEndDate);
-  const plannedUpcomingByCurrency = plannedActivityByCurrency(activities, todayISO, shiftISODate(todayISO, 29));
+  const periodFlow = sumActivitiesByCurrency(actualMovements, rangeStartDate, rangeEndDate);
+  const plannedUpcomingByCurrency = plannedActivityByCurrency(selectMovementActivities(movementSource,todayISO,shiftISODate(todayISO,29),todayISO,'planned'),todayISO,shiftISODate(todayISO,29));
 
   // Item 4: "capital split per currency" — each currency's net worth
   // converted to the preferred currency for a like-for-like comparison
@@ -209,10 +211,10 @@ export function dashboardReport(input: { inputs: NetWorthAsOfInputs; rows: Curre
   // not alphabetically — see `useCurrencyRankComparator`'s own doc comment.
   const ownCurrencies = [...new Set([...rows, ...rangeStartRows, ...rangeEndRows].map((r) => r.currency))].sort();
   const trendCurrentRows = ownCurrencies.map(currency => rows.find(row => row.currency === currency) ?? { currency, assets: 0, liabilities: 0, net: 0, breakdown: [] });
-  const activityCurrencies = [...new Set(activities.map(activity => activity.currencyCode))].sort();
+  const activityCurrencies = [...new Set(movementSource.filter(item=>item.movementKind !== 'transfer').map(activity => activity.currencyCode))].sort();
   const currencySummaryCurrencies = [...new Set([...ownCurrencies, ...Object.keys(todayFlow), ...Object.keys(periodFlow), ...Object.keys(plannedUpcomingByCurrency)])].sort();
   const currencySummaryRows = currencySummaryCurrencies.map(currency => rows.find(row => row.currency === currency) ?? { currency, assets: 0, liabilities: 0, net: 0, breakdown: [] });
-  const selectedRangeActivities = activities.filter(activity => activity.date >= rangeStartDate && activity.date <= rangeEndDate);
+  const selectedRangeActivities = actualMovements.filter(activity => activity.date >= rangeStartDate && activity.date <= rangeEndDate);
   const selectedRangeActualActivities = selectedRangeActivities.filter(activity => activity.executed && !activity.isPending);
   const insightCurrencies = [...new Set([...rangeStartRows, ...rangeEndRows].map(row => row.currency).concat(selectedRangeActualActivities.map(activity => activity.currencyCode)))].sort();
   const periodInsightRows = insightCurrencies.map(currency => rangeEndRows.find(row => row.currency === currency) ?? { currency, assets: 0, liabilities: 0, net: 0, breakdown: [] });
@@ -238,8 +240,8 @@ export function breakdownDelta(previous: NetWorthBreakdownEntry[], current: NetW
   });
 }
 
-const BUDGET_MODULE_LABEL: Record<string, string> = { cash: 'Cash', bank: 'Bank', rentals: 'Rentals' };
-export function monthlyFlowItems(activities: BudgetActivity[], month: string, currency: string): FlowActivityItem[] {
+const BUDGET_MODULE_LABEL = MOVEMENT_MODULE_LABELS;
+export function monthlyFlowItems(activities: MovementActivity[], month: string, currency: string): FlowActivityItem[] {
   return activities
     .filter((a) => !a.isPending && a.date.slice(0, 7) === month && a.currencyCode === currency)
     .map((a) => ({
@@ -282,7 +284,7 @@ export function netWorthBreakdownForMonth(
 }
 
 
-export function categoryGroupReport(activities: BudgetActivity[], group: CategoryGroup, categories: Category[], from: string, to: string) {
+export function categoryGroupReport(activities: MovementActivity[], group: CategoryGroup, categories: Category[], from: string, to: string) {
   const items = activitiesForGroup(activities, group, categories).filter(activity => !activity.isPending && activity.date >= from && activity.date <= to);
   const byCurrency: Record<string, number> = {};
   const details: Record<string, FlowActivityItem[]> = {};
@@ -296,21 +298,21 @@ export function monthlyNetFlow(monthly: import('./budgetPlanner').MonthlyIncomeE
   return (monthly?.income[currency] ?? 0) - (monthly?.expense[currency] ?? 0);
 }
 
-export function monthlyPlanReport(activities: BudgetActivity[], fromMonth: string, monthCount: number, today: string) {
+export function monthlyPlanReport(activities: MovementActivity[], fromMonth: string, monthCount: number, today: string) {
   const start = /^\d{4}-(0[1-9]|1[0-2])$/.test(fromMonth) ? fromMonth : today.slice(0, 7);
   const count = [1, 3, 6, 12].includes(monthCount) ? monthCount : 1;
   const date = new Date(start + '-01T00:00:00Z'); date.setUTCMonth(date.getUTCMonth() + count - 1);
   const months = reportingMonths(start, date.toISOString().slice(0, 7));
   const fromDate = start + '-01', toDate = endOfMonthAsOf(months.at(-1)!);
-  const items = activities.filter(item => item.date >= fromDate && item.date <= toDate);
+  const items = activities.filter(item => item.movementKind !== 'transfer' && item.date >= fromDate && item.date <= toDate);
   const currencies = [...new Set(items.map(item => item.currencyCode))].sort();
   const rows = currencies.map(currency => ({ currency, months: months.map(month => {
     const bucket = items.filter(item => item.currencyCode === currency && item.date.slice(0, 7) === month);
     const actual = bucket.filter(item => item.executed && !item.isPending && item.date <= today);
     const pending = bucket.filter(item => item.isPending);
     const planned = bucket.filter(item => !item.executed && !item.isPending);
-    const inflow = (values: BudgetActivity[]) => values.reduce((sum, item) => sum + Math.max(0, item.amount), 0);
-    const outflow = (values: BudgetActivity[]) => values.reduce((sum, item) => sum + Math.min(0, item.amount), 0);
+    const inflow = (values: MovementActivity[]) => values.reduce((sum, item) => sum + Math.max(0, item.amount), 0);
+    const outflow = (values: MovementActivity[]) => values.reduce((sum, item) => sum + Math.min(0, item.amount), 0);
     return { month, actualIn: inflow(actual), actualOut: outflow(actual), pendingIn: inflow(pending), pendingOut: outflow(pending), pendingNet: inflow(pending) + outflow(pending), plannedIn: inflow(planned), plannedOut: outflow(planned), plannedNet: inflow(planned) + outflow(planned) };
   }) }));
   return { fromDate, toDate, items, planned: items.filter(item => !item.executed && !item.isPending).sort((a,b) => a.date.localeCompare(b.date)), rows, months };
@@ -351,6 +353,6 @@ export function moneyMovementReport(activities: MovementActivity[], from: string
   return { from, to, population, dimension, rows, count: items.length };
 }
 
-export function clearedRangeActivities(activities: BudgetActivity[], from: string, to: string, today: string) {
+export function clearedRangeActivities(activities: MovementActivity[], from: string, to: string, today: string) {
   return activities.filter(item => item.executed && !item.isPending && item.date >= from && item.date <= to && item.date <= today);
 }

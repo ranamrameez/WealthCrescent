@@ -1,5 +1,5 @@
 import { categoryName } from '../categories';
-import type { BudgetActivity } from './budgetPlanner';
+import type { MovementActivity } from './movementActivities';
 import type { Category, CategoryGroup } from '../../types/finance';
 
 /** The set of category display NAMES a group currently resolves to.
@@ -23,7 +23,7 @@ export function groupCategoryNames(group: CategoryGroup, categories: Category[])
  * filters WITHIN one group at a time, so calling it once per group (never
  * summing the results of two different groups together) is the correct
  * way to avoid double-counting a shared category's own activity. */
-export function activitiesForGroup(activities: BudgetActivity[], group: CategoryGroup, categories: Category[]): BudgetActivity[] {
+export function activitiesForGroup(activities: MovementActivity[], group: CategoryGroup, categories: Category[]): MovementActivity[] {
   const names = groupCategoryNames(group, categories);
   return activities.filter((a) => names.has(a.category ?? ''));
 }
@@ -42,7 +42,7 @@ export interface CategoryGroupMonthlyTotal {
  * the "bird's-eye view" the user's own Excel workflow described (e.g.
  * "Expense -> Travel + Grocery + Extra++"). */
 export function groupMonthlyTotals(
-  activities: BudgetActivity[], group: CategoryGroup, categories: Category[], months: string[],
+  activities: MovementActivity[], group: CategoryGroup, categories: Category[], months: string[],
 ): CategoryGroupMonthlyTotal[] {
   const filtered = activitiesForGroup(activities, group, categories);
   return months.map((month) => {

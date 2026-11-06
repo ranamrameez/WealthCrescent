@@ -215,3 +215,5 @@ export function getNativeMovementActivities(modules: readonly string[], window?:
 export type { MovementActivity, MovementKind } from '../../lib/calc/movementActivities';
 
 export function getMonthlyMovementReport(...args: Parameters<typeof CalculationEngine.movements.monthlyMovementReport>) { return CalculationEngine.movements.monthlyMovementReport(...args); }
+
+export function getClearedNativeMovements(activities: Parameters<typeof CalculationEngine.movements.selectMovementActivities>[0], today: string) { return CalculationEngine.movements.selectMovementActivities(activities,'0000-01-01',today,today,'actual'); }

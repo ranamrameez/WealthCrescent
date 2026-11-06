@@ -1,3 +1,4 @@
+import type { MovementActivity } from './movementActivities';
 import { planOccurrences } from './planOccurrences';
 /** Budget Planner (README item 106 / user-requested 2026-08-26) — a
  * cross-module view over Cash/Bank/Rentals' ALREADY-EXISTING planned
@@ -198,7 +199,7 @@ export interface MonthlyIncomeExpense {
  * currency. Callers typically ask for exactly 3 months (previous/current/
  * next) per the user's own request, but this itself is unbounded — pass
  * whichever months you want. */
-export function monthlyIncomeExpense(activities: BudgetActivity[], months: string[]): MonthlyIncomeExpense[] {
+export function monthlyIncomeExpense(activities: MovementActivity[], months: string[]): MonthlyIncomeExpense[] {
   return months.map((month) => {
     const income: Record<string, number> = {};
     const expense: Record<string, number> = {};

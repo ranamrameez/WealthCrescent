@@ -1153,3 +1153,5 @@ Money in/out includes monthly widgets, a local trend chart and matching monthly 
 Manual Cash, Bank and card plan completion now preserves an explicit plan/occurrence/group link on its actual ledger record. New actuals appear under their named plan in Money in/out; historical records without provenance remain Unallocated. Completed recurrence snapshots and the original monthly anchor are preserved. This is user-triggered Mark as done, not automatic payment execution.
 
 Rental plan completion preserves its explicit plan/group link on the property record and linked Cash/Bank record. Reporting counts that rental event once, including the plan allocation. The service checks sign-in, reviewed-plan changes, active source and currency before writing. No automatic settlement or inferred historical allocation.
+
+Dashboard actual movement totals now cover the same included sources in the headline, currency details, Analytics, monthly widgets and Money in/out. They include financing and investment movements; use Movement kind for a narrower breakdown. Movement is not earned income or investment growth. Pending/planned amounts stay separate from cleared actuals.

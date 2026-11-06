@@ -1,3 +1,15 @@
+## Unified dashboard actual-movement scope — 2026-11-06
+
+Headline/native currency pills, Analytics insights, monthly actual widgets/table/drilldowns, category groups and Money in/out now use the same cleared native movement population. Internal transfers are excluded, exact selected dates/current-day cutoff apply, currencies stay separate, and current net-worth valuation is unchanged. Monthly Plans also reads the canonical source set, including cards and personal-loan plans, while preserving separate actual/pending/planned populations. Standalone schedules and investment sketches remain documented adapter work. Net-worth forecasts retain the original tested forecast population; investment purchases are not subtracted from projected net worth as if value disappeared. Movement labels explicitly distinguish financing/investments from earned income and valuation growth.
+
+Validation: 4 files / 41 focused tests passed; both TypeScript projects and production build passed (canonical-dashboard-build.log) after correcting a compatible optional-field input annotation. Browser verified matching native totals across Money in/out, Insights and both monthly widgets, with no real ledger write. Published rental checkpoint 5a8de627 passed Actions 442; this new slice requires its own resulting-head CI.
+
+Consolidated remaining work is indexed in docs/CURRENT_DELIVERY_STATUS.md. Unified budget implementation rules are in docs/UNIFIED_BUDGET_MODEL.md (design, not a completion claim). Continue budgets, remaining source provenance/adapters, UI/service migration, safe RTDB repositories, pending-only scheduler/history/settlement/void and full UI/theme/mobile acceptance. Keep PR 51 draft.
+
+## Current status index — 2026-11-06
+
+Read docs/CURRENT_DELIVERY_STATUS.md for the consolidated completed/pending/planned inventory. The current uncommitted continuation aligns dashboard actual movement totals across headline, Analytics, month widgets, plan comparison and Money in/out; focused 41 tests and read-only browser verification passed. Check canonical-dashboard-build.log, then commit/push and verify exact-head CI. Published rental checkpoint 5a8de627 passed Actions 442. Continue all remaining work; do not treat this index as completion.
+
 ## Rental fulfillment provenance — 2026-11-06
 
 Source 321b18ac5db96231f4a0dded8e0c83d68fba0790 passed Actions 441: 167 files / 1,271 tests, broker regressions, TypeScript and production build. No merge/deployment.

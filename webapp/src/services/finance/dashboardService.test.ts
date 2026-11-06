@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getDashboardReport, getDashboardContext, getDashboardActivities, setNetWorthInclusion, subscribeDashboard } from './dashboardService';
+import { getDashboardReport, getDashboardContext, getDashboardActivities, getNativeMovementActivities, getClearedNativeMovements, getMonthlyMovementReport, getMoneyMovementReport, setNetWorthInclusion, subscribeDashboard } from './dashboardService';
 import { getScopedNetWorthInputs, getNetWorthSummary } from './netWorthService';
 import { useCreditCardWorkbookStore } from '../../store/creditCardWorkbookStore';
 import { usePlannedCashWorkbookStore } from '../../store/plannedCashWorkbookStore';
@@ -75,5 +75,27 @@ it('values the capital split at the selected period end while keeping the curren
     expect(rows[0].net).toBe(1100);
     expect(report.splitData).toEqual([{ currency: 'USD', converted: 100 }]);
     expect(report.rangeEndRows[0].net).toBe(100);
+  } finally { store.setWorkbook(original); }
+});
+
+it('reconciles native card headline, monthly activity and itemized report without counting card payments as income',()=>{
+  const store = useCreditCardWorkbookStore.getState(), original = store.workbook;
+  try {
+    store.setWorkbook({ cards: [{ id: 'card-flow', name: 'Card', currencyCode: 'USD', openingBalance: 0 }], transactions: [
+      { id: 'charge', cardId: 'card-flow', date: '2026-01-05', kind: 'charge', amount: 20, description: 'Food' },
+      { id: 'payment', cardId: 'card-flow', date: '2026-01-06', kind: 'payment', amount: 20, description: 'Pay card' },
+      { id: 'future', cardId: 'card-flow', date: '2026-02-01', kind: 'charge', amount: 900, description: 'Future' },
+    ] });
+    const movements = getNativeMovementActivities(['creditCards']);
+    const report = getDashboardReport({ inputs: getScopedNetWorthInputs(['creditCards']), rows: getNetWorthSummary(['creditCards'],'2026-01-15').rows, activities: [], movements,
+      rentals: getDashboardContext().rentals, todayISO: '2026-01-15', period: 'since-month', fromDate: null, toDate: null, preferredCurrency: 'USD', rates: null });
+    expect(report.periodFlow).toEqual({ USD: -20 });
+    const actual = getClearedNativeMovements(movements,'2026-01-15');
+    expect(actual.map(row=>row.id)).toEqual(['charge']);
+    const monthly = getMonthlyMovementReport(movements,report.rangeStartDate,report.rangeEndDate,'2026-01-15','actual');
+    expect(monthly.rows[0].months[0].netFlow).toBe(report.periodFlow.USD);
+    const grouped = getMoneyMovementReport(movements,report.rangeStartDate,report.rangeEndDate,'2026-01-15','module','actual');
+    expect(grouped.rows[0].groups[0]).toMatchObject({ label: 'Credit cards', net: -20 });
+    expect(grouped.rows[0].groups[0].items.map(item=>item.description)).toEqual(['Food']);
   } finally { store.setWorkbook(original); }
 });

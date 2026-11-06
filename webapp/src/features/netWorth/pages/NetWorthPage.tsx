@@ -31,7 +31,7 @@ import type { NetWorthAsOfInputs } from '../../../lib/calc/netWorthAsOf';
 import { UpcomingList } from '../../../components/UpcomingList';
 import { useUpcomingItems } from '../../../hooks/useUpcomingItems';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
-import { getDashboardReport, getCurrencyDashboardSummary, getBreakdownDelta, getMonthlyFlowItems as monthlyFlowItems, getNetWorthBreakdownForMonth as netWorthBreakdownForMonth, getCategoryGroupReport, getMonthlyNetFlow, getMonthlyPlanReport, getMonthlyStatCards, getModuleBreakdownChart, getClearedRangeActivities, getMoneyMovementReport, getMonthlyMovementReport, type FlowDimension, type FlowPopulation, type MovementKind, getReportingMonths, getMonthlyIncomeExpense as monthlyIncomeExpense,
+import { getDashboardReport, getCurrencyDashboardSummary, getBreakdownDelta, getMonthlyFlowItems as monthlyFlowItems, getNetWorthBreakdownForMonth as netWorthBreakdownForMonth, getCategoryGroupReport, getMonthlyNetFlow, getMonthlyPlanReport, getMonthlyStatCards, getModuleBreakdownChart, getClearedRangeActivities, getMoneyMovementReport, getMonthlyMovementReport, getClearedNativeMovements, type MovementActivity, type FlowDimension, type FlowPopulation, type MovementKind, getReportingMonths, getMonthlyIncomeExpense as monthlyIncomeExpense,
   getNetWorthTrend as projectedNetWorthTrend, getMonthEnd as endOfMonthAsOf } from '../../../services/finance/dashboardService';
 import { useDashboardContext, useDashboardActivities, useNativeMovementActivities } from '../../../hooks/useDashboard';
 import { useNetWorthInputs, useNetWorthSummary } from '../hooks/useNetWorthSummary';
@@ -222,6 +222,7 @@ export function NetWorthPage(_legacySyncProps: {
   );
 
   const activities = useDashboardActivities(selectedModules);
+  const nativeMovements = useNativeMovementActivities(selectedModules);
 
   const netWorthAsOfInputs = useNetWorthInputs(selectedModules);
 
@@ -299,7 +300,8 @@ export function NetWorthPage(_legacySyncProps: {
       setTimeFilters({ period: 'custom', fromDate: shiftISODate(todayISO, -days), toDate: todayISO });
     }
   }, [legacyPeriod, setTimeFilters, todayISO]);
-  const report = getDashboardReport({ inputs: netWorthAsOfInputs, rows, activities, rentals, todayISO, period: legacyPeriod,
+  const actualMovements = useMemo(()=>getClearedNativeMovements(nativeMovements,todayISO),[nativeMovements,todayISO]);
+  const report = getDashboardReport({ movements: nativeMovements, inputs: netWorthAsOfInputs, rows, activities, rentals, todayISO, period: legacyPeriod,
     fromDate: timeFilters.fromDate, toDate: timeFilters.toDate, preferredCurrency, rates });
   const { todayFlow, periodFlow, plannedUpcomingByCurrency, rangeStartDate, rangeEndDate, rangeLabel, rangeBaselineDate,
     unverifiedOpeningCurrencies, hasRangeBaseline, rangeStartByCurrency, rangeEndByCurrency, rangeStartBreakdownByCurrency, rangeEndBreakdownByCurrency,
@@ -349,11 +351,11 @@ export function NetWorthPage(_legacySyncProps: {
               value={fmtMoney(todayFlowTotal.total, preferredCurrency)}
               tone={todayFlowTotal.total >= 0 ? 'positive' : 'negative'}
               title={todayFlowTotal.anyUnconverted ? 'Some currencies excluded — no rate available.' : undefined}
-              tooltip="Cleared Cash, Bank and Rental movement today, converted to the preferred currency."
+              tooltip="Cleared recorded movement across included modules (excluding internal transfers) today, converted to the preferred currency."
               onClick={() => setDrilldown({
                 kind: 'breakdown',
                 title: "Today's net flow, by currency",
-                explanation: `Each currency's own cleared (unconverted) net Cash, Bank and Rental movement on ${todayISO}, converted above to ${preferredCurrency} for the headline figure. Click that currency's own card further down the page for the real itemized transactions.`,
+                explanation: `Each currency's own cleared (unconverted) net recorded movement across included modules (excluding internal transfers) on ${todayISO}, converted above to ${preferredCurrency} for the headline figure. Click that currency's own card further down the page for the real itemized transactions.`,
                 rows: Object.entries(todayFlow).map(([code, amount]) => ({ label: code, currency: code, amount })),
               })}
             />
@@ -362,11 +364,11 @@ export function NetWorthPage(_legacySyncProps: {
               value={fmtMoney(periodFlowTotal.total, preferredCurrency)}
               tone={periodFlowTotal.total >= 0 ? 'positive' : 'negative'}
               title={periodFlowTotal.anyUnconverted ? 'Some currencies excluded — no rate available.' : undefined}
-              tooltip={`Cleared Cash, Bank and Rental movement from ${rangeStartDate} through ${rangeEndDate}, converted to the preferred currency.`}
+              tooltip={`Cleared recorded movement across included modules (excluding internal transfers) from ${rangeStartDate} through ${rangeEndDate}, converted to the preferred currency.`}
               onClick={() => setDrilldown({
                 kind: 'breakdown',
                 title: `Period net flow (${rangeLabel}), by currency`,
-                explanation: `Each currency's own cleared (unconverted) net Cash, Bank and Rental movement from ${rangeStartDate} through ${rangeEndDate}, converted above to ${preferredCurrency} for the headline figure. Click that currency's own card further down the page for the real itemized transactions.`,
+                explanation: `Each currency's own cleared (unconverted) net recorded movement across included modules (excluding internal transfers) from ${rangeStartDate} through ${rangeEndDate}, converted above to ${preferredCurrency} for the headline figure. Click that currency's own card further down the page for the real itemized transactions.`,
                 rows: Object.entries(periodFlow).map(([code, amount]) => ({ label: code, currency: code, amount })),
               })}
             />
@@ -450,29 +452,29 @@ export function NetWorthPage(_legacySyncProps: {
                  in the Net worth summary card, but in this currency's own
                  real, unconverted terms. */}
               <div className="row" style={{ gap: 6, marginTop: 10, alignItems: 'center' }}>
-                <Tooltip text="Cleared Cash, Bank and Rental movement today, excluding linked transfers and pending entries. Click for the real transactions.">
+                <Tooltip text="Cleared recorded movement across included modules (excluding internal transfers) today, excluding linked transfers and pending entries. Click for the real transactions.">
                   <span
                     className={`pill clickable ${todayFlowC >= 0 ? 'pill-positive' : 'pill-negative'}`}
                     onClick={() => setDrilldown({
                       kind: 'flow',
                       title: `Today's ${r.currency} Cash+Bank activity`,
-                      explanation: 'Every cleared Cash, Bank and Rental entry dated today, in this currency. Linked transfers and pending entries are excluded.',
+                      explanation: 'Every cleared native movement record dated today, in this currency. Internal transfers and pending entries are excluded. Financing and investments are movement, not earned income.',
                       currency: r.currency,
                       from: todayISO,
                       to: todayISO,
-                      items: activityFlowItems(activities, r.currency, todayISO, todayISO),
+                      items: activityFlowItems(actualMovements, r.currency, todayISO, todayISO),
                     })}
                   >
                     Today {todayFlowC >= 0 ? '+' : ''}{fmtMoney(todayFlowC, r.currency)}
                   </span>
                 </Tooltip>
-                <Tooltip text={`Cleared Cash, Bank and Rental movement from ${rangeStartDate} through ${rangeEndDate}, excluding linked transfers and pending entries. Click for the real transactions.`}>
+                <Tooltip text={`Cleared recorded movement across included modules (excluding internal transfers) from ${rangeStartDate} through ${rangeEndDate}, excluding linked transfers and pending entries. Click for the real transactions.`}>
                   <span
                     className={`pill clickable ${periodFlowC >= 0 ? 'pill-positive' : 'pill-negative'}`}
                     onClick={() => setDrilldown({
                       kind: 'flow',
                       title: `${r.currency} Cash+Bank activity (${rangeLabel})`,
-                      explanation: `Every cleared Cash, Bank and Rental entry from ${rangeStartDate} through ${rangeEndDate}, in this currency. Linked transfers and pending entries are excluded.`,
+                      explanation: `Every cleared native movement record from ${rangeStartDate} through ${rangeEndDate}, in this currency. Internal transfers and pending entries are excluded. Financing and investments are movement, not earned income.`,
                       currency: r.currency,
                       from: rangeStartDate,
                       to: rangeEndDate,
@@ -534,7 +536,7 @@ export function NetWorthPage(_legacySyncProps: {
       }] : []), ...(sectionVisible('recent') ? [{  key: 'recent', icon: <ListIcon size={16} />, label: 'Recent transactions', content: <NetWorthRecentTransactions /> }] : []), ...(sectionVisible('analytics') ? [{
         key: 'analytics', icon: <StocksIcon size={16} />,
         label: 'Analytics',
-        content: <NetWorthAnalyticsSection ownCurrencies={ownCurrencies} activities={activities} categories={categories} groups={categoryGroups} emiLoans={netWorthAsOfInputs.emiLoans} currentRows={trendCurrentRows} periodEndRows={periodInsightRows} activityCurrencies={activityCurrencies} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} rangeStartDate={rangeStartDate} rangeEndDate={rangeEndDate} rangeLabel={rangeLabel} setDrilldown={setDrilldown} splitData={splitData} preferredCurrency={preferredCurrency} missingFxCurrencies={missingFxCurrencies} rentalsNet={selectedModules.includes('rentals') ? rentalsNetForRange : {}} />,
+        content: <NetWorthAnalyticsSection ownCurrencies={ownCurrencies} activities={actualMovements} forecastActivities={activities} categories={categories} groups={categoryGroups} emiLoans={netWorthAsOfInputs.emiLoans} currentRows={trendCurrentRows} periodEndRows={periodInsightRows} activityCurrencies={activityCurrencies} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISO} rangeStartDate={rangeStartDate} rangeEndDate={rangeEndDate} rangeLabel={rangeLabel} setDrilldown={setDrilldown} splitData={splitData} preferredCurrency={preferredCurrency} missingFxCurrencies={missingFxCurrencies} rentalsNet={selectedModules.includes('rentals') ? rentalsNetForRange : {}} />,
       }] : [])]} />
 
 
@@ -653,7 +655,7 @@ export function NetWorthPage(_legacySyncProps: {
 }
 
 function NetWorthInsightsSection({ rows, activities, fromDate, toDate, rangeLabel, missingFxCurrencies }: {
-  rows: CurrencyNetWorth[]; activities: BudgetActivity[]; fromDate: string; toDate: string; rangeLabel: string; missingFxCurrencies: string[];
+  rows: CurrencyNetWorth[]; activities: MovementActivity[]; fromDate: string; toDate: string; rangeLabel: string; missingFxCurrencies: string[];
 }) {
   const insights = getDashboardInsights(rows, activities, fromDate, toDate);
   return <div className="mb-md">
@@ -666,7 +668,7 @@ function NetWorthInsightsSection({ rows, activities, fromDate, toDate, rangeLabe
           <p><strong>Largest asset:</strong> {largestAsset ? largestAsset.module + ' — ' + fmtMoney(largestAsset.amount, row.currency) : 'No positive balance recorded'}</p>
           <p><strong>Largest liability:</strong> {largestLiability ? largestLiability.module + ' — ' + fmtMoney(largestLiability.amount, row.currency) : 'No liability recorded'}</p>
           <p><strong>Recorded net activity:</strong> <span style={{ color: netActivity >= 0 ? 'var(--profit)' : 'var(--loss)' }}>{fmtMoney(netActivity, row.currency)}</span></p>
-          <p className="text-muted mb-0">{clearedCount} cleared Cash, Bank or Rental entries in this range. Linked transfers are excluded.</p>
+          <p className="text-muted mb-0">{clearedCount} cleared native movement records in this range. Internal transfers are excluded; financing and investments are movement, not earned income.</p>
         </Card>;
       })}
     </div>
@@ -674,8 +676,8 @@ function NetWorthInsightsSection({ rows, activities, fromDate, toDate, rangeLabe
   </div>;
 }
 
-function NetWorthAnalyticsSection({ ownCurrencies, activities, categories, groups, emiLoans, currentRows, periodEndRows, activityCurrencies, netWorthAsOfInputs, todayISODate, rangeStartDate, rangeEndDate, rangeLabel, setDrilldown, splitData, preferredCurrency, missingFxCurrencies, rentalsNet }: {
-  ownCurrencies: string[]; activities: BudgetActivity[]; categories: Category[];
+function NetWorthAnalyticsSection({ ownCurrencies, activities, forecastActivities, categories, groups, emiLoans, currentRows, periodEndRows, activityCurrencies, netWorthAsOfInputs, todayISODate, rangeStartDate, rangeEndDate, rangeLabel, setDrilldown, splitData, preferredCurrency, missingFxCurrencies, rentalsNet }: {
+  ownCurrencies: string[]; activities: MovementActivity[]; forecastActivities: BudgetActivity[]; categories: Category[];
   groups: CategoryGroup[]; emiLoans: Parameters<typeof projectedNetWorthTrend>[0]['emiLoans'];
   currentRows: CurrencyNetWorth[]; periodEndRows: CurrencyNetWorth[]; activityCurrencies: string[]; netWorthAsOfInputs: NetWorthAsOfInputs; todayISODate: string;
   rangeStartDate: string; rangeEndDate: string; rangeLabel: string; setDrilldown: (d: Drilldown) => void;
@@ -683,10 +685,10 @@ function NetWorthAnalyticsSection({ ownCurrencies, activities, categories, group
 }) {
   return <div>
     <NetWorthInsightsSection rows={periodEndRows} activities={activities} fromDate={rangeStartDate} toDate={rangeEndDate} rangeLabel={rangeLabel} missingFxCurrencies={missingFxCurrencies} />
-    <NetWorthMonthlySection ownCurrencies={ownCurrencies} activityCurrencies={activityCurrencies} activities={activities} emiLoans={emiLoans} currentRows={currentRows} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISODate} rangeStartDate={rangeStartDate} rangeEndDate={rangeEndDate} setDrilldown={setDrilldown} />
+    <NetWorthMonthlySection ownCurrencies={ownCurrencies} activityCurrencies={activityCurrencies} activities={activities} forecastActivities={forecastActivities} emiLoans={emiLoans} currentRows={currentRows} netWorthAsOfInputs={netWorthAsOfInputs} todayISODate={todayISODate} rangeStartDate={rangeStartDate} rangeEndDate={rangeEndDate} setDrilldown={setDrilldown} />
     <CategoryGroupsSection ownCurrencies={activityCurrencies} activities={activities} categories={categories} groups={groups} fromDate={rangeStartDate} toDate={rangeEndDate} rangeLabel={rangeLabel} setDrilldown={setDrilldown} />
     {splitData.length > 1 && <ChartCard flat title={`Capital split by currency at period end (converted to ${preferredCurrency})`} empty={false}><div style={{ height: 220 }}><Doughnut data={{ labels: splitData.map((item) => item.currency), datasets: [{ data: splitData.map((item) => item.converted), backgroundColor: HUES }] }} options={{ plugins: { datalabels: dlDoughnut((value) => fmtMoney(value, preferredCurrency)) } }} /></div></ChartCard>}
-    {Object.keys(rentalsNet).length > 0 && <div className="mt-12"><div className="label mb-sm">Rental net income in selected period (informational — not included above)</div><div className="text-muted mb-sm">Property values aren't tracked, and deposited rental income already lands in Cash/Bank; counting it again would double-count it.</div><div className="row" style={{ gap: 12 }}>{Object.entries(rentalsNet).map(([code, amount]) => <div key={code} className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">{code}</div><MoneyValue n={amount} currency={code} /></div>)}</div></div>}
+    {Object.keys(rentalsNet).length > 0 && <div className="mt-12"><div className="label mb-sm">Rental net income in selected period (informational)</div><div className="text-muted mb-sm">Property values aren't tracked. Linked rent is counted once in recorded movement; this separate property breakdown is not added to net worth.</div><div className="row" style={{ gap: 12 }}>{Object.entries(rentalsNet).map(([code, amount]) => <div key={code} className="stat-card card" style={hueStyle('var(--accent)')}><div className="label">{code}</div><MoneyValue n={amount} currency={code} /></div>)}</div></div>}
   </div>;
 }
 
@@ -695,7 +697,7 @@ function NetWorthPlanningReality({ selectedModules, defaultMonth, todayISODate }
   const month = params.get('plan-month') || defaultMonth;
   const span = Number(params.get('plan-months') || 1);
   const bounds = getMonthlyPlanReport([], month, span, todayISODate);
-  const activities = useDashboardActivities(selectedModules, { fromDate: bounds.fromDate, toDate: bounds.toDate });
+  const activities = useNativeMovementActivities(selectedModules, { fromDate: bounds.fromDate, toDate: bounds.toDate });
   const report = getMonthlyPlanReport(activities, month, span, todayISODate);
   const { rows: planRows, controls: planPagination } = useTablePagination(report.planned);
   const change = (patch: Record<string, string>) => { const next = new URLSearchParams(params); Object.entries(patch).forEach(([key, value]) => next.set(key, value)); setParams(next); };
@@ -704,7 +706,7 @@ function NetWorthPlanningReality({ selectedModules, defaultMonth, todayISODate }
       <Field label="Plan month"><TextInput type="month" value={report.fromDate.slice(0, 7)} onChange={event => change({ 'plan-month': event.target.value })} /></Field>
       <Field label="Compare months"><Select value={String(report.months.length)} onChange={event => change({ 'plan-months': event.target.value })}>{[1,3,6,12].map(value => <option key={value} value={value}>{value} {value === 1 ? 'month' : 'months'}</option>)}</Select></Field>
     </div>
-    <p className="text-muted">{report.fromDate} – {report.toDate}. Cash, Bank and Rental activity. Actual values are cleared through {todayISODate}; plans are intentions, not settled balances.</p>
+    <p className="text-muted">{report.fromDate} – {report.toDate}. Recorded movement across included modules, with Cash/Bank/Rental/card/personal-loan plans. Internal transfers are excluded. Actual values are cleared through {todayISODate}; plans are intentions, not settled balances.</p>
     {report.rows.map(row => <div key={row.currency} className="mb-md">
       <h3>{row.currency} monthly activity</h3>
       <ChartCard flat title={row.currency + ' — actual, pending and planned'}><div style={{ height: 240 }}><Chart type="bar" data={{ labels: report.months, datasets: [
@@ -764,6 +766,7 @@ function NetWorthMonthlySection({
   ownCurrencies,
   activityCurrencies,
   activities,
+  forecastActivities,
   emiLoans,
   currentRows,
   netWorthAsOfInputs,
@@ -774,7 +777,8 @@ function NetWorthMonthlySection({
 }: {
   ownCurrencies: string[];
   activityCurrencies: string[];
-  activities: BudgetActivity[];
+  activities: MovementActivity[];
+  forecastActivities: BudgetActivity[];
   emiLoans: Parameters<typeof projectedNetWorthTrend>[0]['emiLoans'];
   currentRows: Parameters<typeof projectedNetWorthTrend>[0]['currentRows'];
   netWorthAsOfInputs: NetWorthAsOfInputs;
@@ -790,8 +794,8 @@ function NetWorthMonthlySection({
   const rangeActivities = useMemo(() => getClearedRangeActivities(activities, rangeStartDate, rangeEndDate, todayISODate), [activities, rangeStartDate, rangeEndDate, todayISODate]);
   const monthly = useMemo(() => monthlyIncomeExpense(rangeActivities, months), [rangeActivities, months]);
   const trend = useMemo(
-    () => projectedNetWorthTrend({ months, currentMonth: nowMonth, todayISODate, currentRows, activities, emiLoans, netWorthAsOfInputs }),
-    [months, nowMonth, todayISODate, currentRows, activities, emiLoans, netWorthAsOfInputs],
+    () => projectedNetWorthTrend({ months, currentMonth: nowMonth, todayISODate, currentRows, activities: forecastActivities, emiLoans, netWorthAsOfInputs }),
+    [months, nowMonth, todayISODate, currentRows, forecastActivities, emiLoans, netWorthAsOfInputs],
   );
 
   if (!ownCurrencies.length && !activityCurrencies.length) return null;
@@ -868,7 +872,7 @@ function NetWorthMonthlySection({
 function CategoryGroupsSection({
   ownCurrencies, activities, categories, groups, fromDate, toDate, rangeLabel, setDrilldown,
 }: {
-  ownCurrencies: string[]; activities: BudgetActivity[]; categories: Category[];
+  ownCurrencies: string[]; activities: MovementActivity[]; categories: Category[];
   groups: CategoryGroup[]; fromDate: string; toDate: string; rangeLabel: string;
   setDrilldown: (d: Drilldown) => void;
 }) {
@@ -901,7 +905,7 @@ function CategoryGroupsSection({
                       onClick={() => setDrilldown({
                         kind: 'flow',
                         title: `${g.name} — ${rangeLabel}, ${c}`,
-                        explanation: `Every real and planned entry from ${fromDate} through ${toDate} whose category is in the "${g.name}" group.`,
+                        explanation: `Every cleared actual record from ${fromDate} through ${toDate} whose category is in the "${g.name}" group.`,
                         currency: c,
                         from: fromDate,
                         to: toDate,
@@ -986,7 +990,7 @@ function MonthlySummaryTable({
   currency, months: initialMonths, nowMonth, monthly, trend, activities, rangeStartDate, rangeEndDate, currentRows, netWorthAsOfInputs, setDrilldown,
 }: {
   currency: string; months: string[]; nowMonth: string; monthly: MonthlyIncomeExpense[]; trend: MonthlyNetWorthPoint[];
-  activities: BudgetActivity[]; rangeStartDate: string; rangeEndDate: string; currentRows: CurrencyNetWorth[]; netWorthAsOfInputs: NetWorthAsOfInputs;
+  activities: MovementActivity[]; rangeStartDate: string; rangeEndDate: string; currentRows: CurrencyNetWorth[]; netWorthAsOfInputs: NetWorthAsOfInputs;
   setDrilldown: (d: Drilldown) => void;
 }) {
   const monthSort = useDateTableSort();
@@ -1027,7 +1031,7 @@ function MonthlySummaryTable({
           <tbody>
             <tr>
               <td>
-                <Tooltip text="Everything that added money in this month — real transactions and planned entries combined, EXCLUDING any linked inter-account transfer (moving your own money between your own accounts isn't real income). Click a month to see the real entries.">
+                <Tooltip text="Everything that added money in this month — cleared actual records only, EXCLUDING any linked inter-account transfer (moving your own money between your own accounts isn't real income). Click a month to see the real entries.">
                   Inflow
                 </Tooltip>
               </td>
@@ -1040,7 +1044,7 @@ function MonthlySummaryTable({
                     onClick={() => setDrilldown({
                       kind: 'flow',
                       title: `Inflow — ${monthLabel(m)}, ${currency}`,
-                      explanation: 'Every real and planned entry that added money this month, in this currency — Cash/Bank/Rentals combined, excluding any linked inter-account transfer.',
+                      explanation: 'Every cleared actual record that added money this month, in this currency — included native modules, excluding any linked inter-account transfer.',
                       currency,
                       from: monthFrom(m),
                       to: monthTo(m),
@@ -1054,7 +1058,7 @@ function MonthlySummaryTable({
             </tr>
             <tr>
               <td>
-                <Tooltip text="Everything that took money out this month — real transactions and planned entries combined, EXCLUDING any linked inter-account transfer (moving your own money between your own accounts isn't a real expense). Click a month to see the real entries.">
+                <Tooltip text="Everything that took money out this month — cleared actual records only, EXCLUDING any linked inter-account transfer (moving your own money between your own accounts isn't a real expense). Click a month to see the real entries.">
                   Outflow
                 </Tooltip>
               </td>
@@ -1067,7 +1071,7 @@ function MonthlySummaryTable({
                     onClick={() => setDrilldown({
                       kind: 'flow',
                       title: `Outflow — ${monthLabel(m)}, ${currency}`,
-                      explanation: 'Every real and planned entry that took money out this month, in this currency — Cash/Bank/Rentals combined, excluding any linked inter-account transfer.',
+                      explanation: 'Every cleared actual record that took money out this month, in this currency — included native modules, excluding any linked inter-account transfer.',
                       currency,
                       from: monthFrom(m),
                       to: monthTo(m),
@@ -1081,7 +1085,7 @@ function MonthlySummaryTable({
             </tr>
             <tr>
               <td>
-                <Tooltip text="Inflow minus outflow for this month — real transactions and planned entries combined, EXCLUDING any linked inter-account transfer (which is neither an inflow nor an outflow). Click a month to see every entry that made up this figure.">
+                <Tooltip text="Inflow minus outflow for this month — cleared actual records only, EXCLUDING any linked inter-account transfer (which is neither an inflow nor an outflow). Click a month to see every entry that made up this figure.">
                   Net flow
                 </Tooltip>
               </td>
@@ -1095,7 +1099,7 @@ function MonthlySummaryTable({
                     onClick={() => setDrilldown({
                       kind: 'flow',
                       title: `Net flow — ${monthLabel(m)}, ${currency}`,
-                      explanation: 'Every real and planned entry this month, in this currency, that makes up Inflow minus Outflow — Cash/Bank/Rentals combined, excluding any linked inter-account transfer.',
+                      explanation: 'Every cleared actual record this month, in this currency, that makes up Inflow minus Outflow — included native modules, excluding any linked inter-account transfer.',
                       currency,
                       from: monthFrom(m),
                       to: monthTo(m),

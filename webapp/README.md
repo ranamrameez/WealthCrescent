@@ -1,3 +1,5 @@
+Current implementation and remaining work: [delivery status](docs/CURRENT_DELIVERY_STATUS.md). Historical checkpoints below do not override that index.
+
 # WealthCrescent — Web App
 
 FinanceManager live link:
@@ -11531,3 +11533,5 @@ Money in/out includes monthly widgets, a local trend chart and matching monthly 
 Manual Cash, Bank and card plan completion now preserves an explicit plan/occurrence/group link on its actual ledger record. New actuals appear under their named plan in Money in/out; historical records without provenance remain Unallocated. Completed recurrence snapshots and the original monthly anchor are preserved. This is user-triggered Mark as done, not automatic payment execution.
 
 Rental plan completion preserves its explicit plan/group link on the property record and linked Cash/Bank record. Reporting counts that rental event once, including the plan allocation. The service checks sign-in, reviewed-plan changes, active source and currency before writing. No automatic settlement or inferred historical allocation.
+
+Dashboard headline movement, Analytics/monthly actuals and Money in/out now share the native movement dataset and internal-transfer exclusions. Forecast valuation keeps its existing accounting inputs. Standalone schedule/investment-plan adapters, unified budgets, broader services and pending-only automation remain open.
