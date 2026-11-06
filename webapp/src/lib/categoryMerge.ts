@@ -70,7 +70,10 @@ export function mergeCategoriesEverywhere(fromId: string, toId: string): number 
   }
   {
     const store = usePlannedCashWorkbookStore.getState();
-    store.setWorkbook({ ...store.workbook, entries: remapByName(store.workbook.entries) });
+    store.setWorkbook({ ...store.workbook, entries: remapByName(store.workbook.entries), budgets: store.workbook.budgets?.map(budget=>{
+      if(!budget.categoryIds?.includes(fromId))return budget;
+      touched++;return {...budget,categoryIds:[...new Set(budget.categoryIds.map(id=>id===fromId?toId:id))]};
+    }) });
   }
   {
     const store = useBankWorkbookStore.getState();

@@ -51,6 +51,7 @@ export interface BudgetActivity {
    * get mapped onto this one signed convention here. */
   amount: number;
   currencyCode: string;
+  categoryId?: string;
   category?: string;
   description: string;
   /** `false` = a not-yet-executed plan (still just an intention); `true` =
@@ -109,7 +110,7 @@ function normalizeCash(entries: CashEntry[], plans: PlannedCashEntry[], categori
     .map((e) => ({
       id: e.id, module: 'cash', sourceLabel: 'Cash', sourceId: 'cash', planGroupId: e.planLink?.groupId, date: e.date,
       amount: e.isDeposit ? e.amount : -e.amount, currencyCode: e.currencyCode,
-      category: categoryName(e.categoryID, categories), description: e.note || (e.isDeposit ? 'Cash in' : 'Cash out'), executed: true, isPending: e.isPending,
+      categoryId: e.categoryID, category: categoryName(e.categoryID, categories), description: e.note || (e.isDeposit ? 'Cash in' : 'Cash out'), executed: true, isPending: e.isPending,
     }));
   const planned: BudgetActivity[] = expandPlans(plans, window).filter((p) => !p.executed).map((p) => ({
     id: p.id, module: 'cash', sourceLabel: 'Cash', sourceId: 'cash', date: p.date,
@@ -128,7 +129,7 @@ function normalizeBank(accounts: BankAccount[], transactions: BankTransaction[],
     return [{
       id: t.id, module: 'bank' as const, sourceLabel: account.name, sourceId: account.id, planGroupId: t.planLink?.groupId, date: t.date,
       amount: t.amount, currencyCode: account.currencyCode,
-      category: categoryName(t.categoryID, categories), description: t.description, executed: true, isPending: t.isPending,
+      categoryId: t.categoryID, category: categoryName(t.categoryID, categories), description: t.description, executed: true, isPending: t.isPending,
     }];
   });
   const planned: BudgetActivity[] = expandPlans(plans, window).filter((p) => !p.executed).flatMap((p) => {

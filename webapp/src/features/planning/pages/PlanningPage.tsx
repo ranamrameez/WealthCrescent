@@ -1,3 +1,4 @@
+import { UnifiedBudgetsPanel } from '../../../components/UnifiedBudgetsPanel';
 import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
@@ -43,6 +44,7 @@ export function PlanningPage({cashPlannedSyncStatus,cashPlannedCloudEmpty,upload
     <FinancePlansHierarchy filters={filters} controls={controls} overview={<>
       <OrphanPlanCleanup />
       <CollapsibleCard title="Upcoming (next 30 days)" className="mt-md" defaultOpen={false}><UpcomingList items={upcoming} emptyText="Nothing expected in the next 30 days." /></CollapsibleCard>
+      <UnifiedBudgetsPanel fromDate={filters.fromDate} toDate={filters.toDate}/>
       <BudgetOverview budget={budget} />
       <ActivityList activities={activities} filtered={filteredActivities} />
       <CollapsibleCard title="Module planning tools" defaultOpen={false}>

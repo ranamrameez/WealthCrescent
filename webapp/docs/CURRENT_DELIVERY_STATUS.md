@@ -4,8 +4,8 @@ Updated 2026-11-06. This is the concise status index; SESSION_HANDOFF.md records
 
 ## Delivery and data safety
 - Existing branch: fix/net-worth-dashboard-parity-and-accounting; draft PR 51 only. Nothing merged/deployed by this work.
-- Published checkpoint: 5a8de6270e0ccbb6717cc2ae81e7071fde5b39de; Actions 442 passed build/tests. Earlier 321b18ac passed 167 files / 1,271 tests in Actions 441.
-- Current working continuation aligns all dashboard actual-flow views with the canonical native movement selector. Focused 4 files / 41 tests passed; browser verified matching native totals in Money in/out, Analytics insights and both monthly widgets. Both TypeScript projects and production build passed (canonical-dashboard-build.log). The resulting published head still requires its own CI.
+- Published checkpoint: 58f3017c850cbfe41d144ced93286e3339fb984f; Actions 443 passed build/tests. Earlier 321b18ac passed 167 files / 1,271 tests in Actions 441.
+- Current working continuation adds currency-owned budgets, explicit allocations/refunds, monthly limits/overrides and rollover with a Planning UI. Six focused files / 40 tests and production build/both TypeScript projects passed; read-only browser editor review and fixture UI save checks passed. Verify resulting published head in CI.
 - No private backup imported, no real user ledger created/settled/deleted, no private proof screenshots uploaded. The only committed sample images are the user's approved stock UI references in docs/ui-samples.
 
 ## Completed implementation
@@ -35,6 +35,7 @@ Updated 2026-11-06. This is the concise status index; SESSION_HANDOFF.md records
 - Finish all allocation drilldowns and source inclusion/empty/negative/FX/opening acceptance cases.
 
 ### 2. Unified currency-owned budgets
+Implemented core/service/Planning UI now includes optional definitions/allocations, monthly overrides, explicit refunds, partial/unallocated conservation, ambiguous scopes and three rollover policies. General budget import/batch/export UI, source identity/import hardening, pending/planned reservation and complete analytical/theme/mobile acceptance remain. The original detailed requirements below remain the full acceptance checklist, not a claim they are all done.
 - Add backward-compatible category/project allocation definitions with explicit currency, month/period, limit and rollover policy. Preserve FinancePlanGroup/native plan IDs.
 - Keep legacy currency-agnostic BankSettings.budgets unassigned until explicitly scoped; never apply one target in multiple currencies.
 - Compute actual/allocated/unallocated, remaining, refunds and rollover through CalculationEngine. One actual must not be counted twice globally when category/project dimensions overlap.

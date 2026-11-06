@@ -1,3 +1,4 @@
+import type { BudgetDefinition, BudgetAllocation } from './budget';
 import type { RecurrenceRule } from './recurrence';
 import type { FinancePlanGroup } from './financePlanGroup';
 
@@ -64,6 +65,8 @@ export interface PlannedCashSettings {
 }
 
 export interface PlannedCashWorkbook {
+  budgets?: BudgetDefinition[];
+  budgetAllocations?: BudgetAllocation[];
   /** Central parent-plan metadata; payments stay in their native planned ledgers. */
   planGroups?: FinancePlanGroup[];
   settings: PlannedCashSettings;

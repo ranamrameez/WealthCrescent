@@ -41,6 +41,7 @@ export function deletePlanPayment(reference: PlanReference, occurrenceDate?: str
 export function deletePlanGroup(id: string, expected: FinancePlanGroup) {
   const store = usePlannedCashWorkbookStore.getState();
   if (JSON.stringify(readPlanGroups().find(group => group.id === id)) !== JSON.stringify(expected)) throw new Error('This plan changed. Reopen its details.');
+  if (store.workbook.budgets?.some(budget=>budget.planGroupId === id)) throw new Error('This plan is used by a budget. Reassign that budget before deleting the plan.');
   const records = readFinancePlans().filter(row => row.plan.groupId === id);
   if (records.some(row => hasFulfilledPayments(row.plan))) throw new Error('This plan has fulfilled payments and must be kept for its history.');
   const bank = usePlannedBankWorkbookStore.getState(), cards = usePlannedCreditCardWorkbookStore.getState(), rentals = usePlannedRentalsWorkbookStore.getState();

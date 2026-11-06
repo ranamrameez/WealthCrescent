@@ -39,6 +39,7 @@ import * as categoryGroups from './categoryGroups';
 import * as recentActivity from './recentActivity';
 import * as movements from './movementActivities';
 import * as manualPayments from './manualPlanFulfillment';
+import * as unifiedBudgets from './unifiedBudgets';
 
 /**
  * Stable domain-oriented API. Keep all financial calculation entry points
@@ -52,7 +53,7 @@ export const CalculationEngine = Object.freeze({
   cash,
   bank: Object.freeze({ ...bank, ...bankReadModels }),
   creditCards,
-  budgets,
+  budgets: Object.freeze({ ...budgets, ...unifiedBudgets }),
   plannedBalances,
   occurrences,
   upcoming,

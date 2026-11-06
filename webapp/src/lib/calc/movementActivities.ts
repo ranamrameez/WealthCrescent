@@ -32,7 +32,7 @@ const linkModule = (module: MovementModule): LinkModule => module === 'creditCar
 /** Read-only movement adapters. Contract/schedule balances never become cash receipts.
  * Explicit domain links choose one economic record; account-only transfers stay separate.
  * No label/amount matching, currency conversion, inferred principal/interest split or writes. */
-export function collectMovementActivities(input: MovementInputs, modules: readonly string[], window: BudgetOccurrenceWindow = {}): MovementActivity[] {
+export function collectMovementActivities(input: MovementInputs, modules: readonly string[], window: BudgetOccurrenceWindow = {}, sourcePolicy: 'dashboard' | 'all-ledgers' = 'dashboard'): MovementActivity[] {
   const { native, categories } = input;
   const rows: MovementActivity[] = collectBudgetActivities({ ...input.base, links: [] }, window)
     .map(item => {
@@ -47,7 +47,7 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
     const card = cards.get(tx.cardId); if (!card) continue;
     add({ id: tx.id, module: 'creditCards', sourceId: card.id, sourceLabel: card.name, date: tx.date,
       amount: tx.kind === 'payment' || tx.kind === 'cashAdvance' ? tx.amount : -tx.amount,
-      currencyCode: card.currencyCode, category: categoryName(tx.categoryID,categories), description: tx.description || tx.kind, executed: true, planGroupId: tx.planLink?.groupId,
+      currencyCode: card.currencyCode, categoryId: tx.categoryID, category: categoryName(tx.categoryID,categories), description: tx.description || tx.kind, executed: true, planGroupId: tx.planLink?.groupId,
       movementKind: tx.kind === 'payment' ? 'transfer' : tx.kind === 'cashAdvance' ? 'financing' : 'operating' });
   }
   for (const plan of planOccurrences(input.plannedCards,window.fromDate,window.toDate,window.asOf,window.horizonDays)) {
@@ -62,13 +62,13 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
     const loan = loans.get(tx.loanId); if (!loan) continue;
     add({ id: tx.id, module: 'personalLoans', sourceId: loan.id, sourceLabel: loan.person, date: tx.date,
       amount: loan.direction === 'owed_to_me' ? tx.amount : -tx.amount, currencyCode: loan.currencyCode,
-      category: categoryName(tx.categoryID,categories), description: tx.description || 'Loan repayment', executed: true, isPending: tx.isPending, movementKind: 'financing' });
+      categoryId: tx.categoryID, category: categoryName(tx.categoryID,categories), description: tx.description || 'Loan repayment', executed: true, isPending: tx.isPending, movementKind: 'financing' });
   }
   for (const plan of native.personalLoans.plans ?? []) {
     const loan = loans.get(plan.loanId); if (!loan || plan.executed) continue;
     add({ id: plan.id, module: 'personalLoans', sourceId: loan.id, sourceLabel: loan.person, date: plan.date,
       amount: loan.direction === 'owed_to_me' ? plan.amount : -plan.amount, currencyCode: loan.currencyCode,
-      category: categoryName(plan.categoryID,categories), description: plan.description || 'Planned loan repayment', executed: false, movementKind: 'financing' });
+      categoryId: plan.categoryID, category: categoryName(plan.categoryID,categories), description: plan.description || 'Planned loan repayment', executed: false, movementKind: 'financing' });
   }
   const emi = new Map(native.emi.entries.map(loan => [loan.id,loan]));
   for (const tx of native.emi.repayments) {
@@ -82,7 +82,7 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
     const fund = funds.get(tx.ticker); if (!fund) continue;
     add({ id: tx.id ?? 'trade:' + native.funds.transactions.indexOf(tx), module: 'funds', sourceId: fund.id, sourceLabel: fund.name, date: tx.date,
       amount: (tx.action === 'BUY' ? -1 : 1) * tx.shares * tx.price, currencyCode: fund.currencyCode, description: tx.action + ' ' + fund.name,
-      category: categoryName(fund.categoryID,categories), executed: true, isPending: tx.isPending, movementKind: 'investment' });
+      categoryId: fund.categoryID, category: categoryName(fund.categoryID,categories), executed: true, isPending: tx.isPending, movementKind: 'investment' });
   }
   for (const tx of native.funds.dividends) {
     const fund = funds.get(tx.ticker); if (!fund) continue;
@@ -132,6 +132,7 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
   }
   const rowKey = (row: MovementActivity) => linkModule(row.module) + ':' + (['qse','psx'].includes(row.module) ? row.sourceId + ':' : '') + row.id;
   const included = (row: MovementActivity) => {
+    if(sourcePolicy === 'all-ledgers')return true;
     if (row.module === 'creditCards') return cards.get(row.sourceId!)?.includeInNetWorth !== false;
     if (row.module === 'personalLoans') return loans.get(row.sourceId!)?.includeInNetWorth !== false;
     if (row.module === 'emi') return emi.get(row.sourceId!)?.includeInNetWorth !== false;
@@ -142,7 +143,11 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
     }
     return true;
   };
-  return rows.filter(row => !suppressed.has(rowKey(row)))
+  return rows.map(row => {
+      if (row.categoryId || !row.category) return row;
+      const matches = categories.filter(category => category.name.trim().toLowerCase() === row.category!.trim().toLowerCase());
+      return matches.length === 1 ? { ...row, categoryId: matches[0].id } : row;
+    }).filter(row => !suppressed.has(rowKey(row)))
     .map(row => internal.has(rowKey(row)) ? { ...row, movementKind: 'transfer' as const } : row)
     .filter(row => modules.includes(row.module) && included(row))
     .sort((a,b) => a.date.localeCompare(b.date) || a.module.localeCompare(b.module) || a.id.localeCompare(b.id));

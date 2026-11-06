@@ -195,9 +195,9 @@ export function getMoneyMovementReport(activities: Parameters<typeof Calculation
 
 export function getClearedRangeActivities(...args: Parameters<typeof CalculationEngine.dashboard.clearedRangeActivities>) { return CalculationEngine.dashboard.clearedRangeActivities(...args); }
 
-export function getNativeMovementActivities(modules: readonly string[], window?: { fromDate: string; toDate: string }) {
+export function getNativeMovementActivities(modules: readonly string[], window?: { fromDate: string; toDate: string }, sourcePolicy: 'dashboard' | 'all-ledgers' = 'dashboard') {
   const today = new Date().toISOString().slice(0,10);
-  const key = JSON.stringify([today,[...modules].sort(),window]);
+  const key = JSON.stringify([today,[...modules].sort(),window,sourcePolicy]);
   const cached = movements.get(key); if (cached) return cached;
   const cash = useCashWorkbookStore.getState().workbook, bank = useBankWorkbookStore.getState().workbook;
   const rentals = useRentalsWorkbookStore.getState().workbook, qse = useWorkbookStore.getState().workbook, psx = usePSXWorkbookStore.getState().workbook;
@@ -205,11 +205,11 @@ export function getNativeMovementActivities(modules: readonly string[], window?:
   const result = CalculationEngine.movements.collectMovementActivities({
     native: { cash: cash.entries, bank, rentals, cards: useCreditCardWorkbookStore.getState().workbook,
       personalLoans: usePersonalLoansWorkbookStore.getState().workbook, emi: useEMIWorkbookStore.getState().workbook, funds: useFundsWorkbookStore.getState().workbook, qse, psx },
-    base: { cashEntries: cash.settings.includeInNetWorth === false ? [] : cash.entries, plannedCash: cash.settings.includeInNetWorth === false ? [] : usePlannedCashWorkbookStore.getState().workbook.entries,
-      bankAccounts: bank.settings.accounts.filter(account => !account.migratedToCreditCardId && account.includeInNetWorth !== false), bankTransactions: bank.transactions, plannedBank: usePlannedBankWorkbookStore.getState().workbook.entries,
+    base: { cashEntries: sourcePolicy === 'dashboard' && cash.settings.includeInNetWorth === false ? [] : cash.entries, plannedCash: sourcePolicy === 'dashboard' && cash.settings.includeInNetWorth === false ? [] : usePlannedCashWorkbookStore.getState().workbook.entries,
+      bankAccounts: bank.settings.accounts.filter(account => !account.migratedToCreditCardId && (sourcePolicy === 'all-ledgers' || account.includeInNetWorth !== false)), bankTransactions: bank.transactions, plannedBank: usePlannedBankWorkbookStore.getState().workbook.entries,
       rentalProperties: rentals.settings.properties, rentalEntries: rentals.entries, plannedRentals: usePlannedRentalsWorkbookStore.getState().workbook.entries, categories },
     plannedCards: usePlannedCreditCardWorkbookStore.getState().workbook.entries, categories, links, qseSettings: qse.settings, psxSettings: psx.settings,
-  },modules,{ ...window, asOf: new Date(today + 'T00:00:00Z'), horizonDays: 365 });
+  },modules,{ ...window, asOf: new Date(today + 'T00:00:00Z'), horizonDays: 365 },sourcePolicy);
   if (movements.size >= 32) movements.clear(); movements.set(key,result); return result;
 }
 export type { MovementActivity, MovementKind } from '../../lib/calc/movementActivities';

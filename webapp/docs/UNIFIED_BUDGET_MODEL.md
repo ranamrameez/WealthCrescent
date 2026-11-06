@@ -33,3 +33,6 @@ Status: implementation continuation, 2026-11-06. Builds on the approved category
 - Partial allocations, over-allocation rejection, orphan allocations, explicit refunds and ordinary positive income.
 - Zero limits, negative remaining, none/surplus/balance rollover, leap/year boundaries and preceding-month carry.
 - Global outflow conservation and detail/chart/table reconciliation. Auth, stale editing, lossless optional-field round trip and legacy budget preservation.
+
+
+Implementation checkpoint: core/service/Planning UI and optional workbook fields now exist; 40 focused tests/build passed. Monthly limits can be overridden without changing defaults. Historical selected end dates cap actuals. Unknown movement requires a specific category/plan scope or explicit assignment; all-ledger budget balances are independent of Net Worth inclusion flags. Dedicated import/batch/export, record collection identity hardening and pending/planned reservations remain pending.
