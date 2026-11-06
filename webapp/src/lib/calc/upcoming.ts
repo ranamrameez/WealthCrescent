@@ -129,6 +129,15 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
     if (!next) return;
     const due = installmentDueDate(loan, next.month);
     if (!inWindow(due, todayStr, windowEndStr)) return;
+    // The explicit loan ID plus due date identifies this occurrence. Legacy
+    // plans can carry a stale installment index; never rewrite it or infer settlement.
+    // Keep partial, differently dated/currency, completed or stale-source plans distinct.
+    const representedByBank = inputs.plannedBank.some(plan =>
+      !plan.executed && !plan.recurrence && plan.sourceEmiLoanId === loan.id
+      && plan.date === due
+      && currencyByAccount.get(plan.accountId) === loan.currencyCode
+      && plan.amount < 0 && Math.abs(-plan.amount - next.emi) < 0.000001);
+    if (representedByBank) return;
     items.push({ id: `${loan.id}@${due}`, date: due, module: 'emi', label: `${loan.name} installment`, amount: next.emi, currencyCode: loan.currencyCode, kind: 'expense', overdue: false });
   });
 

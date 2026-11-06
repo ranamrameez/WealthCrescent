@@ -163,3 +163,19 @@ describe('collectUpcomingItems', () => {
     expect(items.map((i) => i.date)).toEqual(['2026-01-05', '2026-01-10']);
   });
 });
+
+it('shows one reminder for an exact explicitly linked EMI bank installment', () => {
+  const inputs: UpcomingInputs = { ...emptyInputs(),
+    emiLoans: [{ id: 'loan', name: 'Loan', lender: 'Bank', currencyCode: 'USD', principal: 1200, tenureMonths: 12, startDate: '2026-01-01', repaymentMode: 'interest', annualRatePct: 0 }],
+    bankAccounts: [{ id: 'account', name: 'Checking', currencyCode: 'USD', openingBalance: 0 }],
+    plannedBank: [{ id: 'linked', accountId: 'account', date: '2026-02-01', description: 'Installment', amount: -100, sourceEmiLoanId: 'loan', sourceEmiMonth: 1 }],
+  };
+  expect(collectUpcomingItems(inputs,45,new Date('2026-01-01')).map(item => item.module)).toEqual(['bank']);
+  expect(collectUpcomingItems({ ...inputs, plannedBank: [{ ...inputs.plannedBank[0], sourceEmiMonth: 0 }] },45,new Date('2026-01-01')).map(item => item.module)).toEqual(['bank']);
+  for (const patch of [{ amount: -50 }, { sourceEmiLoanId: undefined }, { date: '2026-02-02' }]) {
+    const result = collectUpcomingItems({ ...inputs, plannedBank: [{ ...inputs.plannedBank[0], ...patch }] },45,new Date('2026-01-01'));
+    expect(result.some(item => item.module === 'emi')).toBe(true);
+  }
+  expect(collectUpcomingItems({ ...inputs, bankAccounts: [{ ...inputs.bankAccounts[0], isActive: false }] },45,new Date('2026-01-01')).map(item => item.module)).toEqual(['emi']);
+  expect(collectUpcomingItems({ ...inputs, bankAccounts: [{ ...inputs.bankAccounts[0], currencyCode: 'QAR' }] },45,new Date('2026-01-01')).some(item => item.module === 'emi')).toBe(true);
+});

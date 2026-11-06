@@ -1,3 +1,11 @@
+## CI section-order correction and linked EMI reminder — 2026-11-06
+
+Published Money in/out head: 0941cbc1. Actions 436 build and broker regressions passed, but full suite had one failed UI assertion (1,248 tests passed / 1 failed): moving Money in/out immediately after Summary changed the expected section order. The assertion now checks Summary -> Money in/out -> Per currency summary; this is a test expectation correction, not a financial calculation failure. Do not call Actions 436 green.
+
+New source slice: Upcoming suppresses a separate EMI reminder when an active bank plan explicitly references the same loan, exact due date, native currency and full amount. It retains partial, differently dated/currency, unlinked and stale-source cases. The external backup exposed stale sourceEmiMonth metadata; that index is not rewritten and does not override explicit loan/date occurrence identity for display deduplication. No record is settled or mutated. Domain/service/UI checks passed 3 files / 24 tests (dashboard-order-upcoming-tests.log). Production build and both TypeScript projects passed (upcoming-order-build.log). Browser verified one linked bank reminder and no duplicate EMI reminder, without changing any records. Current full CI must pass on the resulting published head.
+
+The larger all-app reporting, budget, repository/payment and browser matrix tasks remain per DASHBOARD_REPORTING_DESIGN.md and DELIVERY_CHECKLIST.md. The current movement report covers Cash/Bank/Rentals only; actual plan allocation remains explicit/unallocated. Keep draft PR 51; no main merge/deployment.
+
 ## Money-in/out breakdown continuation — 2026-11-06
 
 Dashboard/Funds/calendar/UI source checkpoint is committed and published as fe418990 (preceded by category service a31d6eb); Actions 435 completed successfully on fe418990. Private backup was not published. Existing three density modes only; sample images saved. No main merge or production deployment.

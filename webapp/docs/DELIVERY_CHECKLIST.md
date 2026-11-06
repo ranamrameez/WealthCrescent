@@ -152,3 +152,7 @@ MonthlyStatsWidget, local native module-balance chart and ValueChange arrows add
 Validated dashboard checkpoint: 79 focused tests before widget additions, 18 follow-up tests, production build/both TS checks passed. Browser verified monthly widgets, chart rendering and corrected Funds. Broader canonical cash-flow/plan allocation and native-domain adapters remain pending per DASHBOARD_REPORTING_DESIGN.md.
 
 Money in/out continuation: 36 focused tests, production build/both TS checks passed; browser verified the new section. Supported group dimensions and rows reconcile per currency. Coverage remains Cash/Bank/Rentals; full cards/investment/loan movement classification remains pending.
+
+Actions 436 had one stale section-order assertion failure; the expected order is corrected. Linked EMI/bank Upcoming display deduplication now uses explicit loan/date/currency/full-amount identity without altering ledger state or stale installment metadata. Focused 24 tests passed; build and new-head full CI pending at this checkpoint.
+
+Linked EMI/UI-order correction: 24 focused tests and production build/both TS checks passed; browser confirmed a single linked reminder. Current source must be pushed and full CI verified separately.

@@ -1139,3 +1139,5 @@ Appearance retains the existing Comfortable, Compact and Console density modes. 
 Analytics shows monthly stat widgets with dated balances and explicitly labelled activity totals. Each native-currency overview includes a current balance-by-module chart. Change indicators use arrows; missing baselines remain unavailable. These balance charts are distinct from income/spending reports.
 
 Money in/out shows the selected date range and currently covers Cash, Bank and Rentals. Select cleared actual, pending or remaining plans, then break down by category, module, account/source or plan group. Each currency has its own inflow/outflow chart and table. Select a group row and open its contributing-record view for details. Unallocated means no explicit plan link is stored; account movements are not automatically classified as earned income or consumption.
+
+Upcoming shows one reminder when a bank plan explicitly represents the same loan installment on the same due date, in the same currency and full amount. Partial or unlinked plans remain distinct. This display deduplication never marks a payment settled or rewrites the loan schedule.
