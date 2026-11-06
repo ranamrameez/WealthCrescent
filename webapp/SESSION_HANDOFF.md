@@ -1,3 +1,9 @@
+## Published App Data checkpoint — 2026-11-06
+
+Source committed and pushed: de314785 (Banking scope/budget correctness), 46f039c5 (App Data removal). PR 51 remains draft. Local validation: 27 focused tests across 6 files passed; both TypeScript projects and production build passed. GitHub Actions 433 on source head 46f039c5 has passed build and broker/PSX regression steps; full suite is running at this checkpoint. Verify its final result before claiming a full pass. Any subsequent documentation commit changes PR HEAD; report source-head and current-head evidence accurately.
+
+App Data removal is available in the working branch/local preview. It has not been deployed to production and has not been used on real user data. Browser acceptance and the larger remaining engine/UI/payment scope remain open. Earlier references to these changes being uncommitted/local-only are historical; both source commits are now published.
+
 ## App Data removal and Banking continuation — 2026-11-06
 
 App Data now includes a visible Remove all app data action. It requires sign-in, the exact DELETE ALL DATA phrase and explicit confirmation. The service checks the confirmed UID, atomically replaces all 18 financial workbook paths with defaults under that user, awaits cloud acknowledgement, then resets local workbooks only if the same user is still active. It preserves the login account, appearance preferences and shared market data. Custom categories are removed; general defaults remain. No real user deletion has been executed during development.
