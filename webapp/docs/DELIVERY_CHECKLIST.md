@@ -156,3 +156,7 @@ Money in/out continuation: 36 focused tests, production build/both TS checks pas
 Actions 436 had one stale section-order assertion failure; the expected order is corrected. Linked EMI/bank Upcoming display deduplication now uses explicit loan/date/currency/full-amount identity without altering ledger state or stale installment metadata. Focused 24 tests passed; build and new-head full CI pending at this checkpoint.
 
 Linked EMI/UI-order correction: 24 focused tests and production build/both TS checks passed; browser confirmed a single linked reminder. Current source must be pushed and full CI verified separately.
+
+Actions 437 passed on 1427d3c5: 165 files / 1,250 tests and full build/TS. New Analytics consistency slice uses cleared actuals only for monthly widget/table/drilldowns; pending/plans remain separate in their own views. Focused 22 tests passed; resulting-source build/full CI pending at documentation time.
+
+Actual-only monthly Analytics: 22 focused tests, production build/both TS checks passed; browser verified matching native-currency actual totals. Resulting-head full CI remains required.

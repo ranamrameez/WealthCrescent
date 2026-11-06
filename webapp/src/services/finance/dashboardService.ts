@@ -190,3 +190,5 @@ export function getMoneyMovementReport(activities: Parameters<typeof Calculation
   const names = Object.fromEntries((usePlannedCashWorkbookStore.getState().workbook.planGroups ?? []).map(group => [group.id, group.name]));
   return CalculationEngine.dashboard.moneyMovementReport(activities,from,to,today,dimension,population,names);
 }
+
+export function getClearedRangeActivities(...args: Parameters<typeof CalculationEngine.dashboard.clearedRangeActivities>) { return CalculationEngine.dashboard.clearedRangeActivities(...args); }

@@ -1141,3 +1141,5 @@ Analytics shows monthly stat widgets with dated balances and explicitly labelled
 Money in/out shows the selected date range and currently covers Cash, Bank and Rentals. Select cleared actual, pending or remaining plans, then break down by category, module, account/source or plan group. Each currency has its own inflow/outflow chart and table. Select a group row and open its contributing-record view for details. Unallocated means no explicit plan link is stored; account movements are not automatically classified as earned income or consumption.
 
 Upcoming shows one reminder when a bank plan explicitly represents the same loan installment on the same due date, in the same currency and full amount. Partial or unlinked plans remain distinct. This display deduplication never marks a payment settled or rewrites the loan schedule.
+
+Analytics monthly inflow/outflow widgets and tables show cleared actual activity only, through today and within the selected dates. Pending records and remaining plans are separate in Plans and Money in/out. Net worth snapshot means completed month-end for historical months or today for the current month.

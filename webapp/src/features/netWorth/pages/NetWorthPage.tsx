@@ -31,7 +31,7 @@ import type { NetWorthAsOfInputs } from '../../../lib/calc/netWorthAsOf';
 import { UpcomingList } from '../../../components/UpcomingList';
 import { useUpcomingItems } from '../../../hooks/useUpcomingItems';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
-import { getDashboardReport, getCurrencyDashboardSummary, getBreakdownDelta, getMonthlyFlowItems as monthlyFlowItems, getNetWorthBreakdownForMonth as netWorthBreakdownForMonth, getCategoryGroupReport, getMonthlyNetFlow, getMonthlyPlanReport, getMonthlyStatCards, getModuleBreakdownChart, getMoneyMovementReport, type FlowDimension, type FlowPopulation, getReportingMonths, getMonthlyIncomeExpense as monthlyIncomeExpense,
+import { getDashboardReport, getCurrencyDashboardSummary, getBreakdownDelta, getMonthlyFlowItems as monthlyFlowItems, getNetWorthBreakdownForMonth as netWorthBreakdownForMonth, getCategoryGroupReport, getMonthlyNetFlow, getMonthlyPlanReport, getMonthlyStatCards, getModuleBreakdownChart, getClearedRangeActivities, getMoneyMovementReport, type FlowDimension, type FlowPopulation, getReportingMonths, getMonthlyIncomeExpense as monthlyIncomeExpense,
   getNetWorthTrend as projectedNetWorthTrend, getMonthEnd as endOfMonthAsOf } from '../../../services/finance/dashboardService';
 import { useDashboardContext, useDashboardActivities } from '../../../hooks/useDashboard';
 import { useNetWorthInputs, useNetWorthSummary } from '../hooks/useNetWorthSummary';
@@ -787,7 +787,7 @@ function NetWorthMonthlySection({
   // The same page-level range controls the monthly chart and table; no
   // independent six-month slider can silently show a different period.
   const months = useMemo(() => getReportingMonths(rangeStartDate.slice(0, 7), rangeEndDate.slice(0, 7)), [rangeStartDate, rangeEndDate]);
-  const rangeActivities = useMemo(() => activities.filter(activity => activity.date >= rangeStartDate && activity.date <= rangeEndDate), [activities, rangeStartDate, rangeEndDate]);
+  const rangeActivities = useMemo(() => getClearedRangeActivities(activities, rangeStartDate, rangeEndDate, todayISODate), [activities, rangeStartDate, rangeEndDate, todayISODate]);
   const monthly = useMemo(() => monthlyIncomeExpense(rangeActivities, months), [rangeActivities, months]);
   const trend = useMemo(
     () => projectedNetWorthTrend({ months, currentMonth: nowMonth, todayISODate, currentRows, activities, emiLoans, netWorthAsOfInputs }),

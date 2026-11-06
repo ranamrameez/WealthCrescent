@@ -1,3 +1,11 @@
+## Green source CI and actual-only monthly Analytics — 2026-11-06
+
+Published source 1427d3c5 passed Actions 437: 165 files / 1,250 tests, broker-profile/PSX-fee regressions, both TypeScript projects and production build. This supersedes the stale-order assertion failure in 436. No merge/deployment. The verified source remains the existing draft PR 51.
+
+One further read-model consistency correction is now in the working tree: Analytics monthly inputs, monthly widget and monthly table/drilldowns use engine-filtered cleared actual records only, through today and within exact selected dates. They no longer combine old plans into historical inflow/outflow. Plans and Money in/out retain explicitly separate actual/pending/planned populations. Monthly widget labels are Actual inflow/outflow and Net actual movement; snapshot labels do not call today's current-month value a completed month-end. This does not alter native ledgers or the shared legacy projected budget calculator used elsewhere.
+
+Focused analytics/model checks passed 2 files / 22 tests (actual-monthly-analytics-tests.log). Production build and both TypeScript projects passed (actual-monthly-analytics-build.log). Browser verified monthly actual inflow/outflow/net now match the actual movement report in each currency. Commit/push this slice and verify resulting-head full CI before any merge. Larger native-domain reporting, budget/allocations, service migration, safe payment lifecycle and full UI/theme/mobile matrix remain pending per the reporting design/checklist.
+
 ## CI section-order correction and linked EMI reminder — 2026-11-06
 
 Published Money in/out head: 0941cbc1. Actions 436 build and broker regressions passed, but full suite had one failed UI assertion (1,248 tests passed / 1 failed): moving Money in/out immediately after Summary changed the expected section order. The assertion now checks Summary -> Money in/out -> Per currency summary; this is a test expectation correction, not a financial calculation failure. Do not call Actions 436 green.

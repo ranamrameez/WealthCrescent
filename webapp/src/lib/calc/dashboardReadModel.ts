@@ -350,3 +350,7 @@ export function moneyMovementReport(activities: BudgetActivity[], from: string, 
   });
   return { from, to, population, dimension, rows, count: items.length };
 }
+
+export function clearedRangeActivities(activities: BudgetActivity[], from: string, to: string, today: string) {
+  return activities.filter(item => item.executed && !item.isPending && item.date >= from && item.date <= to && item.date <= today);
+}

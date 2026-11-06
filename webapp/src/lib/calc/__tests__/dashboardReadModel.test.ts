@@ -118,3 +118,8 @@ it('keeps distinct source identities even when accounts share a display name', (
   const result = engine.moneyMovementReport(input,'2026-01-01','2026-01-31','2026-01-31','source','actual');
   expect(result.rows[0].groups).toHaveLength(2); expect(result.rows[0].net).toBe(13);
 });
+
+it('historical analytics uses cleared actual records without plans, pending or future-dated actuals', () => {
+  const data = [activity('actual',100,true),activity('plan',200,false),activity('pending',300,true,{isPending:true}),activity('future',400,true,{date:'2026-02-01'})];
+  expect(engine.clearedRangeActivities(data,'2026-01-01','2026-02-28','2026-01-31').map(item=>item.id)).toEqual(['actual']);
+});
