@@ -1125,3 +1125,7 @@ Bank, account-directory and account-detail balances now share a current cutoff. 
 ## Current delivery scope (2026-11-05)
 
 See [the detailed delivery checklist](docs/DELIVERY_CHECKLIST.md) for completed implementation, pending work, planned dependencies, dashboard/app UI acceptance and validation evidence. General app categories coexist with custom categories; existing personal labels keep their IDs, and older name-only records retain compatibility mappings. The app-wide engine migration and dashboard/UI acceptance are not complete.
+
+## Removing all financial app data
+
+On App Data, export a full backup first. Finish editing on other devices, then type DELETE ALL DATA in the removal section and choose Remove all app data. Review the signed-in account and confirm. This clears all financial modules, accounts, transactions, plans, transfers, custom categories and history from that account and this device, restoring app defaults. Your login account, appearance preferences and shared market data remain. The action cannot be undone from the app; restoring requires a backup. If cloud removal fails, an error is shown.

@@ -1,3 +1,4 @@
+import { workbookSyncEpoch, workbookSyncPaused } from './workbookMaintenance';
 import type { User } from 'firebase/auth';
 import { onValue, ref, set } from 'firebase/database';
 import { useEffect, useRef, useState } from 'react';
@@ -116,10 +117,12 @@ export function useWorkbookCloudSync<TWorkbook>(
   useEffect(() => {
     if (!firebaseReady || !db || !user) return;
     const unsubscribe = useStore.subscribe((state) => {
-      if (applyingRemote.current) return;
+      if (workbookSyncPaused() || applyingRemote.current) return;
       if (!initialSnapshotReceived.current) return;
       if (pushTimer.current) clearTimeout(pushTimer.current);
+      const epoch = workbookSyncEpoch();
       pushTimer.current = setTimeout(() => {
+        if (workbookSyncPaused() || epoch !== workbookSyncEpoch()) return;
         try {
           const payload = stripUndefinedDeep({ ...state.workbook, _updated: new Date().toISOString() });
           set(ref(db!, cloudPath(user.uid)), payload).catch((e) => console.warn(`Failed to push ${cloudPathSuffix} to cloud`, e));
@@ -146,6 +149,7 @@ export function useWorkbookCloudSync<TWorkbook>(
    * before calling this, since it's a full overwrite. */
   const uploadLocalToCloud = async () => {
     if (!firebaseReady || !db || !user) throw new Error('Not signed in');
+    if (workbookSyncPaused()) throw new Error('A data operation is in progress.');
     const local = useStore.getState().workbook;
     const payload = stripUndefinedDeep({ ...local, _updated: new Date().toISOString() });
     await set(ref(db, cloudPath(user.uid)), payload);

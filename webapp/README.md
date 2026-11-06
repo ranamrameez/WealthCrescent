@@ -21,7 +21,7 @@ FinanceManager live link:
 
 ## Current session handoff
 
-For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) first. **Latest checkpoint: 2026-11-05 — financial correctness is the priority on the existing branch / draft PR #51.** Three focused calculation commits are local; the larger Planning/dashboard/service and shared UI continuation remains in the working tree. The handoff records exact local tests/build results and pending final-suite/browser/CI validation. Nothing has been merged to main in this continuation.
+For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) first. **Latest checkpoint: 2026-11-05 — financial correctness is the priority on the existing branch / draft PR #51.** Source through 44018f7b is published on PR #51 and passed GitHub Actions #432. The newer Banking aggregate/budget and App Data removal changes are tracked in the current handoff. The handoff records exact local tests/build results and pending final-suite/browser/CI validation. Nothing has been merged to main in this continuation.
 
 - **Planning service migration (2026-11-04, PR #51):** PlanningPage and FinancePlansHierarchy obtain activities, recurring items, summary amounts, statuses and chart data through cached application queries and CalculationEngine. Shared payment/group editors dispatch authenticated service commands for saves, deletions and finance relinking, retaining stale-edit and completed-history checks. Monthly category and module totals now stay separate by currency and follow category/direction filters. This is a feature-branch checkpoint, not a completed app-wide migration or auto-pay release.
 
@@ -11507,3 +11507,5 @@ Engine/service-backed account, directory, summary and chart reads correct histor
 ## Current delivery scope (2026-11-05)
 
 See [the detailed delivery checklist](docs/DELIVERY_CHECKLIST.md) for completed implementation, pending work, planned dependencies, dashboard/app UI acceptance and validation evidence. General app categories coexist with custom categories; existing personal labels keep their IDs, and older name-only records retain compatibility mappings. The app-wide engine migration and dashboard/UI acceptance are not complete.
+
+- 2026-11-06: App Data removal action implemented with typed confirmation, confirmed-user service authorization, atomic 18-module cloud reset and queued-sync invalidation. Fixture verification in progress; no real user data was deleted. Banking aggregate analytics and honest unassigned legacy target display implemented; unified currency-owned budgets still pending.

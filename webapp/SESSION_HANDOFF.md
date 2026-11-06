@@ -1,3 +1,13 @@
+## App Data removal and Banking continuation — 2026-11-06
+
+App Data now includes a visible Remove all app data action. It requires sign-in, the exact DELETE ALL DATA phrase and explicit confirmation. The service checks the confirmed UID, atomically replaces all 18 financial workbook paths with defaults under that user, awaits cloud acknowledgement, then resets local workbooks only if the same user is still active. It preserves the login account, appearance preferences and shared market data. Custom categories are removed; general defaults remain. No real user deletion has been executed during development.
+
+Workbook maintenance invalidates queued local cloud pushes across the reset; normal writes resume afterward. Existing remote snapshot/rollback handling remains active. This is not a cross-device edit lock: users should finish edits on other devices before resetting. Tests use mocked cloud writes only. Current focused service/engine checks: 4 files / 24 tests passed; isolated App Data component and sync-queue checks passed 2 files / 3 tests. The combined navigation run stalled and was interrupted without a result; production build and both TypeScript projects passed (app-data-removal-build.log).
+
+Banking continuation: aggregate analytics now renders all native accounts in scope, currencies separated, with missing selection staying empty. Legacy budget targets are explicitly unassigned instead of falsely converted to each account currency; actual spending follows the filtered cleared ledger, and no remaining comparison is fabricated. Legacy target writes use an authenticated service with finite-positive amount validation and collision/stale-name checks. Unified currency-owned budgets and wider command migration remain pending.
+
+Publication correction: source through 44018f7b is pushed to existing draft PR 51; GitHub Actions run 432 passed on that exact head. Later App Data and Banking changes described here are local until committed/pushed and revalidated. Browser acceptance remains outstanding after connection/CDP and Windows URL-verification failures. No merge/deployment.
+
 ## Banking analytics continuation — 2026-11-05
 
 Legacy AnalyticsTab now delegates ledger/date/pending/plan reads to useBankAccount -> bankService -> CalculationEngine.bank, including full native balance history and closing balance for chart reconciliation. Its former inline ledger/filter/recurrence path is removed. Focused engine/navigation checks passed 2 files / 18 tests. Production build and both TypeScript projects passed (bank-analytics-boundary-build.log), after removing the unused filter import.
