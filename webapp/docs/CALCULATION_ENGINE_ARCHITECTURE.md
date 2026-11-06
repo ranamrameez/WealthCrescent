@@ -144,3 +144,15 @@ Validation: focused engine/service/Planning/Cash UI regression run passed 4 file
 
 Limits: local rollback/replay protection is not a remote atomic transaction. Whole-workbook sync still needs a transaction-safe repository before backend pending-only scheduling. No scheduler is enabled and no real money moves. Rental fulfillment/provenance migration, explicit EMI/subscription actual classification, unified category/project budgets/rollover, broader UI/service migration and full chart/theme/mobile/finder acceptance remain. Continue those tasks; PR 51 stays draft.
 
+
+
+## Rental fulfillment provenance — 2026-11-06
+
+Source 321b18ac5db96231f4a0dded8e0c83d68fba0790 passed Actions 441: 167 files / 1,271 tests, broker regressions, TypeScript and production build. No merge/deployment.
+
+Rental Mark as done now calls an authenticated application service with the reviewed plan snapshot. A pure engine builder validates positive amount/date and creates explicit plan provenance. Linked rent/expense keeps the planLink on both the property record and its native Cash/Bank counterpart; report deduplication retains the rental event once, including its plan-group allocation. Custom category lookup uses the shared registry. The service rejects stale/deleted/fulfilled plans, inactive properties, incompatible/inactive paying finance and an occurrence whose actual record already exists. Failures restore the touched local rental/plan/link/finance workbooks; unlinked rental plans remain supported. The old lib helper is a compatibility re-export. Native ledgers and optional schema fields remain backward-compatible.
+
+Validation: focused rental/manual/movement tests passed 3 files / 26 tests; production build and both TypeScript projects passed (rental-plan-service-build.log). Tests use fixtures only; no real rent was recorded in browser. This is manual fulfillment/local rollback, not remote atomic execution or auto-pay.
+
+Next: align dashboard headline/monthly actual reporting with the canonical movement scope; complete native plan adapters/classification, unified budgets/allocations/rollover, remaining UI/services and safe RTDB repositories before backend pending-only payment lifecycle. Full UI/theme/mobile/finder/chart acceptance remains open. Do not stop at this checkpoint or mark the large draft PR complete.
+

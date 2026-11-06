@@ -1,3 +1,5 @@
+import type { PlannedRentalEntry } from '../../types/plannedRentals';
+import type { RentalEntry } from '../../types/rentalsWorkbook';
 import { validBatchDate } from '../dateValidation';
 import { planOccurrences } from './planOccurrences';
 import type { FinancePlan, PlanReference } from './financePlanModel';
@@ -30,4 +32,12 @@ export function prepareManualPlanFulfillment(reference: PlanReference, plan: Fin
   const updated: FinancePlan = recurring ? { ...plan, completedDates: [...new Set([...('completedDates' in plan ? plan.completedDates ?? [] : []),occurrenceDate])] } : { ...plan, executed: true, fulfilledDate: actualDate };
   const snapshot: FinancePlan | undefined = recurring ? { ...plan, id: id + ':fulfilled', seriesId: plan.id, date: occurrenceDate, fulfilledDate: actualDate, executed: true, recurrence: undefined, completedDates: undefined, executedThrough: undefined } : undefined;
   return { result, updated, snapshot, recurring };
+}
+
+export function prepareRentalPlanFulfillment(plan: PlannedRentalEntry, categoryID?: string): RentalEntry {
+  if (plan.executed) throw new Error('This plan is already fulfilled.');
+  if (!validBatchDate(plan.date) || !Number.isFinite(plan.amount) || plan.amount <= 0) throw new Error('Check the plan date and positive amount.');
+  return { id: 'plan:rentals:' + encodeURIComponent(plan.id) + ':' + plan.date, propertyId: plan.propertyId, date: plan.date,
+    amount: plan.amount, isDeposit: plan.type === 'RENT_INCOME', category: plan.category, categoryID, note: plan.note,
+    planLink: { module: 'rentals', planId: plan.id, occurrenceDate: plan.date, groupId: plan.groupId } };
 }
