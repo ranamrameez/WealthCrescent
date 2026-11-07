@@ -16,6 +16,7 @@ import type { CreditCardTransactionKind } from './creditCard';
  * kinds of event," same as the real ledger, not a plain deposit/
  * withdrawal. */
 export interface PlannedCreditCardTransaction {
+  sourceEmiObligationId?: string;
   groupId?: string;
   id: string;
   cardId: string;

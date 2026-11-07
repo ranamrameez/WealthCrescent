@@ -16,6 +16,15 @@ export function saveEmiLoan(input: EMILoan, expected?: EMILoan, amountBasis: 'fi
   const current = emi.workbook.entries.find(loan => loan.id === input.id);
   if (current ? !expected || JSON.stringify(current) !== JSON.stringify(expected) : !!expected) throw new Error('This loan changed. Reopen its editor.');
   const loan = CalculationEngine.emi.normalizeEmiTerms(input, amountBasis);
+  if (current?.contractSchedule) {
+    const fields = ['principal', 'tenureMonths', 'startDate', 'firstInstallmentDate', 'repaymentMode', 'annualRatePct', 'totalToReturn', 'installmentOverrides', 'customMonthlyPayment', 'paymentDayOfMonth', 'installmentIntervalMonths', 'linkedBankAccountId'] as const;
+    if (big || fields.some(field => JSON.stringify(current[field]) !== JSON.stringify(loan[field]))) throw new Error('Edit the independent contract obligations to change this agreement. Actual payment history must remain separate.');
+    if (input.currencyCode !== current.currencyCode) throw new Error('An independent contract cannot change currency.');
+    const updated = { ...current, name: input.name.trim(), lender: input.lender.trim() };
+    if (!updated.name) throw new Error('Enter a loan name.');
+    emi.updateEntry(current.id, { name: updated.name, lender: updated.lender });
+    return updated;
+  }
   if (big) {
     if (!Number.isInteger(big.from) || big.from < 1 || !Number.isInteger(big.options.intervalMonths) || big.options.intervalMonths < 1 || !Number.isFinite(big.options.amount) || big.options.amount <= 0) throw new Error('Enter a valid bigger-installment amount and interval.');
     const generated = CalculationEngine.emi.generateBigEmiOverrides(loan, big.from, big.options);

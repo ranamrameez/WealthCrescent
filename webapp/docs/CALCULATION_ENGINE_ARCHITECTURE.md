@@ -53,6 +53,8 @@ Feature hooks are adapters, not alternate business layers. They subscribe to ser
 
 ## Unified budget model
 
+Independent installments now have a dedicated deterministic namespace, CalculationEngine.installmentLedger. It separates immutable reviewed contract obligations from native dated EMI receipts and explicit allocations; services own adoption, receipt entry/editing, funding-plan refresh and authorization. The optional native loan/repayment fields preserve legacy storage and avoid silent conversion. Bank/Cash manual completion creates one linked EMI receipt and preserves plan/category provenance so canonical movement deduplicates the economic event. Fixed contractual remaining and schedule estimates are different read models; interest-bearing actual principal/accrual requires its own statement components or agreed lender policy. See EMI_IRREGULAR_PAYMENTS.md for implemented coverage, verification and remaining scope. This local rollback implementation does not satisfy the remote atomic scheduler requirement.
+
 A budget can be category-based, project-based, or linked to both through explicit allocations. Category and project are separate dimensions, not separate competing calculation systems. A single budget allocation model feeds one CalculationEngine.
 
 - Category budgets answer: how much may be spent in a category over a period?

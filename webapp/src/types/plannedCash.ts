@@ -24,6 +24,7 @@ import type { FinancePlanGroup } from './financePlanGroup';
  * that marker rather than consuming the row, so the SAME plan keeps
  * generating future occurrences. */
 export interface PlannedCashEntry {
+  sourceEmiObligationId?: string;
   groupId?: string;
   id: string;
   date: string;

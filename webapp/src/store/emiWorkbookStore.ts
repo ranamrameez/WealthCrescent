@@ -102,7 +102,7 @@ export const useEMIWorkbookStore = create<EMIStoreState>((set, get) => {
       mutate((wb) => ({
         ...wb,
         repayments: [...wb.repayments, repayment],
-        entries: applyOverride(wb.entries, repayment.loanId, repayment.month, repayment.amount),
+        entries: repayment.paymentOnly || wb.entries.find(loan => loan.id === repayment.loanId)?.contractSchedule ? wb.entries : applyOverride(wb.entries, repayment.loanId, repayment.month, repayment.amount),
       })),
 
     updateRepayment: (id, patch) =>
@@ -110,6 +110,7 @@ export const useEMIWorkbookStore = create<EMIStoreState>((set, get) => {
         const existing = wb.repayments.find((r) => r.id === id);
         if (!existing) return wb;
         const updated = { ...existing, ...patch };
+        if (existing.paymentOnly || wb.entries.find(loan => loan.id === existing.loanId)?.contractSchedule) return { ...wb, repayments: wb.repayments.map(row => row.id === id ? updated : row) };
         let entries = wb.entries;
         // A month change needs the OLD slot cleared first, or the loan
         // would end up with both the stale and the new override set.
@@ -130,7 +131,7 @@ export const useEMIWorkbookStore = create<EMIStoreState>((set, get) => {
         return {
           ...wb,
           repayments: wb.repayments.filter((r) => r.id !== id),
-          entries: existing ? applyOverride(wb.entries, existing.loanId, existing.month, null) : wb.entries,
+          entries: (existing && !existing.paymentOnly && !wb.entries.find(loan => loan.id === existing.loanId)?.contractSchedule ? applyOverride(wb.entries, existing.loanId, existing.month, null) : wb.entries).map(loan => loan.paymentAllocations?.some(row => row.paymentId === id) ? { ...loan, paymentAllocations: loan.paymentAllocations.filter(row => row.paymentId !== id) } : loan),
         };
       }),
 

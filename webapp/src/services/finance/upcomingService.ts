@@ -61,6 +61,7 @@ export function getUpcomingItems(windowDays = 14): UpcomingItem[] {
     creditCards: useCreditCardWorkbookStore.getState().workbook.cards,
     plannedRentals: usePlannedRentalsWorkbookStore.getState().workbook.entries,
     emiLoans: useEMIWorkbookStore.getState().workbook.entries,
+    emiRepayments: useEMIWorkbookStore.getState().workbook.repayments,
     rentalProperties: useRentalsWorkbookStore.getState().workbook.settings.properties,
     subscriptions: useSubscriptionsWorkbookStore.getState().workbook.entries,
   }, windowDays, new Date(`${today}T00:00:00.000Z`));

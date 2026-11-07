@@ -9,7 +9,7 @@ import type { EMILoan } from '../../types/emiWorkbook';
 import type { Property } from '../../types/rentalsWorkbook';
 import type { Subscription } from '../../types/subscriptionsWorkbook';
 import { recurrenceOccurrencesWithin } from './recurrence';
-import { emiSchedule, emiSummary, installmentDueDate } from './emiModule';
+import { emiSchedule, emiSummary, emiRepaymentSummary, installmentDueDate } from './emiModule';
 import { proposeRentCollection } from './rentalPlanning';
 import { generateRenewalOccurrences } from './subscriptionsModule';
 
@@ -37,6 +37,7 @@ export interface UpcomingInputs {
   creditCards?: CreditCard[];
   plannedRentals?: PlannedRentalEntry[];
   emiLoans: EMILoan[];
+  emiRepayments?: import('../../types/emiWorkbook').EMIRepayment[];
   rentalProperties: Property[];
   subscriptions: Subscription[];
 }
@@ -126,6 +127,16 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
   });
 
   inputs.emiLoans.filter(loan => loan.isActive !== false).forEach(loan => {
+    if (loan.contractSchedule) {
+      const report = emiRepaymentSummary(loan, inputs.emiRepayments ?? [], todayStr).independent!;
+      for (const row of report.rows.filter(row => row.remaining > 0 && inWindow(row.dueDate, todayStr, windowEndStr))) {
+        const represented = inputs.plannedBank.some(plan => plan.sourceEmiLoanId === loan.id && plan.sourceEmiObligationId === row.id && !plan.executed && !plan.cancelled)
+          || inputs.plannedCash.some(plan => plan.sourceEmiLoanId === loan.id && plan.sourceEmiObligationId === row.id && !plan.executed && !plan.cancelled)
+          || (inputs.plannedCreditCards ?? []).some(plan => plan.sourceEmiLoanId === loan.id && plan.sourceEmiObligationId === row.id && !plan.executed && !plan.cancelled);
+        if (!represented) items.push({ id: `emi-contract:${loan.id}:${row.id}`, date: row.dueDate, module: 'emi', label: `${loan.name}: ${row.description}`, amount: row.remaining, currencyCode: loan.currencyCode, kind: 'expense', overdue: false });
+      }
+      return;
+    }
     const { rows } = emiSchedule(loan);
     const summary = emiSummary(loan, today);
     const next = rows[summary.elapsed];

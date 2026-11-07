@@ -1,4 +1,8 @@
 export interface EMILoan {
+  /** Explicit opt-in to independent contractual obligations and payment ledger.
+   * Legacy data is never silently reinterpreted or migrated. */
+  contractSchedule?: { id: string; dueDate: string; amount: number; description: string }[];
+  paymentAllocations?: { paymentId: string; obligationId: string; amount: number }[];
   id: string;
   name: string; // "Home Mortgage", "Car Financing"
   lender: string;
@@ -98,6 +102,10 @@ export interface EMILoan {
  * repayment exists per loan per month, so there's no same-day-ordering
  * scenario a time would resolve. */
 export interface EMIRepayment {
+  planLink?: import('./planLink').PlanLink;
+  categoryID?: string;
+  /** Independent payments have no schedule-month meaning (legacy month = 0). */
+  paymentOnly?: boolean;
   id: string;
   loanId: string;
   month: number;

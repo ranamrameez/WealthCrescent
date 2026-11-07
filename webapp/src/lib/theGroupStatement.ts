@@ -1,4 +1,4 @@
-import { strFromU8, unzipSync } from 'fflate';
+import { readTabularXlsx } from './tabularXlsx';
 import { parseCSV } from './csv';
 import type { Transaction, Transfer, Adjustment } from '../types/workbook';
 import { QSE_TICKER_NAMES } from './stockData/qseSeed';
@@ -10,36 +10,10 @@ const tickers: Record<string, string> = {
   'techno q': 'TQES', 'rayyan b': 'MARK', qib: 'QIBK', 'lesha bank': 'QFBQ',
   'industries qatar': 'IQCD',
 };
-function xml(text: string): Document {
-  const doc = new DOMParser().parseFromString(text, 'application/xml');
-  if (doc.querySelector('parsererror')) throw new Error('Invalid statement XML.');
-  return doc;
-}
-const elements = (node: Document | Element, tag: string) => Array.from(node.getElementsByTagNameNS('*', tag));
 export function readStatementXlsx(bytes: Uint8Array): string[][] {
-  if (bytes.length > 10_000_000) throw new Error('Statement is too large (maximum 10 MB).');
-  let total = 0;
-  const files = unzipSync(bytes, { filter: entry => {
-    if (entry.name.endsWith('.xml')) { total += entry.originalSize; if (total > 30_000_000) throw new Error('Expanded statement is too large.'); return true; }
-    return false;
-  } });
-  const read = (path: string) => files[path] ? xml(strFromU8(files[path])) : null;
-  const strings = read('xl/sharedStrings.xml');
-  const shared = strings ? elements(strings, 'si').map(si => elements(si, 't').map(t => t.textContent ?? '').join('')) : [];
-  // The Group exports its Cash statement as the first worksheet.
-  const sheet = read('xl/worksheets/sheet1.xml');
-  if (!sheet) throw new Error('The workbook has no Cash worksheet.');
-  return elements(sheet, 'row').map(row => {
-    const cells: string[] = [];
-    for (const cell of elements(row, 'c')) {
-      const letters = (cell.getAttribute('r') ?? '').replace(/\d/g, '');
-      const index = [...letters].reduce((n, char) => n * 26 + char.charCodeAt(0) - 64, 0) - 1;
-      if (index < 0) continue;
-      const value = elements(cell, 'v')[0]?.textContent ?? '';
-      cells[index] = cell.getAttribute('t') === 's' ? value === '' ? '' : shared[Number(value)] ?? '' : cell.getAttribute('t') === 'inlineStr' ? elements(cell, 't').map(t => t.textContent).join('') : value;
-    }
-    return cells;
-  });
+  const workbook = readTabularXlsx(bytes);
+  if (workbook.dateSystem !== '1900') throw new Error('Unsupported statement date system.');
+  return workbook.sheets[0]?.rows ?? [];
 }
 export function parseTheGroupStatement(table: string[][], existing: StatementRecord[] = []) {
   const header = table.findIndex(row => row[0]?.trim().toLowerCase() === 'date' && row[1]?.trim().toLowerCase() === 'type' && row[2]?.trim().toLowerCase() === 'count');

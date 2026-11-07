@@ -10,16 +10,31 @@ import { useCreditCardWorkbookStore } from '../../store/creditCardWorkbookStore'
 import { usePlannedBankWorkbookStore } from '../../store/plannedBankWorkbookStore';
 import { usePlannedCreditCardWorkbookStore } from '../../store/plannedCreditCardWorkbookStore';
 import { getNativeMovementActivities, getMoneyMovementReport } from './dashboardService';
+import { useEMIWorkbookStore } from '../../store/emiWorkbookStore';
+import { useInterEntityTransfersStore } from '../../store/interEntityTransfersStore';
 const session = vi.hoisted(()=>({ signedIn: true }));
 vi.mock('../../lib/firebase/client',()=>({ auth: { get currentUser() { return session.signedIn ? { uid: 'fixture-user' } : null; } }, db: null, firebaseReady: false }));
 const originalCash = useCashWorkbookStore.getState().workbook;
 const originalPlans = usePlannedCashWorkbookStore.getState().workbook;
 const originalUpdatePlan = usePlannedCashWorkbookStore.getState().updateEntry;
 function capture<W>(store: { getState: () => { workbook: W; setWorkbook: (workbook: W) => void } }) { const workbook=store.getState().workbook; return ()=>store.getState().setWorkbook(workbook); }
-const originals = [capture(useBankWorkbookStore),capture(useCreditCardWorkbookStore),capture(usePlannedBankWorkbookStore),capture(usePlannedCreditCardWorkbookStore)];
+const originals = [capture(useBankWorkbookStore),capture(useCreditCardWorkbookStore),capture(usePlannedBankWorkbookStore),capture(usePlannedCreditCardWorkbookStore),capture(useEMIWorkbookStore),capture(useInterEntityTransfersStore)];
 const live = (module: 'cash' | 'bank' | 'creditCard', id: string) => readFinancePlans().find(row=>row.module === module && row.plan.id === id)!.plan;
 const plan = { id: 'bill', date: '2026-01-31', type: 'OUT' as const, amount: 30, currencyCode: 'USD', groupId: 'goal', category: 'Food' };
 const reference = { module: 'cash' as const, id: 'bill' };
+it('fulfills an independent cash-funded installment with one linked loan receipt and one economic movement', () => {
+  const loan = { id: 'independent-loan', name: 'Property', lender: 'Seller', currencyCode: 'USD', principal: 100, tenureMonths: 1, startDate: '2026-01-01', repaymentMode: 'fixedTotal' as const, totalToReturn: 100, contractSchedule: [{ id: 'obligation', dueDate: plan.date, amount: 100, description: 'Contract' }] };
+  useEMIWorkbookStore.getState().setWorkbook({ settings: { defaultCurrency: 'USD' }, entries: [loan], repayments: [] });
+  useInterEntityTransfersStore.getState().setWorkbook({ settings: {}, entries: [] });
+  usePlannedCashWorkbookStore.getState().updateEntry(plan.id, { sourceEmiLoanId: loan.id, sourceEmiObligationId: 'obligation' });
+  fulfillManualPlan(reference, plan.date, live('cash', plan.id));
+  const repayment = useEMIWorkbookStore.getState().workbook.repayments[0];
+  expect(repayment).toMatchObject({ amount: 30, paymentOnly: true, month: 0, planLink: { groupId: 'goal' } });
+  expect(CalculationEngine.emi.emiRepaymentSummary(loan, [repayment], plan.date).outstanding).toBe(70);
+  expect(useInterEntityTransfersStore.getState().workbook.entries).toHaveLength(1);
+  const report = getMoneyMovementReport(getNativeMovementActivities(['cash', 'emi']), plan.date, plan.date, plan.date, 'plan', 'actual');
+  expect(report.rows[0].groups[0]).toMatchObject({ key: 'goal', net: -30 });
+});
 beforeEach(()=>{
   session.signedIn = true;
   useCashWorkbookStore.getState().setWorkbook({ settings: { defaultCurrency: 'USD' }, entries: [] });

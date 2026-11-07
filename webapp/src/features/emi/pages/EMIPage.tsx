@@ -1,3 +1,5 @@
+import { SummaryGroupCard, SummaryValue } from '../../../components/SummaryGroupCard';
+import { InstallmentLedgerPanel } from '../components/InstallmentLedgerPanel';
 import { saveEmiLoan } from '../../../services/finance/emiCommandService';
 import { useEmiSummaryReadModel, getEmiSummaryTotals, getEmiPeriodSummary, type EmiSummaryViewModel } from '../../../services/finance/emiReadService';
 import { useUrlEntitySelection } from '../../../hooks/useUrlEntitySelection';
@@ -331,9 +333,10 @@ function LinkedEMIRepaymentFields({ loan, month, amount, date, onLinked }: { loa
  * regardless of whether a repayment was actually logged), so a real
  * "Overdue" figure needs its own design pass, not a bolt-on here. */
 function LoanStatZones({ loan, sum, loanRepayments }: { loan: EMILoan; sum: EmiSummaryViewModel; loanRepayments: EMIRepayment[] }) {
-  const netToReturn = loan.repaymentMode === 'fixedTotal' ? loan.totalToReturn ?? loan.principal : loan.principal + sum.totalInterest;
+  const netToReturn = sum.independent?.contractualTotal ?? (loan.repaymentMode === 'fixedTotal' ? loan.totalToReturn ?? loan.principal : loan.principal + sum.totalInterest);
   const nextDueRow = sum.rows[sum.elapsed];
   const nextDueDate = sum.balanceBasis === 'recorded' ? sum.nextUnpaidDueDate : nextDueRow ? resolvedDueDate(loan, nextDueRow.month, loanRepayments) : null;
+  if (sum.independent) return <SummaryGroupCard title="Reviewed contract · recorded position"><SummaryValue primary label="Actual remaining" value={fmtMoney(sum.independent.actualRemaining, loan.currencyCode)} /><SummaryValue label="Actual paid" value={fmtMoney(sum.independent.actualPaid, loan.currencyCode)} /><SummaryValue label="Contractual total" value={fmtMoney(sum.independent.contractualTotal, loan.currencyCode)} /><SummaryValue label="Scheduled remaining" value={fmtMoney(sum.independent.scheduledRemaining, loan.currencyCode)} /><SummaryValue label="Overdue" tone="negative" value={fmtMoney(sum.independent.overdue, loan.currencyCode)} /><SummaryValue label="Advance / credit" tone="positive" value={fmtMoney(sum.independent.advance, loan.currencyCode)} /></SummaryGroupCard>;
   const markupLabel = loan.repaymentMode === 'fixedTotal' ? 'Markup percentage' : 'Interest rate (annual)';
 
   const zone = (title: string, cards: ReactNode) => (
@@ -590,7 +593,7 @@ function LoanDetail({ loan, onSelect, onBack, startInEditMode }: { loan: EMILoan
   };
 
   return (
-    <ModuleDetailTemplate title={loan.name} backLabel="All loans" onBack={onBack} topBarRight={<TopBarControls><QuickEntitySwitch label="Loan" value={loan.id} options={[{value:"",label:"All items"},...switchEntities.filter(item=>item.isActive !== false || item.id===loan.id).map(item=>({value:item.id,label:item.name+' ('+item.currencyCode+')'}))]} onChange={id=>{ const next=switchEntities.find(item=>item.id===id);if(next)onSelect(next);else onBack(); }} /><TransactionFilterMenu value={filters} categories={[]} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls>} sections={[{ key: 'summary', label: 'Account summary', content: <><EMIAccountSummary loans={[loan]} filters={filters} /><LoanStatZones loan={loan} sum={sum} loanRepayments={loanRepayments} /><Notice>{sum.balanceBasis === 'recorded' ? 'Remaining uses dated repayment records. Schedule overrides are planning amounts, not proof of payment.' : 'Remaining is a schedule estimate assuming on-time payment. Select recorded repayments only when your payment history is complete.'} {sum.futureRecordedCount > 0 && <span>{sum.futureRecordedCount} future-dated repayment records are excluded from paid to date. </span>}{sum.mismatches.length > 0 && <span>{sum.mismatches.length} recorded amounts differ from schedule overrides. Your records have been preserved.</span>}</Notice></> }, { key: 'details', label: 'Loan details', defaultOpen: true, headerEnd: (
+    <ModuleDetailTemplate title={loan.name} backLabel="All loans" onBack={onBack} topBarRight={<TopBarControls><QuickEntitySwitch label="Loan" value={loan.id} options={[{value:"",label:"All items"},...switchEntities.filter(item=>item.isActive !== false || item.id===loan.id).map(item=>({value:item.id,label:item.name+' ('+item.currencyCode+')'}))]} onChange={id=>{ const next=switchEntities.find(item=>item.id===id);if(next)onSelect(next);else onBack(); }} /><TransactionFilterMenu value={filters} categories={[]} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} /></TopBarControls>} sections={[{ key: 'installment-ledger', label: 'Contract & payments', content: <InstallmentLedgerPanel loanId={loan.id} /> }, { key: 'summary', label: 'Account summary', content: <><EMIAccountSummary loans={[loan]} filters={filters} /><LoanStatZones loan={loan} sum={sum} loanRepayments={loanRepayments} /><Notice>{sum.balanceBasis === 'recorded' ? 'Remaining uses dated repayment records. Schedule overrides are planning amounts, not proof of payment.' : 'Remaining is a schedule estimate assuming on-time payment. Select recorded repayments only when your payment history is complete.'} {sum.futureRecordedCount > 0 && <span>{sum.futureRecordedCount} future-dated repayment records are excluded from paid to date. </span>}{sum.mismatches.length > 0 && <span>{sum.mismatches.length} recorded amounts differ from schedule overrides. Your records have been preserved.</span>}</Notice></> }, { key: 'details', label: 'Loan details', defaultOpen: true, headerEnd: (
             <div className="row gap-sm">
               <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => { setEditing(true); }} />
               <IconButton
@@ -631,7 +634,7 @@ function LoanDetail({ loan, onSelect, onBack, startInEditMode }: { loan: EMILoan
         {null}
 
       </> },
-{ table: true, key: 'plans', label: 'Plans', defaultOpen: true, headerEnd: <button className="btn secondary" onClick={exportSchedule}>Export full schedule CSV</button>, content: <>
+{ table: true, key: 'plans', label: 'Plans', defaultOpen: true, headerEnd: loan.contractSchedule ? undefined : <button className="btn secondary" onClick={exportSchedule}>Export full schedule CSV</button>, content: loan.contractSchedule ? <Notice>Use Contract &amp; payments for the reviewed obligations, allocations and actual remaining. The legacy amortization sketch is not this contract.</Notice> : <>
       <p className="text-muted mt-0">
         Click the pencil on any upcoming installment to set a different amount (and, optionally, a different due
         date) for just that month. Every later month recalculates from what's actually paid.
@@ -769,7 +772,7 @@ function LoanDetail({ loan, onSelect, onBack, startInEditMode }: { loan: EMILoan
       {schedulePaginationControls}
       </> },
 { table: true, key: 'payments', label: 'Payments', defaultOpen: true,  content: <><HomepagePayments loans={[loan]} filters={filters} /></> },
-{ key: 'analytics', label: 'Analytics', defaultOpen: true,  content: <>
+{ key: 'analytics', label: 'Analytics', defaultOpen: true, content: loan.contractSchedule ? <InstallmentLedgerPanel loanId={loan.id} /> : <>
         <div style={{ height: 220 }}>
           <Bar
             data={{
@@ -1036,7 +1039,7 @@ function HomepagePlans({ loans, filters }: { loans: EMILoan[]; filters: Transact
   const repayments = useEMIWorkbookStore((state) => state.workbook.repayments);
   if (filters.direction === 'in' || filters.source === 'statement-import') return <p className="text-muted">No planned installments match the page filters.</p>;
   return <div className="stack-lg">{loans.map((loan) => (
-    <HomepagePlansForLoan key={loan.id} loan={loan} filters={filters} repayments={repayments} />
+    loan.contractSchedule ? <InstallmentLedgerPanel key={loan.id} loanId={loan.id} /> : <HomepagePlansForLoan key={loan.id} loan={loan} filters={filters} repayments={repayments} />
   ))}</div>;
 }
 
@@ -1059,6 +1062,7 @@ function HomepageAnalytics({ loans, filters }: { loans: EMILoan[]; filters: Tran
   const allRepayments = useEMIWorkbookStore(state => state.workbook.repayments);
   applyChartTheme();
   if (filters.direction === 'in' || filters.source === 'statement-import') return <p className="text-muted">No schedule analytics match the page filters.</p>;
+  if (loans.some(loan => loan.contractSchedule)) return <div className="stack-lg">{loans.map(loan => <div key={loan.id}><h3>{loan.name} ({loan.currencyCode})</h3>{loan.contractSchedule ? <InstallmentLedgerPanel loanId={loan.id} /> : <HomepageAnalytics loans={[loan]} filters={filters} />}</div>)}</div>;
   return <div className="stack-lg">{[...new Set(loans.map(loan => loan.currencyCode))].sort().map(currency => {
     const scoped = loans.filter(loan => loan.currencyCode === currency).map(loan => ({ loan, rows: emiSchedule(loan).rows.map(row => ({ ...row, date: resolvedDueDate(loan, row.month, allRepayments.filter(payment => payment.loanId === loan.id)) })) }));
     const rows = scoped.flatMap(item => item.rows).filter(row => (!filters.fromDate || row.date >= filters.fromDate) && (!filters.toDate || row.date <= filters.toDate));

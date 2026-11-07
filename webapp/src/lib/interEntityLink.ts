@@ -133,10 +133,10 @@ function buildSideRecord(
       // since this function has no store access to read the loan's
       // current schedule.
       if (!cfg.ref) throw new Error('EMI/Loans side of a linked transfer needs a loan.');
-      if (!cfg.emiMonth) throw new Error("Couldn't determine which installment this payment applies to.");
+      if (!cfg.emiMonth && !cfg.emiIndependent) throw new Error("Couldn't determine which installment this payment applies to.");
       return {
         module: 'emi',
-        record: { id, loanId: cfg.ref, month: cfg.emiMonth, amount, date, description: note },
+        record: { id, loanId: cfg.ref, month: cfg.emiIndependent ? 0 : cfg.emiMonth!, paymentOnly: cfg.emiIndependent || undefined, amount, date, description: note },
       };
     case 'creditCard':
       // Same "direction doesn't flip the sign" exception as personalLoans/

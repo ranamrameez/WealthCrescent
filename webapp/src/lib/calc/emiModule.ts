@@ -1,5 +1,6 @@
 import type { EMILoan, EMIRepayment } from '../../types/emiWorkbook';
 import { validBatchDate } from '../dateValidation';
+import { reconcileInstallments } from './installmentLedger';
 
 export interface EMIScheduleRow {
   month: number;
@@ -504,6 +505,7 @@ export function emiRepaymentSummary(loan: EMILoan, repayments: readonly EMIRepay
   const obligation = loan.totalToReturn ?? loan.principal;
   const fixed = loan.repaymentMode === 'fixedTotal';
   const recordedBalance = fixed && (loan.balanceTracking === 'recorded' || (loan.balanceTracking !== 'scheduled' && own.length > 0));
+  const independent = loan.contractSchedule ? reconcileInstallments(loan.contractSchedule.map(row => ({ ...row, currency: loan.currencyCode })), own.map(row => ({ ...row, currency: loan.currencyCode })), loan.currencyCode, asOf, loan.paymentAllocations) : undefined;
   const paidMonths = new Set(recorded.map(payment => payment.month));
   const unpaidRows = scheduled.rows.filter(row => !paidMonths.has(row.month));
   const mismatches = own.filter(payment => {
@@ -512,17 +514,18 @@ export function emiRepaymentSummary(loan: EMILoan, repayments: readonly EMIRepay
   }).map(payment => ({ id: payment.id, month: payment.month, recordedAmount: payment.amount, scheduledAmount: loan.installmentOverrides![payment.month] }));
   return {
     ...scheduled,
-    outstanding: recordedBalance ? Math.max(0, obligation - recordedPaid) : scheduled.outstanding,
-    paidSoFar: recordedBalance ? recordedPaid : scheduled.paidSoFar,
-    balanceBasis: recordedBalance ? 'recorded' as const : 'schedule' as const,
+    outstanding: independent?.actualRemaining ?? (recordedBalance ? Math.max(0, obligation - recordedPaid) : scheduled.outstanding),
+    paidSoFar: independent?.actualPaid ?? (recordedBalance ? recordedPaid : scheduled.paidSoFar),
+    balanceBasis: independent || recordedBalance ? 'recorded' as const : 'schedule' as const,
+    independent,
     recordedPaid, recordedFines,
     overpayment: fixed ? Math.max(0, recordedPaid - obligation) : 0,
     scheduledOutstanding: scheduled.outstanding,
     scheduledPaid: scheduled.paidSoFar,
     futureRecordedCount: own.filter(payment => payment.date > asOf).length,
     mismatches,
-    nextUnpaidDueDate: unpaidRows.length ? installmentDueDate(loan, unpaidRows[0].month) : null,
-    unrecordedDueCount: unpaidRows.filter(row => installmentDueDate(loan, row.month) <= asOf).length,
+    nextUnpaidDueDate: independent ? independent.rows.find(row => row.remaining > 0)?.dueDate ?? null : unpaidRows.length ? installmentDueDate(loan, unpaidRows[0].month) : null,
+    unrecordedDueCount: independent ? independent.rows.filter(row => row.remaining > 0 && row.dueDate <= asOf).length : unpaidRows.filter(row => installmentDueDate(loan, row.month) <= asOf).length,
   };
 }
 
@@ -542,7 +545,8 @@ export function emiPeriodSummary(loans: readonly EMILoan[], repayments: readonly
       outflow -= own.filter(payment => payment.date <= end && within(payment.date) && (filters.source === 'all' || (payment.source ?? 'manual') === filters.source)).reduce((total, payment) => total + payment.amount, 0);
       if (filters.source !== 'statement-import') {
         const settled = new Set(own.filter(payment => payment.date <= today).map(payment => payment.month));
-        plannedOutflow -= emiSchedule(loan).rows.filter(row => !settled.has(row.month) && within(installmentDueDate(loan, row.month))).reduce((total, row) => total + row.emi, 0);
+        const independent = emiRepaymentSummary(loan, own, today).independent;
+        plannedOutflow -= independent ? independent.rows.filter(row => within(row.dueDate)).reduce((total, row) => total + row.remaining, 0) : emiSchedule(loan).rows.filter(row => !settled.has(row.month) && within(installmentDueDate(loan, row.month))).reduce((total, row) => total + row.emi, 0);
       }
     }
   }
@@ -576,9 +580,11 @@ export function projectedEmiByCurrency(loans: EMILoan[], repayments: readonly EM
     let cash = emiScheduledCashOutflowByCurrency([loan], today, cutoff)[loan.currencyCode] ?? 0;
     let balance: number;
     if (repayments !== undefined && emiRepaymentSummary(loan, repayments, today).balanceBasis === 'recorded') {
-      const opening = loan.startDate > today ? loan.totalToReturn ?? loan.principal : emiRepaymentSummary(loan, repayments, today).outstanding;
+      const actual = emiRepaymentSummary(loan, repayments, today);
+      const opening = loan.contractSchedule ? actual.outstanding : loan.startDate > today ? loan.totalToReturn ?? loan.principal : actual.outstanding;
       const settled = new Set(repayments.filter(payment => payment.loanId === loan.id && payment.date <= today).map(payment => payment.month));
       cash = emiSchedule(loan).rows.filter(row => !settled.has(row.month) && installmentDueDate(loan, row.month) > today && installmentDueDate(loan, row.month) <= cutoff).reduce((total, row) => total + row.emi, 0);
+      if (actual.independent) cash = actual.independent.rows.filter(row => row.dueDate > today && row.dueDate <= cutoff).reduce((total, row) => total + row.remaining, 0);
       cash = Math.min(opening, cash);
       balance = opening - cash;
     } else balance = emiSummary(loan, new Date(`${cutoff}T12:00:00Z`)).outstanding;

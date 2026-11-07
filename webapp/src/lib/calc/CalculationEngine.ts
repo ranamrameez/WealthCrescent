@@ -40,6 +40,7 @@ import * as recentActivity from './recentActivity';
 import * as movements from './movementActivities';
 import * as manualPayments from './manualPlanFulfillment';
 import * as unifiedBudgets from './unifiedBudgets';
+import * as installmentLedger from './installmentLedger';
 
 /**
  * Stable domain-oriented API. Keep all financial calculation entry points
@@ -75,6 +76,7 @@ export const CalculationEngine = Object.freeze({
   recentActivity,
   movements,
   manualPayments,
+  installmentLedger,
 });
 
 export type CalculationEngineApi = typeof CalculationEngine;
