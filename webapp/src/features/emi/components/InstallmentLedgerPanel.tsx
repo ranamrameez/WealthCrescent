@@ -1,6 +1,6 @@
 import { useTablePagination } from '../../../hooks/useTablePagination';
 import { useAppearanceStore } from '../../../store/appearanceStore';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useInstallmentReport, saveInstallmentContract, saveInstallmentPayment, saveInstallmentAllocations, setInstallmentPayingAccount } from '../../../services/finance/installmentService';
 import type { EMILoan, EMIRepayment } from '../../../types/emiWorkbook';
 import { Field, TextInput } from '../../../components/ui/Field';
@@ -13,9 +13,11 @@ import { StandardDropdown } from '../../../components/ui/StandardDropdown';
 import { SummaryGroupCard, SummaryValue } from '../../../components/SummaryGroupCard';
 import { AppBar, AppLine } from '../../../components/AppCharts';
 import { cssVar } from '../../../lib/cssVar';
+const InstallmentImportDialog = lazy(() => import('./InstallmentImportDialog').then(module => ({ default: module.InstallmentImportDialog })));
 
 export function InstallmentLedgerPanel({ loanId }: { loanId: string }) {
   const model = useInstallmentReport(loanId);
+  const [importing, setImporting] = useState(false);
   const ensureSignedIn = useEnsureSignedIn();
   const [contract, setContract] = useState<NonNullable<EMILoan['contractSchedule']> | null>(null);
   const [payment, setPayment] = useState<{ date: string; amount: string; description: string; original?: EMIRepayment } | null>(null);
@@ -48,9 +50,11 @@ export function InstallmentLedgerPanel({ loanId }: { loanId: string }) {
   return <div className="stack-lg">
     <Notice>Contract obligations and actual payments are separate. Payments cover the oldest obligations first, including partial and advance payments. Future-dated records are excluded until their payment date. Fines are separate from debt. Review legacy placeholder and generated records before relying on recorded balances.</Notice>
     <div className="row gap-sm">
+      <button className="btn secondary" onClick={() => setImporting(true)}>Reconcile workbook</button>
       <button className="btn secondary" onClick={() => setContract((loan.contractSchedule ?? model.suggested).map(row => ({ ...row })))}>{report ? 'Edit contract obligations' : 'Review independent contract'}</button>
       {report && <button className="btn" onClick={() => setPayment({ date: asOf, amount: '', description: '' })}>＋ Record payment</button>}
     </div>
+    {importing && <Suspense fallback={<p>Loading reconciliation…</p>}><InstallmentImportDialog loan={loan} onClose={() => setImporting(false)} /></Suspense>}
     {contract && <div className="stack-lg">
       <Notice tone="warning">This draft comes from the old schedule and may contain payment-derived overrides. Correct it to the agreed contract, including booking and additional major installments. Saving changes balance tracking; it does not correct historical payments.</Notice>
       <div className="table-scroll"><table><thead><tr><th>Description</th><th>Due date</th><th>Amount ({loan.currencyCode})</th><th /></tr></thead><tbody>{contract.map((row, index) => <tr key={row.id}>

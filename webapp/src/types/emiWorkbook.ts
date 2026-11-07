@@ -133,6 +133,8 @@ export interface EMISettings {
 }
 
 export interface EMIWorkbook {
+  /** Reviewed reconciliation snapshots are excluded from active calculations. */
+  reconciliationHistory?: { id: string; loanId: string; createdAt: string; sourceLabel: string; loan: EMILoan; repayments: EMIRepayment[] }[];
   settings: EMISettings;
   /** Named `entries` (not `loans`) — a holdover from when this module
    * reused the generic `createEntryStore` factory (single-array shape).

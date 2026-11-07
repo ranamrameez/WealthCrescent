@@ -89,3 +89,63 @@ export function installmentMonthlySummary(report: ReturnType<typeof reconcileIns
   }
   return { rows, truncated: start > first };
 }
+
+/** Import adapter for independent schedule/payment tables. Input is cached cell
+ * text, never formulas. Ambiguous human date formats are rejected explicitly. */
+export function previewInstallmentTable(table: readonly string[][], currency: string, dateSystem: '1900' | '1904' = '1900', sourceRows?: readonly number[]) {
+  const normalize = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  const headerIndex = table.findIndex(row => row.some(value => ['scheduledamount', 'paymentamount', 'paidinstallment', 'paidamount'].includes(normalize(value ?? ''))));
+  if (headerIndex < 0) throw new Error('Expected Scheduled Amount / Due Month and/or Payment Date / Paid Installment columns.');
+  const header = table[headerIndex].map(value => normalize(value ?? ''));
+  const column = (...names: string[]) => header.findIndex(value => names.includes(value));
+  const dueColumn = column('duemonth', 'duedate'), scheduledColumn = column('scheduledamount');
+  const dateColumn = column('paymentdate', 'paiddate', 'actualpaymentdate'), amountColumn = column('paidinstallment', 'paymentamount', 'paidamount');
+  const descriptionColumn = column('paymentdesc', 'description', 'paymentdescription'), currencyColumn = column('currency', 'currencycode');
+  const fineColumn = column('fine', 'fines', 'latefee', 'penalty');
+  if ((dueColumn < 0 || scheduledColumn < 0) && (dateColumn < 0 || amountColumn < 0)) throw new Error('A date and matching amount column are required.');
+  const numeric = (raw: string, row: number) => {
+    const amount = Number(raw.replace(/,/g, '').trim());
+    if (!Number.isFinite(amount) || amount < 0) throw new Error(`Invalid amount on source row ${row}.`);
+    return amount;
+  };
+  const date = (raw: string, row: number) => {
+    const value = raw.trim();
+    if (validBatchDate(value)) return value;
+    if (!/^\d+(\.\d+)?$/.test(value)) throw new Error(`Use YYYY-MM-DD or an XLSX date cell on source row ${row}.`);
+    const serial = Math.floor(Number(value));
+    if (!Number.isFinite(serial) || serial < (dateSystem === '1904' ? 0 : 1) || serial > 2958465 || (dateSystem === '1900' && serial === 60)) throw new Error(`Invalid Excel date on source row ${row}.`);
+    const base = dateSystem === '1904' ? Date.UTC(1904, 0, 1) : serial < 60 ? Date.UTC(1899, 11, 31) : Date.UTC(1899, 11, 30);
+    const parsed = new Date(base + serial * 86400000);
+    if (!Number.isFinite(parsed.getTime())) throw new Error(`Invalid date on source row ${row}.`);
+    const result = parsed.toISOString().slice(0, 10);
+    if (!validBatchDate(result)) throw new Error(`Unsupported date on source row ${row}.`);
+    return result;
+  };
+  const obligations: InstallmentObligation[] = [], payments: (InstallmentPayment & { description: string; sourceRow: number; fine?: number })[] = [];
+  for (let index = headerIndex + 1; index < table.length; index++) {
+    const row = table[index], sourceRow = sourceRows?.[index] ?? index + 1;
+    const description = row[descriptionColumn]?.trim() ?? '';
+    if (['sum', 'total', 'totals'].includes(normalize(description)) && !row[dueColumn]?.trim() && !row[dateColumn]?.trim()) continue;
+    if (currencyColumn >= 0 && row[currencyColumn]?.trim() && row[currencyColumn].trim().toUpperCase() !== currency) throw new Error(`Currency mismatch on source row ${sourceRow}.`);
+    if (scheduledColumn >= 0 && row[scheduledColumn]?.trim()) {
+      if (!row[dueColumn]?.trim()) throw new Error(`Missing contractual due date on source row ${sourceRow}.`);
+      obligations.push({ id: `obligation:${sourceRow}`, dueDate: date(row[dueColumn], sourceRow), amount: numeric(row[scheduledColumn], sourceRow), description: description || `Obligation ${sourceRow}`, currency });
+    }
+    if (amountColumn >= 0 && (row[amountColumn]?.trim() || row[fineColumn]?.trim())) {
+      const amount = row[amountColumn]?.trim() ? numeric(row[amountColumn], sourceRow) : 0;
+      const fine = fineColumn >= 0 && row[fineColumn]?.trim() ? numeric(row[fineColumn], sourceRow) : 0;
+      if (amount > 0 || fine > 0) {
+        if (!row[dateColumn]?.trim()) throw new Error(`Missing actual payment date on source row ${sourceRow}.`);
+        payments.push({ id: `payment:${sourceRow}`, date: date(row[dateColumn], sourceRow), amount, description: description || 'Payment', currency, sourceRow, ...(fine ? { fine } : {}) });
+      }
+    }
+    if (obligations.length > 1200 || payments.length > 10000) throw new Error('Import exceeds the supported contract/payment row limit.');
+  }
+  if (!obligations.length && !payments.length) throw new Error('No contractual obligations or actual payments found.');
+  const issues: string[] = [];
+  const summary = table[headerIndex + 1] ?? [];
+  const expectedTotal = column('totalamount'), expectedPaid = column('totalpaid');
+  if (expectedTotal >= 0 && summary[expectedTotal]?.trim() && obligations.length && Math.abs(numeric(summary[expectedTotal], headerIndex + 2) - obligations.reduce((sum, row) => sum + row.amount, 0)) > 0.005) issues.push('Source contractual total differs from the sum of obligation rows.');
+  if (expectedPaid >= 0 && summary[expectedPaid]?.trim() && Math.abs(numeric(summary[expectedPaid], headerIndex + 2) - payments.reduce((sum, row) => sum + row.amount, 0)) > 0.005) issues.push('Source paid total differs from the sum of payment rows.');
+  return { obligations, payments, issues, dateSystem, hasFineColumn: fineColumn >= 0 };
+}

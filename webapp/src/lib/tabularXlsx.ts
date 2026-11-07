@@ -44,6 +44,6 @@ export function readTabularXlsx(bytes: Uint8Array) {
       }
       return cells;
     });
-    return { name: sheet.name, rows };
+    return { name: sheet.name, rows, rowNumbers: sourceRows.map((row, index) => Number(row.getAttribute('r')) || index + 1) };
   }) };
 }
