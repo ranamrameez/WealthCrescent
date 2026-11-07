@@ -1,4 +1,8 @@
 export interface EMILoan {
+  /** Explicit opt-in to independent contractual obligations and payment ledger.
+   * Legacy data is never silently reinterpreted or migrated. */
+  contractSchedule?: { id: string; dueDate: string; amount: number; description: string }[];
+  paymentAllocations?: { paymentId: string; obligationId: string; amount: number }[];
   id: string;
   name: string; // "Home Mortgage", "Car Financing"
   lender: string;
@@ -6,6 +10,18 @@ export interface EMILoan {
   principal: number;
   tenureMonths: number;
   startDate: string;
+  /** Explicit first due date. Absent preserves legacy startDate + one month. */
+  firstInstallmentDate?: string;
+  bookingDate?: string;
+  /** Metadata only: financed principal already excludes this amount. */
+  bookingAmount?: number;
+  purchasePrice?: number;
+  /** Calendar months between installments; tenureMonths remains the legacy
+   * field name for the number of installments. Absent = monthly. */
+  installmentIntervalMonths?: number;
+  /** Explicit actual-ledger versus on-time schedule estimate. Legacy loans
+   * with a repayment ledger use recorded; legacy loans without one estimate. */
+  balanceTracking?: 'recorded' | 'scheduled';
   repaymentMode: 'interest' | 'fixedTotal';
   annualRatePct?: number; // used when repaymentMode === 'interest'
   totalToReturn?: number; // used when repaymentMode === 'fixedTotal'
@@ -86,6 +102,10 @@ export interface EMILoan {
  * repayment exists per loan per month, so there's no same-day-ordering
  * scenario a time would resolve. */
 export interface EMIRepayment {
+  planLink?: import('./planLink').PlanLink;
+  categoryID?: string;
+  /** Independent payments have no schedule-month meaning (legacy month = 0). */
+  paymentOnly?: boolean;
   id: string;
   loanId: string;
   month: number;
@@ -113,6 +133,8 @@ export interface EMISettings {
 }
 
 export interface EMIWorkbook {
+  /** Reviewed reconciliation snapshots are excluded from active calculations. */
+  reconciliationHistory?: { id: string; loanId: string; createdAt: string; sourceLabel: string; loan: EMILoan; repayments: EMIRepayment[] }[];
   settings: EMISettings;
   /** Named `entries` (not `loans`) — a holdover from when this module
    * reused the generic `createEntryStore` factory (single-array shape).

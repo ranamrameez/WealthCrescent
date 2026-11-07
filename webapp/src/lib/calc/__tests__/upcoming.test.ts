@@ -15,7 +15,7 @@ describe('collectUpcomingItems', () => {
       ],
     };
     const items = collectUpcomingItems(inputs, 14, new Date('2026-01-01'));
-    expect(items).toEqual([{ date: '2026-01-05', module: 'cash', label: 'Cash plan', amount: 500, currencyCode: 'USD', kind: 'income', overdue: false }]);
+    expect(items).toMatchObject([{ date: '2026-01-05', module: 'cash', label: 'Cash plan', amount: 500, currencyCode: 'USD', kind: 'income', overdue: false, dueLabel: 'Happening in 4 days' }]);
   });
 
   it('a recurring Cash plan (salary on the 28th) surfaces its next occurrence, not yet executed', () => {
@@ -27,7 +27,7 @@ describe('collectUpcomingItems', () => {
       }],
     };
     const items = collectUpcomingItems(inputs, 14, new Date('2026-01-20'));
-    expect(items).toEqual([{ date: '2026-01-28', module: 'cash', label: 'Salary', amount: 150000, currencyCode: 'PKR', kind: 'income', overdue: false }]);
+    expect(items).toMatchObject([{ date: '2026-01-28', module: 'cash', label: 'Salary', amount: 150000, currencyCode: 'PKR', kind: 'income', overdue: false }]);
   });
 
   it('excludes a recurring occurrence already marked done via executedThrough', () => {
@@ -42,14 +42,63 @@ describe('collectUpcomingItems', () => {
     expect(items).toEqual([]);
   });
 
-  it('a Bank plan resolves its currency from the account and flags overdue correctly', () => {
+  it('does not surface overdue one-off plans in Upcoming', () => {
     const inputs: UpcomingInputs = {
       ...emptyInputs(),
       bankAccounts: [{ id: 'a1', name: 'Checking', currencyCode: 'USD', openingBalance: 0 }],
       plannedBank: [{ id: 'b1', accountId: 'a1', date: '2025-12-20', description: 'Rent', amount: -800 }],
     };
     const items = collectUpcomingItems(inputs, 14, new Date('2026-01-01'));
-    expect(items).toEqual([{ date: '2025-12-20', module: 'bank', label: 'Rent', amount: 800, currencyCode: 'USD', kind: 'expense', overdue: true }]);
+    expect(items).toEqual([]);
+  });
+
+  it('excludes past and completed one-off plans from the future-only Upcoming list', () => {
+    const inputs: UpcomingInputs = {
+      ...emptyInputs(),
+      plannedCash: [
+        { id: 'past', date: '2025-12-20', type: 'OUT', amount: 50, currencyCode: 'USD' },
+        { id: 'done', date: '2026-01-05', type: 'OUT', amount: 75, currencyCode: 'USD', executed: true },
+        { id: 'future', date: '2026-01-08', type: 'IN', amount: 100, currencyCode: 'USD' },
+      ],
+    };
+    expect(collectUpcomingItems(inputs, 14, new Date('2026-01-01'))).toMatchObject([
+      { id: 'future', date: '2026-01-08', module: 'cash', overdue: false },
+    ]);
+  });
+
+  it('includes planned Rentals and Credit Card items, but ignores plans for deleted entities', () => {
+    const inputs: UpcomingInputs = {
+      ...emptyInputs(),
+      rentalProperties: [{ id: 'p1', name: 'Flat 1', currencyCode: 'QAR', monthlyRent: 1000 }],
+      plannedRentals: [
+        { id: 'r1', propertyId: 'p1', date: '2026-01-05', type: 'RENT_INCOME', amount: 1200 },
+        { id: 'r2', propertyId: 'deleted', date: '2026-01-06', type: 'RENT_INCOME', amount: 900 },
+      ],
+      creditCards: [{ id: 'cc1', name: 'Visa', currencyCode: 'QAR' }],
+      plannedCreditCards: [
+        { id: 'cc-plan', cardId: 'cc1', date: '2026-01-07', description: 'Card payment', amount: 300, kind: 'payment' },
+        { id: 'cc-deleted', cardId: 'gone', date: '2026-01-08', description: 'Old card', amount: 100, kind: 'charge' },
+      ],
+    };
+    expect(collectUpcomingItems(inputs, 14, new Date('2026-01-01'))).toMatchObject([
+      { id: 'r1', date: '2026-01-05', module: 'rentals', currencyCode: 'QAR', amount: 1200 },
+      { id: 'cc-plan', date: '2026-01-07', module: 'creditCards', currencyCode: 'QAR', amount: 300 },
+    ]);
+  });
+
+  it('does not duplicate a subscription renewal already represented by its generated plan', () => {
+    const inputs: UpcomingInputs = {
+      ...emptyInputs(),
+      subscriptions: [{ id: 's1', name: 'Netflix', amount: 15, currencyCode: 'USD', billingCycle: 'monthly', startDate: '2026-01-10', active: true }],
+      plannedBank: [{
+        id: 'generated', accountId: 'a1', date: '2026-01-10', description: 'Netflix', amount: -15,
+        sourceSubscriptionId: 's1',
+      }],
+      bankAccounts: [{ id: 'a1', name: 'Checking', currencyCode: 'USD', openingBalance: 0 }],
+    };
+    const items = collectUpcomingItems(inputs, 14, new Date('2026-01-01'));
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ id: 'generated', module: 'bank', date: '2026-01-10' });
   });
 
   it('drops a Bank plan whose account was deleted', () => {
@@ -66,7 +115,7 @@ describe('collectUpcomingItems', () => {
       }],
     };
     const items = collectUpcomingItems(inputs, 45, new Date('2026-01-01'));
-    expect(items).toEqual([{ date: '2026-02-01', module: 'emi', label: 'Car Loan installment', amount: 100, currencyCode: 'USD', kind: 'expense', overdue: false }]);
+    expect(items).toMatchObject([{ date: '2026-02-01', module: 'emi', label: 'Car Loan installment', amount: 100, currencyCode: 'USD', kind: 'expense', overdue: false }]);
   });
 
   it('skips an archived (isActive: false) EMI loan', () => {
@@ -89,7 +138,7 @@ describe('collectUpcomingItems', () => {
       }],
     };
     const items = collectUpcomingItems(inputs, 14, new Date('2026-01-01'));
-    expect(items).toEqual([{ date: '2026-01-05', module: 'rentals', label: 'Flat 1 rent', amount: 1000, currencyCode: 'USD', kind: 'income', overdue: false }]);
+    expect(items).toMatchObject([{ date: '2026-01-05', module: 'rentals', label: 'Flat 1 rent', amount: 1000, currencyCode: 'USD', kind: 'income', overdue: false }]);
   });
 
   it('surfaces a Subscription\'s next renewal', () => {
@@ -98,7 +147,7 @@ describe('collectUpcomingItems', () => {
       subscriptions: [{ id: 's1', name: 'Netflix', amount: 15, currencyCode: 'USD', billingCycle: 'monthly', startDate: '2026-01-10', active: true }],
     };
     const items = collectUpcomingItems(inputs, 14, new Date('2026-01-01'));
-    expect(items).toEqual([{ date: '2026-01-10', module: 'subscriptions', label: 'Netflix', amount: 15, currencyCode: 'USD', kind: 'expense', overdue: false }]);
+    expect(items).toMatchObject([{ date: '2026-01-10', module: 'subscriptions', label: 'Netflix', amount: 15, currencyCode: 'USD', kind: 'expense', overdue: false }]);
   });
 
   it('excludes items beyond the window and sorts the combined list by date', () => {
@@ -113,4 +162,20 @@ describe('collectUpcomingItems', () => {
     const items = collectUpcomingItems(inputs, 14, new Date('2026-01-01'));
     expect(items.map((i) => i.date)).toEqual(['2026-01-05', '2026-01-10']);
   });
+});
+
+it('shows one reminder for an exact explicitly linked EMI bank installment', () => {
+  const inputs: UpcomingInputs = { ...emptyInputs(),
+    emiLoans: [{ id: 'loan', name: 'Loan', lender: 'Bank', currencyCode: 'USD', principal: 1200, tenureMonths: 12, startDate: '2026-01-01', repaymentMode: 'interest', annualRatePct: 0 }],
+    bankAccounts: [{ id: 'account', name: 'Checking', currencyCode: 'USD', openingBalance: 0 }],
+    plannedBank: [{ id: 'linked', accountId: 'account', date: '2026-02-01', description: 'Installment', amount: -100, sourceEmiLoanId: 'loan', sourceEmiMonth: 1 }],
+  };
+  expect(collectUpcomingItems(inputs,45,new Date('2026-01-01')).map(item => item.module)).toEqual(['bank']);
+  expect(collectUpcomingItems({ ...inputs, plannedBank: [{ ...inputs.plannedBank[0], sourceEmiMonth: 0 }] },45,new Date('2026-01-01')).map(item => item.module)).toEqual(['bank']);
+  for (const patch of [{ amount: -50 }, { sourceEmiLoanId: undefined }, { date: '2026-02-02' }]) {
+    const result = collectUpcomingItems({ ...inputs, plannedBank: [{ ...inputs.plannedBank[0], ...patch }] },45,new Date('2026-01-01'));
+    expect(result.some(item => item.module === 'emi')).toBe(true);
+  }
+  expect(collectUpcomingItems({ ...inputs, bankAccounts: [{ ...inputs.bankAccounts[0], isActive: false }] },45,new Date('2026-01-01')).map(item => item.module)).toEqual(['emi']);
+  expect(collectUpcomingItems({ ...inputs, bankAccounts: [{ ...inputs.bankAccounts[0], currencyCode: 'QAR' }] },45,new Date('2026-01-01')).some(item => item.module === 'emi')).toBe(true);
 });

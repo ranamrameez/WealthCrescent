@@ -17,7 +17,7 @@ describe('advanceRecurrence', () => {
   });
 
   it('clamps a day-of-month that does not exist in the target month (day 31 -> Feb)', () => {
-    expect(advanceRecurrence(new Date('2026-01-31'), { cycle: 'monthly' }).toISOString().slice(0, 10)).toBe('2026-03-03');
+    expect(advanceRecurrence(new Date('2026-01-31'), { cycle: 'monthly' }).toISOString().slice(0, 10)).toBe('2026-02-28');
   });
 });
 
@@ -64,5 +64,28 @@ describe('recurrenceMonthlyEquivalent', () => {
     expect(recurrenceMonthlyEquivalent({ cycle: 'yearly' }, 1200)).toBe(100);
     expect(recurrenceMonthlyEquivalent({ cycle: 'weekly' }, 100)).toBeCloseTo((100 * 52) / 12, 6);
     expect(recurrenceMonthlyEquivalent({ cycle: 'custom', customDays: 10 }, 100)).toBe(300);
+  });
+});
+
+
+describe('calendar-anchored recurring amounts', () => {
+  it('clamps short months and restores the original billing day afterwards', () => {
+    expect(recurrenceOccurrencesWithin(rule({ startDate: '2026-01-31' }), '2026-01-01', '2026-05-31')).toEqual([
+      '2026-01-31', '2026-02-28', '2026-03-31', '2026-04-30', '2026-05-31',
+    ]);
+  });
+  it('returns to February 29 in the next leap year without shifting into March', () => {
+    expect(recurrenceOccurrencesWithin(rule({ cycle: 'yearly', startDate: '2024-02-29' }), '2024-01-01', '2028-12-31')).toEqual([
+      '2024-02-29', '2025-02-28', '2026-02-28', '2027-02-28', '2028-02-29',
+    ]);
+  });
+  it('retains the billing-day anchor when an occurrence is excluded or a window starts mid-series', () => {
+    const r = rule({ startDate: '2026-01-31', excludedDates: ['2026-02-28'], endDate: '2026-04-30' });
+    expect(nextRecurrenceOccurrence(r, new Date('2026-02-01'))?.toISOString().slice(0, 10)).toBe('2026-03-31');
+    expect(recurrenceOccurrencesWithin(r, '2026-02-01', '2026-06-01')).toEqual(['2026-03-31', '2026-04-30']);
+  });
+  it('does not drop a valid daily rule just because it began more than 10,000 days ago', () => {
+    const r = rule({ cycle: 'custom', customDays: 1, startDate: '1980-01-01' });
+    expect(nextRecurrenceOccurrence(r, new Date('2026-11-04'))?.toISOString().slice(0, 10)).toBe('2026-11-04');
   });
 });

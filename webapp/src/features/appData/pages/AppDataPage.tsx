@@ -1,3 +1,5 @@
+import { CLOUD_PATH_SUFFIX, CREATE_EMPTY } from '../../../services/appData/workbookRegistry';
+import { removeAllFinancialData } from '../../../services/appData/removeAllFinancialData';
 import { PageHeading } from '../../../components/PageHeading';
 import { BackButton } from '../../../components/BackButton';
 import { ref, set } from 'firebase/database';
@@ -28,24 +30,6 @@ import { useInterEntityTransfersStore } from '../../../store/interEntityTransfer
 import { useNetWorthSnapshotsWorkbookStore } from '../../../store/netWorthSnapshotsWorkbookStore';
 import { useCategoryStore } from '../../../store/categoryStore';
 import { useCategoryGroupStore } from '../../../store/categoryGroupStore';
-import { createEmptyWorkbook } from '../../../store/defaultWorkbook';
-import { createEmptyPSXWorkbook } from '../../../store/defaultPsxWorkbook';
-import { createEmptyBankWorkbook } from '../../../store/defaultBankWorkbook';
-import { createEmptyCreditCardWorkbook } from '../../../store/defaultCreditCardWorkbook';
-import { createEmptyCashWorkbook } from '../../../store/defaultCashWorkbook';
-import { createEmptyEMIWorkbook } from '../../../store/defaultEmiWorkbook';
-import { createEmptyFundsWorkbook } from '../../../store/defaultFundsWorkbook';
-import { createEmptyPersonalLoansWorkbook } from '../../../store/defaultPersonalLoansWorkbook';
-import { createEmptyRentalsWorkbook } from '../../../store/defaultRentalsWorkbook';
-import { createEmptySubscriptionsWorkbook } from '../../../store/defaultSubscriptionsWorkbook';
-import { createEmptyPlannedBankWorkbook } from '../../../store/defaultPlannedBankWorkbook';
-import { createEmptyPlannedCashWorkbook } from '../../../store/defaultPlannedCashWorkbook';
-import { createEmptyPlannedCreditCardWorkbook } from '../../../store/defaultPlannedCreditCardWorkbook';
-import { createEmptyPlannedRentalsWorkbook } from '../../../store/defaultPlannedRentalsWorkbook';
-import { createEmptyInterEntityWorkbook } from '../../../store/defaultInterEntityWorkbook';
-import { createEmptyNetWorthSnapshotsWorkbook } from '../../../store/defaultNetWorthSnapshotsWorkbook';
-import { createEmptyCategoriesWorkbook } from '../../../store/defaultCategoriesWorkbook';
-import { createEmptyCategoryGroupsWorkbook } from '../../../store/defaultCategoryGroupsWorkbook';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -76,14 +60,7 @@ const today = () => new Date().toISOString().slice(0, 10);
  * store/module key is `qse` everywhere else in this app, but its actual
  * cloud path (kept for backwards compatibility with the pre-rewrite legacy
  * app) is `workbook`, not `qse`. */
-const CLOUD_PATH_SUFFIX = {
-  qse: 'workbook', psx: 'psx', bank: 'bank', creditCards: 'creditCards', cash: 'cash', emiLoans: 'emiLoans',
-  funds: 'funds', personalLoans: 'personalLoans', rentals: 'rentals', subscriptions: 'subscriptions',
-  plannedBank: 'plannedBank', plannedCash: 'plannedCash', plannedCreditCard: 'plannedCreditCard',
-  plannedRentals: 'plannedRentals',
-  interEntityTransfers: 'interEntityTransfers', netWorthSnapshots: 'netWorthSnapshots',
-  categories: 'categories', categoryGroups: 'categoryGroups',
-} as const;
+
 
 /** Every module's own `createEmpty*Workbook()` — a real bug found via a
  * user report: `setWorkbook()` (in `createWorkbookStore.ts`,
@@ -104,23 +81,15 @@ const CLOUD_PATH_SUFFIX = {
  * not just `qse` -- exactly the "no transaction imported" symptom, even
  * with the direct-Firebase-write fix from the previous round already in
  * place. */
-const CREATE_EMPTY = {
-  qse: createEmptyWorkbook, psx: createEmptyPSXWorkbook, bank: createEmptyBankWorkbook,
-  creditCards: createEmptyCreditCardWorkbook,
-  cash: createEmptyCashWorkbook, emiLoans: createEmptyEMIWorkbook, funds: createEmptyFundsWorkbook,
-  personalLoans: createEmptyPersonalLoansWorkbook, rentals: createEmptyRentalsWorkbook,
-  subscriptions: createEmptySubscriptionsWorkbook, plannedBank: createEmptyPlannedBankWorkbook,
-  plannedCash: createEmptyPlannedCashWorkbook, plannedCreditCard: createEmptyPlannedCreditCardWorkbook,
-  plannedRentals: createEmptyPlannedRentalsWorkbook,
-  interEntityTransfers: createEmptyInterEntityWorkbook, netWorthSnapshots: createEmptyNetWorthSnapshotsWorkbook,
-  categories: createEmptyCategoriesWorkbook, categoryGroups: createEmptyCategoryGroupsWorkbook,
-} as const;
+
 
 export function AppDataPage() {
   const ensureSignedIn = useEnsureSignedIn();
   const { user } = useAuthState();
   const fileInput = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
 
   const qse = useWorkbookStore();
   const psx = usePSXWorkbookStore();
@@ -243,6 +212,19 @@ export function AppDataPage() {
     reader.readAsText(file);
   };
 
+  const removeAll = async () => {
+    if (deleteConfirmation !== 'DELETE ALL DATA' || busy || deleting || !user) return;
+    const uid = user.uid;
+    if (!(await confirmDialog('Permanently remove all financial data for this signed-in account from the cloud and this device? This includes every module, account, transaction, plan, transfer, custom category and history. Defaults are restored. Your login account, appearance preferences and shared market data remain. Export a backup first; this cannot be undone here.', 'Remove all app data?'))) return;
+    setDeleting(true);
+    try {
+      await removeAllFinancialData(uid);
+      setDeleteConfirmation('');
+      toast('All financial app data removed. Defaults restored.');
+    } catch (error) { toast(error instanceof Error ? error.message : 'Could not remove app data.'); }
+    finally { setDeleting(false); }
+  };
+
   return (
     <div className="standard-page">
       <PageHeading back={<BackButton to="/net-worth">← Overview</BackButton>}><h1 className="pagetitle">App Data</h1></PageHeading>
@@ -253,7 +235,7 @@ export function AppDataPage() {
       <Card className="mb-md">
         <h3 className="mt-0">Export everything</h3>
         <p className="text-muted">Downloads one JSON file with every module's data.</p>
-        <button className="btn" onClick={exportAll}>Export full backup</button>
+        <button className="btn" disabled={deleting} onClick={exportAll}>Export full backup</button>
       </Card>
       <Card>
         <h3 className="mt-0">Import everything</h3>
@@ -261,7 +243,7 @@ export function AppDataPage() {
           This overwrites whichever modules are present in the file, for every one of THIS account's stores. Export
           a backup first if you're not sure.
         </Notice>
-        <button className="btn secondary" disabled={busy} onClick={() => fileInput.current?.click()}>
+        <button className="btn secondary" disabled={busy || deleting} onClick={() => fileInput.current?.click()}>
           {busy ? 'Importing…' : 'Choose file to import'}
         </button>
         <input
@@ -275,6 +257,17 @@ export function AppDataPage() {
             e.target.value = '';
           }}
         />
+      </Card>
+      <Card className="mt-md">
+        <h3 className="mt-0">Remove all app data</h3>
+        <Notice tone="warning">Deletes all financial modules, accounts, transactions, plans, transfers, custom categories and history from your signed-in account and this device. App defaults are restored. Login, appearance preferences and shared market data remain. Export a full backup first and finish edits on other devices before removing data.</Notice>
+        <p className="text-muted">{user ? 'Account: ' + (user.email ?? user.uid) : 'Sign in to remove your cloud and local financial data.'}</p>
+        <label>Type DELETE ALL DATA to confirm
+          <input aria-label="Deletion confirmation" value={deleteConfirmation} disabled={busy || deleting || !user} onChange={event => setDeleteConfirmation(event.target.value)} autoComplete="off" />
+        </label>
+        <button className="btn danger mt-md" disabled={busy || deleting || !user || deleteConfirmation !== 'DELETE ALL DATA'} onClick={removeAll}>
+          {deleting ? 'Removing app data…' : 'Remove all app data'}
+        </button>
       </Card>
     </div>
   );

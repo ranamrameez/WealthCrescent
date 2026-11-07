@@ -1,3 +1,4 @@
+import { useUrlEntitySelection } from '../../../hooks/useUrlEntitySelection';
 import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
@@ -15,7 +16,7 @@ import { ModuleDetailTemplate } from '../../../components/ModuleDetailTemplate';
 import type { User } from 'firebase/auth';
 import { useMemo, useState, type ComponentProps } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Bar, Doughnut } from 'react-chartjs-2';
+import { AppBar as Bar, AppDoughnut as Doughnut } from '../../../components/AppCharts';
 import { Card, EntityCard, MoneyValue } from '../../../components/Card';
 import { CategorySelect } from '../../../components/CategorySelect';
 import { Notice } from '../../../components/Notice';
@@ -862,8 +863,8 @@ export function SubscriptionsPage({
   cloudEmpty: boolean;
   uploadLocalToCloud: () => Promise<void>;
 }) {
-  const [selected, setSelected] = useState<Subscription | null>(null);
   const subs = useSubscriptionsWorkbookStore((s) => s.workbook.entries);
+  const [selected, setSelected] = useUrlEntitySelection('subscription', subs);
   const liveSelected = selected ? subs.find((s) => s.id === selected.id) ?? null : null;
   const [params] = useSearchParams();
   const selectedIds = selectedEntityValues(params, subs.map((s) => s.id));

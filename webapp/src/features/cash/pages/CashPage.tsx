@@ -1,3 +1,4 @@
+import { fulfillManualPlan } from '../../../services/finance/manualPlanPaymentService';
 import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
@@ -7,14 +8,14 @@ import { DateValue } from '../../../components/DateValue';
 import { ToggleChip } from '../../../components/ui/ToggleChip';
 import { FinancePlanEditor } from '../../../components/FinancePlanEditor';
 import { PageHeading } from '../../../components/PageHeading';
-import { planOccurrences, occurrenceCompleted } from '../../../lib/calc/planOccurrences';
+import { planOccurrences } from '../../../lib/calc/planOccurrences';
 import { BackButton } from '../../../components/BackButton';
 import { BalanceSummaryCards } from '../../../components/BalanceSummaryCards';
 import { cashPeriodSummary } from '../../../lib/calc/cashModule';
 import type { User } from 'firebase/auth';
 import { useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Bar, Doughnut, Line } from 'react-chartjs-2';
+import { AppBar as Bar, AppDoughnut as Doughnut, AppLine as Line } from '../../../components/AppCharts';
 import { Card, EntityCard, MoneyValue } from '../../../components/Card';
 import { Notice } from '../../../components/Notice';
 import { confirmDialog } from '../../../components/ConfirmDialog';
@@ -959,9 +960,7 @@ function PlanCurrencyTable({
 function PlanList({ horizonDays, selectedCurrencies, filters }: { horizonDays: PlanningHorizonDays; selectedCurrencies?: string[]; filters?: TransactionPageFilters }) {
   const allPlans = usePlannedCashWorkbookStore((s) => s.workbook.entries);
   const updatePlan = usePlannedCashWorkbookStore((s) => s.updateEntry);
-  const addCompletedPlan = usePlannedCashWorkbookStore((s) => s.addEntry);
   const deletePlan = usePlannedCashWorkbookStore((s) => s.deleteEntry);
-  const addEntry = useCashWorkbookStore((s) => s.addEntry);
   const ensureSignedIn = useEnsureSignedIn();
   const asOf = useMemo(() => new Date(), []);
 
@@ -990,32 +989,14 @@ function PlanList({ horizonDays, selectedCurrencies, filters }: { horizonDays: P
   }, [plans]);
 
   const markDone = async (p: PlannedCashEntry & { planId?: string }) => {
-    const occurrenceDate = p.date;
     const planId = p.planId ?? p.id;
-    const source = allPlans.find((plan) => plan.id === planId);
-    if (!source || p.executed || (p.recurrence && occurrenceCompleted(source, occurrenceDate))) return toast('This occurrence is already completed.');
-    if (!occurrenceDate) return toast('This plan has no more occurrences left (past its end date).');
-    if (!(await ensureSignedIn('Sign in to save cash entries.'))) return;
-    const latestPlan = usePlannedCashWorkbookStore.getState().workbook.entries.find(plan => plan.id === planId);
-    if (!latestPlan || latestPlan.executed || (p.recurrence && occurrenceCompleted(latestPlan, occurrenceDate))) return toast('This occurrence is already completed.');
-    addEntry({
-      id: crypto.randomUUID(),
-      date: p.recurrence ? today() : occurrenceDate,
-      isDeposit: p.type === 'IN',
-      amount: p.amount,
-      currencyCode: p.currencyCode,
-      category: p.category,
-      note: p.note,
-      source: 'manual',
-    });
-    if (p.recurrence) {
-      updatePlan(planId, { completedDates: [...(latestPlan.completedDates ?? []), occurrenceDate] });
-      addCompletedPlan({ ...source, id: crypto.randomUUID(), seriesId: planId, date: occurrenceDate, fulfilledDate: today(), recurrence: undefined, completedDates: undefined, executedThrough: undefined, executed: true });
-      toast(`Marked ${occurrenceDate} as done — added to your Cash ledger. This plan keeps recurring.`);
-    } else {
-      updatePlan(planId, { executed: true });
-      toast('Marked as done — added to your Cash ledger.');
-    }
+    const source = allPlans.find(plan=>plan.id === planId);
+    if (!source) return toast('This plan was removed.');
+    if (!await ensureSignedIn('Sign in to fulfill this planned payment.')) return;
+    try {
+      const result = fulfillManualPlan({ module: 'cash', id: planId },p.date,source);
+      toast(result.recurring ? 'Occurrence marked as done. This plan keeps recurring.' : 'Marked as done — added to the ledger.');
+    } catch (error) { toast(error instanceof Error ? error.message : String(error)); }
   };
 
   return (

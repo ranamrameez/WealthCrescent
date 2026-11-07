@@ -120,11 +120,11 @@ On the **Account** page, **Reset all settings to app defaults** restores broker 
 
 ### Home Dashboard — Net Worth
 
-The sidebar's **Dashboard** opens the cross-module Net Worth home page. Its **Filters** panel has a shared reporting range: Last 7 days, Last 30 days, Last 90 days, Last 6 months, Last 12 months, Year to date, All available history, or a Custom date range. The selected period is stored in the page URL, so it can be bookmarked or shared.
+The sidebar's **Dashboard** opens the cross-module Net Worth home page. The pinned top bar's **Date range** control provides the reporting period and previous/next period navigation; choose a preset or **Custom** to enter exact dates. The selected range is stored in the page URL, so it can be bookmarked or shared. **Dashboard filters** opens the source and section filters separately.
 
 The **Estimated net worth** and per-currency balances remain your live current balances. **Period net flow** and **Net worth change in period** are historical measures: cleared Cash/Bank movement and the difference between real net worth at the period endpoints. **Upcoming planned activity (30 days)** is a separate forward-looking figure; the Plans section has its own projection-horizon controls. A period change is shown only when there is a real opening baseline before the selected start date.
 
-The Analytics section uses the same date range for monthly income/expense, category-group activity, rental net income, and the insight cards. The monthly cash-flow totals and their drill-downs respect the exact dates, including partial first and last months. Net-worth chart points are month-end balances for completed months and today's balance for the current month, not daily snapshots.
+The **Recent Transactions** section shows lifetime activity across modules, newest first, with pagination; it is independent of the historical reporting range. The Analytics section uses the selected date range for monthly income/expense, category-group activity, rental net income, and the insight cards. The monthly cash-flow totals and their drill-downs respect the exact dates, including partial first and last months. Net-worth chart points are month-end balances for completed months and today's balance for the current month, not daily snapshots.
 
 Insights are shown per currency so unlike currencies are never compared as if they were the same unit. They identify the largest asset and liability contributors and cleared activity for the period. If an FX rate is missing, that currency remains visible in its own section and the dashboard warns that it is excluded from converted totals/charts. The reporting filter does not edit or reconcile source transactions.
 
@@ -1096,3 +1096,72 @@ Loading masks use small rounded stat placeholders and large 600px section cards 
 ## Stock broker profiles
 
 QSE and PSX portfolios are separated by broker profile. Each broker owns its own trades, cash transfers, adjustments, dividends, trade plans, settings and derived P/L. Select the broker profile before adding activity. A cash transfer linked to QSE or PSX must target the specific broker profile; its own currency and deposit-fee settings are used, not the parent exchange defaults. Market prices, price history and watchlists remain shared for the exchange. Archived profiles remain available as read-only history; deactivated profiles are hidden from normal activity and cannot be selected for new activity. Legacy PSX records are assigned to the default JS Zindigi/JS Zindagi profile during the versioned migration. Review your backup/export after migration before relying on the new profile separation.
+
+
+## Planning currency totals (PR #51)
+
+The Monthly Budget Plan keeps each currency separate in both Budget by category and Module plan details. The same category in QAR and PKR appears as two rows; amounts are not converted or added across currencies. Category and direction filters also apply to the monthly budget totals. Editing or relinking a payment checks whether it changed since you opened the editor. Reopen the editor if it reports a change.
+
+Auto-pay and its pending-payment/settlement controls are not available in this checkpoint.
+
+### Financial calculation clarification (2026-11-04)
+
+Net worth is valued from native actual ledgers through one calculation engine. Pending entries and future-dated actuals do not count as cleared balances at today's cutoff. Historical stock values include dividends recorded by that date; unfilled BUY prices do not replace an executed holding's fallback price. Personal-loan assets and debts appear separately before calculating net worth.
+
+A period change can show unavailable when exchange rates or dated opening-balance evidence are missing. This avoids reporting an unknown opening as new wealth. Current opening balances are still shown. Month-end recurring plans clamp to the last real day of a short month and return to their original billing day afterwards (January 31, February 28, March 31). Existing fulfilled snapshots remain intact.
+
+### Dashboard reporting consistency (2026-11-05)
+
+Insights and monthly/category drilldowns exclude pending activity just like their displayed totals. The capital-split chart reflects the selected period-end date; current net worth remains live. Planning forecasts include recurring plans throughout the chosen 30/90/365-day horizon and stop at the exact displayed end date. A planned currency can appear even when it has no current balance. Dashboard inclusion controls now include native credit cards.
+
+### Recent source records (2026-11-05)
+
+Recent Transactions retains archived broker history, includes transfer fees in withdrawal outflows, and shows an EMI payment plus its separately recorded fine as the amount paid. Trade rows show recorded trade value before trading fees. This is a lifetime list of native source records; linked records can appear on both sides and must not be summed as a combined cash-flow report.
+
+### Banking balances and reports (2026-11-05)
+
+Bank, account-directory and account-detail balances now share a current cutoff. Future-dated records remain visible in the table and are labeled; they do not enter current actual balances/cleared flow. Account charts retain the real native closing balance when category/source filters hide unrelated flow rows. Bank-specific card summaries show that bank's cards, historical debt respects the selected end date, and available credit is summed independently per card. Closed records retain their balances.
+
+## Current delivery scope (2026-11-05)
+
+See [the detailed delivery checklist](docs/DELIVERY_CHECKLIST.md) for completed implementation, pending work, planned dependencies, dashboard/app UI acceptance and validation evidence. General app categories coexist with custom categories; existing personal labels keep their IDs, and older name-only records retain compatibility mappings. The app-wide engine migration and dashboard/UI acceptance are not complete.
+
+## Removing all financial app data
+
+On App Data, export a full backup first. Finish editing on other devices, then type DELETE ALL DATA in the removal section and choose Remove all app data. Review the signed-in account and confirm. This clears all financial modules, accounts, transactions, plans, transfers, custom categories and history from that account and this device, restoring app defaults. Your login account, appearance preferences and shared market data remain. The action cannot be undone from the app; restoring requires a backup. If cloud removal fails, an error is shown.
+
+The App Data topbar includes a Remove all app data section shortcut. Select it to reveal the warning and confirmation field. New custom categories require sign-in; use the existing category when its name is already listed.
+
+Legacy Funds workbooks without an explicit cash-inclusion setting contribute holdings value to the dashboard. The dashboard explains this and leaves Funds cash disabled until you reconcile deposits and withdrawals and explicitly enable it in Dashboard filters. No missing funding is invented. Dashboard exchange totals include every included broker account, independently of the selected trading-screen broker.
+
+Appearance retains the existing Comfortable, Compact and Console density modes. Their spacing follows the saved reference examples; no new mode is added. Dismiss an informational alert with its × button. Dashboard Plans lets you select a calendar month and compare 1, 3, 6 or 12 months; its currency-specific charts and tables distinguish cleared actual, pending and remaining planned activity. The selected month is retained in the URL.
+
+Analytics shows monthly stat widgets with dated balances and explicitly labelled activity totals. Each native-currency overview includes a current balance-by-module chart. Change indicators use arrows; missing baselines remain unavailable. These balance charts are distinct from income/spending reports.
+
+Money in/out shows the selected date range and currently covers Cash, Bank and Rentals. Select cleared actual, pending or remaining plans, then break down by category, module, account/source or plan group. Each currency has its own inflow/outflow chart and table. Select a group row and open its contributing-record view for details. Unallocated means no explicit plan link is stored; account movements are not automatically classified as earned income or consumption.
+
+Upcoming shows one reminder when a bank plan explicitly represents the same loan installment on the same due date, in the same currency and full amount. Partial or unlinked plans remain distinct. This display deduplication never marks a payment settled or rewrites the loan schedule.
+
+Analytics monthly inflow/outflow widgets and tables show cleared actual activity only, through today and within the selected dates. Pending records and remaining plans are separate in Plans and Money in/out. Net worth snapshot means completed month-end for historical months or today for the current month.
+
+
+### Dashboard movement coverage — 2026-11-06
+Money in/out now includes cards, recorded loan repayments, Funds and all exchange brokers as well as Cash/Bank/Rentals. Choose Movement kind to separate income/spending, financing, investments, unclassified movement and internal transfer legs. Combined movement excludes internal transfers. Explicit rental/loan links count their domain record once. Unknown account movement is not silently classified as earnings; contracts and renewal schedules are not actual payments. Actual, pending and remaining plans stay separate. Older Analytics/Plans/headline flow views retain their stated Cash/Bank/Rentals coverage until their migration is complete.
+
+Money in/out includes monthly widgets, a local trend chart and matching monthly table for the same activity/kind filters and exact selected dates. Outflow is shown as an amount paid in monthly widgets/table. Empty months remain visible; pending/planned do not become actuals.
+
+Manual Cash, Bank and card plan completion now preserves an explicit plan/occurrence/group link on its actual ledger record. New actuals appear under their named plan in Money in/out; historical records without provenance remain Unallocated. Completed recurrence snapshots and the original monthly anchor are preserved. This is user-triggered Mark as done, not automatic payment execution.
+
+Rental plan completion preserves its explicit plan/group link on the property record and linked Cash/Bank record. Reporting counts that rental event once, including the plan allocation. The service checks sign-in, reviewed-plan changes, active source and currency before writing. No automatic settlement or inferred historical allocation.
+
+Dashboard actual movement totals now cover the same included sources in the headline, currency details, Analytics, monthly widgets and Money in/out. They include financing and investment movements; use Movement kind for a narrower breakdown. Movement is not earned income or investment growth. Pending/planned amounts stay separate from cleared actuals.
+
+### Currency budgets in Planning
+Use Currency budgets to add a native-currency monthly limit, optional categories and a named plan. Choose reset, positive-surplus carry or full-balance carry. Modify exposes Month limit for an override to just one month, and definition editing for scope/start/end changes. The monthly table and chart show the same cleared records. Select a record to review/allocate it; split portions across budgets, or explicitly identify a positive receipt as a refund. Empty splits restore automatic matching. Unknown or multiply-matching records remain unallocated. Native transactions are not changed by allocation. Budget balances include earlier days of their calendar months through the selected end date and all native sources, independently of Net Worth inclusion. Pending/planned values do not become cleared usage.
+
+
+### EMI balances, booking and schedule changes
+
+Loan editing separates booking/agreement date, advance/booking amount, first installment date and months between installments. Choose total price before booking to subtract the advance once, or financed principal when the entered amount already excludes it. Booking metadata does not create a real Cash/Bank transaction. Fixed-total installment repayment totals exclude booking; existing historical booking records need explicit review before reclassifying them.
+
+Saving refreshes open linked installments while preserving completed history. Bigger-installment generation changes plans only; it does not record repayments. Recorded-balance tracking requires complete fixed-total repayment history and excludes future-dated records and fines. Schedule estimates assume on-time payment and are labelled; interest-loan balances remain estimates. Existing future-dated or inconsistent records stay visible for review.

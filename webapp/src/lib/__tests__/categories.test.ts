@@ -67,3 +67,11 @@ describe('categoryName', () => {
     expect(categoryName('cat_does_not_exist', DEFAULT_CATEGORIES)).toBe('Uncategorized');
   });
 });
+
+
+
+it('retains historical personal category mappings without seeding them for new users', () => {
+  expect(resolveLegacyCategoryId('Pakistan')).toBe('cat_pakistan');
+  expect(resolveLegacyCategoryId('IgnoreCount')).toBe('cat_ignore_count');
+  expect(DEFAULT_CATEGORIES.some(c => c.id === 'cat_pakistan')).toBe(false);
+});

@@ -1,3 +1,4 @@
+import { useUrlChartFilters } from '../../../hooks/useUrlChartFilters';
 import { PageHeading } from '../../../components/PageHeading';
 import { BackButton } from '../../../components/BackButton';
 import { StockPLCharts } from '../../../components/StockPLCharts';
@@ -10,13 +11,11 @@ import { ChartFilterBar } from '../../../components/ChartFilterBar';
 import { Tabs } from '../../../components/Tabs';
 
 import {
-  EMPTY_CHART_FILTER,
   filterMonthlyDualSeries,
   filterMonthlySeries,
   filterRowsByTicker,
   filterTuplesByTicker,
   isChartFilterActive,
-  type ChartFilter,
 } from '../../../lib/calc/chartFilters';
 import { dimColor, dlBarH, dlBarV, dlDoughnut } from '../../../lib/chartLabels';
 import { profitColor } from '../../../lib/chartLabels';
@@ -60,7 +59,7 @@ export function AnalyticsPage() {
   const chartData = useChartData();
   const currency = workbook.settings.currency;
 
-  const [filter, setFilter] = useState<ChartFilter>(EMPTY_CHART_FILTER);
+  const [filter, setFilter] = useUrlChartFilters();
   const [hoveredTicker, setHoveredTicker] = useState<string | null>(null);
   const allTickers = useMemo(
     () => Array.from(new Set(workbook.transactions.filter(t => !t.isPending).map((t) => t.ticker))).sort(),

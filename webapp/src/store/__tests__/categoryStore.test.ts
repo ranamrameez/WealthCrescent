@@ -73,3 +73,16 @@ it('backfills newly introduced app categories into an older saved registry', () 
   expect(ids.has('cat_loan_lent')).toBe(true);
   expect(ids.has('user-added-1')).toBe(true);
 });
+
+
+it('preserves former personal defaults as custom and adds general defaults idempotently', () => {
+  const original = { id: 'cat_pakistan', serialNumber: 13, name: 'Pakistan', scope: 'app' as const };
+  useCategoryStore.getState().setWorkbook({ categories: [original] });
+  const first = useCategoryStore.getState().workbook;
+  expect(first.categories.find(c => c.id === original.id)).toEqual({ ...original, scope: 'custom' });
+  expect(first.categories.some(c => c.name === 'Utilities' && c.scope === 'app')).toBe(true);
+  useCategoryStore.getState().setWorkbook(first);
+  expect(useCategoryStore.getState().workbook).toEqual(first);
+  expect(original.scope).toBe('app');
+  expect(createEmptyCategoriesWorkbook().categories.some(c => c.id === original.id)).toBe(false);
+});

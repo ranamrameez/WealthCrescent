@@ -83,7 +83,8 @@ export interface FundsSettings {
   /** Pre-fills new funds only — never converts existing ones. */
   defaultCurrency: string;
   /** Independent inclusion control for the portfolio-level, per-currency
-   * Funds cash account. Missing on legacy workbooks means included. */
+   * Funds cash account. Missing on legacy workbooks means holdings-only;
+   * cash requires explicit inclusion because old purchases may lack funding records. */
   includeCashInNetWorth?: boolean;
   /** Versioned metadata migration: one-time currency snapshot used only for
    * legacy transfers that predate Transfer.currencyCode. Existing transfer

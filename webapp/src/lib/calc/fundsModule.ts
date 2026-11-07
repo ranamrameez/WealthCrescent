@@ -4,7 +4,7 @@ import type { Position, PricePoint, Transaction, Transfer } from '../../types/wo
 import { buildCashLedger } from './cashLedger';
 import { sortTransactionsChronological } from './sortTransactions';
 import { categoryName } from '../categories';
-import { computePositions } from './positions';
+import { calculateStockPortfolio } from './stockCalculationEngine';
 import { getDailyPriceHistory, getMarketPrice, getPriceHistory } from './priceHistory';
 
 /** A fund's category label for display/grouping — prefers the shared
@@ -18,9 +18,15 @@ export function fundCategoryLabel(fund: Fund, categories: Category[]): string {
 
 const calcFee = () => 0; // NAV is already net of fund fees — see FundsWorkbook's doc comment
 
+/** Funds are stock-like positions: use the shared StockExchangeEngine for
+ * holdings, lifecycle and oversell semantics instead of a parallel rollup. */
+function fundPositions(transactions: Transaction[]) {
+  return calculateStockPortfolio(transactions.filter(transaction => !transaction.isPending), calcFee, 'average').positions;
+}
+
 /** A fund's true Net P/L: realized profit locked in by every past sell/
  * withdrawal, PLUS unrealized profit on whatever units are still held.
- * `Position.invested` (from `computePositions`) is only the cost basis of
+ * `Position.invested` from the shared stock engine is only the cost basis of
  * the REMAINING position — a withdrawal reduces it, so `value - invested`
  * alone silently drops every past withdrawal's own profit. This is the
  * same `realizedPL + unrealizedPL` shape `cashSummary()`'s app-wide `netPL`
@@ -42,7 +48,7 @@ export function fundsValueByCurrency(
   transactions: Transaction[],
   marketPrices: Record<string, number>,
 ): Record<string, number> {
-  const positions = computePositions(transactions, calcFee);
+  const positions = fundPositions(transactions);
   const out: Record<string, number> = {};
   funds.forEach((fund) => {
     const position = positions.find((p) => p.ticker === fund.id);
@@ -71,21 +77,15 @@ export type FundsCashLedgerEvent = ReturnType<typeof buildCashLedger>[number] & 
  * cash proceeds mirror the units actually removed; a wholly unmatched SELL
  * still contributes no cash. */
 function matchedFundsCashTransactions(transactions: Transaction[]): Transaction[] {
-  const heldByFund = new Map<string, number>();
-  const valid: Transaction[] = [];
-  sortTransactionsChronological(transactions.filter((transaction) => !transaction.isPending)).forEach((transaction) => {
-    const held = heldByFund.get(transaction.ticker) ?? 0;
-    if (transaction.action === 'BUY') {
-      heldByFund.set(transaction.ticker, held + transaction.shares);
-      valid.push(transaction);
-      return;
-    }
-    const matchedShares = Math.min(transaction.shares, held);
-    if (matchedShares <= 1e-7) return;
-    heldByFund.set(transaction.ticker, Math.max(0, held - matchedShares));
-    valid.push(matchedShares === transaction.shares ? transaction : { ...transaction, shares: matchedShares });
+  const ordered = sortTransactionsChronological(transactions.filter(transaction => !transaction.isPending))
+    .map((transaction, index) => transaction.id ? transaction : { ...transaction, id: `fund:cash:legacy:${index}` });
+  const matchedBySell = calculateStockPortfolio(ordered, calcFee, 'average').realizedBySellTxId;
+  return ordered.flatMap(transaction => {
+    if (transaction.action === 'BUY') return [transaction];
+    const matchedShares = transaction.id ? matchedBySell[transaction.id]?.shares ?? 0 : 0;
+    if (matchedShares <= 1e-7) return [];
+    return [{ ...transaction, shares: Math.min(transaction.shares, matchedShares) }];
   });
-  return valid;
 }
 
 export function fundsCashLedgerByCurrency(
@@ -156,7 +156,7 @@ export function allocationByCategory(
   currencyCode: string,
   categories: Category[] = [],
 ): Record<string, number> {
-  const positions = computePositions(transactions, calcFee);
+  const positions = fundPositions(transactions);
   const out: Record<string, number> = {};
   funds
     .filter((f) => f.currencyCode === currencyCode)
@@ -193,36 +193,42 @@ export function contributionVsValueSeries(
   transactions: Transaction[],
   priceHistory: Record<string, PricePoint[]>,
 ): ContributionPoint[] {
-  const txs = transactions.filter((t) => t.ticker === fundId).sort((a, b) => a.date.localeCompare(b.date));
+  // Funds use the same chronological position/lifecycle engine as QSE/PSX.
+  // Do not independently sum BUY minus SELL quantities here: that creates
+  // negative units after an oversell and ignores persisted same-day order.
+  const txs = sortTransactionsChronological(
+    transactions.filter(transaction => transaction.ticker === fundId && !transaction.isPending),
+  ).map((transaction, index) => transaction.id ? transaction : { ...transaction, id: `fund:${fundId}:legacy:${index}` });
   const navHistory = getDailyPriceHistory(fundId, priceHistory);
-
   const priceByDate: Record<string, number> = {};
-  navHistory.forEach((p) => {
-    priceByDate[p.date] = p.price;
-  });
-  txs.forEach((t) => {
-    if (!(t.date in priceByDate)) priceByDate[t.date] = t.price;
+  const explicitNavDates = new Set(navHistory.map(point => point.date));
+  navHistory.forEach(point => { priceByDate[point.date] = point.price; });
+  // When no explicit NAV exists for a transaction date, the last executed
+  // trade on that date is the implicit observation (using the shared order).
+  txs.forEach(transaction => {
+    if (!explicitNavDates.has(transaction.date)) priceByDate[transaction.date] = transaction.price;
   });
 
-  const dates = [...new Set([...txs.map((t) => t.date), ...navHistory.map((p) => p.date)])].sort();
+  const dates = [...new Set([...txs.map(transaction => transaction.date), ...navHistory.map(point => point.date)])].sort();
   if (!dates.length) return [];
 
-  let units = 0;
+  const fullCalculation = calculateStockPortfolio(txs, calcFee, 'average');
   let invested = 0;
   let lastNav = 0;
-  return dates.map((date) => {
-    txs
-      .filter((t) => t.date === date)
-      .forEach((t) => {
-        if (t.action === 'BUY') {
-          units += t.shares;
-          invested += t.shares * t.price;
-        } else {
-          units -= t.shares;
-          invested -= t.shares * t.price;
-        }
-      });
+  return dates.map(date => {
+    txs.filter(transaction => transaction.date === date).forEach(transaction => {
+      if (transaction.action === 'BUY') {
+        invested += transaction.shares * transaction.price;
+      } else {
+        // Unmatched SELL quantity is not an executed disposal and must not
+        // reduce contributed capital or create a fictitious negative holding.
+        const matchedShares = transaction.id ? fullCalculation.realizedBySellTxId[transaction.id]?.shares ?? 0 : 0;
+        invested -= matchedShares * transaction.price;
+      }
+    });
     if (priceByDate[date] !== undefined) lastNav = priceByDate[date];
+    const asOf = calculateStockPortfolio(txs.filter(transaction => transaction.date <= date), calcFee, 'average');
+    const units = asOf.positions.find(position => position.ticker === fundId)?.shares ?? 0;
     return { date, invested, value: units * lastNav };
   });
 }
@@ -407,18 +413,18 @@ export function balanceUpdateHistory(
   transactions: Transaction[],
   priceHistory: Record<string, PricePoint[]>,
 ): BalanceUpdateRow[] {
-  // `date` is the effective valuation date; `time` is audit/intraday metadata.
+  // Date is the effective valuation date; time is audit/intraday metadata.
   // Editing a historical date must therefore move the point chronologically,
   // even though its original timestamp remains unchanged.
   const raw = [...getPriceHistory(fundId, priceHistory)].sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''));
-  const txs = transactions.filter((t) => t.ticker === fundId);
+  const txs = sortTransactionsChronological(transactions.filter(transaction => transaction.ticker === fundId && !transaction.isPending))
+    .map((transaction, index) => transaction.id ? transaction : { ...transaction, id: `fund:${fundId}:legacy:${index}` });
 
   let prevBalance = 0;
   let prevNav = 0;
   return raw.map((point, i) => {
-    const units = txs
-      .filter((t) => t.date <= point.date)
-      .reduce((s, t) => s + (t.action === 'BUY' ? t.shares : -t.shares), 0);
+    const asOf = calculateStockPortfolio(txs.filter(transaction => transaction.date <= point.date), calcFee, 'average');
+    const units = asOf.positions.find(position => position.ticker === fundId)?.shares ?? 0;
     const newBalance = units * point.price;
     const newNav = point.price;
     const change = newBalance - prevBalance;

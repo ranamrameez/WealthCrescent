@@ -1,6 +1,11 @@
 import type { Transfer } from '../../types/workbook';
 import { dateOnlyMs } from '../datetime';
 
+/** Signed transfer movement: fees reduce deposits and add to withdrawals. */
+export function transferCashAmount(transfer: Pick<Transfer, 'type' | 'gross' | 'fee'>): number {
+  return transfer.type === 'DEPOSIT' ? transfer.gross - transfer.fee : -(transfer.gross + transfer.fee);
+}
+
 /** Running net-cash-contributed balance across a list of deposits/
  * withdrawals — user-reported gap: "no running balance column in the cash
  * transfers to know the balance." A deposit adds its gross amount minus its
@@ -24,7 +29,7 @@ export function transferRunningBalance(transfers: Transfer[]): Map<string, numbe
   const out = new Map<string, number>();
   let running = 0;
   for (const { t } of ordered) {
-    running += t.type === 'DEPOSIT' ? t.gross - t.fee : -(t.gross + t.fee);
+    running += transferCashAmount(t);
     out.set(t.id, running);
   }
   return out;

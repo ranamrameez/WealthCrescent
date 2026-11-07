@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { Modal } from './Modal';
 import { PlusIcon } from './icons';
 import { Field, Select, TextInput } from './ui/Field';
 import { IconButton } from './ui/IconButton';
 import { toast } from './Toast';
-import { useCategoryStore } from '../store/categoryStore';
+import { createCustomCategory, getCategories, subscribeCategories } from '../services/finance/categoryService';
+import { useEnsureSignedIn } from '../lib/firebase/useEnsureSignedIn';
 import type { Category } from '../types/finance';
 
 /** Shared category picker for every Finance-based add/edit form
@@ -14,8 +15,8 @@ import type { Category } from '../types/finance';
  * form, same pattern `SideFields`' own entity quick-add already
  * established. */
 export function CategorySelect({ value, onChange }: { value: string; onChange: (categoryID: string) => void }) {
-  const categories = useCategoryStore((s) => s.workbook.categories);
-  const addCategory = useCategoryStore((s) => s.addCategory);
+  const categories = useSyncExternalStore(subscribeCategories, getCategories);
+  const ensureSignedIn = useEnsureSignedIn();
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const byName = (a: Category, b: Category) => a.name.localeCompare(b.name);
@@ -28,10 +29,13 @@ export function CategorySelect({ value, onChange }: { value: string; onChange: (
   const appCategories = categories.filter((c) => c.scope === 'app').sort(byName);
   const customCategories = categories.filter((c) => c.scope !== 'app').sort(byName);
 
-  const submitNew = () => {
+  const submitNew = async () => {
     const trimmed = newName.trim();
     if (!trimmed) return toast('Enter a category name.');
-    const category = addCategory(trimmed);
+    if (!(await ensureSignedIn('Sign in to add a category.'))) return;
+    let category: Category;
+    try { category = createCustomCategory(trimmed); }
+    catch (error) { return toast(error instanceof Error ? error.message : 'Could not add category.'); }
     onChange(category.id);
     setNewName('');
     setAdding(false);

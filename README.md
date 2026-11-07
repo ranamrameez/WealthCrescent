@@ -9,6 +9,16 @@ docs inside its own directory — see the linked README for anything specific to
 
 Cross-module UI, aggregation, filtering, ledger, and parity requirements are documented in the [Page Template and Parity Guide](docs/PAGE_TEMPLATE_GUIDE.md).
 
+## Agent skills
+
+Repository-local skills live in [`.agents/skills/`](.agents/skills/README.md).
+They cover UI design, accessibility, React composition and performance, Vite,
+Vitest, Firebase authentication, browser testing, financial reconciliation,
+variance analysis, research, backend architecture, security, analytics, and
+Chart.js dashboards. They travel with the repo;
+no global skill installation is needed. Start with [`AGENTS.md`](AGENTS.md) for
+project-specific constraints and when to use each skill.
+
 ## Components in this repo
 
 | Component | What it is | Status |

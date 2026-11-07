@@ -52,6 +52,23 @@
 	--radius-lg: 20px;
 	--radius-x-lg: 24px;
 	--radius-full-round: 999px;
+	--summary-surface: var(--panel);
+	--summary-border: 1px solid var(--border);
+	--summary-radius: var(--radius);
+	--summary-shadow: none;
+	--dropdown-radius: var(--radius-md);
+	--dropdown-item-radius: var(--radius);
+	--dropdown-shadow: var(--shadow-lg);
+	--navigation-radius: var(--radius-lg);
+	--navigation-shadow: var(--shadow-card);
+	--chart-tension: .24;
+	--chart-bar-radius: 6;
+	--chart-fill-opacity: .58;
+	--chart-line-width: 2;
+	--chart-grid-opacity: .28;
+	--chart-tooltip-radius: 8;
+	--chart-shadow-blur: 8;
+	--chart-shadow-opacity: .1;
 	/* Lightened 2026-08-27 (redesign rule 4, "lighter shadows to make UI
        less dense") — roughly half the previous opacity/spread on both
        layers, still enough separation to read as "elevated" without the

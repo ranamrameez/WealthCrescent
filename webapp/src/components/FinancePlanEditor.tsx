@@ -5,33 +5,22 @@ import { FormulaInput } from './ui/FormulaInput';
 import { RecurrenceFields } from './ui/RecurrenceFields';
 import { DirectionChips } from './ui/DirectionChips';
 import { Notice } from './Notice';
-import { resolveNumericInput } from '../lib/mathExpression';
-import { validBatchDate } from './batchEditModel';
 import { useEnsureSignedIn } from '../lib/firebase/useEnsureSignedIn';
 import { toast } from './Toast';
-import { useBankWorkbookStore } from '../store/bankWorkbookStore';
-import { useCreditCardWorkbookStore } from '../store/creditCardWorkbookStore';
-import { useRentalsWorkbookStore } from '../store/rentalsWorkbookStore';
-import { useCashWorkbookStore } from '../store/cashWorkbookStore';
 import { useEnabledCurrencies } from '../hooks/useEnabledCurrencies';
-import { deleteFinancePlan, planDescription, readFinancePlans, readPlanGroups, signedPlanAmount, writeFinancePlan, type PlanModule, type PlanReference, type FinancePlan } from '../lib/financePlans';
-import { usePlannedCashWorkbookStore } from '../store/plannedCashWorkbookStore';
+import { savePlannedPayment, planDescription, signedPlanAmount, type PlanModule, type PlanReference } from '../services/finance/planningService';
+import { usePlanningEditorSources } from '../hooks/usePlanning';
 import type { CreditCardTransactionKind } from '../types/creditCard';
 import type { RecurrenceRule } from '../types/recurrence';
-import { occurrenceCompleted } from '../lib/calc/planOccurrences';
 
 export interface PlanFinance { module: PlanModule; ref?: string; currencyCode?: string }
 export function FinancePlanEditor({ reference, initialFinance, occurrenceDate, initialGroupId, onClose }: {
   reference?: PlanReference; initialFinance?: PlanFinance; occurrenceDate?: string; initialGroupId?: string; onClose: () => void;
 }) {
-  const [original] = useState(() => reference && readFinancePlans().find(row => row.module === reference.module && row.plan.id === reference.id)?.plan);
+  const { accounts, cards, properties, defaultCurrency, groups, records } = usePlanningEditorSources();
+  const [original] = useState(() => reference && records.find(row => row.module === reference.module && row.plan.id === reference.id)?.plan);
   const linkedFinance=original && 'finance' in original ? original.finance : undefined;
-  const groups = usePlannedCashWorkbookStore(s => s.workbook.planGroups);
   const [groupId, setGroupId] = useState(original?.groupId ?? initialGroupId ?? '');
-  const accounts = useBankWorkbookStore(s => s.workbook.settings.accounts);
-  const cards = useCreditCardWorkbookStore(s => s.workbook.cards);
-  const properties = useRentalsWorkbookStore(s => s.workbook.settings.properties);
-  const defaultCurrency = useCashWorkbookStore(s => s.workbook.settings.defaultCurrency);
   const [module, setModule] = useState<PlanModule>(linkedFinance?.module ?? reference?.module ?? initialFinance?.module ?? 'cash');
   const [ref, setRef] = useState(linkedFinance?.ref ?? (original && 'accountId' in original ? original.accountId : original && 'cardId' in original ? original.cardId : original && 'propertyId' in original ? original.propertyId : initialFinance?.ref ?? ''));
   const [currency, setCurrency] = useState(linkedFinance?.currencyCode ?? (original && 'currencyCode' in original ? original.currencyCode : initialFinance?.currencyCode ?? defaultCurrency));
@@ -58,42 +47,10 @@ export function FinancePlanEditor({ reference, initialFinance, occurrenceDate, i
             : undefined);
   const currencyChanged = !!originalCurrency && originalCurrency !== effectiveCurrency;
   const save = async (addAnother = false) => {
-    const numeric = resolveNumericInput(amount);
-    if (!validBatchDate(date) || numeric === null || numeric <= 0) return toast('Enter a valid date and a positive amount.');
-    if (module !== 'cash' && (!selected || selected.isActive === false)) return toast('Choose an active finance.');
-    const rental = original && 'propertyId' in original ? original : undefined;
-    if (rental && module !== 'rentals' && (module === 'creditCard' || properties.find(item => item.id === rental.propertyId)?.currencyCode !== effectiveCurrency)) return toast('Rent plans link to Cash or a bank account in the property currency.');
-    if (recurrence && (module === 'rentals' || (recurrence.endDate && recurrence.endDate < date) || (recurrence.cycle === 'custom' && !(recurrence.customDays && recurrence.customDays > 0)))) return toast('Check the recurrence dates and interval.');
-    if (reference && !original) return toast('This plan no longer exists.');
-    if (original?.executed) return toast('Fulfilled plans cannot be reassigned.');
-    if (occurrenceDate && original && 'recurrence' in original && occurrenceCompleted(original, occurrenceDate)) return toast('Fulfilled items cannot be reassigned.');
     setBusy(true);
     try {
       if (!(await ensureSignedIn('Sign in to save this plan.'))) return;
-      if (groupId && !readPlanGroups().some(group => group.id === groupId)) return toast('The parent plan no longer exists. Choose another plan.');
-      const latest = reference && readFinancePlans().find(row => row.module === reference.module && row.plan.id === reference.id)?.plan;
-      if (reference && JSON.stringify(latest) !== JSON.stringify(original)) return toast('This plan changed. Reopen its editor.');
-      if (original && 'recurrence' in original && original.recurrence && !occurrenceDate && module !== reference?.module && (original.completedDates?.length || original.executedThrough)) return toast('Relink an individual occurrence to preserve this series\' completed history.');
-      const id = occurrenceDate ? crypto.randomUUID() : original?.id ?? crypto.randomUUID();
-      const common = { ...original, id, groupId: groupId || undefined, date, amount: numeric, category, executed: false, recurrence: recurrence ? { ...recurrence, startDate: date } : undefined };
-      const destination = rental ? 'rentals' : module;
-      const draft: FinancePlan = rental && module !== 'rentals' ? { ...rental, groupId: groupId || undefined, date, amount:numeric, type:direction==='in'?'RENT_INCOME':'EXPENSE', note:description, category, finance:{module:module==='cash'?'cash':'bank',ref:module==='cash'?undefined:ref,currencyCode:effectiveCurrency} }
-        : module === 'cash' ? { ...common, type: direction === 'in' ? 'IN' : 'OUT', currencyCode: effectiveCurrency, note: description }
-        : module === 'bank' ? { ...common, accountId: ref, amount: direction === 'in' ? numeric : -numeric, description }
-        : module === 'creditCard' ? { ...common, cardId: ref, kind: direction === 'in' ? 'payment' : cardKind==='payment'?'charge':cardKind, description }
-        : { ...common, propertyId: ref, type: direction === 'in' ? 'RENT_INCOME' : 'EXPENSE', note: description };
-      // Keep destination records clean when moving between finance stores.
-      if ('accountId' in draft && module !== 'bank') delete (draft as Partial<{accountId: string}>).accountId;
-      if ('cardId' in draft && module !== 'creditCard') delete (draft as Partial<{cardId: string}>).cardId;
-      if ('propertyId' in draft && destination !== 'rentals') delete (draft as Partial<{propertyId: string}>).propertyId;
-      for (const field of destination === 'rentals' ? ['description', 'kind', 'currencyCode'] : module === 'cash' ? ['description', 'kind'] : module === 'bank' ? ['type', 'kind', 'currencyCode', 'note'] : module === 'creditCard' ? ['type', 'currencyCode', 'note'] : ['description', 'kind', 'currencyCode']) Reflect.deleteProperty(draft, field);
-      if (occurrenceDate && original && 'recurrence' in original && original.recurrence && reference) {
-        writeFinancePlan(reference.module, { ...original, recurrence: { ...original.recurrence, excludedDates: [...new Set([...(original.recurrence.excludedDates ?? []), occurrenceDate])] } }, true);
-        writeFinancePlan(module, { ...draft, seriesId: original.id });
-      } else {
-        writeFinancePlan(destination, draft, !!reference && reference.module === destination);
-        if (reference && reference.module !== destination) deleteFinancePlan(reference);
-      }
+      savePlannedPayment({ reference, original, occurrenceDate, groupId, module, ref, currency, date, amount, direction, cardKind, description, category, recurrence });
       if (addAnother) { setAmount(''); setDescription(''); setRecurrence(undefined); toast('Payment added. Enter the next payment.'); }
       else onClose();
     } catch (error) { toast(error instanceof Error ? error.message : String(error));

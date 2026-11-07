@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { PlanEditorModal } from './PlanEditorModal';
 import { Field, TextInput } from './ui/Field';
 import { StandardButton } from './standard';
-import { savePlanGroup } from '../lib/financePlans';
+import { savePlanningGroup as savePlanGroup } from '../services/finance/planningService';
 import type { FinancePlanGroup } from '../types/financePlanGroup';
 import { useEnsureSignedIn } from '../lib/firebase/useEnsureSignedIn';
 import { toast } from './Toast';

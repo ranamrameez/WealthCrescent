@@ -1,3 +1,451 @@
+## Independent EMI continuation — 2026-11-07
+
+Reconciliation checkpoint validated: installment-import-ui-tests.log passed 7 files / 27 tests; installment-import-final-build.log passed both TypeScript projects/Vite. Browser read the actual workbook locally, verified the chosen-source preview and three date differences, then Cancelled without applying. Publish this checkpoint and verify its exact-head CI; continue archive recovery, remaining EMI cases and all global pending scope. Private source/proof files stay uncommitted.
+
+Published independent workflow source 730733fdc181f1b027a87c6df5aec1a28bb2eadf passed Actions 447 (42345971269), tests and build. Current uncommitted continuation adds worksheet-selecting reconciliation preview, cross-sheet date/sequence diagnostics, strict cached-summary checks, typed-name/review confirmation, auth/stale/linked-receipt/budget-allocation/fine guards, idempotent native receipt replacement and archived original snapshots inside EMIWorkbook. No real import has been applied. Generic fixture checks: installment-import-integration-tests.log, 6 files / 26 tests passed. installment-import-build.log is running; inspect before publishing. Continue actual-workbook read-only preview and import UI/rollback regressions, then remaining EMI recovery/interest/card/refund/parity and the wider app backlog. Keep PR 51 draft.
+
+Latest evidence: Actions 447 passed 176 files / 1,334 tests plus broker regressions, TypeScript and production build. Reconciliation continuation now passed installment-import-ui-tests.log (7 files / 27 tests). Browser selected the actual user workbook, verified the first-sheet preview and three cross-sheet date differences, then Cancelled; no data was replaced. The file chooser tool took an abnormally long wall-clock wait, but subsequent browser actions completed normally. installment-import-build.log passed before the latest source-row/UI test additions; installment-import-final-build.log is now running. Read and record that result, then publish this import checkpoint on the existing branch and verify resulting-head CI. Continue remaining work without marking the larger task complete.
+
+User explicitly requires completion of all planned work; do not end at a checkpoint or merge the large draft PR. Supplied workbook has separate scheduled obligations and irregular payments; confirmed disputed date is 4 June 2025. File remains read-only and uncommitted. See docs/EMI_IRREGULAR_PAYMENTS.md for the new model, implementation and remaining gaps.
+
+Current source adds contractSchedule/paymentAllocations/paymentOnly; independent calculation/allocation/monthly/event report; authenticated contract/payment/allocation/funding commands; Contract & payments UI with shared summaries, monthly charts, accessible paginated tables and searchable allocation/funding selectors; native valuation/forecast/upcoming adapters; allocation-aware linked plan refresh and Bank/Cash manual fulfillment with deterministic native EMI receipt/link and economic-movement deduplication. Preserve legacy data until explicit adoption. Validation: independent-emi-checkpoint-tests.log, 10 files / 93 tests passed; independent-emi-partial-tests.log, 2 files / 9 tests passed. independent-emi-checkpoint-final-build.log passed both TypeScript projects and Vite after fixing an unused binding and unreachable-branch type narrowing. Browser opened/cancelled the actual legacy loan's contract review; no adoption/payment write. Host Vite is running on 127.0.0.1:5173 via exec session 64147; the sandbox server was stopped because the browser could not reach it. Publishing this checkpoint to the existing draft branch requires its own full CI; previous cde1280c passed Actions 446 (173 files / 1,322 tests and build). Do not commit private workbook/backup/proof files.
+
+Remaining priority: finish reviewed import/migration, card-funded payment semantics, reversals, malformed/manual-allocation recovery, pagination/export and full UI/service consistency; then the wider CURRENT_DELIVERY_STATUS.md backlog (safe RTDB repositories/pending-only auto-pay lifecycle, all-app parity/adapters/budgets/acceptance). Keep docs accurate throughout.
+
+## EMI reconciliation and save-time refresh — 2026-11-06
+
+Final source validation: cde1280cf917975afe9c9c69c87e6a8538c592dd passed Actions 446 (42292169304): 173 files / 1,322 tests, broker regressions, both TypeScript projects and production build. Jobs: tests 128148100520, build 128148100179. A following documentation-only checkpoint records this evidence; application source is unchanged. PR 51 remains draft/open and unmerged. Read docs/CURRENT_DELIVERY_STATUS.md and docs/EMI_INSTALLMENT_MODEL.md for outstanding work; do not mark the large migration complete. Earlier in-progress statements below are superseded by this result.
+
+Prior published head: 7ac9cf8b054931a86191afc40c85fd4a269ec2be (collection-aware allocations and explicit native link matching). Keep draft PR 51/main untouched. Source provenance/lifecycle continuation passed 6 files / 50 tests and source-provenance-lifecycle-build.log: explicit EMI/subscription source survives fulfillment; removed source series retain completed snapshots via cancelled and no longer emit unpaid future occurrences.
+
+Latest user priority: changing EMI start dates must regenerate open plans; model bank loans and installment purchases with booking, first installment, variable month interval and replacement/additional big installments. User also reported a wrong remaining balance in the supplied backup. Reconciled privately/read-only: schedule overrides differ from dated repayments and older Big EMI generation had created future repayment records. Do not commit the backup or numeric proof in node_modules/.cache, and never silently rewrite those records.
+
+Implemented engine emiRepaymentSummary, explicit balanceTracking, normalizeEmiTerms, refreshEmiLinkedPlans, emiPeriodSummary and projectedEmiByCurrency; authenticated stale-safe saveEmiLoan with local rollback; service read models in EMI list/detail/aggregate and native repayment input in net-worth valuation/forecasts. Fixed-total complete-ledger balances use dated repayments, fines/future records excluded; legacy loans without a ledger retain clearly labelled estimates. Interest principal remains estimated. Schedule edits and Big EMI no longer create actual repayments. Existing history, plan IDs/routing/project/category metadata survive refresh; explicit first due date and booking/date/advance/price fields added without rewriting legacy date semantics. Details: docs/EMI_INSTALLMENT_MODEL.md.
+
+Read-only browser verified corrected reported-loan balance and editor fields, opened/closed without saving. No real financial data changed. Published source: cde1280cf917975afe9c9c69c87e6a8538c592dd. Focused final regressions: emi-release-tests.log, 10 files / 139 tests passed, including early-payment forecast caps, rerouted Cash identity and pending-record orphan protection. After correcting required native fields in the added fixtures, all 6 service tests passed again (emi-fixture-final-tests.log). Earlier production build emi-acceptance-build.log passed. Final local rerun emi-verified-build.log exhausted Windows paging/Node memory; no final local pass is claimed. Actions 446 (42292169304) build/both TypeScript projects passed on the exact published source; full-suite job remains in progress at this entry. Check and record its outcome. Wider service migration, safe RTDB persistence/auto-pay, chart/finder/theme/mobile acceptance and budget/adapters remain open in CURRENT_DELIVERY_STATUS.md; do not mark the entire large task complete.
+
+## Collection-aware financial record identity — 2026-11-06
+
+Budget source 128d1391639ee46c6a7b807275b4332726d3a03b passed Actions 444: 170 files / 1,297 tests, broker regressions, both TypeScript projects and production build.
+
+New source tags movement rows by native collection and keys budget allocations by module/source/collection/record ID. A trade/dividend/transfer with the same imported ID remains distinct. Existing three-part allocation keys resolve read-only only when exactly one native collection owns the identity. Ambiguous legacy references stay unapplied with review issues and their possible records remain unallocated; no arbitrary collection is selected. Allocation edits write uniquely normalized keys while preserving all values/IDs and leaving native records unchanged.
+
+Explicit linked-transfer matching now checks the owning account/broker and only actual linkable native record kinds. It cannot hide a same-ID trade/fee/dividend or an unrelated planned row. Missing legacy source refs resolve only from one explicit record-ID candidate. Also fixed the Funds source-inclusion edge where a fund happened to have the ID cash.
+
+Validation: 5 focused files / 44 tests passed (budget-identity-tests.log), including linked-transfer/trade-ID collision and legacy alias tests. Final production build/both TS projects passed (budget-identity-final-build.log). This new head requires its own CI. Continue provenance/classification/schedule/trade adapters, budget import validation/parity, service migration and safe pending-only payment persistence/automation; no merge/deployment or real financial write.
+
+## Currency-owned budget implementation — 2026-11-06
+
+Dashboard alignment 58f3017c850cbfe41d144ced93286e3339fb984f passed Actions 443 (tests/build). New budget source is ready for publication after 6 focused files / 40 tests and both TypeScript projects/production build passed (unified-budget-final-tests.log, unified-budget-build.log). Browser read-only reviewed the Planning Currency budgets section and opened/cancelled its editor; no real budget or allocation was saved. Fixture UI tests did exercise create, monthly override and partial allocation through the service.
+
+Implemented optional definitions/allocations in plannedCash, preserving native plans, FinancePlanGroup IDs, custom categories and all legacy currency-unassigned Bank targets. Engine-owned category/project AND scopes, per-currency monthly limits and overrides, cleared-only usage, explicit refunds, partial allocation/unallocated conservation, ambiguity handling and none/surplus/balance rollover (including history before the visible window). Positive income is not silently a refund; broad budgets do not automatically absorb unclassified movement. Budget queries use all native ledgers independently of Net Worth inclusion controls, and historical selected end dates without future actual leakage. Invalid allocations are surfaced, not applied.
+
+Planning now has a noncollapsible inner Currency budgets section, shared create/edit/limit/allocation dialogs, searchable standard dropdowns, monthly table/chart/detail, pagination and explicit App default/Custom category labels. Category merge remaps budget category IDs; a plan used by a budget cannot be deleted without reassigning its budget link. Auth, stale edits, missing categories/plans/currency and excessive allocations are guarded. Metadata exports/imports with the existing plannedCash workbook; a dedicated budget import/batch UI is still pending.
+
+Remaining budget work: collection-aware native record identity/legacy allocation alias hardening; malformed metadata/import validation; full budget UI/batch/export parity, pending/planned reservation with occurrence deduplication, broader category/project analytical views and browser theme/mobile acceptance. This is not a remote atomic repository or auto-pay release. Continue the remaining source provenance/schedule/trade-plan adapters, service migration, safe RTDB persistence and pending-only execution/history/settlement/void. Keep PR 51 draft and main untouched.
+
+## Unified dashboard actual-movement scope — 2026-11-06
+
+Headline/native currency pills, Analytics insights, monthly actual widgets/table/drilldowns, category groups and Money in/out now use the same cleared native movement population. Internal transfers are excluded, exact selected dates/current-day cutoff apply, currencies stay separate, and current net-worth valuation is unchanged. Monthly Plans also reads the canonical source set, including cards and personal-loan plans, while preserving separate actual/pending/planned populations. Standalone schedules and investment sketches remain documented adapter work. Net-worth forecasts retain the original tested forecast population; investment purchases are not subtracted from projected net worth as if value disappeared. Movement labels explicitly distinguish financing/investments from earned income and valuation growth.
+
+Validation: 4 files / 41 focused tests passed; both TypeScript projects and production build passed (canonical-dashboard-build.log) after correcting a compatible optional-field input annotation. Browser verified matching native totals across Money in/out, Insights and both monthly widgets, with no real ledger write. Published rental checkpoint 5a8de627 passed Actions 442; this new slice requires its own resulting-head CI.
+
+Consolidated remaining work is indexed in docs/CURRENT_DELIVERY_STATUS.md. Unified budget implementation rules are in docs/UNIFIED_BUDGET_MODEL.md (design, not a completion claim). Continue budgets, remaining source provenance/adapters, UI/service migration, safe RTDB repositories, pending-only scheduler/history/settlement/void and full UI/theme/mobile acceptance. Keep PR 51 draft.
+
+## Current status index — 2026-11-06
+
+Read docs/CURRENT_DELIVERY_STATUS.md for the consolidated completed/pending/planned inventory. The current uncommitted continuation aligns dashboard actual movement totals across headline, Analytics, month widgets, plan comparison and Money in/out; focused 41 tests and read-only browser verification passed. Check canonical-dashboard-build.log, then commit/push and verify exact-head CI. Published rental checkpoint 5a8de627 passed Actions 442. Continue all remaining work; do not treat this index as completion.
+
+## Rental fulfillment provenance — 2026-11-06
+
+Source 321b18ac5db96231f4a0dded8e0c83d68fba0790 passed Actions 441: 167 files / 1,271 tests, broker regressions, TypeScript and production build. No merge/deployment.
+
+Rental Mark as done now calls an authenticated application service with the reviewed plan snapshot. A pure engine builder validates positive amount/date and creates explicit plan provenance. Linked rent/expense keeps the planLink on both the property record and its native Cash/Bank counterpart; report deduplication retains the rental event once, including its plan-group allocation. Custom category lookup uses the shared registry. The service rejects stale/deleted/fulfilled plans, inactive properties, incompatible/inactive paying finance and an occurrence whose actual record already exists. Failures restore the touched local rental/plan/link/finance workbooks; unlinked rental plans remain supported. The old lib helper is a compatibility re-export. Native ledgers and optional schema fields remain backward-compatible.
+
+Validation: focused rental/manual/movement tests passed 3 files / 26 tests; production build and both TypeScript projects passed (rental-plan-service-build.log). Tests use fixtures only; no real rent was recorded in browser. This is manual fulfillment/local rollback, not remote atomic execution or auto-pay.
+
+Next: align dashboard headline/monthly actual reporting with the canonical movement scope; complete native plan adapters/classification, unified budgets/allocations/rollover, remaining UI/services and safe RTDB repositories before backend pending-only payment lifecycle. Full UI/theme/mobile/finder/chart acceptance remains open. Do not stop at this checkpoint or mark the large draft PR complete.
+
+## Manual fulfillment and explicit actual allocation — 2026-11-06
+
+Monthly movement source bedffd3549e305a189a1d253b2e2c0bdcebb6ac8 passed Actions 440 (build and full suite). No merge/deployment.
+
+New slice: Cash, Bank and native card Mark as done handlers dispatch fulfillManualPlan through an authenticated service. The deterministic engine validates occurrence/date/amount, builds the existing cleared manual record semantics, preserves month-end recurrence anchors and out-of-order completion snapshots, and attaches optional planLink {module, planId, occurrenceDate, groupId}. The service rechecks the reviewed source snapshot, requires an active bank/card source, rejects duplicate occurrence IDs/provenance, and rolls back both local workbooks if a write/marker fails. Bank/Cash/card reports carry the explicit group ID into actual plan breakdowns. Historical records remain unallocated; no amount/date/name matching or backfill. Category names are resolved against the live registry at the command boundary, preserving existing custom categories. Existing data shapes remain backward-compatible.
+
+Validation: focused engine/service/Planning/Cash UI regression run passed 4 files / 25 tests (manual-plan-final-tests.log). Production build and both TypeScript projects passed (manual-plan-build.log); later changes were test-fixture authentication and cleanup only and require new-head CI as usual. Cash component test actually exercises the explicit Mark as done workflow on local fixtures. Browser was not used to fulfill real user payments. The initial rollback fixture leaked its spy through Zustand snapshots; fixture cleanup now restores the action explicitly. This was a test isolation issue, not a passing run until corrected.
+
+Limits: local rollback/replay protection is not a remote atomic transaction. Whole-workbook sync still needs a transaction-safe repository before backend pending-only scheduling. No scheduler is enabled and no real money moves. Rental fulfillment/provenance migration, explicit EMI/subscription actual classification, unified category/project budgets/rollover, broader UI/service migration and full chart/theme/mobile/finder acceptance remain. Continue those tasks; PR 51 stays draft.
+
+## Shared monthly movement population — 2026-11-06
+
+Source 6f8ed930c62885a89ef846838411a139d8a0fc09 passed Actions 439: 166 files / 1,261 tests, broker regressions, TypeScript checks and production build.
+
+Next slice adds monthly movement widgets, a shared line chart and accessible monthly table inside Money in/out, using exactly the same engine selector as its category/module/account/plan report. Actual/pending/planned and movement-kind filters control both. Empty months remain present, currencies stay separate, exact first/last partial-month dates apply, and no missing net-worth snapshot is invented for movement-only cards. Shared MonthlyStatsWidget retains its existing snapshot-first behavior in historical Analytics, with movement-first presentation for this report. Existing narrower legacy flow views remain explicitly scoped pending their migration.
+
+Focused tests: 3 files / 35 passed; production build/both TS projects passed (monthly-native-movement-build.log). Browser verified matching monthly/section totals, native-currency widgets, line canvases and same-data tables. No private proof data or real record mutation. New published-head full CI remains required.
+
+Continue with plan-to-actual allocation linkage, unified currency-owned budgets and broader UI/services, then transaction-safe repositories and pending-only payment lifecycle. Auto-pay is not implemented/enabled; PR 51 stays draft and main untouched. Historical checkpoint entries below describe earlier states and do not override this status.
+
+## Native movement adapters — 2026-11-06
+
+Baseline c1cd12e9 passed Actions 438 on its exact head: 165 files / 1,251 tests, broker/PSX-fee regressions, both TypeScript projects and production build. No merge or deployment. This supersedes older pending-CI statements below.
+
+Current continuation adds a deterministic CalculationEngine.movements read model and cached dashboard service/subscription for Cash, Bank, Rentals, native credit cards, recorded personal-loan/EMI repayments, Funds and every exchange broker. Cards distinguish charge/fee/markup from repayment transfer and cash-advance financing. Loan contracts/schedules are not fabricated cash receipts; EMI fines are explicit separate expenses with no guessed interest allocation. Funds trades are investment movement; exchange trades reuse broker-local fee calculators and split fees from gross consideration. NAV remains net of fund fees. Funding transfers are separate from spending. Dividends and native adjustments remain distinct. Active broker arrays override stale snapshots, archived profiles remain included unless excluded, and currencies never sum together.
+
+Explicit Rental/loan-to-Cash/Bank links choose the domain record once; internal account/card/investment transfer legs are excluded from the combined view and available separately. Same names/dates/amounts never imply a link. Generated subscription plans appear under their paying source; renewals are not actual payments. Card and personal-loan plans are included without rewriting native records. Unknown Cash/Bank movement remains Unclassified rather than pretending it is earned income. Existing historical Analytics/Plans/headline flows still have their documented Cash/Bank/Rentals scope; broader movement totals must not be presented as identical to those narrower views until migration.
+
+Validation: 4 focused files / 37 tests passed, including 10 new accounting/adapter tests. Browser verified kind filter, empty financing view, native-currency charts and matching tables. No real records were written/imported/deleted; no private screenshot or backup published. Production build and both TypeScript projects passed (native-movement-build.log). The initial build caught incomplete test fixtures; those fields and the recurrence fixture were corrected before this passing build. New resulting-head full CI remains required.
+
+Next work: migrate monthly comparisons/widgets to the canonical movement population with shared controls; preserve explicit allocation links into actual native records; currency-owned unified budgets/remaining/rollover; remaining UI service migration and transaction-safe multi-workbook repositories before opt-in pending-only backend auto-pay/history/settlement/void. Full theme/mobile/chart/finder acceptance remains required. Keep existing PR 51 draft.
+
+## Green source CI and actual-only monthly Analytics — 2026-11-06
+
+Published source 1427d3c5 passed Actions 437: 165 files / 1,250 tests, broker-profile/PSX-fee regressions, both TypeScript projects and production build. This supersedes the stale-order assertion failure in 436. No merge/deployment. The verified source remains the existing draft PR 51.
+
+One further read-model consistency correction is now in the working tree: Analytics monthly inputs, monthly widget and monthly table/drilldowns use engine-filtered cleared actual records only, through today and within exact selected dates. They no longer combine old plans into historical inflow/outflow. Plans and Money in/out retain explicitly separate actual/pending/planned populations. Monthly widget labels are Actual inflow/outflow and Net actual movement; snapshot labels do not call today's current-month value a completed month-end. This does not alter native ledgers or the shared legacy projected budget calculator used elsewhere.
+
+Focused analytics/model checks passed 2 files / 22 tests (actual-monthly-analytics-tests.log). Production build and both TypeScript projects passed (actual-monthly-analytics-build.log). Browser verified monthly actual inflow/outflow/net now match the actual movement report in each currency. Commit/push this slice and verify resulting-head full CI before any merge. Larger native-domain reporting, budget/allocations, service migration, safe payment lifecycle and full UI/theme/mobile matrix remain pending per the reporting design/checklist.
+
+## CI section-order correction and linked EMI reminder — 2026-11-06
+
+Published Money in/out head: 0941cbc1. Actions 436 build and broker regressions passed, but full suite had one failed UI assertion (1,248 tests passed / 1 failed): moving Money in/out immediately after Summary changed the expected section order. The assertion now checks Summary -> Money in/out -> Per currency summary; this is a test expectation correction, not a financial calculation failure. Do not call Actions 436 green.
+
+New source slice: Upcoming suppresses a separate EMI reminder when an active bank plan explicitly references the same loan, exact due date, native currency and full amount. It retains partial, differently dated/currency, unlinked and stale-source cases. The external backup exposed stale sourceEmiMonth metadata; that index is not rewritten and does not override explicit loan/date occurrence identity for display deduplication. No record is settled or mutated. Domain/service/UI checks passed 3 files / 24 tests (dashboard-order-upcoming-tests.log). Production build and both TypeScript projects passed (upcoming-order-build.log). Browser verified one linked bank reminder and no duplicate EMI reminder, without changing any records. Current full CI must pass on the resulting published head.
+
+The larger all-app reporting, budget, repository/payment and browser matrix tasks remain per DASHBOARD_REPORTING_DESIGN.md and DELIVERY_CHECKLIST.md. The current movement report covers Cash/Bank/Rentals only; actual plan allocation remains explicit/unallocated. Keep draft PR 51; no main merge/deployment.
+
+## Money-in/out breakdown continuation — 2026-11-06
+
+Dashboard/Funds/calendar/UI source checkpoint is committed and published as fe418990 (preceded by category service a31d6eb); Actions 435 completed successfully on fe418990. Private backup was not published. Existing three density modes only; sample images saved. No main merge or production deployment.
+
+New working-tree implementation: Money in/out top-level section with actual/pending/planned selector and category/module/account-source/plan-group dimensions. Engine owns totals and grouping, preserving currency separation, current-date actual cutoff and record populations. Explicit native source IDs prevent same-name accounts being merged. Planned groupId metadata is passed through from native planned sources; unlinked actual records remain Unallocated, with no inferred plan matching. Chart/table share group totals, and group details expose contributing records. Coverage is Cash/Bank/Rentals; linked-transfer exclusions use the existing collector. This reports account movement, not a complete earned-income/consumption classification. Other native modules and broader accounting classification remain pending.
+
+Focused checks passed 3 files / 36 tests (movement-report-final-tests.log). Production build and both TypeScript projects passed (movement-report-build.log). Browser verified Money in/out rendering, per-currency totals, category chart and accessible table; it is placed directly after Summary. After the build, only section ordering and a chart-heading gap were adjusted; exact pushed-head CI must validate the final source. Initial run failed only the old section-count assertion after adding a new section; test updated to check the new section. The prior fe418990 remains CI green; do not apply that result to uncommitted movement code.
+
+## Validated dashboard checkpoint to publish — 2026-11-06
+
+Final source validation: 8 files / 79 tests passed before monthly widget additions; 2 files / 18 widget/model/dashboard follow-up tests passed. Production build and both TypeScript projects passed (final-dashboard-release-build.log); afterward only the widget's 'Month-end net worth' label was corrected to 'Net worth snapshot' so the current month is not falsely labelled a completed month. Full CI on the published head must validate that final text too. Browser verified Analytics charts, monthly widget, earlier calendar Plans chart/table, corrected PKR Funds, native module contribution chart and section-only collapse. No private backup imported or private proof data added to repository. Samples in docs/ui-samples are the user-supplied stock UI references only.
+
+Existing Comfortable/Compact/Console modes retained; no extra mode. Spacing/heading gaps repaired, semantic icons and change arrows added, Notice dismiss controls present. Important remaining reporting work: full native-domain movement coverage and category/module/account/plan income/outflow drilldowns; explicit-link EMI deduplication; unified budgets and payment persistence/lifecycle; full theme/mobile/hover acceptance. See docs/DASHBOARD_REPORTING_DESIGN.md for the concrete desired report layout and accounting safeguards. Do not mark all remaining work complete or merge the large PR prematurely.
+
+## Monthly widget / cash-flow research continuation — 2026-11-06
+
+User requests added: widget for each month's stats; charts beside related section metrics; income/outflow breakdowns by category, module/account and plan; Bank Account-style arrows and charts. Research/spec saved to docs/DASHBOARD_REPORTING_DESIGN.md with official Copilot, Actual and YNAB sources. Preserve that design as remaining app-wide reporting scope, not a claim it is already implemented.
+
+Added MonthlyStatsWidget to Analytics using engine-provided monthly values, explicit missing historical balances and labels for activity including plans. Added current balance-by-module chart to each native currency summary; this is balance composition, not cash flow. ValueChange presents supplied deltas using up/down arrows and percentage only if supplied. The existing three modes remain Comfortable/Compact/Console. No statLayout preference remains. Reference images are retained under docs/ui-samples.
+
+Final combined focused checkpoint before widget additions: 8 files / 79 tests passed. Widget/model/dashboard follow-up: 2 files / 18 tests passed (final-monthly-widget-tests.log). Production build running in final-dashboard-release-build.log; check result. Earlier monthly/spacing builds passed. All these source edits since 9bee76b2 are uncommitted until the next focused commits; do not lose them or private-proof artifacts. Private backup was never copied into tracked files. Browser has verified Funds correction, section-only collapse, hierarchy, monthly Plans chart/table and dates. New widget/change indicator review remains pending.
+
+Next: save/publish tested checkpoint, inspect full CI on resulting head, then complete canonical movement read models/adapters, complete monthly native-domain coverage and category/module/account/plan drilldowns, linked EMI deduplication, budget allocations and safe pending-only payment lifecycle. Original dashboard/app UI acceptance remains required. Do not merge just because one checkpoint is green.
+
+## Latest UI correction — existing modes only (2026-11-06)
+
+User explicitly rejected extra modes. Removed the proposed statLayout field/control/root attribute entirely. Preserve Comfortable, Compact and Console. Approved screenshots remain in docs/ui-samples as reference material. Repaired the existing spacing tokens: Comfortable 16px vertical card padding, Compact 12px, Console 8px; visible heading/content gaps scale with the same modes. Theme surfaces, radius and elevation remain token-driven. Added existing semantic SVG icons to dashboard section headings without replacing accessible text labels. Informational notices have dismiss buttons. Only outer sections collapse; inner currency summaries/charts/tables stay open. Headline/support/extra hierarchy remains.
+
+Monthly Plans is implemented with per-currency charts, same-dataset accessible summary tables and dated plan rows, URL-backed calendar selection and exact-window recurrence. Source coverage remains Cash/Bank/Rentals; other native domains and linked EMI duplicate obligations remain pending. Tests passed 65 UI/theme/period checks plus 22 final month checks before this spacing/icon correction. Final combined focused checks passed 8 files / 79 tests (final-dashboard-repair-tests.log). Final production build is running in final-dashboard-repair-build.log. The earlier monthly build passed. Earlier entries describing Modern/Compact as a new preference are superseded by this correction.
+
+## Month-based Plans and approved UI samples — 2026-11-06
+
+User steering: Plans must be month-based with dated historical analysis/local charts; only top-level sections collapse; headline values bigger/highlighted than supporting and extra stats. User supplied Modern/Compact references now saved at docs/ui-samples/modern-reference.png and compact-reference.png with README guidance. These are presentation references, not financial source data. The earlier private backup was read locally only and is not committed.
+
+Implemented working-tree continuation: Plans replaces rolling day-horizon controls with URL-backed plan-month and plan-months (1/3/6/12). Service expands recurring source plans over the requested exact window, including past/future months. Engine supplies per-currency monthly cleared actual, pending and unexecuted planned totals, with separate same-dataset chart/table and dated paginated plan rows. Coverage is currently Cash/Bank/Rentals native activities; broader native EMI/subscription/card sources require explicit integration and duplicate-link handling. Monthly plans are not represented as net-worth forecasts. Existing full Planning editor remains linked.
+
+Modern/Compact stat-layout preference is independent of theme and density, available in Appearance. Shared Notice now offers accessible dismissal, with dismissible=false available for required content. New notices reset dismissal. New UI/period tests are in dashboard-monthly-ui-focused.log; inspect footer. Final build and full CI on final published head are still required. Earlier Funds correction and profile valuation passed 78 focused tests; user then requested more UI/monthly work, so validate the new source before publishing.
+
+Remaining findings include explicitly linked EMI duplicates in Upcoming, wider service migration, full native-domain monthly coverage, unified currency-owned budgets and safe auto-pay lifecycle. Browser previously verified corrected native PKR Funds holdings and the headline/support hierarchy; current monthly selector and appearance changes still need visual review. Do not claim the whole app or release complete.
+
+## Dashboard Funds reconciliation and UI parity — 2026-11-06
+
+User reported incorrect PKR Funds and inconsistent dashboard UI. Read the supplied external backup locally without importing it, changing records or adding private data to source control. Confirmed cause: legacy Funds settings omitted includeCashInNetWorth, but the service treated omission as true. An incomplete funding-transfer history therefore generated negative cash that silently cancelled holdings. Missing legacy setting now means holdings-only; explicit true retains native cash including negative balances, and explicit false remains excluded. Fresh workbooks keep their documented explicit default. Dashboard inclusion checkbox uses the same effective policy and explains the funding requirement; no balancing deposits are invented.
+
+Separately confirmed dashboard exchange valuation read only the active broker arrays. It now values profile ledgers independently with each profile's own fees/cost basis/currency, uses current active arrays over stale profile data, retains archived/deactivated history unless excluded, and then aggregates currency totals. Historical dates/scope use the same profile inputs. The exchange-wide inclusion command updates every profile to match its dashboard label.
+
+Dashboard now uses the same StandardPageSections card headers/containers as the other modules, replacing its unframed Show/Hide controls. Existing report bounds, data and drilldowns remain intact. Browser verified native PKR Funds contribution against the supplied backup's holdings calculation and visually reviewed shared section controls. This does not reconcile external bank statements or endorse all dashboard figures. Remaining finding: Upcoming can display an EMI obligation alongside its linked bank plan; inspect explicit linkage before deduplicating. Other chart/theme/mobile acceptance and broader migration/payment work remain open.
+
+Current verification is in dashboard-funds-focused.log; inspect completion before reporting a count. Production build must be rerun after correcting Testing Library role options in the test. Category service changes also remain in this working-tree continuation; its earlier 10 focused tests/build passed. No production deployment or merge.
+
+## Verified visible removal control / category service — 2026-11-06
+
+Browser verification now succeeded for App Data: current server on port 5173 serves this workspace; review tab displays the Remove all app data topbar section and its full warning, phrase field and disabled-until-confirmed button. Selecting the section brings the form into view. The review tab was left open as a deliverable. No phrase was entered, no confirmation accepted and no real data deleted. This is narrow App Data acceptance, not completion of dashboard/chart/theme/browser review.
+
+Actions 433 passed on 46f039c5 and Actions 434 passed on 9bee76b2. Source and docs through 9bee76b2 are published. New work: CategorySelect reads via categoryService and dispatches authenticated category creation; blank/duplicate normalized names rejected without modifying history. Focused tests passed 2 files / 10 tests. Production build running in category-service-build.log. This next source slice is uncommitted until saved below.
+
+## Published App Data checkpoint — 2026-11-06
+
+Source committed and pushed: de314785 (Banking scope/budget correctness), 46f039c5 (App Data removal). PR 51 remains draft. Local validation: 27 focused tests across 6 files passed; both TypeScript projects and production build passed. GitHub Actions 433 on source head 46f039c5 has passed build and broker/PSX regression steps; full suite is running at this checkpoint. Verify its final result before claiming a full pass. Any subsequent documentation commit changes PR HEAD; report source-head and current-head evidence accurately.
+
+App Data removal is available in the working branch/local preview. It has not been deployed to production and has not been used on real user data. Browser acceptance and the larger remaining engine/UI/payment scope remain open. Earlier references to these changes being uncommitted/local-only are historical; both source commits are now published.
+
+## App Data removal and Banking continuation — 2026-11-06
+
+App Data now includes a visible Remove all app data action. It requires sign-in, the exact DELETE ALL DATA phrase and explicit confirmation. The service checks the confirmed UID, atomically replaces all 18 financial workbook paths with defaults under that user, awaits cloud acknowledgement, then resets local workbooks only if the same user is still active. It preserves the login account, appearance preferences and shared market data. Custom categories are removed; general defaults remain. No real user deletion has been executed during development.
+
+Workbook maintenance invalidates queued local cloud pushes across the reset; normal writes resume afterward. Existing remote snapshot/rollback handling remains active. This is not a cross-device edit lock: users should finish edits on other devices before resetting. Tests use mocked cloud writes only. Current focused service/engine checks: 4 files / 24 tests passed; isolated App Data component and sync-queue checks passed 2 files / 3 tests. The combined navigation run stalled and was interrupted without a result; production build and both TypeScript projects passed (app-data-removal-build.log).
+
+Banking continuation: aggregate analytics now renders all native accounts in scope, currencies separated, with missing selection staying empty. Legacy budget targets are explicitly unassigned instead of falsely converted to each account currency; actual spending follows the filtered cleared ledger, and no remaining comparison is fabricated. Legacy target writes use an authenticated service with finite-positive amount validation and collision/stale-name checks. Unified currency-owned budgets and wider command migration remain pending.
+
+Publication correction: source through 44018f7b is pushed to existing draft PR 51; GitHub Actions run 432 passed on that exact head. Later App Data and Banking changes described here are local until committed/pushed and revalidated. Browser acceptance remains outstanding after connection/CDP and Windows URL-verification failures. No merge/deployment.
+
+## Banking analytics continuation — 2026-11-05
+
+Legacy AnalyticsTab now delegates ledger/date/pending/plan reads to useBankAccount -> bankService -> CalculationEngine.bank, including full native balance history and closing balance for chart reconciliation. Its former inline ledger/filter/recurrence path is removed. Focused engine/navigation checks passed 2 files / 18 tests. Production build and both TypeScript projects passed (bank-analytics-boundary-build.log), after removing the unused filter import.
+
+Remaining in this tab: first-account fallback for aggregate scope, unscoped legacy budget comparison/editor, direct source metadata/budget subscriptions and commands. These are not fixed by this narrow read-path migration. Do not infer a currency for legacy targets. Category compatibility checks passed 23 tests and its production build/both TS projects passed. Category compatibility source is committed as 348bd812. Banking analytics and documentation updates remain working-tree changes until committed.
+
+## Current evidence correction — 2026-11-05
+
+The Banking thread-pool retry has ended with a worker-response timeout; it is not still running and is not a passing full suite. See bank-query-full-suite-threads.log. Earlier running-status entries below are historical. Category general-default/custom migration and legacy name mapping follow-up are currently uncommitted. Final category compatibility checks passed 3 files / 23 tests. Production build and both TypeScript projects passed (category-defaults-build.log). The detailed [delivery checklist](docs/DELIVERY_CHECKLIST.md) is the current complete scope index, including small UI acceptance tasks and dependencies.
+
+## Scope clarification — 2026-11-05
+
+See [current delivery checklist](docs/DELIVERY_CHECKLIST.md) for dashboard redesign, all-app charts, shared topbar/filters, dropdown navigation, themes, categories and engine/payment work. Dashboard and UI acceptance are still outstanding. Category defaults are being corrected to general-purpose labels; existing personal labels retain their IDs as custom categories.
+
+## Latest Banking checkpoint — source committed; full regression retry running
+
+Banking source is committed locally as e2647a7b: calc/bankReadModel.ts, services/finance/bankService.ts, hooks/useBankQueries.ts, model/service tests, CalculationEngine.ts, BankPage.tsx and its navigation test. Account detail, bank/account directory, scope summaries and account-chart calculations now use engine/service models. Corrections: historical card-debt cutoff; per-card available credit; closed balances retained; future records stay visible/labeled but do not become current actuals; native chart closing balance survives flow filters; signed comparison bars; issuer-specific card scope and cache keys, including card-only banks; non-mutating bank sorting and archive-safe directory totals.
+
+Latest focused validation **passed 4 files / 47 tests** (bank-query-verified-focused.log). Latest production build and both TypeScript projects **passed** (bank-query-verified-build.log). The repeated three-cycle lazy-editor test now has a localized 15-second total budget, while each DOM finder remains bounded at five seconds; cold Windows load previously exceeded the old five-second total budget. No global test timeout was raised.
+
+**Full-suite retry is running on final Banking code**: webapp/bank-query-full-suite-threads.log, execution session 14563 at launch, --pool=threads --maxWorkers=1. The prior default-fork run (bank-query-full-suite.log / session 29212) failed to terminate the PriceInputLive test worker and was interrupted without a completion footer; do not call it passing. No assertion failure was recorded before the runner shutdown problem. Inspect the new retry footer before claiming a completed full result. No concurrent compiler. Vitest runs safely in the sandbox when TEMP and TMP point at webapp/node_modules/.cache/wealthcrescent-vitest-tmp (create first); the default AppContainer temp directory triggers EPERM renames. Record final output and update documentation; the Banking source commit is already saved. No source edits since starting this full run; docs/inventory updates only.
+
+Remaining Banking work: legacy AnalyticsTab budget reads/private ledger filters and editor/transaction/other form commands still need migration. BankSettings.budgets is explicitly currency-agnostic legacy data; do not silently infer currency during the approved unified category/project budget migration. Preserve unscoped targets until explicitly assigned. Current UTC date semantics match datetime.todayISODate() without a specified zone; market-fee calendars remain market-specific. The new migration inventory is docs/CALCULATION_ENGINE_MIGRATION_INVENTORY.md; it is a static review map, not a proof of correctness or completion.
+
+The completed 158-file / 1,210-test checkpoint below precedes this Banking source. GitHub connector fallback failed with an HTTP transport error; no API publication occurred. Git pushes remain failed/unverified. Earlier source is committed through ede55d7b plus docs 9f07b719; Banking adds e2647a7b. A fresh GitHub connector read now succeeds and verifies existing draft PR #51 still at remote ce3e4be8. Git fetch succeeds too. Retry publication without forcing or creating a duplicate PR. No main push/merge.
+
+---
+
+## 2026-11-05 — Latest validated source checkpoint (read this first)
+
+Financial correctness / completing CalculationEngine remains the priority. All source from this continuation is now saved in focused local commits on fix/net-worth-dashboard-parity-and-accounting. Latest application head: ede55d7b (theme profiles); financial query/read-model head: 9dc4f20e. Earlier entries below are historical checkpoints and may mention work that is now committed or defects that are now fixed.
+
+### Completed and verified
+
+- Final full suite: **158 files / 1,210 tests passed**, 296.77 seconds, webapp/recent-engine-full-suite.log.
+- Final production build and both TypeScript projects: **passed**, webapp/recent-engine-build.log.
+- Recent Activity migration: 5 files / 23 focused tests passed, webapp/recent-activity-validation.log. The later full suite includes the final active-broker currency assertion too.
+- NetWorthRecentTransactions is now render-only through useRecentTransactions -> recentActivityService -> CalculationEngine.recentActivity. Funds/QSE/PSX withdrawal fees reconcile with native cash ledgers through shared transferCashAmount; migrated legacy card records are not repeated; archived/deactivated broker history is retained; active native data/currency overrides stale profile snapshots; EMI paid outflow includes its additional fine. Trade values are explicitly labeled before trading fees and are not presented as combined cash flow.
+- NetWorthPage now uses engine/service report, headline, per-currency, Insights, category, monthly, forecast, inclusion and local FX interfaces. No runtime private calculator or financial-store imports remain in that page; appearance state is presentation-only.
+- Shared charts, dropdown/finder/mobile topbar/reporting controls and theme changes are committed too, preserving the user's earlier requests. See SHARED_UI_COMPONENTS.md for their contract. Required final browser acceptance remains outstanding.
+
+### Local commits in order after user skills head ce3e4be8
+
+1. da797287 — recurrence calendar anchoring / old daily schedules.
+2. 35b8a80c — executed-only fallback prices and shared chronology.
+3. bf9524b2 — explicit recurring activity windows / exact forecast cutoffs.
+4. 24dfdeb7 — durable audit and continuation checkpoint.
+5. c75d4449 — shared chart renderers and pointer interaction.
+6. 72a14c24 — shared entity dropdown/finder, mobile topbar and reporting controls.
+7. 53042101 — Planning engine queries / authenticated commands.
+8. 9dc4f20e — central valuation, dashboard and recent-activity models/services/tests.
+9. ede55d7b — distinct theme surfaces and chart treatment.
+
+### Delivery state / next work
+
+- Existing draft PR #51 remains the target. No duplicate PR, merge or main push.
+- Git fetch succeeds. Three Git push attempts (including per-command HTTP/1.1) failed with RPC/curl 52 Empty reply from server. A verified fetch still showed remote ce3e4be8, so **do not claim these local commits are pushed**. No approval review rejected the actions; this is a transport failure.
+- The GitHub connector provides create_tree/create_commit/update_ref and can be used as a safe publication fallback if Git transport remains unavailable. Preserve the remote parent/history, use an expected-head lease and a fast-forward update only. Connector-created commit IDs may differ; compare final trees before reconciling local refs, and retain a backup of local commits. Never force over someone else's work.
+- This documentation update is the only remaining working-tree work at this checkpoint; commit it after verifying git status. Do not stage unrelated user changes.
+- Next implementation slice: continue app-wide financial query/command migration (Bank/Cash/Cards/Funds/EMI/Personal Loans/Rentals/Subscriptions/exchange consumers). Their tested pure calculators already exist behind CalculationEngine; remaining UI-local financial derivation and direct persistence must move to services. Do not label the full architecture complete just because the dashboard and current suite pass.
+- Unified category/project allocation and payment lifecycle remain pending. Transaction-safe multi-workbook persistence is still a prerequisite for scheduled app-only auto-pay; no scheduler is implemented/enabled.
+- Start a fresh Vite server for final browser checks; the prior process ended with the environment restart. Preserve the user's tab and inspect a separate review tab. Complete chart hover/cursor, mobile topbar, theme light/dark and finder navigation checks. Remote CI must validate the exact final published head before any merge.
+
+---
+
+## 2026-11-05 — Authoritative continuation checkpoint
+
+**Priority:** complete financial correctness / CalculationEngine before resuming appearance work. The user's shared charts, standard dropdown, mobile topbar, dashboard and theme requests remain authorized and are preserved in the working tree. The user explicitly asks that this handoff remain current for another chat.
+
+### Repository and delivery state
+
+- Workspace: D:/Coding/WealthCrescent. Working branch: fix/net-worth-dashboard-parity-and-accounting.
+- Last focused calculation commit: bf9524b27cfeb9ef91b4fa13af0ae15758bc9186. Documentation checkpoint commit: 24dfdeb7.
+- Three focused calculation commits are now local: da797287 (month-end/leap-year recurrence and old daily schedules); 35b8a80c (executed-only, chronologically ordered fallback prices); bf9524b2 (explicit recurring activity windows and exact forecast cutoffs/new currencies/future loans).
+- Existing draft PR #51 remains the target. A fresh fetch verified remote head ce3e4be8 (user-added skills), and local HEAD was four commits ahead / zero behind before the push attempt. Push the existing branch only; inspect its actual completion before claiming success. No merge and no main push.
+- There are 96 modified/untracked tracked-workspace paths at this checkpoint, covering prior UI work plus financial query migration/tests/docs. Do not reset them. Some new files are untracked and must be included in appropriate commits. Preserve user-provided AGENTS.md / .agents skills; do not sweep them into implementation commits.
+
+### Financial work now in the working tree
+
+- lib/calc/netWorthValuation.ts is the shared current/historical native-ledger valuation assembly. netWorthAsOf.ts delegates to it. It takes an explicit date; handles native inclusion and currencies; includes historical dividends; preserves stock accounting/cost-basis settings; splits personal-loan receivables/debts; and reports unverified undated openings.
+- services/finance/netWorthService.ts owns native store/feed access, live quote overlays, scoped input snapshots, caching and midnight invalidation. features/netWorth/hooks/useNetWorthSummary.ts is now a thin subscription adapter and also exposes useNetWorthInputs.
+- lib/calc/dashboardReadModel.ts now owns headline and per-currency summaries, historical report assembly, exact reporting ranges, cleared Insights, category totals/details, monthly drilldowns and planning reality. Capital split uses the selected period-end valuation; the current headline remains live. Drilldowns and totals exclude the same pending rows. Missing opening evidence / missing FX withhold period deltas.
+- services/finance/dashboardService.ts and hooks/useDashboard.ts own dashboard sources, recurring activity queries, inclusion option view models and authenticated narrow inclusion commands. Native credit cards now have inclusion controls. Commands read the latest workbook to retain unrelated edits and reject deleted sources. The original local FX cache/manual-rate behavior is behind this service too.
+- NetWorthPage.tsx no longer imports financial stores or runtime private calculators. Appearance state remains presentation-only. Its recent-transactions child still needs inspection/migration before describing the whole dashboard subtree as render-only.
+- CalculationEngine.ts adds valuation, dashboard, currency, personalLoans, transfers, rentalActuals and categoryGroups; it also exposes the earlier new Planning model. Do not commit the facade without its referenced new modules.
+- lib/calc/currencyConversion.ts holds pure conversion math; lib/fx.ts re-exports compatibility functions and rejects invalid cross-rates. Historical prices sort by date before time. Existing persisted actual transactions/fulfilled snapshots have not been rewritten.
+- budgetPlanner now accepts an optional explicit occurrence window. Dashboard queries expand recurring plans through 365 days (rather than silently truncating 90/365-day forecasts at 30 days). Planning queries expand the requested report window. Future projections use exact end dates, retain new currencies and do not amortize a future-start loan as if it already existed today.
+
+### Exact validation evidence
+
+- Earlier UI-only checkpoint: 153 files / 1,168 tests passed (final-ui-validation.log).
+- Financial domain checkpoint: 46 files / 635 tests passed (engine-domain-tests.log); before later dashboard extraction.
+- Calendar regression checkpoint: 8 files / 126 tests passed (engine-calendar-tests.log).
+- A full-suite run concurrent with a build reported timeouts in Bank navigation, QSE transactions, BatchEditGrid and FinancePlanGroups, then its process disappeared without a completion footer. **Do not report that run as passing.** All four files passed in isolation afterward: 37 tests (engine-failed-review.log).
+- Most recent focused engine/dashboard/service checkpoint: **8 files / 61 tests passed** (engine-complete-dashboard-tests.log). Covers native inclusion authorization, stale/deleted-source preservation, historical capital split, pending-safe monthly/category/Insight details, exact forecast horizons and recurring source expansion.
+- **Most recent production build passed**, including both TypeScript projects (engine-dashboard-final-build.log). This includes the final dashboard service/FX extraction.
+- **Final full suite PASSED: 156 test files / 1,205 tests**, output webapp/engine-verified-full-suite.log, duration 503.53 seconds. Command from webapp/: node node_modules/vitest/vitest.mjs run --maxWorkers=1. This validates the current working-tree source through the dashboard service/FX extraction. Later source changes require new relevant verification and the required final checks.
+- No new exact-head remote CI result or final browser acceptance is claimed. Tests use fixtures, not reconciliation of every private user ledger against statements.
+
+### Prior UI work to preserve and finish after the financial priority
+
+- Shared AppCharts wrappers and appChartStyle/chartInteraction/chartThemeVisuals, nearest-x non-intersecting hover, cursor guideline, reduced motion, StockCharts adapters; feature renderer imports migrated. Theme profiles now vary surfaces, corners, elevation and chart treatment across all nine themes; final visual QA remains outstanding.
+- StandardDropdown supports section titles, icon + text + independent favorite action, isTypeable, keyboard navigation and a portalled accessible grid. Market ticker controls and entity switches use it. AppEntityFinder/navigationService supplies cross-module search and favorite navigation; Funds/EMI/Personal Loans/Subscriptions use URL-backed selection.
+- Mobile menu moved to the beginning of TopBar; sidebar drawer behavior, shared reporting/date/filter controls and QSE/PSX analytics URL ranges are implemented. Shared summary components compact the main dashboard, and CategoryNav recognizes /dashboard correctly.
+- Prior browser review covered Planning/navigation/editor open-cancel, ticker picker appearance and compact dashboard layout. No private financial records were saved during browser review. Required final browser checks still include charts/cursor interaction, mobile topbar, theme variants and cross-module finder navigation.
+- The old Vite process is no longer running after the environment update. Start a fresh dev server when needed, using the existing /WealthCrescent/ base. Preserve the user's open tab; use a separate review tab. CUA documentation must be refreshed on resumed computer-use work.
+
+### Next actions, in order
+
+1. Preserve the successful checkpoint above. The next source change is the Recent Transactions migration below; run its focused tests, then required final suite/build on the resulting code.
+2. Migrate NetWorthRecentTransactions to a pure engine model and service subscription. **Confirmed pending defect:** its Funds and QSE/PSX withdrawal rows use -(gross - fee), while native ledgers use -(gross + fee). It also assembles financial signs in the component and omits archived/deactivated broker history from a view labeled lifetime. Add native-ledger reconciliation tests, preserve broker isolation, and inspect active-profile data freshness before fixing. Then inspect any remaining dashboard financial derivation. Continue the wider engine/service migration from the explicit pending list in CALCULATION_ENGINE_AUDIT.md; do not call the whole architecture complete.
+3. Commit the coherent tested query/model work and retained UI work in focused groups. Some files mix financial and visual changes, especially NetWorthPage.tsx and main.css; inspect hunks. Do not lose untracked dependencies.
+4. Update validation/docs with final results; push the existing branch (never main), refresh PR #51 and verify CI on the exact pushed head. Keep it draft until acceptance is met.
+5. Complete browser review and then resume outstanding charts/dropdown/topbar/theme refinements. Scheduled app-only auto-pay still requires transaction-safe multi-workbook persistence before implementation; it is not implemented or enabled.
+
+---
+
+## 2026-11-04 — Financial correctness is the active priority
+
+The user's latest instruction prioritizes correct figures and completing CalculationEngine over further visual work. Continue the existing branch and draft PR #51; do not merge or create a duplicate PR. The current working tree also contains the earlier shared charts/dropdown/topbar/dashboard/theme work. Preserve it; resume the authorized visual work after the financial priority is handled.
+
+The new central valuation/query path and concrete accounting corrections are documented in [CALCULATION_ENGINE_AUDIT.md](docs/CALCULATION_ENGINE_AUDIT.md). Current and historical valuation now share one engine path; recorded dividends, gross personal-loan assets/debts, executed-only fallback prices, validated FX, opening-evidence coverage and month-end recurrence have explicit regression coverage. Dashboard headline calculations now come from the engine through service functions. Remaining secondary analytics/UI/service and auto-pay work is listed explicitly in that audit; do not claim engine architecture completion.
+
+Validation in this working session: earlier shared UI checkpoint passed 153 files / 1,168 tests; subsequent financial domain checkpoint passed 46 files / 635 tests; calendar-focused checkpoint passed 8 files / 126 tests. Later financial edits require the final full suite and production build now in progress. These are local results, not new exact-head CI evidence. No merge has occurred.
+
+## 2026-11-04 — Centralized CalculationEngine and app-only auto-pay (user-approved direction)
+
+### User's confirmed requirements
+
+- **Auto-pay means application-only ledger processing.** No bank APIs, payment-provider APIs, external money movement, or claim that money was transferred. On the due date, the app automatically creates a pending record in its own ledger; the user explicitly confirms settlement afterward.
+- **One centralized `CalculationEngine`.** Every financial calculation must go through this engine. Existing stock accounting (`stockCalculationEngine.ts` and `portfolioCalculationEngine.ts`) is the reference pattern and must remain correct; route it through the central public boundary rather than duplicating its logic.
+- **UI is render-only.** Every UI component/page obtains required read data and dispatches writes through application-service/function boundaries. No component-local calculations, business rules, direct store mutations, Firebase/localStorage persistence or direct imports of calculation modules. Formatting values for display is allowed; calculating financial meaning is not.
+- These requirements apply to every component, including cards, tables, forms, dialogs, dashboard widgets, charts and page-level hooks. Hooks may adapt service subscriptions/loading/error state but must not become alternate calculation/business layers.
+
+### Architecture document and implementation started
+
+- Added `webapp/docs/CALCULATION_ENGINE_ARCHITECTURE.md` with target layers, engine/service responsibilities, unified category + project budget direction, app-only auto-pay lifecycle, migration rules and required verification.
+- Updated root `CLAUDE.md` to make these user-approved constraints mandatory for future sessions.
+- Added `webapp/src/lib/calc/CalculationEngine.ts` as the first public calculation facade. It groups and delegates to the existing stock, portfolio, cash, bank, card, budget, planning, recurrence, upcoming, net-worth, EMI, rental and subscription calculation modules. It deliberately reuses the existing implementations rather than cloning or changing financial logic.
+- Exported the facade from `webapp/src/lib/calc/index.ts`.
+- Added `webapp/src/lib/calc/__tests__/CalculationEngine.test.ts` to assert that the facade delegates to the exact existing stock, portfolio, budget-activity and upcoming implementations.
+- Commits on this branch: `7ff4c6e6df9ec04e830b22e8fdae926eef4a79ad` (architecture document), `661aff729e51fe54bbef608cbaa067fd7881b8c7` (agent rules), `310a00008439271c4c61e0e190bf48004901a076` (CalculationEngine facade), `bcef2aa210ca842c6f6b23f4d2fb9fe2eada15c3` (public export), `29dfb7af5943433dabedf445b1f2bacc42a40230` (facade contract test), and `1fea6abf45354c3a43da395fd490098245298976` (checkpoint docs).
+- **Important: this is only the foundation, not completion of the architecture.** Existing components and feature hooks still import calculators and stores directly. The next implementation step is to establish application query/command services, then migrate all UI consumers incrementally. Auto-pay backend processing has not been implemented.
+- At latest verification, branch head was `1fea6abf45354c3a43da395fd490098245298976`; branch was 49 commits ahead / 0 behind `main`, with 23 changed files. Re-fetch before further work.
+- No local type-check, test suite or production build has been run in this environment; the facade contract test is added but unverified. Do not treat this code slice as validated. No main-branch push or merge.
+
+### Code review findings that shape implementation
+
+- The repo already has a strong stock calculation foundation: `stockCalculationEngine.ts` performs the consolidated stock accounting pass and `portfolioCalculationEngine.ts` assembles the portfolio calculation result. QSE/PSX derived hooks currently call `calculatePortfolio` directly; legacy wrappers such as `positions.ts`, `realizedPL.ts` and `closedTrades.ts` also call the stock engine directly. The central facade must become the only public entry point, then these consumers must migrate without changing accounting behavior.
+- Financial calculations are distributed across `lib/calc/**` (including `budgetPlanner.ts`, `plannedBalance.ts`, `upcoming.ts`, `bankModule.ts`, `cashModule.ts`, `creditCardModule.ts`, `netWorth.ts`, `netWorthTrend.ts`, `emiModule.ts`, `rentalPlanning.ts` and `subscriptionsModule.ts`). For example, `PlanningPage.tsx` and `NetWorthPage.tsx` currently call calculation helpers directly, and `BankPage.tsx` calls bank calculation helpers directly. These must be migrated behind CalculationEngine/application queries.
+- Components currently access Zustand stores and mutate them directly in several flows. `financePlans.ts` is a useful existing cross-module read/write helper but itself directly accesses the four planned-workbook stores; it needs to become a repository/service implementation, not remain a UI-facing shortcut.
+- Planned workbooks are separate Firebase paths: `users/{uid}/plannedCash`, `plannedBank`, `plannedCreditCard`, `plannedRentals`; actual module workbooks are stored separately. Existing `useWorkbookCloudSync` writes whole workbook documents after a debounce. Do not implement scheduled auto-pay by appending to arrays or by a browser timer. The backend repository needs a concurrency-safe, idempotent transaction strategy across plan occurrence/execution and the target native ledger.
+- Existing pending-ledger semantics are not identical across modules: Cash and Bank explicitly exclude `isPending` from cleared balances; credit-card planned records currently have no equivalent unified pending lifecycle. Auto-pay eligibility and native-ledger mapping must be defined per module before enabling it. First release should process eligible planned outflows only; rental income and forecast income are not auto-pay.
+- Existing recurrence identity and completion behavior in `planOccurrences.ts` must be reused; do not create a second recurrence implementation.
+
+### Approved implementation sequence
+
+1. Introduce a single public CalculationEngine facade and service/query/command boundaries. Add parity tests against existing calculators before migrating callers.
+2. Migrate calculation consumers and UI reads/writes incrementally, beginning with planning/payment flows. Keep all existing stores and persisted data compatible while services take ownership of access.
+3. Finalize the unified category + project budget model through CalculationEngine; preserve FinancePlanGroup and all existing native planned records with lossless mapping.
+4. Add payment execution identity/history and pending native-ledger mapping, then a scheduled Firebase Function only after transaction-safe idempotency and retry behavior are covered by tests.
+5. Migrate remaining modules (Cash, Bank, Cards, Rentals, EMI, Subscriptions, Net Worth, QSE and PSX) behind the same boundary. Preserve StockExchangeEngine results and broker-profile isolation.
+6. For every slice, run targeted tests, full tests as appropriate, TypeScript checks, production build and diff review against latest main. Never mark a slice complete without the checks for its exact head. Continue small focused commits on this branch; never push directly to main.
+
+# WealthCrescent — Session Handoff (refreshed 2026-11-04, continuation checkpoint)
+
+## 2026-11-04 — Budget planning, dashboard, upcoming and accounting continuation
+
+### Exact repository state at handoff
+
+- **Working branch:** `fix/net-worth-dashboard-parity-and-accounting`
+- **Latest application-code head:** `1cf181cdba2a4f61936c0842be2f573dc78093ec` — `refactor(upcoming): keep renewal dates separate from alert reminders`. Later commits on this branch are handoff-documentation-only; re-fetch the live branch tip before starting work.
+- **Base / current `main`:** `e545273018b08eebd9f95328b766c7cb2764c5af` (PR #50 documentation follow-up, after PR #49's Net Worth dashboard rebuild).
+- **Application diff:** 35 application commits ahead, 0 behind `main`; merge base is exactly the current `main` SHA above. The application comparison contains 17 changed files. Additional commits/files on the branch update the two handoff documents; re-fetch the live total ahead count and exact branch HEAD at session start.
+- **PR status:** no open PR exists for this branch at the last live check. Do not assume PR #48/#49/#50 is the active PR: #49 and #50 are closed/merged; this branch still needs its own review/PR after validation.
+- **CI status:** no pull-request workflow runs were returned for application head `1cf181cdba2a4f61936c0842be2f573dc78093ec`. Subsequent commits only update handoff documentation; no fresh type-check, production build, full test suite, or interactive browser smoke test has been run for the application changes. Do not describe this branch as validated.
+- **No merge or direct-main push has occurred.** Continue on this feature branch, preserve its commits, and never push directly to `main`.
+
+### What is already on this branch — inspect before changing
+
+The branch contains 35 focused commits. The notable work includes:
+
+1. **Upcoming / reminders**
+   - Future-only active obligations are collected across module plan stores, with stable row identity and routing to the correct module dashboard.
+   - Upcoming and subscription reminders are consolidated into dated items to reduce duplicate presentation.
+   - Reminder lead-time alerts fire on their own scheduled calendar day (not all 1/2/3-day reminders together).
+   - Latest commit separates renewal dates from alert-reminder dates; preserve that distinction.
+   - Relevant files: `lib/calc/upcoming.ts`, `lib/calc/subscriptionsModule.ts`, `hooks/useUpcomingItems.ts`, `components/UpcomingList.tsx`, and their tests.
+
+2. **Dashboard / date navigation**
+   - `/dashboard` is the canonical app homepage; `/` and `/net-worth` redirect to it, while the Net Worth dashboard is reused at the canonical route.
+   - Shared date-range navigation was extracted to `components/DateRangeWidget.tsx` and integrated into the pinned top bar.
+   - Net Worth uses account-style presets and URL-backed date navigation; manual Snapshot controls and duplicate renewal alerts were removed.
+   - Lifetime recent transactions were added across modules; inspect broker-profile aggregation carefully before extending it.
+   - Relevant files: `App.tsx`, `DateRangeWidget.tsx`, `TopBarControls.tsx`, `NetWorthPage.tsx`, `NetWorthRecentTransactions.tsx`.
+
+3. **Planning / finance summaries**
+   - Planning can render embedded editable plan ledgers in the standard section-card pattern.
+   - Plan status/category/finance allocation charts were added.
+   - Dashboard work includes editable multi-finance budget presentation and lifetime activity.
+   - These are useful incremental improvements, **not yet a complete unified budget engine**. Do not infer that category targets, rollover, project budgets, goals/sinking funds, partial-payment reconciliation, or all forecasting scenarios are already implemented.
+
+4. **Funds and financial integrity**
+   - Fund summaries were aligned to central stock position totals and historical units now use the central stock accounting engine.
+   - Same-day execution price handling and stable legacy execution identities were addressed; regression tests cover oversells and lifecycle-safe valuations.
+   - Keep the merged stock calculation engine and broker-profile isolation intact. Never move broker-owned trades/transfers/settings/P&L to an exchange-wide shared scope.
+   - Preserve the rule that unmatched SELL quantities and their fees are flagged/reconciled, never assigned invented BUY cost basis or fictitious realized profit.
+
+### User's latest product direction: WealthCrescent is a finance + budget-planning system
+
+The user explicitly clarified that budget planning is a core product capability and should support practical real-world planning scenarios, not just a list of payment reminders. The previous session researched common patterns in YNAB, Actual Budget, Monarch Money and PocketSmith. Useful concepts to consider (research context, not yet approved implementation requirements):
+
+- Category/envelope budgets with allocated amounts, available/remaining balances, rollover and weekly/monthly/yearly/custom target periods.
+- Project/goal budgets that group multiple planned payments across dates, categories, modules and financial accounts.
+- Recurring schedules with flexible frequency, expected amount/range, end date, skip/complete actions and optional matching to actual ledger entries.
+- Split transactions and partial payments with allocations that reconcile exactly to the parent transaction amount.
+- Savings goals/sinking funds, cash-flow projections, actual-vs-planned reporting and what-if scenarios.
+- Rules/automation for categorization and recurring transaction handling, while preserving explicit user confirmation where financial records are uncertain.
+
+A possible direction discussed was one unified budget domain supporting multiple budget modes (category/envelope, project/goal, recurring/periodic, savings/sinking fund, cash-flow). This remains a **proposal**, not an approved schema. The previous assistant asked whether the user approves supporting both category-based and project-based budgets in one unified engine; the user had not answered before this handoff request. Ask this one design approval question before committing to that architecture, unless the user explicitly says to proceed.
+
+### Proposed architecture to evaluate after approval — do not blindly implement
+
+- A parent Budget with one or more child budget items/allocations. Budget items may point to a module/entity, account/finance, category, currency, expected amount/range, due date and recurrence.
+- Link allocations to actual existing ledger transactions; do not duplicate/copy financial transactions into the budget store.
+- Derive Planned / Pending / Partially paid / Paid / Overdue / Skipped / Cancelled from actual linked records and remaining amount. Keep labels such as “Due Today” or “Happening in X days” separate from lifecycle status.
+- Normalize activity from Cash, Banking, Cards, Rentals, EMI/Loans, Subscriptions, Funds, QSE and PSX for reporting without losing source module IDs or broker profile ownership.
+- Keep currency totals separate unless the user explicitly enables a sourced FX conversion. Do not double-count internal transfers or credit-card repayments; distinguish investment contributions from consumption.
+- Use the central calculation engine as the single source of financial calculations; UI components must not independently recompute balances, budgets, P/L or forecasts.
+- Rental income and expenses should both participate in period flow; do not reduce Rentals to a special net-only treatment.
+- Forecasts must be based on real historical balances/transactions and clearly label estimates; never invent historical snapshots or settlement dates.
+
+### Previously specified dashboard / planning UX contract
+
+Keep these requirements in scope when reviewing the branch and planning future work:
+
+1. Overall section: per-currency grouped stat cards and chart.
+2. Per Currency section: assets, liabilities, net worth, module contributors/changes, Planned vs Reality and chart.
+3. Monthly navigator.
+4. Plans table with all relevant actions, including Modify.
+5. Recent Transactions across all modules, lifetime, newest first, 25 per page by default.
+6. Insights, followed by Upcoming.
+7. Monthly summaries should use a timeline-style widget rather than an excessively wide table.
+8. Use the reusable date-range widget consistently across pages, with backward/forward navigation and URL-backed state where appropriate.
+9. Clicking a module should open its module dashboard; exchanges should have their own dashboards.
+10. Upcoming should contain future unresolved items only; completed/deleted/stale items must not reappear. Alerts are separate, date-accurate and deduplicated.
+11. Use the standard app section-card patterns; avoid cards nested inside cards. Do not reintroduce a manual Snapshot button.
+
+### Next-session execution order
+
+1. Re-read root `CLAUDE.md`, this handoff, `webapp/MODULES_PLAN.md`, `webapp/README.md` (if its contents can be retrieved), `webapp/USER_MANUAL.md`, `webapp/audit.md`, and the relevant dashboard/planning guides before editing.
+2. Refresh live `main`, this branch head, PR list and Actions. Confirm the branch remains 35 ahead / 0 behind (or record the new state); never rely on the SHA in this handoff if the remote moved.
+3. Review the full 35-commit history and all 17 changed files against current `main`. Preserve the already-merged PR #48 stock engine, PR #41/#43 broker-profile isolation, PR #46 Funds cash ledger, and PR #49 Net Worth dashboard work. Do not restore older branch versions over newer main code.
+4. Audit the existing implementation and tests before designing a unified budget schema. Explicitly distinguish working features from proposals and gaps. Resolve the category-budget + project-budget design approval first.
+5. Fix any correctness regressions in Upcoming, reminder timing, funds valuation, date navigation, and cross-broker recent activity. Keep stable IDs, chronology and profile ownership.
+6. Run the complete webapp test suite, both TypeScript checks/type-check, and production build on the exact final branch head. If application code changes after validation, rerun all required checks. Add regression tests for every financial or date calculation fix.
+7. Perform interactive browser smoke tests with representative multi-currency, multi-broker and partial-month data when an interactive preview is available. If unavailable, record that as not done; do not claim visual verification.
+8. Update `webapp/README.md` Done/Pending and `webapp/USER_MANUAL.md` only for behavior that actually ships and is verified. The GitHub file reader returned an empty content body for `webapp/README.md` at this checkpoint (blob SHA `e5fd4b52dbb9b3cba23c4f174c555bfff8e5c305`); do not overwrite it with an empty replacement. Retry a safe retrieval method before editing it.
+9. Once review and checks are complete, create/update a PR from this branch to `main`; keep the PR focused and do not merge until the exact PR head passes all required checks.
+
 # WealthCrescent — Session Handoff (refreshed 2026-11-04)
 
 ## 2026-11-04 — Net Worth dashboard rebuild, PR #49 merged
@@ -283,3 +731,44 @@ Latest implementation details:
 - Unmatched SELL shares remain visible and receive no invented cost basis or realized profit; actual proceeds remain in cash and unmatched SELL fees are expensed separately.
 
 The current documentation/comment refresh is behavior-neutral. Verify the live PR head and Actions again before merge; any later application-code change requires a fresh full validation. No browser smoke test or real-backup review is claimed. No merge to `main` has been performed.
+
+
+## 2026-11-04 — Upcoming application-service migration checkpoint
+
+- **Working branch:** `fix/net-worth-dashboard-parity-and-accounting`; re-fetch the live head before continuing.
+- Added `webapp/src/services/finance/upcomingService.ts`. It owns subscriptions to the nine source workbooks, gathers current data, calls `CalculationEngine.upcoming.collectUpcomingItems`, and caches snapshots by source revision, horizon and calendar day.
+- Replaced `useUpcomingItems`' direct Zustand/calculator dependencies with a thin `useSyncExternalStore` adapter to the application service.
+- Moved due-timing label calculation into the calculation result. `UpcomingList` now renders the supplied `dueLabel`; it no longer derives day differences locally.
+- Added `upcomingService.test.ts` to check stable snapshots, store-change invalidation and the service-produced next-day label. Extended `upcoming.test.ts` to assert the engine-provided label.
+- Architecture checkpoint recorded in `webapp/docs/CALCULATION_ENGINE_ARCHITECTURE.md`.
+- This is a deliberately small first service migration. It does **not** complete the UI-only architecture: `PlanningPage`, `FinancePlansHierarchy`, other pages/components and plan writes still need migration. No auto-pay scheduler, execution history, pending-ledger command or settlement workflow has been implemented yet.
+- No local test/build was available through the connected GitHub workflow tools before opening a PR. The next action is to open a draft PR from this branch, inspect the exact-head full-test and build/type-check results, and fix failures before considering merge. Do not merge if any check is pending, missing, failing, or tied to an older head. No direct-main push.
+
+
+## 2026-11-04 — PR #51 implementation and validation checkpoint
+
+- **Branch:** `fix/net-worth-dashboard-parity-and-accounting`
+- **PR:** [#51 — Centralize financial calculations and migrate planning read services](https://github.com/ranamrameez/WealthCrescent/pull/51), currently draft against `main`.
+- **Last validated application/documentation head:** `aacb7c60bab1ca4d1df1597e59d388091bcd5621` (80 PR commits, 29 changed files at that point; re-fetch before further work).
+- **Base:** `main` `e545273018b08eebd9f95328b766c7cb2764c5af`. No merge or direct-main push has occurred.
+- Added the public `CalculationEngine` facade. It delegates to the existing domain calculators and preserves the existing StockExchangeEngine implementation. The `funds` namespace is included; Funds holdings/category valuation and matched SELL cash handling now use `calculateStockPortfolio`, avoiding a parallel position/oversell implementation.
+- Added the first service migration: `src/services/finance/upcomingService.ts` owns Upcoming source subscriptions, gathers inputs, calls `CalculationEngine`, and caches stable read-model snapshots. `useUpcomingItems` is now a thin `useSyncExternalStore` adapter. Due labels are calculated outside the renderer.
+- Dashboard work includes shared top-bar reporting range navigation, source/section filter behavior, lifetime Recent Transactions, URL-backed date controls and tests. Preset/custom date ends are clamped to today.
+- Pending Cash/Bank/Rentals activity remains visible as pending but is excluded from cleared monthly budget actuals. Subscription lead-time reminders fire only on their scheduled calendar day; missed days are not replayed. Test fixtures and assertions were aligned with those semantics.
+- Updated `USER_MANUAL.md`, `MODULES_PLAN.md`, `CALCULATION_ENGINE_ARCHITECTURE.md`, root `CLAUDE.md`, and this handoff. The old budget note is superseded: category-based and project-based budgeting are approved as one unified model.
+- **CI:** Actions run #421 passed on code head `8e17ce13c4378b362dee435c34f7fff69e4b8664`; Actions run #423 passed on documentation head `3662f3eade965a21069aeae1190b7e33e5127004`; Actions run #424 passed on exact head `aacb7c60bab1ca4d1df1597e59d388091bcd5621`. The successful exact-head run includes broker-profile/PSX-fee regressions, full Vitest suite (144 test files / 1,143 tests), TypeScript checks and production build. The subsequent commits `bed06c91ea469e9d016d1c09dd23e51038e1688e` and `ec7292b5c3e4bbb45ed99072da43a081c528ec31` are documentation-only; check the new workflow run for the resulting current head before any merge decision.
+- **Not complete:** app-wide UI/service migration; PlanningPage and FinancePlansHierarchy query/command migration; planned-payment write services; scheduled app-only auto-pay; deterministic occurrence execution history; pending-ledger creation; and explicit settlement workflow. No bank APIs, payment-provider APIs, or external money movement have been added.
+- **Manual UI verification remains outstanding.** The UI guidelines require a real rendered-page review; the connected browser surface available in this session is read-only and no branch preview was available. Do not claim visual acceptance. Keep the PR draft and do not merge until the exact current head is green and the required UI review has been completed. A passing automated build/test suite alone does not complete the requested auto-pay feature.
+
+
+## 2026-11-04 continuation — Planning read/write service slice
+
+Continue PR #51 on fix/net-worth-dashboard-parity-and-accounting; main is untouched. The fetched starting head was 5d5ca1c48e5b68d0faa0039c1ebeb307deef8211 and main was e545273018b08eebd9f95328b766c7cb2764c5af.
+
+Implemented planningService.ts, thin usePlanning adapters, and CalculationEngine.planning. PlanningPage/FinancePlansHierarchy read recurring items, activity, statuses, currency-safe summaries and chart data through that boundary. Shared payment/group/finance-link editors dispatch authenticated service commands; commands retain stale edits, recurrence exclusions, currency acknowledgement, inactive-finance rejection and fulfilled-history protection. Pure plan primitives were extracted from the store-facing financePlans module to keep engine imports pure. Shared date validation moved to lib/dateValidation.ts with a compatibility re-export.
+
+Regression coverage includes separate same-category/module currencies, filters, fulfilled recurrence snapshots, empty group selection, stable service snapshots/store invalidation, command authorization and stale writes; existing shared editor/group behavior tests remain relevant. Restored locked local dependencies with npm ci because the old installation lacked fflate. Vitest needs an unsandboxed run on this Windows machine because sandbox temporary-file renames fail. Build/type-check passed during development; final full-suite/build results will be recorded after completion.
+
+Local interactive review now works through the in-app browser and local Vite server. Checked Planning overview, category/module budget view switching, recurring-plan navigation and opening/cancelling an occurrence editor. Browser error log was empty at that checkpoint. No user financial records were saved or deleted. Other dashboard/mobile/write-flow acceptance is still outstanding.
+
+Next: introduce transaction-safe persistence before scheduled auto-pay. useWorkbookCloudSync currently writes whole workbooks with set(), so simply appending backend-created ledger entries can lose them to a stale client write. Scheduler, occurrence execution history, pending-ledger creation, settlement/void commands and the remaining UI/module service migration are still outstanding. Keep PR #51 draft; do not merge on this slice alone.

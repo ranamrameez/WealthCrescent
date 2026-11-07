@@ -174,7 +174,8 @@ function App() {
         <AppShell user={user}>
           <ErrorBoundary>
             <PageContent>
-              <Route path="/" element={<Navigate to="/net-worth" replace />} />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/net-worth" element={<Navigate to="/dashboard" replace />} />
               <Route path="/qse" element={<DashboardPage />} />
               <Route path="/brokers" element={<BrokersPage />} />
               <Route path="/portfolio" element={<PortfolioPage />} />
@@ -332,7 +333,7 @@ function App() {
                 }
               />
               <Route
-                path="/net-worth"
+                path="/dashboard"
                 element={
                   <NetWorthPage
                     syncStatus={netWorthSnapshotsSync.status}

@@ -51,8 +51,8 @@ it('uses ordered standard sections, compact cards and independent favourite cont
 it('keeps grouped searchable ticker selection on the topbar and page fields in one popup',()=>{
  show();expect(screen.queryByRole('combobox',{name:'Stock'})).toBeNull();expect(screen.queryByRole('combobox',{name:'Data source'})).toBeNull();
  const input=screen.getByRole('combobox',{name:'Ticker'});fireEvent.focus(input);
- for(const name of ['Opened','Fav','Closed','All Others'])expect(screen.getByRole('group',{name})).toBeVisible();
- fireEvent.change(input,{target:{value:'Islamic'}});expect(screen.getByRole('option',{name:/QIBK/})).toBeVisible();
+ for(const name of ['Opened','Fav','Closed','All Others'])expect(screen.getByRole('rowgroup',{name})).toBeVisible();
+ fireEvent.change(input,{target:{value:'Islamic'}});expect(screen.getByRole('button',{name:/^QIBK/})).toBeVisible();
  fireEvent.keyDown(input,{key:'Enter'});expect((screen.getByRole('combobox',{name:'Ticker'}) as HTMLInputElement).value).toContain('QIBK');
  fireEvent.click(screen.getByRole('button',{name:/^Filters/}));expect(screen.getByRole('combobox',{name:'Data source'})).toHaveValue('all');
  expect(screen.getByRole('combobox',{name:'Price flags'})).toBeVisible();expect(screen.getByRole('combobox',{name:'Updates per page'})).toBeVisible();

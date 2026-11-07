@@ -10,6 +10,11 @@ import { useCategoryStore } from '../../store/categoryStore';
 
 beforeEach(() => {
   localStorage.clear();
+  // Personal categories belong to an existing user's workbook, not new-user defaults.
+  useCategoryStore.getState().setWorkbook({ categories: [
+    { id: 'cat_ignore_count', serialNumber: 1, name: 'IgnoreCount', scope: 'custom' },
+    { id: 'cat_ignore', serialNumber: 2, name: 'Ignore', scope: 'custom' },
+  ] });
 });
 
 describe('mergeCategoriesEverywhere', () => {

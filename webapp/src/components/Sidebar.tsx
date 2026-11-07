@@ -168,7 +168,7 @@ export function Sidebar({
   );
 
   return (
-    <div className={`sidebar ${className}`.trim()}>
+    <div id="app-navigation" role="navigation" aria-label="Main navigation" className={`sidebar ${className}`.trim()}>
       <div className="sidebar-title-row">
         <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 18, letterSpacing: '.01em' }}>
           <LogoMark />

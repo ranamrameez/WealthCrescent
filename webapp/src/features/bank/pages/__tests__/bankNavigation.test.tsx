@@ -90,15 +90,19 @@ it.each(['/bank/account/a1', '/bank/bank/b1'])('keeps plan creation in the FAB w
   expect(screen.getByRole('button', { name: 'Save plan' })).toBeTruthy();
 });
 
+// Three lazy-editor cycles need a total budget that covers the bounded
+// five-second finder for each cycle on a cold Windows/CI worker.
 it('keeps one live section stack after repeatedly closing batch edit', async () => {
   const { container } = show('/bank/account/a1?section=transactions');
   for (let i = 0; i < 3; i++) {
     const transactionSection = [...container.querySelectorAll('section')].find(section => section.querySelector('.standard-card-title')?.textContent === 'Transactions')!;
     fireEvent.click(transactionSection.querySelector('button[aria-label="Card options"]')!);
     fireEvent.click(screen.getByRole('button', { name: 'Batch edit' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Cancel / Discard' }));
+    // The editor is lazy-loaded; cold Windows/CI transforms may exceed the
+    // default one-second DOM query timeout without changing its behavior.
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel / Discard' }, { timeout: 5000 }));
     expect(container.querySelectorAll('.standard-section-stack')).toHaveLength(1);
     expect(container.querySelectorAll('.standard-section-anchor')).toHaveLength(5);
     expect(screen.getAllByText('Future cleared payment')).toHaveLength(1);
   }
-});
+}, 15000);

@@ -1,3 +1,4 @@
+import type { MovementActivity } from './movementActivities';
 import { planOccurrences } from './planOccurrences';
 /** Budget Planner (README item 106 / user-requested 2026-08-26) — a
  * cross-module view over Cash/Bank/Rentals' ALREADY-EXISTING planned
@@ -27,6 +28,11 @@ import type { Property, RentalEntry } from '../../types/rentalsWorkbook';
 import type { PlannedRentalEntry } from '../../types/plannedRentals';
 import type { InterEntityTransfer } from '../../types/interEntityTransfer';
 
+export interface BudgetOccurrenceWindow { fromDate?: string; toDate?: string; asOf?: Date; horizonDays?: number | null; }
+function expandPlans<T extends Parameters<typeof planOccurrences>[0][number]>(plans: T[], window: BudgetOccurrenceWindow) {
+  return planOccurrences(plans, window.fromDate, window.toDate, window.asOf, window.horizonDays);
+}
+
 export type BudgetModule = 'cash' | 'bank' | 'rentals';
 
 export interface BudgetActivity {
@@ -36,6 +42,8 @@ export interface BudgetActivity {
    * "Cash" itself for the Cash module (no sub-accounts), an account/
    * property name for Bank/Rentals. */
   sourceLabel: string;
+  sourceId?: string;
+  planGroupId?: string;
   date: string;
   /** Signed: positive = income, negative = expense — same convention as
    * `BankTransaction.amount`, so Bank needs no sign transformation at all;
@@ -43,6 +51,7 @@ export interface BudgetActivity {
    * get mapped onto this one signed convention here. */
   amount: number;
   currencyCode: string;
+  categoryId?: string;
   category?: string;
   description: string;
   /** `false` = a not-yet-executed plan (still just an intention); `true` =
@@ -51,6 +60,9 @@ export interface BudgetActivity {
    * below (its real counterpart is already included as `executed: true`,
    * so including both would double-count the same money movement). */
   executed: boolean;
+  /** Pending real records remain visible in the activity ledger but are excluded
+   * from cleared cash-flow totals and monthly actuals. */
+  isPending?: boolean;
   /** Passthrough of `PlannedBankTransaction.sourceEmiLoanId` — set only for
    * a not-yet-executed EMI "Link to bank" installment plan. Exists so
    * `netWorthTrend.ts`'s monthly projection can exclude these from its
@@ -58,6 +70,7 @@ export interface BudgetActivity {
    * EMI schedule's own liability reduction — counting both would double-
    * count the payment, see that file's own doc comment). */
   sourceEmiLoanId?: string;
+  sourceSubscriptionId?: string;
 }
 
 /** User-reported (2026-09-04): "Inter-account transfers are counting as
@@ -92,66 +105,66 @@ function linkedRecordKeys(links: InterEntityTransfer[]): Set<string> {
  * restructure was deliberately scoped to the 3 primary record types, not
  * their Planned* counterparts (see `types/finance.ts`'s file-level
  * comment), so this is a real, documented asymmetry, not an oversight. */
-function normalizeCash(entries: CashEntry[], plans: PlannedCashEntry[], categories: Category[], linked: Set<string>): BudgetActivity[] {
+function normalizeCash(entries: CashEntry[], plans: PlannedCashEntry[], categories: Category[], linked: Set<string>, window: BudgetOccurrenceWindow): BudgetActivity[] {
   const real: BudgetActivity[] = entries
     .filter((e) => !linked.has(`cash:${e.id}`))
     .map((e) => ({
-      id: e.id, module: 'cash', sourceLabel: 'Cash', date: e.date,
+      id: e.id, module: 'cash', sourceLabel: 'Cash', sourceId: 'cash', planGroupId: e.planLink?.groupId, date: e.date, sourceEmiLoanId: e.planLink?.source?.module==='emi'?e.planLink.source.id:undefined, sourceSubscriptionId: e.planLink?.source?.module==='subscription'?e.planLink.source.id:undefined,
       amount: e.isDeposit ? e.amount : -e.amount, currencyCode: e.currencyCode,
-      category: categoryName(e.categoryID, categories), description: e.note || (e.isDeposit ? 'Cash in' : 'Cash out'), executed: true,
+      categoryId: e.categoryID, category: categoryName(e.categoryID, categories), description: e.note || (e.isDeposit ? 'Cash in' : 'Cash out'), executed: true, isPending: e.isPending,
     }));
-  const planned: BudgetActivity[] = planOccurrences(plans).filter((p) => !p.executed).map((p) => ({
-    id: p.id, module: 'cash', sourceLabel: 'Cash', date: p.date,
+  const planned: BudgetActivity[] = expandPlans(plans, window).filter((p) => !p.executed).map((p) => ({
+    id: p.id, module: 'cash', sourceLabel: 'Cash', sourceId: 'cash', date: p.date,
     amount: p.type === 'IN' ? p.amount : -p.amount, currencyCode: p.currencyCode,
-    category: p.category, description: p.note || (p.type === 'IN' ? 'Planned cash in' : 'Planned cash out'), executed: false,
+    planGroupId: p.groupId, sourceSubscriptionId: p.sourceSubscriptionId, sourceEmiLoanId: p.sourceEmiLoanId, category: p.category, description: p.note || (p.type === 'IN' ? 'Planned cash in' : 'Planned cash out'), executed: false,
   }));
   return [...real, ...planned];
 }
 
-function normalizeBank(accounts: BankAccount[], transactions: BankTransaction[], plans: PlannedBankTransaction[], categories: Category[], linked: Set<string>): BudgetActivity[] {
+function normalizeBank(accounts: BankAccount[], transactions: BankTransaction[], plans: PlannedBankTransaction[], categories: Category[], linked: Set<string>, window: BudgetOccurrenceWindow): BudgetActivity[] {
   const accountById = new Map(accounts.map((a) => [a.id, a]));
   const real: BudgetActivity[] = transactions.flatMap((t) => {
     if (linked.has(`bank:${t.id}`)) return [];
     const account = accountById.get(t.accountId);
     if (!account) return [];
     return [{
-      id: t.id, module: 'bank' as const, sourceLabel: account.name, date: t.date,
+      id: t.id, module: 'bank' as const, sourceLabel: account.name, sourceId: account.id, planGroupId: t.planLink?.groupId, date: t.date, sourceEmiLoanId: t.planLink?.source?.module==='emi'?t.planLink.source.id:undefined, sourceSubscriptionId: t.planLink?.source?.module==='subscription'?t.planLink.source.id:undefined,
       amount: t.amount, currencyCode: account.currencyCode,
-      category: categoryName(t.categoryID, categories), description: t.description, executed: true,
+      categoryId: t.categoryID, category: categoryName(t.categoryID, categories), description: t.description, executed: true, isPending: t.isPending,
     }];
   });
-  const planned: BudgetActivity[] = planOccurrences(plans).filter((p) => !p.executed).flatMap((p) => {
+  const planned: BudgetActivity[] = expandPlans(plans, window).filter((p) => !p.executed).flatMap((p) => {
     const account = accountById.get(p.accountId);
     if (!account) return [];
     return [{
-      id: p.id, module: 'bank' as const, sourceLabel: account.name, date: p.date,
+      id: p.id, module: 'bank' as const, sourceLabel: account.name, sourceId: account.id, date: p.date,
       amount: p.amount, currencyCode: account.currencyCode,
-      category: p.category, description: p.description, executed: false,
-      sourceEmiLoanId: p.sourceEmiLoanId,
+      planGroupId: p.groupId, category: p.category, description: p.description, executed: false,
+      sourceEmiLoanId: p.sourceEmiLoanId, sourceSubscriptionId: p.sourceSubscriptionId,
     }];
   });
   return [...real, ...planned];
 }
 
-function normalizeRentals(properties: Property[], entries: RentalEntry[], plans: PlannedRentalEntry[], categories: Category[], linked: Set<string>): BudgetActivity[] {
+function normalizeRentals(properties: Property[], entries: RentalEntry[], plans: PlannedRentalEntry[], categories: Category[], linked: Set<string>, window: BudgetOccurrenceWindow): BudgetActivity[] {
   const propertyById = new Map(properties.map((p) => [p.id, p]));
   const real: BudgetActivity[] = entries.flatMap((e) => {
     if (linked.has(`rentals:${e.id}`)) return [];
     const property = propertyById.get(e.propertyId);
     if (!property) return [];
     return [{
-      id: e.id, module: 'rentals' as const, sourceLabel: property.name, date: e.date,
+      id: e.id, module: 'rentals' as const, sourceLabel: property.name, sourceId: property.id, planGroupId: e.planLink?.groupId, date: e.date,
       amount: e.isDeposit ? e.amount : -e.amount, currencyCode: property.currencyCode,
-      category: categoryName(e.categoryID, categories), description: e.note || (e.isDeposit ? 'Rent income' : 'Expense'), executed: true,
+      category: categoryName(e.categoryID, categories), description: e.note || (e.isDeposit ? 'Rent income' : 'Expense'), executed: true, isPending: e.isPending,
     }];
   });
-  const planned: BudgetActivity[] = planOccurrences(plans).filter((p) => !p.executed).flatMap((p) => {
+  const planned: BudgetActivity[] = expandPlans(plans, window).filter((p) => !p.executed).flatMap((p) => {
     const property = propertyById.get(p.propertyId);
     if (!property) return [];
     return [{
-      id: p.id, module: 'rentals' as const, sourceLabel: property.name, date: p.date,
+      id: p.id, module: 'rentals' as const, sourceLabel: property.name, sourceId: property.id, date: p.date,
       amount: p.type === 'RENT_INCOME' ? p.amount : -p.amount, currencyCode: property.currencyCode,
-      category: p.category, description: p.note || (p.type === 'RENT_INCOME' ? 'Planned rent income' : 'Planned expense'), executed: false,
+      planGroupId: p.groupId, category: p.category, description: p.note || (p.type === 'RENT_INCOME' ? 'Planned rent income' : 'Planned expense'), executed: false,
     }];
   });
   return [...real, ...planned];
@@ -167,12 +180,12 @@ export function collectBudgetActivities(inputs: {
    * don't break, but every real caller should pass the live list (see
    * `linkedRecordKeys`'s own doc comment for why). */
   links?: InterEntityTransfer[];
-}): BudgetActivity[] {
+}, window: BudgetOccurrenceWindow = {}): BudgetActivity[] {
   const linked = linkedRecordKeys(inputs.links ?? []);
   return [
-    ...normalizeCash(inputs.cashEntries, inputs.plannedCash, inputs.categories, linked),
-    ...normalizeBank(inputs.bankAccounts, inputs.bankTransactions, inputs.plannedBank, inputs.categories, linked),
-    ...normalizeRentals(inputs.rentalProperties, inputs.rentalEntries, inputs.plannedRentals, inputs.categories, linked),
+    ...normalizeCash(inputs.cashEntries, inputs.plannedCash, inputs.categories, linked, window),
+    ...normalizeBank(inputs.bankAccounts, inputs.bankTransactions, inputs.plannedBank, inputs.categories, linked, window),
+    ...normalizeRentals(inputs.rentalProperties, inputs.rentalEntries, inputs.plannedRentals, inputs.categories, linked, window),
   ].sort((a, b) => a.date.localeCompare(b.date));
 }
 
@@ -188,12 +201,12 @@ export interface MonthlyIncomeExpense {
  * currency. Callers typically ask for exactly 3 months (previous/current/
  * next) per the user's own request, but this itself is unbounded — pass
  * whichever months you want. */
-export function monthlyIncomeExpense(activities: BudgetActivity[], months: string[]): MonthlyIncomeExpense[] {
+export function monthlyIncomeExpense(activities: MovementActivity[], months: string[]): MonthlyIncomeExpense[] {
   return months.map((month) => {
     const income: Record<string, number> = {};
     const expense: Record<string, number> = {};
     activities
-      .filter((a) => a.date.slice(0, 7) === month)
+      .filter((a) => !a.isPending && a.date.slice(0, 7) === month)
       .forEach((a) => {
         if (a.amount >= 0) income[a.currencyCode] = (income[a.currencyCode] || 0) + a.amount;
         else expense[a.currencyCode] = (expense[a.currencyCode] || 0) + -a.amount;

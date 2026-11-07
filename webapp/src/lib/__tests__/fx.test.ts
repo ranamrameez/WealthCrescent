@@ -116,3 +116,19 @@ describe('setCrossRate', () => {
     expect(result.rates.PKR).toBe(280);
   });
 });
+
+
+describe('invalid FX input cannot corrupt totals', () => {
+  it.each([0, -2, NaN, Infinity])('rejects a non-positive or non-finite destination rate: %s', value => {
+    const invalid = { ...rates, rates: { ...rates.rates, QAR: value } };
+    expect(convertAmount(10, 'USD', 'QAR', invalid)).toBeNull();
+    expect(effectiveRate('USD', 'QAR', invalid)).toBeNull();
+    expect(convertAmount(10, 'QAR', 'USD', invalid)).toBeNull();
+  });
+  it('rejects non-finite amounts and manual cross-rates', () => {
+    expect(convertAmount(Infinity, 'USD', 'USD', rates)).toBeNull();
+    expect(setCrossRate('USD', 'QAR', Infinity, rates)).toBeNull();
+    expect(setCrossRate('USD', 'USD', 2, rates)).toBeNull();
+    expect(setCrossRate('QAR', 'PKR', Number.MAX_VALUE, rates)).toBeNull();
+  });
+});

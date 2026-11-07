@@ -1,3 +1,4 @@
+import type { BudgetDefinition, BudgetAllocation } from './budget';
 import type { RecurrenceRule } from './recurrence';
 import type { FinancePlanGroup } from './financePlanGroup';
 
@@ -23,6 +24,7 @@ import type { FinancePlanGroup } from './financePlanGroup';
  * that marker rather than consuming the row, so the SAME plan keeps
  * generating future occurrences. */
 export interface PlannedCashEntry {
+  sourceEmiObligationId?: string;
   groupId?: string;
   id: string;
   date: string;
@@ -34,6 +36,8 @@ export interface PlannedCashEntry {
   /** True once "Mark as done" created a real `CashEntry` from this plan.
    * Only meaningful when `recurrence` is unset. */
   executed?: boolean;
+  /** Retains fulfilled series history while suppressing unresolved future occurrences. */
+  cancelled?: boolean;
   /** Set for a recurring plan — see this interface's own doc comment. */
   recurrence?: RecurrenceRule;
   /** The last occurrence date already turned into a real `CashEntry`, for
@@ -50,6 +54,9 @@ export interface PlannedCashEntry {
    * lets regeneration replace only this subscription's own not-yet-executed
    * plans, same pattern as EMI/Loans' `sourceEmiLoanId`. */
   sourceSubscriptionId?: string;
+  /** Retained when a loan installment is explicitly routed to this finance. */
+  sourceEmiLoanId?: string;
+  sourceEmiMonth?: number;
 }
 
 export interface PlannedCashSettings {
@@ -64,6 +71,8 @@ export interface PlannedCashSettings {
 }
 
 export interface PlannedCashWorkbook {
+  budgets?: BudgetDefinition[];
+  budgetAllocations?: BudgetAllocation[];
   /** Central parent-plan metadata; payments stay in their native planned ledgers. */
   planGroups?: FinancePlanGroup[];
   settings: PlannedCashSettings;

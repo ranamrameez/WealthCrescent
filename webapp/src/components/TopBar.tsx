@@ -6,6 +6,7 @@ import { TopBarSelect } from './TopBarControls';
 import { usePageTopBarStore } from '../store/pageTopBarStore';
 import { useRef } from 'react';
 import { useTopBarPageSections } from '../hooks/useTopBarPageSections';
+import { AppEntityFinder } from './AppEntityFinder';
 
 /** App-wide fixed top bar — user-requested (2026-09-11, design reference:
  * `wealth_tracker_template/` in this repo): the page's own sections
@@ -28,7 +29,7 @@ import { useTopBarPageSections } from '../hooks/useTopBarPageSections';
  * Reads from `pageTopBarStore` — the exact same "page registers, one
  * globally-mounted component renders" shape `FabPanel`/`fabActionsStore`
  * already established for the floating action button. The sidebar owns module navigation; this bar keeps page sections, sibling switchers and filters. */
-export function TopBar() {
+export function TopBar({ onToggleNavigation, navigationOpen = false }: { onToggleNavigation?: () => void; navigationOpen?: boolean }) {
   const location = useLocation();
   const navigate = useNavigate();
   const category = categoryForPath(location.pathname);
@@ -49,6 +50,10 @@ export function TopBar() {
 
   return (
     <div ref={bar} className={`page-topbar${loading ? ' is-loading' : ''}`} aria-busy={loading}>
+      {onToggleNavigation && <button type="button" className="mobile-menu-btn" onClick={onToggleNavigation} aria-label={navigationOpen ? 'Close navigation' : 'Open navigation'} aria-controls="app-navigation" aria-expanded={navigationOpen}>
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+        <span className="sr-only">Menu</span>
+      </button>}
       {loading && <div className="page-topbar-loading" role="status" aria-label="Loading page"><i /><i /><i /></div>}
       <div className="chip-tabs page-topbar-sections">
         {chips.map((c) => (
@@ -58,6 +63,7 @@ export function TopBar() {
         ))}
       </div>
       <div className="page-topbar-right">
+        <AppEntityFinder />
         {category === 'stocks' && (
           <TopBarSelect
             label="Broker"

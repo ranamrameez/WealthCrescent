@@ -19,15 +19,9 @@
  * still plain localStorage, not synced to the cloud, just no longer
  * shared across accounts on one browser. */
 
-export interface FxRates {
-  /** All rates are expressed as 1 unit of `base` = rates[code] units of
-   * that currency. */
-  base: string;
-  rates: Record<string, number>;
-  fetchedAt: string;
-  source: 'api' | 'manual';
-}
-
+import type { FxRates } from './calc/currencyConversion';
+export type { FxRates } from './calc/currencyConversion';
+export { convertAmount, effectiveRate } from './calc/currencyConversion';
 const FX_CACHE_KEY = 'WealthCrescent_fx_rates_v1';
 const FX_API_URL = 'https://open.er-api.com/v6/latest/USD';
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000;
@@ -83,19 +77,6 @@ export async function fetchFxRates(): Promise<FxRates> {
   return { base: 'USD', rates: data.rates, fetchedAt: new Date().toISOString(), source: 'api' };
 }
 
-/** Converts an amount between two currency codes using a base-USD rate
- * table. Returns null (rather than a wrong number) when either currency's
- * rate isn't known — callers should show "no rate available", never guess. */
-export function convertAmount(amount: number, from: string, to: string, rates: FxRates | null): number | null {
-  if (from === to) return amount;
-  if (!rates) return null;
-  const fromRate = from === rates.base ? 1 : rates.rates[from];
-  const toRate = to === rates.base ? 1 : rates.rates[to];
-  if (typeof fromRate !== 'number' || typeof toRate !== 'number' || fromRate <= 0) return null;
-  const amountInBase = amount / fromRate;
-  return amountInBase * toRate;
-}
-
 export function setManualRate(code: string, unitsPerBase: number, existing: FxRates | null, base = 'USD'): FxRates {
   const next: FxRates = {
     base,
@@ -104,24 +85,6 @@ export function setManualRate(code: string, unitsPerBase: number, existing: FxRa
     source: 'manual',
   };
   return next;
-}
-
-/** The rate table is internally anchored to one base currency (USD), but
- * item 3 of a 2026-08-26 feedback batch asked why FX entry only lets you
- * set "1 USD = X" — the user holds several currencies and wants to view or
- * set a rate between ANY two of them directly, not just each one's own
- * USD leg. `effectiveRate` computes that cross-rate from the existing
- * USD-anchored table (correct for any pair as long as both legs are known —
- * this is exactly how `convertAmount` already converts non-USD-to-non-USD
- * amounts, just exposed as a rate instead of a converted amount) — returns
- * null, never a guess, when either leg is unknown. */
-export function effectiveRate(from: string, to: string, rates: FxRates | null): number | null {
-  if (from === to) return 1;
-  if (!rates) return null;
-  const fromRate = from === rates.base ? 1 : rates.rates[from];
-  const toRate = to === rates.base ? 1 : rates.rates[to];
-  if (typeof fromRate !== 'number' || typeof toRate !== 'number' || fromRate <= 0) return null;
-  return toRate / fromRate;
 }
 
 /** Sets a rate between any two currencies (not just "1 USD = X"), by
@@ -142,14 +105,15 @@ export function effectiveRate(from: string, to: string, rates: FxRates | null): 
  * for exactly this case. */
 export function setCrossRate(from: string, to: string, value: number, existing: FxRates | null, base = 'USD'): FxRates | null {
   const rates = { ...(existing?.base === base ? existing.rates : {}), [base]: 1 };
-  if (!value || value <= 0) return null;
+  if (!from || !to || from === to || !Number.isFinite(value) || value <= 0) return null;
   if (to === base) {
     // 1 `from` = value `base`, so 1 `base` = (1/value) `from`.
+    if (!Number.isFinite(1 / value)) return null;
     rates[from] = 1 / value;
     return { base, rates, fetchedAt: new Date().toISOString(), source: 'manual' };
   }
   const fromRateUSD = from === base ? 1 : rates[from];
-  if (typeof fromRateUSD !== 'number' || fromRateUSD <= 0) return null;
+  if (typeof fromRateUSD !== 'number' || !Number.isFinite(fromRateUSD) || fromRateUSD <= 0 || (!Number.isFinite(fromRateUSD * value) || fromRateUSD * value <= 0)) return null;
   // 1 `from` = value `to`, and 1 USD = fromRateUSD `from`, so
   // 1 USD = fromRateUSD * value `to`.
   rates[to] = fromRateUSD * value;

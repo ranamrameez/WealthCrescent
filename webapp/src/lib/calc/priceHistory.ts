@@ -1,3 +1,4 @@
+import { sortTransactionsChronological } from './sortTransactions';
 import type { PricePoint, PriceStats, Transaction } from '../../types/workbook';
 
 /** Returns the manually-set market price for a ticker, falling back to the
@@ -7,17 +8,15 @@ export function getMarketPrice(
   marketPrices: Record<string, number>,
   transactions: Transaction[],
 ): number {
-  if (marketPrices[ticker] !== undefined && Number(marketPrices[ticker]) > 0) {
+  if (marketPrices[ticker] !== undefined && Number.isFinite(Number(marketPrices[ticker])) && Number(marketPrices[ticker]) > 0) {
     return Number(marketPrices[ticker]);
   }
   const buys = (transactions || []).filter(
-    (t) => t.ticker.toUpperCase() === ticker.toUpperCase() && t.action === 'BUY' && Number(t.price) > 0,
+    (t) => !t.isPending && t.ticker.toUpperCase() === ticker.toUpperCase() && t.action === 'BUY' && Number.isFinite(Number(t.price)) && Number(t.price) > 0,
   );
   if (buys.length) {
-    // `seq` (see `Transaction.seq`'s doc comment) breaks a same-date tie by
-    // real entry order, not array position.
-    buys.sort((a, b) => a.date.localeCompare(b.date) || (a.seq ?? 0) - (b.seq ?? 0));
-    return Number(buys[buys.length - 1].price);
+    // Use the shared accounting chronology, including same-day order.
+    return Number(sortTransactionsChronological(buys).at(-1)!.price);
   }
   return 0;
 }
