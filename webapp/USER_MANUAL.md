@@ -1177,3 +1177,7 @@ From **QSE → Transactions → Trade list**, choose **Import The Group statemen
 ### Reverse an installment receipt
 
 In **Contract & payments**, choose **Reverse payment** on an unlinked receipt. Enter the date and amount actually reversed by the lender. The app keeps the original receipt and records a separate reversal that reopens the loan balance from that date. The reversal covers the installment only. Linked receipts require coordinated corrections in their funding ledger.
+
+### Export currency budget reports
+
+Open the **Currency budgets** card menu in Planning and choose **Export monthly balances** or **Export allocation details**. The CSV uses the selected calendar months and the report's cleared-record cutoff. Each row includes its native currency.

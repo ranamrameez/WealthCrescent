@@ -1,6 +1,7 @@
 import { auth } from '../../lib/firebase/client';
 import { CalculationEngine } from '../../lib/calc/CalculationEngine';
 import { resolveNumericInput } from '../../lib/mathExpression';
+import { toCSV } from '../../lib/csv';
 import { validBatchDate } from '../../lib/dateValidation';
 import { usePlannedCashWorkbookStore } from '../../store/plannedCashWorkbookStore';
 import { useCashWorkbookStore } from '../../store/cashWorkbookStore';
@@ -39,6 +40,25 @@ export function getBudgetOverview(fromDate='',toDate='') {
   const existing=cache.get(key); if(existing) return existing;
   const result=buildOverview(fromDate,toDate); if(cache.size>=24)cache.clear(); cache.set(key,result); return result;
 }
+export function exportBudgetCsv(report: ReturnType<typeof buildOverview>['report'], type: 'balances' | 'allocations') {
+  const periods = report.rows.flatMap(({ budget, months }) => months.map(month => ({ budget, month })));
+  const identity = ['Budget ID', 'Budget', 'Currency', 'Month', 'Report cutoff'];
+  const rows = type === 'balances'
+    ? [[...identity, 'Limit', 'Carry in', 'Available', 'Outflow', 'Refunds', 'Net used', 'Remaining', 'Forecast carry'], ...periods.map(({ budget, month }) => [
+      budget.id, budget.name, budget.currencyCode, month.month, report.today,
+      month.limit, month.carryIn, month.available, month.outflow, month.refunds, month.used, month.remaining, month.isFuture ? 'Yes' : 'No',
+    ])]
+    : [[...identity, 'Record key', 'Date', 'Module', 'Source', 'Description', 'Native amount', 'Allocated amount', 'Refund'],
+      ...periods.flatMap(({ budget, month }) => month.items.map(item => [
+        budget.id, budget.name, budget.currencyCode, month.month, report.today,
+        item.recordKey, item.record.date, item.record.module, item.record.sourceLabel, item.record.description,
+        item.record.amount, item.allocated, item.allocated < 0 ? 'Yes' : 'No',
+      ]))];
+  // Financial values stay numeric. User-provided labels are cells, not formulas.
+  const csv = toCSV(rows.map(row => row.map(value => typeof value === 'string' && /^[\s\uFEFF]*[=+@-]|^[\t\r\n]/.test(value) ? "'" + value : value)));
+  return { fileName: `budget-${type}-${report.fromMonth}-${report.toMonth}.csv`, csv };
+}
+
 export const subscribeBudgets = subscribeDashboard;
 function requireUser() { if(!auth?.currentUser)throw new Error('Sign in to change budgets.'); }
 export interface BudgetInput extends Omit<BudgetDefinition,'monthlyLimit'> { monthlyLimit: string; }

@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from 'react';
-import { getBudgetOverview, getBudgetRecordKey, subscribeBudgets, saveBudget, setBudgetMonthLimit, removeBudget, saveBudgetAllocations, type BudgetDefinition, type BudgetAllocation, type AllocationInput } from '../services/finance/budgetService';
+import { getBudgetOverview, exportBudgetCsv, getBudgetRecordKey, subscribeBudgets, saveBudget, setBudgetMonthLimit, removeBudget, saveBudgetAllocations, type BudgetDefinition, type BudgetAllocation, type AllocationInput } from '../services/finance/budgetService';
 import type { MovementActivity } from '../services/finance/dashboardService';
 import { StandardCard } from './StandardCard';
 import { SummarySection, SummarySections, SummaryValue } from './SummaryGroupCard';
@@ -32,6 +32,15 @@ export function UnifiedBudgetsPanel({ fromDate, toDate }: { fromDate: string; to
   const visible=report.rows.flatMap(row=>row.months.map(month=>({budget:row.budget,month})));
   const { rows,controls }=useTablePagination(visible);
   const { rows:unallocatedRows,controls:unallocatedControls }=useTablePagination(report.unallocated);
+  const exportCsv = (type: 'balances' | 'allocations') => {
+    const { fileName, csv } = exportBudgetCsv(report, type);
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
   const remove=async(budget:BudgetDefinition)=>{
     if(!await ensureSignedIn('Sign in to change budgets.'))return;
     if(!await confirmDialog('Remove this unused budget definition? Native transactions will be kept.'))return;
@@ -41,6 +50,8 @@ export function UnifiedBudgetsPanel({ fromDate, toDate }: { fromDate: string; to
     {label:'Add budget',onClick:()=>setEditing('new')},
     {label:modify?'Done modifying':'Modify',onClick:()=>setModify(!modify)},
     {label:'Allocate / identify refund',onClick:()=>setAllocating('choose'),disabled:!context.records.length},
+    {label:'Export monthly balances',onClick:()=>exportCsv('balances'),disabled:!visible.length},
+    {label:'Export allocation details',onClick:()=>exportCsv('allocations'),disabled:!visible.some(({ month }) => month.items.length)},
   ]}>
     <p className="text-muted">{report.fromMonth} – {report.toMonth}. Calendar-month balances include earlier days in each selected month and all cleared native records through {report.today}. Pending records and plans do not count as cleared usage. Monthly limits keep their own currencies; legacy unassigned Bank targets are separate.</p>
     <div className="row mb-md"><button className="btn secondary small" onClick={()=>setEditing('new')}><PlusIcon size={14}/> Add budget</button><button className="btn secondary small" disabled={!context.records.length} onClick={()=>setAllocating('choose')}>Allocate / identify refund</button></div>

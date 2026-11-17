@@ -1,5 +1,6 @@
+import { parseCSV } from '../../lib/csv';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { getBudgetOverview, saveBudget, saveBudgetAllocations, setBudgetMonthLimit, removeBudget } from './budgetService';
+import { getBudgetOverview, exportBudgetCsv, saveBudget, saveBudgetAllocations, setBudgetMonthLimit, removeBudget } from './budgetService';
 import { usePlannedCashWorkbookStore } from '../../store/plannedCashWorkbookStore';
 import { useCashWorkbookStore } from '../../store/cashWorkbookStore';
 import { useCategoryStore } from '../../store/categoryStore';
@@ -70,4 +71,19 @@ it('uses the selected historical end date without treating later legitimate allo
   expect(historical.report.rows[0].months[0].used).toBe(30);
   expect(historical.report.issues).toEqual([]);
   expect(historical.records.some(record=>record.id==='later')).toBe(false);
+});
+
+
+it('exports the same monthly balances and allocations through the selected cutoff', () => {
+  saveBudget({ ...input, name: '=Formula', startMonth: '2026-01' });
+  const current = getBudgetOverview();
+  saveBudgetAllocations(current.records.find(row => row.id === 'income')!, [{ budgetId: input.id, amount: '10' }], []);
+  const { report } = getBudgetOverview('2026-01-01', '2026-01-03');
+  const balances = exportBudgetCsv(report, 'balances');
+  expect(balances.fileName).toBe('budget-balances-2026-01-2026-01.csv');
+  expect(parseCSV(balances.csv)[1]).toEqual([
+    'food', "'=Formula", 'USD', '2026-01', '2026-01-03', '100', '0', '100', '30', '10', '20', '80', 'No',
+  ]);
+  const details = parseCSV(exportBudgetCsv(report, 'allocations').csv);
+  expect(details.slice(1).map(row => row.slice(-3))).toEqual([['-30', '30', 'No'], ['10', '-10', 'Yes']]);
 });

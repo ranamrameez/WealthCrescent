@@ -10114,6 +10114,8 @@ For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) first. **Lates
 
 ## Done
 
+- Currency budgets exports monthly balances and contributing allocation details for the selected report dates.
+
 - Explicit uploads into empty cloud workbooks use a conditional RTDB transaction and preserve data that another client creates first.
 
 - Money in/out shows dated QSE and PSX strategy estimates by broker and plan. Saved dates and explicit fee settings carry through when a trade is recorded.
