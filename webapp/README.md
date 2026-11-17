@@ -10114,6 +10114,8 @@ For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) first. **Lates
 
 ## Done
 
+- Explicit uploads into empty cloud workbooks use a conditional RTDB transaction and preserve data that another client creates first.
+
 - Money in/out shows dated QSE and PSX strategy estimates by broker and plan. Saved dates and explicit fee settings carry through when a trade is recorded.
 
 - Upcoming labels standalone renewal and legacy EMI estimates and retains reviewed loan obligations when planned funding is partial, conflicting or inactive.

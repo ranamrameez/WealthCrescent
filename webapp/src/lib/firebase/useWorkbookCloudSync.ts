@@ -1,6 +1,6 @@
 import { workbookSyncEpoch, workbookSyncPaused } from './workbookMaintenance';
 import type { User } from 'firebase/auth';
-import { onValue, ref, set } from 'firebase/database';
+import { onValue, ref, runTransaction, set } from 'firebase/database';
 import { useEffect, useRef, useState } from 'react';
 import type { StoreApi, UseBoundStore } from 'zustand';
 import { db, firebaseReady } from './client';
@@ -59,11 +59,18 @@ export function useWorkbookCloudSync<TWorkbook>(
   const applyingRemote = useRef(false);
   const pushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialSnapshotReceived = useRef(false);
+  const remoteWorkbookExists = useRef(false);
+  const sessionVersion = useRef(0);
+  const activeUid = useRef<string | null>(null);
 
   const cloudPath = (uid: string) => `users/${uid}/${cloudPathSuffix}`;
 
   useEffect(() => {
+    sessionVersion.current++;
+    activeUid.current = user?.uid ?? null;
     initialSnapshotReceived.current = false;
+    remoteWorkbookExists.current = false;
+    setCloudEmpty(false);
     if (!firebaseReady || !db) {
       setStatus('Cloud sync unavailable — Firebase failed to load');
       return;
@@ -79,6 +86,7 @@ export function useWorkbookCloudSync<TWorkbook>(
       workbookRef,
       (snap) => {
         const remote = snap.val() as (TWorkbook & { _updated?: string }) | null;
+        remoteWorkbookExists.current = remote !== null;
         if (remote) {
           applyingRemote.current = true;
           const { _updated, ...workbook } = remote;
@@ -107,7 +115,7 @@ export function useWorkbookCloudSync<TWorkbook>(
       },
     );
 
-    return () => unsubscribe();
+    return () => { activeUid.current = null; sessionVersion.current++; unsubscribe(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
 
@@ -143,16 +151,24 @@ export function useWorkbookCloudSync<TWorkbook>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
 
-  /** Explicit, user-initiated upload of the current local workbook to the
-   * cloud. Only meant to be offered when `cloudEmpty` is true (confirmed no
-   * data at this path) — the caller should still confirm with the user
-   * before calling this, since it's a full overwrite. */
+  /** Explicit, user-initiated initialization of an empty cloud workbook.
+   * A second client's initialization or server write wins over this upload. */
   const uploadLocalToCloud = async () => {
     if (!firebaseReady || !db || !user) throw new Error('Not signed in');
+    if (activeUid.current !== user.uid) throw new Error('The active account changed. Reopen the upload.');
     if (workbookSyncPaused()) throw new Error('A data operation is in progress.');
+    if (!initialSnapshotReceived.current || remoteWorkbookExists.current) throw new Error('Cloud storage must be confirmed empty before upload.');
+    if (pushTimer.current) clearTimeout(pushTimer.current);
     const local = useStore.getState().workbook;
+    const session = sessionVersion.current;
+    const epoch = workbookSyncEpoch();
+    const active = () => sessionVersion.current === session && !workbookSyncPaused() && workbookSyncEpoch() === epoch;
     const payload = stripUndefinedDeep({ ...local, _updated: new Date().toISOString() });
-    await set(ref(db, cloudPath(user.uid)), payload);
+    const result = await runTransaction(ref(db, cloudPath(user.uid)), (current: unknown) =>
+      current === null && active() ? payload : undefined, { applyLocally: false });
+    if (!active()) throw new Error('The active account or workbook changed during upload.');
+    if (!result.committed) throw new Error('Cloud data was created before the upload completed. Local data was not uploaded.');
+    remoteWorkbookExists.current = true;
     setCloudEmpty(false);
     setStatus('Synced (uploaded local data)');
   };
