@@ -5,7 +5,7 @@ import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { DateValue } from '../../../components/DateValue';
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { selectedEntityValues } from '../../../components/EntityScopeMenu';
 import { PageFilterModal } from '../../../components/PageFilterModal';
@@ -31,7 +31,7 @@ import type { NetWorthAsOfInputs } from '../../../lib/calc/netWorthAsOf';
 import { UpcomingList } from '../../../components/UpcomingList';
 import { useUpcomingItems } from '../../../hooks/useUpcomingItems';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
-import { getDashboardReport, getCurrencyDashboardSummary, getBreakdownDelta, getMonthlyFlowItems as monthlyFlowItems, getNetWorthBreakdownForMonth as netWorthBreakdownForMonth, getCategoryGroupReport, getMonthlyNetFlow, getMonthlyPlanReport, getMonthlyStatCards, getModuleBreakdownChart, getClearedRangeActivities, getMoneyMovementReport, getMonthlyMovementReport, getClearedNativeMovements, type MovementActivity, type FlowDimension, type FlowPopulation, type MovementKind, getReportingMonths, getMonthlyIncomeExpense as monthlyIncomeExpense,
+import { getDashboardReport, getCurrencyDashboardSummary, getBreakdownDelta, getMonthlyFlowItems as monthlyFlowItems, getNetWorthBreakdownForMonth as netWorthBreakdownForMonth, getCategoryGroupReport, getMonthlyNetFlow, getMonthlyPlanReport, getMonthlyStatCards, getModuleBreakdownChart, getClearedRangeActivities, getMoneyMovementReport, getClearedMovementComparison, getMonthlyMovementReport, getClearedNativeMovements, type MovementActivity, type FlowDimension, type FlowPopulation, type MovementKind, getReportingMonths, getMonthlyIncomeExpense as monthlyIncomeExpense,
   getNetWorthTrend as projectedNetWorthTrend, getMonthEnd as endOfMonthAsOf } from '../../../services/finance/dashboardService';
 import { useDashboardContext, useDashboardActivities, useNativeMovementActivities } from '../../../hooks/useDashboard';
 import { useNetWorthInputs, useNetWorthSummary } from '../hooks/useNetWorthSummary';
@@ -1165,14 +1165,45 @@ function MoneyMovementSection({ selectedModules, from, to, today, setDrilldown }
   const [dimension,setDimension] = useState<FlowDimension>('category');
   const [population,setPopulation] = useState<FlowPopulation>('actual');
   const [kind,setKind] = useState<MovementKind | 'all'>('all');
+  const [comparePrior, setComparePrior] = useState(false);
   const activities = useNativeMovementActivities(selectedModules,{ fromDate: from, toDate: to });
   const report = getMoneyMovementReport(activities,from,to,today,dimension,population,kind);
   const monthly = getMonthlyMovementReport(activities,from,to,today,population,kind);
+  const comparison = population === 'actual' && comparePrior ? getClearedMovementComparison(activities, from, to, today, kind) : null;
   return <div className="money-movement-report">
     <p className="text-muted">{from} – {to}. Cash, Bank, Rentals, cards, recorded loan repayments, Funds and all exchange brokers. Investments and financing are separate from income/spending. Unclassified account records stay visible. Internal transfers are excluded from the combined view.</p>
     <div className="row mb-md"><Field label="Activity"><Select value={population} onChange={event => setPopulation(event.target.value as FlowPopulation)}><option value="actual">Cleared actual</option><option value="pending">Pending</option><option value="planned">Remaining plans</option></Select></Field>
       <Field label="Break down by"><Select value={dimension} onChange={event => setDimension(event.target.value as FlowDimension)}><option value="category">Category</option><option value="module">Module</option><option value="source">Account / source</option><option value="plan">Plan group</option><option value="kind">Movement kind</option></Select></Field>
       <Field label="Movement kind"><Select value={kind} onChange={event => setKind(event.target.value as MovementKind | 'all')}><option value="all">All except internal transfers</option><option value="operating">Income / spending</option><option value="financing">Financing</option><option value="investment">Investments</option><option value="unclassified">Unclassified movement</option><option value="transfer">Internal transfer legs</option></Select></Field></div>
+    {population === 'actual' && <label><input type="checkbox" checked={comparePrior} onChange={event => setComparePrior(event.target.checked)} /> Compare with the prior period</label>}
+    {comparison && <div className="table-scroll"><table>
+      <caption>Cleared movement, {comparison.current.from} to {comparison.current.to} compared with {comparison.prior.from} to {comparison.prior.to}</caption>
+      <thead><tr><th>Currency</th><th>Period</th><th>Money in</th><th>Money out</th><th>Net movement</th><th>Records</th></tr></thead>
+      <tbody>{comparison.rows.map(row => <Fragment key={row.currency}>
+        {(['current', 'prior'] as const).map(period => {
+          const amounts = row[period];
+          const range = comparison[period];
+          const label = period === 'current' ? 'Selected period' : 'Prior period';
+          return <tr key={period}>
+            <th scope="row">{row.currency}</th><td>{label}</td>
+            <td>{amounts ? fmtMoney(amounts.inflow, row.currency) : '—'}</td>
+            <td>{amounts ? fmtMoney(amounts.outflow, row.currency) : '—'}</td>
+            <td>{amounts ? fmtMoney(amounts.net, row.currency) : '—'}</td>
+            <td>{amounts ? <button className="btn secondary small" onClick={() => setDrilldown({
+              kind: 'flow', title: `${label} · ${row.currency}`, explanation: 'Cleared records for the selected movement kind.',
+              currency: row.currency, ...range, items: amounts.items,
+            })}>View {amounts.items.length} {label.toLowerCase()} records</button> : 'No activity'}</td>
+          </tr>;
+        })}
+        {row.netChange !== null && <tr>
+          <th scope="row">{row.currency}</th><td colSpan={3}>Net movement change</td>
+          <td>{fmtMoney(row.netChange, row.currency)}</td>
+          <td>{row.netChangePct === null ? '—' : `${row.netChangePct.toLocaleString(undefined, { maximumFractionDigits: 2, signDisplay: 'exceptZero' })}%`}</td>
+        </tr>}
+      </Fragment>)}
+      {!comparison.rows.length && <tr><td colSpan={6}>No cleared movement in either period.</td></tr>}</tbody>
+    </table></div>}
+    {population === 'actual' && comparePrior && !comparison && <p className="text-muted">No comparable prior period for these dates.</p>}
     {report.rows.map(row => <div key={row.currency} className="mb-md"><SummarySections><SummarySection title={row.currency + ' · ' + population}>
       <SummaryValue primary label="Net movement" value={fmtMoney(row.net,row.currency)} />
       <SummaryValue label="Money in" value={fmtMoney(row.inflow,row.currency)} tone="positive" />

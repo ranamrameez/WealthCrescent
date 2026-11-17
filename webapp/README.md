@@ -10114,6 +10114,8 @@ For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) first. **Lates
 
 ## Done
 
+- Net Worth’s cleared movement report can compare the selected dates with the immediately preceding equal-length period. Currency totals and contributing records remain separate.
+
 - Independent unlinked EMI receipts support dated full and partial reversals. The original receipt stays in history and the remaining balance reflects the reversal date. Linked funding reversals are pending.
 
 - Reviewed independent installment plans routed to same-currency credit cards can be fulfilled as linked charges and EMI receipts. Combined reports count the receipt once.

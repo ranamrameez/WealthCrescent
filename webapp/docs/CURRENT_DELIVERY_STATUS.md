@@ -41,7 +41,7 @@ Updated 2026-11-07. This is the concise status index; SESSION_HANDOFF.md records
 - Carry explicit EMI/subscription provenance into future actual completion records so classification can use source identity. Preserve unknown historical records.
 - Add standalone subscription/EMI schedule adapters with explicit estimate labels and explicit-ID/date deduplication against generated native plans/actuals. Never turn elapsed schedules into cleared payments.
 - Add dated investment trade-plan adapters with existing broker fee/order semantics; distinguish sketches, pending orders and settled trades.
-- Add prior-period/month comparisons with honest zero/missing baselines, partial-period bounds and supporting records.
+- The cleared movement report compares the selected period with an immediately preceding equal-length period and provides both sets of records. Dedicated calendar-month comparison presets remain open.
 - Finish all allocation drilldowns and source inclusion/empty/negative/FX/opening acceptance cases.
 
 ### 2. Unified currency-owned budgets

@@ -356,3 +356,38 @@ export function moneyMovementReport(activities: MovementActivity[], from: string
 export function clearedRangeActivities(activities: MovementActivity[], from: string, to: string, today: string) {
   return activities.filter(item => item.executed && !item.isPending && item.date >= from && item.date <= to && item.date <= today);
 }
+
+/** Compare the observed portion of the selected period with an immediately
+ * preceding window of the same calendar-day length. */
+export function precedingClearedMovementWindow(from: string, to: string, today: string) {
+  if (![from, to, today].every(value => isValidISODate(value))) return null;
+  const end = to < today ? to : today;
+  if (from > end) return null;
+  const days = Math.round((Date.parse(end) - Date.parse(from)) / 86_400_000) + 1;
+  const priorFrom = shiftISODate(from, -days);
+  const priorTo = shiftISODate(from, -1);
+  if (!isValidISODate(priorFrom) || !isValidISODate(priorTo)) return null;
+  return { current: { from, to: end }, prior: { from: priorFrom, to: priorTo } };
+}
+
+export function clearedMovementComparison(activities: MovementActivity[], from: string, to: string, today: string, kind: MovementKind | 'all') {
+  const window = precedingClearedMovementWindow(from, to, today);
+  if (!window) return null;
+  const report = (range: typeof window.current) => new Map(
+    moneyMovementReport(activities, range.from, range.to, today, 'kind', 'actual', {}, kind).rows.map(row => [row.currency, {
+      inflow: row.inflow, outflow: row.outflow, net: row.net, items: row.groups.flatMap(group => group.items),
+    }]),
+  );
+  const currentByCurrency = report(window.current);
+  const priorByCurrency = report(window.prior);
+  const currencies = [...new Set([...currentByCurrency.keys(), ...priorByCurrency.keys()])].sort();
+  return {
+    ...window,
+    rows: currencies.map(currency => {
+      const current = currentByCurrency.get(currency) ?? null;
+      const prior = priorByCurrency.get(currency) ?? null;
+      const netChange = current && prior ? current.net - prior.net : null;
+      return { currency, current, prior, netChange, netChangePct: netChange !== null && prior?.net ? netChange / Math.abs(prior.net) * 100 : null };
+    }),
+  };
+}

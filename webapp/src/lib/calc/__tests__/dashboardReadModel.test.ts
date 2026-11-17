@@ -123,3 +123,35 @@ it('historical analytics uses cleared actual records without plans, pending or f
   const data = [activity('actual',100,true),activity('plan',200,false),activity('pending',300,true,{isPending:true}),activity('future',400,true,{date:'2026-02-01'})];
   expect(engine.clearedRangeActivities(data,'2026-01-01','2026-02-28','2026-01-31').map(item=>item.id)).toEqual(['actual']);
 });
+
+describe('prior cleared movement comparison', () => {
+  it('aligns the prior window to the observed day count and crosses leap day', () => {
+    expect(engine.precedingClearedMovementWindow('2024-03-01', '2024-03-31', '2024-03-03')).toEqual({
+      current: { from: '2024-03-01', to: '2024-03-03' },
+      prior: { from: '2024-02-27', to: '2024-02-29' },
+    });
+    expect(engine.precedingClearedMovementWindow('2024-03-04', '2024-03-31', '2024-03-03')).toBeNull();
+    expect(engine.precedingClearedMovementWindow('2024-02-30', '2024-03-31', '2024-03-03')).toBeNull();
+    expect(engine.precedingClearedMovementWindow('0000-01-01', '0000-01-01', '0000-01-01')).toBeNull();
+  });
+
+  it('uses cleared supporting records and distinguishes a missing period from a zero net baseline', () => {
+    const input = [
+      activity('current', 120, true, { date: '2026-01-15' }),
+      activity('earlier-in', 60, true, { date: '2026-01-12' }),
+      activity('earlier-out', -60, true, { date: '2026-01-13' }),
+      activity('pending', 500, true, { date: '2026-01-15', isPending: true }),
+      activity('plan', 900, false, { date: '2026-01-15' }),
+      activity('other-currency', 200, true, { date: '2026-01-14', currencyCode: 'QAR' }),
+      activity('future', 700, true, { date: '2026-01-16' }),
+    ].map(row => ({ ...row, movementKind: 'operating' as const }));
+    const result = engine.clearedMovementComparison(input, '2026-01-14', '2026-01-17', '2026-01-15', 'operating');
+    expect(result?.rows).toEqual([
+      expect.objectContaining({ currency: 'QAR', current: expect.objectContaining({ net: 200 }), prior: null, netChange: null, netChangePct: null }),
+      expect.objectContaining({ currency: 'USD', current: expect.objectContaining({ net: 120 }), prior: expect.objectContaining({ net: 0 }), netChange: 120, netChangePct: null }),
+    ]);
+    const usd = result?.rows.find(row => row.currency === 'USD');
+    expect(usd?.current?.items.map(row => row.description)).toEqual(['current']);
+    expect(usd?.prior?.items.map(row => row.description)).toEqual(['earlier-in', 'earlier-out']);
+  });
+});

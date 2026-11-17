@@ -1,3 +1,7 @@
+## Prior cleared movement comparison
+
+Money in/out can compare the observed part of the selected range with the immediately preceding equal-length period. Both use the selected native sources and movement kind. Per-currency figures open their contributing cleared records. Missing observations display as blank amounts and a recorded zero baseline does not have a percentage change.
+
 ## Shared monthly movement population — 2026-11-06
 
 Source 6f8ed930c62885a89ef846838411a139d8a0fc09 passed Actions 439: 166 files / 1,261 tests, broker regressions, TypeScript checks and production build.
