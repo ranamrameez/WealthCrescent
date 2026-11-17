@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
-import { previewInstallmentImport, previewInstallmentWorkbook, applyInstallmentImport } from './installmentImportService';
+import { previewInstallmentImport, previewInstallmentWorkbook, applyInstallmentImport, previewInstallmentRestore, applyInstallmentRestore } from './installmentImportService';
 import { useEMIWorkbookStore } from '../../store/emiWorkbookStore';
 import { useInterEntityTransfersStore } from '../../store/interEntityTransfersStore';
 import { usePlannedCashWorkbookStore } from '../../store/plannedCashWorkbookStore';
@@ -57,4 +57,73 @@ it('rejects a preview from a different account with identical loan and payment d
 
   expect(() => applyInstallmentImport(preview, loan.name)).toThrow('signed-in account changed');
   expect(useEMIWorkbookStore.getState().workbook).toBe(before);
+});
+
+function importAndReviewRestore() {
+  const imported = applyInstallmentImport(previewInstallmentImport(loan, table, '1900', 'Fixture'), loan.name);
+  return previewInstallmentRestore(loan.id, imported.archiveId!);
+}
+
+it('restores a legacy receipt ledger, preserves current metadata and archives the displaced import', () => {
+  const original = useEMIWorkbookStore.getState().workbook;
+  const imported = importAndReviewRestore();
+  const store = useEMIWorkbookStore.getState();
+  store.updateEntry(loan.id, { name: 'Renamed property' });
+  const review = previewInstallmentRestore(loan.id, imported.archive.id);
+  expect(() => applyInstallmentRestore(review, loan.name)).toThrow('Type the loan name');
+  expect(applyInstallmentRestore(review, 'Renamed property').changed).toBe(true);
+  const restored = useEMIWorkbookStore.getState().workbook;
+  expect(restored.entries).toEqual([{ ...loan, name: 'Renamed property' }, original.entries[1]]);
+  expect(restored.repayments).toEqual(original.repayments);
+  expect(restored.reconciliationHistory?.[1].repayments).toEqual(imported.payments);
+  const retry = previewInstallmentRestore(loan.id, imported.archive.id);
+  expect(applyInstallmentRestore(retry, 'Renamed property').changed).toBe(false);
+});
+
+it('rejects stale and cross-account restore reviews', () => {
+  const preview = importAndReviewRestore();
+  session.uid = 'another-account';
+  expect(() => applyInstallmentRestore(preview, loan.name)).toThrow('signed-in account changed');
+  session.uid = 'fixture';
+  useEMIWorkbookStore.getState().updateRepayment(preview.payments[0].id, { description: 'Edited' });
+  const current = useEMIWorkbookStore.getState().workbook;
+  expect(() => applyInstallmentRestore(preview, loan.name)).toThrow('receipts or archive changed');
+  expect(useEMIWorkbookStore.getState().workbook).toBe(current);
+});
+
+it('blocks budget references to archived receipts and links added after review', () => {
+  const preview = importAndReviewRestore();
+  const plans = usePlannedCashWorkbookStore.getState();
+  const unallocated = plans.workbook;
+  const recordKey = CalculationEngine.budgets.budgetRecordKey({ module: 'emi', sourceId: loan.id, recordType: 'emi-repayment', id: 'old' });
+  plans.setWorkbook({ ...unallocated, budgetAllocations: [{ id: 'allocation', budgetId: 'budget', amount: 100, recordKey }] });
+  expect(() => applyInstallmentRestore(preview, loan.name)).toThrow('budget allocations');
+  plans.setWorkbook(unallocated);
+
+  const receipt = preview.payments[0];
+  useInterEntityTransfersStore.getState().addEntry({
+    id: 'link', date: receipt.date, from: { module: 'bank', ref: 'bank' },
+    to: { module: 'emi', ref: loan.id }, fromAmount: receipt.amount,
+    toAmount: receipt.amount, fromRecordId: 'bank-record', toRecordId: receipt.id,
+  });
+  expect(() => applyInstallmentRestore(preview, loan.name)).toThrow('linked receipts');
+});
+
+it('rolls back the entire workbook when archived contract validation fails', () => {
+  const preview = importAndReviewRestore();
+  const store = useEMIWorkbookStore.getState();
+  store.setWorkbook({
+    ...store.workbook,
+    reconciliationHistory: [{
+      ...preview.archive,
+      loan: {
+        ...preview.archive.loan,
+        contractSchedule: [{ id: 'invalid', dueDate: 'invalid', amount: 100, description: 'Invalid date' }],
+      },
+    }],
+  });
+  const before = useEMIWorkbookStore.getState().workbook;
+  const invalid = previewInstallmentRestore(loan.id, preview.archive.id);
+  expect(() => applyInstallmentRestore(invalid, loan.name)).toThrow(/date/i);
+  expect(useEMIWorkbookStore.getState().workbook).toEqual(before);
 });
