@@ -1,3 +1,4 @@
+import { QseDashboardQuickImport } from '../../qse/components/QseDashboardQuickImport';
 import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
@@ -516,7 +517,7 @@ export function NetWorthPage({
 
   return (
     <div className="standard-page">
-      <div className="page-heading"><h1>Dashboard</h1><span className="text-muted">Selected range: {rangeLabel}</span></div>
+      <div className="page-heading"><h1>Dashboard</h1><div className="row gap-sm"><span className="text-muted">Selected range: {rangeLabel}</span><QseDashboardQuickImport /></div></div>
       <StandardPageSections sections={[{ key: 'summary', label: 'Overall summary', defaultOpen: true, unframed: true, unframedHeader: true, content: <div className="grid-auto" style={{ ...gridAutoStyle(320, 16), marginBottom: 16, alignItems: 'start' }}>
         {preferredCurrencyOptions.map(({ code: preferredCurrency }) => {
           const sum = (values: Record<string, number>) => {

@@ -128,3 +128,16 @@ it('restores hidden sections from a deep link and opens exchange rates only from
   fireEvent.keyDown(document, { key: 'Escape' });
   expect(document.querySelector('.modal-box')).toBeNull();
 });
+
+it('opens the QSE statement picker from the dashboard and returns keyboard focus on Escape', () => {
+  show();
+  const shortcut = screen.getByRole('button', { name: 'Import QSE trades' });
+  shortcut.focus();
+  fireEvent.click(shortcut);
+  const dialog = screen.getByRole('dialog', { name: 'Import QSE trades' });
+  expect(within(dialog).getByLabelText('The Group statement (.xlsx or .csv)')).toBeTruthy();
+  expect(document.activeElement).toBe(dialog);
+  fireEvent.keyDown(document, { key: 'Escape' });
+  expect(screen.queryByRole('dialog', { name: 'Import QSE trades' })).toBeNull();
+  expect(document.activeElement).toBe(shortcut);
+});

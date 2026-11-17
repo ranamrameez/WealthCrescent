@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QseRecordActions, QseReorder } from '../QseTableActions';
 import { useWorkbookStore } from '../../../../store/workbookStore';
 import { createEmptyWorkbook } from '../../../../store/defaultWorkbook';
@@ -165,21 +165,23 @@ it('updates correction CSV IDs in place, adds one sale, and remains idempotent',
   fireEvent.change(input, { target: { files: [makeFile()] } });
   await waitFor(() => expect(useWorkbookStore.getState().workbook.transactions).toHaveLength(3));
 });
-it('warns about rounded Excel figures before import confirmation and lets the user cancel', async () => {
+it('reviews rounded Excel figures before importing selected trades and lets the user cancel', async () => {
   const { container } = show();
   const bytes = zipSync({ 'xl/worksheets/sheet1.xml': strToU8('<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row><c r="A1" t="inlineStr"><is><t>Date</t></is></c><c r="B1" t="inlineStr"><is><t>Type</t></is></c><c r="C1" t="inlineStr"><is><t>Count</t></is></c></row><row><c r="A2" t="inlineStr"><is><t>15/10/2026</t></is></c><c r="B2" t="inlineStr"><is><t>Buy</t></is></c><c r="C2"><v>1</v></c><c r="D2" t="inlineStr"><is><t>Qatar Fuel</t></is></c><c r="E2"><v>12.24</v></c></row></sheetData></worksheet>') });
   const file = new File([], 'statement.xlsx');
   Object.defineProperty(file, 'arrayBuffer', { value: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) });
   const input = container.querySelector('input[type=file]')!;
-  vi.mocked(confirmDialog).mockResolvedValueOnce(false);
   fireEvent.change(input, { target: { files: [file] } });
-  await waitFor(() => expect(confirmDialog).toHaveBeenCalledTimes(1));
-  expect(vi.mocked(confirmDialog).mock.calls[0]).toEqual([expect.stringContaining('incorrect balances'), 'Warning: rounded statement figures']);
+  const review = await screen.findByRole('dialog', { name: 'Review The Group trades' });
+  expect(within(review).getByText(/rounds cash amounts/)).toBeVisible();
+  expect(within(review).getByRole('button', { name: 'Import selected trades (0)' })).toBeDisabled();
+  fireEvent.click(within(review).getByRole('button', { name: 'Cancel' }));
   expect(useWorkbookStore.getState().workbook.transactions).toHaveLength(2);
-  vi.mocked(confirmDialog).mockClear().mockResolvedValue(true);
   fireEvent.change(input, { target: { files: [file] } });
-  await waitFor(() => expect(useWorkbookStore.getState().workbook.transactions).toHaveLength(3));
-  expect(vi.mocked(confirmDialog).mock.calls.map(call => call[1])).toEqual(['Warning: rounded statement figures', 'Import QSE transactions?']);
+  const reopened = await screen.findByRole('dialog', { name: 'Review The Group trades' });
+  fireEvent.click(within(reopened).getByRole('button', { name: 'Select all new trades' }));
+  fireEvent.click(within(reopened).getByRole('button', { name: 'Import selected trades (1)' }));
+  expect(useWorkbookStore.getState().workbook.transactions).toHaveLength(3);
 });
 it('imports statement sequence and price corrections while keeping precise rewards and repeated imports unchanged', async () => {
   const wb = createEmptyWorkbook();
@@ -209,4 +211,80 @@ it('imports statement sequence and price corrections while keeping precise rewar
   await waitFor(()=>expect(confirmDialog).toHaveBeenCalledTimes(1));
   await new Promise(resolve=>setTimeout(resolve,20));
   expect(useWorkbookStore.getState().workbook).toEqual(after);
+});
+
+it('lets the user compare and select matched and new trades, retaining existing IDs and fee overrides', async () => {
+  const { container } = show();
+  const file = new File([], 'review.csv');
+  Object.defineProperty(file, 'text', { value: async () => toCSV([
+    ['Date', 'Type', 'Count', 'Unit', 'Price', 'Amount'],
+    ['01/10/2026', 'Buy', 10, 'Qatar National Bank', 12.24, -122],
+    ['02/10/2026', 'Sell', 2, 'QNBK', 13.2, 26],
+    ['03/10/2026', 'Buy', 4, 'GWC', 8, -32],
+    ['03/10/2026', 'Buy', 4, 'Qatar German Med', 4, -16],
+  ]) });
+  fireEvent.change(container.querySelector('input[type=file]')!, { target: { files: [file] } });
+  const review = within(await screen.findByRole('dialog', { name: 'Review The Group trades' }));
+  const buy = within(review.getByRole('region', { name: /QNBK 2026-10-01/ }));
+  expect(buy.getByText('Existing')).toBeVisible();
+  expect(buy.getByText('Statement')).toBeVisible();
+  fireEvent.click(review.getByRole('button', { name: 'Use statement for all matches' }));
+  fireEvent.click(review.getByRole('button', { name: 'Keep all existing matches' }));
+  fireEvent.click(buy.getByRole('checkbox', { name: 'Use statement values for this match' }));
+  fireEvent.click(review.getByRole('button', { name: 'Select all new trades' }));
+  const skip = within(review.getByRole('region', { name: /GWCS 2026-10-03/ }));
+  fireEvent.click(skip.getByRole('checkbox'));
+  expect(useWorkbookStore.getState().workbook.transactions).toHaveLength(2);
+  fireEvent.click(review.getByRole('button', { name: 'Import selected trades (2)' }));
+  const rows = useWorkbookStore.getState().workbook.transactions;
+  expect(rows).toHaveLength(3);
+  expect(rows.find(row => row.id === 'buy')).toMatchObject({ price: 12.24, feeOverride: 3 });
+  expect(rows.find(row => row.id === 'sell')).toMatchObject({ price: 13 });
+  expect(rows[2]).toMatchObject({ ticker: 'QGMD' });
+});
+
+it('rejects an import if the broker ledger changes after review', async () => {
+  const { container } = show();
+  const file = new File([], 'review.csv');
+  Object.defineProperty(file, 'text', { value: async () => toCSV([
+    ['Date', 'Type', 'Count', 'Unit', 'Price', 'Amount'],
+    ['03/10/2026', 'Buy', 4, 'GWC', 8, -32],
+  ]) });
+  fireEvent.change(container.querySelector('input[type=file]')!, { target: { files: [file] } });
+  const review = within(await screen.findByRole('dialog', { name: 'Review The Group trades' }));
+  useWorkbookStore.getState().updateTransaction(0, { price: 11 });
+  fireEvent.click(review.getByRole('button', { name: 'Select all new trades' }));
+  fireEvent.click(review.getByRole('button', { name: 'Import selected trades (1)' }));
+  expect(review.getByRole('alert')).toHaveTextContent('broker or its ledger changed');
+  expect(useWorkbookStore.getState().workbook.transactions).toHaveLength(2);
+});
+
+it('inserts a selected same-day addition before its existing statement anchor without duplicating that anchor', async () => {
+  const workbook = createEmptyWorkbook();
+  workbook.transactions = [{ id: 'sell', date: '2026-10-02', ticker: 'GWCS', action: 'SELL', shares: 2, price: 9, accountingOrder: 1 }];
+  workbook.adjustments = [{ id: 'reward', date: '2026-10-02', amount: 0.34, note: 'Trading reward', accountingOrder: 2 }];
+  useWorkbookStore.setState({ workbook });
+  const { container } = show();
+  const file = new File([], 'review.csv');
+  Object.defineProperty(file, 'text', { value: async () => toCSV([
+    ['Date', 'Type', 'Count', 'Unit', 'Price', 'Amount'],
+    ['02/10/2026', 'Buy', 2, 'GWC', 8, -16],
+    ['02/10/2026', 'Sell', 2, 'GWCS', 9, 18],
+  ]) });
+  const input = container.querySelector('input[type=file]')!;
+  fireEvent.change(input, { target: { files: [file] } });
+  const dialog = within(await screen.findByRole('dialog', { name: 'Review The Group trades' }));
+  fireEvent.click(dialog.getByRole('button', { name: 'Select all new trades' }));
+  fireEvent.click(dialog.getByRole('button', { name: 'Import selected trades (1)' }));
+  const result = useWorkbookStore.getState().workbook;
+  expect(result.transactions).toHaveLength(2);
+  expect(result.transactions.find(row => row.action === 'BUY')?.accountingOrder).toBe(1);
+  expect(result.transactions.find(row => row.id === 'sell')?.accountingOrder).toBe(2);
+  expect(result.adjustments[0]).toMatchObject({ id: 'reward', amount: 0.34, accountingOrder: 3 });
+  fireEvent.change(input, { target: { files: [file] } });
+  const repeated = within(await screen.findByRole('dialog', { name: 'Review The Group trades' }));
+  expect(repeated.getByRole('button', { name: 'Select all new trades' })).toBeDisabled();
+  fireEvent.click(repeated.getByRole('button', { name: 'Use statement for all matches' }));
+  fireEvent.click(repeated.getByRole('button', { name: 'Import selected trades (2)' }));
+  expect(useWorkbookStore.getState().workbook).toBe(result);
 });

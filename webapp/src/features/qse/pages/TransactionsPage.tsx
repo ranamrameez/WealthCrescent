@@ -291,6 +291,7 @@ function groupKey(tx: Transaction, groupBy: GroupBy): string {
 }
 
 function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } = {}) {
+  const { tickerNames } = useQSEStockData();
   const pageFilters = useQseFilters();
   const [modifying, setModifying] = useState(false);
   const { workbook, calcFee, positions, closedTrades, realizedBySellTxId: sellPLById, sellReconciliationByTxId, lots } = useQSEDerived();
@@ -617,7 +618,7 @@ function TransactionList({ sectionProps }: { sectionProps?: SectionCardProps } =
   );
 
   return (
-    <QseRecordCard dateSort={dateSort} title="Trade list" editRequest={sourceEditRequest} sectionProps={sectionProps} kind="transactions" rows={sorted.map(row => row.tx)} modifying={modifying} onModify={() => setModifying(value => !value)} extraActions={[{ label: 'Export workbook backup', onClick: exportJSON }, { label: 'Clear all transaction data', tone: 'danger', onClick: clearAll }]}>
+    <QseRecordCard tickerNames={tickerNames} dateSort={dateSort} title="Trade list" editRequest={sourceEditRequest} sectionProps={sectionProps} kind="transactions" rows={sorted.map(row => row.tx)} modifying={modifying} onModify={() => setModifying(value => !value)} extraActions={[{ label: 'Export workbook backup', onClick: exportJSON }, { label: 'Clear all transaction data', tone: 'danger', onClick: clearAll }]}>
 
       <details open className="mb-md">
         <summary className="summary-heading">
@@ -955,7 +956,7 @@ function CashLedgerSection({ sectionProps }: { sectionProps?: SectionCardProps }
     else if (source.kind === 'dividend') { const index = state.workbook.dividends.findIndex(row => row.id === source.id); if (index >= 0) state.removeDividend(index); }
     else { const index = state.workbook.adjustments.findIndex(row => row.id === source.id); if (index >= 0) state.deleteAdjustment(index); }
   };
-  return <QseRecordCard dateSort={dateSort} title="Cash ledger" sectionProps={sectionProps} kind="ledger" rows={sources(filtered)} allRecords={sources(sorted)} modifying={modifying} onModify={() => setModifying(value => !value)} editRequest={editRequest} exportData={{ rows: exportRows(filtered), allRows: exportRows(sorted) }}>
+  return <QseRecordCard tickerNames={tickerNames} dateSort={dateSort} title="Cash ledger" sectionProps={sectionProps} kind="ledger" rows={sources(filtered)} allRecords={sources(sorted)} modifying={modifying} onModify={() => setModifying(value => !value)} editRequest={editRequest} exportData={{ rows: exportRows(filtered), allRows: exportRows(sorted) }}>
     <div className="table-scroll"><table className="cash-ledger-table">
       <thead><tr><th aria-label="Details" /><dateSort.Th rows={dateSortInput}>Date</dateSort.Th><th>Type</th><th>Count</th><th>Unit</th><th>Price</th><th>Amount</th><th>Balance</th>{modifying && <th>Actions</th>}</tr></thead>
       <tbody>{page.rows.map((event, index) => {

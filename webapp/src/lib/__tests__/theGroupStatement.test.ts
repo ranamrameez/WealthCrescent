@@ -76,3 +76,38 @@ it('matches same-day deposits by amount and keeps their precise stored gross and
  expect(parsed[1]).toMatchObject({id:'b',gross:200.23,fee:10.02});
  expect(parseTheGroupStatement(rows,parsed).records).toEqual(parsed);
 });
+
+it('resolves broker aliases, public ticker names and combined symbol/name labels', () => {
+  const table = [header,
+    ['17/11/2026', 'Buy', '5', ' GWC ', '1'],
+    ['17/11/2026', 'Buy', '5', 'Qatar German Med.', '2'],
+    ['17/11/2026', 'Buy', '5', 'Qatari German Co. for Medical Devices (QGMD)', '3'],
+    ['17/11/2026', 'Buy', '5', 'GWCS - Gulf Warehousing', '4'],
+    ['17/11/2026', 'Buy', '5', 'Example   Leasing, Co.', '5'],
+  ];
+  const result = parseTheGroupStatement(table, [], { tickerNames: { EXMP: 'Example Leasing Co' } });
+  expect(result.records.map(record => record.kind === 'trade' && record.ticker)).toEqual(['GWCS', 'QGMD', 'QGMD', 'GWCS', 'EXMP']);
+  expect(() => parseTheGroupStatement([header, ['17/11/2026', 'Buy', '5', 'Qatar German Med (GWCS)', '2']])).toThrow('Unknown statement stock');
+});
+
+it('distinguishes imported exact fills from additional identical fills in trade review', () => {
+  const existing = [{ kind: 'trade' as const, id: 'old', date: '2026-10-14', ticker: 'GWCS', action: 'BUY' as const, shares: 2, price: 1.8 }];
+  const fill = ['14/10/2026', 'Buy', '2', 'GWC', '1.8'];
+  const result = parseTheGroupStatement([header, fill, fill], existing, { reviewTrades: true });
+  expect(result.conflicts).toEqual({});
+  expect(result.records).toMatchObject([{ id: 'old', ticker: 'GWCS' }, { ticker: 'GWCS' }]);
+  expect(result.records[1].id).toBeUndefined();
+});
+
+it('exposes ambiguous prices beside independent additions during trade review', () => {
+  const existing = [{ kind: 'trade' as const, id: 'old', date: '2026-10-14', ticker: 'GWCS', action: 'BUY' as const, shares: 2, price: 1.8 }];
+  const result = parseTheGroupStatement([header,
+    ['14/10/2026', 'Buy', '2', 'GWC', '1.9'],
+    ['14/10/2026', 'Buy', '2', 'GWC', '2'],
+    ['14/10/2026', 'Buy', '2', 'Qatar German Med', '4'],
+    ['14/10/2026', 'SWIFT TR. FROM', '', '', '', '90'],
+  ], existing, { reviewTrades: true });
+  expect(Object.keys(result.conflicts)).toEqual(['0', '1']);
+  expect(result.records).toHaveLength(3);
+  expect(result.records[2]).toMatchObject({ ticker: 'QGMD' });
+});

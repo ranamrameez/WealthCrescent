@@ -1096,3 +1096,7 @@ Loading masks use small rounded stat placeholders and large 600px section cards 
 ## Stock broker profiles
 
 QSE and PSX portfolios are separated by broker profile. Each broker owns its own trades, cash transfers, adjustments, dividends, trade plans, settings and derived P/L. Select the broker profile before adding activity. A cash transfer linked to QSE or PSX must target the specific broker profile; its own currency and deposit-fee settings are used, not the parent exchange defaults. Market prices, price history and watchlists remain shared for the exchange. Archived profiles remain available as read-only history; deactivated profiles are hidden from normal activity and cannot be selected for new activity. Legacy PSX records are assigned to the default JS Zindigi/JS Zindagi profile during the versioned migration. Review your backup/export after migration before relying on the new profile separation.
+
+### Quick import from The Group
+
+Choose **Import QSE trades** on the main Dashboard or the QSE Dashboard. Open a statement, confirm the broker shown in the popup, and review the existing and statement values. Select individual trades or use the bulk selection controls, then choose **Import selected trades**.

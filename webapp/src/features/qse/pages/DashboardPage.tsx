@@ -1,3 +1,4 @@
+import { QseDashboardQuickImport } from '../components/QseDashboardQuickImport';
 import { RecordRow } from '../../../components/RecordRow';
 import { PageHeading } from '../../../components/PageHeading';
 import { InvestmentPlans } from '../../../components/InvestmentPlans';
@@ -372,7 +373,7 @@ export function DashboardPage() {
 
   return (
     <div className="standard-page">
-      <PageHeading back={<BackButton to="/net-worth">← Overview</BackButton>}><h1 className="pagetitle">Dashboard</h1></PageHeading>
+      <PageHeading back={<BackButton to="/net-worth">← Overview</BackButton>}><div className="row gap-sm"><h1 className="pagetitle">Dashboard</h1><QseDashboardQuickImport /></div></PageHeading>
 
       {/* Only the 9 stat cards genuinely identical regardless of cost-basis
           method live here, unified — Realized/Unrealized/Net P/L and
