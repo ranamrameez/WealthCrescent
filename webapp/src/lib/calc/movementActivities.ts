@@ -1,3 +1,4 @@
+import { emiRepaymentEffect } from '../../types/emiWorkbook';
 import { isCardFundedInstallmentLink } from '../../types/interEntityTransfer';
 import { collectBudgetActivities, type BudgetActivity, type BudgetOccurrenceWindow } from './budgetPlanner';
 import type { RecentActivityInputs } from './recentActivity';
@@ -70,7 +71,8 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
   for (const tx of native.emi.repayments) {
     const loan = emi.get(tx.loanId); if (!loan) continue;
     const common = { module: 'emi' as const, sourceId: loan.id, sourceLabel: loan.name, date: tx.date, currencyCode: loan.currencyCode, executed: true };
-    add({ ...common, id: tx.id, recordType: 'emi-repayment', amount: -tx.amount, description: tx.description || 'Loan installment', movementKind: 'financing', planGroupId: tx.planLink?.groupId, categoryId: tx.categoryID });
+    add({ ...common, id: tx.id, recordType: tx.reversesPaymentId ? 'emi-reversal' : 'emi-repayment',
+      amount: -emiRepaymentEffect(tx), description: tx.description || (tx.reversesPaymentId ? 'Loan installment reversal' : 'Loan installment'), movementKind: 'financing', planGroupId: tx.planLink?.groupId, categoryId: tx.categoryID });
     if (tx.fine) add({ ...common, id: tx.id + ':fine', recordType: 'emi-fine', amount: -tx.fine, description: 'Installment fine', category: 'Loan fines', movementKind: 'operating' });
   }
   const funds = new Map(native.funds.funds.map(fund => [fund.id,fund]));

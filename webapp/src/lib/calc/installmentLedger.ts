@@ -1,7 +1,14 @@
 import { validBatchDate } from '../dateValidation';
 
 export interface InstallmentObligation { id: string; dueDate: string; amount: number; currency: string; description: string; }
-export interface InstallmentPayment { id: string; date: string; amount: number; currency: string; }
+export interface InstallmentPayment {
+  id: string;
+  date: string;
+  amount: number;
+  currency: string;
+  /** Positive amount reversing all or part of the original dated payment. */
+  reversesPaymentId?: string;
+}
 export interface InstallmentAllocation { paymentId: string; obligationId: string; amount: number; }
 
 /** Fixed contractual totals only. Independent payments can span obligations;
@@ -18,27 +25,51 @@ export function reconcileInstallments(obligations: readonly InstallmentObligatio
       if (!validBatchDate('dueDate' in row ? row.dueDate : row.date)) throw new Error('Invalid ledger date.');
     }
   }
+  const originals = new Map(payments.filter(row => row.reversesPaymentId === undefined).map(row => [row.id, row]));
+  const remainingByPayment = new Map<string, number>();
+  const reversedAsOf = new Map<string, number>();
+  for (const reversal of payments) {
+    if (reversal.reversesPaymentId === undefined) continue;
+    const original = originals.get(reversal.reversesPaymentId);
+    if (!original || reversal.date < original.date || reversal.amount <= 0) {
+      throw new Error('A reversal needs a positive amount, an original payment, and a date on or after that payment.');
+    }
+    const remaining = (remainingByPayment.get(original.id) ?? original.amount) - reversal.amount;
+    if (remaining < -0.0000001) throw new Error('Reversals exceed the original payment.');
+    remainingByPayment.set(original.id, remaining);
+    if (reversal.date <= asOf) reversedAsOf.set(original.id, (reversedAsOf.get(original.id) ?? 0) + reversal.amount);
+  }
   const ordered = obligations.map((row, index) => ({ ...row, index, paid: 0 })).sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.index - b.index);
   const explicitKeys = new Set<string>();
   for (const allocation of explicit) {
     const key = JSON.stringify([allocation.paymentId, allocation.obligationId]);
     if (explicitKeys.has(key)) throw new Error('Duplicate payment allocation.');
     explicitKeys.add(key);
-    if (!payments.some(row => row.id === allocation.paymentId) || !ordered.some(row => row.id === allocation.obligationId)) throw new Error('Allocation refers to a missing payment or obligation.');
+    if (!originals.has(allocation.paymentId) || !ordered.some(row => row.id === allocation.obligationId)) throw new Error('Allocation refers to a missing payment or obligation.');
     if (!Number.isFinite(allocation.amount) || allocation.amount <= 0) throw new Error('Allocation amount must be positive.');
   }
   const eligible = payments.map((row, index) => ({ ...row, index })).filter(row => row.date <= asOf).sort((a, b) => a.date.localeCompare(b.date) || a.index - b.index);
   const allocations: { paymentId: string; obligationId: string; amount: number }[] = [];
   let unappliedCredit = 0;
-  for (const payment of eligible) {
-    let remaining = payment.amount;
+  const effectivePayments = eligible.filter(row => row.reversesPaymentId === undefined);
+  for (const payment of effectivePayments) {
+    const reversed = reversedAsOf.get(payment.id) ?? 0;
+    let remaining = Math.max(0, payment.amount - reversed);
     const manual = explicit.filter(row => row.paymentId === payment.id);
     if (manual.length) {
+      if (manual.reduce((sum, row) => sum + row.amount, 0) - payment.amount > 0.0000001) {
+        throw new Error('Allocation exceeds the payment or obligation remainder.');
+      }
+      // Reversals first reduce unapplied credit, then release reviewed splits
+      // in reverse allocation order. The stored manual splits stay auditable.
       for (const allocation of manual) {
         const obligation = ordered.find(row => row.id === allocation.obligationId)!;
-        if (allocation.amount - remaining > 0.0000001 || allocation.amount - (obligation.amount - obligation.paid) > 0.0000001) throw new Error('Allocation exceeds the payment or obligation remainder.');
-        remaining -= allocation.amount; obligation.paid += allocation.amount;
-        allocations.push({ ...allocation });
+        const amount = reversed > 0 ? Math.min(remaining, allocation.amount) : allocation.amount;
+        if (amount - (obligation.amount - obligation.paid) > 0.0000001) throw new Error('Allocation exceeds the payment or obligation remainder.');
+        if (amount <= 0) continue;
+        remaining -= amount;
+        obligation.paid += amount;
+        allocations.push({ ...allocation, amount });
       }
       unappliedCredit += Math.max(0, remaining);
       continue;
@@ -55,16 +86,19 @@ export function reconcileInstallments(obligations: readonly InstallmentObligatio
   }
   const rows = ordered.map(({ index: _index, ...row }) => ({ ...row, remaining: Math.max(0, row.amount - row.paid), status: row.paid >= row.amount ? 'paid' : row.paid > 0 ? 'partial' : row.dueDate <= asOf ? 'overdue' : 'scheduled' }));
   const contractualTotal = obligations.reduce((sum, row) => sum + row.amount, 0);
-  const actualPaid = eligible.reduce((sum, row) => sum + row.amount, 0);
+  const actualPaid = effectivePayments.reduce((sum, row) => sum + Math.max(0, row.amount - (reversedAsOf.get(row.id) ?? 0)), 0);
   if (!Number.isFinite(contractualTotal) || !Number.isFinite(actualPaid)) throw new Error('Ledger totals exceed supported numeric values.');
   const scheduledDue = obligations.filter(row => row.dueDate <= asOf).reduce((sum, row) => sum + row.amount, 0);
   const overdue = rows.filter(row => row.dueDate <= asOf).reduce((sum, row) => sum + row.remaining, 0);
   const advance = rows.filter(row => row.dueDate > asOf).reduce((sum, row) => sum + row.paid, 0) + unappliedCredit;
   let cumulativeScheduled = 0, cumulativePaid = 0;
+  const eventPriority = { obligation: 0, payment: 1, reversal: 2 };
   const events = [
     ...obligations.map((row, index) => ({ id: row.id, date: row.dueDate, description: row.description, kind: 'obligation' as const, amount: row.amount, index })),
-    ...payments.map((row, index) => ({ id: row.id, date: row.date, description: 'Payment', kind: 'payment' as const, amount: row.amount, index })),
-  ].sort((a, b) => a.date.localeCompare(b.date) || (a.kind === b.kind ? a.index - b.index : a.kind === 'obligation' ? -1 : 1)).map(event => {
+    ...payments.map((row, index) => row.reversesPaymentId === undefined
+      ? { id: row.id, date: row.date, description: 'Payment', kind: 'payment' as const, amount: row.amount, index }
+      : { id: row.id, date: row.date, description: 'Payment reversal', kind: 'reversal' as const, amount: -row.amount, index }),
+  ].sort((a, b) => a.date.localeCompare(b.date) || eventPriority[a.kind] - eventPriority[b.kind] || a.index - b.index).map(event => {
     if (event.kind === 'obligation') cumulativeScheduled += event.amount;
     else if (event.date <= asOf) cumulativePaid += event.amount;
     return { ...event, future: event.date > asOf, cumulativeScheduled, cumulativePaid, actualRemaining: Math.max(0, contractualTotal - cumulativePaid), scheduledRemaining: Math.max(0, contractualTotal - cumulativeScheduled), pending: cumulativeScheduled - cumulativePaid };
@@ -82,8 +116,8 @@ export function installmentMonthlySummary(report: ReturnType<typeof reconcileIns
     const month = `${Math.floor(index / 12).toString().padStart(4, '0')}-${String(index % 12 + 1).padStart(2, '0')}`;
     const future = month > report.asOf.slice(0, 7);
     const scheduled = report.events.filter(row => row.kind === 'obligation' && row.date.startsWith(month)).reduce((sum, row) => sum + row.amount, 0);
-    const actual = report.events.filter(row => row.kind === 'payment' && !row.future && row.date.startsWith(month)).reduce((sum, row) => sum + row.amount, 0);
-    const paidToDate = report.events.filter(row => row.kind === 'payment' && !row.future && row.date.slice(0, 7) <= month).reduce((sum, row) => sum + row.amount, 0);
+    const actual = report.events.filter(row => row.kind !== 'obligation' && !row.future && row.date.startsWith(month)).reduce((sum, row) => sum + row.amount, 0);
+    const paidToDate = report.events.filter(row => row.kind !== 'obligation' && !row.future && row.date.slice(0, 7) <= month).reduce((sum, row) => sum + row.amount, 0);
     const dueToDate = report.events.filter(row => row.kind === 'obligation' && row.date.slice(0, 7) <= month).reduce((sum, row) => sum + row.amount, 0);
     rows.push({ month, scheduled, actual: future ? null : actual, actualRemaining: future ? null : Math.max(0, report.contractualTotal - paidToDate), scheduledRemaining: Math.max(0, report.contractualTotal - dueToDate) });
   }

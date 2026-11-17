@@ -19,7 +19,7 @@ function linkedReceipts(payments: EMIRepayment[]) {
 }
 
 function budgetReferences(loanId: string, payments: EMIRepayment[]) {
-  const keys = new Set(payments.flatMap(row => [CalculationEngine.budgets.budgetRecordKey({ module: 'emi', sourceId: loanId, recordType: 'emi-repayment', id: row.id }), CalculationEngine.budgets.budgetRecordKey({ module: 'emi', sourceId: loanId, id: row.id }), CalculationEngine.budgets.budgetRecordKey({ module: 'emi', sourceId: loanId, recordType: 'emi-fine', id: row.id + ':fine' }), CalculationEngine.budgets.budgetRecordKey({ module: 'emi', sourceId: loanId, id: row.id + ':fine' })]));
+  const keys = new Set(payments.flatMap(row => [CalculationEngine.budgets.budgetRecordKey({ module: 'emi', sourceId: loanId, recordType: row.reversesPaymentId === undefined ? 'emi-repayment' : 'emi-reversal', id: row.id }), CalculationEngine.budgets.budgetRecordKey({ module: 'emi', sourceId: loanId, id: row.id }), CalculationEngine.budgets.budgetRecordKey({ module: 'emi', sourceId: loanId, recordType: 'emi-fine', id: row.id + ':fine' }), CalculationEngine.budgets.budgetRecordKey({ module: 'emi', sourceId: loanId, id: row.id + ':fine' })]));
   return usePlannedCashWorkbookStore.getState().workbook.budgetAllocations?.some(row => keys.has(row.recordKey)) ?? false;
 }
 
@@ -37,6 +37,7 @@ export function previewInstallmentImport(loan: EMILoan, table: string[][], dateS
   const current = useEMIWorkbookStore.getState().workbook.repayments.filter(row => row.loanId === loan.id);
   const payments: EMIRepayment[] = parsed.payments.map(row => ({ id: `emi-import:${encodeURIComponent(loan.id)}:${encodeURIComponent(row.id)}`, loanId: loan.id, date: row.date, amount: row.amount, fine: row.fine, month: 0, paymentOnly: true, description: row.description, source: 'statement-import', statementRef: `${sourceLabel}#${row.sourceRow}` }));
   const blocked = [...parsed.issues];
+  if (current.some(row => row.reversesPaymentId !== undefined)) blocked.push('Reconcile this ledger’s recorded reversals before replacing it with worksheet receipts.');
   const linked = linkedReceipts(current);
   if (linked.length) blocked.push(`${linked.length} existing linked receipt(s) require review through their Bank/Cash transaction workflow before replacement.`);
   if (!parsed.hasFineColumn && current.some(row => (row.fine ?? 0) !== 0)) blocked.push('Existing receipts contain separately recorded fines. Include an explicit Fine column and reconcile those charges before replacing history.');
@@ -75,7 +76,7 @@ export function applyInstallmentImport(preview: InstallmentImportPreview, confir
   if (!current || JSON.stringify(current) !== JSON.stringify(preview.loan) || JSON.stringify(payments) !== JSON.stringify(preview.existingPayments)) throw new Error('The loan or payments changed. Generate a fresh preview.');
   if (confirmation.trim() !== current.name) throw new Error('Type the loan name to confirm replacement.');
   if (current.repaymentMode !== 'fixedTotal') throw new Error('This import supports fixed-total installment agreements only.');
-  if (preview.blocked.length) throw new Error('Resolve the preview issues before applying.');
+  if (preview.blocked.length || payments.some(row => row.reversesPaymentId !== undefined)) throw new Error('Resolve the preview issues before applying.');
   if (budgetReferences(current.id, payments)) throw new Error('Receipt budget allocations changed. Generate a fresh preview.');
   if (!preview.hasFineColumn && payments.some(row => (row.fine ?? 0) !== 0)) throw new Error('Reconcile existing fines before replacing receipt history.');
   if (!preview.payments.length && payments.length) throw new Error('A schedule-only import cannot replace existing payment history. Choose the payment data or use the contract editor.');

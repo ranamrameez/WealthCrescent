@@ -1,3 +1,4 @@
+import { emiRepaymentEffect, isEmiReversalProtected } from '../../../types/emiWorkbook';
 import { SummaryGroupCard, SummaryValue } from '../../../components/SummaryGroupCard';
 import { InstallmentLedgerPanel } from '../components/InstallmentLedgerPanel';
 import { saveEmiLoan } from '../../../services/finance/emiCommandService';
@@ -920,6 +921,7 @@ function RepaymentLog({ loan, repayments }: { loan: EMILoan; repayments: EMIRepa
   const sorted = dateSort.rows(dateSortInput, { date: row => row.date, month: row => row.month });
   const { rows: pageRows, controls } = useTablePagination(sorted);
 
+  const allRepayments = useEMIWorkbookStore(state => state.workbook.repayments);
   const linkByRecordId = useMemo(() => {
     const map = new Map<string, (typeof links)[number]>();
     for (const l of links) {
@@ -936,7 +938,8 @@ function RepaymentLog({ loan, repayments }: { loan: EMILoan; repayments: EMIRepa
     if (!(await ensureSignedIn('Sign in to edit this loan\'s repayments.'))) return;
     const choice = await resolveLinkedEdit('emi', r.id);
     if (choice === 'cancel') return;
-    updateRepayment(r.id, { amount: editAmount });
+    try { updateRepayment(r.id, { amount: editAmount }); }
+    catch (error) { return toast(error instanceof Error ? error.message : 'Repayment could not be edited.'); }
     let msg = 'Repayment updated.';
     if (choice === 'both') {
       const result = propagateLinkedEdit('emi', r.id, { amount: editAmount });
@@ -959,17 +962,18 @@ function RepaymentLog({ loan, repayments }: { loan: EMILoan; repayments: EMIRepa
           <tbody>
             {pageRows.map((r) => {
               const link = linkByRecordId.get(r.id);
+              const reversalProtected = isEmiReversalProtected(r, allRepayments);
               const otherSide = link ? (link.from.module === 'emi' && link.fromRecordId === r.id ? link.to : link.from) : undefined;
               return (
-              <RecordRow onEdit={(!(editId === r.id)) ? () => { setEditId(r.id); setEditAmount(r.amount); } : undefined}    record={r}  onCancel={() => setEditId(null)} key={r.id}>
-                <td>#{r.month}</td>
+              <RecordRow onEdit={editId !== r.id && !reversalProtected ? () => { setEditId(r.id); setEditAmount(r.amount); } : undefined}    record={r}  onCancel={() => setEditId(null)} key={r.id}>
+                <td>{r.reversesPaymentId ? 'Reversal' : `#${r.month}`}</td>
                 <td>{r.date}{r.date > today() && <span className="pill-info">Future-dated · excluded from paid to date</span>}</td>
                 <td>
                   {editId === r.id ? (
                     <TextInput type="number" step="0.01" value={editAmount || ''} onChange={(e) => setEditAmount(Number(e.target.value))} className="w-100" />
                   ) : (
                     <>
-                      {fmtMoney(r.amount, loan.currencyCode)}
+                      {fmtMoney(emiRepaymentEffect(r), loan.currencyCode)}
                       {link && (
                         <Link to={linkTargetPath(otherSide!)} className="pill-info ml-6" title="Linked — go to the other side">
                           🔗 {sideLabel(link.from)} → {sideLabel(link.to)}
@@ -985,7 +989,7 @@ function RepaymentLog({ loan, repayments }: { loan: EMILoan; repayments: EMIRepa
                       <IconButton label="Save" icon={<SaveIcon size={13} />} align="right" onClick={() => saveEdit(r)} />
                       <IconButton label="Cancel" icon={<XIcon size={13} />} align="right" onClick={() => setEditId(null)} />
                     </div>
-                  ) : (
+                  ) : !reversalProtected && (
                     <div className="row" style={{ gap: 4 }}>
                       <IconButton label="Edit" icon={<EditIcon size={13} />} align="right" onClick={() => { setEditId(r.id); setEditAmount(r.amount); }} />
                       <IconButton label="Delete" icon={<TrashIcon size={13} />} align="right" onClick={() => confirmAndDeleteLinkable('emi', r.id, () => deleteRepayment(r.id))} />
@@ -1047,9 +1051,9 @@ function HomepagePlans({ loans, filters }: { loans: EMILoan[]; filters: Transact
 
 function HomepagePayments({ loans, filters }: { loans: EMILoan[]; filters: TransactionPageFilters }) {
   const repayments = useEMIWorkbookStore((state) => state.workbook.repayments);
-  if (filters.direction === 'in') return <p className="text-muted">No repayments match the page filters.</p>;
   return <div className="stack-lg">{loans.map((loan) => {
     const rows = repayments.filter((repayment) => repayment.loanId === loan.id
+      && (filters.direction === 'all' || (repayment.reversesPaymentId ? filters.direction === 'in' : filters.direction === 'out'))
       && (!filters.fromDate || repayment.date >= filters.fromDate)
       && (!filters.toDate || repayment.date <= filters.toDate)
       && (filters.source === 'all' || (repayment.source ?? 'manual') === filters.source));

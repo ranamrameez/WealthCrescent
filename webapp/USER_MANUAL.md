@@ -1173,3 +1173,7 @@ Open a loan’s **Contract & payments** section and choose **Receipt archive**. 
 ### Review trades from The Group statements
 
 From **QSE → Transactions → Trade list**, choose **Import The Group statement**. Verify the broker shown in the review. Compare existing and statement values on matched rows, and use the filter to find new trades or items that need manual review. Select individual trades, all new trades, or statement values for all matches. Unchecked matches retain their existing values. Click **Import selected trades** to apply the selection.
+
+### Reverse an installment receipt
+
+In **Contract & payments**, choose **Reverse payment** on an unlinked receipt. Enter the date and amount actually reversed by the lender. The app keeps the original receipt and records a separate reversal that reopens the loan balance from that date. The reversal covers the installment only. Linked receipts require coordinated corrections in their funding ledger.

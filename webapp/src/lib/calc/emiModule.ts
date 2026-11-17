@@ -1,3 +1,4 @@
+import { emiRepaymentEffect } from '../../types/emiWorkbook';
 import type { EMILoan, EMIRepayment } from '../../types/emiWorkbook';
 import { validBatchDate } from '../dateValidation';
 import { reconcileInstallments } from './installmentLedger';
@@ -500,7 +501,7 @@ export function emiRepaymentSummary(loan: EMILoan, repayments: readonly EMIRepay
   const scheduled = emiSummary(loan, new Date(`${asOf}T12:00:00Z`));
   const own = repayments.filter(payment => payment.loanId === loan.id);
   const recorded = own.filter(payment => payment.date <= asOf);
-  const recordedPaid = recorded.reduce((total, payment) => total + payment.amount, 0);
+  const recordedPaid = recorded.reduce((total, payment) => total + emiRepaymentEffect(payment), 0);
   const recordedFines = recorded.reduce((total, payment) => total + (payment.fine ?? 0), 0);
   const obligation = loan.totalToReturn ?? loan.principal;
   const fixed = loan.repaymentMode === 'fixedTotal';
@@ -509,6 +510,7 @@ export function emiRepaymentSummary(loan: EMILoan, repayments: readonly EMIRepay
   const paidMonths = new Set(recorded.map(payment => payment.month));
   const unpaidRows = scheduled.rows.filter(row => !paidMonths.has(row.month));
   const mismatches = own.filter(payment => {
+    if (payment.reversesPaymentId !== undefined) return false;
     const override = loan.installmentOverrides?.[payment.month];
     return override != null && Math.abs(override - payment.amount) > 0.005;
   }).map(payment => ({ id: payment.id, month: payment.month, recordedAmount: payment.amount, scheduledAmount: loan.installmentOverrides![payment.month] }));

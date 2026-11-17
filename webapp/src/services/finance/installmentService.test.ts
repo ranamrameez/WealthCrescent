@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
-import { saveInstallmentContract, saveInstallmentPayment, saveInstallmentAllocations } from './installmentService';
+import { saveInstallmentContract, saveInstallmentPayment, saveInstallmentAllocations, previewInstallmentReversal, saveInstallmentReversal } from './installmentService';
 import { useEMIWorkbookStore } from '../../store/emiWorkbookStore';
 import { useInterEntityTransfersStore } from '../../store/interEntityTransfersStore';
 import type { EMILoan } from '../../types/emiWorkbook';
@@ -9,13 +9,13 @@ import { useCreditCardWorkbookStore } from '../../store/creditCardWorkbookStore'
 import { usePlannedCreditCardWorkbookStore } from '../../store/plannedCreditCardWorkbookStore';
 import type { PlannedCreditCardTransaction } from '../../types/plannedCreditCard';
 import { fulfillManualPlan } from './manualPlanPaymentService';
-const session = vi.hoisted(() => ({ signedIn: true }));
-vi.mock('../../lib/firebase/client', () => ({ auth: { get currentUser() { return session.signedIn ? { uid: 'fixture' } : null; } }, db: null, firebaseReady: false }));
+const session = vi.hoisted(() => ({ signedIn: true, uid: 'fixture' }));
+vi.mock('../../lib/firebase/client', () => ({ auth: { get currentUser() { return session.signedIn ? { uid: session.uid } : null; } }, db: null, firebaseReady: false }));
 const original = useEMIWorkbookStore.getState().workbook;
 const links = useInterEntityTransfersStore.getState().workbook;
 const loan: EMILoan = { id: 'loan', name: 'Property', lender: 'Seller', currencyCode: 'PKR', principal: 1000, tenureMonths: 10, startDate: '2026-01-01', repaymentMode: 'fixedTotal', totalToReturn: 1000, installmentOverrides: { 1: 300 } };
 const contract = [{ id: 'booking', dueDate: '2026-01-01', amount: 200, description: 'Booking' }, { id: 'regular', dueDate: '2026-02-01', amount: 800, description: 'Remaining installments' }];
-beforeEach(() => { session.signedIn = true; useEMIWorkbookStore.getState().setWorkbook({ settings: { defaultCurrency: 'PKR' }, entries: [loan], repayments: [] }); useInterEntityTransfersStore.getState().setWorkbook({ ...links, entries: [] }); });
+beforeEach(() => { session.signedIn = true; session.uid = 'fixture'; useEMIWorkbookStore.getState().setWorkbook({ settings: { defaultCurrency: 'PKR' }, entries: [loan], repayments: [] }); useInterEntityTransfersStore.getState().setWorkbook({ ...links, entries: [] }); });
 afterEach(() => { useEMIWorkbookStore.getState().setWorkbook(original); useInterEntityTransfersStore.getState().setWorkbook(links); });
 it('adopts only a reviewed contract and preserves legacy payments and overrides', () => {
   const payment = { id: 'old', loanId: loan.id, month: 1, amount: 300, date: '2026-02-01' };
@@ -119,4 +119,37 @@ it('records an actual card charge and one installment receipt for a reviewed pla
     cardStore.setWorkbook(cardStore.workbook);
     planStore.setWorkbook(planStore.workbook);
   }
+});
+
+
+it('records a dated reversal without rewriting the original and rejects retries from a stale review', () => {
+  saveInstallmentContract(loan, contract);
+  const current = useEMIWorkbookStore.getState().workbook.entries[0];
+  const paid = saveInstallmentPayment(current, { date: '2026-02-01', amount: 150 });
+  const preview = previewInstallmentReversal(current, paid);
+  session.uid = 'other';
+  expect(() => saveInstallmentReversal(preview, { date: '2026-02-02', amount: 40 })).toThrow('account changed');
+  session.uid = 'fixture';
+  expect(() => saveInstallmentReversal(preview, { date: '2026-02-02', amount: 160 })).toThrow('exceed');
+  const reversal = saveInstallmentReversal(preview, { date: '2026-02-02', amount: 40 });
+  const workbook = useEMIWorkbookStore.getState().workbook;
+  expect(workbook.repayments).toEqual([paid, reversal]);
+  expect(reversal).toMatchObject({ amount: 40, reversesPaymentId: paid.id });
+  expect(() => saveInstallmentReversal(preview, { date: '2026-02-02', amount: 40 })).toThrow('history changed');
+  expect(() => useEMIWorkbookStore.getState().deleteRepayment(paid.id)).toThrow('cannot be deleted');
+  expect(() => saveInstallmentPayment(current, { id: paid.id, date: paid.date, amount: 120 }, paid)).toThrow('cannot be edited');
+  expect(previewInstallmentReversal(current, paid).remaining).toBe(110);
+});
+
+it('requires a coordinated workflow when a receipt has a funding link', () => {
+  saveInstallmentContract(loan, contract);
+  const current = useEMIWorkbookStore.getState().workbook.entries[0];
+  const paid = saveInstallmentPayment(current, { date: '2026-02-01', amount: 150 });
+  const preview = previewInstallmentReversal(current, paid);
+  useInterEntityTransfersStore.getState().addEntry({
+    id: 'existing', from: { module: 'cash' }, to: { module: 'emi', ref: loan.id },
+    fromRecordId: 'cash', toRecordId: paid.id, fromAmount: paid.amount, toAmount: paid.amount, date: paid.date,
+  });
+  expect(() => saveInstallmentReversal(preview, { date: '2026-02-02', amount: 40 })).toThrow('coordinated reversal');
+  expect(useEMIWorkbookStore.getState().workbook.repayments).toEqual([paid]);
 });

@@ -102,6 +102,8 @@ export interface EMILoan {
  * repayment exists per loan per month, so there's no same-day-ordering
  * scenario a time would resolve. */
 export interface EMIRepayment {
+  /** A separate dated reversal of all or part of an independent receipt. */
+  reversesPaymentId?: string;
   planLink?: import('./planLink').PlanLink;
   categoryID?: string;
   /** Independent payments have no schedule-month meaning (legacy month = 0). */
@@ -125,6 +127,14 @@ export interface EMIRepayment {
    * `emiSchedule()`'s balance/interest calculation. Purely a display/
    * record-keeping figure alongside the real installment. */
   fine?: number;
+}
+
+export function emiRepaymentEffect(payment: EMIRepayment): number {
+  return payment.reversesPaymentId === undefined ? payment.amount : -payment.amount;
+}
+
+export function isEmiReversalProtected(payment: EMIRepayment, repayments: readonly EMIRepayment[]): boolean {
+  return payment.reversesPaymentId !== undefined || repayments.some(row => row.reversesPaymentId === payment.id);
 }
 
 export interface EMISettings {

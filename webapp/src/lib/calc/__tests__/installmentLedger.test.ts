@@ -40,3 +40,42 @@ it('shows arrears and rejects ambiguous identities, reversals and mixed currenci
   expect(() => reconcileInstallments(obligations, [{ id: 'x', date: '2026-01-01', amount: -1, currency: 'PKR' }], 'PKR', '2026-02-20')).toThrow('Reversals');
   expect(() => reconcileInstallments(obligations, [], 'USD', '2026-02-20')).toThrow('Currencies');
 });
+
+it('keeps original payment history and reopens fixed-total obligations on a dated partial reversal', () => {
+  const original = { id: 'payment', date: '2026-01-15', amount: 150, currency: 'PKR' };
+  const reversal = { id: 'reversal', date: '2026-02-16', amount: 75, currency: 'PKR', reversesPaymentId: original.id };
+  const before = reconcileInstallments(obligations, [original, reversal], 'PKR', '2026-02-15');
+  const after = reconcileInstallments(obligations, [original, reversal], 'PKR', '2026-02-16');
+  expect(before.actualPaid).toBe(150);
+  expect(after.actualPaid).toBe(75);
+  expect(after.rows.map(row => row.paid)).toEqual([75, 0, 0]);
+  expect(after.events.filter(row => row.kind !== 'obligation').map(row => [row.kind, row.amount])).toEqual([['payment', 150], ['reversal', -75]]);
+  const months = installmentMonthlySummary(after).rows;
+  expect(months.find(row => row.month === '2026-01')?.actual).toBe(150);
+  expect(months.find(row => row.month === '2026-02')?.actual).toBe(-75);
+});
+
+it('releases unapplied credit before releasing reviewed payment splits on reversal', () => {
+  const original = { id: 'payment', date: '2026-01-15', amount: 150, currency: 'PKR' };
+  const reversals = [
+    { id: 'partial', date: '2026-02-15', amount: 30, currency: 'PKR', reversesPaymentId: original.id },
+    { id: 'more', date: '2026-02-16', amount: 30, currency: 'PKR', reversesPaymentId: original.id },
+  ];
+  const splits = [{ paymentId: original.id, obligationId: 'due-1', amount: 50 }, { paymentId: original.id, obligationId: 'due-3', amount: 50 }];
+  const first = reconcileInstallments(obligations, [original, ...reversals], 'PKR', '2026-02-15', splits);
+  const second = reconcileInstallments(obligations, [original, ...reversals], 'PKR', '2026-02-16', splits);
+  expect(first.unappliedCredit).toBe(20);
+  expect(first.allocations).toEqual(splits);
+  expect(second.unappliedCredit).toBe(0);
+  expect(second.allocations).toEqual([splits[0], { ...splits[1], amount: 40 }]);
+});
+
+it('rejects overlapping reversal amounts, missing originals, reversal chains and backdating', () => {
+  const original = { id: 'payment', date: '2026-01-15', amount: 100, currency: 'PKR' };
+  const reversal = { id: 'refund', date: '2026-02-15', amount: 60, currency: 'PKR', reversesPaymentId: original.id };
+  const report = (payments: Parameters<typeof reconcileInstallments>[1]) => reconcileInstallments(obligations, payments, 'PKR', '2026-02-20');
+  expect(() => report([original, reversal, { ...reversal, id: 'duplicate' }])).toThrow('exceed');
+  expect(() => report([reversal])).toThrow('original payment');
+  expect(() => report([original, { ...reversal, date: '2026-01-14' }])).toThrow('on or after');
+  expect(() => report([original, reversal, { ...reversal, id: 'chain', reversesPaymentId: reversal.id }])).toThrow('original payment');
+});

@@ -10114,6 +10114,8 @@ For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) first. **Lates
 
 ## Done
 
+- Independent unlinked EMI receipts support dated full and partial reversals. The original receipt stays in history and the remaining balance reflects the reversal date. Linked funding reversals are pending.
+
 - Reviewed independent installment plans routed to same-currency credit cards can be fulfilled as linked charges and EMI receipts. Combined reports count the receipt once.
 
 - QSE Trade list reviews The Group statement matches and new trades in paired cards before applying a selection. Known symbols, company names and broker aliases resolve to the canonical QSE ticker.

@@ -60,3 +60,16 @@ it('reviews and restores only the selected loan archive through the ledger', asy
   expect(useEMIWorkbookStore.getState().workbook.repayments).toEqual([archived]);
   expect(useEMIWorkbookStore.getState().workbook.reconciliationHistory?.at(-1)?.repayments).toEqual([imported]);
 });
+
+it('records a reversal from the receipt list and refreshes the remaining balance', async () => {
+  const loan = { id: 'fixture', name: 'Property', lender: 'Seller', currencyCode: 'PKR', principal: 1000, totalToReturn: 1000, tenureMonths: 1, startDate: '2026-01-01', repaymentMode: 'fixedTotal' as const, balanceTracking: 'recorded' as const };
+  const paid = { id: 'receipt', loanId: loan.id, month: 0, paymentOnly: true, amount: 180, date: '2026-02-01' };
+  useEMIWorkbookStore.getState().setWorkbook({ settings: { defaultCurrency: 'PKR' }, entries: [{ ...loan, contractSchedule: [{ id: 'one', dueDate: '2026-02-01', amount: 1000, description: 'Contract' }] }], repayments: [paid] });
+  render(<InstallmentLedgerPanel loanId={loan.id} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Reverse payment' }));
+  fireEvent.change(await screen.findByLabelText('Reversal amount (PKR)'), { target: { value: '80' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Record reversal' }));
+  expect(useEMIWorkbookStore.getState().workbook.repayments).toEqual([paid, expect.objectContaining({ amount: 80, reversesPaymentId: paid.id })]);
+  expect(screen.getAllByText('900.00 PKR').length).toBeGreaterThan(0);
+  expect(screen.queryByRole('button', { name: 'Edit payment' })).toBeNull();
+});

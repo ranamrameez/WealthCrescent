@@ -1,3 +1,4 @@
+import { emiRepaymentEffect } from '../../types/emiWorkbook';
 import type { Transaction, Transfer, Adjustment, Dividend } from '../../types/workbook';
 import type { BankWorkbook } from '../../types/bankWorkbook';
 import type { CashEntry } from '../../types/cashWorkbook';
@@ -118,8 +119,9 @@ export function recentTransactions(input: RecentActivityInputs): RecentTransacti
       if (!loan) return;
       add({
         id: `emi-repayment:${repayment.id}`, date: repayment.date, module: `EMI/Loans · ${loan.name}`,
-        description: repayment.description || `Installment ${repayment.month}`, currency: loan.currencyCode,
-        amount: -(repayment.amount + (repayment.fine ?? 0)), amountBasis: 'Installment and fine paid', href: '/emi-loans',
+        description: repayment.description || (repayment.reversesPaymentId ? 'Installment reversal' : `Installment ${repayment.month}`), currency: loan.currencyCode,
+        amount: -emiRepaymentEffect(repayment) - (repayment.fine ?? 0),
+        amountBasis: repayment.reversesPaymentId ? 'Installment reversed' : 'Installment and fine paid', href: '/emi-loans',
       });
     });
 

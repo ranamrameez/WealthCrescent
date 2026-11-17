@@ -3,7 +3,7 @@ import { auth } from '../../lib/firebase/client';
 import { todayISODate } from '../../lib/datetime';
 import { CalculationEngine } from '../../lib/calc/CalculationEngine';
 import { useEMIWorkbookStore } from '../../store/emiWorkbookStore';
-import type { EMILoan, EMIRepayment } from '../../types/emiWorkbook';
+import { isEmiReversalProtected, type EMILoan, type EMIRepayment } from '../../types/emiWorkbook';
 import { useInterEntityTransfersStore } from '../../store/interEntityTransfersStore';
 import { usePlannedBankWorkbookStore } from '../../store/plannedBankWorkbookStore';
 import { usePlannedCashWorkbookStore } from '../../store/plannedCashWorkbookStore';
@@ -72,6 +72,7 @@ export function saveInstallmentPayment(expected: EMILoan, input: { id?: string; 
   if (!expected.contractSchedule) throw new Error('Review and save a contract schedule first.');
   const existing = input.id ? store.workbook.repayments.find(row => row.id === input.id && row.loanId === expected.id) : undefined;
   if (input.id && (!existing || !original || JSON.stringify(existing) !== JSON.stringify(original))) throw new Error('This payment changed. Reopen its editor.');
+  if (existing && isEmiReversalProtected(existing, store.workbook.repayments)) throw new Error('Receipts with reversal history cannot be edited in place.');
   if (existing && useInterEntityTransfersStore.getState().workbook.entries.some(link => (link.from.module === 'emi' && link.fromRecordId === existing.id) || (link.to.module === 'emi' && link.toRecordId === existing.id))) throw new Error('Edit this linked payment through its linked transaction workflow to keep both ledgers consistent.');
   if (!(input.amount > 0)) throw new Error('Payment must be positive.');
   CalculationEngine.installmentLedger.reconcileInstallments([], [{ id: input.id ?? 'new', date: input.date, amount: input.amount, currency: expected.currencyCode }], expected.currencyCode, todayISODate());
@@ -83,10 +84,61 @@ export function saveInstallmentPayment(expected: EMILoan, input: { id?: string; 
   } catch (error) { store.setWorkbook(before); throw error; }
   return record;
 }
+export function previewInstallmentReversal(expected: EMILoan, original: EMIRepayment) {
+  const { store } = reviewedLoan(expected);
+  const reviewedUid = auth?.currentUser?.uid;
+  if (!reviewedUid) throw new Error('Sign in to review the reversal.');
+  if (!expected.contractSchedule?.length) throw new Error('Review a contract before reversing a payment.');
+  const own = store.workbook.repayments.filter(row => row.loanId === expected.id);
+  const current = own.find(row => row.id === original.id);
+  if (!current || JSON.stringify(current) !== JSON.stringify(original)) throw new Error('The original receipt changed. Review it again.');
+  if (current.reversesPaymentId !== undefined) throw new Error('Review the original payment before recording a reversal.');
+  if (current.planLink || useInterEntityTransfersStore.getState().workbook.entries.some(link =>
+    (link.from.module === 'emi' && link.fromRecordId === current.id) || (link.to.module === 'emi' && link.toRecordId === current.id))) {
+    throw new Error('A linked payment needs a coordinated reversal with its funding ledger.');
+  }
+  const reversed = own.filter(row => row.reversesPaymentId === current.id);
+  const remaining = current.amount - reversed.reduce((sum, row) => sum + row.amount, 0);
+  if (remaining <= 0.0000001) throw new Error('This payment has already been reversed in full.');
+  return structuredClone({ expected, original: current, reviewedUid, reversed, remaining });
+}
+
+export function saveInstallmentReversal(preview: ReturnType<typeof previewInstallmentReversal>, input: { date: string; amount: number; description?: string }) {
+  const { expected, original } = preview;
+  if (auth?.currentUser?.uid !== preview.reviewedUid) throw new Error('The signed-in account changed. Review the receipt again.');
+  const current = previewInstallmentReversal(expected, original);
+  if (JSON.stringify(current.reversed) !== JSON.stringify(preview.reversed)) throw new Error('The reversal history changed. Review the receipt again.');
+  const store = useEMIWorkbookStore.getState();
+  const before = store.workbook;
+  const own = before.repayments.filter(row => row.loanId === expected.id);
+  const contract = expected.contractSchedule!;
+  const asOf = todayISODate();
+  if (input.date > asOf) throw new Error('A recorded reversal date cannot be in the future.');
+  const reversal: EMIRepayment = {
+    id: crypto.randomUUID(), loanId: expected.id, date: input.date, amount: input.amount, month: 0,
+    paymentOnly: true, reversesPaymentId: original.id, description: input.description?.trim() || 'Payment reversal', source: 'manual',
+  };
+  CalculationEngine.installmentLedger.reconcileInstallments(
+    contract.map(row => ({ ...row, currency: expected.currencyCode })),
+    [...own, reversal].map(row => ({ ...row, currency: expected.currencyCode })),
+    expected.currencyCode, asOf, expected.paymentAllocations,
+  );
+  try {
+    store.addRepayment(reversal);
+    saveInstallmentContract(expected, contract);
+  } catch (error) {
+    store.setWorkbook(before);
+    throw error;
+  }
+  return reversal;
+}
+
 export function saveInstallmentAllocations(expected: EMILoan, paymentId: string, allocations: { obligationId: string; amount: number }[]) {
   const { store } = reviewedLoan(expected);
   if (!expected.contractSchedule) throw new Error('Review a contract first.');
-  if (!store.workbook.repayments.some(row => row.id === paymentId && row.loanId === expected.id)) throw new Error('Payment no longer exists.');
+  const payment = store.workbook.repayments.find(row => row.id === paymentId && row.loanId === expected.id);
+  if (!payment) throw new Error('Payment no longer exists.');
+  if (isEmiReversalProtected(payment, store.workbook.repayments)) throw new Error('Receipts with reversal history retain their reviewed allocations.');
   const next = [...(expected.paymentAllocations ?? []).filter(row => row.paymentId !== paymentId), ...allocations.map(row => ({ ...row, paymentId }))];
   saveInstallmentContract(expected, expected.contractSchedule, next);
 }
@@ -106,6 +158,7 @@ export function setInstallmentPayingAccount(expected: EMILoan, accountId: string
 export function useInstallmentReport(loanId: string) {
   const workbook = useEMIWorkbookStore(state => state.workbook);
   const accounts = useBankWorkbookStore(state => state.workbook.settings.accounts);
+  const links = useInterEntityTransfersStore(state => state.workbook.entries);
   const asOf = todayISODate();
   return useMemo(() => {
     const loan = workbook.entries.find(row => row.id === loanId);
@@ -117,6 +170,16 @@ export function useInstallmentReport(loanId: string) {
       .filter(row => row.loanId === loanId)
       .map(({ id, sourceLabel, createdAt }) => ({ id, sourceLabel, createdAt }))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    return { loan, payments, suggested, asOf, report, archives, monthly: report ? CalculationEngine.installmentLedger.installmentMonthlySummary(report) : null, fundingOptions: accounts.filter(row => row.currencyCode === loan.currencyCode && row.isActive !== false && !row.migratedToCreditCardId).map(row => ({ value: row.id, label: row.name })) };
-  }, [workbook, accounts, loanId, asOf]);
+    const linkedPaymentIds = new Set(links.flatMap(link => [
+      ...(link.from.module === 'emi' ? [link.fromRecordId] : []),
+      ...(link.to.module === 'emi' ? [link.toRecordId] : []),
+    ]));
+    const remainingByPayment = new Map(payments.filter(row => row.reversesPaymentId === undefined).map(row => [row.id, row.amount]));
+    for (const row of payments) if (row.reversesPaymentId) {
+      remainingByPayment.set(row.reversesPaymentId, (remainingByPayment.get(row.reversesPaymentId) ?? 0) - row.amount);
+    }
+    const reversible = new Set(payments.filter(row => !row.planLink && !linkedPaymentIds.has(row.id) && row.date <= asOf &&
+      (remainingByPayment.get(row.id) ?? 0) > 0.0000001).map(row => row.id));
+    return { loan, payments, suggested, asOf, report, archives, linkedPaymentIds, reversible, monthly: report ? CalculationEngine.installmentLedger.installmentMonthlySummary(report) : null, fundingOptions: accounts.filter(row => row.currencyCode === loan.currencyCode && row.isActive !== false && !row.migratedToCreditCardId).map(row => ({ value: row.id, label: row.name })) };
+  }, [workbook, accounts, links, loanId, asOf]);
 }
