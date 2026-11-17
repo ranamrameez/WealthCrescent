@@ -5,12 +5,12 @@ import { useInterEntityTransfersStore } from '../../store/interEntityTransfersSt
 import { usePlannedCashWorkbookStore } from '../../store/plannedCashWorkbookStore';
 import { CalculationEngine } from '../../lib/calc/CalculationEngine';
 import type { EMILoan } from '../../types/emiWorkbook';
-const session = vi.hoisted(() => ({ signedIn: true }));
-vi.mock('../../lib/firebase/client', () => ({ auth: { get currentUser() { return session.signedIn ? { uid: 'fixture' } : null; } }, db: null, firebaseReady: false }));
+const session = vi.hoisted(() => ({ signedIn: true, uid: 'fixture' }));
+vi.mock('../../lib/firebase/client', () => ({ auth: { get currentUser() { return session.signedIn ? { uid: session.uid } : null; } }, db: null, firebaseReady: false }));
 const originals = [useEMIWorkbookStore.getState().workbook, useInterEntityTransfersStore.getState().workbook, usePlannedCashWorkbookStore.getState().workbook] as const;
 const loan: EMILoan = { id: 'import-loan', name: 'Property', lender: 'Seller', principal: 1000, totalToReturn: 1000, tenureMonths: 10, startDate: '2024-01-01', currencyCode: 'PKR', repaymentMode: 'fixedTotal' };
 const table = [['Payment Desc', 'Due Month', 'Scheduled Amount', 'Payment Date', 'Paid Installment', 'Total Amount', 'Total Paid'], ['Booking', '2024-03-23', '200', '2024-03-23', '200', '1000', '550'], ['Regular', '2024-04-10', '100', '', '0'], ['Major', '2024-04-10', '700', '2024-06-04', '350']];
-beforeEach(() => { session.signedIn = true; useEMIWorkbookStore.getState().setWorkbook({ settings: { defaultCurrency: 'PKR' }, entries: [loan, { ...loan, id: 'other' }], repayments: [{ id: 'old', loanId: loan.id, month: 1, date: '2024-02-01', amount: 100 }] }); useInterEntityTransfersStore.getState().setWorkbook({ settings: {}, entries: [] }); usePlannedCashWorkbookStore.getState().setWorkbook({ ...originals[2], budgetAllocations: [], entries: [] }); });
+beforeEach(() => { session.signedIn = true; session.uid = 'fixture'; useEMIWorkbookStore.getState().setWorkbook({ settings: { defaultCurrency: 'PKR' }, entries: [loan, { ...loan, id: 'other' }], repayments: [{ id: 'old', loanId: loan.id, month: 1, date: '2024-02-01', amount: 100 }] }); useInterEntityTransfersStore.getState().setWorkbook({ settings: {}, entries: [] }); usePlannedCashWorkbookStore.getState().setWorkbook({ ...originals[2], budgetAllocations: [], entries: [] }); });
 afterEach(() => { useEMIWorkbookStore.getState().setWorkbook(originals[0]); useInterEntityTransfersStore.getState().setWorkbook(originals[1]); usePlannedCashWorkbookStore.getState().setWorkbook(originals[2]); });
 it('previews without writing, archives originals on explicit replacement and preserves other loans', () => {
   const before = useEMIWorkbookStore.getState().workbook;
@@ -49,4 +49,12 @@ it('shows conflicting worksheet dates without guessing or merging receipts', () 
   const preview = previewInstallmentWorkbook(loan, workbook, 0, 'Fixture');
   expect(preview.report.actualRemaining).toBe(450); expect(preview.differences.join(' ')).toContain('2099-06-04');
   expect(preview.payments[1].date).toBe('2024-06-04');
+});
+it('rejects a preview from a different account with identical loan and payment data', () => {
+  const before = useEMIWorkbookStore.getState().workbook;
+  const preview = previewInstallmentImport(loan, table, '1900', 'Fixture');
+  session.uid = 'another-account';
+
+  expect(() => applyInstallmentImport(preview, loan.name)).toThrow('signed-in account changed');
+  expect(useEMIWorkbookStore.getState().workbook).toBe(before);
 });

@@ -1,3 +1,7 @@
+## PR #51 review triage — 2026-11-17
+
+Actions 448 passed on the published workbook-import checkpoint 4f367f8a. The PR had no submitted reviews or inline threads. The import command now rejects a reviewed preview from another account even when both workbooks have identical loan and receipt data. Continue guarded archive recovery and the remaining acceptance in docs/CURRENT_DELIVERY_STATUS.md before merging.
+
 ## Independent EMI continuation — 2026-11-07
 
 Reconciliation checkpoint validated: installment-import-ui-tests.log passed 7 files / 27 tests; installment-import-final-build.log passed both TypeScript projects/Vite. Browser read the actual workbook locally, verified the chosen-source preview and three date differences, then Cancelled without applying. Publish this checkpoint and verify its exact-head CI; continue archive recovery, remaining EMI cases and all global pending scope. Private source/proof files stay uncommitted.

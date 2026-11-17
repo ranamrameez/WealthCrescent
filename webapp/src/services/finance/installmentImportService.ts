@@ -35,7 +35,7 @@ export function previewInstallmentImport(loan: EMILoan, table: string[][], dateS
   if (budgetReferences(loan.id, current)) blocked.push('Existing receipt budget allocations need reassignment before replacing their native IDs.');
   const report = CalculationEngine.installmentLedger.reconcileInstallments(obligations.map(row => ({ ...row, currency: loan.currencyCode })), payments.map(row => ({ ...row, currency: loan.currencyCode })), loan.currencyCode, todayISODate());
   const currentSummary = CalculationEngine.emi.emiRepaymentSummary(loan, current, todayISODate());
-  return { sourceLabel, loan: { ...loan }, existingPayments: current.map(row => ({ ...row })), obligations, payments, report, blocked, hasFineColumn: parsed.hasFineColumn, currentRemaining: currentSummary.outstanding, currentRecordedPaid: currentSummary.recordedPaid };
+  return { sourceLabel, reviewedUid: auth?.currentUser?.uid, loan: structuredClone(loan), existingPayments: current.map(row => ({ ...row })), obligations, payments, report, blocked, hasFineColumn: parsed.hasFineColumn, currentRemaining: currentSummary.outstanding, currentRecordedPaid: currentSummary.recordedPaid };
 }
 export type InstallmentImportPreview = ReturnType<typeof previewInstallmentImport>;
 export function previewInstallmentWorkbook(loan: EMILoan, workbook: Awaited<ReturnType<typeof readInstallmentImportFile>>, sheetIndex: number, fileLabel: string) {
@@ -58,7 +58,9 @@ export function previewInstallmentWorkbook(loan: EMILoan, workbook: Awaited<Retu
 /** Explicit reviewed replacement only. Originals are archived, not discarded;
  * linked native financial records are never rewritten to force reconciliation. */
 export function applyInstallmentImport(preview: InstallmentImportPreview, confirmation: string) {
-  if (!auth?.currentUser) throw new Error('Sign in to apply the reviewed import.');
+  const uid = auth?.currentUser?.uid;
+  if (!uid) throw new Error('Sign in to apply the reviewed import.');
+  if (uid !== preview.reviewedUid) throw new Error('The signed-in account changed. Generate a fresh preview.');
   const store = useEMIWorkbookStore.getState(), before = store.workbook;
   const current = before.entries.find(row => row.id === preview.loan.id);
   const payments = before.repayments.filter(row => row.loanId === preview.loan.id);
