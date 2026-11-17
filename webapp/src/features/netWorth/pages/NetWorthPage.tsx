@@ -31,7 +31,7 @@ import type { NetWorthAsOfInputs } from '../../../lib/calc/netWorthAsOf';
 import { UpcomingList } from '../../../components/UpcomingList';
 import { useUpcomingItems } from '../../../hooks/useUpcomingItems';
 import { usePageTopBarRightSlot } from '../../../hooks/usePageTopBar';
-import { getDashboardReport, getCurrencyDashboardSummary, getBreakdownDelta, getMonthlyFlowItems as monthlyFlowItems, getNetWorthBreakdownForMonth as netWorthBreakdownForMonth, getCategoryGroupReport, getMonthlyNetFlow, getMonthlyPlanReport, getMonthlyStatCards, getModuleBreakdownChart, getClearedRangeActivities, getMoneyMovementReport, getClearedMovementComparison, getMonthlyMovementReport, getClearedNativeMovements, type MovementActivity, type FlowDimension, type FlowPopulation, type MovementKind, getReportingMonths, getMonthlyIncomeExpense as monthlyIncomeExpense,
+import { getDashboardReport, getCurrencyDashboardSummary, getBreakdownDelta, getMonthlyFlowItems as monthlyFlowItems, getNetWorthBreakdownForMonth as netWorthBreakdownForMonth, getCategoryGroupReport, getMonthlyNetFlow, getMonthlyPlanReport, getMonthlyStatCards, getModuleBreakdownChart, getClearedRangeActivities, getMoneyMovementReport, getClearedMovementComparison, getDatedTradeEstimates, getMonthlyMovementReport, getClearedNativeMovements, type MovementActivity, type FlowDimension, type FlowPopulation, type MovementKind, getReportingMonths, getMonthlyIncomeExpense as monthlyIncomeExpense,
   getNetWorthTrend as projectedNetWorthTrend, getMonthEnd as endOfMonthAsOf } from '../../../services/finance/dashboardService';
 import { useDashboardContext, useDashboardActivities, useNativeMovementActivities } from '../../../hooks/useDashboard';
 import { useNetWorthInputs, useNetWorthSummary } from '../hooks/useNetWorthSummary';
@@ -41,7 +41,7 @@ import { getDashboardFxRates as loadCachedFxRates, isDashboardFxStale as isFxSta
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { useUrlTransactionFilters } from '../../../hooks/useUrlTransactionFilters';
 import { presetDateRange } from '../../../lib/dateRange';
-import { fmtMoney } from '../../../lib/format';
+import { fmtMoney, fmtPSXPrice, fmtQSEPrice } from '../../../lib/format';
 import { dlDoughnut, dlLine, withAlpha } from '../../../lib/chartLabels';
 import type { ChartDataset } from 'chart.js';
 import { applyChartTheme } from '../../../lib/chartSetup';
@@ -1169,6 +1169,9 @@ function MoneyMovementSection({ selectedModules, from, to, today, setDrilldown }
   const activities = useNativeMovementActivities(selectedModules,{ fromDate: from, toDate: to });
   const report = getMoneyMovementReport(activities,from,to,today,dimension,population,kind);
   const monthly = getMonthlyMovementReport(activities,from,to,today,population,kind);
+  const tradeEstimates = population === 'planned' && (kind === 'all' || kind === 'investment')
+    ? getDatedTradeEstimates(selectedModules, from, to)
+    : [];
   const comparison = population === 'actual' && comparePrior ? getClearedMovementComparison(activities, from, to, today, kind) : null;
   return <div className="money-movement-report">
     <p className="text-muted">{from} – {to}. Cash, Bank, Rentals, cards, recorded loan repayments, Funds and all exchange brokers. Investments and financing are separate from income/spending. Unclassified account records stay visible. Internal transfers are excluded from the combined view.</p>
@@ -1225,6 +1228,18 @@ function MoneyMovementSection({ selectedModules, from, to, today, setDrilldown }
       ] }} options={{ plugins: { legend: { display: true } } }} /></div></ChartCard>
       <div className="table-scroll"><table><caption>{row.currency} — monthly totals for the same selected records; partial months use {from} through {to}</caption><thead><tr><th>Month</th><th>Inflow</th><th>Outflow</th><th>Net movement</th><th>Records</th></tr></thead><tbody>{row.months.map(month=><tr key={month.month}><td>{month.month}</td><td>{fmtMoney(month.income,row.currency)}</td><td>{fmtMoney(month.expense,row.currency)}</td><td>{fmtMoney(month.netFlow,row.currency)}</td><td>{month.count}</td></tr>)}</tbody></table></div>
     </div>)}
+    {tradeEstimates.length > 0 && <section className="stack-md">
+      <h3>Dated trade estimates</h3>
+      <p className="text-muted">Saved strategies are separate scenarios. Their estimated cash effects are excluded from the movement totals above.</p>
+      {tradeEstimates.map(plan => <div className="table-scroll" key={`${plan.module}:${plan.brokerId}:${plan.planId}`}><table>
+        <caption>{plan.module.toUpperCase()} · {plan.brokerName} · {plan.planName}</caption>
+        <thead><tr><th>Expected date</th><th>Symbol</th><th>Side</th><th>Shares</th><th>Price</th><th>Estimated fee</th><th>Estimated cash</th></tr></thead>
+        <tbody>{plan.rows.map(row => <tr key={row.index}>
+          <td>{row.date}</td><td>{row.ticker}</td><td>{row.action}</td><td>{row.shares}</td>
+          <td>{plan.module === 'qse' ? fmtQSEPrice(row.price) : fmtPSXPrice(row.price)} {plan.currency}</td><td>{fmtMoney(row.fee, plan.currency)}</td><td>{fmtMoney(row.estimatedCash, plan.currency)}</td>
+        </tr>)}</tbody>
+      </table></div>)}
+    </section>}
     {!report.rows.length && <p className="text-muted">No matching {population} activity in this period and source scope.</p>}
     <p className="text-muted">Loan contracts, amortization schedules and subscription renewals are not actual payments. Generated subscription plans appear under their paying source. Internal transfer details show recorded legs; gross amounts are not income or spending.</p>
     {dimension === 'plan' && <p className="text-muted">Actual records remain unallocated unless a plan link exists; no allocation is inferred from matching labels or amounts.</p>}

@@ -221,3 +221,10 @@ export function getClearedNativeMovements(activities: Parameters<typeof Calculat
 export function getClearedMovementComparison(...args: Parameters<typeof CalculationEngine.dashboard.clearedMovementComparison>) {
   return CalculationEngine.dashboard.clearedMovementComparison(...args);
 }
+
+export function getDatedTradeEstimates(modules: readonly string[], from: string, to: string) {
+  return CalculationEngine.dashboard.datedTradeEstimates({
+    qse: useWorkbookStore.getState().workbook,
+    psx: usePSXWorkbookStore.getState().workbook,
+  }, modules, from, to);
+}

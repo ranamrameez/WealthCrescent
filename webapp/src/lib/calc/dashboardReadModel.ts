@@ -1,3 +1,7 @@
+import { makeQSEFeeCalculator } from './fees';
+import { makePSXFeeCalculator } from './psxFees';
+import type { PSXSettings, PSXWorkbook } from '../../types/psxWorkbook';
+import type { Transaction, Workbook } from '../../types/workbook';
 import { MOVEMENT_MODULE_LABELS, MOVEMENT_KIND_LABELS, selectMovementActivities, type MovementActivity, type MovementKind } from './movementActivities';
 import { projectedNetWorthTrend, endOfMonthAsOf, type MonthlyNetWorthPoint } from './netWorthTrend';
 import { earliestActivityDate, netWorthAsOfDate, type NetWorthAsOfInputs } from './netWorthAsOf';
@@ -390,4 +394,43 @@ export function clearedMovementComparison(activities: MovementActivity[], from: 
       return { currency, current, prior, netChange, netChangePct: netChange !== null && prior?.net ? netChange / Math.abs(prior.net) * 100 : null };
     }),
   };
+}
+
+/** Keep saved strategy scenarios independent of native pending and actual trades. */
+export function datedTradeEstimates(workbooks: { qse: Workbook; psx: PSXWorkbook }, modules: readonly string[], from: string, to: string) {
+  if (!isValidISODate(from) || !isValidISODate(to) || from > to) return [];
+  return (['qse', 'psx'] as const).filter(module => modules.includes(module)).flatMap(module => {
+    const workbook = workbooks[module];
+    const sources = workbook.brokerProfiles?.length
+      ? workbook.brokerProfiles.filter(profile => !profile.archived && !profile.deactivated).map(profile => ({
+        id: profile.id, name: profile.name,
+        settings: profile.id === workbook.activeBrokerId ? workbook.settings : profile.settings,
+        data: profile.id === workbook.activeBrokerId ? workbook : profile.data,
+      }))
+      : [{ id: 'legacy', name: module.toUpperCase(), settings: workbook.settings, data: workbook }];
+    return sources.flatMap(({ id, name, settings, data }) => {
+      if (!data || settings.includeInNetWorth === false) return [];
+      const linkedIds = new Set(data.transactions.map(row => row.id).filter(Boolean));
+      return (data.tradePlans ?? []).flatMap(plan => {
+        const pending = plan.legs.flatMap((leg, index) => {
+          const date = leg.date ?? null;
+          if (leg.ignored || leg.executed || (leg.executedTransactionId && linkedIds.has(leg.executedTransactionId)) ||
+              !isValidISODate(date) || !leg.ticker?.trim() || leg.shares <= 0 || leg.price <= 0 ||
+              (leg.action !== 'BUY' && leg.action !== 'SELL') ||
+              !Number.isFinite(leg.shares * leg.price) ||
+              (leg.feeOverride !== undefined && (!Number.isFinite(leg.feeOverride) || leg.feeOverride < 0))) return [];
+          return [{ index, tx: { ...leg, date } satisfies Transaction }];
+        });
+        const calcFee = module === 'qse' ? makeQSEFeeCalculator(settings)
+          : makePSXFeeCalculator(settings as PSXSettings, [...data.transactions, ...pending.map(row => row.tx)]);
+        const rows = pending.filter(({ tx }) => tx.date >= from && tx.date <= to).map(({ index, tx }) => {
+          const gross = tx.shares * tx.price;
+          const buy = tx.action === 'BUY';
+          const fee = calcFee(gross, buy, { shares: tx.shares, tx });
+          return { ...tx, index, gross, fee, estimatedCash: (buy ? -gross : gross) - fee };
+        }).sort((a, b) => a.date.localeCompare(b.date) || a.index - b.index);
+        return rows.length ? [{ module, brokerId: id, brokerName: name, planId: plan.id, planName: plan.name, currency: settings.currency, rows }] : [];
+      });
+    });
+  });
 }

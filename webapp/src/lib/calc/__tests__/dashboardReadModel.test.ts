@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { createEmptyWorkbook } from '../../../store/defaultWorkbook';
+import { createEmptyPSXWorkbook } from '../../../store/defaultPsxWorkbook';
 import { CalculationEngine } from '../CalculationEngine';
 import type { BudgetActivity } from '../budgetPlanner';
 const engine = CalculationEngine.dashboard;
@@ -154,4 +156,32 @@ describe('prior cleared movement comparison', () => {
     expect(usd?.current?.items.map(row => row.description)).toEqual(['current']);
     expect(usd?.prior?.items.map(row => row.description)).toEqual(['earlier-in', 'earlier-out']);
   });
+});
+
+
+it('keeps dated trade estimates broker- and scenario-scoped, and excludes linked or undated legs', () => {
+  const qse = createEmptyWorkbook();
+  const psx = createEmptyPSXWorkbook();
+  const buy = { date: '2026-02-10', ticker: 'QNBK', action: 'BUY' as const, shares: 20, price: 5 };
+  qse.transactions = [{ ...buy, id: 'native-pending', isPending: true }];
+  qse.tradePlans = [
+    { id: 'plan-a', name: 'Strategy A', createdAt: '2026-01-01', legs: [
+      { ...buy, feeOverride: 3 },
+      { ...buy, date: undefined },
+      { ...buy, executedTransactionId: 'native-pending' },
+      { ...buy, executed: true },
+      { ...buy, ignored: true },
+      { ...buy, date: '2026-03-01' },
+    ] },
+    { id: 'plan-b', name: 'Strategy B', createdAt: '2026-01-01', legs: [{ ...buy, action: 'SELL', feeOverride: 2 }] },
+  ];
+  qse.brokerProfiles.push({ id: 'archived', name: 'Closed', archived: true, settings: qse.settings, data: { ...qse, tradePlans: qse.tradePlans } });
+  psx.tradePlans = [{ id: 'psx-plan', name: 'PSX scenario', createdAt: '2026-01-01', legs: [{ ...buy, ticker: 'OGDC', feeOverride: 5 }] }];
+  const rows = engine.datedTradeEstimates({ qse, psx }, ['qse', 'psx'], '2026-02-01', '2026-02-28');
+  expect(rows).toMatchObject([
+    { module: 'qse', brokerId: qse.activeBrokerId, planId: 'plan-a', currency: qse.settings.currency, rows: [{ fee: 3, estimatedCash: -103 }] },
+    { module: 'qse', brokerId: qse.activeBrokerId, planId: 'plan-b', rows: [{ fee: 2, estimatedCash: 98 }] },
+    { module: 'psx', brokerId: psx.activeBrokerId, planId: 'psx-plan', currency: psx.settings.currency, rows: [{ fee: 5, estimatedCash: -105 }] },
+  ]);
+  expect(rows.map(row => row.rows.length)).toEqual([1, 1, 1]);
 });
