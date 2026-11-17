@@ -10114,6 +10114,8 @@ For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) first. **Lates
 
 ## Done
 
+- QSE Trade list reviews The Group statement matches and new trades in paired cards before applying a selection. Known symbols, company names and broker aliases resolve to the canonical QSE ticker.
+
 - PR #51 has guarded receipt archive recovery in Contract & payments. It binds review to the signed-in account, checks stale snapshots and receipt dependencies, and archives displaced records. Legacy schedules with active planning dependencies require separate review.
 
 - PR #51 workbook import previews now require the same signed-in account at review and apply time. The original receipts are still archived on confirmed replacement.

@@ -1169,3 +1169,7 @@ Saving refreshes open linked installments while preserving completed history. Bi
 ### Restore an installment receipt archive
 
 Open a loan’s **Contract & payments** section and choose **Receipt archive**. Select and review a saved snapshot, including the archived obligations and receipt amounts. Check the review box and type the loan’s current name to restore. The current ledger is kept in a new archive entry. Resolve linked receipts and budget allocations through their existing workflows before restoring.
+
+### Review trades from The Group statements
+
+From **QSE → Transactions → Trade list**, choose **Import The Group statement**. Verify the broker shown in the review. Compare existing and statement values on matched rows, and use the filter to find new trades or items that need manual review. Select individual trades, all new trades, or statement values for all matches. Unchecked matches retain their existing values. Click **Import selected trades** to apply the selection.

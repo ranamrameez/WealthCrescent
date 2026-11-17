@@ -1,3 +1,5 @@
+import { QseStatementTradeReview } from './QseStatementTradeReview';
+import { previewQseStatementTrades, type QseStatementTradePreview } from '../../../services/finance/qseStatementImportService';
 import type { TableCardDateSort } from '../../../components/tableSortContext';
 import { parseTheGroupStatement, readStatementXlsx, type StatementRecord } from '../../../lib/theGroupStatement';
 import { TransactionEntryModal } from '../../../components/TransactionEntryModal';
@@ -77,11 +79,13 @@ export interface QseRecordActionProps {
   exportData?: { rows: object[]; allRows: object[] };
   editRequest?: Row | null;
   dateSort?: TableCardDateSort;
+  tickerNames?: Record<string, string>;
 }
-export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, render, extraActions = [], exportData, editRequest }: QseRecordActionProps) {
+export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, render, extraActions = [], exportData, editRequest, tickerNames = {} }: QseRecordActionProps) {
   const workbook = useWorkbookStore(s => s.workbook);
   const ensureSignedIn = useEnsureSignedIn();
   const inputId = useId();
+  const [statementReview, setStatementReview] = useState<QseStatementTradePreview | null>(null);
   const [storedEditing, setEditing] = useState<{ rows: Row[]; owner?: string; single?: boolean } | null>(null);
   const [dismissedRequest, setDismissedRequest] = useState<Row | null>(null);
   const requestSnapshot = useMemo(() => editRequest ? { rows: [structuredClone(editRequest)], owner: getCurrentUser()?.uid, single: true } : null, [editRequest]);
@@ -120,23 +124,34 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
   };
   const importFile = async (file: File) => {
     try {
+      const requestedOwner = getCurrentUser()?.uid;
       const current = recordsFor(kind);
       const brokerId = useWorkbookStore.getState().workbook.activeBrokerId;
       const xlsx = /\.xlsx$/i.test(file.name);
       const table = xlsx ? readStatementXlsx(new Uint8Array(await file.arrayBuffer())) : parseCSV(await file.text());
       const isStatement = xlsx || table.some(row => row[0]?.trim().toLowerCase() === 'date' && row[1]?.trim().toLowerCase() === 'type' && row[2]?.trim().toLowerCase() === 'count');
+      if (isStatement && kind === 'transactions') {
+        if (!(await ensureSignedIn('Sign in to review trades for import.'))) return;
+        const owner = getCurrentUser()?.uid;
+        const latest = useWorkbookStore.getState().workbook;
+        if (!owner || owner !== getCurrentUser()?.uid || (requestedOwner && owner !== requestedOwner) || latest.activeBrokerId !== brokerId) {
+          throw new Error('The account or broker changed. Open the statement again.');
+        }
+        setStatementReview(previewQseStatementTrades(table, file.name, tickerNames, latest, owner));
+        return;
+      }
       let statementWarning = '';
       let importTable = table;
       if (isStatement) {
-        if (kind !== 'ledger' && kind !== 'transactions') throw new Error('Import The Group statements from Cash ledger or Trade list.');
+        if (kind !== 'ledger') throw new Error('Import The Group statements from Cash ledger or Trade list.');
         if (!(await confirmDialog(
           'The Group Excel statement contains rounded cash amounts instead of exact figures. Importing rounded numbers may produce incorrect balances, fees, profit/loss and other calculations. Use an exact statement where available and verify the imported figures. Rounded rewards are excluded; existing exact rewards are retained. Statement sequence and uniquely matched price corrections will be applied after review. Continue to review this import?',
           'Warning: rounded statement figures',
         ))) return;
         const existing = recordsFor('ledger').filter(row => row.kind !== 'dividend') as StatementRecord[];
-        const result = parseTheGroupStatement(table, existing);
-        statementWarning = result.warning + (kind === 'transactions' ? ' Trade list imports trades only. Use Cash ledger to reconcile transfers and existing reward sequence as well.' : '');
-        const records = kind === 'transactions' ? result.records.filter(row => row.kind === 'trade') : result.records;
+        const result = parseTheGroupStatement(table, existing, { tickerNames });
+        statementWarning = result.warning;
+        const records = result.records;
         const keys = ['id', 'kind', 'date', 'ticker', 'action', 'shares', 'price', 'type', 'gross', 'fee', 'description', 'time', 'timezone', 'amount', 'note', 'feeOverride', 'targetLotBuyId', 'accountingOrder'];
         importTable = [keys, ...records.map(row => keys.map(key => String((row as unknown as Record<string, unknown>)[key] ?? '')))];
       }
@@ -227,6 +242,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
   const header = { actions, summary: <SummaryChip label="Filtered" value={rows.length} />, headerEnd: modifying ? <IconButton label="Hide modification options" icon={<XIcon size={13} />} align="right" onClick={onModify} /> : null };
   return <>{render ? render(header) : <div className="section-toolbar">{header.summary}<CardActionMenu actions={actions} /></div>}
   <input id={inputId} type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void importFile(file); }} />
+  {statementReview && <QseStatementTradeReview preview={statementReview} onClose={() => setStatementReview(null)} />}
   {editing && transferEdit && <TransactionEntryModal editTransfer={{ module: 'qse', record: Object.fromEntries(Object.entries(editing.rows[0]).filter(([key]) => key !== 'kind')) as unknown as Transfer }} onClose={closeEditor} />}
   {editing && !transferEdit && <BatchEditGrid title={`${editing.single ? 'Edit' : 'Batch edit'} QSE ${kind}`} description="Use the row arrows in the transaction tables to change the shared same-day sequence. Dates remain unchanged. Linked transfers must be edited individually." rows={editing.rows} columns={columns} getRowId={row => row.id} getRowDate={row => row.date} createRow={editing.single ? undefined : createRow} validateRow={row => validateQseRow(kind, row)} rowReadOnly={editing.single ? undefined : locked} onClose={closeEditor} onSave={async (changes, mutations) => {
     if (!(await ensureSignedIn('Sign in to save changes.'))) throw new Error('Sign in is required.');
