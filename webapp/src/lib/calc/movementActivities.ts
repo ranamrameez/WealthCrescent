@@ -1,3 +1,4 @@
+import { isCardFundedInstallmentLink } from '../../types/interEntityTransfer';
 import { collectBudgetActivities, type BudgetActivity, type BudgetOccurrenceWindow } from './budgetPlanner';
 import type { RecentActivityInputs } from './recentActivity';
 import type { PlannedCreditCardTransaction } from '../../types/plannedCreditCard';
@@ -121,6 +122,7 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
   const entityModules=new Set<LinkModule>(['bank','rentals','personalLoans','emi','creditCard','qse','psx']);
   const linkable=(row:MovementActivity)=>row.executed && (['qse','psx','funds'].includes(row.module)?row.recordType==='transfer':row.module==='emi'?row.recordType==='emi-repayment':row.recordType!=='plan');
   const rowKey=(row:MovementActivity)=>linkModule(row.module)+':'+(entityModules.has(linkModule(row.module))?(row.sourceId ?? '')+':':'')+row.id;
+  const nativeKeys = new Set(rows.filter(linkable).map(rowKey));
   for (const link of input.links) {
     const key=(side:typeof link.from,id:string)=>{
       let ref=side.ref;
@@ -131,6 +133,10 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
       return side.module+':'+(entityModules.has(side.module)?(ref ?? '__unresolved__')+':':'')+id;
     };
     const left=key(link.from,link.fromRecordId),right=key(link.to,link.toRecordId);
+    if (isCardFundedInstallmentLink(link)) {
+      if (nativeKeys.has(right)) suppressed.add(left);
+      continue;
+    }
     if(domain.has(link.from.module) && ['cash','bank'].includes(link.to.module))suppressed.add(right);
     else if(domain.has(link.to.module) && ['cash','bank'].includes(link.from.module))suppressed.add(left);
     else {internal.add(left);internal.add(right);}

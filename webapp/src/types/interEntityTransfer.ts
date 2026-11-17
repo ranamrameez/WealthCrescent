@@ -115,6 +115,10 @@ export interface InterEntityTransfer extends InterEntityTransferInput {
   toRecordId: string;
 }
 
+export function isCardFundedInstallmentLink(link?: InterEntityTransfer): boolean {
+  return link?.from.module === 'creditCard' && link.to.module === 'emi' && link.to.emiIndependent === true;
+}
+
 export interface InterEntityWorkbook {
   settings: Record<string, never>;
   entries: InterEntityTransfer[];

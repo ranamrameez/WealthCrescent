@@ -1,3 +1,4 @@
+import { isCardFundedInstallmentLink } from '../../../types/interEntityTransfer';
 import { fulfillManualPlan } from '../../../services/finance/manualPlanPaymentService';
 import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
@@ -62,7 +63,7 @@ import {
   proposeMinPayment,
 } from '../../../lib/calc/creditCardModule';
 import { formatDate, fmtMoney } from '../../../lib/format';
-import { createLinkedTransfer } from '../../../lib/linkCascade';
+import { createLinkedTransfer, findLinkForRecord, hasCardFundedInstallmentLinks } from '../../../lib/linkCascade';
 import { defaultTimezoneForCurrency, nowTime } from '../../../lib/datetime';
 import { firebaseReady } from '../../../lib/firebase/client';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
@@ -145,6 +146,10 @@ function CreditCardForm({
     if (!(await ensureSignedIn(card ? 'Sign in to update this credit card.' : 'Sign in to save credit cards.'))) return;
     const clean = { ...draft, name: draft.name.trim() };
     if (card) {
+      const currentCard = useCreditCardWorkbookStore.getState().workbook.cards.find(row => row.id === card.id);
+      if (clean.currencyCode !== currentCard?.currencyCode && hasCardFundedInstallmentLinks('creditCard', card.id)) {
+        return toast('This card cannot change currency while linked to installment receipts.');
+      }
       updateCard(card.id, clean);
       toast('Credit card updated.');
       onSaved?.(card.id);
@@ -427,6 +432,7 @@ function CreditCardTransactionEditModal({
   const [draft, setDraft] = useState<CreditCardTransaction>({ ...transaction });
 
   const save = () => {
+    if (isCardFundedInstallmentLink(findLinkForRecord('creditCard', draft.id))) return toast('This charge is linked to an installment receipt.');
     if (!(draft.amount > 0)) return toast('Enter an amount greater than zero.');
     if (!draft.description.trim()) return toast('Enter a description.');
     updateTransaction(draft.id, { ...draft, description: draft.description.trim() });
@@ -502,7 +508,9 @@ function TransactionsTable({ card, filters, showActions = false }: { card: Credi
                   icon={<TrashIcon size={12} />}
                   align="right"
                   onClick={async () => {
-                    if (await confirmDialog('This cannot be undone.', 'Delete this transaction?')) deleteTransaction(t.id);
+                    if (!(await confirmDialog('This cannot be undone.', 'Delete this transaction?'))) return;
+                    if (isCardFundedInstallmentLink(findLinkForRecord('creditCard', t.id))) return toast('This charge is linked to an installment receipt.');
+                    deleteTransaction(t.id);
                   }}
                 />}
               </td>
@@ -767,6 +775,9 @@ export function CreditCardDetailPage() {
 
   const deleteThisCard = async () => {
     if (!(await confirmDialog('This deletes the card and all its transactions — this cannot be undone.', `Delete "${card.name}"?`))) return;
+    if (hasCardFundedInstallmentLinks('creditCard', card.id)) {
+      return toast('This card has charges linked to installment receipts.');
+    }
     deleteCard(card.id);
     toast('Card deleted.');
     navigate('/bank');

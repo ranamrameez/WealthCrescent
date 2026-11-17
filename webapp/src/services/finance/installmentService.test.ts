@@ -5,6 +5,9 @@ import { useInterEntityTransfersStore } from '../../store/interEntityTransfersSt
 import type { EMILoan } from '../../types/emiWorkbook';
 import { useBankWorkbookStore } from '../../store/bankWorkbookStore';
 import { usePlannedBankWorkbookStore } from '../../store/plannedBankWorkbookStore';
+import { useCreditCardWorkbookStore } from '../../store/creditCardWorkbookStore';
+import { usePlannedCreditCardWorkbookStore } from '../../store/plannedCreditCardWorkbookStore';
+import type { PlannedCreditCardTransaction } from '../../types/plannedCreditCard';
 import { fulfillManualPlan } from './manualPlanPaymentService';
 const session = vi.hoisted(() => ({ signedIn: true }));
 vi.mock('../../lib/firebase/client', () => ({ auth: { get currentUser() { return session.signedIn ? { uid: 'fixture' } : null; } }, db: null, firebaseReady: false }));
@@ -76,4 +79,44 @@ it('validates manual splits before persistence and can restore automatic allocat
   current = useEMIWorkbookStore.getState().workbook.entries[0];
   saveInstallmentAllocations(current, payment.id, []);
   expect(useEMIWorkbookStore.getState().workbook.entries[0].paymentAllocations).toEqual([]);
+});
+
+it('records an actual card charge and one installment receipt for a reviewed planned occurrence', () => {
+  const cardStore = useCreditCardWorkbookStore.getState();
+  const planStore = usePlannedCreditCardWorkbookStore.getState();
+  const card = { id: 'card', name: 'Paying card', currencyCode: loan.currencyCode };
+  const plan: PlannedCreditCardTransaction = {
+    id: 'card-plan', cardId: card.id, sourceEmiLoanId: loan.id, sourceEmiObligationId: contract[0].id,
+    date: contract[0].dueDate, kind: 'charge', amount: 50, description: 'Card installment', executed: false,
+  };
+  const reference = { module: 'creditCard' as const, id: plan.id };
+  const currentPlan = () => usePlannedCreditCardWorkbookStore.getState().workbook.entries.find(row => row.id === plan.id)!;
+  try {
+    cardStore.setWorkbook({ ...cardStore.workbook, cards: [{ ...card, currencyCode: 'USD' }], transactions: [] });
+    planStore.setWorkbook({ ...planStore.workbook, entries: [plan] });
+    saveInstallmentContract(loan, contract);
+    planStore.updateEntry(plan.id, { amount: plan.amount });
+    expect(() => fulfillManualPlan(reference, plan.date, currentPlan(), '2026-03-01')).toThrow('currency');
+    expect(useEMIWorkbookStore.getState().workbook.repayments).toEqual([]);
+    cardStore.updateCard(card.id, { currencyCode: loan.currencyCode });
+    planStore.updateEntry(plan.id, { kind: 'payment' });
+    expect(() => fulfillManualPlan(reference, plan.date, currentPlan(), '2026-03-01')).toThrow('card charge');
+    planStore.updateEntry(plan.id, { kind: 'charge' });
+    const { actualId } = fulfillManualPlan(reference, plan.date, currentPlan(), '2026-03-01');
+    expect(useCreditCardWorkbookStore.getState().workbook.transactions).toEqual([
+      expect.objectContaining({ id: actualId, kind: 'charge', amount: 50 }),
+    ]);
+    expect(useEMIWorkbookStore.getState().workbook.repayments).toEqual([
+      expect.objectContaining({ id: `emi:${actualId}`, loanId: loan.id, amount: 50, paymentOnly: true }),
+    ]);
+    expect(useInterEntityTransfersStore.getState().workbook.entries).toEqual([
+      expect.objectContaining({ from: { module: 'creditCard', ref: card.id }, fromRecordId: actualId, toRecordId: `emi:${actualId}` }),
+    ]);
+    const done = usePlannedCreditCardWorkbookStore.getState().workbook.entries.find(row => row.id === plan.id)!;
+    expect(done.executed).toBe(true);
+    expect(() => fulfillManualPlan(reference, plan.date, done, '2026-03-01')).toThrow('already completed');
+  } finally {
+    cardStore.setWorkbook(cardStore.workbook);
+    planStore.setWorkbook(planStore.workbook);
+  }
 });

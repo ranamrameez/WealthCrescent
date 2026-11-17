@@ -48,7 +48,7 @@ import { useAppearanceStore } from '../../../store/appearanceStore';
 import { fmtMoney } from '../../../lib/format';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { firebaseReady } from '../../../lib/firebase/client';
-import { confirmAndDeleteLinkable, createLinkedTransfer, propagateLinkedEdit, resolveLinkedEdit } from '../../../lib/linkCascade';
+import { hasCardFundedInstallmentLinks, confirmAndDeleteLinkable, createLinkedTransfer, propagateLinkedEdit, resolveLinkedEdit } from '../../../lib/linkCascade';
 import { getLastTransferSource, rememberTransferSource } from '../../../hooks/useLastTransferSource';
 import { useBankWorkbookStore } from '../../../store/bankWorkbookStore';
 import { useCashWorkbookStore } from '../../../store/cashWorkbookStore';
@@ -611,10 +611,12 @@ function LoanDetail({ loan, onSelect, onBack, startInEditMode }: { loan: EMILoan
                 icon={<TrashIcon size={13} />}
                 align="right"
                 onClick={async () => {
-                  if (await confirmDialog('This cannot be undone.', `Delete loan "${loan.name}"?`)) {
-                    deleteEntry(loan.id);
-                    onBack();
+                  if (!(await confirmDialog('This cannot be undone.', `Delete loan "${loan.name}"?`))) return;
+                  if (hasCardFundedInstallmentLinks('emi', loan.id)) {
+                    return toast('This loan has receipts linked to card charges.');
                   }
+                  deleteEntry(loan.id);
+                  onBack();
                 }}
               />
             </div>

@@ -154,3 +154,14 @@ it('classifies explicit fulfilled source provenance without guessing from descri
   expect(report(f,'financing').rows[0].outflow).toBe(-150);
   expect(report(f).rows[0].groups.find(group=>group.key==='unclassified')?.outflow).toBe(-30);
 });
+
+it('counts a linked card-funded installment once, with the receipt as the financing record', () => {
+  const f = fixture();
+  f.native.emi.entries.push({ id: 'loan', name: 'Loan', lender: 'Seller', principal: 500, totalToReturn: 500, currencyCode: 'USD', tenureMonths: 1, startDate: '2026-01-01', repaymentMode: 'fixedTotal' });
+  f.native.cards.cards.push({ id: 'card', name: 'Card', currencyCode: 'USD' });
+  f.native.cards.transactions.push({ id: 'charge', cardId: 'card', date: '2026-01-02', kind: 'charge', amount: 50, description: 'Installment' });
+  f.native.emi.repayments.push({ id: 'receipt', loanId: 'loan', date: '2026-01-02', month: 0, amount: 50, paymentOnly: true });
+  f.links.push({ id: 'link', date: '2026-01-02', from: { module: 'creditCard', ref: 'card' }, to: { module: 'emi', ref: 'loan', emiIndependent: true }, fromRecordId: 'charge', toRecordId: 'receipt', fromAmount: 50, toAmount: 50 });
+  expect(report(f, 'financing').rows[0].outflow).toBe(-50);
+  expect(report(f).count).toBe(1);
+});

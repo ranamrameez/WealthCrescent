@@ -10114,6 +10114,8 @@ For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) first. **Lates
 
 ## Done
 
+- Reviewed independent installment plans routed to same-currency credit cards can be fulfilled as linked charges and EMI receipts. Combined reports count the receipt once.
+
 - QSE Trade list reviews The Group statement matches and new trades in paired cards before applying a selection. Known symbols, company names and broker aliases resolve to the canonical QSE ticker.
 
 - PR #51 has guarded receipt archive recovery in Contract & payments. It binds review to the signed-in account, checks stale snapshots and receipt dependencies, and archives displaced records. Legacy schedules with active planning dependencies require separate review.

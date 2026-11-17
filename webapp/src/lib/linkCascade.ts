@@ -1,3 +1,4 @@
+import { toast } from '../components/Toast';
 import { confirmDialog } from '../components/ConfirmDialog';
 import { linkedEditChoiceDialog, type LinkedEditChoice } from '../components/LinkedEditChoiceDialog';
 import { useBankWorkbookStore } from '../store/bankWorkbookStore';
@@ -10,7 +11,7 @@ import { usePersonalLoansWorkbookStore } from '../store/personalLoansWorkbookSto
 import { usePSXWorkbookStore } from '../store/psxWorkbookStore';
 import { useRentalsWorkbookStore } from '../store/rentalsWorkbookStore';
 import { useWorkbookStore } from '../store/workbookStore';
-import { LINK_MODULE_LABELS, type InterEntityTransfer, type InterEntityTransferInput, type LinkModule, type LinkSideConfig } from '../types/interEntityTransfer';
+import { isCardFundedInstallmentLink, LINK_MODULE_LABELS, type InterEntityTransfer, type InterEntityTransferInput, type LinkModule, type LinkSideConfig } from '../types/interEntityTransfer';
 import { buildLinkedRecords, type LinkSideRecord } from './interEntityLink';
 import { defaultTimeForDate, defaultTimezoneForCurrency } from './datetime';
 
@@ -146,10 +147,13 @@ export function createLinkedTransfer(input: InterEntityTransferInput): { link: I
  * which aren't retained here. If this ever throws partway, the two sides
  * may end up briefly inconsistent; this is reported honestly rather than
  * claimed as safe. */
+const cardInstallmentEditMessage = 'This installment and its card charge must be corrected together.';
+
 export function updateLinkedTransfer(
   input: InterEntityTransferInput,
   link: InterEntityTransfer,
 ): { link: InterEntityTransfer } | { error: string } {
+  if (isCardFundedInstallmentLink(link)) return { error: cardInstallmentEditMessage };
   const ids = { linkId: link.id, fromRecordId: link.fromRecordId, toRecordId: link.toRecordId };
   const resolved = resolveTransferInput(input);
   const fromSide = resolveTransferSide(input.from, 'out', link.fromRecordId);
@@ -173,6 +177,7 @@ export function updateLinkedTransfer(
  * below, so deleting either side from its native module cascades exactly
  * like deleting it from the Transfers page does. */
 export function deleteLinkCascade(link: InterEntityTransfer) {
+  if (isCardFundedInstallmentLink(link)) throw new Error(cardInstallmentEditMessage);
   dispatchRemove(link.from.module, link.fromRecordId);
   dispatchRemove(link.to.module, link.toRecordId);
   useInterEntityTransfersStore.getState().deleteEntry(link.id);
@@ -193,6 +198,11 @@ export function findLinkForRecord(module: LinkModule, recordId: string): InterEn
  * link store, never a second persisted copy of the same fact (a stored
  * boolean could silently go stale the moment a link is created or removed
  * elsewhere in the app — see `types/finance.ts`'s file-level comment). */
+export function hasCardFundedInstallmentLinks(module: 'creditCard' | 'emi', entityId: string): boolean {
+  return useInterEntityTransfersStore.getState().workbook.entries.some(link =>
+    isCardFundedInstallmentLink(link) && (module === 'creditCard' ? link.from.ref === entityId : link.to.ref === entityId));
+}
+
 export function isRecordLinked(module: LinkModule, recordId: string): boolean {
   return !!findLinkForRecord(module, recordId);
 }
@@ -218,6 +228,7 @@ export function isRecordLinked(module: LinkModule, recordId: string): boolean {
 export async function warnIfLinked(module: LinkModule, id: string): Promise<boolean> {
   const link = findLinkForRecord(module, id);
   if (!link) return true;
+  if (isCardFundedInstallmentLink(link)) { toast(cardInstallmentEditMessage); return false; }
   const otherModule = link.from.module === module ? link.to.module : link.from.module;
   return confirmDialog(
     `This entry is linked to a transfer with ${LINK_MODULE_LABELS[otherModule]}. Editing it here updates only this side — the other side and the link record won't change to match.`,
@@ -238,6 +249,7 @@ export async function warnIfLinked(module: LinkModule, id: string): Promise<bool
 export async function resolveLinkedEdit(module: LinkModule, id: string): Promise<LinkedEditChoice> {
   const link = findLinkForRecord(module, id);
   if (!link) return 'this';
+  if (isCardFundedInstallmentLink(link)) { toast(cardInstallmentEditMessage); return 'cancel'; }
   const otherModule = link.fromRecordId === id ? link.to.module : link.from.module;
   return linkedEditChoiceDialog(LINK_MODULE_LABELS[otherModule]);
 }
@@ -305,6 +317,7 @@ export function propagateLinkedEdit(
 ): { error?: string; message?: string } {
   const link = findLinkForRecord(module, id);
   if (!link) return {};
+  if (isCardFundedInstallmentLink(link)) return { error: cardInstallmentEditMessage };
 
   const wasFromSide = link.fromRecordId === id;
   // For money-pool modules, OUT means this record is the link's from side
@@ -394,6 +407,7 @@ export async function confirmAndDeleteLinkable(module: LinkModule, id: string, p
     if (await confirmDialog('This cannot be undone.', 'Delete this entry?')) plainDelete();
     return;
   }
+  if (isCardFundedInstallmentLink(link)) { toast(cardInstallmentEditMessage); return; }
   const otherModule = link.from.module === module ? link.to.module : link.from.module;
   const ok = await confirmDialog(
     `This entry is part of a linked transfer with ${LINK_MODULE_LABELS[otherModule]} — deleting it here also removes the linked record on the other side and the link itself. This cannot be undone.`,
