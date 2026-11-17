@@ -10114,6 +10114,8 @@ For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) first. **Lates
 
 ## Done
 
+- PR #51 has guarded receipt archive recovery in Contract & payments. It binds review to the signed-in account, checks stale snapshots and receipt dependencies, and archives displaced records. Legacy schedules with active planning dependencies require separate review.
+
 - PR #51 workbook import previews now require the same signed-in account at review and apply time. The original receipts are still archived on confirmed replacement.
 
 - **Persisted QSE/PSX transaction ordering (2026-10-30, PR #36 merged):** `globalTransactionIndex` is the canonical accounting order across all trades; `perTickerIndex` is derived from that same order for each ticker. Reordering trades swaps global positions and recalculates per-ticker positions in one shared helper, so the two indexes cannot drift. Legacy `transactionIndex` and `seq` are compatibility mirrors only. Legacy workbooks are migrated and all store add/edit/delete/plan-execution paths keep indexes synchronized. QSE/PSX tables expose cross-date move controls without changing effective trade dates. PR #36 merged as `e4aef0bcd2ccf20e2cd7c73a3fe98cc293943be8` after full tests and production build passed in Actions run #94. The combined cash ledger still displays mixed trade/transfer/adjustment events chronologically; unified mixed-event ordering remains a separate unresolved design item.
@@ -10124,7 +10126,7 @@ For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) first. **Lates
 
 ## Pending
 
-- Finish guarded receipt archive recovery, then complete the remaining [delivery acceptance](docs/CURRENT_DELIVERY_STATUS.md) for PR #51.
+- Verify the receipt archive restore flow on desktop and mobile. Then complete the remaining [delivery acceptance](docs/CURRENT_DELIVERY_STATUS.md) for PR #51.
 
 - **PR #51 remaining architecture work:** migrate legacy module summaries/planning tools and other UI consumers; implement a transaction-safe multi-workbook repository before enabling scheduled app-only auto-pay, deterministic execution history, pending native-ledger creation and explicit settlement/void workflows. Existing whole-workbook cloud replacement must not race backend ledger writes. Keep the PR draft. Local Planning read/navigation/editor-cancel review is now available; complete dashboard/mobile and write-flow acceptance separately.
 

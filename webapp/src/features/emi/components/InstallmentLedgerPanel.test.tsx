@@ -23,3 +23,40 @@ it('records multiple same-day receipts through the independent payment form with
   expect(workbook.entries[0].contractSchedule).toEqual(contract);
   expect(screen.getAllByText('800.00 PKR').length).toBeGreaterThan(0);
 });
+
+it('reviews and restores only the selected loan archive through the ledger', async () => {
+  const loan = { id: 'fixture', name: 'Property', lender: 'Seller', currencyCode: 'PKR', principal: 1000, totalToReturn: 1000, tenureMonths: 1, startDate: '2026-01-01', repaymentMode: 'fixedTotal' as const };
+  const archived = { id: 'original', loanId: loan.id, date: '2026-02-01', amount: 120, month: 1 };
+  const imported = { ...archived, id: 'imported', amount: 180 };
+  const contractSchedule = [{ id: 'one', dueDate: '2026-02-01', amount: 1000, description: 'Contract' }];
+  const store = useEMIWorkbookStore.getState();
+  store.setWorkbook({
+    settings: { defaultCurrency: 'PKR' },
+    entries: [{ ...loan, contractSchedule }],
+    repayments: [imported],
+    reconciliationHistory: [
+      { id: 'correct', sourceLabel: 'Reviewed worksheet', createdAt: '2026-02-02', loanId: loan.id, loan, repayments: [archived] },
+      { id: 'foreign', sourceLabel: 'Other worksheet', createdAt: '2026-02-03', loanId: 'other', loan: { ...loan, id: 'other' }, repayments: [] },
+    ],
+  });
+  render(<InstallmentLedgerPanel loanId={loan.id} />);
+  const trigger = screen.getByRole('button', { name: 'Receipt archive' });
+  trigger.focus();
+  fireEvent.click(trigger);
+  const dialog = await screen.findByRole('dialog', { name: 'Receipt archive for Property' });
+  expect(document.activeElement).toBe(dialog);
+  expect(screen.queryByRole('option', { name: /Other worksheet/ })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Review archive' }));
+  const restore = await screen.findByRole<HTMLButtonElement>('button', { name: 'Restore reviewed archive' });
+  expect(restore.disabled).toBe(true);
+  expect(screen.getByRole('table', { name: 'Archived receipts' }).textContent).toContain('120.00 PKR');
+  expect(useEMIWorkbookStore.getState().workbook.repayments).toEqual([imported]);
+  fireEvent.click(screen.getByRole('checkbox', { name: /I reviewed/ }));
+  fireEvent.change(screen.getByLabelText('Type Property to confirm restoration'), { target: { value: 'Property' } });
+  expect(restore.disabled).toBe(false);
+  fireEvent.click(restore);
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(document.activeElement).toBe(trigger);
+  expect(useEMIWorkbookStore.getState().workbook.repayments).toEqual([archived]);
+  expect(useEMIWorkbookStore.getState().workbook.reconciliationHistory?.at(-1)?.repayments).toEqual([imported]);
+});

@@ -113,6 +113,10 @@ export function useInstallmentReport(loanId: string) {
     const payments = workbook.repayments.filter(row => row.loanId === loanId).sort((a, b) => a.date.localeCompare(b.date));
     const suggested = CalculationEngine.emi.emiSchedule(loan).rows.map(row => ({ id: `installment:${row.month}`, dueDate: CalculationEngine.emi.installmentDueDate(loan, row.month), amount: row.emi, description: `Installment ${row.month}` }));
     const report = loan.contractSchedule ? CalculationEngine.installmentLedger.reconcileInstallments(loan.contractSchedule.map(row => ({ ...row, currency: loan.currencyCode })), payments.map(row => ({ ...row, currency: loan.currencyCode })), loan.currencyCode, asOf, loan.paymentAllocations) : null;
-    return { loan, payments, suggested, asOf, report, monthly: report ? CalculationEngine.installmentLedger.installmentMonthlySummary(report) : null, fundingOptions: accounts.filter(row => row.currencyCode === loan.currencyCode && row.isActive !== false && !row.migratedToCreditCardId).map(row => ({ value: row.id, label: row.name })) };
+    const archives = (workbook.reconciliationHistory ?? [])
+      .filter(row => row.loanId === loanId)
+      .map(({ id, sourceLabel, createdAt }) => ({ id, sourceLabel, createdAt }))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return { loan, payments, suggested, asOf, report, archives, monthly: report ? CalculationEngine.installmentLedger.installmentMonthlySummary(report) : null, fundingOptions: accounts.filter(row => row.currencyCode === loan.currencyCode && row.isActive !== false && !row.migratedToCreditCardId).map(row => ({ value: row.id, label: row.name })) };
   }, [workbook, accounts, loanId, asOf]);
 }

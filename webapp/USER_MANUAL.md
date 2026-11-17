@@ -1165,3 +1165,7 @@ Use Currency budgets to add a native-currency monthly limit, optional categories
 Loan editing separates booking/agreement date, advance/booking amount, first installment date and months between installments. Choose total price before booking to subtract the advance once, or financed principal when the entered amount already excludes it. Booking metadata does not create a real Cash/Bank transaction. Fixed-total installment repayment totals exclude booking; existing historical booking records need explicit review before reclassifying them.
 
 Saving refreshes open linked installments while preserving completed history. Bigger-installment generation changes plans only; it does not record repayments. Recorded-balance tracking requires complete fixed-total repayment history and excludes future-dated records and fines. Schedule estimates assume on-time payment and are labelled; interest-loan balances remain estimates. Existing future-dated or inconsistent records stay visible for review.
+
+### Restore an installment receipt archive
+
+Open a loan’s **Contract & payments** section and choose **Receipt archive**. Select and review a saved snapshot, including the archived obligations and receipt amounts. Check the review box and type the loan’s current name to restore. The current ledger is kept in a new archive entry. Resolve linked receipts and budget allocations through their existing workflows before restoring.

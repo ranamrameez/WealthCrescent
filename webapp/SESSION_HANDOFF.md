@@ -1,3 +1,7 @@
+## EMI archive recovery service
+
+Added an account-bound restore preview and typed-name apply command. It restores the archived contract, allocations, balance mode, overrides and native receipts while keeping current loan metadata and other loans. It blocks conflicting IDs, linked receipts, receipt budget allocations and legacy restores with active planning dependencies. The existing contract service refreshes linked plans for independent contracts. Restore archives the displaced ledger. The installment ledger now offers archive selection, review and typed confirmation. The regression test verifies scope, focus and receipt replacement. Complete desktop and mobile browser acceptance once the fixture is reachable.
+
 ## PR #51 review triage — 2026-11-17
 
 Actions 448 passed on the published workbook-import checkpoint 4f367f8a. The PR had no submitted reviews or inline threads. The import command now rejects a reviewed preview from another account even when both workbooks have identical loan and receipt data. Continue guarded archive recovery and the remaining acceptance in docs/CURRENT_DELIVERY_STATUS.md before merging.

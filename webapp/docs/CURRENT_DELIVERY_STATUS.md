@@ -1,8 +1,8 @@
 # Current delivery status
 
-Actions 448 passed on 4f367f8a, the published reviewed workbook-import checkpoint. Import apply now also verifies the preview was reviewed under the current account. Guarded archive restore is implemented in the application service. The ledger UI and interactive acceptance are pending.
+Actions 448 passed on 4f367f8a, the published reviewed workbook-import checkpoint. Import apply now also verifies the preview was reviewed under the current account. Guarded archive restore is available from the installment ledger. The integration test covers account-scoped review, typed confirmation, focus restoration and archiving the displaced ledger. Desktop and mobile browser acceptance are pending because the local browser environment could not reach the fixture.
 
-Latest evidence: independent source 730733fd passed Actions 447 (176 files / 1,334 tests and build). The reviewed workbook-import continuation passed 7 focused files / 27 tests and final TypeScript/production build. Read-only browser verified actual workbook totals and date diagnostics, then cancelled. Imports preserve archived originals and reject stale/link/budget/fine conflicts. Archive recovery UI and the broader remaining backlog are still open.
+Latest evidence: independent source 730733fd passed Actions 447 (176 files / 1,334 tests and build). The reviewed workbook-import continuation passed 7 focused files / 27 tests and final TypeScript/production build. Read-only browser verified actual workbook totals and date diagnostics, then cancelled. Imports preserve archived originals and reject stale/link/budget/fine conflicts. Archive browser acceptance and the broader remaining backlog are still open.
 
 2026-11-07 priority clarification: irregular EMI needs independent contract events, dated payments and many-to-many allocations; current month-keyed repayment editing is insufficient. See EMI_IRREGULAR_PAYMENTS.md for the reference report, migration plan and a spreadsheet-versus-backup conflict. Earlier reported remaining is backup-based, not reconciled to the newly supplied spreadsheet.
 
