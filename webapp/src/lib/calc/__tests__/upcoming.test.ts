@@ -179,3 +179,23 @@ it('shows one reminder for an exact explicitly linked EMI bank installment', () 
   expect(collectUpcomingItems({ ...inputs, bankAccounts: [{ ...inputs.bankAccounts[0], isActive: false }] },45,new Date('2026-01-01')).map(item => item.module)).toEqual(['emi']);
   expect(collectUpcomingItems({ ...inputs, bankAccounts: [{ ...inputs.bankAccounts[0], currencyCode: 'QAR' }] },45,new Date('2026-01-01')).some(item => item.module === 'emi')).toBe(true);
 });
+
+it('keeps an independent obligation visible when its paying account cannot cover it', () => {
+  const base = emptyInputs();
+  base.emiLoans = [{ id: 'loan', name: 'Property', lender: 'Seller', principal: 100, totalToReturn: 100, tenureMonths: 1, startDate: '2026-01-01', currencyCode: 'USD', repaymentMode: 'fixedTotal', contractSchedule: [{ id: 'due', dueDate: '2026-01-05', amount: 100, description: 'Installment' }] }];
+  base.bankAccounts = [{ id: 'archived', name: 'Closed', isActive: false, currencyCode: 'USD', openingBalance: 0 }];
+  base.plannedBank = [{ id: 'stale', accountId: 'archived', date: '2026-01-05', amount: -100, description: 'Old loan plan', sourceEmiLoanId: 'loan', sourceEmiObligationId: 'due' }];
+  expect(collectUpcomingItems(base, 14, new Date('2026-01-01'))).toMatchObject([{ module: 'emi', amount: 100 }]);
+  base.plannedCash = [{ id: 'partial', date: '2026-01-05', type: 'OUT', amount: 40, currencyCode: 'USD', sourceEmiLoanId: 'loan', sourceEmiObligationId: 'due' }];
+  expect(collectUpcomingItems(base, 14, new Date('2026-01-01'))).toMatchObject([{ module: 'cash', amount: 40 }, { module: 'emi', amount: 60 }]);
+  base.bankAccounts[0] = { ...base.bankAccounts[0], isActive: true };
+  expect(collectUpcomingItems(base, 14, new Date('2026-01-01'))).toMatchObject([{ module: 'emi', amount: 100 }]);
+});
+
+it('marks a standalone renewal as an estimate when its paying plan is inactive', () => {
+  const base = emptyInputs();
+  base.subscriptions = [{ id: 'subscription', name: 'Service', amount: 15, currencyCode: 'USD', billingCycle: 'monthly', startDate: '2026-01-10', active: true }];
+  base.bankAccounts = [{ id: 'closed', name: 'Closed', isActive: false, currencyCode: 'USD', openingBalance: 0 }];
+  base.plannedBank = [{ id: 'stale', accountId: 'closed', date: '2026-01-10', description: 'Renewal', amount: -15, sourceSubscriptionId: 'subscription' }];
+  expect(collectUpcomingItems(base, 14, new Date('2026-01-01'))).toMatchObject([{ module: 'subscriptions', amount: 15, estimate: true }]);
+});

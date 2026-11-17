@@ -21,6 +21,7 @@ export interface UpcomingItem {
   amount: number;
   currencyCode: string;
   kind: 'income' | 'expense';
+  estimate?: boolean;
   /** Kept for renderer compatibility. Upcoming is now future-only; overdue
    * obligations belong in Alerts and are never emitted by this collector. */
   overdue: false;
@@ -62,28 +63,58 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
   const windowEndStr = addUtcDays(todayStr, windowDays);
   const items: Array<Omit<UpcomingItem, 'dueLabel'>> = [];
   const plannedSubscriptionKeys = new Set<string>();
-
-  const addRecurringKeys = <T extends { sourceSubscriptionId?: string; recurrence?: PlannedCashEntry['recurrence']; date: string; cancelled?: boolean; executed?: boolean; completedDates?: string[]; executedThrough?: string }>(plans: T[]) => {
-    plans.forEach(plan => {
-      if (!plan.sourceSubscriptionId) return;
-      const dates = plan.recurrence
-        ? recurrenceOccurrencesWithin(plan.recurrence, todayStr, windowEndStr)
-        : [plan.date];
-      dates.filter(date => (!plan.cancelled || (plan.recurrence ? occurrenceCompleted(plan,date) : plan.executed)) && inWindow(date, todayStr, windowEndStr)).forEach(date => {
-        plannedSubscriptionKeys.add(`${plan.sourceSubscriptionId}@${date}`);
-      });
-    });
+  const currencyByAccount = new Map(inputs.bankAccounts
+    .filter(account => account.isActive !== false && !account.migratedToCreditCardId)
+    .map(account => [account.id, account.currencyCode]));
+  const currencyByCard = new Map((inputs.creditCards ?? [])
+    .filter(card => card.isActive !== false)
+    .map(card => [card.id, card.currencyCode]));
+  const activeLoans = inputs.emiLoans.filter(loan => loan.isActive !== false);
+  const contracts = new Map(activeLoans.filter(loan => loan.contractSchedule).map(loan => {
+    const rows = emiRepaymentSummary(loan, inputs.emiRepayments ?? [], todayStr).independent!.rows;
+    return [loan.id, { loan, rows: new Map(rows.map(row => [row.id, row])) }];
+  }));
+  type FundedPlan = Pick<PlannedCashEntry, 'sourceEmiLoanId' | 'sourceEmiObligationId'>;
+  type Item = Omit<UpcomingItem, 'dueLabel'>;
+  const fundedRows = new Map<string, Item[]>();
+  const obligationKey = (loanId: string, obligationId: string) => JSON.stringify([loanId, obligationId]);
+  const addItem = (plan: FundedPlan, item: Item, canFundLoan: boolean) => {
+    if (!plan.sourceEmiObligationId) { items.push(item); return; }
+    const contract = plan.sourceEmiLoanId ? contracts.get(plan.sourceEmiLoanId) : undefined;
+    const row = contract?.rows.get(plan.sourceEmiObligationId);
+    if (!contract || !row || row.dueDate !== item.date || contract.loan.currencyCode !== item.currencyCode ||
+        !canFundLoan || !Number.isFinite(item.amount) || item.amount <= 0) return;
+    const key = obligationKey(contract.loan.id, row.id);
+    const rows = fundedRows.get(key) ?? [];
+    rows.push(item);
+    fundedRows.set(key, rows);
   };
-  addRecurringKeys(inputs.plannedCash);
-  addRecurringKeys(inputs.plannedBank);
-  addRecurringKeys(inputs.plannedCreditCards ?? []);
+
+  type SubscriptionPlan = PlannedCashEntry | PlannedBankTransaction | PlannedCreditCardTransaction;
+  const activeSubscriptions = new Map(inputs.subscriptions.filter(row => row.active).map(row => [row.id, row]));
+  const addRecurringKeys = (plans: SubscriptionPlan[], payingCurrency: (plan: SubscriptionPlan) => string | undefined) => {
+    for (const plan of plans) {
+      const subscription = plan.sourceSubscriptionId ? activeSubscriptions.get(plan.sourceSubscriptionId) : undefined;
+      if (!subscription) continue;
+      const dates = plan.recurrence ? recurrenceOccurrencesWithin(plan.recurrence, todayStr, windowEndStr) : [plan.date];
+      for (const date of dates.filter(date => inWindow(date, todayStr, windowEndStr))) {
+        const completed = plan.recurrence ? occurrenceCompleted(plan, date) : plan.executed;
+        if (completed || (!plan.cancelled && payingCurrency(plan) === subscription.currencyCode)) {
+          plannedSubscriptionKeys.add(`${subscription.id}@${date}`);
+        }
+      }
+    }
+  };
+  addRecurringKeys(inputs.plannedCash, plan => 'currencyCode' in plan && plan.type === 'OUT' ? plan.currencyCode : undefined);
+  addRecurringKeys(inputs.plannedBank, plan => 'accountId' in plan && plan.amount < 0 ? currencyByAccount.get(plan.accountId) : undefined);
+  addRecurringKeys(inputs.plannedCreditCards ?? [], plan => 'cardId' in plan && plan.kind === 'charge' ? currencyByCard.get(plan.cardId) : undefined);
 
   inputs.plannedCash.forEach(plan => {
     if(plan.cancelled)return;
     const label = plan.category?.trim() || plan.note?.trim() || 'Cash plan';
     const add = (date: string, id: string) => {
       if (!inWindow(date, todayStr, windowEndStr)) return;
-      items.push({ id, date, module: 'cash', label, amount: Math.abs(plan.amount), currencyCode: plan.currencyCode, kind: plan.type === 'IN' ? 'income' : 'expense', overdue: false });
+      addItem(plan, { id, date, module: 'cash', label, amount: Math.abs(plan.amount), currencyCode: plan.currencyCode, kind: plan.type === 'IN' ? 'income' : 'expense', overdue: false }, plan.type === 'OUT');
     };
     if (plan.recurrence) {
       recurrenceOccurrencesWithin(plan.recurrence, todayStr, windowEndStr)
@@ -92,15 +123,13 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
     } else if (!plan.executed) add(plan.date, plan.id);
   });
 
-  const activeAccounts = inputs.bankAccounts.filter(account => account.isActive !== false);
-  const currencyByAccount = new Map(activeAccounts.map(account => [account.id, account.currencyCode]));
   inputs.plannedBank.forEach(plan => {
     if(plan.cancelled)return;
     const currencyCode = currencyByAccount.get(plan.accountId);
     if (!currencyCode) return;
     const add = (date: string, id: string) => {
       if (!inWindow(date, todayStr, windowEndStr)) return;
-      items.push({ id, date, module: 'bank', label: plan.description, amount: Math.abs(plan.amount), currencyCode, kind: plan.amount >= 0 ? 'income' : 'expense', overdue: false });
+      addItem(plan, { id, date, module: 'bank', label: plan.description, amount: Math.abs(plan.amount), currencyCode, kind: plan.amount >= 0 ? 'income' : 'expense', overdue: false }, plan.amount < 0);
     };
     if (plan.recurrence) {
       recurrenceOccurrencesWithin(plan.recurrence, todayStr, windowEndStr)
@@ -109,15 +138,13 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
     } else if (!plan.executed) add(plan.date, plan.id);
   });
 
-  const activeCards = (inputs.creditCards ?? []).filter(card => card.isActive !== false);
-  const currencyByCard = new Map(activeCards.map(card => [card.id, card.currencyCode]));
   (inputs.plannedCreditCards ?? []).forEach(plan => {
     if(plan.cancelled)return;
     const currencyCode = currencyByCard.get(plan.cardId);
     if (!currencyCode) return;
     const add = (date: string, id: string) => {
       if (!inWindow(date, todayStr, windowEndStr)) return;
-      items.push({ id, date, module: 'creditCards', label: plan.description, amount: Math.abs(plan.amount), currencyCode, kind: 'expense', overdue: false });
+      addItem(plan, { id, date, module: 'creditCards', label: plan.description, amount: Math.abs(plan.amount), currencyCode, kind: 'expense', overdue: false }, plan.kind === 'charge');
     };
     if (plan.recurrence) {
       recurrenceOccurrencesWithin(plan.recurrence, todayStr, windowEndStr)
@@ -126,14 +153,19 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
     } else if (!plan.executed) add(plan.date, plan.id);
   });
 
-  inputs.emiLoans.filter(loan => loan.isActive !== false).forEach(loan => {
-    if (loan.contractSchedule) {
-      const report = emiRepaymentSummary(loan, inputs.emiRepayments ?? [], todayStr).independent!;
-      for (const row of report.rows.filter(row => row.remaining > 0 && inWindow(row.dueDate, todayStr, windowEndStr))) {
-        const represented = inputs.plannedBank.some(plan => plan.sourceEmiLoanId === loan.id && plan.sourceEmiObligationId === row.id && !plan.executed && !plan.cancelled)
-          || inputs.plannedCash.some(plan => plan.sourceEmiLoanId === loan.id && plan.sourceEmiObligationId === row.id && !plan.executed && !plan.cancelled)
-          || (inputs.plannedCreditCards ?? []).some(plan => plan.sourceEmiLoanId === loan.id && plan.sourceEmiObligationId === row.id && !plan.executed && !plan.cancelled);
-        if (!represented) items.push({ id: `emi-contract:${loan.id}:${row.id}`, date: row.dueDate, module: 'emi', label: `${loan.name}: ${row.description}`, amount: row.remaining, currencyCode: loan.currencyCode, kind: 'expense', overdue: false });
+  activeLoans.forEach(loan => {
+    const contract = contracts.get(loan.id);
+    if (contract) {
+      for (const row of contract.rows.values()) {
+        if (!(row.remaining > 0.0000001 && inWindow(row.dueDate, todayStr, windowEndStr))) continue;
+        const funding = fundedRows.get(obligationKey(loan.id, row.id)) ?? [];
+        const plannedAmount = funding.reduce((sum, item) => sum + item.amount, 0);
+        const validFunding = plannedAmount <= row.remaining + 0.0000001;
+        if (validFunding) items.push(...funding);
+        const remainder = validFunding ? row.remaining - plannedAmount : row.remaining;
+        if (remainder > 0.0000001) {
+          items.push({ id: `emi-contract:${loan.id}:${row.id}`, date: row.dueDate, module: 'emi', label: `${loan.name}: ${row.description}`, amount: remainder, currencyCode: loan.currencyCode, kind: 'expense', overdue: false });
+        }
       }
       return;
     }
@@ -152,7 +184,7 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
       && currencyByAccount.get(plan.accountId) === loan.currencyCode
       && plan.amount < 0 && Math.abs(-plan.amount - next.emi) < 0.000001);
     if (representedByBank) return;
-    items.push({ id: `${loan.id}@${due}`, date: due, module: 'emi', label: `${loan.name} installment`, amount: next.emi, currencyCode: loan.currencyCode, kind: 'expense', overdue: false });
+    items.push({ id: `${loan.id}@${due}`, date: due, module: 'emi', label: `${loan.name} installment`, amount: next.emi, currencyCode: loan.currencyCode, estimate: true, kind: 'expense', overdue: false });
   });
 
   const activeProperties = inputs.rentalProperties.filter(property => property.isActive !== false);
@@ -190,6 +222,7 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
         module: 'subscriptions',
         label: subscription.name,
         amount: occurrence.amount,
+        estimate: true,
         currencyCode: subscription.currencyCode,
         kind: 'expense',
         overdue: false,

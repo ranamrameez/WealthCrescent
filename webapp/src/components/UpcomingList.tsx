@@ -45,7 +45,7 @@ export function UpcomingList({
           <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
             <span className="text-muted" style={{ marginRight: 8 }}>{item.date} · {item.dueLabel}</span>
             {item.label}
-            <span className="text-muted" style={{ marginLeft: 8 }}>({MODULE_LABELS[item.module]})</span>
+            <span className="text-muted" style={{ marginLeft: 8 }}>({MODULE_LABELS[item.module]}{item.estimate ? ' · Estimate' : ''})</span>
 
           </span>
           <span className={item.kind === 'income' ? 'pill-positive' : 'pill-negative'} style={{ flexShrink: 0 }}>
