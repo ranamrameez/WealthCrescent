@@ -15,7 +15,7 @@ The register lives on the shared delivery branch linked to the active PR. For th
 | Integrate the PSX cash reconciliation from main | Done | WC-TR coordination, PR #51 | Merged main at `23085a33` and kept both release notes. |
 | Protect linked independent installment receipts from generic edits and deletions | Done | WC-TR coordination, PR #51 | Shared transfer actions, bank account changes and loan deletion. Cash, Bank and card fixtures passed with the full suite. |
 | Coordinate reversal with the funding ledger | Ready | | Depends on linked-receipt protection and atomic payment persistence. |
-| Reset pending-payment execution history with app data | In progress | WC-TR coordination, PR #51, 2026-11-18 UTC | Include execution history in acknowledged full account reset. |
+| Reset pending-payment execution history with app data | Done | WC-TR coordination, PR #51 | The atomic full reset clears execution history together with all 18 workbook paths. Focused reset, payment and maintenance tests passed. |
 | Integrate and verify atomic multi-workbook payment persistence | Ready | | Verify the owner-only RTDB rules and emulator behavior. Integrate pending records with reporting, deliberate settlement, backup and reset before activation. |
 | Count pending Cash and Bank occurrences once in movement reports | Done | WC-TR coordination, PR #51 | Focused movement regressions cover explicit linkage, recurring dates, bank-account scope and removal. |
 | Hide already-pending Cash and Bank occurrences from Upcoming | Done | WC-TR coordination, PR #51 | Service test verifies that adding and removing a linked pending record refreshes Upcoming while keeping later recurring occurrences. |

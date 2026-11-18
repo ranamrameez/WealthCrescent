@@ -1,4 +1,5 @@
 import { ref, update } from 'firebase/database';
+import { PAYMENT_EXECUTIONS_PATH } from '../../lib/firebase/paymentPaths';
 import { auth, db, firebaseReady } from '../../lib/firebase/client';
 import { beginWorkbookMaintenance } from '../../lib/firebase/workbookMaintenance';
 import { resetAllLocalWorkbooks } from '../../lib/resetLocalData';
@@ -11,7 +12,7 @@ export async function removeAllFinancialData(expectedUid: string) {
   }
   const finish = beginWorkbookMaintenance();
   try {
-    const updates: Record<string, unknown> = {};
+    const updates: Record<string, unknown> = { [PAYMENT_EXECUTIONS_PATH]: null };
     const updated = new Date().toISOString();
     for (const key of Object.keys(CREATE_EMPTY) as Array<keyof typeof CREATE_EMPTY>) {
       updates[CLOUD_PATH_SUFFIX[key]] = JSON.parse(JSON.stringify({ ...CREATE_EMPTY[key](), _updated: updated }));

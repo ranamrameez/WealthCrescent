@@ -1,4 +1,5 @@
 import { ref, runTransaction } from 'firebase/database';
+import { PAYMENT_EXECUTIONS_PATH } from '../../lib/firebase/paymentPaths';
 import { validBatchDate } from '../../lib/dateValidation';
 import { CalculationEngine } from '../../lib/calc/CalculationEngine';
 import { planOccurrenceRecordId } from '../../lib/calc/planOccurrenceIdentity';
@@ -13,8 +14,6 @@ import type { InterEntityWorkbook } from '../../types/interEntityTransfer';
 import type { CashEntry, CashWorkbook } from '../../types/cashWorkbook';
 import type { PlannedBankTransaction, PlannedBankWorkbook } from '../../types/plannedBank';
 import type { PlannedCashEntry, PlannedCashWorkbook } from '../../types/plannedCash';
-
-const PAYMENT_EXECUTIONS_PATH = 'paymentExecutions';
 
 interface PendingExecution {
   id: string;

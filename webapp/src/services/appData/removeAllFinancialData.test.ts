@@ -6,13 +6,14 @@ vi.mock('../../lib/resetLocalData', () => ({ resetAllLocalWorkbooks: mocks.reset
 import { removeAllFinancialData } from './removeAllFinancialData';
 import { workbookSyncEpoch, workbookSyncPaused } from '../../lib/firebase/workbookMaintenance';
 beforeEach(() => { vi.clearAllMocks(); mocks.auth.currentUser = { uid: 'owner' }; mocks.update.mockResolvedValue(undefined); });
-it('atomically replaces all 18 module paths under only the confirmed user', async () => {
+it('atomically resets all module paths and payment history under only the confirmed user', async () => {
   const epoch = workbookSyncEpoch();
   await removeAllFinancialData('owner');
   expect(mocks.update).toHaveBeenCalledTimes(1);
   const [path, data] = mocks.update.mock.calls[0];
   expect(path).toBe('users/owner');
-  expect(Object.keys(data)).toHaveLength(18);
+  expect(Object.keys(data)).toHaveLength(19);
+  expect(data.paymentExecutions).toBeNull();
   expect(data.workbook.transactions).toEqual([]);
   expect(data.plannedCash.entries).toEqual([]);
   expect(data.bank.transactions).toEqual([]);
