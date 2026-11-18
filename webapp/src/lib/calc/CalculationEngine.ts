@@ -38,6 +38,7 @@ import * as rentalActuals from './rentalsModule';
 import * as categoryGroups from './categoryGroups';
 import * as recentActivity from './recentActivity';
 import * as movements from './movementActivities';
+import * as pendingPayments from './pendingPayment';
 import * as manualPayments from './manualPlanFulfillment';
 import * as unifiedBudgets from './unifiedBudgets';
 import * as installmentLedger from './installmentLedger';
@@ -76,6 +77,7 @@ export const CalculationEngine = Object.freeze({
   recentActivity,
   movements,
   manualPayments,
+  pendingPayments,
   installmentLedger,
 });
 

@@ -1,3 +1,4 @@
+import { fingerprint } from './workbookFingerprint';
 import { workbookSyncEpoch, workbookSyncPaused } from './workbookMaintenance';
 import type { User } from 'firebase/auth';
 import { onValue, ref, runTransaction } from 'firebase/database';
@@ -33,14 +34,6 @@ export interface MinimalWorkbookStore<TWorkbook> {
  * a note carried `note: undefined`. */
 export function stripUndefinedDeep<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
-}
-
-/** RTDB snapshots may enumerate identical object keys in different orders. */
-function fingerprint(value: unknown): string {
-  return JSON.stringify(value, (_key, node: unknown) => {
-    if (!node || typeof node !== 'object' || Array.isArray(node)) return node;
-    return Object.fromEntries(Object.entries(node).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0));
-  });
 }
 
 /** Generic per-module Firebase sync, factored out so every module (QSE,

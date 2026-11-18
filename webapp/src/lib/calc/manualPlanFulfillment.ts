@@ -1,6 +1,7 @@
 import type { PlannedRentalEntry } from '../../types/plannedRentals';
 import type { RentalEntry } from '../../types/rentalsWorkbook';
 import { validBatchDate } from '../dateValidation';
+import { planOccurrenceRecordId } from './planOccurrenceIdentity';
 import { planOccurrences } from './planOccurrences';
 import type { FinancePlan, PlanReference } from './financePlanModel';
 import type { CashEntry } from '../../types/cashWorkbook';
@@ -20,7 +21,7 @@ export function prepareManualPlanFulfillment(reference: PlanReference, plan: Fin
   const planLink: PlanLink = { module: reference.module, planId: plan.id, occurrenceDate, groupId: plan.groupId };
   if('sourceEmiLoanId' in plan && typeof plan.sourceEmiLoanId==='string' && plan.sourceEmiLoanId)planLink.source={module:'emi',id:plan.sourceEmiLoanId};
   else if('sourceSubscriptionId' in plan && typeof plan.sourceSubscriptionId==='string' && plan.sourceSubscriptionId)planLink.source={module:'subscription',id:plan.sourceSubscriptionId};
-  const id = 'plan:' + reference.module + ':' + encodeURIComponent(plan.id) + ':' + occurrenceDate;
+  const id = planOccurrenceRecordId(reference, occurrenceDate);
   const common = { id, date: actualDate, source: 'manual' as const, categoryID, planLink };
   const result = reference.module === 'cash' && 'currencyCode' in plan && 'type' in plan
     ? { module: 'cash' as const, record: { ...common, currencyCode: plan.currencyCode, amount: plan.amount, isDeposit: plan.type === 'IN', category: plan.category, note: plan.note } satisfies CashEntry }
