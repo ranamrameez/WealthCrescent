@@ -236,3 +236,20 @@ it('keeps linked Cash and Bank occurrences in pending movement without repeating
   f.base.bankTransactions = [];
   expect(collect(f, ['bank']).map(row => row.id)).toContain('bank-plan');
 });
+
+it('includes uncovered rent only as a planned estimate', () => {
+  const f = fixture();
+  const property = { id: 'lease', name: 'Home', currencyCode: 'QAR', collectionCycle: 'monthly' as const,
+    lastCollectionDate: '2026-01-03', monthlyRent: 100, pendingRentBalance: 7 };
+  f.base.rentalProperties.push(property, { ...property, id: 'archived', isActive: false },
+    { ...property, id: 'ended', leaseEndDate: '2026-02-01' });
+  f.base.plannedRentals.push({ id: 'maintenance', propertyId: property.id, date: '2026-02-03', type: 'EXPENSE', amount: 20 });
+  const rows = collect(f, ['rentals']);
+  expect(rows.filter(row => row.recordType === 'rent-estimate')).toMatchObject([{
+    id: 'lease@2026-02-03', currencyCode: 'QAR', amount: 107, executed: false,
+  }]);
+  expect(engine.movements.selectMovementActivities(rows, '2026-01-01', '2026-02-28', '2026-02-28', 'actual')).toEqual([]);
+  expect(engine.movements.selectMovementActivities(rows, '2026-01-01', '2026-02-28', '2026-02-28', 'pending')).toEqual([]);
+  f.base.plannedRentals.push({ id: 'rent', propertyId: property.id, date: '2026-02-03', type: 'RENT_INCOME', amount: 107 });
+  expect(collect(f, ['rentals']).map(row => row.id)).toEqual(['maintenance', 'rent']);
+});

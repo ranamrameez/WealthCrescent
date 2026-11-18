@@ -12,7 +12,7 @@ import type { Property } from '../../types/rentalsWorkbook';
 import type { Subscription } from '../../types/subscriptionsWorkbook';
 import { recurrenceOccurrencesWithin } from './recurrence';
 import { emiSchedule, emiSummary, emiRepaymentSummary, installmentDueDate } from './emiModule';
-import { proposeRentCollection } from './rentalPlanning';
+import { standaloneRentCollections } from './rentalPlanning';
 import { generateRenewalOccurrences } from './subscriptionsModule';
 
 export interface UpcomingItem {
@@ -216,11 +216,9 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
 
   const activeProperties = inputs.rentalProperties.filter(property => property.isActive !== false);
   const propertyById = new Map(activeProperties.map(property => [property.id, property]));
-  const plannedRentalKeys = new Set<string>();
   (inputs.plannedRentals ?? []).forEach(plan => {
     const property = propertyById.get(plan.propertyId);
     if (!property || plan.executed || plan.cancelled || !inWindow(plan.date, todayStr, windowEndStr)) return;
-    plannedRentalKeys.add(`${plan.propertyId}@${plan.date}`);
     items.push({
       id: plan.id,
       date: plan.date,
@@ -232,12 +230,10 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
       overdue: false,
     });
   });
-  activeProperties.forEach(property => {
-    const proposal = proposeRentCollection(property, today);
-    if (!proposal || !inWindow(proposal.dueDate, todayStr, windowEndStr)) return;
-    if (plannedRentalKeys.has(`${property.id}@${proposal.dueDate}`)) return;
-    items.push({ id: `${property.id}@${proposal.dueDate}`, date: proposal.dueDate, module: 'rentals', label: `${property.name} rent`, amount: proposal.amount, currencyCode: property.currencyCode, kind: 'income', overdue: false });
-  });
+  for (const { property, dueDate, amount } of standaloneRentCollections(activeProperties, inputs.plannedRentals ?? [], today, windowEndStr)) {
+    items.push({ id: `${property.id}@${dueDate}`, date: dueDate, module: 'rentals', label: `${property.name} rent`, amount,
+      currencyCode: property.currencyCode, estimate: true, kind: 'income', overdue: false });
+  }
 
   for (const { subscription, date, amount } of standaloneSubscriptionRenewals(inputs, today, windowEndStr)) {
     items.push({

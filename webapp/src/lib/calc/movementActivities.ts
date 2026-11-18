@@ -11,6 +11,7 @@ import { categoryName } from '../categories';
 import { planOccurrences } from './planOccurrences';
 import { makeQSEFeeCalculator } from './fees';
 import { makePSXFeeCalculator } from './psxFees';
+import { standaloneRentCollections } from './rentalPlanning';
 import { standaloneSubscriptionRenewals } from './upcoming';
 import type { Subscription } from '../../types/subscriptionsWorkbook';
 
@@ -45,10 +46,19 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
     .map(item => ({ ...item, recordType: item.executed?'entry':'plan', movementKind: item.sourceEmiLoanId?'financing':item.module==='rentals' || item.sourceSubscriptionId?'operating':'unclassified' }));
   const add = (row: MovementActivity) => { if (Number.isFinite(row.amount) && row.date && row.currencyCode) rows.push(row); };
   const cards = new Map(native.cards.cards.map(card => [card.id,card]));
+  const asOf = window.asOf ?? new Date();
+  const horizonEnd = new Date(asOf);
+  horizonEnd.setUTCDate(horizonEnd.getUTCDate() + (window.horizonDays ?? 365));
+  const through = window.toDate ?? horizonEnd.toISOString().slice(0, 10);
+  if (modules.includes('rentals')) {
+    for (const { property, dueDate, amount } of standaloneRentCollections(input.base.rentalProperties, input.base.plannedRentals, asOf, through)) {
+      if (window.fromDate && dueDate < window.fromDate) continue;
+      add({ id: `${property.id}@${dueDate}`, recordType: 'rent-estimate', module: 'rentals',
+        sourceId: property.id, sourceLabel: property.name, date: dueDate, amount, currencyCode: property.currencyCode,
+        description: `${property.name} (estimated rent collection)`, movementKind: 'operating', executed: false });
+    }
+  }
   if (modules.includes('subscriptions') && input.subscriptions?.length) {
-    const asOf = window.asOf ?? new Date();
-    const horizonEnd = new Date(asOf);
-    horizonEnd.setUTCDate(horizonEnd.getUTCDate() + (window.horizonDays ?? 365));
     const renewals = standaloneSubscriptionRenewals({
       subscriptions: input.subscriptions,
       plannedCash: input.base.plannedCash,
@@ -56,7 +66,7 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
       bankAccounts: input.base.bankAccounts,
       plannedCreditCards: input.plannedCards,
       creditCards: native.cards.cards.filter(card => sourcePolicy === 'all-ledgers' || card.includeInNetWorth !== false),
-    }, asOf, window.toDate ?? horizonEnd.toISOString().slice(0, 10));
+    }, asOf, through);
     for (const { subscription, date, amount } of renewals) {
       if (amount <= 0 || (window.fromDate && date < window.fromDate)) continue;
       add({ id: `${subscription.id}@${date}`, recordType: 'subscription-estimate', module: 'subscriptions', sourceId: subscription.id,
