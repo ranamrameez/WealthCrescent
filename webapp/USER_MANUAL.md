@@ -1181,3 +1181,7 @@ In **Contract & payments**, choose **Reverse payment** on an unlinked receipt. E
 ### Export currency budget reports
 
 Open the **Currency budgets** card menu in Planning and choose **Export monthly balances** or **Export allocation details**. The CSV uses the selected calendar months and the report's cleared-record cutoff. Each row includes its native currency.
+
+### Quick import from The Group
+
+Choose **Import QSE trades** on the main Dashboard or the QSE Dashboard. Open a statement, confirm the broker shown in the popup, and review the existing and statement values. Select individual trades or use the bulk selection controls, then choose **Import selected trades**.

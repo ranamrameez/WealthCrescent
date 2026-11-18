@@ -1,3 +1,7 @@
+## QSE dashboard import
+
+The focused dashboard import branch brings the reviewed Trade list importer to both dashboards. Both entry points use the same broker/account review and ledger checks. The wider reporting and payment acceptance stays tracked on PR #51.
+
 ## EMI archive recovery service
 
 Added an account-bound restore preview and typed-name apply command. It restores the archived contract, allocations, balance mode, overrides and native receipts while keeping current loan metadata and other loans. It blocks conflicting IDs, linked receipts, receipt budget allocations and legacy restores with active planning dependencies. The existing contract service refreshes linked plans for independent contracts. Restore archives the displaced ledger. The installment ledger now offers archive selection, review and typed confirmation. The regression test verifies scope, focus and receipt replacement. Complete desktop and mobile browser acceptance once the fixture is reachable.

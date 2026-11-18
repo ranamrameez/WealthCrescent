@@ -21,6 +21,10 @@ FinanceManager live link:
 > `SESSION_HANDOFF.md` current; never push directly to `main`; and do not merge until the
 > latest application-code head passes the full test suite and production build/type-check.
 
+## QSE statement quick import
+
+Use **Import QSE trades** on the main Dashboard or the QSE Dashboard to review and selectively apply The Group trades for the active broker. See [Importing The Group statements](docs/the-group-import.md).
+
 ## Current session handoff
 
 For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) first. **Latest checkpoint: 2026-11-05 — financial correctness is the priority on the existing branch / draft PR #51.** Source through 44018f7b is published on PR #51 and passed GitHub Actions #432. The newer Banking aggregate/budget and App Data removal changes are tracked in the current handoff. The handoff records exact local tests/build results and pending final-suite/browser/CI validation. Nothing has been merged to main in this continuation.

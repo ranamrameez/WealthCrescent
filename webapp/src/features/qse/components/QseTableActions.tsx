@@ -1,5 +1,5 @@
 import { QseStatementTradeReview } from './QseStatementTradeReview';
-import { previewQseStatementTrades, type QseStatementTradePreview } from '../../../services/finance/qseStatementImportService';
+import { prepareQseStatementTradeReview, type QseStatementTradePreview } from '../../../services/finance/qseStatementImportService';
 import type { TableCardDateSort } from '../../../components/tableSortContext';
 import { parseTheGroupStatement, readStatementXlsx, type StatementRecord } from '../../../lib/theGroupStatement';
 import { TransactionEntryModal } from '../../../components/TransactionEntryModal';
@@ -131,13 +131,8 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
       const table = xlsx ? readStatementXlsx(new Uint8Array(await file.arrayBuffer())) : parseCSV(await file.text());
       const isStatement = xlsx || table.some(row => row[0]?.trim().toLowerCase() === 'date' && row[1]?.trim().toLowerCase() === 'type' && row[2]?.trim().toLowerCase() === 'count');
       if (isStatement && kind === 'transactions') {
-        if (!(await ensureSignedIn('Sign in to review trades for import.'))) return;
-        const owner = getCurrentUser()?.uid;
-        const latest = useWorkbookStore.getState().workbook;
-        if (!owner || owner !== getCurrentUser()?.uid || (requestedOwner && owner !== requestedOwner) || latest.activeBrokerId !== brokerId) {
-          throw new Error('The account or broker changed. Open the statement again.');
-        }
-        setStatementReview(previewQseStatementTrades(table, file.name, tickerNames, latest, owner));
+        const preview = await prepareQseStatementTradeReview(table, file.name, tickerNames, { owner: requestedOwner, brokerId }, ensureSignedIn);
+        if (preview) setStatementReview(preview);
         return;
       }
       let statementWarning = '';

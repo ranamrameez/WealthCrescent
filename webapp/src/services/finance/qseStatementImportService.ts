@@ -4,6 +4,22 @@ import { parseTheGroupStatement } from '../../lib/theGroupStatement';
 import { useWorkbookStore } from '../../store/workbookStore';
 import type { Transaction, Workbook } from '../../types/workbook';
 
+export async function prepareQseStatementTradeReview(
+  table: string[][],
+  fileName: string,
+  tickerNames: Record<string, string>,
+  requested: { owner?: string; brokerId: string },
+  ensureSignedIn: (message: string) => Promise<boolean>,
+) {
+  if (!(await ensureSignedIn('Sign in to review trades for import.'))) return null;
+  const owner = getCurrentUser()?.uid;
+  const workbook = useWorkbookStore.getState().workbook;
+  if (!owner || (requested.owner && owner !== requested.owner) || workbook.activeBrokerId !== requested.brokerId) {
+    throw new Error('The account or broker changed. Open the statement again.');
+  }
+  return previewQseStatementTrades(table, fileName, tickerNames, workbook, owner);
+}
+
 function ledgerSnapshot(workbook: Workbook) {
   const { transactions, transfers, adjustments, dividends } = workbook;
   return JSON.stringify({ transactions, transfers, adjustments, dividends });

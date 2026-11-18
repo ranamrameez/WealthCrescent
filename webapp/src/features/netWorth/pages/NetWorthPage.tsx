@@ -1,3 +1,4 @@
+import { QseDashboardQuickImport } from '../../qse/components/QseDashboardQuickImport';
 import { ValueChange } from '../../../components/ValueChange';
 import { MonthlyStatsWidget } from '../../../components/MonthlyStatsWidget';
 import { useTablePagination } from '../../../hooks/useTablePagination';
@@ -321,7 +322,7 @@ export function NetWorthPage(_legacySyncProps: {
 
   return (
     <div className="standard-page">
-      <div className="page-heading"><h1>Dashboard</h1><span className="text-muted">Selected range: {rangeLabel}</span></div>
+      <div className="page-heading"><h1>Dashboard</h1><div className="row gap-sm"><span className="text-muted">Selected range: {rangeLabel}</span><QseDashboardQuickImport /></div></div>
       {fundsCashRequiresOptIn && <Notice tone="warning" className="mb-md">Funds totals include holdings only. Legacy purchase history does not establish a funded cash balance. Enable Funds cash in Dashboard filters only after reconciling its deposits and withdrawals.</Notice>}
       <StandardPageSections preserveOrder sections={[{ key: 'summary', icon: <DashboardIcon size={16} />, label: 'Overall summary', defaultOpen: true,  content: <SummarySections>
         {preferredCurrencyOptions.map(({ code: preferredCurrency }) => {

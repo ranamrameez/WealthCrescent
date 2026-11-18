@@ -22,7 +22,13 @@ function TradeCard({ title, trade, currency }: { title: string; trade: Transacti
   </div>;
 }
 
-export function QseStatementTradeReview({ preview, onClose }: { preview: QseStatementTradePreview; onClose: () => void }) {
+export function QseStatementTradeReview(props: { preview: QseStatementTradePreview; onClose: () => void }) {
+  return <Modal title="Review The Group trades" onClose={props.onClose} widthClass="60" manageFocus>
+    <QseStatementTradeReviewContent {...props} />
+  </Modal>;
+}
+
+export function QseStatementTradeReviewContent({ preview, onClose }: { preview: QseStatementTradePreview; onClose: () => void }) {
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
@@ -55,8 +61,7 @@ export function QseStatementTradeReview({ preview, onClose }: { preview: QseStat
     }
   };
 
-  return <Modal title="Review The Group trades" onClose={onClose} widthClass="60" manageFocus>
-    <div className="stack-md">
+  return <div className="stack-md">
       <p>{preview.fileName} · {preview.brokerName}</p>
       <Notice tone="warning">The statement rounds cash amounts and commissions. Trade values use the statement’s shares and price with the broker’s configured fees. Existing fee overrides are kept. This review imports trades only.</Notice>
       <div className="row gap-sm">
@@ -94,6 +99,5 @@ export function QseStatementTradeReview({ preview, onClose }: { preview: QseStat
             {match ? ' Use statement values for this match' : ' Import this new trade'}
           </label>}
       </section>)}
-    </div>
-  </Modal>;
+  </div>;
 }
