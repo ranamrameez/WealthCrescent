@@ -57,6 +57,31 @@ function inWindow(date: string, today: string, end: string): boolean {
   return date >= today && date <= end;
 }
 
+/** The next installment for each legacy loan without a matching active bank plan. */
+export function standaloneLegacyInstallments(
+  inputs: Pick<UpcomingInputs, 'emiLoans' | 'plannedBank' | 'bankAccounts'>,
+  asOf: Date,
+  through: string,
+) {
+  const from = asOf.toISOString().slice(0, 10);
+  const currencyByAccount = new Map(inputs.bankAccounts
+    .filter(account => account.isActive !== false && !account.migratedToCreditCardId)
+    .map(account => [account.id, account.currencyCode]));
+  return inputs.emiLoans.flatMap(loan => {
+    if (loan.isActive === false || loan.contractSchedule) return [];
+    const next = emiSchedule(loan).rows[emiSummary(loan, asOf).elapsed];
+    if (!next || !Number.isFinite(next.emi) || next.emi <= 0) return [];
+    const date = installmentDueDate(loan, next.month);
+    if (!inWindow(date, from, through)) return [];
+    // Loan ID plus due date identifies the occurrence even on plans with a stale installment index.
+    const covered = inputs.plannedBank.some(plan =>
+      !plan.executed && !plan.cancelled && !plan.recurrence && plan.sourceEmiLoanId === loan.id &&
+      plan.date === date && currencyByAccount.get(plan.accountId) === loan.currencyCode &&
+      plan.amount < 0 && Math.abs(-plan.amount - next.emi) < 0.000001);
+    return covered ? [] : [{ loan, date, amount: next.emi }];
+  });
+}
+
 /** A funded renewal belongs to its existing plan. Standalone schedules only
  * estimate future outflows, including when a funding source has gone inactive. */
 export function standaloneSubscriptionRenewals(
@@ -180,39 +205,23 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
     } else if (!plan.executed) add(plan.date, plan.id);
   });
 
-  activeLoans.forEach(loan => {
-    const contract = contracts.get(loan.id);
-    if (contract) {
-      for (const row of contract.rows.values()) {
-        if (!(row.remaining > 0.0000001 && inWindow(row.dueDate, todayStr, windowEndStr))) continue;
-        const funding = fundedRows.get(obligationKey(loan.id, row.id)) ?? [];
-        const plannedAmount = funding.reduce((sum, item) => sum + item.amount, 0);
-        const validFunding = plannedAmount <= row.remaining + 0.0000001;
-        if (validFunding) items.push(...funding);
-        const remainder = validFunding ? row.remaining - plannedAmount : row.remaining;
-        if (remainder > 0.0000001) {
-          items.push({ id: `emi-contract:${loan.id}:${row.id}`, date: row.dueDate, module: 'emi', label: `${loan.name}: ${row.description}`, amount: remainder, currencyCode: loan.currencyCode, kind: 'expense', overdue: false });
-        }
+  for (const { loan, rows } of contracts.values()) {
+    for (const row of rows.values()) {
+      if (!(row.remaining > 0.0000001 && inWindow(row.dueDate, todayStr, windowEndStr))) continue;
+      const funding = fundedRows.get(obligationKey(loan.id, row.id)) ?? [];
+      const plannedAmount = funding.reduce((sum, item) => sum + item.amount, 0);
+      const validFunding = plannedAmount <= row.remaining + 0.0000001;
+      if (validFunding) items.push(...funding);
+      const remainder = validFunding ? row.remaining - plannedAmount : row.remaining;
+      if (remainder > 0.0000001) {
+        items.push({ id: `emi-contract:${loan.id}:${row.id}`, date: row.dueDate, module: 'emi', label: `${loan.name}: ${row.description}`, amount: remainder, currencyCode: loan.currencyCode, kind: 'expense', overdue: false });
       }
-      return;
     }
-    const { rows } = emiSchedule(loan);
-    const summary = emiSummary(loan, today);
-    const next = rows[summary.elapsed];
-    if (!next) return;
-    const due = installmentDueDate(loan, next.month);
-    if (!inWindow(due, todayStr, windowEndStr)) return;
-    // The explicit loan ID plus due date identifies this occurrence. Legacy
-    // plans can carry a stale installment index; never rewrite it or infer settlement.
-    // Keep partial, differently dated/currency, completed or stale-source plans distinct.
-    const representedByBank = inputs.plannedBank.some(plan =>
-      !plan.executed && !plan.cancelled && !plan.recurrence && plan.sourceEmiLoanId === loan.id
-      && plan.date === due
-      && currencyByAccount.get(plan.accountId) === loan.currencyCode
-      && plan.amount < 0 && Math.abs(-plan.amount - next.emi) < 0.000001);
-    if (representedByBank) return;
-    items.push({ id: `${loan.id}@${due}`, date: due, module: 'emi', label: `${loan.name} installment`, amount: next.emi, currencyCode: loan.currencyCode, estimate: true, kind: 'expense', overdue: false });
-  });
+  }
+  for (const { loan, date, amount } of standaloneLegacyInstallments(inputs, today, windowEndStr)) {
+    items.push({ id: `${loan.id}@${date}`, date, module: 'emi', label: `${loan.name} installment`, amount,
+      currencyCode: loan.currencyCode, estimate: true, kind: 'expense', overdue: false });
+  }
 
   const activeProperties = inputs.rentalProperties.filter(property => property.isActive !== false);
   const propertyById = new Map(activeProperties.map(property => [property.id, property]));

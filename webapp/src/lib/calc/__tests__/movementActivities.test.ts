@@ -253,3 +253,19 @@ it('includes uncovered rent only as a planned estimate', () => {
   f.base.plannedRentals.push({ id: 'rent', propertyId: property.id, date: '2026-02-03', type: 'RENT_INCOME', amount: 107 });
   expect(collect(f, ['rentals']).map(row => row.id)).toEqual(['maintenance', 'rent']);
 });
+
+it('reports the next legacy EMI as planned until an active matching bank plan covers it', () => {
+  const f = fixture();
+  const loan = { id: 'legacy', name: 'Loan', currencyCode: 'QAR', lender: 'Bank', repaymentMode: 'fixedTotal' as const,
+    principal: 1200, totalToReturn: 1200, tenureMonths: 12, startDate: '2026-01-01' };
+  f.native.emi.entries.push(loan, { ...loan, id: 'independent', contractSchedule: [] });
+  f.base.bankAccounts.push({ id: 'checking', name: 'Checking', currencyCode: 'QAR', openingBalance: 0 });
+  const estimate = collect(f, ['emi']);
+  expect(estimate).toMatchObject([{ date: '2026-02-01', amount: -100, recordType: 'emi-estimate', executed: false }]);
+  expect(engine.movements.selectMovementActivities(estimate, '2026-01-01', '2026-02-28', '2026-02-28', 'actual')).toEqual([]);
+  f.base.plannedBank.push({ id: 'funding', date: '2026-02-01', amount: -100, accountId: 'checking',
+    description: 'Funding for installment', sourceEmiLoanId: loan.id });
+  expect(collect(f, ['emi', 'bank']).map(row => row.id)).toEqual(['funding']);
+  f.base.bankAccounts[0].isActive = false;
+  expect(collect(f, ['emi']).map(row => row.id)).toEqual(['legacy@2026-02-01']);
+});

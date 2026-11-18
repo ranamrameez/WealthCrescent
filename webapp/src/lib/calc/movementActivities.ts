@@ -12,7 +12,7 @@ import { planOccurrences } from './planOccurrences';
 import { makeQSEFeeCalculator } from './fees';
 import { makePSXFeeCalculator } from './psxFees';
 import { standaloneRentCollections } from './rentalPlanning';
-import { standaloneSubscriptionRenewals } from './upcoming';
+import { standaloneLegacyInstallments, standaloneSubscriptionRenewals } from './upcoming';
 import type { Subscription } from '../../types/subscriptionsWorkbook';
 
 export type MovementKind = 'operating' | 'financing' | 'investment' | 'transfer' | 'unclassified';
@@ -56,6 +56,18 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
       add({ id: `${property.id}@${dueDate}`, recordType: 'rent-estimate', module: 'rentals',
         sourceId: property.id, sourceLabel: property.name, date: dueDate, amount, currencyCode: property.currencyCode,
         description: `${property.name} (estimated rent collection)`, movementKind: 'operating', executed: false });
+    }
+  }
+  if (modules.includes('emi')) {
+    const independentLoanIds = new Set(input.links.filter(isIndependentInstallmentLink).map(link => link.to.ref));
+    for (const { loan, date, amount } of standaloneLegacyInstallments({
+      emiLoans: native.emi.entries.filter(loan => !independentLoanIds.has(loan.id)),
+      plannedBank: input.base.plannedBank, bankAccounts: input.base.bankAccounts,
+    }, asOf, through)) {
+      if (window.fromDate && date < window.fromDate) continue;
+      add({ id: `${loan.id}@${date}`, recordType: 'emi-estimate', module: 'emi', sourceId: loan.id,
+        sourceLabel: loan.name, date, amount: -amount, currencyCode: loan.currencyCode,
+        description: `${loan.name} (estimated installment)`, executed: false, movementKind: 'financing' });
     }
   }
   if (modules.includes('subscriptions') && input.subscriptions?.length) {
