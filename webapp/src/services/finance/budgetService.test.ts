@@ -1,17 +1,17 @@
 import { parseCSV } from '../../lib/csv';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { getBudgetOverview, exportBudgetCsv, saveBudget, saveBudgetAllocations, setBudgetMonthLimit, removeBudget } from './budgetService';
+import { getBudgetOverview, exportBudgetCsv, BUDGET_IMPORT_COLUMNS, previewBudgetDefinitionImport, applyBudgetDefinitionImport, saveBudget, saveBudgetAllocations, setBudgetMonthLimit, removeBudget } from './budgetService';
 import { usePlannedCashWorkbookStore } from '../../store/plannedCashWorkbookStore';
 import { useCashWorkbookStore } from '../../store/cashWorkbookStore';
 import { useCategoryStore } from '../../store/categoryStore';
-const session=vi.hoisted(()=>({ signedIn: true }));
-vi.mock('../../lib/firebase/client',()=>({ auth: { get currentUser() { return session.signedIn ? { uid:'budget-fixture' }:null; } },db:null,firebaseReady:false }));
+const session=vi.hoisted(()=>({ signedIn: true, uid: 'budget-fixture' }));
+vi.mock('../../lib/firebase/client',()=>({ auth: { get currentUser() { return session.signedIn ? { uid:session.uid }:null; } },db:null,firebaseReady:false }));
 const originalPlans=usePlannedCashWorkbookStore.getState().workbook;
 const originalCash=useCashWorkbookStore.getState().workbook;
 const originalCategories=useCategoryStore.getState().workbook;
 const input={ id:'food',name:'Food',currencyCode:'USD',startMonth:'2026-01',monthlyLimit:'100',categoryIds:['food-category'],rollover:'none' as const };
 beforeEach(()=>{
-  session.signedIn=true; vi.useFakeTimers({ toFake:['Date'] }); vi.setSystemTime(new Date('2026-01-31T12:00:00Z'));
+  session.signedIn=true; session.uid='budget-fixture'; vi.useFakeTimers({ toFake:['Date'] }); vi.setSystemTime(new Date('2026-01-31T12:00:00Z'));
   useCategoryStore.getState().setWorkbook({ categories:[{ id:'food-category',name:'Food',serialNumber:1,scope:'custom' }] });
   usePlannedCashWorkbookStore.getState().setWorkbook({ ...originalPlans,entries:[],budgets:[],budgetAllocations:[] });
   useCashWorkbookStore.getState().setWorkbook({settings:{defaultCurrency:'USD'},entries:[{id:'spent',date:'2026-01-02',amount:30,isDeposit:false,currencyCode:'USD',categoryID:'food-category',source:'manual'},{id:'income',date:'2026-01-03',amount:10,isDeposit:true,currencyCode:'USD',source:'manual'}]});
@@ -86,4 +86,27 @@ it('exports the same monthly balances and allocations through the selected cutof
   ]);
   const details = parseCSV(exportBudgetCsv(report, 'allocations').csv);
   expect(details.slice(1).map(row => row.slice(-3))).toEqual([['-30', '30', 'No'], ['10', '-10', 'Yes']]);
+});
+
+
+it('reviews an entire budget CSV without writing and refuses stale or invalid batches', () => {
+  const header = BUDGET_IMPORT_COLUMNS.join(',');
+  const food = 'new-food,Food,usd,120.50,2026-01,,surplus,food-category,';
+  const rent = 'rent,Rent,qar,0,2026-01,2026-12,balance,,';
+  const store = usePlannedCashWorkbookStore.getState();
+  expect(() => previewBudgetDefinitionImport([header, food, 'bad,Invalid,USD,,2026-01,,none,,'].join('\n'))).toThrow('row 2');
+  expect(() => previewBudgetDefinitionImport([header, food, food].join('\n'))).toThrow('already exists');
+  expect(() => previewBudgetDefinitionImport([header, food.replace('food-category', 'unknown')].join('\n'))).toThrow('category ID');
+  const preview = previewBudgetDefinitionImport([header, food, rent].join('\n'));
+  expect(usePlannedCashWorkbookStore.getState().workbook.budgets).toEqual([]);
+  session.uid = 'other-user';
+  expect(() => applyBudgetDefinitionImport(preview)).toThrow('account changed');
+  session.uid = 'budget-fixture';
+  expect(applyBudgetDefinitionImport(preview)).toBe(2);
+  expect(usePlannedCashWorkbookStore.getState().workbook.budgets).toMatchObject([
+    { id: 'new-food', currencyCode: 'USD', monthlyLimit: 120.5, categoryIds: ['food-category'] },
+    { id: 'rent', currencyCode: 'QAR', monthlyLimit: 0 },
+  ]);
+  expect(() => applyBudgetDefinitionImport(preview)).toThrow('already exists');
+  expect(usePlannedCashWorkbookStore.getState().workbook.budgetAllocations).toEqual(store.workbook.budgetAllocations);
 });

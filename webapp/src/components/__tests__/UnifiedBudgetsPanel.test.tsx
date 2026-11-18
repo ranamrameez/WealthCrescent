@@ -6,6 +6,7 @@ import { useCashWorkbookStore } from '../../store/cashWorkbookStore';
 import { useCategoryStore } from '../../store/categoryStore';
 const session=vi.hoisted(()=>({signedIn:true}));
 vi.mock('../../lib/firebase/client',()=>({auth:{get currentUser(){return session.signedIn?{uid:'budget-ui-fixture'}:null;}},db:null,firebaseReady:false}));
+vi.mock('../../lib/firebase/useAuthState', () => ({ getCurrentUser: () => ({ uid: 'budget-ui-fixture' }) }));
 vi.mock('../../lib/firebase/useEnsureSignedIn',()=>({useEnsureSignedIn:()=>async()=>true}));
 vi.mock('react-chartjs-2',()=>({Chart:()=> <div>Budget chart</div>,Doughnut:()=>null}));
 const originalPlans=usePlannedCashWorkbookStore.getState().workbook,originalCash=useCashWorkbookStore.getState().workbook,originalCategories=useCategoryStore.getState().workbook;
@@ -44,4 +45,24 @@ it('opens the shared searchable allocation picker and preserves a partial unallo
   await waitFor(()=>expect(usePlannedCashWorkbookStore.getState().workbook.budgetAllocations).toHaveLength(1));
   expect(unallocated.textContent).toContain('10.00');
   expect(useCashWorkbookStore.getState().workbook.entries).toHaveLength(1);
+});
+
+
+it('requires reviewing the CSV before saving budgets from the card menu', async () => {
+  show();
+  fireEvent.click(screen.getByRole('button', { name: 'Card options' }));
+  fireEvent.click(screen.getByText('Import budget definitions', { exact: true }));
+  const dialog = within(screen.getByRole('dialog', { name: 'Import budget definitions' }));
+  const apply = dialog.getByRole<HTMLButtonElement>('button', { name: 'Import reviewed budgets' });
+  expect(apply.disabled).toBe(true);
+  const file = new File([], 'budget.csv');
+  Object.defineProperty(file, 'text', { value: async () =>
+    'id,name,currency,monthly_limit,start_month,end_month,rollover,category_ids,plan_group_id\nnew,Food,USD,100,2026-01,,none,food,',
+  });
+  fireEvent.change(dialog.getByLabelText('Budget definitions CSV'), { target: { files: [file] } });
+  expect(await dialog.findByRole('table', { name: 'New budget definitions' })).toBeTruthy();
+  expect(usePlannedCashWorkbookStore.getState().workbook.budgets).toEqual([]);
+  fireEvent.click(apply);
+  expect(usePlannedCashWorkbookStore.getState().workbook.budgets).toMatchObject([{ id: 'new', currencyCode: 'USD' }]);
+  expect(screen.queryByRole('dialog', { name: 'Import budget definitions' })).toBeNull();
 });

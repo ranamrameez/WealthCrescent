@@ -10118,6 +10118,8 @@ For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) first. **Lates
 
 ## Done
 
+- Currency budgets can review and add new budget definitions from CSV in a single batch. Each row must specify its native currency and a unique ID.
+
 - Currency budgets exports monthly balances and contributing allocation details for the selected report dates.
 
 - Explicit uploads into empty cloud workbooks use a conditional RTDB transaction and preserve data that another client creates first.

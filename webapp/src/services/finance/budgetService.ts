@@ -1,7 +1,7 @@
 import { auth } from '../../lib/firebase/client';
 import { CalculationEngine } from '../../lib/calc/CalculationEngine';
 import { resolveNumericInput } from '../../lib/mathExpression';
-import { toCSV } from '../../lib/csv';
+import { parseCSV, toCSV } from '../../lib/csv';
 import { validBatchDate } from '../../lib/dateValidation';
 import { usePlannedCashWorkbookStore } from '../../store/plannedCashWorkbookStore';
 import { useCashWorkbookStore } from '../../store/cashWorkbookStore';
@@ -60,7 +60,11 @@ export function exportBudgetCsv(report: ReturnType<typeof buildOverview>['report
 }
 
 export const subscribeBudgets = subscribeDashboard;
-function requireUser() { if(!auth?.currentUser)throw new Error('Sign in to change budgets.'); }
+function requireUser() {
+  const user = auth?.currentUser;
+  if (!user) throw new Error('Sign in to change budgets.');
+  return user;
+}
 export interface BudgetInput extends Omit<BudgetDefinition,'monthlyLimit'> { monthlyLimit: string; }
 export function saveBudget(input: BudgetInput,expected?:BudgetDefinition) {
   requireUser();
@@ -75,6 +79,57 @@ export function saveBudget(input: BudgetInput,expected?:BudgetDefinition) {
   if(current && (workbook.budgetAllocations ?? []).some(item=>item.budgetId===current.id) && current.currencyCode!==next.currencyCode)throw new Error('A budget with allocations keeps its native currency. Create a separate budget instead.');
   usePlannedCashWorkbookStore.getState().setWorkbook({...workbook,budgets:current ? (workbook.budgets ?? []).map(item=>item.id===next.id?next:item) : [...(workbook.budgets ?? []),next]});
 }
+export const BUDGET_IMPORT_COLUMNS = ['id', 'name', 'currency', 'monthly_limit', 'start_month', 'end_month', 'rollover', 'category_ids', 'plan_group_id'] as const;
+
+function validateNewBudgetDefinitions(definitions: BudgetDefinition[]) {
+  const workbook = usePlannedCashWorkbookStore.getState().workbook;
+  const categoryIds = new Set(useCategoryStore.getState().workbook.categories.map(category => category.id));
+  const groupIds = new Set((workbook.planGroups ?? []).map(group => group.id));
+  const used = new Set((workbook.budgets ?? []).map(budget => budget.id));
+  for (const [index, definition] of definitions.entries()) {
+    try {
+      CalculationEngine.budgets.validateBudgetDefinition(definition);
+      if (used.has(definition.id)) throw new Error(`Budget ID "${definition.id}" already exists in the file or workbook.`);
+      if (definition.categoryIds?.some(id => !categoryIds.has(id))) throw new Error('A category ID does not exist.');
+      if (definition.planGroupId && !groupIds.has(definition.planGroupId)) throw new Error('The plan group ID does not exist.');
+      used.add(definition.id);
+    } catch (cause) {
+      throw new Error(`Budget row ${index + 1}: ${cause instanceof Error ? cause.message : String(cause)}`);
+    }
+  }
+  return workbook;
+}
+
+export function previewBudgetDefinitionImport(csv: string) {
+  const owner = requireUser().uid;
+  const [header, ...rows] = parseCSV(csv);
+  if (!header || header.length !== BUDGET_IMPORT_COLUMNS.length ||
+      !BUDGET_IMPORT_COLUMNS.every((column, index) => column === header[index].trim().toLowerCase())) {
+    throw new Error('Use the budget definition CSV columns in the listed order.');
+  }
+  if (!rows.length || rows.length > 500) throw new Error('Include 1 to 500 budget definitions.');
+  const definitions = rows.map((row, index): BudgetDefinition => {
+    if (row.length !== BUDGET_IMPORT_COLUMNS.length) throw new Error(`Budget row ${index + 1} has the wrong number of columns.`);
+    const [id, name, currency, limit, startMonth, endMonth, rollover, categories, planGroupId] = row.map(cell => cell.trim());
+    return {
+      id, name, currencyCode: currency.toUpperCase(), startMonth,
+      monthlyLimit: /^\d+(?:\.\d+)?$/.test(limit) ? Number(limit) : NaN,
+      endMonth: endMonth || undefined, rollover: rollover.toLowerCase() as BudgetDefinition['rollover'],
+      categoryIds: categories ? categories.split('|').map(value => value.trim()) : undefined,
+      planGroupId: planGroupId || undefined,
+    };
+  });
+  validateNewBudgetDefinitions(definitions);
+  return { owner, definitions };
+}
+
+export function applyBudgetDefinitionImport(preview: ReturnType<typeof previewBudgetDefinitionImport>) {
+  if (requireUser().uid !== preview.owner) throw new Error('The signed-in account changed. Review the CSV again.');
+  const workbook = validateNewBudgetDefinitions(preview.definitions);
+  usePlannedCashWorkbookStore.getState().setWorkbook({ ...workbook, budgets: [...(workbook.budgets ?? []), ...preview.definitions] });
+  return preview.definitions.length;
+}
+
 export function setBudgetMonthLimit(id:string,month:string,raw:string,expected:BudgetDefinition) {
   requireUser();
   if(id!==expected.id)throw new Error('This budget changed. Reopen its details.');

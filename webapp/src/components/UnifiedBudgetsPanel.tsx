@@ -1,15 +1,17 @@
 import { useState, useSyncExternalStore } from 'react';
-import { getBudgetOverview, exportBudgetCsv, getBudgetRecordKey, subscribeBudgets, saveBudget, setBudgetMonthLimit, removeBudget, saveBudgetAllocations, type BudgetDefinition, type BudgetAllocation, type AllocationInput } from '../services/finance/budgetService';
+import { getBudgetOverview, exportBudgetCsv, BUDGET_IMPORT_COLUMNS, previewBudgetDefinitionImport, applyBudgetDefinitionImport, getBudgetRecordKey, subscribeBudgets, saveBudget, setBudgetMonthLimit, removeBudget, saveBudgetAllocations, type BudgetDefinition, type BudgetAllocation, type AllocationInput } from '../services/finance/budgetService';
 import type { MovementActivity } from '../services/finance/dashboardService';
 import { StandardCard } from './StandardCard';
 import { SummarySection, SummarySections, SummaryValue } from './SummaryGroupCard';
 import { Field, Select, TextInput } from './ui/Field';
 import { StandardDropdown } from './ui/StandardDropdown';
+import { StandardButton } from './standard/Button';
 import { Modal } from './Modal';
 import { Notice } from './Notice';
 import { RecordRow } from './RecordRow';
 import { CalendarIcon, CashIcon, PlusIcon, EditIcon } from './icons';
 import { useTablePagination } from '../hooks/useTablePagination';
+import { getCurrentUser } from '../lib/firebase/useAuthState';
 import { useEnsureSignedIn } from '../lib/firebase/useEnsureSignedIn';
 import { confirmDialog } from './ConfirmDialog';
 import { fmtMoney } from '../lib/format';
@@ -28,6 +30,7 @@ export function UnifiedBudgetsPanel({ fromDate, toDate }: { fromDate: string; to
   const [detail,setDetail]=useState<{budget:BudgetDefinition;month:BudgetMonth}|null>(null);
   const [allocating,setAllocating]=useState<MovementActivity | 'choose' | null>(null);
   const [modify,setModify]=useState(false);
+  const [importing, setImporting] = useState(false);
   const ensureSignedIn=useEnsureSignedIn();
   const visible=report.rows.flatMap(row=>row.months.map(month=>({budget:row.budget,month})));
   const { rows,controls }=useTablePagination(visible);
@@ -48,6 +51,7 @@ export function UnifiedBudgetsPanel({ fromDate, toDate }: { fromDate: string; to
   };
   return <StandardCard title="Currency budgets" collapsible={false} className="mb-md" actions={[
     {label:'Add budget',onClick:()=>setEditing('new')},
+    {label:'Import budget definitions',onClick:()=>setImporting(true)},
     {label:modify?'Done modifying':'Modify',onClick:()=>setModify(!modify)},
     {label:'Allocate / identify refund',onClick:()=>setAllocating('choose'),disabled:!context.records.length},
     {label:'Export monthly balances',onClick:()=>exportCsv('balances'),disabled:!visible.length},
@@ -70,11 +74,69 @@ export function UnifiedBudgetsPanel({ fromDate, toDate }: { fromDate: string; to
     {report.charts.filter(chart=>chart.labels.length).map(chart=><ChartCard flat key={chart.currency} title={chart.currency+' — available vs net allocated use'}><div style={{height:260}}><AppChart type="bar" data={{labels:chart.labels,datasets:[{label:'Available ('+chart.currency+')',data:chart.available,backgroundColor:HUES[0]},{label:'Net allocated use ('+chart.currency+')',data:chart.used,backgroundColor:HUES[1]}]}}/></div></ChartCard>)}
     <h3>Unallocated records</h3><p className="text-muted">A record matching multiple budgets stays unallocated until you choose a split. Unclassified account movement needs an explicit category/plan scope or manual allocation. Ordinary income only becomes a budget refund when explicitly identified.</p>
     <div className="table-scroll"><table><caption>Cleared outflow not yet assigned to a budget</caption><thead><tr><th>Date</th><th>Source / record</th><th>Unallocated</th><th>Reason</th></tr></thead><tbody>{unallocatedRows.map(item=><RecordRow key={item.recordKey} record={item} onOpen={()=>setAllocating(item.record)}><td>{item.record.date}</td><td>{item.record.sourceLabel}<br/>{item.record.description}</td><td>{fmtMoney(item.amount,item.record.currencyCode)}</td><td>{item.ambiguousBudgetIds.length?'Multiple matching budgets':'No allocation or partial allocation'}</td></RecordRow>)}</tbody></table></div>{unallocatedControls}
+    {importing && <BudgetImportDialog onClose={() => setImporting(false)} />}
     {editing&&<BudgetEditor context={context} original={editing==='new'?undefined:editing} onClose={()=>setEditing(null)}/>}
     {limit&&<MonthLimitEditor budget={limit.budget} month={limit.month} onClose={()=>setLimit(null)}/>}
     {allocating&&<AllocationEditor context={context} initial={allocating==='choose'?undefined:allocating} onClose={()=>setAllocating(null)}/>}
     {detail&&<Modal title={detail.budget.name+' · '+detail.month.month} onClose={()=>setDetail(null)}><p>Limit {fmtMoney(detail.month.limit,detail.budget.currencyCode)}; carry {fmtMoney(detail.month.carryIn,detail.budget.currencyCode)}; remaining {fmtMoney(detail.month.remaining,detail.budget.currencyCode)}.</p><div className="table-scroll"><table><caption>Allocated portions supporting this month's usage; negative portions are explicit refunds</caption><thead><tr><th>Date</th><th>Source / record</th><th>Native amount</th><th>Allocated portion</th></tr></thead><tbody>{detail.month.items.map((item,index)=><RecordRow key={item.recordKey+index} record={item} onOpen={()=>{setDetail(null);setAllocating(item.record);}}><td>{item.record.date}</td><td>{item.record.sourceLabel}<br/>{item.record.description}</td><td>{fmtMoney(item.record.amount,item.record.currencyCode)}</td><td>{fmtMoney(item.allocated,item.record.currencyCode)}</td></RecordRow>)}</tbody></table></div>{!detail.month.items.length&&<p>No cleared usage in this month.</p>}</Modal>}
   </StandardCard>;
+}
+
+function BudgetImportDialog({ onClose }: { onClose: () => void }) {
+  const ensureSignedIn = useEnsureSignedIn();
+  const [preview, setPreview] = useState<ReturnType<typeof previewBudgetDefinitionImport> | null>(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const { rows, controls } = useTablePagination(preview?.definitions ?? []);
+  const review = async (file: File) => {
+    const requestedOwner = getCurrentUser()?.uid;
+    setPreview(null);
+    setError('');
+    setBusy(true);
+    try {
+      if (file.size > 1_000_000) throw new Error('Use a CSV of 1 MB or less.');
+      if (!(await ensureSignedIn('Sign in to review budget definitions.'))) return;
+      const owner = getCurrentUser()?.uid;
+      const csv = await file.text();
+      if (!owner || (requestedOwner && owner !== requestedOwner) || owner !== getCurrentUser()?.uid) throw new Error('The signed-in account changed. Review the CSV again.');
+      setPreview(previewBudgetDefinitionImport(csv));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const apply = () => {
+    if (!preview) return;
+    try {
+      toast(`Imported ${applyBudgetDefinitionImport(preview)} budget definitions.`);
+      onClose();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    }
+  };
+  return <Modal title="Import budget definitions" onClose={onClose} manageFocus>
+    <div className="stack-md">
+      <p>Add budgets with unique IDs and explicit native currencies. Use YYYY-MM for months, none, surplus or balance for rollover, and | to separate category IDs. End month, category IDs and plan group ID are optional.</p>
+      <p className="text-muted">{BUDGET_IMPORT_COLUMNS.join(', ')}</p>
+      <Field label="Budget definitions CSV"><TextInput type="file" accept=".csv,text/csv" disabled={busy} onChange={event => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (file) void review(file);
+      }} /></Field>
+      {error && <div role="alert"><Notice tone="danger">{error}</Notice></div>}
+      {preview && <div className="table-scroll"><table>
+        <caption>New budget definitions</caption>
+        <thead><tr><th>ID</th><th>Budget</th><th>Monthly limit</th><th>Months</th><th>Rollover</th><th>Category IDs</th><th>Plan group</th></tr></thead>
+        <tbody>{rows.map(item => <tr key={item.id}><td>{item.id}</td><td>{item.name}</td><td>{fmtMoney(item.monthlyLimit,item.currencyCode)}</td><td>{item.startMonth} – {item.endMonth ?? 'Open'}</td><td>{item.rollover}</td><td>{item.categoryIds?.join(', ') ?? 'All'}</td><td>{item.planGroupId ?? 'Any'}</td></tr>)}</tbody>
+      </table></div>}
+      {preview && controls}
+      <div className="row gap-sm">
+        <StandardButton disabled={busy || !preview} onClick={apply}>Import reviewed budgets</StandardButton>
+        <StandardButton tone="secondary" onClick={onClose}>Cancel</StandardButton>
+      </div>
+    </div>
+  </Modal>;
 }
 
 function BudgetEditor({context,original,onClose}:{context:Context;original?:BudgetDefinition;onClose:()=>void}) {

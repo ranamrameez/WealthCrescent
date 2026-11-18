@@ -1185,3 +1185,7 @@ Open the **Currency budgets** card menu in Planning and choose **Export monthly 
 ### Quick import from The Group
 
 Choose **Import QSE trades** on the main Dashboard or the QSE Dashboard. Open a statement, confirm the broker shown in the popup, and review the existing and statement values. Select individual trades or use the bulk selection controls, then choose **Import selected trades**.
+
+### Import budget definitions
+
+From **Currency budgets** choose **Import budget definitions** and use the column order shown in the popup. Each row needs a unique ID, a native currency, a monthly limit, a start month, and a rollover policy. Review the list and select **Import reviewed budgets** to add the batch.
