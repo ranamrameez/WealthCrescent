@@ -50,6 +50,39 @@ function matches(budget: BudgetDefinition, record: MovementActivity) {
     && (!budget.planGroupId || budget.planGroupId === record.planGroupId);
 }
 
+function automaticBudgets(budgets: BudgetDefinition[], record: MovementActivity) {
+  const classified = (record.movementKind ?? 'unclassified') !== 'unclassified';
+  return budgets.filter(budget => matches(budget, record) && (classified || !!budget.categoryIds?.length || !!budget.planGroupId));
+}
+
+type ReservationPopulation = 'pending' | 'planned';
+type BudgetReservation = { record: MovementActivity; population: ReservationPopulation; amount: number };
+
+function budgetReservations(budgets: BudgetDefinition[], activities: MovementActivity[], fromMonth: string, toMonth: string, today: string) {
+  const byBudget = new Map<string, Map<string, BudgetReservation[]>>();
+  for (const population of ['pending', 'planned'] as const) {
+    const candidates = selectMovementActivities(activities, fromMonth + '-01', toMonth + '-31', today, population);
+    const counts = new Map<string, number>();
+    for (const record of candidates) {
+      const key = budgetRecordKey(record);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    for (const record of candidates) {
+      if (counts.get(budgetRecordKey(record)) !== 1 || !Number.isFinite(record.amount) || record.amount >= 0) continue;
+      const eligible = automaticBudgets(budgets, record);
+      if (eligible.length !== 1) continue;
+      const budget = eligible[0];
+      const byMonth = byBudget.get(budget.id) ?? new Map<string, BudgetReservation[]>();
+      const month = record.date.slice(0, 7);
+      const entries = byMonth.get(month) ?? [];
+      entries.push({ record, population, amount: -record.amount });
+      byMonth.set(month, entries);
+      byBudget.set(budget.id, byMonth);
+    }
+  }
+  return byBudget;
+}
+
 /** One allocation authority. Overlapping scopes never silently duplicate usage;
  * ordinary income is not a refund. All computations use native currencies. */
 export function unifiedBudgetReport(definitions: BudgetDefinition[], allocations: BudgetAllocation[], activities: MovementActivity[], fromMonth: string, toMonth: string, today: string) {
@@ -116,25 +149,32 @@ export function unifiedBudgetReport(definitions: BudgetDefinition[], allocations
       if (total > Math.abs(record.amount)+1e-8) issues.push({ code: 'overallocated', recordKey: key, message: 'Allocations exceed the native record; none of these allocations is applied.' });
       else for (const { allocation,budget } of valid) { add(budget.id,{ recordKey: key, allocated: allocation.amount, record, explicit: true }); allocated += allocation.amount; }
     } else if (record.amount < 0) {
-      const candidates = budgets.filter(budget=>matches(budget,record) && ((record.movementKind ?? 'unclassified') !== 'unclassified' || !!budget.categoryIds?.length || !!budget.planGroupId));
+      const candidates = automaticBudgets(budgets, record);
       if (candidates.length === 1) { allocated = -record.amount; add(candidates[0].id,{ recordKey: key, allocated, record, explicit: false }); }
       else if (candidates.length > 1) ambiguousBudgetIds = candidates.map(budget=>budget.id);
     }
     if (record.amount < 0 && -record.amount-allocated > 1e-8) unallocated.push({ recordKey: key, record, amount: -record.amount-allocated, ambiguousBudgetIds });
   }
+  const reservations = budgetReservations(budgets, activities, fromMonth, toMonth, today);
   const rows = budgets.map(budget => {
     const items = usage.get(budget.id) ?? [];
     const byMonth = new Map<string,BudgetUsageItem[]>();
     for (const item of items) { const month=item.record.date.slice(0,7); byMonth.set(month,[...(byMonth.get(month) ?? []),item]); }
     let carry = 0;
-    const months: Array<{ month: string; limit: number; carryIn: number; available: number; outflow: number; refunds: number; used: number; remaining: number; isFuture: boolean; items: BudgetUsageItem[] }> = [];
+    const months: Array<{ month: string; limit: number; carryIn: number; available: number; outflow: number; refunds: number; used: number; remaining: number; isFuture: boolean; items: BudgetUsageItem[]; pendingReserved: number; plannedReserved: number; afterReservations: number; reservations: BudgetReservation[] }> = [];
     const end = monthIndex(budget.endMonth && budget.endMonth < toMonth ? budget.endMonth : toMonth);
     for (let index=monthIndex(budget.startMonth); index<=end; index++) {
       const month = indexMonth(index), native = byMonth.get(month) ?? [];
       const outflow = native.reduce((sum,item)=>sum+Math.max(0,item.allocated),0), refunds = native.reduce((sum,item)=>sum+Math.max(0,-item.allocated),0);
       const limit = budget.monthlyLimits?.[month] ?? budget.monthlyLimit;
       const available = limit+carry, used=outflow-refunds, remaining=available-used;
-      if (month >= fromMonth) months.push({ month, limit, carryIn: carry, available, outflow, refunds, used, remaining, isFuture: month > today.slice(0,7), items: native });
+      if (month >= fromMonth) {
+        const monthlyReservations = reservations.get(budget.id)?.get(month) ?? [];
+        const pendingReserved = monthlyReservations.reduce((sum, entry) => sum + (entry.population === 'pending' ? entry.amount : 0), 0);
+        const plannedReserved = monthlyReservations.reduce((sum, entry) => sum + (entry.population === 'planned' ? entry.amount : 0), 0);
+        months.push({ month, limit, carryIn: carry, available, outflow, refunds, used, remaining, isFuture: month > today.slice(0,7), items: native,
+          pendingReserved, plannedReserved, afterReservations: remaining - pendingReserved - plannedReserved, reservations: monthlyReservations });
+      }
       carry = budget.rollover === 'none' ? 0 : budget.rollover === 'surplus' ? Math.max(0,remaining) : remaining;
     }
     return { budget, months };

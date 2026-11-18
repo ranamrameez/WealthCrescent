@@ -82,7 +82,7 @@ it('exports the same monthly balances and allocations through the selected cutof
   const balances = exportBudgetCsv(report, 'balances');
   expect(balances.fileName).toBe('budget-balances-2026-01-2026-01.csv');
   expect(parseCSV(balances.csv)[1]).toEqual([
-    'food', "'=Formula", 'USD', '2026-01', '2026-01-03', '100', '0', '100', '30', '10', '20', '80', 'No',
+    'food', "'=Formula", 'USD', '2026-01', '2026-01-03', '100', '0', '100', '30', '10', '20', '80', 'No', '0', '0', '80',
   ]);
   const details = parseCSV(exportBudgetCsv(report, 'allocations').csv);
   expect(details.slice(1).map(row => row.slice(-3))).toEqual([['-30', '30', 'No'], ['10', '-10', 'Yes']]);
@@ -143,4 +143,23 @@ it('applies definition edits together and preserves overrides, allocations and n
   expect(result.allocations).toEqual(before.allocations);
   expect(result.budgets[0]).toEqual({ ...before.budgets[0], name: 'Food revised', monthlyLimit: 120, rollover: 'surplus' });
   expect(result.report.rows[0].months[0]).toMatchObject({ limit: 80, used: 30 });
+});
+
+it('reserves a linked pending Cash occurrence once while keeping future planned occurrences', () => {
+  saveBudget(input);
+  const date = '2026-01-31';
+  useCategoryStore.getState().setWorkbook({ categories: [{ id: 'food-category', name: 'Fixture groceries', serialNumber: 1, scope: 'custom' }] });
+  const store = usePlannedCashWorkbookStore.getState();
+  store.setWorkbook({ ...store.workbook, entries: [{
+    id: 'cash-plan', date, amount: 20, currencyCode: 'USD', type: 'OUT', category: 'Fixture groceries',
+    recurrence: { cycle: 'monthly', startDate: date },
+  }] });
+  useCashWorkbookStore.getState().addEntry({
+    id: 'cash-pending', date, amount: 20, currencyCode: 'USD', isDeposit: false,
+    source: 'manual', categoryID: 'food-category', isPending: true,
+    planLink: { module: 'cash', planId: 'cash-plan', occurrenceDate: date },
+  });
+  const report = getBudgetOverview('2026-01-01', '2026-02-28').report;
+  expect(report.rows[0].months[0]).toMatchObject({ used: 30, pendingReserved: 20, plannedReserved: 0, afterReservations: 50 });
+  expect(report.rows[0].months[1]).toMatchObject({ pendingReserved: 0, plannedReserved: 20, afterReservations: 80 });
 });

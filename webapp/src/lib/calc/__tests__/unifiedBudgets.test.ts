@@ -137,3 +137,31 @@ it('flags duplicate native identities in either order even when one amount is in
     expect(result.issues).toContainEqual(expect.objectContaining({ code: 'duplicate-record' }));
   }
 });
+
+it('shows uniquely scoped pending and planned reservations separately from cleared usage and rollover', () => {
+  const food = budget('food', { categoryIds: ['food'], rollover: 'surplus' });
+  const dining = budget('dining', { categoryIds: ['dining'], planGroupId: 'trip' });
+  const records = [
+    record('cleared', -10, { categoryId: 'food' }),
+    record('pending', -20, { categoryId: 'food', isPending: true }),
+    record('plan', -30, { categoryId: 'food', executed: false }),
+    record('income', 50, { categoryId: 'food', executed: false }),
+    record('other-currency', -50, { categoryId: 'food', executed: false, currencyCode: 'PKR' }),
+    record('other-scope', -50, { categoryId: 'dining', executed: false }),
+    record('transfer', -50, { categoryId: 'food', executed: false, movementKind: 'transfer' }),
+  ];
+  const result = report([food, dining], records, [], '2026-01', '2026-02');
+  expect(result.rows[0].months[0]).toMatchObject({ used: 10, remaining: 90, pendingReserved: 20, plannedReserved: 30, afterReservations: 40 });
+  expect(result.rows[0].months[0].reservations.map(entry => entry.record.id)).toEqual(['pending', 'plan']);
+  expect(result.rows[0].months[1].carryIn).toBe(90);
+  expect(result.rows[1].months[0].plannedReserved).toBe(0);
+  expect(result.totals[0].outflow).toBe(10);
+});
+
+it('leaves overlapping reservations unassigned rather than reserving the same outflow twice', () => {
+  const pending = record('pending', -20, { isPending: true });
+  const planned = record('plan', -30, { executed: false });
+  const result = report([budget('one'), budget('two')], [pending, planned]);
+  expect(result.rows.map(row => row.months[0].afterReservations)).toEqual([100, 100]);
+  expect(result.rows.flatMap(row => row.months[0].reservations)).toEqual([]);
+});
