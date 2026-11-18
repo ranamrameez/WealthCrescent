@@ -17,6 +17,7 @@ The register lives on the shared delivery branch linked to the active PR. For th
 | Build atomic multi-workbook payment persistence | Ready | | Native pending record, linkage, execution history and replay protection. |
 | Complete scheduled-payment and settlement lifecycle | Ready | | Depends on atomic payment persistence. |
 | Add standalone subscription renewals to planned movement | Done | WC-TR coordination, PR #51 | Shared Upcoming funding checks and dashboard scope. Tests cover active and archived funding, cancelled subscriptions, and the Money in/out breakdown and record detail. |
+| Keep installment funding visible when its linked receipt is missing | In progress | WC-TR coordination, `work/pr51-main-integration`, 2026-11-18 UTC | Canonical Cash, Bank and card movement deduplication when cloud records arrive separately. |
 | Finish remaining canonical reporting adapters and drilldowns | Ready | | Other standalone schedules, allocation drilldowns and source-scope acceptance. |
 | Finish currency budget workflows | Ready | | Bulk definition edits, source identity and planned reservations. |
 | Continue UI-to-service migration | Ready | | Claim one named module and workflow at a time. |
