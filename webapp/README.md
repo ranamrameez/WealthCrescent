@@ -19,6 +19,10 @@ FinanceManager live link:
 > `SESSION_HANDOFF.md` current; never push directly to `main`; and do not merge until the
 > latest application-code head passes the full test suite and production build/type-check.
 
+## QSE statement quick import
+
+Use **Import QSE trades** on the main Dashboard or the QSE Dashboard to review and selectively apply The Group trades for the active broker. See [Importing The Group statements](docs/the-group-import.md).
+
 ## Current session handoff
 
 For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) before continuing. **Latest handoff: 2026-11-04 — PR #49 merged into `main`.** Merge commit `efaa8b2e4a6da1cd9b6ffdc2728afcf94fedc690`; PR-head Actions run #399 passed 142 test files / 1,132 tests, both TypeScript checks and the production build. Manual browser review remains outstanding; details are recorded in [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) and [`docs/net-worth-dashboard.md`](docs/net-worth-dashboard.md).

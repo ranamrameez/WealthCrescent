@@ -1,3 +1,7 @@
+## QSE dashboard import
+
+The focused dashboard import branch brings the reviewed Trade list importer to both dashboards. Both entry points use the same broker/account review and ledger checks. The wider reporting and payment acceptance stays tracked on PR #51.
+
 # WealthCrescent — Session Handoff (refreshed 2026-11-04)
 
 ## 2026-11-04 — Net Worth dashboard rebuild, PR #49 merged
