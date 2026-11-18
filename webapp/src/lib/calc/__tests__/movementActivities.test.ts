@@ -199,3 +199,40 @@ it.each(['cash', 'bank'] as const)('retains %s funding when the linked installme
   f.native.emi.repayments.push({ id: 'receipt', loanId: 'loan', date, month: 0, amount: 50, paymentOnly: true });
   expect(collect(f).map(row => [row.id, row.amount])).toEqual([['receipt', -50]]);
 });
+
+it('keeps linked Cash and Bank occurrences in pending movement without repeating them as plans', () => {
+  const f = fixture();
+  const date = '2026-01-31';
+  const occurrence = (module: 'cash' | 'bank', planId: string) => ({ module, planId, occurrenceDate: date });
+  f.base.plannedCash.push({
+    id: 'cash-plan', date, amount: 10, currencyCode: 'USD', type: 'OUT',
+    recurrence: { cycle: 'monthly', startDate: date },
+  });
+  f.base.cashEntries.push({
+    id: 'cash-pending', date, amount: 10, currencyCode: 'USD', isDeposit: false, source: 'manual',
+    isPending: true, planLink: occurrence('cash', 'cash-plan'),
+  });
+  f.base.bankAccounts.push(
+    { id: 'paying', name: 'Paying', currencyCode: 'USD', openingBalance: 0 },
+    { id: 'other', name: 'Other', currencyCode: 'USD', openingBalance: 0 },
+  );
+  f.base.plannedBank.push(
+    { id: 'bank-plan', date, accountId: 'paying', amount: -20, description: 'Bill' },
+    { id: 'other-plan', date, accountId: 'other', amount: -20, description: 'Other bill' },
+  );
+  const payment = { date, accountId: 'paying', amount: -20, description: 'Bill', isDeposit: false, isPending: true, source: 'manual' as const };
+  f.base.bankTransactions.push(
+    { ...payment, id: 'bank-pending', planLink: occurrence('bank', 'bank-plan') },
+    { ...payment, id: 'wrong-account', planLink: occurrence('bank', 'other-plan') },
+  );
+
+  const rows = collect(f, ['cash', 'bank']);
+  const population = (kind: 'actual' | 'pending' | 'planned') =>
+    engine.movements.selectMovementActivities(rows, '2026-01-01', '2026-02-28', date, kind).map(row => row.id);
+  expect(population('planned')).toEqual(['other-plan', 'cash-plan@2026-02-28']);
+  expect(population('pending')).toEqual(['bank-pending', 'wrong-account', 'cash-pending']);
+  expect(population('actual')).toEqual([]);
+
+  f.base.bankTransactions = [];
+  expect(collect(f, ['bank']).map(row => row.id)).toContain('bank-plan');
+});

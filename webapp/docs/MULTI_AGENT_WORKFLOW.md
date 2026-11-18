@@ -15,7 +15,7 @@ The register lives on the shared delivery branch linked to the active PR. For th
 | Protect linked independent installment receipts from generic edits and deletions | Done | WC-TR coordination, PR #51 | Shared transfer actions, bank account changes and loan deletion. Cash, Bank and card fixtures passed with the full suite. |
 | Coordinate reversal with the funding ledger | Ready | | Depends on linked-receipt protection and atomic payment persistence. |
 | Integrate and verify atomic multi-workbook payment persistence | Ready | | Verify the owner-only RTDB rules and emulator behavior. Integrate pending records with reporting, deliberate settlement, backup and reset before activation. |
-| Count pending Cash and Bank occurrences once in movement reports | In progress | WC-TR coordination, PR #51, 2026-11-18 UTC | Match native pending records by their explicit plan occurrence link. |
+| Count pending Cash and Bank occurrences once in movement reports | Done | WC-TR coordination, PR #51 | Focused movement regressions cover explicit linkage, recurring dates, bank-account scope and removal. |
 | Add atomic pending Cash and Bank occurrence persistence | Done | WC-TR coordination, PR #51 | Draft service and transaction fixtures cover occurrence identity, replay, concurrent writes, stale plans, cancellation and auth changes. |
 | Complete scheduled-payment and settlement lifecycle | Ready | | Depends on atomic payment persistence. |
 | Add standalone subscription renewals to planned movement | Done | WC-TR coordination, PR #51 | Shared Upcoming funding checks and dashboard scope. Tests cover active and archived funding, cancelled subscriptions, and the Money in/out breakdown and record detail. |

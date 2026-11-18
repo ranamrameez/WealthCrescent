@@ -41,7 +41,7 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
   const { native, categories } = input;
   const activeBankAccounts = new Set(input.base.bankAccounts.filter(account => account.isActive !== false && !account.migratedToCreditCardId).map(account => account.id));
   const plannedBank = input.base.plannedBank.filter(plan => !plan.sourceSubscriptionId || activeBankAccounts.has(plan.accountId));
-  const rows: MovementActivity[] = collectBudgetActivities({ ...input.base, plannedBank, links: [] }, window)
+  const rows: MovementActivity[] = collectBudgetActivities({ ...input.base, plannedBank, links: [], reservePendingOccurrences: true }, window)
     .map(item => ({ ...item, recordType: item.executed?'entry':'plan', movementKind: item.sourceEmiLoanId?'financing':item.module==='rentals' || item.sourceSubscriptionId?'operating':'unclassified' }));
   const add = (row: MovementActivity) => { if (Number.isFinite(row.amount) && row.date && row.currencyCode) rows.push(row); };
   const cards = new Map(native.cards.cards.map(card => [card.id,card]));
