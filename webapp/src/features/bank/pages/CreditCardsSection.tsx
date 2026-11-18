@@ -63,7 +63,7 @@ import {
   proposeMinPayment,
 } from '../../../lib/calc/creditCardModule';
 import { formatDate, fmtMoney } from '../../../lib/format';
-import { createLinkedTransfer, findLinkForRecord, hasCardFundedInstallmentLinks } from '../../../lib/linkCascade';
+import { createLinkedTransfer, findLinkForRecord, hasIndependentInstallmentLinks } from '../../../lib/linkCascade';
 import { defaultTimezoneForCurrency, nowTime } from '../../../lib/datetime';
 import { firebaseReady } from '../../../lib/firebase/client';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
@@ -147,7 +147,7 @@ function CreditCardForm({
     const clean = { ...draft, name: draft.name.trim() };
     if (card) {
       const currentCard = useCreditCardWorkbookStore.getState().workbook.cards.find(row => row.id === card.id);
-      if (clean.currencyCode !== currentCard?.currencyCode && hasCardFundedInstallmentLinks('creditCard', card.id)) {
+      if (clean.currencyCode !== currentCard?.currencyCode && hasIndependentInstallmentLinks('creditCard', card.id)) {
         return toast('This card cannot change currency while linked to installment receipts.');
       }
       updateCard(card.id, clean);
@@ -775,7 +775,7 @@ export function CreditCardDetailPage() {
 
   const deleteThisCard = async () => {
     if (!(await confirmDialog('This deletes the card and all its transactions — this cannot be undone.', `Delete "${card.name}"?`))) return;
-    if (hasCardFundedInstallmentLinks('creditCard', card.id)) {
+    if (hasIndependentInstallmentLinks('creditCard', card.id)) {
       return toast('This card has charges linked to installment receipts.');
     }
     deleteCard(card.id);
@@ -1319,6 +1319,7 @@ function MigrateLegacyCreditCards() {
     );
     if (!ok) return;
     if (!(await ensureSignedIn('Sign in to migrate this account.'))) return;
+    if (hasIndependentInstallmentLinks('bank', account.id)) return toast('This account has transactions linked to installment receipts.');
     const cardId = uid();
     addCard({
       id: cardId,

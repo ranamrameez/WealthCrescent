@@ -49,7 +49,7 @@ import { useAppearanceStore } from '../../../store/appearanceStore';
 import { fmtMoney } from '../../../lib/format';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { firebaseReady } from '../../../lib/firebase/client';
-import { hasCardFundedInstallmentLinks, confirmAndDeleteLinkable, createLinkedTransfer, propagateLinkedEdit, resolveLinkedEdit } from '../../../lib/linkCascade';
+import { hasIndependentInstallmentLinks, confirmAndDeleteLinkable, createLinkedTransfer, propagateLinkedEdit, resolveLinkedEdit } from '../../../lib/linkCascade';
 import { getLastTransferSource, rememberTransferSource } from '../../../hooks/useLastTransferSource';
 import { useBankWorkbookStore } from '../../../store/bankWorkbookStore';
 import { useCashWorkbookStore } from '../../../store/cashWorkbookStore';
@@ -613,8 +613,8 @@ function LoanDetail({ loan, onSelect, onBack, startInEditMode }: { loan: EMILoan
                 align="right"
                 onClick={async () => {
                   if (!(await confirmDialog('This cannot be undone.', `Delete loan "${loan.name}"?`))) return;
-                  if (hasCardFundedInstallmentLinks('emi', loan.id)) {
-                    return toast('This loan has receipts linked to card charges.');
+                  if (hasIndependentInstallmentLinks('emi', loan.id)) {
+                    return toast('This loan has receipts linked to funding transactions.');
                   }
                   deleteEntry(loan.id);
                   onBack();

@@ -116,7 +116,11 @@ export interface InterEntityTransfer extends InterEntityTransferInput {
 }
 
 export function isCardFundedInstallmentLink(link?: InterEntityTransfer): boolean {
-  return link?.from.module === 'creditCard' && link.to.module === 'emi' && link.to.emiIndependent === true;
+  return link?.from.module === 'creditCard' && isIndependentInstallmentLink(link);
+}
+
+export function isIndependentInstallmentLink(link?: InterEntityTransfer): boolean {
+  return link?.to.module === 'emi' && link.to.emiIndependent === true;
 }
 
 export interface InterEntityWorkbook {

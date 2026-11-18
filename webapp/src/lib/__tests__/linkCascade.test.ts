@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { confirmDialog } from '../../components/ConfirmDialog';
 import {
+  confirmAndDeleteLinkable,
   createLinkedTransfer,
   deleteLinkCascade,
   findLinkForRecord,
+  hasIndependentInstallmentLinks,
   propagateLinkedEdit,
   resolveLinkedEdit,
   resolveSideCurrency,
@@ -27,7 +29,7 @@ import { useWorkbookStore } from '../../store/workbookStore';
 import { usePSXWorkbookStore } from '../../store/psxWorkbookStore';
 import { createEmptyWorkbook } from '../../store/defaultWorkbook';
 import { createEmptyPSXWorkbook } from '../../store/defaultPsxWorkbook';
-import type { InterEntityTransferInput } from '../../types/interEntityTransfer';
+import type { InterEntityTransfer, InterEntityTransferInput } from '../../types/interEntityTransfer';
 
 const bankAccountId = 'acct-1';
 const loanId = 'loan-1';
@@ -64,6 +66,43 @@ const cashToBankInput: InterEntityTransferInput = {
   from: { module: 'cash', currencyCode: 'USD' },
   to: { module: 'bank', ref: bankAccountId },
 };
+
+const installmentLink: InterEntityTransfer = {
+  ...cashToBankInput,
+  id: 'installment-link',
+  fromRecordId: 'funding-record',
+  toRecordId: 'receipt',
+  to: { module: 'emi', ref: loanId, emiIndependent: true },
+};
+
+it.each(['cash', 'bank', 'creditCard'] as const)('preserves independent receipts funded by %s in generic transfer actions', async module => {
+  const link = { ...installmentLink, from: { ...installmentLink.from, module, ref: bankAccountId } };
+  useInterEntityTransfersStore.getState().addEntry(link);
+
+  expect(await resolveLinkedEdit(module, link.fromRecordId)).toBe('cancel');
+  expect(await warnIfLinked('emi', link.toRecordId)).toBe(false);
+  expect(propagateLinkedEdit(module, link.fromRecordId, { amount: 20 }).error).toContain('corrected together');
+  expect(updateLinkedTransfer({ ...link, toAmount: 20 }, link)).toHaveProperty('error');
+  expect(() => deleteLinkCascade(link)).toThrow('corrected together');
+  const plainDelete = vi.fn();
+  await confirmAndDeleteLinkable('emi', link.toRecordId, plainDelete);
+  expect(plainDelete).not.toHaveBeenCalled();
+  expect(hasIndependentInstallmentLinks('emi', loanId)).toBe(true);
+  expect(hasIndependentInstallmentLinks('bank', bankAccountId)).toBe(module === 'bank');
+  expect(hasIndependentInstallmentLinks('creditCard', bankAccountId)).toBe(module === 'creditCard');
+  expect(findLinkForRecord('emi', link.toRecordId)).toMatchObject(link);
+});
+
+it('rechecks receipt linkage after the delete confirmation', async () => {
+  vi.mocked(confirmDialog).mockImplementationOnce(async () => {
+    useInterEntityTransfersStore.getState().addEntry(installmentLink);
+    return true;
+  });
+  const plainDelete = vi.fn();
+  await confirmAndDeleteLinkable('cash', installmentLink.fromRecordId, plainDelete);
+  expect(plainDelete).not.toHaveBeenCalled();
+  expect(findLinkForRecord('cash', installmentLink.fromRecordId)).toMatchObject(installmentLink);
+});
 
 describe('broker profile currency resolution', () => {
   it('uses the selected QSE and PSX broker settings instead of exchange defaults', () => {

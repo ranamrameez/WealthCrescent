@@ -68,7 +68,7 @@ import { chartAlpha } from '../../../lib/chartVisuals';
 import { parseCSV, toCSV } from '../../../lib/csv';
 import { formatDate, fmtMoney, parseDateInput } from '../../../lib/format';
 import { dateOnlyMs } from '../../../lib/datetime';
-import { confirmAndDeleteLinkable, propagateLinkedEdit, resolveLinkedEdit } from '../../../lib/linkCascade';
+import { confirmAndDeleteLinkable, hasIndependentInstallmentLinks, propagateLinkedEdit, resolveLinkedEdit } from '../../../lib/linkCascade';
 import { isValidIbanFormat, lookupIban } from '../../../lib/ibanLookup';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { firebaseReady } from '../../../lib/firebase/client';
@@ -448,6 +448,10 @@ export function AddAccountForm({ onSaved, initialCurrency, initialBankId, accoun
       bic: a.bic?.trim() || undefined,
     };
     if (account) {
+      const current = useBankWorkbookStore.getState().workbook.settings.accounts.find(row => row.id === account.id);
+      if (clean.currencyCode !== current?.currencyCode && hasIndependentInstallmentLinks('bank', account.id)) {
+        return toast('This account has transactions linked to installment receipts.');
+      }
       updateAccount(account.id, clean);
       toast('Account updated.');
       onSaved?.(account.id);
@@ -909,6 +913,7 @@ export function AccountDetailPage() {
 
   const deleteThisAccount = async () => {
     if (!(await confirmDialog('This deletes the account and all its transactions — this cannot be undone.', `Delete "${account.name}"?`))) return;
+    if (hasIndependentInstallmentLinks('bank', account.id)) return toast('This account has transactions linked to installment receipts.');
     deleteAccount(account.id);
     toast('Account deleted.');
     navigate('/bank');

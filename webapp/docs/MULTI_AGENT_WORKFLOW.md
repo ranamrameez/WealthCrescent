@@ -12,11 +12,12 @@ The register lives on the shared delivery branch linked to the active PR. For th
 | Task | Status | Owner and branch | Scope or evidence |
 | --- | --- | --- | --- |
 | Preserve the QSE statement reconciliation in the delivery branch | Done | WC-TR coordination, PR #51 | Integrate `main` at `32c289aa`, which contains merged PR #53. |
-| Protect linked independent installment receipts from generic edits and deletions | In progress | WC-TR coordination, `work/pr51-main-integration`, 2026-11-18 UTC | Shared transfer commands and native Cash, Bank, card and EMI mutation entry points. |
+| Protect linked independent installment receipts from generic edits and deletions | Done | WC-TR coordination, PR #51 | Shared transfer actions, bank account changes and loan deletion. Cash, Bank and card fixtures passed with the full suite. |
 | Coordinate reversal with the funding ledger | Ready | | Depends on linked-receipt protection and atomic payment persistence. |
 | Build atomic multi-workbook payment persistence | Ready | | Native pending record, linkage, execution history and replay protection. |
 | Complete scheduled-payment and settlement lifecycle | Ready | | Depends on atomic payment persistence. |
-| Finish canonical reporting adapters and drilldowns | Ready | | Standalone schedules, allocation drilldowns and source-scope acceptance. |
+| Add standalone subscription renewals to planned movement | In progress | WC-TR coordination, `work/pr51-main-integration`, 2026-11-18 UTC | Subscription schedule adapter, funding-plan deduplication and dashboard filter. |
+| Finish remaining canonical reporting adapters and drilldowns | Ready | | Other standalone schedules, allocation drilldowns and source-scope acceptance. |
 | Finish currency budget workflows | Ready | | Bulk definition edits, source identity and planned reservations. |
 | Continue UI-to-service migration | Ready | | Claim one named module and workflow at a time. |
 | Complete UX acceptance | Ready | | Claim one module or a specific shared control at a time. |
