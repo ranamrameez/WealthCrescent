@@ -68,6 +68,7 @@ Implemented core/service/Planning UI now includes optional definitions/allocatio
 - Verify duplicates, interrupted retries, simultaneous clients, auth changes, month-end/leap boundaries and cancellation before enabling the scheduler.
 
 ### 5. App-wide UX acceptance
+- Add app-wide keyword search to the shared topbar and a dedicated results page. Search transactions and other native records across modules by their available fields, including titles, descriptions, notes, references and symbols. Let users narrow the same query to one or more modules and submodules, such as a bank account or broker when applicable. Show each result’s module and record context and link it to the relevant native view. Keep search scoped to the signed-in account’s authorized data, reuse shared controls, and verify keyboard, mobile, empty-result and account-switch behavior. Track implementation slices in the task register.
 - Audit every module aggregate/detail page against PAGE_TEMPLATE_GUIDE: shared scoped controls, summaries/plans/history/analytics/ledger, modify/batch/import/export parity and currency-safe all-entity totals.
 - Finish global finder Cash/exchange/broker/position coverage and shared-filter preservation. Check independent favorites, keyboard, disabled/no-result and popup placement.
 - Audit every chart consumer for shared renderer use, full-plot hover/guideline, units/denominators/date labels, truthful scales/negative/zero/missing cases, table equivalents, mobile sizing and reduced motion.

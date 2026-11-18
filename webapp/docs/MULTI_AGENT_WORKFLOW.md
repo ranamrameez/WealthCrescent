@@ -2,10 +2,10 @@
 
 The register lives on the shared delivery branch linked to the active PR. For the current delivery, use the head branch of [PR #51](https://github.com/ranamrameez/WealthCrescent/pull/51). Read that remote version before claiming work, even if your local checkout is newer in other files. The [delivery checklist](CURRENT_DELIVERY_STATUS.md) describes the acceptance criteria.
 
-1. Fetch the delivery branch and check the register and active PRs. Choose the next ready, unclaimed item in dependency order. Split broad work into named deliverables and give each a file or feature scope. Check for overlap with other in-progress items.
+1. Fetch the delivery branch. Read current AGENTS.md, the session handoff, the delivery checklist, and the relevant module docs and guidelines. Check the register and active PRs. Choose the next ready, unclaimed item in dependency order. Split broad work into named deliverables and give each a file or feature scope. Check for overlap with other in-progress items.
 2. Set the row to **In progress** with your agent or session identifier, branch or PR, scope, and UTC date. Publish the claim to the delivery branch before editing product files. Use a fast-forward ref update against the head you read. If another session advances the branch, fetch and reread the register before retrying. If it claimed the same work, choose another item.
 3. Work from the published claim on your own branch. Use a separate worktree for each session that shares a local clone. Keep your row current if scope or dependencies change. For a blocked item, record the blocker and whether ownership is retained. Confirm a handoff with the current owner before taking over their claim. If nobody can confirm a stale claim, leave a note for the coordinating session.
-4. When the deliverable meets its acceptance criteria, publish **Done** with the commit or PR and verification. Then fetch the register and claim the next ready item. If an item is released unfinished, set it to **Ready** and record the remaining work and its branch or commit.
+4. When the deliverable meets its acceptance criteria, publish **Done** with the commit or PR and verification. Then fetch and reread the register, claim the next ready unowned item, and begin it without waiting for a user prompt. Keep the repository instructions, handoff and affected delivery docs up to date. If no unowned item is ready, record the dependencies or ownership that prevent progress. If an item is released unfinished, set it to **Ready** and record the remaining work and its branch or commit.
 
 ## PR #51 task register
 
@@ -24,5 +24,7 @@ The register lives on the shared delivery branch linked to the active PR. For th
 | Continue UI-to-service migration | Ready | | Claim one named module and workflow at a time. |
 | Cash accounts in the global finder | Done | WC-TR session 1939ef032035, PR #51 | `0526e262` covers defaults, Cash entries, Cash plans, independent favorites and filter-preserving links. 1,390 tests and build passed locally; Actions 474 passed. |
 | Shared finder keyboard acceptance | Done | WC-TR session 1939ef032035, PR #51 | `92c13b71` skips disabled keyboard results and handles empty searches. 1,393 tests passed locally; Actions 477 passed tests and build. |
+| Add app-wide record search | Ready | | High priority. Topbar keyword search and a dedicated results page with module and submodule scopes. See the delivery checklist for acceptance. |
+| Validate Cash currency detail links | In progress | WC-TR session 1939ef032035, work/cash-currency-detail, 2026-11-18 UTC | Validate currency against the Cash registry and preserve filters when switching currencies. |
 | Complete UX acceptance | Ready | | Claim one module or a specific shared control at a time. |
 | Final PR validation and merge | Ready | | Depends on the remaining acceptance checks and exact-head CI. |

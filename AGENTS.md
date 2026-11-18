@@ -1,6 +1,6 @@
 # Parallel work
 
-Before editing a shared delivery task, publish your claim in the [delivery task register](webapp/docs/MULTI_AGENT_WORKFLOW.md). Once you finish, record the verification and claim the next unowned task whose dependencies are ready.
+At the start of each task, fetch the delivery branch and study the current repository instructions, handoff, delivery checklist, and guidelines for the affected area. Keep the affected docs current as you work. Publish your claim in the [delivery task register](webapp/docs/MULTI_AGENT_WORKFLOW.md) before editing shared work. After recording verification, automatically claim the next ready, unowned task without waiting for another user prompt.
 
 # Project skills
 
