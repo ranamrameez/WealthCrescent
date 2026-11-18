@@ -211,7 +211,7 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
   const internal = new Set<string>();
   const entityModules=new Set<string>(['bank','rentals','personalLoans','emi','creditCard','qse','psx']);
   const linkable=(row:MovementActivity)=>row.executed && (['qse','psx','funds'].includes(row.module)?row.recordType==='transfer':row.module==='emi'?row.recordType==='emi-repayment':row.recordType!=='plan');
-  const recordKey = (module: LinkModule, sourceId: string | undefined, id: string) =>
+  const recordKey = (module: ReturnType<typeof linkModule>, sourceId: string | undefined, id: string) =>
     JSON.stringify([module, entityModules.has(module) ? sourceId ?? null : null, id]);
   const rowKey = (row: MovementActivity) => recordKey(linkModule(row.module), row.sourceId, row.id);
   const nativeKeys = new Set(rows.filter(linkable).map(rowKey));
