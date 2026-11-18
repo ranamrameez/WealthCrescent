@@ -28,7 +28,7 @@ The register lives on the shared delivery branch linked to the active PR. For th
 | Finish currency budget workflows | Ready | | Bulk definition edits, source identity and planned reservations. |
 | Verify budget source identity | Done | WC-TR PSX session, work/budget-source-identity | `70691ca4` guards ambiguous legacy identities and malformed duplicates. Full local suite (1,411 tests) and production build passed. |
 | Batch edit budget definitions | Done | WC-TR PSX session, work/budget-definition-batch | `f9b282f0` adds grid edits for names, default limits and rollover. Focused service/UI tests and production build passed. |
-| Budget pending and planned reservations | Ready | | Show estimated reservations independently of cleared usage and rollover. Use canonical movement and verify pending occurrences count once. |
+| Budget pending and planned reservations | In progress | WC-TR PSX session, work/budget-reservations, 2026-11-18 UTC | Show estimated reservations independently of cleared usage and rollover. Use canonical movement and verify pending occurrences count once. |
 | Continue UI-to-service migration | Ready | | Claim one named module and workflow at a time. |
 | Cash accounts in the global finder | Done | WC-TR session 1939ef032035, PR #51 | `0526e262` covers defaults, Cash entries, Cash plans, independent favorites and filter-preserving links. 1,390 tests and build passed locally; Actions 474 passed. |
 | Shared finder keyboard acceptance | Done | WC-TR session 1939ef032035, PR #51 | `92c13b71` skips disabled keyboard results and handles empty searches. 1,393 tests passed locally; Actions 477 passed tests and build. |
