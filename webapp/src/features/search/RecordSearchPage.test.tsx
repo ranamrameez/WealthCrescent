@@ -2,6 +2,8 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
+import { BrokersPage } from '../stocks/pages/BrokersPage';
+import { useWorkbookStore } from '../../store/workbookStore';
 import { useCashWorkbookStore } from '../../store/cashWorkbookStore';
 import { RecordSearchPage, TopBarRecordSearch } from './RecordSearchPage';
 import type { SearchWorkbook } from './useSearchRecords';
@@ -10,7 +12,8 @@ vi.mock('../../lib/firebase/useAuthState', () => ({ useAuthState: () => ({ user:
 vi.mock('../../lib/firebase/useEnsureSignedIn', () => ({ useEnsureSignedIn: () => async () => true }));
 
 const original = useCashWorkbookStore.getState().workbook;
-afterEach(() => { cleanup(); useCashWorkbookStore.setState({ workbook: original }); });
+const originalStocks = useWorkbookStore.getState().workbook;
+afterEach(() => { cleanup(); useCashWorkbookStore.setState({ workbook: original }); useWorkbookStore.setState({ workbook: originalStocks }); });
 const entries = [
   { id: 'one', title: 'Coffee Doha', currencyCode: 'QAR' },
   { id: 'two', title: 'Coffee Lahore', currencyCode: 'PKR' },
@@ -48,4 +51,23 @@ it('never uses cached records or search text from the previous account', () => {
   fireEvent.change(input, { target: { value: 'Coffee' } });
   fireEvent.submit(screen.getByRole('search', { name: 'Search results' }));
   expect(screen.queryByRole('link', { name: /Coffee/ })).toBeNull();
+});
+
+it('opens an archived broker from search without activating it', () => {
+  const active = { id: 'current', name: 'Current broker', settings: originalStocks.settings };
+  const archived = { ...active, id: 'archive / 1', name: 'Archived broker', archived: true };
+  useWorkbookStore.setState({ workbook: { ...originalStocks, activeBrokerId: active.id, brokerProfiles: [active, archived] } });
+  render(<MemoryRouter initialEntries={[{ pathname: '/search', state: { query: 'Archived broker', owner: 'owner' } }]}>
+    <Routes>
+      <Route path="/search" element={<RecordSearchPage owner="owner" workbookOwners={{ ...workbookOwners, qse: 'owner' }} />} />
+      <Route path="/brokers" element={<BrokersPage />} />
+    </Routes>
+  </MemoryRouter>);
+  const profile = screen.getByRole('link', { name: 'Archived broker' });
+  expect(profile).toHaveAttribute('href', '/brokers?broker=archive%20%2F%201');
+  fireEvent.click(profile);
+  expect(screen.getByRole('link', { name: 'Show all broker profiles' })).toBeVisible();
+  expect(screen.getByText('Archived broker')).toBeVisible();
+  expect(screen.queryByText('Current broker')).toBeNull();
+  expect(useWorkbookStore.getState().workbook.activeBrokerId).toBe(active.id);
 });

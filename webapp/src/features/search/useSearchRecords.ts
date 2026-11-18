@@ -39,12 +39,13 @@ function exchangeRecords(workbook: ExchangeWorkbook | undefined, module: string,
   const profiles: NonNullable<ExchangeWorkbook['brokerProfiles']> = workbook.brokerProfiles?.length ? workbook.brokerProfiles : [{ id: '', name: module, data: workbook }];
   return profiles.flatMap(profile => {
     const data = profile.id === workbook.activeBrokerId ? workbook : profile.data;
+    const profileUrl = base + '/brokers' + (profile.id ? '?broker=' + encode(profile.id) : '');
     const context = () => ({
       id: profile.id, label: [profile.name, profile.accountLabel].filter(Boolean).join(' · '),
-      url: !profile.id || profile.id === workbook.activeBrokerId ? base + '/transactions' : base + '/brokers',
+      url: !profile.id || profile.id === workbook.activeBrokerId ? base + '/transactions' : profileUrl,
     });
     return [
-      ...collect({ module, kind: 'Broker', records: [profile], context }),
+      ...collect({ module, kind: 'Broker', records: [profile], context: () => ({ ...context(), url: profileUrl }) }),
       ...collect({ module, kind: 'Trade', records: data?.transactions ?? [], context }),
       ...collect({ module, kind: 'Cash transfer', records: data?.transfers ?? [], context }),
       ...collect({ module, kind: 'Cash adjustment', records: data?.adjustments ?? [], context }),
