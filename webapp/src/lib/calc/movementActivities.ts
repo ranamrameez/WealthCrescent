@@ -227,9 +227,14 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
       if (nativeKeys.has(right)) suppressed.add(left);
       continue;
     }
-    if(domain.has(link.from.module) && ['cash','bank'].includes(link.to.module))suppressed.add(right);
-    else if(domain.has(link.to.module) && ['cash','bank'].includes(link.from.module))suppressed.add(left);
-    else {internal.add(left);internal.add(right);}
+    if (domain.has(link.from.module) && ['cash', 'bank'].includes(link.to.module)) {
+      if (nativeKeys.has(left)) suppressed.add(right);
+    } else if (domain.has(link.to.module) && ['cash', 'bank'].includes(link.from.module)) {
+      if (nativeKeys.has(right)) suppressed.add(left);
+    } else {
+      internal.add(left);
+      internal.add(right);
+    }
   }
   const included = (row: MovementActivity) => {
     if(sourcePolicy === 'all-ledgers')return true;

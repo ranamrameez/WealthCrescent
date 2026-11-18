@@ -286,3 +286,25 @@ it('reports independent installment remainders after matching eligible planned f
   f.base.plannedCash[0].amount = 110;
   expect(collect(f, ['cash', 'emi']).map(row => [row.id, row.amount])).toEqual([['emi-contract:agreement:due', -100]]);
 });
+
+it('retains Cash and Bank counterparts when a linked rental record is absent from its exact property', () => {
+  const f = fixture();
+  const date = '2026-01-02';
+  f.base.bankAccounts.push({ id: 'b', name: 'Checking', currencyCode: 'USD', openingBalance: 0 });
+  f.base.bankTransactions.push({ id: 'deposit', accountId: 'b', date, amount: 100, description: 'Rent', source: 'manual', isDeposit: true });
+  f.base.cashEntries.push({ id: 'expense', date, amount: 30, currencyCode: 'USD', isDeposit: false, source: 'manual' });
+  f.base.rentalProperties.push(
+    { id: 'actual-property', name: 'Home', currencyCode: 'USD' },
+    { id: 'other-property', name: 'Other home', currencyCode: 'USD' },
+  );
+  f.base.rentalEntries.push({ id: 'rent', propertyId: 'other-property', date, amount: 70, isDeposit: true });
+  f.links.push(
+    { id: 'rent-receipt', date, from: { module: 'rentals', ref: 'actual-property' }, to: { module: 'bank', ref: 'b' },
+      fromRecordId: 'rent', toRecordId: 'deposit', fromAmount: 100, toAmount: 100 },
+    { id: 'rent-expense', date, from: { module: 'cash' }, to: { module: 'rentals', ref: 'actual-property' },
+      fromRecordId: 'expense', toRecordId: 'missing', fromAmount: 30, toAmount: 30 },
+  );
+  expect(collect(f, ['bank', 'cash']).map(row => [row.id, row.amount, row.movementKind])).toEqual([
+    ['deposit', 100, 'unclassified'], ['expense', -30, 'unclassified'],
+  ]);
+});
