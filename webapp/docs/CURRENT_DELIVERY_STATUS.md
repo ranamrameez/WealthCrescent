@@ -64,7 +64,7 @@ Implemented core/service/Planning UI now includes optional definitions/allocatio
 - Generic transfer edits and deletes protect independent installment receipts and their Cash, Bank or card funding records. Coordinated reversals remain open.
 - The draft Cash and Bank persistence command uses deterministic occurrence IDs and one account-scoped transaction for the pending native record, plan link and execution history. Fixture tests cover replay, retry, stale or cancelled plans and auth changes. The command is isolated from UI and scheduling. Verify account-root rules and RTDB emulator behavior, then integrate settlement, backup and reset before activation. Money in/out keeps matched Cash and Bank occurrences in Pending. Planned movement and Upcoming omit those occurrences while later recurrence dates remain visible.
 - Add opt-in eligible outflow policies and backend scheduled execution. Skip fulfilled/cancelled/archived/deleted/inactive/excluded sources and income. Never move real money.
-- Add explicit settlement, partial settlement, void and reconciliation. Pending never silently becomes cleared.
+- Draft full settlement updates the native Cash or Bank entry, matching plan occurrence and execution history together. UI integration, partial settlement, void and reconciliation are open. Pending stays pending until explicitly settled.
 - Verify duplicates, interrupted retries, simultaneous clients, auth changes, month-end/leap boundaries and cancellation before enabling the scheduler.
 
 ### 5. App-wide UX acceptance

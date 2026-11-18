@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('firebase/database', () => ({ ref: (_db: unknown, path: string) => path, runTransaction: mocks.transaction }));
 vi.mock('../../lib/firebase/client', () => ({ auth: mocks.auth, db: {}, firebaseReady: true }));
 
-import { createPendingPayment } from './pendingPaymentService';
+import { createPendingPayment, settlePendingPayment } from './pendingPaymentService';
 
 const date = '2028-02-29';
 const now = new Date('2028-02-29T12:00:00Z');
@@ -106,4 +106,40 @@ it('rejects changed identity upfront and invalidates a transaction retry after s
     return { committed: false, snapshot: { val: fixture } };
   });
   await expect(createPendingPayment('owner', cash, date, now)).rejects.toThrow('active account');
+});
+
+it('settles the Cash entry, recurrence and execution history in one acknowledged transaction', async () => {
+  const read = transactionFor(fixture());
+  const { id } = await createPendingPayment('owner', cash, date, now);
+  const clearedOn = '2028-03-01';
+  const clearedAt = new Date(clearedOn + 'T12:00:00Z');
+  const confirmed = await settlePendingPayment('owner', cash, date, clearedOn, clearedAt);
+  expect(confirmed).toEqual({ id, occurrenceDate: date, settlementDate: clearedOn });
+  expect(read()).toMatchObject({
+    cash: { entries: [{ id, date: clearedOn, amount: 25, isPending: false }] },
+    plannedCash: { entries: [
+      { id: cash.plan.id, completedDates: [date] },
+      { id: id + ':fulfilled', date, fulfilledDate: clearedOn, executed: true },
+    ] },
+    paymentExecutions: [{ id, occurrenceDate: date, settledOn: clearedOn }],
+  });
+  const saved = read();
+  await expect(settlePendingPayment('owner', cash, date, clearedOn, clearedAt)).resolves.toEqual(confirmed);
+  expect(read()).toEqual(saved);
+});
+
+it('rejects stale Bank review and invalid date before settling the original pending record', async () => {
+  const read = transactionFor(fixture());
+  const { id } = await createPendingPayment('owner', bank, date, now);
+  const pending = read();
+  await expect(settlePendingPayment('owner', { ...bank, plan: { ...bank.plan, description: 'Changed' } }, date, date, now))
+    .rejects.toThrow('cloud plan changed');
+  await expect(settlePendingPayment('owner', bank, date, '2028-03-01', now)).rejects.toThrow('settlement date');
+  expect(read()).toEqual(pending);
+  await settlePendingPayment('owner', bank, date, date, now);
+  expect(read()).toMatchObject({
+    bank: { transactions: [{ id, amount: -40, isPending: false }] },
+    plannedBank: { entries: [{ id: bank.plan.id, executed: true, fulfilledDate: date }] },
+    paymentExecutions: [{ id, settledOn: date }],
+  });
 });
