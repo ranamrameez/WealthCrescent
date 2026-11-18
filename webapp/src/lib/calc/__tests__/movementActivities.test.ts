@@ -269,3 +269,20 @@ it('reports the next legacy EMI as planned until an active matching bank plan co
   f.base.bankAccounts[0].isActive = false;
   expect(collect(f, ['emi']).map(row => row.id)).toEqual(['legacy@2026-02-01']);
 });
+
+it('reports independent installment remainders after matching eligible planned funding', () => {
+  const f = fixture();
+  const date = '2026-02-01';
+  f.native.emi.entries.push({ id: 'agreement', name: 'Loan', currencyCode: 'QAR', lender: 'Bank',
+    repaymentMode: 'fixedTotal', principal: 100, totalToReturn: 100, tenureMonths: 1, startDate: '2026-01-01',
+    contractSchedule: [{ id: 'due', dueDate: date, amount: 100, description: 'Installment' }] });
+  f.base.plannedCash.push({ id: 'part', date, type: 'OUT', amount: 40, currencyCode: 'QAR',
+    sourceEmiLoanId: 'agreement', sourceEmiObligationId: 'due' });
+  const rows = collect(f, ['cash', 'emi']);
+  expect(rows.map(row => [row.id, row.amount, row.executed])).toEqual([
+    ['part', -40, false], ['emi-contract:agreement:due', -60, false],
+  ]);
+  expect(engine.movements.selectMovementActivities(rows, '2026-01-01', '2026-02-28', '2026-02-28', 'actual')).toEqual([]);
+  f.base.plannedCash[0].amount = 110;
+  expect(collect(f, ['cash', 'emi']).map(row => [row.id, row.amount])).toEqual([['emi-contract:agreement:due', -100]]);
+});

@@ -12,7 +12,7 @@ import { planOccurrences } from './planOccurrences';
 import { makeQSEFeeCalculator } from './fees';
 import { makePSXFeeCalculator } from './psxFees';
 import { standaloneRentCollections } from './rentalPlanning';
-import { standaloneLegacyInstallments, standaloneSubscriptionRenewals } from './upcoming';
+import { collectUpcomingItems, standaloneLegacyInstallments, standaloneSubscriptionRenewals } from './upcoming';
 import type { Subscription } from '../../types/subscriptionsWorkbook';
 
 export type MovementKind = 'operating' | 'financing' | 'investment' | 'transfer' | 'unclassified';
@@ -101,6 +101,46 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
       amount: plan.kind === 'payment' || plan.kind === 'cashAdvance' ? plan.amount : -plan.amount,
       currencyCode: card.currencyCode, category: plan.category, description: plan.description, executed: false, planGroupId: plan.groupId,
       movementKind: plan.kind === 'payment' ? 'transfer' : plan.kind === 'cashAdvance' || plan.sourceEmiLoanId ? 'financing' : 'operating' });
+  }
+  const independentLoans = native.emi.entries.filter(loan => loan.contractSchedule);
+  if (modules.includes('emi') && independentLoans.length) {
+    const linked = <T extends { sourceEmiObligationId?: string }>(plans: T[]) => plans.filter(plan => plan.sourceEmiObligationId);
+    const plannedCash = linked(input.base.plannedCash);
+    const fundingBank = linked(input.base.plannedBank);
+    const plannedCreditCards = linked(input.plannedCards);
+    const throughTime = Date.parse(through);
+    const start = asOf.toISOString().slice(0, 10);
+    const finish = Math.round((throughTime - Date.parse(start)) / 86400000);
+    if (Number.isFinite(finish) && finish >= 0) {
+      const schedule = collectUpcomingItems({
+        plannedCash, cashEntries: input.base.cashEntries, plannedBank: fundingBank,
+        bankTransactions: input.base.bankTransactions, bankAccounts: input.base.bankAccounts,
+        plannedCreditCards, creditCards: native.cards.cards.filter(card => sourcePolicy === 'all-ledgers' || card.includeInNetWorth !== false),
+        emiLoans: independentLoans, emiRepayments: native.emi.repayments, subscriptions: [], rentalProperties: [],
+      }, finish, asOf);
+      const rowKey = (module: string, id: string) => JSON.stringify([module, id]);
+      const linkedOccurrences = new Set([
+        ...planOccurrences(plannedCash, start, through, asOf).map(plan => rowKey('cash', plan.id)),
+        ...planOccurrences(fundingBank, start, through, asOf).map(plan => rowKey('bank', plan.id)),
+        ...planOccurrences(plannedCreditCards, start, through, asOf).map(plan => rowKey('creditCards', plan.id)),
+      ]);
+      const eligible = new Set(schedule.map(item => rowKey(item.module, item.id)));
+      // Keep the native plan representation for eligible funding. The reviewed remainder is a separate planned row.
+      for (let index = rows.length - 1; index >= 0; index--) {
+        const row = rows[index];
+        if (row.executed || row.date < start || row.date > through) continue;
+        const key = rowKey(row.module, row.id);
+        if (linkedOccurrences.has(key) && !eligible.has(key)) rows.splice(index, 1);
+      }
+      const byId = new Map(independentLoans.map(loan => [loan.id, loan]));
+      for (const item of schedule) {
+        const loan = item.obligationLoanId && byId.get(item.obligationLoanId);
+        if (!loan || (window.fromDate && item.date < window.fromDate)) continue;
+        add({ id: item.id, recordType: 'emi-obligation', module: 'emi', sourceId: loan.id, sourceLabel: loan.name,
+          date: item.date, currencyCode: item.currencyCode, amount: -item.amount,
+          description: item.label, executed: false, movementKind: 'financing' });
+      }
+    }
   }
   const loans = new Map(native.personalLoans.loans.map(loan => [loan.id,loan]));
   for (const tx of native.personalLoans.repayments) {

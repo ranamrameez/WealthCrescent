@@ -24,6 +24,7 @@ export interface UpcomingItem {
   currencyCode: string;
   kind: 'income' | 'expense';
   estimate?: boolean;
+  obligationLoanId?: string;
   /** Kept for renderer compatibility. Upcoming is now future-only; overdue
    * obligations belong in Alerts and are never emitted by this collector. */
   overdue: false;
@@ -214,7 +215,7 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
       if (validFunding) items.push(...funding);
       const remainder = validFunding ? row.remaining - plannedAmount : row.remaining;
       if (remainder > 0.0000001) {
-        items.push({ id: `emi-contract:${loan.id}:${row.id}`, date: row.dueDate, module: 'emi', label: `${loan.name}: ${row.description}`, amount: remainder, currencyCode: loan.currencyCode, kind: 'expense', overdue: false });
+        items.push({ id: `emi-contract:${loan.id}:${row.id}`, date: row.dueDate, module: 'emi', obligationLoanId: loan.id, label: `${loan.name}: ${row.description}`, amount: remainder, currencyCode: loan.currencyCode, kind: 'expense', overdue: false });
       }
     }
   }
