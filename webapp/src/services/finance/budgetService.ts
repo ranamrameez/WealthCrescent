@@ -137,6 +137,38 @@ export function setBudgetMonthLimit(id:string,month:string,raw:string,expected:B
   if(limit===null || !Number.isFinite(limit) || limit<0)throw new Error('Enter a finite monthly limit of zero or more.');
   saveBudget({...expected,monthlyLimit:String(expected.monthlyLimit),monthlyLimits:{...expected.monthlyLimits,[month]:limit}},expected);
 }
+export interface BudgetMonthLimitChange {
+  expected: BudgetDefinition;
+  month: string;
+  limit: number;
+}
+
+export function applyBudgetMonthLimits(changes: BudgetMonthLimitChange[], reviewedUid: string) {
+  if (requireUser().uid !== reviewedUid) throw new Error('The signed-in account changed. Reopen the editor.');
+  if (!changes.length) return 0;
+  const store = usePlannedCashWorkbookStore.getState();
+  const definitions = store.workbook.budgets ?? [];
+  const byId = new Map(definitions.map(budget => [budget.id, budget]));
+  const updates = new Map<string, BudgetDefinition>();
+  const keys = new Set<string>();
+  for (const { expected, month, limit } of changes) {
+    const current = byId.get(expected.id);
+    if (!current || JSON.stringify(current) !== JSON.stringify(expected)) throw new Error('A budget changed. Reopen the editor.');
+    if (!validBatchDate(month + '-01') || month < current.startMonth || (current.endMonth && month > current.endMonth)) {
+      throw new Error('A month is outside its budget period.');
+    }
+    const key = JSON.stringify([current.id, month]);
+    if (keys.has(key)) throw new Error('The same budget month was selected twice.');
+    keys.add(key);
+    const next = updates.get(current.id) ?? current;
+    const updated = { ...next, monthlyLimits: { ...next.monthlyLimits, [month]: limit } };
+    CalculationEngine.budgets.validateBudgetDefinition(updated);
+    updates.set(current.id, updated);
+  }
+  store.setWorkbook({ ...store.workbook, budgets: definitions.map(budget => updates.get(budget.id) ?? budget) });
+  return changes.length;
+}
+
 export function removeBudget(id:string,expected:BudgetDefinition) {
   requireUser(); const { workbook,activities }=sources();
   const current=workbook.budgets?.find(item=>item.id===id);

@@ -1,6 +1,6 @@
 import { parseCSV } from '../../lib/csv';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { getBudgetOverview, exportBudgetCsv, BUDGET_IMPORT_COLUMNS, previewBudgetDefinitionImport, applyBudgetDefinitionImport, saveBudget, saveBudgetAllocations, setBudgetMonthLimit, removeBudget } from './budgetService';
+import { getBudgetOverview, exportBudgetCsv, BUDGET_IMPORT_COLUMNS, previewBudgetDefinitionImport, applyBudgetDefinitionImport, applyBudgetMonthLimits, saveBudget, saveBudgetAllocations, setBudgetMonthLimit, removeBudget } from './budgetService';
 import { usePlannedCashWorkbookStore } from '../../store/plannedCashWorkbookStore';
 import { useCashWorkbookStore } from '../../store/cashWorkbookStore';
 import { useCategoryStore } from '../../store/categoryStore';
@@ -109,4 +109,17 @@ it('reviews an entire budget CSV without writing and refuses stale or invalid ba
   ]);
   expect(() => applyBudgetDefinitionImport(preview)).toThrow('already exists');
   expect(usePlannedCashWorkbookStore.getState().workbook.budgetAllocations).toEqual(store.workbook.budgetAllocations);
+});
+
+
+it('validates all budget month edits before saving and keeps earlier overrides', () => {
+  saveBudget({ ...input, endMonth: '2026-05' });
+  const budget = getBudgetOverview().budgets[0];
+  const edits = [{ expected: budget, month: '2026-02', limit: 0 }, { expected: budget, month: '2026-04', limit: 80 }];
+  expect(() => applyBudgetMonthLimits([...edits, { expected: budget, month: '2026-06', limit: 10 }], session.uid)).toThrow('outside');
+  expect(getBudgetOverview().budgets[0].monthlyLimits).toBeUndefined();
+  expect(() => applyBudgetMonthLimits(edits, 'other-user')).toThrow('account changed');
+  expect(applyBudgetMonthLimits(edits, session.uid)).toBe(2);
+  expect(getBudgetOverview().budgets[0]).toMatchObject({ monthlyLimit: 100, monthlyLimits: { '2026-02': 0, '2026-04': 80 } });
+  expect(() => applyBudgetMonthLimits(edits, session.uid)).toThrow('budget changed');
 });

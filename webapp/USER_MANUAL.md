@@ -1193,3 +1193,5 @@ From **Currency budgets** choose **Import budget definitions** and use the colum
 ### Compare movement with the previous calendar month
 
 In **Money in/out**, select **Cleared actual** and open **Compare with**. Use **Previous calendar month** for a range starting on the first day of one month. Completed months compare in full. A month-to-date range compares through the same day of the previous month, or through its last day if it was shorter.
+
+Use **Batch edit monthly limits** in the **Currency budgets** menu to edit limits for the report's displayed months. Saving the batch creates month-specific overrides and retains each budget's default limit and currency.

@@ -1,10 +1,11 @@
 import { useState, useSyncExternalStore } from 'react';
-import { getBudgetOverview, exportBudgetCsv, BUDGET_IMPORT_COLUMNS, previewBudgetDefinitionImport, applyBudgetDefinitionImport, getBudgetRecordKey, subscribeBudgets, saveBudget, setBudgetMonthLimit, removeBudget, saveBudgetAllocations, type BudgetDefinition, type BudgetAllocation, type AllocationInput } from '../services/finance/budgetService';
+import { getBudgetOverview, exportBudgetCsv, BUDGET_IMPORT_COLUMNS, previewBudgetDefinitionImport, applyBudgetDefinitionImport, applyBudgetMonthLimits, getBudgetRecordKey, subscribeBudgets, saveBudget, setBudgetMonthLimit, removeBudget, saveBudgetAllocations, type BudgetDefinition, type BudgetAllocation, type AllocationInput } from '../services/finance/budgetService';
 import type { MovementActivity } from '../services/finance/dashboardService';
 import { StandardCard } from './StandardCard';
 import { SummarySection, SummarySections, SummaryValue } from './SummaryGroupCard';
 import { Field, Select, TextInput } from './ui/Field';
 import { StandardDropdown } from './ui/StandardDropdown';
+import { BatchEditGrid, type BatchColumn } from './BatchEditGrid';
 import { StandardButton } from './standard/Button';
 import { Modal } from './Modal';
 import { Notice } from './Notice';
@@ -22,6 +23,13 @@ import { HUES } from '../lib/statCardHues';
 
 type Context = ReturnType<typeof getBudgetOverview>;
 type BudgetMonth = Context['report']['rows'][number]['months'][number];
+type BudgetLimitRow = { budget: BudgetDefinition; name: string; currency: string; month: string; limit: number };
+const limitColumns: BatchColumn<BudgetLimitRow>[] = [
+  { key: 'name', label: 'Budget', type: 'text', editable: false },
+  { key: 'currency', label: 'Currency', type: 'text', editable: false },
+  { key: 'month', label: 'Month', type: 'text', editable: false },
+  { key: 'limit', label: 'Monthly limit', type: 'number' },
+];
 export function UnifiedBudgetsPanel({ fromDate, toDate }: { fromDate: string; toDate: string }) {
   const context=useSyncExternalStore(subscribeBudgets,()=>getBudgetOverview(fromDate,toDate));
   const { report }=context;
@@ -31,10 +39,20 @@ export function UnifiedBudgetsPanel({ fromDate, toDate }: { fromDate: string; to
   const [allocating,setAllocating]=useState<MovementActivity | 'choose' | null>(null);
   const [modify,setModify]=useState(false);
   const [importing, setImporting] = useState(false);
+  const [batch, setBatch] = useState<{ owner: string; rows: BudgetLimitRow[] } | null>(null);
   const ensureSignedIn=useEnsureSignedIn();
   const visible=report.rows.flatMap(row=>row.months.map(month=>({budget:row.budget,month})));
   const { rows,controls }=useTablePagination(visible);
   const { rows:unallocatedRows,controls:unallocatedControls }=useTablePagination(report.unallocated);
+  const openBatch = async () => {
+    if (!(await ensureSignedIn('Sign in to edit monthly limits.'))) return;
+    const owner = getCurrentUser()?.uid;
+    if (!owner) return;
+    const current = getBudgetOverview(fromDate, toDate);
+    setBatch({ owner, rows: current.report.rows.flatMap(({ budget, months }) => months.map(month => ({
+      budget, name: budget.name, currency: budget.currencyCode, month: month.month, limit: month.limit,
+    }))) });
+  };
   const exportCsv = (type: 'balances' | 'allocations') => {
     const { fileName, csv } = exportBudgetCsv(report, type);
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
@@ -52,6 +70,7 @@ export function UnifiedBudgetsPanel({ fromDate, toDate }: { fromDate: string; to
   return <StandardCard title="Currency budgets" collapsible={false} className="mb-md" actions={[
     {label:'Add budget',onClick:()=>setEditing('new')},
     {label:'Import budget definitions',onClick:()=>setImporting(true)},
+    {label:'Batch edit monthly limits',onClick:()=>void openBatch(),disabled:!visible.length},
     {label:modify?'Done modifying':'Modify',onClick:()=>setModify(!modify)},
     {label:'Allocate / identify refund',onClick:()=>setAllocating('choose'),disabled:!context.records.length},
     {label:'Export monthly balances',onClick:()=>exportCsv('balances'),disabled:!visible.length},
@@ -74,6 +93,16 @@ export function UnifiedBudgetsPanel({ fromDate, toDate }: { fromDate: string; to
     {report.charts.filter(chart=>chart.labels.length).map(chart=><ChartCard flat key={chart.currency} title={chart.currency+' — available vs net allocated use'}><div style={{height:260}}><AppChart type="bar" data={{labels:chart.labels,datasets:[{label:'Available ('+chart.currency+')',data:chart.available,backgroundColor:HUES[0]},{label:'Net allocated use ('+chart.currency+')',data:chart.used,backgroundColor:HUES[1]}]}}/></div></ChartCard>)}
     <h3>Unallocated records</h3><p className="text-muted">A record matching multiple budgets stays unallocated until you choose a split. Unclassified account movement needs an explicit category/plan scope or manual allocation. Ordinary income only becomes a budget refund when explicitly identified.</p>
     <div className="table-scroll"><table><caption>Cleared outflow not yet assigned to a budget</caption><thead><tr><th>Date</th><th>Source / record</th><th>Unallocated</th><th>Reason</th></tr></thead><tbody>{unallocatedRows.map(item=><RecordRow key={item.recordKey} record={item} onOpen={()=>setAllocating(item.record)}><td>{item.record.date}</td><td>{item.record.sourceLabel}<br/>{item.record.description}</td><td>{fmtMoney(item.amount,item.record.currencyCode)}</td><td>{item.ambiguousBudgetIds.length?'Multiple matching budgets':'No allocation or partial allocation'}</td></RecordRow>)}</tbody></table></div>{unallocatedControls}
+    {batch && <BatchEditGrid title="Batch edit monthly budget limits" description="Edit targets for the displayed months. Each budget keeps its default limit and currency."
+      rows={batch.rows} columns={limitColumns}
+      getRowId={row => JSON.stringify([row.budget.id, row.month])}
+      validateRow={row => ({ limit: Number.isFinite(row.limit) && row.limit >= 0 ? undefined : 'Enter a finite monthly limit of zero or more.' })}
+      onSave={changes => {
+        const count = applyBudgetMonthLimits(changes.map(({ before, after }) => ({ expected: before.budget, month: before.month, limit: after.limit })), batch.owner);
+        toast(`Updated ${count} monthly limits.`);
+      }}
+      onClose={() => setBatch(null)}
+    />}
     {importing && <BudgetImportDialog onClose={() => setImporting(false)} />}
     {editing&&<BudgetEditor context={context} original={editing==='new'?undefined:editing} onClose={()=>setEditing(null)}/>}
     {limit&&<MonthLimitEditor budget={limit.budget} month={limit.month} onClose={()=>setLimit(null)}/>}

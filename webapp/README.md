@@ -10118,7 +10118,7 @@ For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) first. **Lates
 
 ## Done
 
-- Currency budgets can review and add new budget definitions from CSV in a single batch. Each row must specify its native currency and a unique ID.
+- Currency budgets can review and add new budget definitions from CSV in a single batch. Each row must specify its native currency and a unique ID. The shared batch editor can set multiple month-specific limits without changing default limits or currencies.
 
 - Currency budgets exports monthly balances and contributing allocation details for the selected report dates.
 

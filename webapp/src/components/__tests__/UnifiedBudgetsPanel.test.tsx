@@ -66,3 +66,20 @@ it('requires reviewing the CSV before saving budgets from the card menu', async 
   expect(usePlannedCashWorkbookStore.getState().workbook.budgets).toMatchObject([{ id: 'new', currencyCode: 'USD' }]);
   expect(screen.queryByRole('dialog', { name: 'Import budget definitions' })).toBeNull();
 });
+
+it('saves a month override from the shared batch editor', async () => {
+  usePlannedCashWorkbookStore.getState().setWorkbook({
+    ...originalPlans,
+    entries: [], budgetAllocations: [],
+    budgets: [{ id: 'food-budget', name: 'Food', currencyCode: 'USD', startMonth: '2026-01', monthlyLimit: 100, rollover: 'none' }],
+  });
+  show();
+  fireEvent.click(screen.getByRole('button', { name: 'Card options' }));
+  fireEvent.click(screen.getByText('Batch edit monthly limits', { exact: true }));
+  const dialog = within(await screen.findByRole('dialog', { name: 'Batch edit monthly budget limits' }));
+  fireEvent.change(dialog.getByLabelText('Row 1, Monthly limit'), { target: { value: '80' } });
+  fireEvent.click(dialog.getByRole('button', { name: 'Save all changes' }));
+  await waitFor(() => expect(usePlannedCashWorkbookStore.getState().workbook.budgets?.[0]).toMatchObject({
+    monthlyLimit: 100, monthlyLimits: { '2026-01': 80 },
+  }));
+});

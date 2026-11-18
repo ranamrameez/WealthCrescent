@@ -1,3 +1,7 @@
+## PR #51 integration and budgeting
+
+Integrated the QSE dashboard import released on main. Added reviewed CSV creation of currency budget definitions, batch editing for monthly limits, and a previous-calendar-month comparison in Money in/out. Work on linked funding reversals, routine sync and pending-only payments remains open.
+
 ## QSE dashboard import
 
 The focused dashboard import branch brings the reviewed Trade list importer to both dashboards. Both entry points use the same broker/account review and ledger checks. The wider reporting and payment acceptance stays tracked on PR #51.
