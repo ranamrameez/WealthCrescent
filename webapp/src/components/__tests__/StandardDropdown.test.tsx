@@ -38,6 +38,27 @@ describe('StandardDropdown', () => {
     fireEvent.keyDown(input, { key: 'ArrowDown' }); fireEvent.keyDown(input, { key: 'ArrowDown' }); fireEvent.keyDown(input, { key: 'Enter' });
     expect(change).toHaveBeenCalledWith('qar');
   });
+  it('selects the first enabled search result after empty or disabled-only searches', () => {
+    const change = vi.fn();
+    const results: DropdownSection[] = [{ title: 'Accounts', items: [
+      { value: 'closed', label: 'Closed wallet', disabled: true },
+      { value: 'open', label: 'Open wallet' },
+    ] }];
+    render(<StandardDropdown label="Finance" value="" sections={results} onChange={change} isTypeable />);
+    const input = screen.getByRole('combobox', { name: 'Finance' });
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'missing' } });
+    expect(screen.getByRole('status')).toHaveTextContent('No matching items.');
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.change(input, { target: { value: 'Closed' } });
+    expect(input).not.toHaveAttribute('aria-activedescendant');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(change).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: 'wallet' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(change).toHaveBeenCalledExactlyOnceWith('open');
+  });
   it('keeps failed favorites reviewable and supports Escape and outside dismissal', async () => {
     render(<StandardDropdown label="Finance" value="a" sections={sections} onChange={vi.fn()} isTypeable onFavoriteToggle={async () => { throw new Error('Retry favorite'); }} />);
     const input = screen.getByRole('combobox', { name: 'Finance' }); fireEvent.focus(input);

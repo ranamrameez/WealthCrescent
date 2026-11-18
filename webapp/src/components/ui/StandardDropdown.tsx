@@ -38,7 +38,8 @@ export function StandardDropdown({ label, value, sections, onChange, onFavoriteT
   })), [sections, query]);
   const rows = filtered.flatMap(section => section.items.map(item => ({ item, sectionIndex: section.sectionIndex })));
   const selected = sections.flatMap(section => section.items).find(item => item.value === value);
-  const activeRow = rows[active];
+  const activeIndex = rows[active] && !rows[active].item.disabled ? active : rows.findIndex(row => !row.item.disabled);
+  const activeRow = rows[activeIndex];
   const close = () => { setOpen(false); setSearch(''); setError(''); };
   const show = (last = false) => {
     if (disabled) return;
@@ -79,16 +80,16 @@ export function StandardDropdown({ label, value, sections, onChange, onFavoriteT
     return () => { window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true); };
   }, [open]);
   useEffect(() => {
-    if (active >= rows.length) setActive(Math.max(0, rows.length - 1));
     if (open) menu.current?.querySelector<HTMLElement>('[data-active="true"]')?.scrollIntoView?.({ block: 'nearest' });
-  }, [open, active, rows.length]);
+  }, [open, activeIndex, rows.length]);
   const keyDown = (event: KeyboardEvent) => {
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); restoreFocus(); return; }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
       if (!open) return show(event.key === 'ArrowUp');
+      if (!activeRow) return;
       const direction = event.key === 'ArrowDown' ? 1 : -1;
-      let next = active;
+      let next = activeIndex;
       for (let count = 0; count < rows.length; count++) { next = (next + direction + rows.length) % rows.length; if (!rows[next].item.disabled) break; }
       setActive(next); return;
     }
@@ -107,7 +108,7 @@ export function StandardDropdown({ label, value, sections, onChange, onFavoriteT
     <div className={`standard-dropdown-trigger${disabled ? ' is-disabled' : ''}`}>
       {selected?.icon && <span className="standard-dropdown-icon" aria-hidden="true">{selected.icon}</span>}
       <input ref={input} id={`${id}-input`} role="combobox" aria-label={label} aria-haspopup="grid" aria-expanded={open}
-        aria-controls={open ? `${id}-options` : undefined} aria-activedescendant={open && activeRow ? `${id}-option-${active}` : undefined}
+        aria-controls={open ? `${id}-options` : undefined} aria-activedescendant={open && activeRow ? `${id}-option-${activeIndex}` : undefined}
         aria-autocomplete={isTypeable ? 'list' : 'none'} aria-readonly={!isTypeable} aria-describedby={`${id}-help`}
         readOnly={!isTypeable} disabled={disabled} autoComplete="off" spellCheck={false}
         value={open && isTypeable ? search : selected?.label ?? value}
@@ -125,10 +126,10 @@ export function StandardDropdown({ label, value, sections, onChange, onFavoriteT
           {section.items.map(item => {
             const index = rowIndex++;
             return <div key={`${section.sectionIndex}:${item.value}`} role="row" aria-selected={item.value === value} aria-disabled={item.disabled || undefined}
-              className="standard-dropdown-row" data-active={index === active}>
+              className="standard-dropdown-row" data-active={index === activeIndex}>
               <div role="gridcell" id={`${id}-option-${index}`}>
                 <button type="button" className="standard-dropdown-option" tabIndex={-1} disabled={item.disabled}
-                  onMouseDown={event => event.preventDefault()} onPointerMove={() => setActive(index)} onClick={() => choose(item)}>
+                  onMouseDown={event => event.preventDefault()} onPointerMove={() => { if (!item.disabled) setActive(index); }} onClick={() => choose(item)}>
                   <span className="standard-dropdown-icon" aria-hidden="true">{item.icon ?? <span className="standard-dropdown-initial">{item.label.slice(0, 2)}</span>}</span>
                   <span className="standard-dropdown-text">{item.label}</span>
                   {item.value === value && <span className="standard-dropdown-check" aria-hidden="true">✓</span>}
@@ -136,7 +137,7 @@ export function StandardDropdown({ label, value, sections, onChange, onFavoriteT
               </div>
               {(onFavoriteToggle || item.isFavorite !== undefined) && <div role="gridcell">
                 <button type="button" data-favorite className="standard-dropdown-favorite" aria-pressed={!!item.isFavorite}
-                  tabIndex={index === active ? 0 : -1}
+                  tabIndex={index === activeIndex ? 0 : -1}
                   aria-label={`${item.isFavorite ? 'Unfavorite' : 'Favorite'} ${item.label}`} disabled={!onFavoriteToggle || item.disabled || pending !== null}
                   onMouseDown={event => event.preventDefault()} onClick={() => void toggleFavorite(item)}><StarIcon filled={item.isFavorite} /></button>
               </div>}
