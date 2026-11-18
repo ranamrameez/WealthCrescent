@@ -36,6 +36,8 @@ Updated 2026-11-07. This is the concise status index; SESSION_HANDOFF.md records
 
 ## Remaining work, in dependency order
 
+- User-reported transfer editing gap: edit mode must allow adding a missed finance link while retaining the original record. Linked rows in batch editors must offer coordinated editing of both sides.
+
 Use the [delivery task register](MULTI_AGENT_WORKFLOW.md) to coordinate ownership across agents and sessions.
 
 ### 1. Complete reporting and calculation contracts
