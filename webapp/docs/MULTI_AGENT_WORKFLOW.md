@@ -29,7 +29,9 @@ The register lives on the shared delivery branch linked to the active PR. For th
 | Continue UI-to-service migration | Ready | | Claim one named module and workflow at a time. |
 | Cash accounts in the global finder | Done | WC-TR session 1939ef032035, PR #51 | `0526e262` covers defaults, Cash entries, Cash plans, independent favorites and filter-preserving links. 1,390 tests and build passed locally; Actions 474 passed. |
 | Shared finder keyboard acceptance | Done | WC-TR session 1939ef032035, PR #51 | `92c13b71` skips disabled keyboard results and handles empty searches. 1,393 tests passed locally; Actions 477 passed tests and build. |
-| Add app-wide record search | In progress | WC-TR session 1939ef032035, work/app-record-search, 2026-11-18 UTC | High priority. Topbar keyword search and a dedicated results page with module and submodule scopes. See the delivery checklist for acceptance. |
+| Add app-wide record search | Done | WC-TR session 1939ef032035, PR #51 | `466b642b` adds account-scoped topbar search, native record links and module/submodule filters. 1,408 tests passed locally; Actions 492 passed. |
 | Validate Cash currency detail links | Done | WC-TR session 1939ef032035, PR #51 | `7fb88810` shares the Cash currency registry, rejects unknown URLs and preserves active filters. Focused tests and Actions 483 passed. |
+| Verify app-wide search in a mobile browser | Ready | | The local Chromium process was blocked by the execution environment. Recheck the topbar and results at a narrow viewport with fixtures. |
+| Deep-link exchange broker search results | In progress | WC-TR session 1939ef032035, work/search-broker-links, 2026-11-18 UTC | Open the matching broker on the native broker screen without switching the active broker. |
 | Complete UX acceptance | Ready | | Claim one module or a specific shared control at a time. |
 | Final PR validation and merge | Ready | | Depends on the remaining acceptance checks and exact-head CI. |
