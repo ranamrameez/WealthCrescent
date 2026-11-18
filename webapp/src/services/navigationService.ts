@@ -1,3 +1,4 @@
+import { listCashCurrencies } from '../lib/cashCurrencyNavigation';
 import { auth } from '../lib/firebase/client';
 import { useCashWorkbookStore } from '../store/cashWorkbookStore';
 import { usePlannedCashWorkbookStore } from '../store/plannedCashWorkbookStore';
@@ -31,8 +32,7 @@ export function getNavigationItems(): NavigationSection[] {
   })).sort((a, b) => Number(b.isFavorite) - Number(a.isFavorite) || a.label.localeCompare(b.label)) });
   const cash = useCashWorkbookStore.getState().workbook;
   const cashPlans = usePlannedCashWorkbookStore.getState().workbook.entries;
-  const cashCurrencies = [...new Set([cash.settings.defaultCurrency, ...cash.entries.map(row => row.currencyCode), ...cashPlans.map(row => row.currencyCode)])]
-    .filter(Boolean)
+  const cashCurrencies = listCashCurrencies(cash.settings.defaultCurrency, cash.entries, cashPlans)
     .map(id => ({ id, name: `${id} cash`, isFavorite: cash.settings.favoriteCurrencies?.includes(id) }));
   cache = [
     section('Cash currencies', 'cashCurrency', cashCurrencies, id => `/cash/${id}`),

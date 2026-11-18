@@ -1,3 +1,4 @@
+import { cashCurrencyLocation } from '../lib/cashCurrencyNavigation';
 import { useMemo, useSyncExternalStore } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { StandardDropdown } from './ui/StandardDropdown';
@@ -23,9 +24,7 @@ export function AppEntityFinder() {
       const path = item.url.split('?')[0];
       if (path !== location.pathname) usePageTopBarStore.getState().beginNavigation(path);
       if (item.kind === 'cashCurrency' && (location.pathname === '/cash' || location.pathname.startsWith('/cash/'))) {
-        const params = new URLSearchParams(location.search);
-        params.delete('entities');
-        navigate({ pathname: path, search: params.toString() });
+        navigate(cashCurrencyLocation(item.id, location.search));
       } else {
         navigate(item.url);
       }

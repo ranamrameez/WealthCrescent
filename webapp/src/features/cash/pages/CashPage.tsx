@@ -1,3 +1,4 @@
+import { cashCurrencyLocation, listCashCurrencies } from '../../../lib/cashCurrencyNavigation';
 import { fulfillManualPlan } from '../../../services/finance/manualPlanPaymentService';
 import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
@@ -141,6 +142,7 @@ function CashPageFab({ defaultCurrencyOverride }: { defaultCurrencyOverride?: st
 
 function BalancesSummary({ selectedCurrencies, entries: suppliedEntries }: { selectedCurrencies?: string[]; entries?: CashEntry[] } = {}) {
   const navigate = useNavigate();
+  const { search } = useLocation();
   const storedEntries = useCashWorkbookStore((s) => s.workbook.entries);
   const entries = suppliedEntries ?? storedEntries;
   const plannedEntries = usePlannedCashWorkbookStore((s) => s.workbook.entries);
@@ -175,7 +177,7 @@ function BalancesSummary({ selectedCurrencies, entries: suppliedEntries }: { sel
             statLabel="Balance"
             stat={<MoneyValue n={balances[code] ?? 0} currency={code} />}
             hue={balances[code] >= 0 ? 'var(--profit)' : 'var(--loss)'}
-            onClick={() => navigate(`/cash/${encodeURIComponent(code)}`)}
+            onClick={() => navigate(cashCurrencyLocation(code, search))}
             badge={<>
             {/* User-requested (2026-09-08): don't just exclude pending money
                from the headline balance — show it too, so nothing that's
@@ -1197,9 +1199,9 @@ export function CashPage({
   const navigate = useNavigate();
   const entries = useCashWorkbookStore((s) => s.workbook.entries);
   const categories = useCategoryStore((s) => s.workbook.categories);
-  const currencyPlans=usePlannedCashWorkbookStore(state=>state.workbook.entries);
-  const defaultCurrency=useCashWorkbookStore(state=>state.workbook.settings.defaultCurrency);
-  const currencies = useMemo(() => [...new Set([defaultCurrency,...entries.map(entry=>entry.currencyCode),...currencyPlans.map(plan=>plan.currencyCode)])].sort(), [entries,currencyPlans,defaultCurrency]);
+  const currencyPlans = usePlannedCashWorkbookStore(state => state.workbook.entries);
+  const defaultCurrency = useCashWorkbookStore(state => state.workbook.settings.defaultCurrency);
+  const currencies = useMemo(() => listCashCurrencies(defaultCurrency, entries, currencyPlans), [defaultCurrency, entries, currencyPlans]);
   const [params] = useSearchParams();
   const selectedCurrencies = selectedEntityValues(params, currencies);
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
@@ -1212,7 +1214,7 @@ export function CashPage({
     [entries, filters, categories, selectedCurrencies],
   );
   usePageTopBarRightSlot(currencies.length ? <TopBarControls>
-    <TopBarSelect label="Currency" className="account-switch-select" value="" options={[{value:"",label:"All cash"},...currencies.map(code=>({value:code,label:code}))]} onChange={event=>{if(event.target.value)navigate(`/cash/${encodeURIComponent(event.target.value)}`);}} /><EntityScopeMenu label="Cash currencies" options={[{value:"",label:"All cash"},...currencies.map((code) => ({ value: code, label: code }))]} />
+    <TopBarSelect label="Currency" className="account-switch-select" value="" options={[{value:"",label:"All cash"},...currencies.map(code=>({value:code,label:code}))]} onChange={event=>{if(event.target.value)navigate(cashCurrencyLocation(event.target.value, params.toString()));}} /><EntityScopeMenu label="Cash currencies" options={[{value:"",label:"All cash"},...currencies.map((code) => ({ value: code, label: code }))]} />
     <TransactionFilterMenu value={filters} categories={filterCategories} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} />
   </TopBarControls> : null);
   return (
@@ -1278,33 +1280,35 @@ export function CashCurrencyPage() {
   const location = useLocation();
   const { currency: rawCurrency } = useParams();
   const navigate = useNavigate();
-  const currency = decodeURIComponent(rawCurrency ?? '').toUpperCase();
+  const currency = (rawCurrency ?? '').toUpperCase();
   const entries = useCashWorkbookStore((state) => state.workbook.entries);
   const categories = useCategoryStore((state) => state.workbook.categories);
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
   const filteredEntries = useMemo(() => filterCashEntries(entries, filters, categories).filter((entry) => entry.currencyCode === currency), [entries, filters, categories, currency]);
   const filterCategories = useMemo(() => [...new Set(entries.filter((entry) => entry.currencyCode === currency).map((entry) => categoryName(entry.categoryID, categories)))].sort(), [entries, categories, currency]);
-  const currencyPlans=usePlannedCashWorkbookStore(state=>state.workbook.entries);
-  const currencies = useMemo(() => [...new Set([currency,...entries.map(entry=>entry.currencyCode),...currencyPlans.map(plan=>plan.currencyCode)])].sort(), [entries,currencyPlans,currency]);
-  usePageTopBarRightSlot(currencies.length ? (
+  const currencyPlans = usePlannedCashWorkbookStore(state => state.workbook.entries);
+  const defaultCurrency = useCashWorkbookStore(state => state.workbook.settings.defaultCurrency);
+  const currencies = useMemo(() => listCashCurrencies(defaultCurrency, entries, currencyPlans), [defaultCurrency, entries, currencyPlans]);
+  const validCurrency = currencies.includes(currency);
+  usePageTopBarRightSlot(validCurrency ? (
     <TopBarControls>
       <TopBarSelect
         label="Currency"
         className="account-switch-select"
         value={currency}
-        onChange={(event) => navigate(event.target.value ? `/cash/${encodeURIComponent(event.target.value)}${location.search}` : `/cash${location.search}`)}
+        onChange={(event) => navigate(cashCurrencyLocation(event.target.value, location.search))}
         options={currencies.map((code) => ({ value: code, label: code }))}
       />
       <TransactionFilterMenu value={filters} categories={filterCategories} activeCount={activeCount} onChange={setFilters} onClear={resetFilters} />
     </TopBarControls>
   ) : null);
 
-  if (!currency || !currencies.includes(currency)) {
-    return <div className="standard-page"><BackButton to="/cash">← Back to Cash</BackButton><p className="text-muted mt-12">Cash currency not found.</p></div>;
+  if (!validCurrency) {
+    return <div className="standard-page"><BackButton to={`/cash${location.search}`}>← Back to Cash</BackButton><p className="text-muted mt-12">Cash currency not found.</p></div>;
   }
 
   return <div className="standard-page">
-    <PageHeading back={<BackButton to="/cash">← Back to Cash</BackButton>}><div className="module-detail-heading"><h1>{currency} cash</h1><div className="muted">Account-like view for this currency balance</div></div></PageHeading>
+    <PageHeading back={<BackButton to={`/cash${location.search}`}>← Back to Cash</BackButton>}><div className="module-detail-heading"><h1>{currency} cash</h1><div className="muted">Account-like view for this currency balance</div></div></PageHeading>
     <StandardPageSections sections={[
       {
         key: 'summary',

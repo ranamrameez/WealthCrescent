@@ -1,7 +1,8 @@
+import { usePageTopBarStore } from '../../../../store/pageTopBarStore';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { PlanningTab } from '../CashPage';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { CashCurrencyPage, PlanningTab } from '../CashPage';
 import { useCashWorkbookStore } from '../../../../store/cashWorkbookStore';
 import { usePlannedCashWorkbookStore } from '../../../../store/plannedCashWorkbookStore';
 import { createEmptyCashWorkbook } from '../../../../store/defaultCashWorkbook';
@@ -30,4 +31,30 @@ it('fulfills a future occurrence once and saves its own immutable amount and dat
   expect(screen.queryByRole('button', { name: 'Mark as done' })).toBeNull();
   usePlannedCashWorkbookStore.getState().updateEntry('rent', { amount: 200 });
   expect(usePlannedCashWorkbookStore.getState().workbook.entries.find(plan => plan.seriesId === 'rent')?.amount).toBe(100);
+});
+
+function CashDetailTopBar() {
+  return usePageTopBarStore(state => state.rightSlot);
+}
+
+function CashDetailFixture() {
+  const location = useLocation();
+  return <><CashDetailTopBar /><output>{location.pathname + location.search}</output>
+    <Routes><Route path="/cash/:currency" element={<CashCurrencyPage />} /></Routes>
+  </>;
+}
+
+it('rejects unknown currency detail links', () => {
+  render(<MemoryRouter initialEntries={['/cash/ZZZ']}><CashDetailFixture /></MemoryRouter>);
+  expect(screen.getByText('Cash currency not found.')).toBeTruthy();
+  expect(screen.queryByRole('combobox', { name: 'Currency' })).toBeNull();
+});
+
+it('switches between default and plan-only Cash currencies without losing filters', () => {
+  useCashWorkbookStore.getState().updateSettings({ defaultCurrency: 'QAR' });
+  render(<MemoryRouter initialEntries={['/cash/USD?period=all&from=&to=&direction=out']}><CashDetailFixture /></MemoryRouter>);
+  expect(screen.getByRole('heading', { name: 'USD cash' })).toBeTruthy();
+  fireEvent.change(screen.getByRole('combobox', { name: 'Currency' }), { target: { value: 'QAR' } });
+  expect(screen.getByRole('heading', { name: 'QAR cash' })).toBeTruthy();
+  expect(screen.getByText('/cash/QAR?period=all&from=&to=&direction=out')).toBeTruthy();
 });
