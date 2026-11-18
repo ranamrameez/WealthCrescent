@@ -44,9 +44,9 @@ export function exportBudgetCsv(report: ReturnType<typeof buildOverview>['report
   const periods = report.rows.flatMap(({ budget, months }) => months.map(month => ({ budget, month })));
   const identity = ['Budget ID', 'Budget', 'Currency', 'Month', 'Report cutoff'];
   const rows = type === 'balances'
-    ? [[...identity, 'Limit', 'Carry in', 'Available', 'Outflow', 'Refunds', 'Net used', 'Remaining', 'Forecast carry'], ...periods.map(({ budget, month }) => [
+    ? [[...identity, 'Limit', 'Carry in', 'Available', 'Outflow', 'Refunds', 'Net used', 'Remaining', 'Forecast carry', 'Pending reserved', 'Planned reserved', 'After reservations'], ...periods.map(({ budget, month }) => [
       budget.id, budget.name, budget.currencyCode, month.month, report.today,
-      month.limit, month.carryIn, month.available, month.outflow, month.refunds, month.used, month.remaining, month.isFuture ? 'Yes' : 'No',
+      month.limit, month.carryIn, month.available, month.outflow, month.refunds, month.used, month.remaining, month.isFuture ? 'Yes' : 'No', month.pendingReserved, month.plannedReserved, month.afterReservations,
     ])]
     : [[...identity, 'Record key', 'Date', 'Module', 'Source', 'Description', 'Native amount', 'Allocated amount', 'Refund'],
       ...periods.flatMap(({ budget, month }) => month.items.map(item => [

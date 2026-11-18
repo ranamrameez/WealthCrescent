@@ -27,10 +27,10 @@ The register lives on the shared delivery branch linked to the active PR. For th
 | Include standalone rent collections in planned movement | Done | WC-TR session 1939ef032035, PR #51 | `b4b2ce84` uses the same future rent proposal in Upcoming and Money In/Out; deduplicates native plans. 37 focused tests and Actions 497 passed. |
 | Include uncovered legacy EMI estimates in planned movement | In progress | WC-TR session 1939ef032035, work/legacy-emi-movement, 2026-11-18 UTC | Share the Upcoming legacy estimate and funding suppression with Money In/Out. |
 | Finish remaining canonical reporting adapters and drilldowns | Ready | | Other standalone schedules, allocation drilldowns and source-scope acceptance. |
-| Finish currency budget workflows | Ready | | Bulk definition edits, source identity and planned reservations. |
+| Finish currency budget workflows | Done | WC-TR PSX session, PR #51 | Definition batch editing, source identity and pending/planned reservations are integrated. Cross-module browser acceptance remains tracked separately. |
 | Verify budget source identity | Done | WC-TR PSX session, work/budget-source-identity | `70691ca4` guards ambiguous legacy identities and malformed duplicates. Full local suite (1,411 tests) and production build passed. |
 | Batch edit budget definitions | Done | WC-TR PSX session, work/budget-definition-batch | `f9b282f0` adds grid edits for names, default limits and rollover. Focused service/UI tests and production build passed. |
-| Budget pending and planned reservations | In progress | WC-TR PSX session, work/budget-reservations, 2026-11-18 UTC | Show estimated reservations independently of cleared usage and rollover. Use canonical movement and verify pending occurrences count once. |
+| Budget pending and planned reservations | Done | WC-TR PSX session, work/budget-reservations | `e9dd8264` adds monthly reservations, detail and CSV, apart from cleared usage and rollover. Full local suite (1,431 tests) and production build passed. |
 | Continue UI-to-service migration | Ready | | Claim one named module and workflow at a time. |
 | Cash accounts in the global finder | Done | WC-TR session 1939ef032035, PR #51 | `0526e262` covers defaults, Cash entries, Cash plans, independent favorites and filter-preserving links. 1,390 tests and build passed locally; Actions 474 passed. |
 | Shared finder keyboard acceptance | Done | WC-TR session 1939ef032035, PR #51 | `92c13b71` skips disabled keyboard results and handles empty searches. 1,393 tests passed locally; Actions 477 passed tests and build. |
