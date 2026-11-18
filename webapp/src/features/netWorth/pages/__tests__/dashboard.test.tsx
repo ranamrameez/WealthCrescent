@@ -5,6 +5,7 @@ import { NetWorthPage } from '../NetWorthPage';
 import { TopBar } from '../../../../components/TopBar';
 import { useCashWorkbookStore } from '../../../../store/cashWorkbookStore';
 import { useBankWorkbookStore } from '../../../../store/bankWorkbookStore';
+import { useSubscriptionsWorkbookStore } from '../../../../store/subscriptionsWorkbookStore';
 import { createEmptyBankWorkbook } from '../../../../store/defaultBankWorkbook';
 import { useEnabledCurrenciesStore } from '../../../../store/enabledCurrenciesStore';
 import { saveFxRates } from '../../../../lib/fx';
@@ -41,6 +42,27 @@ it('shows converted overall summaries in both currencies before the per-currency
   expect(sections[1].textContent).toContain('Money in / out');
   expect(sections[2].textContent).toContain('Per currency summary');
   expect(screen.queryByLabelText('Show total in')).toBeNull();
+});
+it('shows a subscription renewal estimate in remaining plans and its contributing record', () => {
+  const original = useSubscriptionsWorkbookStore.getState().workbook;
+  const today = new Date().toISOString().slice(0, 10);
+  useSubscriptionsWorkbookStore.setState({ workbook: { ...original, entries: [
+    { id: 'fixture-subscription', name: 'Fixture membership', amount: 17, currencyCode: 'USD', billingCycle: 'monthly', startDate: today, active: true },
+  ] } });
+  try {
+    const view = show(`/net-worth?entities=subscriptions&period=custom&from=${today}&to=${today}`);
+    fireEvent.click(screen.getByRole('button', { name: 'Money in / out', expanded: false }));
+    const report = within(view.container.querySelector<HTMLElement>('.money-movement-report')!);
+    expect(report.getByText(/No matching actual activity/)).toBeTruthy();
+    const [population, dimension] = report.getAllByRole('combobox');
+    fireEvent.change(population, { target: { value: 'planned' } });
+    fireEvent.change(dimension, { target: { value: 'module' } });
+    fireEvent.click(report.getByRole('cell', { name: 'Subscriptions' }));
+    expect(screen.getByText('Fixture membership (estimated renewal)')).toBeTruthy();
+    view.unmount();
+  } finally {
+    useSubscriptionsWorkbookStore.setState({ workbook: original });
+  }
 });
 it('centralizes URL-backed section and source filters and restores defaults', () => {
   show();

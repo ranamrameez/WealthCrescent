@@ -16,7 +16,7 @@ The register lives on the shared delivery branch linked to the active PR. For th
 | Coordinate reversal with the funding ledger | Ready | | Depends on linked-receipt protection and atomic payment persistence. |
 | Build atomic multi-workbook payment persistence | Ready | | Native pending record, linkage, execution history and replay protection. |
 | Complete scheduled-payment and settlement lifecycle | Ready | | Depends on atomic payment persistence. |
-| Add standalone subscription renewals to planned movement | Done | WC-TR coordination, PR #51 | Shared Upcoming funding checks, planned-only movement rows, and dashboard scope. Regression covers an active funding plan, an archived paying account and cancelled subscriptions. |
+| Add standalone subscription renewals to planned movement | Done | WC-TR coordination, PR #51 | Shared Upcoming funding checks and dashboard scope. Tests cover active and archived funding, cancelled subscriptions, and the Money in/out breakdown and record detail. |
 | Finish remaining canonical reporting adapters and drilldowns | Ready | | Other standalone schedules, allocation drilldowns and source-scope acceptance. |
 | Finish currency budget workflows | Ready | | Bulk definition edits, source identity and planned reservations. |
 | Continue UI-to-service migration | Ready | | Claim one named module and workflow at a time. |
