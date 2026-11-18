@@ -17,19 +17,19 @@ afterEach(() => {
 it('reviews from the dashboard, saves selected trades, and restores focus', async () => {
   useWorkbookStore.getState().setWorkbook(createEmptyWorkbook());
   render(<QseDashboardQuickImport />);
-  const shortcut = screen.getByRole('button', { name: 'Import QSE trades' });
+  const shortcut = screen.getByRole('button', { name: 'Import QSE statement' });
   shortcut.focus();
   fireEvent.click(shortcut);
-  const dialog = screen.getByRole('dialog', { name: 'Import QSE trades' });
+  const dialog = screen.getByRole('dialog', { name: 'Import QSE statement' });
   const file = new File([], 'fixture.csv');
   Object.defineProperty(file, 'text', { value: async () => 'Date,Type,Count,Unit,Price,Amount\n17/11/2026,Buy,4,GWC,8,-32' });
   fireEvent.change(within(dialog).getByLabelText('The Group statement (.xlsx or .csv)'), { target: { files: [file] } });
-  const review = await screen.findByRole('dialog', { name: 'Review The Group trades' });
+  const review = await screen.findByRole('dialog', { name: 'Review The Group statement' });
   expect(review).toBe(dialog);
   expect(within(review).getByText('GWCS')).toBeTruthy();
   expect(useWorkbookStore.getState().workbook.transactions).toEqual([]);
-  fireEvent.click(within(review).getByRole('button', { name: 'Select all new trades' }));
-  fireEvent.click(within(review).getByRole('button', { name: 'Import selected trades (1)' }));
+  fireEvent.click(within(review).getByRole('button', { name: 'Select all new records' }));
+  fireEvent.click(within(review).getByRole('button', { name: 'Import selected records (1)' }));
   expect(useWorkbookStore.getState().workbook.transactions).toMatchObject([{ ticker: 'GWCS', shares: 4 }]);
   expect(screen.queryByRole('dialog')).toBeNull();
   expect(document.activeElement).toBe(shortcut);

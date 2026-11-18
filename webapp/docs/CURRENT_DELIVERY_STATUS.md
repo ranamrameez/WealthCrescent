@@ -36,6 +36,8 @@ Updated 2026-11-07. This is the concise status index; SESSION_HANDOFF.md records
 
 ## Remaining work, in dependency order
 
+Use the [delivery task register](MULTI_AGENT_WORKFLOW.md) to coordinate ownership across agents and sessions.
+
 ### 1. Complete reporting and calculation contracts
 - Publish/verify the current unified dashboard actual-population slice; check the new exact head in CI.
 - Carry explicit EMI/subscription provenance into future actual completion records so classification can use source identity. Preserve unknown historical records.

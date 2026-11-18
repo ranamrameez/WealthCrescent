@@ -1,3 +1,7 @@
+# Parallel work
+
+Before editing a shared delivery task, publish your claim in the [delivery task register](webapp/docs/MULTI_AGENT_WORKFLOW.md). Once you finish, record the verification and claim the next unowned task whose dependencies are ready.
+
 # Project skills
 
 Project-local skills are in `.agents/skills/`. Read the relevant `SKILL.md` when

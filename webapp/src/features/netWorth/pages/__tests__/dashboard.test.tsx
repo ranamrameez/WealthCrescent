@@ -150,14 +150,14 @@ it('renders a scoped money-in/out breakdown with accessible totals and group row
 
 it('opens the QSE statement picker from the dashboard and returns keyboard focus on Escape', () => {
   show();
-  const shortcut = screen.getByRole('button', { name: 'Import QSE trades' });
+  const shortcut = screen.getByRole('button', { name: 'Import QSE statement' });
   shortcut.focus();
   fireEvent.click(shortcut);
-  const dialog = screen.getByRole('dialog', { name: 'Import QSE trades' });
+  const dialog = screen.getByRole('dialog', { name: 'Import QSE statement' });
   expect(within(dialog).getByLabelText('The Group statement (.xlsx or .csv)')).toBeTruthy();
   expect(document.activeElement).toBe(dialog);
   fireEvent.keyDown(document, { key: 'Escape' });
-  expect(screen.queryByRole('dialog', { name: 'Import QSE trades' })).toBeNull();
+  expect(screen.queryByRole('dialog', { name: 'Import QSE statement' })).toBeNull();
   expect(document.activeElement).toBe(shortcut);
 });
 

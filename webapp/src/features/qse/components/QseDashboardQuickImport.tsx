@@ -16,7 +16,7 @@ export function QseDashboardQuickImport() {
   const [open, setOpen] = useState(false);
   return <>
     <StandardButton type="button" tone="secondary" size="small" onClick={() => setOpen(true)}>
-      Import QSE trades
+      Import QSE statement
     </StandardButton>
     {open && <QuickImportDialog onClose={() => setOpen(false)} />}
   </>;
@@ -49,9 +49,9 @@ function QuickImportDialog({ onClose }: { onClose: () => void }) {
     }
   };
 
-  return <Modal title={preview ? 'Review The Group trades' : 'Import QSE trades'} onClose={onClose} widthClass={preview ? '60' : undefined} manageFocus>
+  return <Modal title={preview ? 'Review The Group statement' : 'Import QSE statement'} onClose={onClose} widthClass={preview ? '60' : undefined} manageFocus>
     {preview ? <QseStatementTradeReviewContent preview={preview} onClose={onClose} /> : <div className="stack-md">
-      <p>Import trades from The Group into <strong>{brokerName}</strong>.</p>
+      <p>Import trades, rewards, and cash transfers from The Group into <strong>{brokerName}</strong>.</p>
       <Field label="The Group statement (.xlsx or .csv)">
         <TextInput type="file" accept=".xlsx,.csv" disabled={busy} onChange={event => {
           const file = event.target.files?.[0];
