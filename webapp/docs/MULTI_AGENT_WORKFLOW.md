@@ -25,7 +25,8 @@ The register lives on the shared delivery branch linked to the active PR. For th
 | Keep installment funding visible when its linked receipt is missing | Done | WC-TR coordination, PR #51 | Cash and Bank regressions verify the funding stays visible until its receipt exists, then counts only once. Card behavior uses the same rule. |
 | Finish remaining canonical reporting adapters and drilldowns | Ready | | Other standalone schedules, allocation drilldowns and source-scope acceptance. |
 | Finish currency budget workflows | Ready | | Bulk definition edits, source identity and planned reservations. |
-| Verify budget source identity | In progress | WC-TR PSX session, work/budget-source-identity, 2026-11-18 UTC | Audit native movement identities used for budget allocation and add focused regressions or fixes. |
+| Verify budget source identity | Done | WC-TR PSX session, work/budget-source-identity | `70691ca4` guards ambiguous legacy identities and malformed duplicates. Full local suite (1,411 tests) and production build passed. |
+| Batch edit budget definitions | In progress | WC-TR PSX session, work/budget-definition-batch, 2026-11-18 UTC | Edit budget names, base limits, and rollover in the existing grid. Keep period and currency rules intact. |
 | Continue UI-to-service migration | Ready | | Claim one named module and workflow at a time. |
 | Cash accounts in the global finder | Done | WC-TR session 1939ef032035, PR #51 | `0526e262` covers defaults, Cash entries, Cash plans, independent favorites and filter-preserving links. 1,390 tests and build passed locally; Actions 474 passed. |
 | Shared finder keyboard acceptance | Done | WC-TR session 1939ef032035, PR #51 | `92c13b71` skips disabled keyboard results and handles empty searches. 1,393 tests passed locally; Actions 477 passed tests and build. |

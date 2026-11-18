@@ -1,19 +1,30 @@
 import type { BudgetDefinition, BudgetAllocation } from '../../types/budget';
 import { selectMovementActivities, type MovementActivity } from './movementActivities';
-export const budgetRecordKey = (record: Pick<MovementActivity,'module' | 'sourceId' | 'id' | 'recordType'>) => JSON.stringify(record.recordType?[record.module,record.sourceId ?? '',record.recordType,record.id]:[record.module,record.sourceId ?? '',record.id]);
-/** Read compatibility for the first optional allocation schema. Resolve an old
- * three-part identity only when one native collection owns it; never guess. */
-export function normalizeBudgetAllocations(allocations:BudgetAllocation[], activities:MovementActivity[]):BudgetAllocation[] {
-  const keys=new Set(activities.map(budgetRecordKey));
-  const aliases=new Map<string,Set<string>>();
-  for(const record of activities) {
-    const legacy=JSON.stringify([record.module,record.sourceId ?? '',record.id]);
-    const values=aliases.get(legacy) ?? new Set<string>();values.add(budgetRecordKey(record));aliases.set(legacy,values);
+type BudgetRecordIdentity = Pick<MovementActivity, 'module' | 'sourceId' | 'id' | 'recordType'>;
+
+const legacyRecordKey = (record: BudgetRecordIdentity) => JSON.stringify([record.module, record.sourceId ?? '', record.id]);
+export const budgetRecordKey = (record: BudgetRecordIdentity) => record.recordType
+  ? JSON.stringify([record.module, record.sourceId ?? '', record.recordType, record.id])
+  : legacyRecordKey(record);
+
+function indexLegacyAliases(activities: MovementActivity[]) {
+  const aliases = new Map<string, Set<string>>();
+  for (const record of activities) {
+    const legacy = legacyRecordKey(record);
+    const values = aliases.get(legacy) ?? new Set<string>();
+    values.add(budgetRecordKey(record));
+    aliases.set(legacy, values);
   }
-  return allocations.map(allocation=>{
-    if(keys.has(allocation.recordKey))return allocation;
-    const candidates=aliases.get(allocation.recordKey);
-    return candidates?.size===1?{...allocation,recordKey:[...candidates][0]}:allocation;
+  return aliases;
+}
+
+/** Resolve a legacy three-part identity only when one collection owns it. */
+export function normalizeBudgetAllocations(allocations: BudgetAllocation[], activities: MovementActivity[]): BudgetAllocation[] {
+  const aliases = indexLegacyAliases(activities);
+  return allocations.map(allocation => {
+    const candidates = aliases.get(allocation.recordKey);
+    if (candidates?.size !== 1 || candidates.has(allocation.recordKey)) return allocation;
+    return { ...allocation, recordKey: [...candidates][0] };
   });
 }
 const validMonth = (value: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
@@ -58,26 +69,31 @@ export function unifiedBudgetReport(definitions: BudgetDefinition[], allocations
   const eligible = selectMovementActivities(activities,'0000-01-01',today,today,'actual');
   const records = new Map<string,MovementActivity>();
   const duplicateKeys = new Set<string>();
+  const seenKeys = new Set<string>();
   for (const record of eligible) {
     const key = budgetRecordKey(record);
-    if (records.has(key)) duplicateKeys.add(key);
+    if (seenKeys.has(key)) duplicateKeys.add(key);
     else if (Number.isFinite(record.amount)) records.set(key,record);
     else issues.push({ code: 'invalid-record', recordKey: key, message: 'Record has a non-finite amount.' });
+    seenKeys.add(key);
   }
   for (const key of duplicateKeys) { records.delete(key); issues.push({ code: 'duplicate-record', recordKey: key, message: 'Duplicate native record identity requires review.' }); }
   const explicit = new Map<string,BudgetAllocation[]>();
   const duplicateAllocationIds = new Set(allocations.filter((item,index)=>allocations.findIndex(other=>other.id === item.id) !== index).map(item=>item.id));
   const allocationIds = new Set<string>();
+  const aliases = indexLegacyAliases(activities);
   for (const allocation of allocations) {
+    const candidates = aliases.get(allocation.recordKey);
+    if (candidates && candidates.size > 1) {
+      // The scope or cutoff may hide one candidate, but cannot resolve identity.
+      for (const key of candidates) if (records.has(key) && !explicit.has(key)) explicit.set(key, []);
+      issues.push({ code: 'orphan-allocation', allocationId: allocation.id, recordKey: allocation.recordKey,
+        message: 'Legacy allocation matches multiple native collections. Review the record identity.' });
+      continue;
+    }
     if (duplicateAllocationIds.has(allocation.id) || allocationIds.has(allocation.id)) { explicit.set(allocation.recordKey,explicit.get(allocation.recordKey) ?? []); issues.push({ code: 'duplicate-allocation', allocationId: allocation.id, message: 'Duplicate allocation identity.' }); continue; }
     allocationIds.add(allocation.id);
     explicit.set(allocation.recordKey,[...(explicit.get(allocation.recordKey) ?? []),allocation]);
-  }
-  // An ambiguous legacy identity is not permission to choose a collection or
-  // fall back to automatic allocation of the possibly intended records.
-  for(const allocation of allocations) if(!records.has(allocation.recordKey)) {
-    const candidates=[...records].filter(([,record])=>JSON.stringify([record.module,record.sourceId ?? '',record.id])===allocation.recordKey);
-    if(candidates.length>1)for(const [key] of candidates)explicit.set(key,explicit.get(key) ?? []);
   }
   const usage = new Map<string,BudgetUsageItem[]>();
   const unallocated: Array<{ recordKey: string; record: MovementActivity; amount: number; ambiguousBudgetIds: string[] }> = [];

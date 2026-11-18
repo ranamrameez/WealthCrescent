@@ -105,3 +105,35 @@ it('does not guess which collection an ambiguous legacy allocation belonged to',
   expect(result.totals[0].unallocatedOutflow).toBe(23);
   expect(result.issues.map(issue=>issue.code)).toContain('orphan-allocation');
 });
+
+it('keeps a legacy allocation unresolved even when the other candidate is outside the cutoff', () => {
+  const cleared = record('same', -20, { recordType: 'entry' });
+  const future = record('same', -30, { recordType: 'plan', date: '2026-04-01', executed: false });
+  const legacy = { id: 'legacy', budgetId: 'one', recordKey: JSON.stringify(['bank', 'account', 'same']), amount: 10 };
+  const result = report([budget('one')], [cleared, future], [legacy]);
+  expect(result.rows[0].months[0].used).toBe(0);
+  expect(result.totals[0]).toMatchObject({ outflow: 20, unallocatedOutflow: 20 });
+  expect(result.issues).toContainEqual(expect.objectContaining({ allocationId: 'legacy', code: 'orphan-allocation' }));
+});
+
+it('does not prefer an untyped record when the same legacy key identifies a typed record', () => {
+  const untyped = record('same', -20);
+  const typed = record('same', -30, { recordType: 'entry' });
+  const legacy = { id: 'legacy', budgetId: 'one', recordKey: engine.budgetRecordKey(untyped), amount: 10 };
+  const current = { id: 'current', budgetId: 'one', recordKey: engine.budgetRecordKey(typed), amount: 5 };
+  const result = report([budget('one')], [untyped, typed], [current, legacy]);
+  expect(result.rows[0].months[0].items).toEqual([
+    expect.objectContaining({ record: typed, allocated: 5 }),
+  ]);
+  expect(result.totals[0]).toMatchObject({ outflow: 50, unallocatedOutflow: 45 });
+});
+
+it('flags duplicate native identities in either order even when one amount is invalid', () => {
+  const valid = record('same', -20, { recordType: 'entry' });
+  const invalid = { ...valid, amount: NaN };
+  for (const records of [[valid, invalid], [invalid, valid]]) {
+    const result = report([budget('one')], records);
+    expect(result.rows[0].months[0].used).toBe(0);
+    expect(result.issues).toContainEqual(expect.objectContaining({ code: 'duplicate-record' }));
+  }
+});
