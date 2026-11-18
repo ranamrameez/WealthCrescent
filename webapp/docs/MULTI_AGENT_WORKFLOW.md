@@ -14,7 +14,8 @@ The register lives on the shared delivery branch linked to the active PR. For th
 | Preserve the QSE statement reconciliation in the delivery branch | Done | WC-TR coordination, PR #51 | Integrate `main` at `32c289aa`, which contains merged PR #53. |
 | Protect linked independent installment receipts from generic edits and deletions | Done | WC-TR coordination, PR #51 | Shared transfer actions, bank account changes and loan deletion. Cash, Bank and card fixtures passed with the full suite. |
 | Coordinate reversal with the funding ledger | Ready | | Depends on linked-receipt protection and atomic payment persistence. |
-| Build atomic multi-workbook payment persistence | Ready | | Native pending record, linkage, execution history and replay protection. |
+| Build atomic multi-workbook payment persistence | Ready | | Cash and Bank pending records, linkage, execution history and replay protection. |
+| Add atomic pending Cash and Bank occurrence persistence | In progress | WC-TR coordination, `work/pr51-main-integration`, 2026-11-18 UTC | Account-scoped RTDB transaction, native pending outflow and execution history. |
 | Complete scheduled-payment and settlement lifecycle | Ready | | Depends on atomic payment persistence. |
 | Add standalone subscription renewals to planned movement | Done | WC-TR coordination, PR #51 | Shared Upcoming funding checks and dashboard scope. Tests cover active and archived funding, cancelled subscriptions, and the Money in/out breakdown and record detail. |
 | Keep installment funding visible when its linked receipt is missing | Done | WC-TR coordination, PR #51 | Cash and Bank regressions verify the funding stays visible until its receipt exists, then counts only once. Card behavior uses the same rule. |
