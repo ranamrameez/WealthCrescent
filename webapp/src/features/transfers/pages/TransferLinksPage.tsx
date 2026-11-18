@@ -242,6 +242,7 @@ export function SideFields({
   subscriptionId = '',
   onSubscriptionChange,
   disabled = false,
+  wrap = false,
 }: {
   label: string;
   cfg: LinkSideConfig;
@@ -252,6 +253,7 @@ export function SideFields({
   subscriptionId?: string;
   onSubscriptionChange?: (subscriptionId: string, finance?: LinkSideConfig) => void;
   disabled?: boolean;
+  wrap?: boolean;
 }) {
   const qseBrokers = useWorkbookStore((s) => s.workbook.brokerProfiles ?? []);
   const psxBrokers = usePSXWorkbookStore((s) => s.workbook.brokerProfiles ?? []);
@@ -351,7 +353,7 @@ export function SideFields({
   }, [disabled, subscriptionMode, hasRefPicker, cfg, entities, filteredEntities, onChange]);
 
   return (
-    <div className="row gap-sm" style={{ alignItems: 'flex-end', flexWrap: 'nowrap', overflowX: 'auto' }}>
+    <div className="row gap-sm" style={{ alignItems: 'flex-end', flexWrap: wrap ? 'wrap' : 'nowrap', overflowX: wrap ? undefined : 'auto' }}>
       <Field label={label} width={150}>
         <Select
           value={subscriptionMode ? '__subscription__' : cfg.module}

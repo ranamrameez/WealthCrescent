@@ -252,9 +252,10 @@ function TxRowFields({
   }, [currencyMismatch, suggestedToAmount, row.toAmountTouched]);
 
   return (
-    <div className="entry-row">
+    <div className="entry-row transfer-entry-row">
       <SideFields
         label="Finance"
+        wrap
         cfg={row.finance}
         disabled={financeLocked}
         allowSubscriptions
@@ -405,6 +406,7 @@ function TxRowFields({
         <div className="mt-sm">
           <SideFields
             label="Other finance"
+            wrap
             disabled={transferEditing}
             cfg={row.other}
             onChange={(other) => onChange({ ...row, other, toAmount: undefined, toAmountTouched: false })}
@@ -453,7 +455,7 @@ function TxRowFields({
         {row.linked && <TransferFeeField disabled={transferEditing && !wholeLinkEditing} side={row.other} direction={row.direction === 'in' ? 'out' : 'in'} amount={row.toAmount ?? row.amount} onChange={other => onChange({ ...row, other })} />}
       </div>
       {canRemove && (
-        <div className="d-flex justify-end mt-sm">
+        <div className="transfer-entry-actions d-flex justify-end">
           <button className="btn secondary small" onClick={onRemove}>
             <TrashIcon size={12} />Remove row
           </button>
@@ -878,7 +880,7 @@ export function TransactionEntryModal({
       : 'Transfers';
 
   return (
-    <Modal title={modalTitle} onClose={onClose}>
+    <Modal title={modalTitle} onClose={onClose} widthClass="60">
       {rows.map((r) => (
         <TxRowFields
           key={r.key}
