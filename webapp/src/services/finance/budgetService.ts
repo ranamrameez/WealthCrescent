@@ -169,6 +169,36 @@ export function applyBudgetMonthLimits(changes: BudgetMonthLimitChange[], review
   return changes.length;
 }
 
+export interface BudgetDefinitionChange {
+  expected: BudgetDefinition;
+  name: string;
+  monthlyLimit: number;
+  rollover: BudgetDefinition['rollover'];
+}
+
+export function applyBudgetDefinitionChanges(changes: BudgetDefinitionChange[], reviewedUid: string) {
+  if (requireUser().uid !== reviewedUid) throw new Error('The signed-in account changed. Reopen the editor.');
+  if (!changes.length) return 0;
+  const store = usePlannedCashWorkbookStore.getState();
+  const definitions = store.workbook.budgets ?? [];
+  const byId = new Map<string, BudgetDefinition>();
+  for (const budget of definitions) {
+    if (byId.has(budget.id)) throw new Error('Duplicate budget IDs require review before editing.');
+    byId.set(budget.id, budget);
+  }
+  const updates = new Map<string, BudgetDefinition>();
+  for (const { expected, name, monthlyLimit, rollover } of changes) {
+    const current = byId.get(expected.id);
+    if (!current || JSON.stringify(current) !== JSON.stringify(expected)) throw new Error('A budget changed. Reopen the editor.');
+    if (updates.has(current.id)) throw new Error('The same budget was selected twice.');
+    const next = { ...current, name: name.trim(), monthlyLimit, rollover };
+    CalculationEngine.budgets.validateBudgetDefinition(next);
+    updates.set(current.id, next);
+  }
+  store.setWorkbook({ ...store.workbook, budgets: definitions.map(budget => updates.get(budget.id) ?? budget) });
+  return updates.size;
+}
+
 export function removeBudget(id:string,expected:BudgetDefinition) {
   requireUser(); const { workbook,activities }=sources();
   const current=workbook.budgets?.find(item=>item.id===id);
