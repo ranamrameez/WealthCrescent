@@ -57,7 +57,7 @@ Implemented core/service/Planning UI now includes optional definitions/allocatio
 - Preserve FIFO versus advisory lots, broker/currency isolation, fee treatment, unmatched SELL guards, active filters and Android/WebView/auth behavior.
 
 ### 4. Safe payment persistence and pending-only automation
-- Explicit uploads into empty cloud workbooks use an RTDB transaction and abort if another client creates data during the upload. Routine sync and the multi-workbook payment repository still need transaction-safe conflict handling.
+- Explicit uploads and routine per-workbook sync use RTDB transactions. Competing changes stop sync and preserve the local workbook for export. Atomic multi-workbook payment persistence and conflict recovery remain open.
 - Add deterministic occurrence identity, atomic native pending record + linkage + execution history, replay/retry/concurrent-edit protection and user isolation.
 - Add opt-in eligible outflow policies and backend scheduled execution. Skip fulfilled/cancelled/archived/deleted/inactive/excluded sources and income. Never move real money.
 - Add explicit settlement, partial settlement, void and reconciliation. Pending never silently becomes cleared.
