@@ -30,3 +30,10 @@ export function flushLocalStorageWrites() {
 }
 
 if (typeof window !== 'undefined') window.addEventListener('pagehide', flushLocalStorageWrites);
+
+/** Commit a reviewed snapshot before notifying subscribers or discarding queued writes. */
+export function writeLocalStorageSnapshot(key: string, value: unknown, expected: string | null) {
+  if (localStorage.getItem(key) !== expected) throw new Error('The saved ledger changed in another tab. Reload and open the review again.');
+  localStorage.setItem(key, JSON.stringify(value));
+  pending.delete(key);
+}

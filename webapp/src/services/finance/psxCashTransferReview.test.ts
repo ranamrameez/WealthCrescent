@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { parsePsxCashStatement, readPsxCashStatement } from '../../lib/psxCashStatement';
 import { createEmptyPSXWorkbook } from '../../store/defaultPsxWorkbook';
-import { usePSXWorkbookStore } from '../../store/psxWorkbookStore';
+import { PSX_WORKBOOK_STORAGE_KEY, usePSXWorkbookStore } from '../../store/psxWorkbookStore';
 import type { BankTransaction, BankWorkbook } from '../../types/bankWorkbook';
 import type { Transfer } from '../../types/workbook';
-import { applyPsxCashTransfers, bankCashSources, matchCashTransfers, previewPsxCashTransfers } from './psxCashTransferReview';
+import { applyPsxCashTransfers, bankCashSources, matchCashTransfers, preparePsxCashTransferReview, previewPsxCashTransfers } from './psxCashTransferReview';
 
 vi.mock('../../lib/firebase/useAuthState', () => ({ getCurrentUser: () => ({ uid: 'test-user' }) }));
 
@@ -25,6 +25,7 @@ describe('PSX cash-transfer reconciliation', () => {
   it('reads only deposit and withdrawal rows from AHL HTML and keeps precise amounts', async () => {
     const lines = [header, example,
       ['Nov 02,2026', 'T+2 Sell ABC', '0', '8,000.00', '28,000.00'],
+      ['Nov 02,2026', 'Fund Transfer Fee', '10.00', '0', '27,990.00'],
       ['Nov 03,2026', 'FUND TRANSFER VIA - CatRaast out', '100.25', '0', '27,899.75']];
     const html = '<table>' + lines.map(row => '<tr>' + row.map(cell => '<td>' + cell + '</td>').join('') + '</tr>').join('') + '</table>';
     const file = { name: 'statement.html.txt', text: async () => html, size: html.length } as File;
@@ -54,7 +55,7 @@ describe('PSX cash-transfer reconciliation', () => {
     const rows = parsePsxCashStatement([[header, example]]);
     const ledger = [transfer('wrong-date', '2026-11-06'), transfer('exact')];
     const review = matchCashTransfers(rows, ledger);
-    expect(review.rows[0]).toMatchObject({ status: 'matched', candidates: [ledger[1]] });
+    expect(review.rows[0]).toMatchObject({ status: 'mismatch', candidates: [ledger[1]] });
     expect(review.existingOnly).toEqual([ledger[0]]);
   });
 
@@ -70,14 +71,16 @@ describe('PSX cash-transfer reconciliation', () => {
       [statement[0].sourceId, { action: 'keep', id: 'manual' }],
       [statement[1].sourceId, { action: 'add' }],
     ]));
-    expect(previewPsxCashTransfers(statement).rows.map(row => row.status)).toEqual(['matched', 'matched']);
+    expect(previewPsxCashTransfers(statement).rows.map(row => row.status)).toEqual(['mismatch', 'matched']);
     expect(usePSXWorkbookStore.getState().workbook.transfers).toHaveLength(2);
     expect(() => applyPsxCashTransfers(preview, new Map([[statement[1].sourceId, { action: 'add' }]]))).toThrow(/ledger changed/);
   });
 
   it('updates just the chosen broker transfer, preserving its fee and ID', () => {
     const store = usePSXWorkbookStore.getState();
-    store.addTransfer({ ...transfer('unaffected'), brokerId: 'psx-js-zindigi' });
+    store.addTransfer({ ...transfer('unaffected', '2026-10-01', 45), fee: 2, description: 'Other broker', brokerId: 'psx-js-zindigi' });
+    const unaffected = usePSXWorkbookStore.getState().workbook.brokerProfiles
+      .find(profile => profile.id === 'psx-js-zindigi')?.data?.transfers[0];
     store.addTransfer({ ...transfer('to-correct', '2026-11-06'), fee: 5 });
     const statement = parsePsxCashStatement([[header, example]]);
     const { sourceId } = statement[0];
@@ -88,6 +91,38 @@ describe('PSX cash-transfer reconciliation', () => {
       { id: 'to-correct', date: '2026-11-02', fee: 5, cashSourceIds: [sourceId] },
     ]);
     store.setActiveBroker('psx-js-zindigi');
-    expect(usePSXWorkbookStore.getState().workbook.transfers).toMatchObject([{ id: 'unaffected' }]);
+    expect(usePSXWorkbookStore.getState().workbook.transfers).toEqual([unaffected]);
   });
+
+  it('infers month-first dates from the statement and rejects unresolved numeric dates', () => {
+    const us = ['11/02/2026', ...example.slice(1)];
+    expect(() => parsePsxCashStatement([[header, us]])).toThrow(/Ambiguous numeric date/);
+    const later = ['11/14/2026', ...example.slice(1)];
+    expect(parsePsxCashStatement([[header, us, later]]).map(row => row.date)).toEqual(['2026-11-02', '2026-11-14']);
+  });
+
+  it('distinguishes otherwise identical statement movements by running balance', () => {
+    const single = parsePsxCashStatement([[header, example]])[0];
+    const duplicate = parsePsxCashStatement([[header, [...example.slice(0, 4), '40,000.00']]])[0];
+    expect(single.sourceId).not.toBe(duplicate.sourceId);
+    const existing = { ...transfer('recorded'), cashSourceIds: [single.sourceId] };
+    expect(matchCashTransfers([duplicate], [existing]).rows[0]).toMatchObject({ status: 'ambiguous', candidates: [existing] });
+  });
+
+  it('rejects a shared-storage change and leaves the in-memory ledger untouched on a failed write', () => {
+    const statement = parsePsxCashStatement([[header, example]]);
+    const preview = preparePsxCashTransferReview(statement);
+    const choice = new Map([[statement[0].sourceId, { action: 'add' as const }]]);
+    localStorage.setItem(PSX_WORKBOOK_STORAGE_KEY, '{}');
+    expect(() => applyPsxCashTransfers(preview, choice)).toThrow(/saved ledger changed/);
+    localStorage.setItem(PSX_WORKBOOK_STORAGE_KEY, preview.persistedSnapshot!);
+    const mock = vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => { throw new Error('Quota exceeded'); });
+    try {
+      expect(() => applyPsxCashTransfers(preview, choice)).toThrow(/Quota exceeded/);
+      expect(usePSXWorkbookStore.getState().workbook.transfers).toEqual([]);
+    } finally {
+      mock.mockRestore();
+    }
+  });
+
 });

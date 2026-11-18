@@ -1,9 +1,10 @@
+import { flushLocalStorageWrites } from '../../lib/localStoragePersistence';
 import { getCurrentUser } from '../../lib/firebase/useAuthState';
 import { nextSeq } from '../../lib/seq';
 import type { CashTransferSource } from '../../lib/psxCashStatement';
 import { useBankWorkbookStore } from '../../store/bankWorkbookStore';
 import { useInterEntityTransfersStore } from '../../store/interEntityTransfersStore';
-import { usePSXWorkbookStore } from '../../store/psxWorkbookStore';
+import { PSX_WORKBOOK_STORAGE_KEY, usePSXWorkbookStore } from '../../store/psxWorkbookStore';
 import type { BankWorkbook } from '../../types/bankWorkbook';
 import type { InterEntityTransfer } from '../../types/interEntityTransfer';
 import type { Transfer } from '../../types/workbook';
@@ -46,7 +47,8 @@ export function matchCashTransfers(sources: CashTransferSource[], existing: Tran
   const references = sources.map(source => existing.find(row => row.id === source.linkedTransferId || row.cashSourceIds?.includes(source.sourceId)));
   const claimed = new Set(references.flatMap(row => row ? [row.id] : []));
   const exactCandidates = sources.map((source, index) => references[index] || source.linkedTransferId ? [] :
-    existing.filter(row => !claimed.has(row.id) && available(source, row) && exact(source, row)));
+    existing.filter(row => !claimed.has(row.id) && available(source, row) && exact(source, row) &&
+      (!source.sourceId.startsWith('statement:') || !row.cashSourceIds?.some(id => id.startsWith('statement:')))));
   const demand = new Map<string, number>();
   for (const candidates of exactCandidates) {
     for (const row of candidates) demand.set(row.id, (demand.get(row.id) ?? 0) + 1);
@@ -63,7 +65,10 @@ export function matchCashTransfers(sources: CashTransferSource[], existing: Tran
         row.date === source.date ||
         (Math.abs(source.gross - row.gross) < 1e-8 && Math.abs(Date.parse(row.date) - Date.parse(source.date)) <= 7 * 86400000)
       ));
-    const status = match ? exact(source, match) && (source.fee === undefined || source.fee === match.fee) ? 'matched' : 'mismatch'
+    const status = match ? exact(source, match) && (source.fee === undefined || source.fee === match.fee) &&
+      (source.description === undefined || source.description === match.description) &&
+      (source.time === undefined || source.time === match.time) &&
+      (source.timezone === undefined || source.timezone === match.timezone) ? 'matched' : 'mismatch'
       : candidates.length || source.linkedTransferId ? 'ambiguous' : 'new';
     return { source, candidates, status } as const;
   });
@@ -102,7 +107,18 @@ export function previewPsxCashTransfers(statement?: CashTransferSource[]) {
     ...matchCashTransfers(sources, transfers, linkedIds), sources, linkedIds, statement: !!statement,
     owner, brokerId: activeBrokerId, brokerName: broker.name, currency: settings.currency,
     ledgerSnapshot: JSON.stringify(transfers),
+    persistedSnapshot: localStorage.getItem(PSX_WORKBOOK_STORAGE_KEY),
   };
+}
+
+export function preparePsxCashTransferReview(statement?: CashTransferSource[]) {
+  flushLocalStorageWrites();
+  const preview = previewPsxCashTransfers(statement);
+  if (preview.persistedSnapshot !== null &&
+    preview.persistedSnapshot !== JSON.stringify(usePSXWorkbookStore.getState().workbook)) {
+    throw new Error('The saved ledger differs from this tab. Reload and open the review again.');
+  }
+  return preview;
 }
 
 export type PsxCashPreview = ReturnType<typeof previewPsxCashTransfers>;
@@ -136,13 +152,18 @@ export function applyPsxCashTransfers(preview: PsxCashPreview, choices: Readonly
     if (choice.action === 'replace' && fresh.linkedIds.has(existing.id)) throw new Error('Edit linked values through the existing transfer link.');
     const nextFee = fee ?? existing.fee;
     if (choice.action === 'replace' && type === 'DEPOSIT' && nextFee > gross) throw new Error('The existing fee exceeds the incoming deposit. Correct the fee in the ledger first.');
-    const replacement = choice.action === 'replace' ? { date, type, gross, fee: nextFee } : {};
+    const replacement = choice.action === 'replace' ? {
+      date, type, gross, fee: nextFee,
+      description: description ?? existing.description,
+      time: time ?? existing.time,
+      timezone: timezone ?? existing.timezone,
+    } : {};
     updates.set(existing.id, { ...existing, ...replacement,
       ...(date !== existing.date && choice.action === 'replace' ? { accountingOrder: undefined } : {}),
       cashSourceIds: [...new Set([...(existing.cashSourceIds ?? []), sourceId])],
     });
   }
   if (!applied || applied !== choices.size) throw new Error('Select at least one available record.');
-  store.setWorkbook({ ...workbook, transfers: [...workbook.transfers.map(row => updates.get(row.id) ?? row), ...additions] });
+  store.setWorkbook({ ...workbook, transfers: [...workbook.transfers.map(row => updates.get(row.id) ?? row), ...additions] }, { expectedPersistedSnapshot: preview.persistedSnapshot });
   return { added: additions.length, reconciled: updates.size };
 }

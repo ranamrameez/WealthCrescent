@@ -12,14 +12,19 @@ export type CashTransferSource = Pick<Transfer, 'date' | 'type' | 'gross' | 'des
 };
 
 const normalizeHeader = (value: string) => value.trim().toLowerCase().replace(/^\uFEFF/, '');
+const numericDate = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/;
+type DateOrder = 'day-first' | 'month-first';
 const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
-function statementDate(value: string, dateSystem?: '1900' | '1904') {
+function statementDate(value: string, dateSystem?: '1900' | '1904', order?: DateOrder) {
   const named = /^([a-z]{3})\s+(\d{1,2}),\s*(\d{4})$/i.exec(value);
-  const numeric = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(value);
+  const numeric = numericDate.exec(value);
+  if (numeric && !order && Number(numeric[1]) !== Number(numeric[2])) {
+    throw new Error('Ambiguous numeric date. Use YYYY-MM-DD dates or include an unambiguous date in the same format.');
+  }
   const serial = dateSystem && /^\d+(?:\.\d+)?$/.test(value) ? Math.floor(Number(value)) : NaN;
   const iso = named ? [named[3], String(months.indexOf(named[1].toLowerCase()) + 1).padStart(2, '0'), named[2].padStart(2, '0')].join('-')
-    : numeric ? [numeric[3], numeric[2].padStart(2, '0'), numeric[1].padStart(2, '0')].join('-')
+    : numeric ? [numeric[3], numeric[order === 'month-first' ? 1 : 2].padStart(2, '0'), numeric[order === 'month-first' ? 2 : 1].padStart(2, '0')].join('-')
     : serial >= 1 && serial <= 2_958_000
       ? new Date(Date.UTC(dateSystem === '1904' ? 1904 : 1899, dateSystem === '1904' ? 0 : 11, dateSystem === '1904' ? 1 : serial < 60 ? 31 : 30) + serial * 86400000).toISOString().slice(0, 10)
       : value;
@@ -39,6 +44,21 @@ function amount(value: string) {
 
 const cashNarration = /^(?:funds? transfer\b|(?:cash|bank) (?:deposit|withdrawal)\b|(?:deposit|withdrawal)\b|(?:bank|cash|online|cheque) (?:receipt|payment)\b)/i;
 
+const chargeNarration = /\b(?:fees?|charges?|commission|tax)\b/i;
+const isCashNarration = (description: string) => cashNarration.test(description) && !chargeNarration.test(description);
+
+function inferDateOrder(dates: string[]): DateOrder | undefined {
+  const orders = new Set<DateOrder>();
+  for (const date of dates) {
+    const parts = numericDate.exec(date);
+    if (!parts) continue;
+    if (Number(parts[1]) > 12) orders.add('day-first');
+    if (Number(parts[2]) > 12) orders.add('month-first');
+  }
+  if (orders.size > 1) throw new Error('Mixed numeric date formats. Convert dates to YYYY-MM-DD and try again.');
+  return orders.values().next().value;
+}
+
 export function parsePsxCashStatement(tables: string[][][], dateSystem?: '1900' | '1904'): CashTransferSource[] {
   const occurrences = new Map<string, number>();
   const records: CashTransferSource[] = [];
@@ -53,11 +73,16 @@ export function parsePsxCashStatement(tables: string[][][], dateSystem?: '1900' 
     foundHeader = true;
     const headers = table[headerAt].map(normalizeHeader);
     const explicit = headers.includes('type') && headers.includes('gross');
-    for (const [index, row] of table.slice(headerAt + 1).entries()) {
+    const data = table.slice(headerAt + 1);
+    const dateColumn = headers.indexOf('date');
+    const descriptionColumn = headers.indexOf('description');
+    const order = inferDateOrder(data.filter(row => explicit || isCashNarration(row[descriptionColumn]?.trim() ?? ''))
+      .map(row => row[dateColumn]?.trim() ?? ''));
+    for (const [index, row] of data.entries()) {
       const get = (key: string) => row[headers.indexOf(key)]?.trim() ?? '';
       const description = get('description');
       const direction = get('type').toUpperCase();
-      if (explicit ? !direction || direction === 'TYPE' : !cashNarration.test(description)) continue;
+      if (explicit ? !direction || direction === 'TYPE' : !isCashNarration(description)) continue;
       try {
         if (explicit && direction !== 'DEPOSIT' && direction !== 'WITHDRAWAL') throw new Error('Expected DEPOSIT or WITHDRAWAL.');
         const credit = explicit ? 0 : amount(get('credit'));
@@ -67,12 +92,17 @@ export function parsePsxCashStatement(tables: string[][][], dateSystem?: '1900' 
         const gross = explicit ? amount(get('gross')) : credit || debit;
         const fee = explicit && get('fee') ? amount(get('fee')) : undefined;
         if (gross <= 0 || (type === 'DEPOSIT' && fee !== undefined && fee > gross)) throw new Error('Invalid gross amount or fee.');
-        const date = statementDate(get('date'), dateSystem);
-        const key = explicit && get('id') ? JSON.stringify(['id', get('id')]) : JSON.stringify([date, type, gross, description.toLowerCase().replace(/\s+/g, ' ')]);
+        const date = statementDate(get('date'), dateSystem, order);
+        const reference = get('id') || get('reference');
+        const balance = get('balance').replace(/[,\s]/g, '');
+        const time = get('time') || undefined;
+        const timezone = get('timezone') || undefined;
+        const key = reference ? JSON.stringify(['id', reference]) : JSON.stringify([date, type, gross,
+          description.toLowerCase().replace(/\s+/g, ' '), balance, time, timezone]);
         const occurrence = (occurrences.get(key) ?? 0) + 1;
-        if (explicit && get('id') && occurrence > 1) throw new Error('Duplicate transfer ID.');
+        if (reference && occurrence > 1) throw new Error('Duplicate transfer ID.');
         occurrences.set(key, occurrence);
-        records.push({ date, type, gross, fee, description, brokerId: get('brokerid') || undefined,
+        records.push({ date, type, gross, fee, description: description || undefined, time, timezone, brokerId: get('brokerid') || undefined,
           currencyCode: get('currencycode') || undefined, sourceId: `statement:${key}:${occurrence}` });
       } catch (error) {
         throw new Error(`Statement row ${headerAt + index + 2}. ${(error as Error).message}`);
@@ -92,10 +122,18 @@ export async function readPsxCashStatement(file: File) {
   }
   const text = await file.text();
   if (!/<table(?:\s|>)/i.test(text)) return parsePsxCashStatement([parseCSV(text)]);
-  // Template content stays inert and is never inserted into the page.
-  const template = document.createElement('template');
-  template.innerHTML = text;
-  const tables = Array.from(template.content.querySelectorAll('table'), table =>
-    Array.from(table.rows, row => Array.from(row.cells, cell => cell.textContent ?? '')));
+  // Parse text into an inert syntax tree without invoking browser DOM sinks.
+  const { parseFragment } = await import('parse5');
+  const fragment = parseFragment(text);
+  type Node = (typeof fragment.childNodes)[number];
+  const children = (node: Node) => 'childNodes' in node ? node.childNodes : [];
+  const find = (nodes: Node[], names: string[]): Node[] => nodes.flatMap(node =>
+    'tagName' in node && names.includes(node.tagName) ? [node] : find(children(node), names));
+  const plainText = (node: Node): string => {
+    if ('tagName' in node && ['script', 'style', 'template'].includes(node.tagName)) return '';
+    return 'value' in node ? node.value : children(node).map(plainText).join('');
+  };
+  const tables = find(fragment.childNodes, ['table']).map(table =>
+    find(children(table), ['tr']).map(row => find(children(row), ['td', 'th']).map(plainText)));
   return parsePsxCashStatement(tables);
 }

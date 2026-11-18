@@ -9,21 +9,21 @@ import { useTablePagination } from '../../../hooks/useTablePagination';
 import { getCurrentUser } from '../../../lib/firebase/useAuthState';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { readPsxCashStatement, type CashTransferSource } from '../../../lib/psxCashStatement';
-import { applyPsxCashTransfers, isAhlBroker, previewPsxCashTransfers, type CashChoice, type PsxCashPreview } from '../../../services/finance/psxCashTransferReview';
+import { applyPsxCashTransfers, isAhlBroker, preparePsxCashTransferReview, type CashChoice, type PsxCashPreview } from '../../../services/finance/psxCashTransferReview';
 import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
 import type { Transfer } from '../../../types/workbook';
 
-type CashRecord = Pick<CashTransferSource, 'date' | 'type' | 'gross' | 'fee' | 'description'>;
+type CashRecord = Pick<CashTransferSource, 'date' | 'type' | 'gross' | 'fee' | 'description' | 'time' | 'timezone'>;
 const fields = (record: CashRecord, currency: string): [string, string | number][] => [
   ['Date', record.date], ['Direction', record.type], [`Gross (${currency})`, record.gross],
-  [`Fee (${currency})`, record.fee ?? '—'],
+  [`Fee (${currency})`, record.fee ?? '—'], ['Time', record.time ?? '—'], ['Time zone', record.timezone ?? '—'],
+  ['Description', record.description ?? '—'],
 ];
 
 function TransferCard({ record, compare, title, currency }: { record: CashRecord; compare?: CashRecord; title: string; currency: string }) {
   const comparison = new Map(compare && fields(compare, currency));
   return <div className="card stack-sm">
     <strong>{title}</strong>
-    {record.description && <p>{record.description}</p>}
     <div className="stat-card-2-grid record-detail-grid">
       {fields(record, currency).map(([label, value]) =>
         <StatCard2 key={label} label={label}
@@ -143,7 +143,7 @@ export function PsxCashTransferActions() {
       if (!(await ensureSignedIn('Sign in to reconcile PSX cash transfers.'))) return;
       const owner = getCurrentUser()?.uid;
       const statement = file ? await readPsxCashStatement(file) : undefined;
-      const preview = previewPsxCashTransfers(statement);
+      const preview = preparePsxCashTransferReview(statement);
       if (!owner || preview.owner !== owner || (originalOwner && owner !== originalOwner) || preview.brokerId !== broker?.id) {
         throw new Error('The account or broker changed. Open the review again.');
       }
