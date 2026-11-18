@@ -321,6 +321,16 @@ table.
 
 ## 7. PSX-specific: fees, CGT, and cost basis
 
+### Reconcile PSX cash transfers
+
+Open **Trade Transactions → Cash transfers** under the relevant PSX broker profile.
+
+- **Import cash statement** reads AHL account activity as HTML (including saved `.html.txt`), CSV, or XLSX with Date, Description, Debit and Credit columns. It reads labeled cash movements from the activity and skips trades, balances and standalone fees. A transfer export with Date, Type (`DEPOSIT` or `WITHDRAWAL`) and Gross also works, with optional Description and Fee. Use ISO dates (YYYY-MM-DD) when slash dates are ambiguous.
+- **Sync bank transfers** appears on the Al Habib broker profile. It finds cleared same-currency Banking entries whose description contains PSX and AHL, Al Habib, or AHCML, plus any entries already linked to this broker. A bank debit becomes a broker deposit and a bank credit becomes a broker withdrawal. Check the bank description when an eligible transfer is missing from the review. Saving updates the broker ledger and records the bank source for repeat sync.
+- Compare new, matched, ambiguous and existing-only entries. Select all new rows or choose individually. For an overlap, keep the existing values, use the incoming values, or add a separate transfer when offered. Existing-only rows remain available in the ledger for manual review. To change the values of a transfer that already has a link, edit it through the linked transfer workflow.
+
+### Fees, CGT, and cost basis
+
 PSX has a more detailed fee model than QSE (commission, SST, PSX fee, NCCPL fee, SECP levy,
 CDC, CVT — all configurable in Settings, see §9) plus capital gains tax. A few things worth
 understanding:
