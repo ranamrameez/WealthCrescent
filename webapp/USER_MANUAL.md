@@ -1189,3 +1189,7 @@ Choose **Import QSE trades** on the main Dashboard or the QSE Dashboard. Open a 
 ### Import budget definitions
 
 From **Currency budgets** choose **Import budget definitions** and use the column order shown in the popup. Each row needs a unique ID, a native currency, a monthly limit, a start month, and a rollover policy. Review the list and select **Import reviewed budgets** to add the batch.
+
+### Compare movement with the previous calendar month
+
+In **Money in/out**, select **Cleared actual** and open **Compare with**. Use **Previous calendar month** for a range starting on the first day of one month. Completed months compare in full. A month-to-date range compares through the same day of the previous month, or through its last day if it was shorter.

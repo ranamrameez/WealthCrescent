@@ -185,3 +185,15 @@ it('keeps dated trade estimates broker- and scenario-scoped, and excludes linked
   ]);
   expect(rows.map(row => row.rows.length)).toEqual([1, 1, 1]);
 });
+
+
+it('aligns calendar-month comparisons for short, leap, and partial months', () => {
+  expect(engine.precedingCalendarMonthWindow('2024-03-01', '2024-03-31', '2024-04-02')).toEqual({
+    current: { from: '2024-03-01', to: '2024-03-31' }, prior: { from: '2024-02-01', to: '2024-02-29' },
+  });
+  expect(engine.precedingCalendarMonthWindow('2024-02-01', '2024-02-29', '2024-03-02')?.prior.to).toBe('2024-01-31');
+  expect(engine.precedingCalendarMonthWindow('2024-03-01', '2024-03-31', '2024-03-15')?.prior.to).toBe('2024-02-15');
+  expect(engine.precedingCalendarMonthWindow('2024-03-01', '2024-03-31', '2024-03-30')?.prior.to).toBe('2024-02-29');
+  expect(engine.precedingCalendarMonthWindow('2024-03-02', '2024-03-31', '2024-03-30')).toBeNull();
+  expect(engine.precedingCalendarMonthWindow('2024-03-01', '2024-04-01', '2024-04-02')).toBeNull();
+});

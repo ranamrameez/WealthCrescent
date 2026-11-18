@@ -41,7 +41,7 @@ Updated 2026-11-07. This is the concise status index; SESSION_HANDOFF.md records
 - Carry explicit EMI/subscription provenance into future actual completion records so classification can use source identity. Preserve unknown historical records.
 - Upcoming now labels standalone renewal and legacy EMI estimates. Active same-day funding plans offset the matching reviewed installment by obligation ID and currency. Partial funding leaves a visible remainder and conflicting plans leave the contract obligation visible. Canonical movement-report schedule adapters remain open.
 - Dated QSE and PSX trade estimates are shown by broker and strategy in Money in/out. Strategy dates remain as entered and fee overrides carry into executed trades. Saved scenarios remain separate from cleared and pending transactions.
-- The cleared movement report compares the selected period with an immediately preceding equal-length period and provides both sets of records. Dedicated calendar-month comparison presets remain open.
+- The cleared movement report compares the selected period with an immediately preceding equal-length period and provides both sets of records. A previous-calendar-month preset compares completed months in full and aligns month-to-date cutoffs where possible.
 - Finish all allocation drilldowns and source inclusion/empty/negative/FX/opening acceptance cases.
 
 ### 2. Unified currency-owned budgets

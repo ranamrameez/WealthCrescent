@@ -374,8 +374,23 @@ export function precedingClearedMovementWindow(from: string, to: string, today: 
   return { current: { from, to: end }, prior: { from: priorFrom, to: priorTo } };
 }
 
-export function clearedMovementComparison(activities: MovementActivity[], from: string, to: string, today: string, kind: MovementKind | 'all') {
-  const window = precedingClearedMovementWindow(from, to, today);
+export type ClearedMovementComparisonMode = 'equal-days' | 'calendar-month';
+
+export function precedingCalendarMonthWindow(from: string, to: string, today: string) {
+  if (![from, to, today].every(value => isValidISODate(value))) return null;
+  const end = to < today ? to : today;
+  if (!from.endsWith('-01') || from > end || from.slice(0, 7) !== to.slice(0, 7)) return null;
+  const priorEnd = shiftISODate(from, -1);
+  if (!isValidISODate(priorEnd)) return null;
+  const priorFrom = priorEnd.slice(0, 7) + '-01';
+  const endDay = end.slice(8, 10);
+  const currentFull = !shiftISODate(end, 1).startsWith(end.slice(0, 7));
+  const priorTo = currentFull || endDay >= priorEnd.slice(8, 10) ? priorEnd : priorFrom.slice(0, 8) + endDay;
+  return { current: { from, to: end }, prior: { from: priorFrom, to: priorTo } };
+}
+
+export function clearedMovementComparison(activities: MovementActivity[], from: string, to: string, today: string, kind: MovementKind | 'all', mode: ClearedMovementComparisonMode = 'equal-days') {
+  const window = mode === 'calendar-month' ? precedingCalendarMonthWindow(from, to, today) : precedingClearedMovementWindow(from, to, today);
   if (!window) return null;
   const report = (range: typeof window.current) => new Map(
     moneyMovementReport(activities, range.from, range.to, today, 'kind', 'actual', {}, kind).rows.map(row => [row.currency, {

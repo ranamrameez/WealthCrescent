@@ -160,3 +160,12 @@ it('opens the QSE statement picker from the dashboard and returns keyboard focus
   expect(screen.queryByRole('dialog', { name: 'Import QSE trades' })).toBeNull();
   expect(document.activeElement).toBe(shortcut);
 });
+
+it('shows the previous calendar month with its actual date bounds', () => {
+  show('/dashboard?section=movement&period=custom&from=2024-03-01&to=2024-03-31');
+  const compare = screen.getByRole('combobox', { name: 'Compare with' });
+  fireEvent.change(compare, { target: { value: 'calendar-month' } });
+  expect(screen.getByRole('table', {
+    name: 'Cleared movement, 2024-03-01 to 2024-03-31 compared with 2024-02-01 to 2024-02-29',
+  })).toBeTruthy();
+});

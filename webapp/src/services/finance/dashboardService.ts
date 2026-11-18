@@ -218,6 +218,8 @@ export function getMonthlyMovementReport(...args: Parameters<typeof CalculationE
 
 export function getClearedNativeMovements(activities: Parameters<typeof CalculationEngine.movements.selectMovementActivities>[0], today: string) { return CalculationEngine.movements.selectMovementActivities(activities,'0000-01-01',today,today,'actual'); }
 
+export type { ClearedMovementComparisonMode } from '../../lib/calc/dashboardReadModel';
+
 export function getClearedMovementComparison(...args: Parameters<typeof CalculationEngine.dashboard.clearedMovementComparison>) {
   return CalculationEngine.dashboard.clearedMovementComparison(...args);
 }
