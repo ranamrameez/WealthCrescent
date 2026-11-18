@@ -21,6 +21,7 @@ The register lives on the shared delivery branch linked to the active PR. For th
 | Hide already-pending Cash and Bank occurrences from Upcoming | Done | WC-TR coordination, PR #51 | Service test verifies that adding and removing a linked pending record refreshes Upcoming while keeping later recurring occurrences. |
 | Add atomic pending Cash and Bank occurrence persistence | Done | WC-TR coordination, PR #51 | Draft service and transaction fixtures cover occurrence identity, replay, concurrent writes, stale plans, cancellation and auth changes. |
 | Complete scheduled-payment and settlement lifecycle | Ready | | Depends on atomic payment persistence. |
+| Reject duplicate pending-payment execution identities | In progress | WC-TR coordination, PR #51 | Abort replay when native ledger or execution history contains duplicate identities. |
 | Protect pending settlement from newly linked transfers | Done | WC-TR coordination, PR #51 | Settlement and void share transaction-time linkage checks. Regressions cover links on either side appearing during retry. |
 | Add explicit full settlement for pending Cash and Bank occurrences | Done | WC-TR coordination, PR #51 | Draft transaction updates the ledger, plan occurrence and history together. Fixtures cover recurring and one-time plans, stale reviews and retries. |
 | Add explicit void for pending Cash and Bank occurrences | Done | WC-TR coordination, PR #51 | Draft transaction removes the pending ledger record and preserves execution history. Fixtures cover replay, settled entries and linked transfers. |
