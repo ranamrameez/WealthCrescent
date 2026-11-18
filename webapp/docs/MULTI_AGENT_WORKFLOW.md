@@ -21,5 +21,6 @@ The register lives on the shared delivery branch linked to the active PR. For th
 | Finish remaining canonical reporting adapters and drilldowns | Ready | | Other standalone schedules, allocation drilldowns and source-scope acceptance. |
 | Finish currency budget workflows | Ready | | Bulk definition edits, source identity and planned reservations. |
 | Continue UI-to-service migration | Ready | | Claim one named module and workflow at a time. |
+| Cash accounts in the global finder | In progress | WC-TR session 1939ef032035, work/cash-account-finder, 2026-11-18 UTC | Cash finder entries, deep links and favorites. |
 | Complete UX acceptance | Ready | | Claim one module or a specific shared control at a time. |
 | Final PR validation and merge | Ready | | Depends on the remaining acceptance checks and exact-head CI. |
