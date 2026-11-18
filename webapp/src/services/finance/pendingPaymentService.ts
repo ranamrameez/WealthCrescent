@@ -9,6 +9,7 @@ import { fingerprint } from '../../lib/firebase/workbookFingerprint';
 import { nextSerialNumberForEntity } from '../../lib/financeSerial';
 import { createEmptyCashWorkbook } from '../../store/defaultCashWorkbook';
 import type { BankTransaction, BankWorkbook } from '../../types/bankWorkbook';
+import type { InterEntityWorkbook } from '../../types/interEntityTransfer';
 import type { CashEntry, CashWorkbook } from '../../types/cashWorkbook';
 import type { PlannedBankTransaction, PlannedBankWorkbook } from '../../types/plannedBank';
 import type { PlannedCashEntry, PlannedCashWorkbook } from '../../types/plannedCash';
@@ -22,6 +23,7 @@ interface PendingExecution {
   occurrenceDate: string;
   createdAt: string;
   settledOn?: string;
+  voidedAt?: string;
 }
 
 interface AccountWorkbooks {
@@ -29,6 +31,7 @@ interface AccountWorkbooks {
   bank?: BankWorkbook;
   plannedCash?: PlannedCashWorkbook;
   plannedBank?: PlannedBankWorkbook;
+  interEntityTransfers?: InterEntityWorkbook;
   [PAYMENT_EXECUTIONS_PATH]?: PendingExecution[];
 }
 
@@ -120,16 +123,32 @@ export async function createPendingPayment(expectedUid: string, input: PendingPa
   return { id, occurrenceDate };
 }
 
-function settleRows<T extends CashEntry | BankTransaction, P extends PlannedCashEntry | PlannedBankTransaction>(
-  ledger: T[], plans: P[], expected: P, history: PendingExecution, settlementDate: string, sameSource: (record: T) => boolean,
+function reviewedRecord<T extends CashEntry | BankTransaction>(
+  ledger: T[], history: PendingExecution, amount: number, sameSource: (record: T) => boolean,
 ) {
   const matches = ledger.filter(record => record.id === history.id);
   const record = matches[0];
   if (matches.length !== 1 || record.planLink?.module !== history.module || record.planLink.planId !== history.planId ||
       record.planLink.occurrenceDate !== history.occurrenceDate || !sameSource(record) ||
-      record.isDeposit || record.amount !== expected.amount) {
-    throw new Error('The funded record changed. Review it before settling.');
+      record.isDeposit || record.amount !== amount) {
+    throw new Error('The funded record changed. Review it before continuing.');
   }
+  return record;
+}
+
+function reviewedExecution(account: AccountWorkbooks, reviewed: PendingPaymentPlan, id: string, occurrenceDate: string) {
+  const history = rows(account[PAYMENT_EXECUTIONS_PATH]);
+  const executions = history.filter(entry => entry.id === id);
+  const execution = executions[0];
+  if (executions.length !== 1 || execution.module !== reviewed.module || execution.planId !== reviewed.plan.id ||
+      execution.occurrenceDate !== occurrenceDate) throw new Error('No matching payment execution is available.');
+  return { history, execution };
+}
+
+function settleRows<T extends CashEntry | BankTransaction, P extends PlannedCashEntry | PlannedBankTransaction>(
+  ledger: T[], plans: P[], expected: P, history: PendingExecution, settlementDate: string, sameSource: (record: T) => boolean,
+) {
+  const record = reviewedRecord(ledger, history, expected.amount, sameSource);
   if (history.settledOn) {
     if (history.settledOn === settlementDate && record.date === settlementDate && !record.isPending) return null;
     throw new Error('This occurrence already has a different settlement.');
@@ -171,11 +190,8 @@ export async function settlePendingPayment(
   const prepared = CalculationEngine.pendingPayments.preparePendingPayment(reviewed, occurrenceDate, today);
   const id = prepared.record.id;
   const payload = await changeAccount(expectedUid, value => {
-    const history = rows(value[PAYMENT_EXECUTIONS_PATH]);
-    const executions = history.filter(entry => entry.id === id);
-    const execution = executions[0];
-    if (executions.length !== 1 || execution.module !== reviewed.module || execution.planId !== reviewed.plan.id ||
-        execution.occurrenceDate !== occurrenceDate) throw new Error('No matching payment execution is available to settle.');
+    const { history, execution } = reviewedExecution(value, reviewed, id, occurrenceDate);
+    if (execution.voidedAt) throw new Error('This occurrence was voided.');
     const next = {
       ...value,
       [PAYMENT_EXECUTIONS_PATH]: history.map(entry => entry.id === id ? { ...entry, settledOn: settlementDate } : entry),
@@ -208,4 +224,49 @@ export async function settlePendingPayment(
     throw new Error('No matching cloud payment was available for settlement.');
   }
   return { id, occurrenceDate, settlementDate };
+}
+
+/** Void an existing pending record while retaining its execution identity. */
+export async function voidPendingPayment(
+  expectedUid: string, input: PendingPaymentPlan, occurrenceDate: string, now = new Date(),
+) {
+  const reviewed = structuredClone(input);
+  const voidedAt = now.toISOString();
+  if (!validBatchDate(occurrenceDate)) throw new Error('Choose a valid occurrence to void.');
+  const id = planOccurrenceRecordId({ module: reviewed.module, id: reviewed.plan.id }, occurrenceDate);
+  const payload = await changeAccount(expectedUid, value => {
+    const { history, execution } = reviewedExecution(value, reviewed, id, occurrenceDate);
+    if (execution.settledOn) throw new Error('This occurrence has already settled.');
+    const linked = rows(value.interEntityTransfers?.entries).some(link =>
+      (link.from.module === reviewed.module && link.fromRecordId === id) ||
+      (link.to.module === reviewed.module && link.toRecordId === id));
+    if (linked) throw new Error('Review the linked transfer before voiding this pending record.');
+
+    function removePending<T extends CashEntry | BankTransaction>(ledger: T[], sameSource: (record: T) => boolean) {
+      if (execution.voidedAt && !ledger.some(record => record.id === id)) return null;
+      const record = reviewedRecord(ledger, execution, reviewed.plan.amount, sameSource);
+      if (execution.voidedAt || !record.isPending || record.date !== occurrenceDate) {
+        throw new Error('The funded record is no longer pending in its original ledger.');
+      }
+      return ledger.filter(row => row.id !== id);
+    }
+
+    const next = {
+      ...value,
+      [PAYMENT_EXECUTIONS_PATH]: history.map(entry => entry.id === id ? { ...entry, voidedAt } : entry),
+    };
+    if (reviewed.module === 'cash') {
+      const { cash } = value;
+      if (!cash) throw new Error('No matching Cash workbook is available to void.');
+      const entries = removePending(rows(cash.entries), record => record.currencyCode === reviewed.plan.currencyCode);
+      return entries ? { ...next, cash: { ...cash, entries, _updated: voidedAt } } : value;
+    }
+    const { bank } = value;
+    if (!bank) throw new Error('No matching Bank workbook is available to void.');
+    const transactions = removePending(rows(bank.transactions), record => record.accountId === reviewed.plan.accountId);
+    return transactions ? { ...next, bank: { ...bank, transactions, _updated: voidedAt } } : value;
+  });
+  const execution = payload?.[PAYMENT_EXECUTIONS_PATH]?.find(entry => entry.id === id);
+  if (!execution?.voidedAt) throw new Error('No matching cloud payment was available to void.');
+  return { id, occurrenceDate, voidedAt: execution.voidedAt };
 }

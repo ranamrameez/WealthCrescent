@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('firebase/database', () => ({ ref: (_db: unknown, path: string) => path, runTransaction: mocks.transaction }));
 vi.mock('../../lib/firebase/client', () => ({ auth: mocks.auth, db: {}, firebaseReady: true }));
 
-import { createPendingPayment, settlePendingPayment } from './pendingPaymentService';
+import { createPendingPayment, settlePendingPayment, voidPendingPayment } from './pendingPaymentService';
 
 const date = '2028-02-29';
 const now = new Date('2028-02-29T12:00:00Z');
@@ -142,4 +142,43 @@ it('rejects stale Bank review and invalid date before settling the original pend
     plannedBank: { entries: [{ id: bank.plan.id, executed: true, fulfilledDate: date }] },
     paymentExecutions: [{ id, settledOn: date }],
   });
+});
+
+it.each([cash, bank])('voids a pending $module entry and preserves execution history and plans', async reviewed => {
+  const read = transactionFor(fixture());
+  const { id } = await createPendingPayment('owner', reviewed, date, now);
+  const result = await voidPendingPayment('owner', reviewed, date, now);
+  const ledger = reviewed.module === 'cash' ? { cash: { entries: [] } } : { bank: { transactions: [] } };
+  const saved = read();
+  expect(saved).toMatchObject({
+    ...ledger,
+    plannedCash: fixture().plannedCash,
+    plannedBank: fixture().plannedBank,
+    paymentExecutions: [{ id, occurrenceDate: date, voidedAt: now.toISOString() }],
+  });
+  await expect(voidPendingPayment('owner', reviewed, date, new Date('2028-03-01T12:00:00Z'))).resolves.toEqual(result);
+  await expect(createPendingPayment('owner', reviewed, date, now)).rejects.toThrow('execution history');
+  await expect(settlePendingPayment('owner', reviewed, date, date, now)).rejects.toThrow('was voided');
+  expect(read()).toEqual(saved);
+});
+
+it('keeps a settled record when a delayed void command arrives', async () => {
+  const read = transactionFor(fixture());
+  await createPendingPayment('owner', bank, date, now);
+  await settlePendingPayment('owner', bank, date, date, now);
+  const saved = read();
+  await expect(voidPendingPayment('owner', bank, date, now)).rejects.toThrow('already settled');
+  expect(read()).toEqual(saved);
+});
+
+it('refuses to void a pending record that now belongs to a linked transfer', async () => {
+  const read = transactionFor(fixture());
+  const { id } = await createPendingPayment('owner', cash, date, now);
+  const cloud = {
+    ...read() as ReturnType<typeof fixture>,
+    interEntityTransfers: { entries: [{ from: { module: 'cash' }, fromRecordId: id, to: { module: 'bank' }, toRecordId: 'other' }] },
+  };
+  const linked = transactionFor(cloud);
+  await expect(voidPendingPayment('owner', cash, date, now)).rejects.toThrow('linked transfer');
+  expect(linked()).toEqual(cloud);
 });
