@@ -42,6 +42,7 @@ import { linkTargetPath, useLinkSideLabel } from '../../transfers/pages/Transfer
 import type { Adjustment, Transaction, Transfer } from '../../../types/workbook';
 import { DividendsSection } from '../components/DividendsSection';
 import { PSXReorder } from '../components/PSXReorder';
+import { PsxCashTransferActions } from '../components/PsxCashTransferActions';
 import { usePSXDerived } from '../hooks/usePSXDerived';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -879,7 +880,8 @@ function TransfersSection() {
   const startEdit = (t: Transfer) => setEditRow({ ...t });
 
   return (<>
-    <div>
+    <div className="stack-sm">
+      <PsxCashTransferActions />
       <PageFilters><div className="row gap-sm mb-sm">
         <Field label="Type" width={140}>
           <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}>
@@ -895,6 +897,7 @@ function TransfersSection() {
             <tr>
               <dateSort.Th rows={dateSortInput} column="date">Date</dateSort.Th>
               <th>Type</th>
+              <th>Description</th>
               <th>Gross</th>
               <th>Fee</th>
               <th>Balance</th>
@@ -919,6 +922,7 @@ function TransfersSection() {
                       </Link>
                     )}
                   </td>
+                  <td>{t.description || '—'}</td>
                   <td>{fmtMoney(t.gross, currency)}</td>
                   <td>{fmtMoney(t.fee, currency)}</td>
                   <td>
@@ -933,7 +937,7 @@ function TransfersSection() {
                 </RecordRow>
               );
             })}
-            {!sorted.length && <tr><td colSpan={6} className="text-muted">No transfers yet.</td></tr>}
+            {!sorted.length && <tr><td colSpan={7} className="text-muted">No transfers yet.</td></tr>}
           </tbody>
         </table>
       </div>

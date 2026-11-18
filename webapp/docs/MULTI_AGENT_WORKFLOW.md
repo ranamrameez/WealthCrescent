@@ -12,7 +12,7 @@ The register lives on the shared delivery branch linked to the active PR. For th
 | Task | Status | Owner and branch | Scope or evidence |
 | --- | --- | --- | --- |
 | Preserve the QSE statement reconciliation in the delivery branch | Done | WC-TR coordination, PR #51 | Integrate `main` at `32c289aa`, which contains merged PR #53. |
-| Integrate the PSX cash reconciliation from main | In progress | WC-TR coordination, PR #51, 2026-11-18 UTC | Preserve merged PR #54 and resolve README and handoff conflicts. |
+| Integrate the PSX cash reconciliation from main | Done | WC-TR coordination, PR #51 | Merged main at `23085a33` and kept both release notes. |
 | Protect linked independent installment receipts from generic edits and deletions | Done | WC-TR coordination, PR #51 | Shared transfer actions, bank account changes and loan deletion. Cash, Bank and card fixtures passed with the full suite. |
 | Coordinate reversal with the funding ledger | Ready | | Depends on linked-receipt protection and atomic payment persistence. |
 | Integrate and verify atomic multi-workbook payment persistence | Ready | | Verify the owner-only RTDB rules and emulator behavior. Integrate pending records with reporting, deliberate settlement, backup and reset before activation. |

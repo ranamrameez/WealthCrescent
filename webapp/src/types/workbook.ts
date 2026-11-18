@@ -145,6 +145,8 @@ export interface Transaction {
 }
 
 export interface Transfer {
+  /** Reconciled statement or bank row references used to recognize repeated imports. */
+  cashSourceIds?: string[];
   /** Broker/account profile that owns this cash movement. */
   brokerId?: string;
   /** Stable id, not the transfer's array position — needed so cross-entity

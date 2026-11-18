@@ -2,6 +2,10 @@
 
 Integrated the QSE dashboard import released on main. Added reviewed CSV creation of currency budget definitions, batch editing for monthly limits, and a previous-calendar-month comparison in Money in/out. Work on linked funding reversals, routine sync and pending-only payments remains open.
 
+## 2026-11-18 — PSX cash-transfer reconciliation
+
+Merged PR #54 adds Cash transfers statement import and Al Habib bank sync. Source matching and stale-preview checks live in `psxCashTransferReview.ts`. Review choices persist through the ordinary PSX workbook and affect only its active profile. Bank sync stores source references on the broker transfer. Existing inter-entity links retain their usual editing workflow.
+
 ## QSE dashboard import
 
 The focused dashboard import branch brings the reviewed Trade list importer to both dashboards. Both entry points use the same broker/account review and ledger checks. The wider reporting and payment acceptance stays tracked on PR #51.

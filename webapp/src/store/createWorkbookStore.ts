@@ -2,7 +2,7 @@ import { create, type UseBoundStore, type StoreApi } from 'zustand';
 import { toInstantMs } from '../lib/datetime';
 import { backfillSeq, nextSeq, nextSeqForEntity, syncAccountingEventCollections, syncTransactionIndexes, type AccountingEventOrderPair, type AccountingEventKind } from '../lib/seq';
 import type { Adjustment, BrokerPortfolioData, BrokerProfile, Dividend, PricePoint, Transaction, TradePlan, Transfer, WatchlistItem } from '../types/workbook';
-import { scheduleLocalStorageWrite } from '../lib/localStoragePersistence';
+import { scheduleLocalStorageWrite, writeLocalStorageSnapshot } from '../lib/localStoragePersistence';
 
 function chronologicalByInstant<T extends { date: string; time?: string; timezone?: string }>(records: T[]): T[] {
   return [...records].sort((a, b) => toInstantMs(a.date, a.time, a.timezone) - toInstantMs(b.date, b.time, b.timezone));
@@ -28,7 +28,7 @@ export interface BaseWorkbook<TSettings> {
 
 export interface WorkbookStoreState<TWorkbook extends BaseWorkbook<unknown>> {
   workbook: TWorkbook;
-  setWorkbook: (wb: TWorkbook, opts?: { skipPersist?: boolean }) => void;
+  setWorkbook: (wb: TWorkbook, opts?: { skipPersist?: boolean; expectedPersistedSnapshot?: string | null }) => void;
   addTransaction: (tx: Transaction) => void;
   addTransactions: (txs: Transaction[]) => void;
   updateTransaction: (index: number, patch: Partial<Transaction>) => void;
@@ -263,8 +263,11 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
       workbook: loadFromLocalStorage(),
       setWorkbook: (wb, opts) => {
         const next = normalize(wb);
+        if (opts?.expectedPersistedSnapshot !== undefined) {
+          writeLocalStorageSnapshot(storageKey, next, opts.expectedPersistedSnapshot);
+        }
         set({ workbook: next });
-        if (!opts?.skipPersist) persist(next);
+        if (!opts?.skipPersist && opts?.expectedPersistedSnapshot === undefined) persist(next);
       },
       addTransaction: (tx) => mutate((wb) => {
         const perTickerIndex = Number.isInteger(tx.perTickerIndex) ? tx.perTickerIndex! : nextSeqForEntity(wb.transactions, (t) => t.ticker, tx.ticker);
