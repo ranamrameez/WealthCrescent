@@ -1,4 +1,6 @@
 import { auth } from '../lib/firebase/client';
+import { useCashWorkbookStore } from '../store/cashWorkbookStore';
+import { usePlannedCashWorkbookStore } from '../store/plannedCashWorkbookStore';
 import { useBankWorkbookStore } from '../store/bankWorkbookStore';
 import { useCreditCardWorkbookStore } from '../store/creditCardWorkbookStore';
 import { useFundsWorkbookStore } from '../store/fundsWorkbookStore';
@@ -7,13 +9,13 @@ import { usePersonalLoansWorkbookStore } from '../store/personalLoansWorkbookSto
 import { useRentalsWorkbookStore } from '../store/rentalsWorkbookStore';
 import { useSubscriptionsWorkbookStore } from '../store/subscriptionsWorkbookStore';
 
-export type NavigationKind = 'fund' | 'fundBroker' | 'bank' | 'account' | 'card' | 'emi' | 'personalLoan' | 'property' | 'subscription';
+export type NavigationKind = 'cashCurrency' | 'fund' | 'fundBroker' | 'bank' | 'account' | 'card' | 'emi' | 'personalLoan' | 'property' | 'subscription';
 export interface NavigationItem { value: string; id: string; label: string; url: string; kind: NavigationKind; isFavorite: boolean; keywords: string }
 export interface NavigationSection { title: string; items: NavigationItem[] }
 const listeners = new Set<() => void>();
 let cache: NavigationSection[] | undefined;
 const invalidate = () => { cache = undefined; listeners.forEach(listener => listener()); };
-[useBankWorkbookStore, useCreditCardWorkbookStore, useFundsWorkbookStore, useEMIWorkbookStore,
+[useCashWorkbookStore, usePlannedCashWorkbookStore, useBankWorkbookStore, useCreditCardWorkbookStore, useFundsWorkbookStore, useEMIWorkbookStore,
   usePersonalLoansWorkbookStore, useRentalsWorkbookStore, useSubscriptionsWorkbookStore].forEach(store => store.subscribe(invalidate));
 export function subscribeNavigation(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
 
@@ -27,7 +29,13 @@ export function getNavigationItems(): NavigationSection[] {
     value: `${kind}:${item.id}`, id: item.id, kind, label: `${item.name ?? item.person ?? item.id}${item.currencyCode ? ` (${item.currencyCode})` : ''}`,
     isFavorite: !!item.isFavorite, keywords: `${title} ${item.currencyCode ?? ''}`, url: path(encodeURIComponent(item.id)),
   })).sort((a, b) => Number(b.isFavorite) - Number(a.isFavorite) || a.label.localeCompare(b.label)) });
+  const cash = useCashWorkbookStore.getState().workbook;
+  const cashPlans = usePlannedCashWorkbookStore.getState().workbook.entries;
+  const cashCurrencies = [...new Set([cash.settings.defaultCurrency, ...cash.entries.map(row => row.currencyCode), ...cashPlans.map(row => row.currencyCode)])]
+    .filter(Boolean)
+    .map(id => ({ id, name: `${id} cash`, isFavorite: cash.settings.favoriteCurrencies?.includes(id) }));
   cache = [
+    section('Cash currencies', 'cashCurrency', cashCurrencies, id => `/cash/${id}`),
     section('Funds', 'fund', funds.funds, id => `/funds?fund=${id}`),
     section('Fund brokers', 'fundBroker', funds.brokers, id => `/funds?broker=${id}`),
     section('Banks', 'bank', bank.settings.banks ?? [], id => `/bank/bank/${id}`),
@@ -48,6 +56,14 @@ export function toggleNavigationFavorite(value: string) {
   if (!item) throw new Error('This item no longer exists or is archived.');
   const patch = { isFavorite: !item.isFavorite };
   switch (item.kind) {
+    case 'cashCurrency': {
+      const store = useCashWorkbookStore.getState();
+      const favorites = new Set(store.workbook.settings.favoriteCurrencies);
+      if (item.isFavorite) favorites.delete(item.id);
+      else favorites.add(item.id);
+      store.updateSettings({ favoriteCurrencies: [...favorites] });
+      break;
+    }
     case 'bank': useBankWorkbookStore.getState().updateBank(item.id, patch); break;
     case 'account': useBankWorkbookStore.getState().updateAccount(item.id, patch); break;
     case 'card': useCreditCardWorkbookStore.getState().updateCard(item.id, patch); break;

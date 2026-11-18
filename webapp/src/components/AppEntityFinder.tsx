@@ -1,13 +1,13 @@
 import { useMemo, useSyncExternalStore } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { StandardDropdown } from './ui/StandardDropdown';
-import { BankIcon, EMIIcon, FundsIcon, PersonalLoanIcon, RentalsIcon, SubscriptionsIcon } from './icons';
+import { CashIcon, BankIcon, EMIIcon, FundsIcon, PersonalLoanIcon, RentalsIcon, SubscriptionsIcon } from './icons';
 import { findNavigationItem, getNavigationItems, subscribeNavigation, toggleNavigationFavorite, type NavigationKind } from '../services/navigationService';
 import { useEnsureSignedIn } from '../lib/firebase/useEnsureSignedIn';
 import { usePageTopBarStore } from '../store/pageTopBarStore';
 import { toast } from './Toast';
 
-const icons: Record<NavigationKind, typeof FundsIcon> = { fund: FundsIcon, fundBroker: FundsIcon, bank: BankIcon, account: BankIcon, card: BankIcon,
+const icons: Record<NavigationKind, typeof FundsIcon> = { cashCurrency: CashIcon, fund: FundsIcon, fundBroker: FundsIcon, bank: BankIcon, account: BankIcon, card: BankIcon,
   emi: EMIIcon, personalLoan: PersonalLoanIcon, property: RentalsIcon, subscription: SubscriptionsIcon };
 /** One searchable entity finder on every page, backed by the native module registries. */
 export function AppEntityFinder() {
@@ -22,6 +22,12 @@ export function AppEntityFinder() {
       if (!item) { toast('This item no longer exists. Search again.'); return; }
       const path = item.url.split('?')[0];
       if (path !== location.pathname) usePageTopBarStore.getState().beginNavigation(path);
-      navigate(item.url);
+      if (item.kind === 'cashCurrency' && (location.pathname === '/cash' || location.pathname.startsWith('/cash/'))) {
+        const params = new URLSearchParams(location.search);
+        params.delete('entities');
+        navigate({ pathname: path, search: params.toString() });
+      } else {
+        navigate(item.url);
+      }
     }} onFavoriteToggle={async value => { if (await ensureSignedIn('Sign in to save favorites.')) toggleNavigationFavorite(value); }} />;
 }
