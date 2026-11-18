@@ -39,5 +39,5 @@ The register lives on the shared delivery branch linked to the active PR. For th
 | Verify app-wide search in a mobile browser | Ready | | The local Chromium process was blocked by the execution environment. Recheck the topbar and results at a narrow viewport with fixtures. |
 | Deep-link exchange broker search results | Done | WC-TR session 1939ef032035, PR #51 | `486160fe` opens the matching QSE or PSX profile without activating it. Focused tests, production build, clean 1,414-test rerun and integrated Actions 493 passed. |
 | Complete UX acceptance | Ready | | Claim one module or a specific shared control at a time. |
-| PSX transfer review fixture acceptance | In progress | WC-TR PSX session, work/psx-transfer-review-acceptance, 2026-11-18 UTC | Exercise bank and statement review controls, selection and stale-save handling using app fixtures. Live browser terms gate remains. |
+| PSX transfer review fixture acceptance | Done | WC-TR PSX session, work/psx-transfer-review-acceptance | `e8425d9f` covers statement selection, bank filtering and stale-save failure/retry. 10 focused tests passed. The deployed terms gate prevented live interaction. |
 | Final PR validation and merge | Ready | | Depends on the remaining acceptance checks and exact-head CI. |
