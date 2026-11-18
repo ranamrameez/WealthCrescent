@@ -1,5 +1,7 @@
 import { occurrenceCompleted } from './planOccurrences';
-import type { BankAccount } from '../../types/bankWorkbook';
+import { pendingOccurrenceKey, pendingOccurrenceKeys } from './planOccurrenceIdentity';
+import type { CashEntry } from '../../types/cashWorkbook';
+import type { BankAccount, BankTransaction } from '../../types/bankWorkbook';
 import type { PlannedBankTransaction } from '../../types/plannedBank';
 import type { PlannedCashEntry } from '../../types/plannedCash';
 import type { PlannedCreditCardTransaction } from '../../types/plannedCreditCard';
@@ -32,7 +34,9 @@ export interface UpcomingItem {
 
 export interface UpcomingInputs {
   plannedCash: PlannedCashEntry[];
+  cashEntries?: CashEntry[];
   plannedBank: PlannedBankTransaction[];
+  bankTransactions?: BankTransaction[];
   bankAccounts: BankAccount[];
   plannedCreditCards?: PlannedCreditCardTransaction[];
   creditCards?: CreditCard[];
@@ -129,11 +133,14 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
     fundedRows.set(key, rows);
   };
 
+  const reservedCash = pendingOccurrenceKeys(inputs.cashEntries ?? [], 'cash', row => row.currencyCode);
+  const reservedBank = pendingOccurrenceKeys(inputs.bankTransactions ?? [], 'bank', row => row.accountId);
+
   inputs.plannedCash.forEach(plan => {
     if(plan.cancelled)return;
     const label = plan.category?.trim() || plan.note?.trim() || 'Cash plan';
     const add = (date: string, id: string) => {
-      if (!inWindow(date, todayStr, windowEndStr)) return;
+      if (!inWindow(date, todayStr, windowEndStr) || reservedCash.has(pendingOccurrenceKey(plan.currencyCode, plan.id, date))) return;
       addItem(plan, { id, date, module: 'cash', label, amount: Math.abs(plan.amount), currencyCode: plan.currencyCode, kind: plan.type === 'IN' ? 'income' : 'expense', overdue: false }, plan.type === 'OUT');
     };
     if (plan.recurrence) {
@@ -148,7 +155,7 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
     const currencyCode = currencyByAccount.get(plan.accountId);
     if (!currencyCode) return;
     const add = (date: string, id: string) => {
-      if (!inWindow(date, todayStr, windowEndStr)) return;
+      if (!inWindow(date, todayStr, windowEndStr) || reservedBank.has(pendingOccurrenceKey(plan.accountId, plan.id, date))) return;
       addItem(plan, { id, date, module: 'bank', label: plan.description, amount: Math.abs(plan.amount), currencyCode, kind: plan.amount >= 0 ? 'income' : 'expense', overdue: false }, plan.amount < 0);
     };
     if (plan.recurrence) {

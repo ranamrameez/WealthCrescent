@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getUpcomingItems, subscribeUpcomingItems } from './upcomingService';
 import { usePlannedCashWorkbookStore } from '../../store/plannedCashWorkbookStore';
+import { useCashWorkbookStore } from '../../store/cashWorkbookStore';
 
 describe('upcoming application query', () => {
   afterEach(() => {
@@ -46,4 +47,31 @@ describe('upcoming application query', () => {
       usePlannedCashWorkbookStore.getState().setWorkbook(original);
     }
   });
+});
+
+it('refreshes when a linked Cash occurrence enters and leaves the pending ledger', () => {
+  const plans = usePlannedCashWorkbookStore.getState();
+  const cash = useCashWorkbookStore.getState();
+  const date = new Date().toISOString().slice(0, 10);
+  const id = 'reserved-upcoming-plan';
+  const ids = () => getUpcomingItems(35).map(item => item.id);
+  try {
+    plans.setWorkbook({ ...plans.workbook, entries: [{
+      id, date, type: 'OUT', amount: 25, currencyCode: 'QAR', recurrence: { cycle: 'monthly', startDate: date },
+    }] });
+    expect(ids()).toContain(`${id}@${date}`);
+
+    cash.setWorkbook({ ...cash.workbook, entries: [{
+      id: 'pending-entry', date, amount: 25, currencyCode: 'QAR', isDeposit: false, isPending: true, source: 'manual',
+      planLink: { module: 'cash', planId: id, occurrenceDate: date },
+    }] });
+    expect(ids()).not.toContain(`${id}@${date}`);
+    expect(ids().filter(value => value.startsWith(`${id}@`))).toHaveLength(1);
+
+    cash.setWorkbook(cash.workbook);
+    expect(ids()).toContain(`${id}@${date}`);
+  } finally {
+    plans.setWorkbook(plans.workbook);
+    cash.setWorkbook(cash.workbook);
+  }
 });

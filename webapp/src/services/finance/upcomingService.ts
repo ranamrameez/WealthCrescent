@@ -2,6 +2,7 @@ import { CalculationEngine } from '../../lib/calc/CalculationEngine';
 import type { UpcomingItem } from '../../lib/calc/upcoming';
 import { usePlannedCashWorkbookStore } from '../../store/plannedCashWorkbookStore';
 import { usePlannedBankWorkbookStore } from '../../store/plannedBankWorkbookStore';
+import { useCashWorkbookStore } from '../../store/cashWorkbookStore';
 import { useBankWorkbookStore } from '../../store/bankWorkbookStore';
 import { usePlannedCreditCardWorkbookStore } from '../../store/plannedCreditCardWorkbookStore';
 import { useCreditCardWorkbookStore } from '../../store/creditCardWorkbookStore';
@@ -33,6 +34,7 @@ const storeUnsubscribers = [
   usePlannedCashWorkbookStore.subscribe(invalidate),
   usePlannedBankWorkbookStore.subscribe(invalidate),
   useBankWorkbookStore.subscribe(invalidate),
+  useCashWorkbookStore.subscribe(invalidate),
   usePlannedCreditCardWorkbookStore.subscribe(invalidate),
   useCreditCardWorkbookStore.subscribe(invalidate),
   usePlannedRentalsWorkbookStore.subscribe(invalidate),
@@ -53,10 +55,13 @@ export function getUpcomingItems(windowDays = 14): UpcomingItem[] {
   const cached = snapshots.get(key);
   if (cached) return cached;
 
+  const bank = useBankWorkbookStore.getState().workbook;
   const items = CalculationEngine.upcoming.collectUpcomingItems({
     plannedCash: usePlannedCashWorkbookStore.getState().workbook.entries,
     plannedBank: usePlannedBankWorkbookStore.getState().workbook.entries,
-    bankAccounts: useBankWorkbookStore.getState().workbook.settings.accounts,
+    cashEntries: useCashWorkbookStore.getState().workbook.entries,
+    bankTransactions: bank.transactions,
+    bankAccounts: bank.settings.accounts,
     plannedCreditCards: usePlannedCreditCardWorkbookStore.getState().workbook.entries,
     creditCards: useCreditCardWorkbookStore.getState().workbook.cards,
     plannedRentals: usePlannedRentalsWorkbookStore.getState().workbook.entries,

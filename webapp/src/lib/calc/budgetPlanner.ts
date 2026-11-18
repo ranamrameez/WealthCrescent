@@ -26,7 +26,7 @@ import type { BankAccount, BankTransaction } from '../../types/bankWorkbook';
 import type { PlannedBankTransaction } from '../../types/plannedBank';
 import type { Property, RentalEntry } from '../../types/rentalsWorkbook';
 import type { PlannedRentalEntry } from '../../types/plannedRentals';
-import type { PlanLink } from '../../types/planLink';
+import { pendingOccurrenceKey, pendingOccurrenceKeys } from './planOccurrenceIdentity';
 import type { InterEntityTransfer } from '../../types/interEntityTransfer';
 
 export interface BudgetOccurrenceWindow { fromDate?: string; toDate?: string; asOf?: Date; horizonDays?: number | null; }
@@ -99,17 +99,6 @@ function linkedRecordKeys(links: InterEntityTransfer[]): Set<string> {
   return keys;
 }
 
-function pendingOccurrenceKeys<T extends { isPending?: boolean; planLink?: PlanLink }>(
-  records: T[], module: 'cash' | 'bank', source: (record: T) => string,
-) {
-  return new Set(records.flatMap(record => {
-    const link = record.planLink;
-    return record.isPending && link?.module === module
-      ? [JSON.stringify([source(record), link.planId, link.occurrenceDate])]
-      : [];
-  }));
-}
-
 /** Real entries resolve their display category from `categoryID` via the
  * shared registry; planned entries (`PlannedCashEntry`/
  * `PlannedBankTransaction`/`PlannedRentalEntry`) still carry the old
@@ -127,7 +116,7 @@ function normalizeCash(entries: CashEntry[], plans: PlannedCashEntry[], categori
       categoryId: e.categoryID, category: categoryName(e.categoryID, categories), description: e.note || (e.isDeposit ? 'Cash in' : 'Cash out'), executed: true, isPending: e.isPending,
     }));
   const planned: BudgetActivity[] = expandPlans(plans, window)
-    .filter(p => !p.executed && !reserved.has(JSON.stringify([p.currencyCode, p.planId ?? p.id, p.date])))
+    .filter(p => !p.executed && !reserved.has(pendingOccurrenceKey(p.currencyCode, p.planId ?? p.id, p.date)))
     .map((p) => ({
       id: p.id, module: 'cash', sourceLabel: 'Cash', sourceId: 'cash', date: p.date,
       amount: p.type === 'IN' ? p.amount : -p.amount, currencyCode: p.currencyCode,
@@ -150,7 +139,7 @@ function normalizeBank(accounts: BankAccount[], transactions: BankTransaction[],
     }];
   });
   const planned: BudgetActivity[] = expandPlans(plans, window)
-    .filter(p => !p.executed && !reserved.has(JSON.stringify([p.accountId, p.planId ?? p.id, p.date])))
+    .filter(p => !p.executed && !reserved.has(pendingOccurrenceKey(p.accountId, p.planId ?? p.id, p.date)))
     .flatMap((p) => {
       const account = accountById.get(p.accountId);
       if (!account) return [];
