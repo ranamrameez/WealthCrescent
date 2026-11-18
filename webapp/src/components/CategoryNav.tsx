@@ -47,7 +47,7 @@ export const CATEGORIES: { key: CategoryKey; label: string; to: string; icon: Re
  * sidebar while on `/account` — this was that same fallback firing for a
  * page it was never meant to cover. */
 export function categoryForPath(pathname: string): CategoryKey | null {
-  if (pathname.startsWith('/account')) return null;
+  if (pathname === '/search' || pathname.startsWith('/account')) return null;
   if (pathname.startsWith('/app-data')) return null;
   if (pathname.startsWith('/legal')) return null;
   if (pathname === '/' || pathname === '/dashboard' || pathname.startsWith('/net-worth')) return 'netWorth';

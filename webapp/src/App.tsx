@@ -1,3 +1,4 @@
+import { RecordSearchPage } from './features/search/RecordSearchPage';
 import { MarketPricesPage } from './features/qse/pages/MarketPricesPage';
 import { HashRouter, Navigate, Route } from 'react-router-dom';
 import { PageContent } from './components/PageContent';
@@ -97,7 +98,7 @@ function useApplyAppearance() {
 // feedback_cloud_sync_safety memory.
 function App() {
   useApplyAppearance();
-  const { user, status, cloudEmpty, uploadLocalToCloud } = useFirebaseSync();
+  const { user, status, cloudEmpty, uploadLocalToCloud, workbookOwner: qseOwner } = useFirebaseSync();
   // Same account, separate cloud path — see usePSXFirebaseSync. Both syncs
   // run all the time (not just while their routes are active) so a PSX
   // trade logged, say, right before switching to QSE has already started
@@ -118,7 +119,7 @@ function App() {
   // speculative data, not irreplaceable history, so skipping the manual
   // "upload local to cloud" affordance for cloudEmpty is an accepted v1
   // simplification. Still run the sync itself so plans persist/pull.
-  usePlannedRentalsFirebaseSync();
+  const plannedRentalsSync = usePlannedRentalsFirebaseSync();
   const transfersSync = useInterEntityTransfersFirebaseSync();
   const subscriptionsSync = useSubscriptionsFirebaseSync();
   const netWorthSnapshotsSync = useNetWorthSnapshotsFirebaseSync();
@@ -175,6 +176,15 @@ function App() {
           <ErrorBoundary>
             <PageContent>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/search" element={<RecordSearchPage owner={user?.uid} workbookOwners={{
+                qse: qseOwner, psx: psxSync.workbookOwner, cash: cashSync.workbookOwner,
+                bank: bankSync.workbookOwner, cards: creditCardSync.workbookOwner, rentals: rentalsSync.workbookOwner,
+                funds: fundsSync.workbookOwner, emi: emiSync.workbookOwner, loans: personalLoansSync.workbookOwner,
+                subscriptions: subscriptionsSync.workbookOwner, cashPlans: plannedCashSync.workbookOwner,
+                bankPlans: plannedBankSync.workbookOwner, cardPlans: plannedCreditCardSync.workbookOwner,
+                rentalPlans: plannedRentalsSync.workbookOwner, transfers: transfersSync.workbookOwner,
+                snapshots: netWorthSnapshotsSync.workbookOwner,
+              }} />} />
               <Route path="/net-worth" element={<Navigate to="/dashboard" replace />} />
               <Route path="/qse" element={<DashboardPage />} />
               <Route path="/brokers" element={<BrokersPage />} />

@@ -55,10 +55,12 @@ export function useWorkbookCloudSync<TWorkbook>(
 ) {
   const [status, setStatus] = useState('Not signed in');
   const [cloudEmpty, setCloudEmpty] = useState(false);
+  const [workbookOwner, setWorkbookOwner] = useState<string>();
   const upload = useRef<{ uid: string; run: () => Promise<void> } | null>(null);
 
   useEffect(() => {
     setCloudEmpty(false);
+    setWorkbookOwner(undefined);
     if (!firebaseReady || !db) {
       setStatus('Cloud sync unavailable — Firebase failed to load');
       return;
@@ -85,6 +87,7 @@ export function useWorkbookCloudSync<TWorkbook>(
       baseline = remote;
       setCloudEmpty(remote === null);
       if (remote === null) {
+        setWorkbookOwner(undefined);
         setStatus('No cloud data found for this account yet');
         return;
       }
@@ -95,6 +98,7 @@ export function useWorkbookCloudSync<TWorkbook>(
       } finally {
         applying = false;
       }
+      setWorkbookOwner(user.uid);
       setStatus(`Synced${_updated ? ' · ' + new Date(_updated).toLocaleString() : ''}`);
     };
 
@@ -131,6 +135,7 @@ export function useWorkbookCloudSync<TWorkbook>(
         const committed = (result.snapshot?.val() ?? payload) as Snapshot;
         baseline = committed;
         setCloudEmpty(false);
+        setWorkbookOwner(user.uid);
         setStatus('Synced');
         // Firebase can deliver a newer server value before the transaction
         // promise resolves. A queued edit still belongs to the committed base.
@@ -207,5 +212,5 @@ export function useWorkbookCloudSync<TWorkbook>(
     await upload.current.run();
   };
 
-  return { status, cloudEmpty, uploadLocalToCloud };
+  return { status, cloudEmpty, uploadLocalToCloud, workbookOwner: user?.uid === workbookOwner ? workbookOwner : undefined };
 }

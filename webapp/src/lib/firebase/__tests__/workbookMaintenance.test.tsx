@@ -73,6 +73,23 @@ it('aborts initialization when a second client creates its workbook first', asyn
   expect(store.getState().workbook.entries).toEqual(['local']);
 });
 
+it('exposes a workbook owner only after applying that account’s remote data', () => {
+  const store = create<{ workbook: { entries: string[] }; setWorkbook: (wb: { entries: string[] }) => void }>(set => ({
+    workbook: { entries: ['cached'] }, setWorkbook: workbook => set({ workbook }),
+  }));
+  const { result, rerender } = renderHook(
+    ({ uid }) => useWorkbookCloudSync('cash', store, { uid } as User, () => ({ entries: [] })),
+    { initialProps: { uid: 'owner' } },
+  );
+  expect(result.current.workbookOwner).toBeUndefined();
+  act(() => mock.listener?.({ val: () => ({ entries: ['verified'] }) }));
+  expect(result.current.workbookOwner).toBe('owner');
+  rerender({ uid: 'next-user' });
+  expect(result.current.workbookOwner).toBeUndefined();
+  act(() => mock.listener?.({ val: () => null }));
+  expect(result.current.workbookOwner).toBeUndefined();
+});
+
 it('invalidates a pending initialization when the signed-in account changes', async () => {
   let retry: ((current: unknown) => unknown) | undefined;
   let finish: ((value: { committed: boolean }) => void) | undefined;

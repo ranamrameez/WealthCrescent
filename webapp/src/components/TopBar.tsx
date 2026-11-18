@@ -6,6 +6,7 @@ import { TopBarSelect } from './TopBarControls';
 import { usePageTopBarStore } from '../store/pageTopBarStore';
 import { useRef } from 'react';
 import { useTopBarPageSections } from '../hooks/useTopBarPageSections';
+import { TopBarRecordSearch } from '../features/search/RecordSearchPage';
 import { AppEntityFinder } from './AppEntityFinder';
 
 /** App-wide fixed top bar — user-requested (2026-09-11, design reference:
@@ -64,6 +65,7 @@ export function TopBar({ onToggleNavigation, navigationOpen = false }: { onToggl
       </div>
       <div className="page-topbar-right">
         <AppEntityFinder />
+        <TopBarRecordSearch />
         {category === 'stocks' && (
           <TopBarSelect
             label="Broker"
