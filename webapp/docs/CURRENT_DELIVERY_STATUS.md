@@ -44,7 +44,7 @@ Use the [delivery task register](MULTI_AGENT_WORKFLOW.md) to coordinate ownershi
 - Upcoming labels standalone renewal and legacy EMI estimates. Money in/out includes uncovered subscription renewals as planned estimates using the same funding checks. Active same-day funding plans offset the matching reviewed installment by obligation ID and currency. Partial funding leaves a visible remainder and conflicting plans leave the contract obligation visible. The canonical movement-report adapters for other standalone schedules remain open.
 - Dated QSE and PSX trade estimates are shown by broker and strategy in Money in/out. Strategy dates remain as entered and fee overrides carry into executed trades. Saved scenarios remain separate from cleared and pending transactions.
 - The cleared movement report compares the selected period with an immediately preceding equal-length period and provides both sets of records. A previous-calendar-month preset compares completed months in full and aligns month-to-date cutoffs where possible.
-- Independent installment funding remains visible when a linked receipt is absent. When both records are available, the receipt represents the movement once.
+- Cash and Bank funding stays visible if the linked Rental or loan record is missing. When the exact linked record is present, it represents the movement once. Link resolution distinguishes module, source and record IDs, including IDs containing colons, and leaves ambiguous legacy links unresolved.
 - Finish all allocation drilldowns and source inclusion/empty/negative/FX/opening acceptance cases.
 
 ### 2. Unified currency-owned budgets
@@ -68,7 +68,7 @@ Implemented core/service/Planning UI now includes optional definitions/allocatio
 - Verify duplicates, interrupted retries, simultaneous clients, auth changes, month-end/leap boundaries and cancellation before enabling the scheduler.
 
 ### 5. App-wide UX acceptance
-- Add app-wide keyword search to the shared topbar and a dedicated results page. Search transactions and other native records across modules by their available fields, including titles, descriptions, notes, references and symbols. Let users narrow the same query to one or more modules and submodules, such as a bank account or broker when applicable. Show each result’s module and record context and link it to the relevant native view. Keep search scoped to the signed-in account’s authorized data, reuse shared controls, and verify keyboard, mobile, empty-result and account-switch behavior. Track implementation slices in the task register.
+- App-wide keyword search is integrated in the shared topbar. Its results page searches account-scoped native records and supports module and submodule filters and native-view links. Narrow mobile browser acceptance remains open.
 - Audit every module aggregate/detail page against PAGE_TEMPLATE_GUIDE: shared scoped controls, summaries/plans/history/analytics/ledger, modify/batch/import/export parity and currency-safe all-entity totals.
 - Finish global finder Cash/exchange/broker/position coverage and shared-filter preservation. Check independent favorites, keyboard, disabled/no-result and popup placement.
 - Audit every chart consumer for shared renderer use, full-plot hover/guideline, units/denominators/date labels, truthful scales/negative/zero/missing cases, table equivalents, mobile sizing and reduced motion.
