@@ -182,3 +182,20 @@ it('counts a linked card-funded installment once, with the receipt as the financ
   expect(report(f, 'financing').rows[0].outflow).toBe(-50);
   expect(report(f).count).toBe(1);
 });
+
+it.each(['cash', 'bank'] as const)('retains %s funding when the linked installment receipt is missing', module => {
+  const f = fixture();
+  const date = '2026-01-02';
+  f.native.emi.entries.push({ id: 'loan', name: 'Loan', lender: 'Seller', principal: 500, totalToReturn: 500, currencyCode: 'USD', tenureMonths: 1, startDate: '2026-01-01', repaymentMode: 'fixedTotal' });
+  f.base.bankAccounts.push({ id: 'bank', name: 'Checking', currencyCode: 'USD', openingBalance: 0 });
+  if (module === 'bank') {
+    f.base.bankTransactions.push({ id: 'funding', accountId: 'bank', date, amount: -50, description: 'Installment', source: 'manual', isDeposit: false });
+  } else {
+    f.base.cashEntries.push({ id: 'funding', currencyCode: 'USD', date, amount: 50, source: 'manual', isDeposit: false });
+  }
+  f.links.push({ id: 'link', date, from: { module, ref: module === 'bank' ? 'bank' : undefined }, to: { module: 'emi', ref: 'loan', emiIndependent: true }, fromRecordId: 'funding', toRecordId: 'receipt', fromAmount: 50, toAmount: 50 });
+
+  expect(collect(f).map(row => [row.id, row.amount])).toEqual([['funding', -50]]);
+  f.native.emi.repayments.push({ id: 'receipt', loanId: 'loan', date, month: 0, amount: 50, paymentOnly: true });
+  expect(collect(f).map(row => [row.id, row.amount])).toEqual([['receipt', -50]]);
+});

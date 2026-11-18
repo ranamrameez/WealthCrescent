@@ -1,5 +1,5 @@
 import { emiRepaymentEffect } from '../../types/emiWorkbook';
-import { isCardFundedInstallmentLink } from '../../types/interEntityTransfer';
+import { isIndependentInstallmentLink } from '../../types/interEntityTransfer';
 import { collectBudgetActivities, type BudgetActivity, type BudgetOccurrenceWindow } from './budgetPlanner';
 import type { RecentActivityInputs } from './recentActivity';
 import type { PlannedCreditCardTransaction } from '../../types/plannedCreditCard';
@@ -161,7 +161,7 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
       return side.module+':'+(entityModules.has(side.module)?(ref ?? '__unresolved__')+':':'')+id;
     };
     const left=key(link.from,link.fromRecordId),right=key(link.to,link.toRecordId);
-    if (isCardFundedInstallmentLink(link)) {
+    if (isIndependentInstallmentLink(link) && ['cash', 'bank', 'creditCard'].includes(link.from.module)) {
       if (nativeKeys.has(right)) suppressed.add(left);
       continue;
     }
