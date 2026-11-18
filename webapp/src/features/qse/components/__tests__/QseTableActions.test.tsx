@@ -172,18 +172,18 @@ it('reviews rounded Excel figures before importing selected trades and lets the 
   Object.defineProperty(file, 'arrayBuffer', { value: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) });
   const input = container.querySelector('input[type=file]')!;
   fireEvent.change(input, { target: { files: [file] } });
-  const review = await screen.findByRole('dialog', { name: 'Review The Group trades' });
+  const review = await screen.findByRole('dialog', { name: 'Review The Group statement' });
   expect(within(review).getByText(/rounds cash amounts/)).toBeVisible();
-  expect(within(review).getByRole('button', { name: 'Import selected trades (0)' })).toBeDisabled();
+  expect(within(review).getByRole('button', { name: 'Import selected records (0)' })).toBeDisabled();
   fireEvent.click(within(review).getByRole('button', { name: 'Cancel' }));
   expect(useWorkbookStore.getState().workbook.transactions).toHaveLength(2);
   fireEvent.change(input, { target: { files: [file] } });
-  const reopened = await screen.findByRole('dialog', { name: 'Review The Group trades' });
-  fireEvent.click(within(reopened).getByRole('button', { name: 'Select all new trades' }));
-  fireEvent.click(within(reopened).getByRole('button', { name: 'Import selected trades (1)' }));
+  const reopened = await screen.findByRole('dialog', { name: 'Review The Group statement' });
+  fireEvent.click(within(reopened).getByRole('button', { name: 'Select all new records' }));
+  fireEvent.click(within(reopened).getByRole('button', { name: 'Import selected records (1)' }));
   expect(useWorkbookStore.getState().workbook.transactions).toHaveLength(3);
 });
-it('imports statement sequence and price corrections while keeping precise rewards and repeated imports unchanged', async () => {
+it('reviews ledger mismatches, imports new cash events, and keeps precise matches on repeat', async () => {
   const wb = createEmptyWorkbook();
   wb.transactions = [{ id: 'buy', date: '2026-11-01', ticker: 'MARK', action: 'BUY', shares: 10, price: 1.8, feeOverride: 0.02 }, { id: 'sale', date: '2026-11-01', ticker: 'MARK', action: 'SELL', shares: 10, price: 1.836 }];
   wb.adjustments = [{ id: 'reward', date: '2026-11-01', amount: 0.34, note: 'Trading Reward' }];
@@ -195,22 +195,31 @@ it('imports statement sequence and price corrections while keeping precise rewar
     ['01/11/2026','Buy',10,'Rayyan B',1.8,-18],
     ['01/11/2026','Sell',10,'Rayyan B',1.835,18],
     ['01/11/2026','Trading Reward','','','',0],
-    ['02/11/2026','Trading Reward','','','',40],
+    ['02/11/2026','Trading Reward','','','',0],
+    ['02/11/2026','Acc. Transfer','','','',-5110],
+    ['','Acc. Transfer','','','',-5100],
+    ['','Electronic Transfer','','','',-10],
   ])});
   const input = container.querySelector('input[type=file]')!;
   fireEvent.change(input,{target:{files:[file]}});
-  await waitFor(()=>expect(useWorkbookStore.getState().workbook.transactions.find(r=>r.id==='sale')?.price).toBe(1.835));
-  const after = structuredClone(useWorkbookStore.getState().workbook);
-  expect(after.transactions).toHaveLength(2);
-  expect(after.transactions.find(r=>r.id==='buy')).toMatchObject({accountingOrder:1,feeOverride:0.02});
-  expect(after.transactions.find(r=>r.id==='sale')).toMatchObject({accountingOrder:2});
-  expect(after.adjustments).toHaveLength(1);
-  expect(after.adjustments[0]).toMatchObject({id:'reward',amount:0.34,accountingOrder:3});
-  vi.mocked(confirmDialog).mockClear();
-  fireEvent.change(input,{target:{files:[file]}});
-  await waitFor(()=>expect(confirmDialog).toHaveBeenCalledTimes(1));
-  await new Promise(resolve=>setTimeout(resolve,20));
-  expect(useWorkbookStore.getState().workbook).toEqual(after);
+  const review = within(await screen.findByRole('dialog', { name: 'Review The Group statement' }));
+  fireEvent.change(review.getByLabelText('Show records'), { target: { value: 'mismatches' } });
+  const reward = within(review.getByRole('region', { name: /Trading reward 2026-11-01/ }));
+  expect(reward.getByText('0.34')).toBeVisible();
+  expect(reward.getByText('0')).toBeVisible();
+  expect(reward.getByRole('checkbox')).not.toBeChecked();
+  expect(reward.getByText(/Keeping existing values/)).toBeVisible();
+  fireEvent.click(within(review.getByRole('region', { name: /MARK 2026-11-01 SELL/ })).getByRole('checkbox'));
+  fireEvent.click(review.getByRole('button', { name: 'Select all new records' }));
+  fireEvent.click(review.getByRole('button', { name: 'Import selected records (3)' }));
+  const after = useWorkbookStore.getState().workbook;
+  expect(after.transactions.find(row => row.id === 'sale')?.price).toBe(1.835);
+  expect(after.adjustments).toMatchObject([{ id: 'reward', amount: 0.34 }, { amount: 0 }]);
+  expect(after.transfers).toMatchObject([{ type: 'WITHDRAWAL', gross: 5100, fee: 10 }]);
+  fireEvent.change(input, { target: { files: [file] } });
+  const repeated = within(await screen.findByRole('dialog', { name: 'Review The Group statement' }));
+  expect(repeated.getByRole('button', { name: 'Select all new records' })).toBeDisabled();
+  expect(useWorkbookStore.getState().workbook).toBe(after);
 });
 
 it('lets the user compare and select matched and new trades, retaining existing IDs and fee overrides', async () => {
@@ -224,18 +233,18 @@ it('lets the user compare and select matched and new trades, retaining existing 
     ['03/10/2026', 'Buy', 4, 'Qatar German Med', 4, -16],
   ]) });
   fireEvent.change(container.querySelector('input[type=file]')!, { target: { files: [file] } });
-  const review = within(await screen.findByRole('dialog', { name: 'Review The Group trades' }));
+  const review = within(await screen.findByRole('dialog', { name: 'Review The Group statement' }));
   const buy = within(review.getByRole('region', { name: /QNBK 2026-10-01/ }));
   expect(buy.getByText('Existing')).toBeVisible();
   expect(buy.getByText('Statement')).toBeVisible();
   fireEvent.click(review.getByRole('button', { name: 'Use statement for all matches' }));
   fireEvent.click(review.getByRole('button', { name: 'Keep all existing matches' }));
   fireEvent.click(buy.getByRole('checkbox', { name: 'Use statement values for this match' }));
-  fireEvent.click(review.getByRole('button', { name: 'Select all new trades' }));
+  fireEvent.click(review.getByRole('button', { name: 'Select all new records' }));
   const skip = within(review.getByRole('region', { name: /GWCS 2026-10-03/ }));
   fireEvent.click(skip.getByRole('checkbox'));
   expect(useWorkbookStore.getState().workbook.transactions).toHaveLength(2);
-  fireEvent.click(review.getByRole('button', { name: 'Import selected trades (2)' }));
+  fireEvent.click(review.getByRole('button', { name: 'Import selected records (2)' }));
   const rows = useWorkbookStore.getState().workbook.transactions;
   expect(rows).toHaveLength(3);
   expect(rows.find(row => row.id === 'buy')).toMatchObject({ price: 12.24, feeOverride: 3 });
@@ -251,10 +260,10 @@ it('rejects an import if the broker ledger changes after review', async () => {
     ['03/10/2026', 'Buy', 4, 'GWC', 8, -32],
   ]) });
   fireEvent.change(container.querySelector('input[type=file]')!, { target: { files: [file] } });
-  const review = within(await screen.findByRole('dialog', { name: 'Review The Group trades' }));
+  const review = within(await screen.findByRole('dialog', { name: 'Review The Group statement' }));
   useWorkbookStore.getState().updateTransaction(0, { price: 11 });
-  fireEvent.click(review.getByRole('button', { name: 'Select all new trades' }));
-  fireEvent.click(review.getByRole('button', { name: 'Import selected trades (1)' }));
+  fireEvent.click(review.getByRole('button', { name: 'Select all new records' }));
+  fireEvent.click(review.getByRole('button', { name: 'Import selected records (1)' }));
   expect(review.getByRole('alert')).toHaveTextContent('broker or its ledger changed');
   expect(useWorkbookStore.getState().workbook.transactions).toHaveLength(2);
 });
@@ -273,18 +282,18 @@ it('inserts a selected same-day addition before its existing statement anchor wi
   ]) });
   const input = container.querySelector('input[type=file]')!;
   fireEvent.change(input, { target: { files: [file] } });
-  const dialog = within(await screen.findByRole('dialog', { name: 'Review The Group trades' }));
-  fireEvent.click(dialog.getByRole('button', { name: 'Select all new trades' }));
-  fireEvent.click(dialog.getByRole('button', { name: 'Import selected trades (1)' }));
+  const dialog = within(await screen.findByRole('dialog', { name: 'Review The Group statement' }));
+  fireEvent.click(dialog.getByRole('button', { name: 'Select all new records' }));
+  fireEvent.click(dialog.getByRole('button', { name: 'Import selected records (1)' }));
   const result = useWorkbookStore.getState().workbook;
   expect(result.transactions).toHaveLength(2);
   expect(result.transactions.find(row => row.action === 'BUY')?.accountingOrder).toBe(1);
   expect(result.transactions.find(row => row.id === 'sell')?.accountingOrder).toBe(2);
   expect(result.adjustments[0]).toMatchObject({ id: 'reward', amount: 0.34, accountingOrder: 3 });
   fireEvent.change(input, { target: { files: [file] } });
-  const repeated = within(await screen.findByRole('dialog', { name: 'Review The Group trades' }));
-  expect(repeated.getByRole('button', { name: 'Select all new trades' })).toBeDisabled();
+  const repeated = within(await screen.findByRole('dialog', { name: 'Review The Group statement' }));
+  expect(repeated.getByRole('button', { name: 'Select all new records' })).toBeDisabled();
   fireEvent.click(repeated.getByRole('button', { name: 'Use statement for all matches' }));
-  fireEvent.click(repeated.getByRole('button', { name: 'Import selected trades (2)' }));
+  fireEvent.click(repeated.getByRole('button', { name: 'Import selected records (2)' }));
   expect(useWorkbookStore.getState().workbook).toBe(result);
 });

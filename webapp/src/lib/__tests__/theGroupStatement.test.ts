@@ -11,7 +11,7 @@ describe('The Group Cash statement', () => {
     const rows = readStatementXlsx(bytes);
     expect(rows[0][0]).toBe('Date'); expect(rows[0][1]).toBe(''); expect(rows[0][5]).toBe('-10');
   });
-  it('uses price/quantity and transfer breakdowns, excluding rounded rewards and commission detail rows', () => {
+  it('uses price/quantity and transfer breakdowns and rounded rewards, skipping commission detail rows', () => {
     const result = parseTheGroupStatement([header,
       ['15/10/2026', 'Buy', '2', 'Qatar Fuel', '12.24', '-25'],
       ['', 'Buy', '2', 'Qatar Fuel', '12.24', '-25'], ['', 'Commission', '', '', '', '-1'],
@@ -19,10 +19,10 @@ describe('The Group Cash statement', () => {
       ['', 'SWIFT TR. FROM', '', '', '', '6010'], ['', 'Electronic Transfer', '', '', '', '-10'],
       ['15/10/2026', 'Trading Reward', '', '', '', '1'],
     ]);
-    expect(result.records).toHaveLength(2);
+    expect(result.records).toHaveLength(3);
     expect(result.records[0]).toMatchObject({ ticker: 'QFLS', shares: 2, price: 12.24, action: 'BUY' });
     expect(result.records[1]).toMatchObject({ gross: 6010, fee: 10 });
-    expect(result.warning).toContain('1 missing rounded reward rows excluded');
+    expect(result.records[2]).toMatchObject({ kind: 'adjustment', amount: 1 });
   });
   it('preserves combined fills and stable IDs on repeated import', () => {
     const existing = [{ kind: 'trade' as const, id: 'buy', date: '2026-10-14', ticker: 'QFLS', action: 'BUY' as const, shares: 2, price: 11.8 }];
@@ -108,6 +108,31 @@ it('exposes ambiguous prices beside independent additions during trade review', 
     ['14/10/2026', 'SWIFT TR. FROM', '', '', '', '90'],
   ], existing, { reviewTrades: true });
   expect(Object.keys(result.conflicts)).toEqual(['0', '1']);
-  expect(result.records).toHaveLength(3);
+  expect(result.records).toHaveLength(4);
   expect(result.records[2]).toMatchObject({ ticker: 'QGMD' });
+  expect(result.records[3]).toMatchObject({ kind: 'transfer', gross: 90, fee: 0 });
+});
+
+it('reserves exact cash matches before pairing same-day differences and exposes workbook values', () => {
+  const result = parseTheGroupStatement([header,
+    ['18/11/2026', 'Trading Reward', '', '', '', '1'],
+    ['18/11/2026', 'Trading Reward', '', '', '', '1.2'],
+    ['18/11/2026', 'Acc. Transfer', '', '', '', '-110'],
+    ['', 'Acc. Transfer', '', '', '', '-100'],
+    ['', 'Electronic Transfer', '', '', '', '-10'],
+  ], [
+    { kind: 'adjustment', id: 'exact', date: '2026-11-18', amount: 1.2, note: 'Trading reward' },
+    { kind: 'adjustment', id: 'manual', date: '2026-11-18', amount: 0.3, note: 'Trading reward' },
+    { kind: 'transfer', id: 'cash', date: '2026-11-18', type: 'WITHDRAWAL', gross: 100.2, fee: 9.9 },
+  ], { reviewTrades: true });
+  expect(result.conflicts).toEqual({});
+  expect(result.records).toMatchObject([
+    { id: 'manual', amount: 0.3 },
+    { id: 'exact', amount: 1.2 },
+    { id: 'cash', gross: 100.2, fee: 9.9 },
+  ]);
+  expect(result.incomingValues).toMatchObject({
+    0: { amount: 1 },
+    2: { type: 'WITHDRAWAL', gross: 100, fee: 10 },
+  });
 });

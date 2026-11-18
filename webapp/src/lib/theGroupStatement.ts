@@ -37,7 +37,7 @@ function stockResolver(catalog: Record<string, string>) {
 }
 
 type StatementTrade = Extract<StatementRecord, { kind: 'trade' }>;
-interface TradeConflict { existing: StatementTrade[]; message: string; }
+interface StatementConflict { existing: StatementRecord[]; message: string; }
 interface StatementOptions { tickerNames?: Record<string, string>; reviewTrades?: boolean; }
 export function readStatementXlsx(bytes: Uint8Array): string[][] {
   const workbook = readTabularXlsx(bytes);
@@ -49,9 +49,8 @@ export function parseTheGroupStatement(table: string[][], existing: StatementRec
   const header = table.findIndex(row => row[0]?.trim().toLowerCase() === 'date' && row[1]?.trim().toLowerCase() === 'type' && row[2]?.trim().toLowerCase() === 'count');
   if (header < 0) throw new Error('Expected The Group Cash statement columns: Date, Type, Count, Unit, Price, Amount.');
   const records: StatementRecord[] = [];
-  const usedTransfers = new Set<StatementRecord>();
-  const missingRewards: string[] = [];
-  const numeric = (value: string | undefined) => Number((value ?? "").replace(/,/g, ""));
+
+  const numeric = (value: string | undefined) => value?.trim() ? Number(value.replace(/,/g, '')) : NaN;
   for (const [index, row] of table.slice(header + 1).entries()) {
     if (!row[0]?.trim() || row[0] === 'ⓘ') continue;
     const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(row[0].trim());
@@ -60,15 +59,10 @@ export function parseTheGroupStatement(table: string[][], existing: StatementRec
     const parsedDate = new Date(date);
     if (!Number.isFinite(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) throw new Error(`Statement row ${header + index + 2}: invalid date.`);
     const type = row[1]?.trim().toLowerCase();
-    if (options.reviewTrades && type !== 'buy' && type !== 'sell') continue;
     if (type === 'trading reward') {
-      const known = existing.filter((r): r is Adjustment & { kind: 'adjustment' } => r.kind === 'adjustment' && r.date === date && /trading reward/i.test(r.note ?? ''));
-      if (known.length) records.push(...known);
-      else {
-        const amount = numeric(row[5]);
-        if (!Number.isFinite(amount) || amount < 0) throw new Error(`Invalid reward on ${date}.`);
-        missingRewards.push(`${date}: ${amount} QAR (rounded)`);
-      }
+      const amount = numeric(row[5]);
+      if (!row[5]?.trim() || !Number.isFinite(amount) || amount < 0) throw new Error(`Invalid reward on ${date}.`);
+      records.push({ kind: 'adjustment', date, amount, note: 'Trading reward', timezone: 'Asia/Qatar' });
       continue;
     }
     if (type === 'buy' || type === 'sell') {
@@ -78,20 +72,22 @@ export function parseTheGroupStatement(table: string[][], existing: StatementRec
       const shares = numeric(row[2]), price = numeric(row[4]);
       if (!Number.isFinite(shares) || !Number.isFinite(price) || !(shares > 0) || !(price > 0)) throw new Error(`Invalid shares/price on statement row ${header + index + 2}.`);
       records.push({ kind: 'trade', date, ticker, action: type === 'buy' ? 'BUY' : 'SELL', shares, price, timezone: 'Asia/Qatar' });
-    } else if (type === 'swift tr. from' || type === 'electronic transfer') {
-      const details = table.slice(header + index + 2, header + index + 4);
-      const grossRow = details.find(detail => !detail[0] && detail[1]?.trim().toLowerCase() === 'swift tr. from');
-      const feeRow = details.find(detail => !detail[0] && detail[1]?.trim().toLowerCase() === 'electronic transfer');
-      const known = existing.filter((r): r is Transfer & { kind: 'transfer' } => r.kind === 'transfer' && r.date === date && r.type === 'DEPOSIT' && !usedTransfers.has(r));
-      if (grossRow && feeRow) {
-        const gross = numeric(grossRow[5]), fee = Math.abs(numeric(feeRow[5]));
-        if (!Number.isFinite(gross) || !(gross > 0) || !Number.isFinite(fee) || fee > gross) throw new Error(`Invalid transfer breakdown on ${date}.`);
-        const match = known.find(r => r.gross === gross || Number.isInteger(gross) && Math.round(r.gross) === gross);
-        if (known.length && !match) throw new Error(`The rounded statement deposit on ${date} differs from the existing gross. Review exact amounts using Modify.`);
-        if (match) usedTransfers.add(match);
-        records.push({ ...match, id: match?.id ?? crypto.randomUUID(), kind: 'transfer', date, type: 'DEPOSIT', gross: match?.gross ?? gross, fee: match?.fee ?? fee, description: match?.description || row[1], timezone: match?.timezone || 'Asia/Qatar' });
-      } else if (known.length === 1) { records.push(known[0]); usedTransfers.add(known[0]); }
-      else throw new Error(`Deposit on ${date} needs its gross/fee breakdown. Import exact transfer CSV records first.`);
+    } else if (type === 'swift tr. from' || type === 'electronic transfer' || type === 'acc. transfer') {
+      const details = [];
+      for (const detail of table.slice(header + index + 2, header + index + 4)) {
+        if (detail[0]?.trim()) break;
+        details.push(detail);
+      }
+      const grossRow = details.find(detail => detail[1]?.trim().toLowerCase() === type);
+      const feeRow = details.find(detail => detail !== grossRow && detail[1]?.trim().toLowerCase() === 'electronic transfer');
+      const net = numeric(row[5]);
+      const gross = Math.abs(grossRow ? numeric(grossRow[5]) : net);
+      const fee = feeRow ? Math.abs(numeric(feeRow[5])) : grossRow ? Math.abs(net - numeric(grossRow[5])) : 0;
+      const direction = (grossRow ? numeric(grossRow[5]) : net) < 0 ? 'WITHDRAWAL' : 'DEPOSIT';
+      if (!row[5]?.trim() || !Number.isFinite(net) || !Number.isFinite(gross) || gross <= 0 || !Number.isFinite(fee) || fee > gross) {
+        throw new Error(`Invalid transfer amounts on ${date}.`);
+      }
+      records.push({ id: crypto.randomUUID(), kind: 'transfer', date, type: direction, gross, fee, description: row[1], timezone: 'Asia/Qatar' });
     } else throw new Error(`Unsupported statement event: ${row[1]}. No records were imported.`);
   }
   if (!records.length) throw new Error('The statement contains no supported records.');
@@ -106,7 +102,7 @@ export function parseTheGroupStatement(table: string[][], existing: StatementRec
   const replacements = new Map<StatementRecord, StatementRecord[]>();
   const used = new Set<StatementRecord>();
   const priceCorrections: string[] = [];
-  const conflicts = new Map<StatementRecord, TradeConflict>();
+  const conflicts = new Map<StatementRecord, StatementConflict>();
   const markConflict = (group: StatementTrade[], matches: StatementTrade[], message: string) => {
     if (!options.reviewTrades) throw new Error(message);
     for (const row of group) conflicts.set(row, { existing: matches, message });
@@ -175,9 +171,49 @@ export function parseTheGroupStatement(table: string[][], existing: StatementRec
     }
     matches.forEach(row => used.add(row));
   }
+  const statementValues = new Map<StatementRecord, StatementRecord>();
+  const cashKey = (row: StatementRecord) => JSON.stringify([row.kind, row.date, row.kind === 'transfer' ? row.type : '']);
+  const cashAmount = (row: StatementRecord) => row.kind === 'transfer' ? row.gross : row.kind === 'adjustment' ? row.amount : NaN;
+  const cashRows = records.filter(row => row.kind !== 'trade');
+  const cashExisting = existing.filter(row => row.kind === 'transfer' ||
+    (row.kind === 'adjustment' && /trading reward/i.test(row.note ?? '')));
+  const matchCash = (row: StatementRecord, match: StatementRecord) => {
+    used.add(match);
+    const replacement = { ...match };
+    replacements.set(row, [replacement]);
+    statementValues.set(replacement, row);
+  };
+  // Reserve exact matches before considering rounded values or same-day differences.
+  for (const rounded of [false, true]) {
+    for (const row of cashRows) {
+      if (replacements.has(row)) continue;
+      const amount = cashAmount(row);
+      const match = cashExisting.find(candidate => {
+        if (used.has(candidate) || cashKey(candidate) !== cashKey(row)) return false;
+        const stored = cashAmount(candidate);
+        return rounded ? Number.isInteger(amount) && Math.round(stored) === amount : stored === amount;
+      });
+      if (match) matchCash(row, match);
+    }
+  }
+  for (const row of cashRows) {
+    if (replacements.has(row)) continue;
+    const candidates = cashExisting.filter(candidate => !used.has(candidate) && cashKey(candidate) === cashKey(row));
+    if (!candidates.length) continue;
+    const unmatched = cashRows.filter(other => !replacements.has(other) && cashKey(other) === cashKey(row));
+    if (candidates.length === 1 && unmatched.length === 1) matchCash(row, candidates[0]);
+    else {
+      const message = `Multiple cash events on ${row.date} need manual reconciliation before importing this row.`;
+      if (!options.reviewTrades) throw new Error(message);
+      conflicts.set(row, { existing: candidates, message });
+    }
+  }
   const counters = new Map<string, number>();
-  const pendingConflicts: Record<number, TradeConflict> = {};
+  const pendingConflicts: Record<number, StatementConflict> = {};
+  const incomingValues: Record<number, StatementRecord> = {};
   const reconciled = records.flatMap(row => replacements.get(row) ?? [row]).map((row, index) => {
+    const original = statementValues.get(row);
+    if (original) incomingValues[index] = original;
     const conflict = conflicts.get(row);
     if (conflict) pendingConflicts[index] = conflict;
     if (row.kind === 'trade') row = { ...row, ticker: tickerOf(row) };
@@ -185,6 +221,6 @@ export function parseTheGroupStatement(table: string[][], existing: StatementRec
     counters.set(row.date, accountingOrder);
     return { ...row, accountingOrder };
   });
-  return { records: reconciled, conflicts: pendingConflicts, warning: `Statement order is retained. ${priceCorrections.length} uniquely matched trade prices corrected.${priceCorrections.length ? " " + priceCorrections.join("; ") + "." : ""} Cash amounts and commissions in this export are rounded to whole riyals: trade values use quantity × price and configured fees (existing fee overrides are retained). ${missingRewards.length} missing rounded reward rows excluded; existing exact rewards are retained.${missingRewards.length ? " Review missing rewards using exact records: " + missingRewards.join("; ") + "." : ""} Verify cash against an exact broker record; a zero rounded reward cannot recover its fractional value.` };
+  return { records: reconciled, incomingValues, conflicts: pendingConflicts, warning: `Statement order is retained. ${priceCorrections.length} uniquely matched trade prices corrected. Cash amounts and commissions may be rounded. Existing cash values are retained when matched, and unmatched cash events use statement values.` };
 }
 export const parseTheGroupCsv = (text: string, existing?: StatementRecord[]) => parseTheGroupStatement(parseCSV(text), existing);

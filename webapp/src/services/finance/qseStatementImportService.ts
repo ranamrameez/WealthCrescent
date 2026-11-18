@@ -1,8 +1,9 @@
 import { getCurrentUser } from '../../lib/firebase/useAuthState';
 import { getAccountingEventRefs, syncAccountingEventCollections } from '../../lib/seq';
-import { parseTheGroupStatement } from '../../lib/theGroupStatement';
+import { parseTheGroupStatement, type StatementRecord } from '../../lib/theGroupStatement';
 import { useWorkbookStore } from '../../store/workbookStore';
-import type { Transaction, Workbook } from '../../types/workbook';
+import { useInterEntityTransfersStore } from '../../store/interEntityTransfersStore';
+import type { Workbook } from '../../types/workbook';
 
 export async function prepareQseStatementTradeReview(
   table: string[][],
@@ -11,7 +12,7 @@ export async function prepareQseStatementTradeReview(
   requested: { owner?: string; brokerId: string },
   ensureSignedIn: (message: string) => Promise<boolean>,
 ) {
-  if (!(await ensureSignedIn('Sign in to review trades for import.'))) return null;
+  if (!(await ensureSignedIn('Sign in to review the statement for import.'))) return null;
   const owner = getCurrentUser()?.uid;
   const workbook = useWorkbookStore.getState().workbook;
   if (!owner || (requested.owner && owner !== requested.owner) || workbook.activeBrokerId !== requested.brokerId) {
@@ -26,20 +27,51 @@ function ledgerSnapshot(workbook: Workbook) {
 }
 
 export function previewQseStatementTrades(table: string[][], fileName: string, tickerNames: Record<string, string>, workbook: Workbook, owner?: string) {
-  const existingById = new Map(workbook.transactions.map(row => [row.id, row]));
-  const result = parseTheGroupStatement(table, workbook.transactions.map(row => ({ ...row, kind: 'trade' })), { tickerNames, reviewTrades: true });
-  const rows = result.records.flatMap((row, index) => {
-    if (row.kind !== 'trade') return [];
-    const { kind: _kind, ...incoming } = row;
+  const existing: StatementRecord[] = [
+    ...workbook.transactions.map(row => ({ ...row, kind: 'trade' as const })),
+    ...workbook.transfers.map(row => ({ ...row, kind: 'transfer' as const })),
+    ...workbook.adjustments.map(row => ({ ...row, kind: 'adjustment' as const })),
+  ];
+  const existingById = new Map(existing.filter(row => row.id).map(row => [recordKey(row), row]));
+  const result = parseTheGroupStatement(table, existing, { tickerNames, reviewTrades: true });
+  const rows = result.records.map((row, index) => {
+    const incoming = result.incomingValues[index] ?? row;
+    const match = row.id ? existingById.get(recordKey(row)) : undefined;
     const conflict = result.conflicts[index];
-    const match = incoming.id ? existingById.get(incoming.id) : undefined;
-    return [{ index, incoming, match, conflict }];
+    const mismatched = !!match && Boolean(statementChanges(match, incoming));
+    const blocked = match?.kind === 'transfer' && incoming.kind === 'transfer' &&
+      match.gross !== incoming.gross && isLinkedTransfer(match.id);
+    return { index, incoming, match, conflict, mismatched, blocked };
   });
   return {
     rows, fileName, owner, snapshot: ledgerSnapshot(workbook), brokerId: workbook.activeBrokerId,
     brokerName: workbook.brokerProfiles.find(broker => broker.id === workbook.activeBrokerId)?.name ?? 'Active QSE broker',
     currency: workbook.settings.currency,
   };
+}
+
+function recordKey(row: { kind: string; id?: string }) {
+  return `${row.kind}:${row.id}`;
+}
+
+function isLinkedTransfer(id: string) {
+  return useInterEntityTransfersStore.getState().workbook.entries.some(link =>
+    (link.from.module === 'qse' && link.fromRecordId === id) ||
+    (link.to.module === 'qse' && link.toRecordId === id));
+}
+
+function statementChanges(match: StatementRecord, incoming: StatementRecord): StatementRecord | undefined {
+  if (match.kind === 'trade' && incoming.kind === 'trade' &&
+    (match.ticker !== incoming.ticker || match.price !== incoming.price || match.shares !== incoming.shares)) {
+    return { ...match, ticker: incoming.ticker, price: incoming.price, shares: incoming.shares };
+  }
+  if (match.kind === 'transfer' && incoming.kind === 'transfer' && (match.gross !== incoming.gross || match.fee !== incoming.fee)) {
+    return { ...match, gross: incoming.gross, fee: incoming.fee };
+  }
+  if (match.kind === 'adjustment' && incoming.kind === 'adjustment' && match.amount !== incoming.amount) {
+    return { ...match, amount: incoming.amount };
+  }
+  return undefined;
 }
 
 export type QseStatementTradePreview = ReturnType<typeof previewQseStatementTrades>;
@@ -54,17 +86,23 @@ export function applyQseStatementTrades(preview: QseStatementTradePreview, selec
     throw new Error('The broker or its ledger changed. Open the statement again.');
   }
   const chosen = preview.rows.filter(row => selected.has(row.index));
-  if (!chosen.length || chosen.length !== selected.size || chosen.some(row => row.conflict)) {
-    throw new Error('Select at least one available statement trade.');
+  if (!chosen.length || chosen.length !== selected.size || chosen.some(row => row.conflict || row.blocked)) {
+    throw new Error('Select at least one available statement record.');
   }
-  const updates = new Map<string, Transaction>();
-  const additions = new Map<number, Transaction & { id: string }>();
+  const updates = new Map<string, StatementRecord>();
+  const additions = new Map<number, StatementRecord>();
   for (const { index, incoming, match } of chosen) {
     if (!match?.id) {
-      additions.set(index, { ...incoming, id: crypto.randomUUID(), brokerId: workbook.activeBrokerId, timestamp: new Date().toISOString() });
-    } else if (match.ticker !== incoming.ticker || match.price !== incoming.price || match.shares !== incoming.shares) {
-      updates.set(match.id, { ...match, ticker: incoming.ticker, price: incoming.price, shares: incoming.shares });
+      const record = { ...incoming, id: crypto.randomUUID(), brokerId: workbook.activeBrokerId };
+      additions.set(index, record.kind === 'trade' ? { ...record, timestamp: new Date().toISOString() } : record);
+      continue;
     }
+    const changed = statementChanges(match, incoming);
+    if (!changed) continue;
+    if (changed.kind === 'transfer' && match.kind === 'transfer' && changed.gross !== match.gross && isLinkedTransfer(match.id)) {
+      throw new Error('Use Modify to change the gross amount of a linked transfer.');
+    }
+    updates.set(recordKey(changed), changed);
   }
 
   if (!updates.size && !additions.size) return { added: 0, updated: 0 };
@@ -75,39 +113,59 @@ export function applyQseStatementTrades(preview: QseStatementTradePreview, selec
   const order = new Map<string, number>();
   for (const date of new Set([...additions.values()].map(row => row.date))) {
     const day = refs.filter(row => row.date === date);
-    const positions = new Map(day.flatMap((row, at) => row.kind === 'trade' ? [[row.id, at] as const] : []));
+    const positions = new Map(day.map((row, at) => [recordKey(row), at]));
     const insertions = new Map<number, string[]>();
     const incomingDay = preview.rows.filter(row => row.incoming.date === date && !row.conflict);
-    const anchorPositions = incomingDay.flatMap(row => row.match?.id && positions.has(row.match.id) ? [positions.get(row.match.id)!] : []);
-    if (anchorPositions.some((position, index) => index > 0 && position < anchorPositions[index - 1])) {
-      throw new Error(`Existing trades on ${date} are ordered differently from the statement. Review their order using Modify before adding new same-day trades.`);
+    const anchors = (tradeOnly: boolean) => incomingDay.flatMap(({ match }) => {
+      if (!match?.id || (tradeOnly && match.kind !== 'trade')) return [];
+      const position = positions.get(recordKey(match));
+      return position === undefined ? [] : [position];
+    });
+    const ordered = (items: number[]) => items.every((position, index) => index === 0 || position >= items[index - 1]);
+    const tradeOnly = !ordered(anchors(false));
+    if (tradeOnly && !ordered(anchors(true))) {
+      throw new Error(`Existing trades on ${date} are ordered differently from the statement. Review their order using Modify before adding new same-day records.`);
     }
     let nextAnchor = day.length;
     for (const row of [...incomingDay].reverse()) {
-      if (row.match?.id && positions.has(row.match.id)) nextAnchor = positions.get(row.match.id)!;
+      if (row.match?.id && (!tradeOnly || row.match.kind === 'trade')) {
+        nextAnchor = positions.get(recordKey(row.match)) ?? nextAnchor;
+      }
       const addition = additions.get(row.index);
       if (!addition) continue;
       const chunk = insertions.get(nextAnchor) ?? [];
-      chunk.push(addition.id);
+      chunk.push(recordKey(addition));
       insertions.set(nextAnchor, chunk);
     }
     const keys = day.flatMap((row, at) => [
-      ...(insertions.get(at) ?? []).reverse().map(id => `trade:${id}`),
+      ...(insertions.get(at) ?? []).reverse(),
       `${row.kind}:${row.id}`,
     ]);
-    keys.push(...(insertions.get(day.length) ?? []).reverse().map(id => `trade:${id}`));
+    keys.push(...(insertions.get(day.length) ?? []).reverse());
     keys.forEach((key, index) => order.set(key, index + 1));
   }
 
-  const withOrder = <T extends { id?: string; accountingOrder?: number }>(row: T, kind: 'trade' | 'transfer' | 'adjustment' | 'dividend') => {
-    const accountingOrder = order.get(`${kind}:${row.id}`);
-    return accountingOrder === undefined ? row : { ...row, accountingOrder };
+  const withOrder = <T extends { id?: string; accountingOrder?: number }>(record: T, kind: string) => {
+    const accountingOrder = order.get(recordKey({ kind, id: record.id }));
+    return accountingOrder === undefined ? record : { ...record, accountingOrder };
+  };
+  const reconcile = <K extends StatementRecord['kind']>(
+    rows: Omit<Extract<StatementRecord, { kind: K }>, 'kind'>[],
+    kind: K,
+  ) => {
+    const isKind = (row: StatementRecord | undefined): row is Extract<StatementRecord, { kind: K }> => row?.kind === kind;
+    const stripKind = ({ kind: _kind, ...record }: Extract<StatementRecord, { kind: K }>) => record;
+    const existing = rows.map(row => {
+      const update = updates.get(recordKey({ kind, id: row.id }));
+      return isKind(update) ? stripKind(update) : row;
+    });
+    return [...existing, ...[...additions.values()].filter(isKind).map(stripKind)].map(row => withOrder(row, kind));
   };
   store.setWorkbook({
     ...workbook,
-    transactions: [...workbook.transactions.map(row => updates.get(row.id ?? '') ?? row), ...additions.values()].map(row => withOrder(row, 'trade')),
-    transfers: workbook.transfers.map(row => withOrder(row, 'transfer')),
-    adjustments: workbook.adjustments.map(row => withOrder(row, 'adjustment')),
+    transactions: reconcile(workbook.transactions, 'trade'),
+    transfers: reconcile(workbook.transfers, 'transfer'),
+    adjustments: reconcile(workbook.adjustments, 'adjustment'),
     dividends: workbook.dividends.map(row => withOrder(row, 'dividend')),
   });
   return { added: additions.size, updated: updates.size };
