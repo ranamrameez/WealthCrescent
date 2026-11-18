@@ -182,3 +182,23 @@ it('refuses to void a pending record that now belongs to a linked transfer', asy
   await expect(voidPendingPayment('owner', cash, date, now)).rejects.toThrow('linked transfer');
   expect(linked()).toEqual(cloud);
 });
+
+it.each(['from', 'to'] as const)('aborts settlement if a transfer links its %s side during a transaction retry', async side => {
+  const read = transactionFor(fixture());
+  const { id } = await createPendingPayment('owner', cash, date, now);
+  const original = read();
+  const link = {
+    from: { module: side === 'from' ? 'cash' : 'bank' },
+    fromRecordId: side === 'from' ? id : 'peer',
+    to: { module: side === 'to' ? 'cash' : 'bank' },
+    toRecordId: side === 'to' ? id : 'peer',
+  };
+  const changed = { ...original as object, interEntityTransfers: { entries: [link] } };
+  mocks.transaction.mockImplementation(async (_path, update) => {
+    expect(update(original)).toHaveProperty('cash');
+    expect(update(changed)).toBeUndefined();
+    return { committed: false, snapshot: { val: () => changed } };
+  });
+  await expect(settlePendingPayment('owner', cash, date, date, now)).rejects.toThrow('linked transfer');
+  expect(read()).toEqual(original);
+});

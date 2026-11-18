@@ -144,6 +144,13 @@ function reviewedExecution(account: AccountWorkbooks, reviewed: PendingPaymentPl
   return { history, execution };
 }
 
+function requireUnlinkedPayment(account: AccountWorkbooks, module: PendingPaymentPlan['module'], id: string) {
+  const linked = rows(account.interEntityTransfers?.entries).some(link =>
+    (link.from.module === module && link.fromRecordId === id) ||
+    (link.to.module === module && link.toRecordId === id));
+  if (linked) throw new Error('Review the linked transfer before changing this pending record.');
+}
+
 function settleRows<T extends CashEntry | BankTransaction, P extends PlannedCashEntry | PlannedBankTransaction>(
   ledger: T[], plans: P[], expected: P, history: PendingExecution, settlementDate: string, sameSource: (record: T) => boolean,
 ) {
@@ -191,6 +198,7 @@ export async function settlePendingPayment(
   const payload = await changeAccount(expectedUid, value => {
     const { history, execution } = reviewedExecution(value, reviewed, id, occurrenceDate);
     if (execution.voidedAt) throw new Error('This occurrence was voided.');
+    requireUnlinkedPayment(value, reviewed.module, id);
     const next = {
       ...value,
       [PAYMENT_EXECUTIONS_PATH]: history.map(entry => entry.id === id ? { ...entry, settledOn: settlementDate } : entry),
@@ -236,10 +244,7 @@ export async function voidPendingPayment(
   const payload = await changeAccount(expectedUid, value => {
     const { history, execution } = reviewedExecution(value, reviewed, id, occurrenceDate);
     if (execution.settledOn) throw new Error('This occurrence has already settled.');
-    const linked = rows(value.interEntityTransfers?.entries).some(link =>
-      (link.from.module === reviewed.module && link.fromRecordId === id) ||
-      (link.to.module === reviewed.module && link.toRecordId === id));
-    if (linked) throw new Error('Review the linked transfer before voiding this pending record.');
+    requireUnlinkedPayment(value, reviewed.module, id);
 
     function removePending<T extends CashEntry | BankTransaction>(ledger: T[], sameSource: (record: T) => boolean) {
       if (execution.voidedAt && !ledger.some(record => record.id === id)) return null;

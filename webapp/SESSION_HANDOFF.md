@@ -1,3 +1,7 @@
+## Pending payment continuation
+
+The full app reset clears payment execution history with the native workbooks in one acknowledged update. Settlement and void both recheck linked transfers inside their transaction callback. Focused fixtures verify new links arriving during a retry abort settlement. Complete pending-payment backup, emulator/rules verification and UI integration before activation. Read CURRENT_DELIVERY_STATUS and the shared task register for current ownership.
+
 ## PR #51 integration and budgeting
 
 Integrated the QSE dashboard import released on main. Added reviewed CSV creation of currency budget definitions, batch editing for monthly limits, and a previous-calendar-month comparison in Money in/out. Work on linked funding reversals, routine sync and pending-only payments remains open.
