@@ -20,6 +20,23 @@ const modules = ['cash','bank','rentals','creditCards','personalLoans','emi','fu
 const collect = (input: MovementInputs, scope = modules) => engine.movements.collectMovementActivities(input,scope,{ fromDate: '2026-01-01', toDate: '2026-02-28', asOf: new Date('2026-01-31T00:00:00Z') });
 const report = (input: MovementInputs, kind: MovementKind | 'all' = 'all') => engine.dashboard.moneyMovementReport(collect(input),'2026-01-01','2026-02-28','2026-01-31','kind','actual',{},kind);
 
+it('includes only active, uncovered renewal estimates in the planned movement population', () => {
+  const f = fixture();
+  const membership = { id: 'streaming', name: 'Streaming', amount: 15, currencyCode: 'USD', billingCycle: 'monthly' as const, startDate: '2025-12-31', active: true };
+  f.subscriptions = [membership, { ...membership, id: 'cancelled', active: false }];
+  f.base.plannedCash.push({ id: 'funded', date: '2026-01-31', amount: 14.5, currencyCode: 'USD', type: 'OUT', sourceSubscriptionId: membership.id });
+  f.base.bankAccounts.push({ id: 'archived', name: 'Old account', currencyCode: 'USD', openingBalance: 0, isActive: false });
+  f.base.plannedBank.push({ id: 'stale-funding', date: '2026-02-28', amount: -15, accountId: 'archived', description: 'Old renewal plan', sourceSubscriptionId: membership.id });
+  const rows = collect(f, ['cash', 'bank', 'subscriptions']);
+  expect(rows.map(row => [row.id, row.amount, row.recordType])).toEqual([
+    ['funded', -14.5, 'plan'],
+    ['streaming@2026-02-28', -15, 'subscription-estimate'],
+  ]);
+  expect(engine.movements.selectMovementActivities(rows, '2026-01-01', '2026-02-28', '2026-02-28', 'actual')).toEqual([]);
+  expect(engine.movements.selectMovementActivities(rows, '2026-01-01', '2026-02-28', '2026-02-28', 'pending')).toEqual([]);
+  expect(collect(f, ['cash']).map(row => row.id)).toEqual(['funded']);
+});
+
 it('separates purchases, fees and interest from card repayment transfers and borrowing', () => {
   const f = fixture(); f.native.cards.cards.push({ id: 'c', name: 'Card', currencyCode: 'USD' });
   f.native.cards.transactions.push(...(['charge','payment','cashAdvance','fee','markup'] as const).map((kind,i) => ({ id: kind, cardId: 'c', date: '2026-01-02', kind, amount: [50,50,100,2,3][i], description: kind })));

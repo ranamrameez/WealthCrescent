@@ -17,6 +17,7 @@ import { useCategoryStore } from '../../store/categoryStore';
 import { useCategoryGroupStore } from '../../store/categoryGroupStore';
 import { useInterEntityTransfersStore } from '../../store/interEntityTransfersStore';
 import { usePlannedCreditCardWorkbookStore } from '../../store/plannedCreditCardWorkbookStore';
+import { useSubscriptionsWorkbookStore } from '../../store/subscriptionsWorkbookStore';
 import { getNetWorthInputs } from './netWorthService';
 
 /** Query functions for a dashboard reporting snapshot. No persistence or UI dependencies. */
@@ -58,6 +59,7 @@ const activities = new Map<string, ReturnType<typeof CalculationEngine.dashboard
 const movements = new Map<string, ReturnType<typeof CalculationEngine.movements.collectMovementActivities>>();
 function invalidateDashboard() { context = undefined; activities.clear(); movements.clear(); listeners.forEach(listener => listener()); }
 for (const source of [useCashWorkbookStore, useBankWorkbookStore, useCreditCardWorkbookStore, usePersonalLoansWorkbookStore, useEMIWorkbookStore, useFundsWorkbookStore, useWorkbookStore, usePSXWorkbookStore, usePlannedCashWorkbookStore, usePlannedBankWorkbookStore, usePlannedRentalsWorkbookStore, useRentalsWorkbookStore, useCategoryStore, useCategoryGroupStore, useInterEntityTransfersStore, usePlannedCreditCardWorkbookStore]) source.subscribe(invalidateDashboard);
+useSubscriptionsWorkbookStore.subscribe(invalidateDashboard);
 let calendarTimer: ReturnType<typeof setInterval> | undefined;
 export function subscribeDashboard(listener: () => void) {
   listeners.add(listener);
@@ -208,7 +210,8 @@ export function getNativeMovementActivities(modules: readonly string[], window?:
     base: { cashEntries: sourcePolicy === 'dashboard' && cash.settings.includeInNetWorth === false ? [] : cash.entries, plannedCash: sourcePolicy === 'dashboard' && cash.settings.includeInNetWorth === false ? [] : usePlannedCashWorkbookStore.getState().workbook.entries,
       bankAccounts: bank.settings.accounts.filter(account => !account.migratedToCreditCardId && (sourcePolicy === 'all-ledgers' || account.includeInNetWorth !== false)), bankTransactions: bank.transactions, plannedBank: usePlannedBankWorkbookStore.getState().workbook.entries,
       rentalProperties: rentals.settings.properties, rentalEntries: rentals.entries, plannedRentals: usePlannedRentalsWorkbookStore.getState().workbook.entries, categories },
-    plannedCards: usePlannedCreditCardWorkbookStore.getState().workbook.entries, categories, links, qseSettings: qse.settings, psxSettings: psx.settings,
+    plannedCards: usePlannedCreditCardWorkbookStore.getState().workbook.entries,
+    subscriptions: useSubscriptionsWorkbookStore.getState().workbook.entries, categories, links, qseSettings: qse.settings, psxSettings: psx.settings,
   },modules,{ ...window, asOf: new Date(today + 'T00:00:00Z'), horizonDays: 365 },sourcePolicy);
   if (movements.size >= 32) movements.clear(); movements.set(key,result); return result;
 }

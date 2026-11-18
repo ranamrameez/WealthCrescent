@@ -41,7 +41,7 @@ Use the [delivery task register](MULTI_AGENT_WORKFLOW.md) to coordinate ownershi
 ### 1. Complete reporting and calculation contracts
 - Publish/verify the current unified dashboard actual-population slice; check the new exact head in CI.
 - Carry explicit EMI/subscription provenance into future actual completion records so classification can use source identity. Preserve unknown historical records.
-- Upcoming now labels standalone renewal and legacy EMI estimates. Active same-day funding plans offset the matching reviewed installment by obligation ID and currency. Partial funding leaves a visible remainder and conflicting plans leave the contract obligation visible. Canonical movement-report schedule adapters remain open.
+- Upcoming labels standalone renewal and legacy EMI estimates. Money in/out includes uncovered subscription renewals as planned estimates using the same funding checks. Active same-day funding plans offset the matching reviewed installment by obligation ID and currency. Partial funding leaves a visible remainder and conflicting plans leave the contract obligation visible. The canonical movement-report adapters for other standalone schedules remain open.
 - Dated QSE and PSX trade estimates are shown by broker and strategy in Money in/out. Strategy dates remain as entered and fee overrides carry into executed trades. Saved scenarios remain separate from cleared and pending transactions.
 - The cleared movement report compares the selected period with an immediately preceding equal-length period and provides both sets of records. A previous-calendar-month preset compares completed months in full and aligns month-to-date cutoffs where possible.
 - Finish all allocation drilldowns and source inclusion/empty/negative/FX/opening acceptance cases.
@@ -60,6 +60,7 @@ Implemented core/service/Planning UI now includes optional definitions/allocatio
 
 ### 4. Safe payment persistence and pending-only automation
 - Explicit uploads and routine per-workbook sync use RTDB transactions. Competing changes stop sync and preserve the local workbook for export. Atomic multi-workbook payment persistence and conflict recovery remain open.
+- Generic transfer edits and deletes protect independent installment receipts and their Cash, Bank or card funding records. Coordinated reversals remain open.
 - Add deterministic occurrence identity, atomic native pending record + linkage + execution history, replay/retry/concurrent-edit protection and user isolation.
 - Add opt-in eligible outflow policies and backend scheduled execution. Skip fulfilled/cancelled/archived/deleted/inactive/excluded sources and income. Never move real money.
 - Add explicit settlement, partial settlement, void and reconciliation. Pending never silently becomes cleared.

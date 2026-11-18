@@ -56,7 +56,7 @@ import { useEnabledCurrencies } from '../../../hooks/useEnabledCurrencies';
 import type { Category, CategoryGroup } from '../../../types/finance';
 import { gridAutoStyle } from '../../../lib/gridStyle';
 
-const DASHBOARD_MODULES = ['cash', 'bank', 'creditCards', 'personalLoans', 'emi', 'funds', 'qse', 'psx', 'rentals'];
+const DASHBOARD_MODULES = ['cash', 'bank', 'creditCards', 'personalLoans', 'emi', 'funds', 'qse', 'psx', 'rentals', 'subscriptions'];
 
 const today = () => new Date().toISOString().slice(0, 10);
 const monthLabel = (m: string) => new Date(`${m}-01`).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });

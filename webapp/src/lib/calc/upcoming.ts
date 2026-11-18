@@ -53,6 +53,46 @@ function inWindow(date: string, today: string, end: string): boolean {
   return date >= today && date <= end;
 }
 
+/** A funded renewal belongs to its existing plan. Standalone schedules only
+ * estimate future outflows, including when a funding source has gone inactive. */
+export function standaloneSubscriptionRenewals(
+  inputs: Pick<UpcomingInputs, 'subscriptions' | 'plannedCash' | 'plannedBank' | 'plannedCreditCards' | 'bankAccounts' | 'creditCards'>,
+  today: Date,
+  endDate: string,
+) {
+  const todayStr = today.toISOString().slice(0, 10);
+  const plannedSubscriptionKeys = new Set<string>();
+  const currencyByAccount = new Map(inputs.bankAccounts
+    .filter(account => account.isActive !== false && !account.migratedToCreditCardId)
+    .map(account => [account.id, account.currencyCode]));
+  const currencyByCard = new Map((inputs.creditCards ?? [])
+    .filter(card => card.isActive !== false)
+    .map(card => [card.id, card.currencyCode]));
+  type SubscriptionPlan = PlannedCashEntry | PlannedBankTransaction | PlannedCreditCardTransaction;
+  const activeSubscriptions = new Map(inputs.subscriptions.filter(row => row.active).map(row => [row.id, row]));
+  const addRecurringKeys = (plans: SubscriptionPlan[], payingCurrency: (plan: SubscriptionPlan) => string | undefined) => {
+    for (const plan of plans) {
+      const subscription = plan.sourceSubscriptionId ? activeSubscriptions.get(plan.sourceSubscriptionId) : undefined;
+      if (!subscription) continue;
+      const dates = plan.recurrence ? recurrenceOccurrencesWithin(plan.recurrence, todayStr, endDate) : [plan.date];
+      for (const date of dates.filter(date => inWindow(date, todayStr, endDate))) {
+        const completed = plan.recurrence ? occurrenceCompleted(plan, date) : plan.executed;
+        if (completed || (!plan.cancelled && Number.isFinite(plan.amount) && plan.amount !== 0 && payingCurrency(plan) === subscription.currencyCode)) {
+          plannedSubscriptionKeys.add(`${subscription.id}@${date}`);
+        }
+      }
+    }
+  };
+  addRecurringKeys(inputs.plannedCash, plan => 'currencyCode' in plan && plan.type === 'OUT' ? plan.currencyCode : undefined);
+  addRecurringKeys(inputs.plannedBank, plan => 'accountId' in plan && plan.amount < 0 ? currencyByAccount.get(plan.accountId) : undefined);
+  addRecurringKeys(inputs.plannedCreditCards ?? [], plan => 'cardId' in plan && plan.kind === 'charge' ? currencyByCard.get(plan.cardId) : undefined);
+  return [...activeSubscriptions.values()].flatMap(subscription =>
+    generateRenewalOccurrences(subscription, today)
+      .filter(({ date }) => inWindow(date, todayStr, endDate) && !plannedSubscriptionKeys.has(`${subscription.id}@${date}`))
+      .map(occurrence => ({ ...occurrence, subscription })),
+  );
+}
+
 /** Upcoming is deliberately a forward-looking list, not an overdue queue.
  * It contains only active, unresolved occurrences from today through the
  * requested horizon. Historical missed obligations are handled by Alerts.
@@ -62,7 +102,6 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
   const todayStr = today.toISOString().slice(0, 10);
   const windowEndStr = addUtcDays(todayStr, windowDays);
   const items: Array<Omit<UpcomingItem, 'dueLabel'>> = [];
-  const plannedSubscriptionKeys = new Set<string>();
   const currencyByAccount = new Map(inputs.bankAccounts
     .filter(account => account.isActive !== false && !account.migratedToCreditCardId)
     .map(account => [account.id, account.currencyCode]));
@@ -89,25 +128,6 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
     rows.push(item);
     fundedRows.set(key, rows);
   };
-
-  type SubscriptionPlan = PlannedCashEntry | PlannedBankTransaction | PlannedCreditCardTransaction;
-  const activeSubscriptions = new Map(inputs.subscriptions.filter(row => row.active).map(row => [row.id, row]));
-  const addRecurringKeys = (plans: SubscriptionPlan[], payingCurrency: (plan: SubscriptionPlan) => string | undefined) => {
-    for (const plan of plans) {
-      const subscription = plan.sourceSubscriptionId ? activeSubscriptions.get(plan.sourceSubscriptionId) : undefined;
-      if (!subscription) continue;
-      const dates = plan.recurrence ? recurrenceOccurrencesWithin(plan.recurrence, todayStr, windowEndStr) : [plan.date];
-      for (const date of dates.filter(date => inWindow(date, todayStr, windowEndStr))) {
-        const completed = plan.recurrence ? occurrenceCompleted(plan, date) : plan.executed;
-        if (completed || (!plan.cancelled && payingCurrency(plan) === subscription.currencyCode)) {
-          plannedSubscriptionKeys.add(`${subscription.id}@${date}`);
-        }
-      }
-    }
-  };
-  addRecurringKeys(inputs.plannedCash, plan => 'currencyCode' in plan && plan.type === 'OUT' ? plan.currencyCode : undefined);
-  addRecurringKeys(inputs.plannedBank, plan => 'accountId' in plan && plan.amount < 0 ? currencyByAccount.get(plan.accountId) : undefined);
-  addRecurringKeys(inputs.plannedCreditCards ?? [], plan => 'cardId' in plan && plan.kind === 'charge' ? currencyByCard.get(plan.cardId) : undefined);
 
   inputs.plannedCash.forEach(plan => {
     if(plan.cancelled)return;
@@ -212,22 +232,19 @@ export function collectUpcomingItems(inputs: UpcomingInputs, windowDays = 14, to
     items.push({ id: `${property.id}@${proposal.dueDate}`, date: proposal.dueDate, module: 'rentals', label: `${property.name} rent`, amount: proposal.amount, currencyCode: property.currencyCode, kind: 'income', overdue: false });
   });
 
-  inputs.subscriptions.filter(subscription => subscription.active).forEach(subscription => {
-    generateRenewalOccurrences(subscription, today)
-      .filter(occurrence => inWindow(occurrence.date, todayStr, windowEndStr))
-      .filter(occurrence => !plannedSubscriptionKeys.has(`${subscription.id}@${occurrence.date}`))
-      .forEach(occurrence => items.push({
-        id: `${subscription.id}@${occurrence.date}`,
-        date: occurrence.date,
-        module: 'subscriptions',
-        label: subscription.name,
-        amount: occurrence.amount,
-        estimate: true,
-        currencyCode: subscription.currencyCode,
-        kind: 'expense',
-        overdue: false,
-      }));
-  });
+  for (const { subscription, date, amount } of standaloneSubscriptionRenewals(inputs, today, windowEndStr)) {
+    items.push({
+      id: `${subscription.id}@${date}`,
+      date,
+      module: 'subscriptions',
+      label: subscription.name,
+      amount,
+      estimate: true,
+      currencyCode: subscription.currencyCode,
+      kind: 'expense',
+      overdue: false,
+    });
+  }
 
   return items
     .sort((a, b) => a.date.localeCompare(b.date) || a.module.localeCompare(b.module) || a.id.localeCompare(b.id))

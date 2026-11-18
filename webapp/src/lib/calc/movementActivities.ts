@@ -11,11 +11,13 @@ import { categoryName } from '../categories';
 import { planOccurrences } from './planOccurrences';
 import { makeQSEFeeCalculator } from './fees';
 import { makePSXFeeCalculator } from './psxFees';
+import { standaloneSubscriptionRenewals } from './upcoming';
+import type { Subscription } from '../../types/subscriptionsWorkbook';
 
 export type MovementKind = 'operating' | 'financing' | 'investment' | 'transfer' | 'unclassified';
-export type MovementModule = BudgetActivity['module'] | 'creditCards' | 'personalLoans' | 'emi' | 'funds' | 'qse' | 'psx';
+export type MovementModule = BudgetActivity['module'] | 'creditCards' | 'personalLoans' | 'emi' | 'funds' | 'qse' | 'psx' | 'subscriptions';
 export interface MovementActivity extends Omit<BudgetActivity, 'module'> { module: MovementModule; movementKind?: MovementKind; recordType?: string; }
-export const MOVEMENT_MODULE_LABELS: Record<MovementModule, string> = { cash: 'Cash', bank: 'Bank', rentals: 'Rentals', creditCards: 'Credit cards', personalLoans: 'Personal loans', emi: 'EMI / loans', funds: 'Funds', qse: 'QSE', psx: 'PSX' };
+export const MOVEMENT_MODULE_LABELS: Record<MovementModule, string> = { cash: 'Cash', bank: 'Bank', rentals: 'Rentals', creditCards: 'Credit cards', personalLoans: 'Personal loans', emi: 'EMI / loans', funds: 'Funds', qse: 'QSE', psx: 'PSX', subscriptions: 'Subscriptions' };
 export const MOVEMENT_KIND_LABELS: Record<MovementKind, string> = { operating: 'Income / spending', financing: 'Financing', investment: 'Investments', transfer: 'Internal transfers', unclassified: 'Unclassified movement' };
 type ExchangeMovementInput<T> = Omit<RecentActivityInputs['qse'], 'settings' | 'brokerProfiles'> & {
   settings: T; brokerProfiles?: Array<Omit<NonNullable<RecentActivityInputs['qse']['brokerProfiles']>[number], 'settings'> & { settings: T }>;
@@ -24,22 +26,45 @@ export interface MovementInputs {
   native: Omit<RecentActivityInputs, 'qse' | 'psx'> & { qse: ExchangeMovementInput<QSESettings>; psx: ExchangeMovementInput<PSXSettings> };
   base: Parameters<typeof collectBudgetActivities>[0];
   plannedCards: PlannedCreditCardTransaction[];
+  subscriptions?: Subscription[];
   categories: Category[];
   links: InterEntityTransfer[];
   qseSettings: QSESettings;
   psxSettings: PSXSettings;
 }
-const linkModule = (module: MovementModule): LinkModule => module === 'creditCards' ? 'creditCard' : module;
+const linkModule = (module: MovementModule) => module === 'creditCards' ? 'creditCard' : module;
 
 /** Read-only movement adapters. Contract/schedule balances never become cash receipts.
  * Explicit domain links choose one economic record; account-only transfers stay separate.
  * No label/amount matching, currency conversion, inferred principal/interest split or writes. */
 export function collectMovementActivities(input: MovementInputs, modules: readonly string[], window: BudgetOccurrenceWindow = {}, sourcePolicy: 'dashboard' | 'all-ledgers' = 'dashboard'): MovementActivity[] {
   const { native, categories } = input;
-  const rows: MovementActivity[] = collectBudgetActivities({ ...input.base, links: [] }, window)
+  const activeBankAccounts = new Set(input.base.bankAccounts.filter(account => account.isActive !== false && !account.migratedToCreditCardId).map(account => account.id));
+  const plannedBank = input.base.plannedBank.filter(plan => !plan.sourceSubscriptionId || activeBankAccounts.has(plan.accountId));
+  const rows: MovementActivity[] = collectBudgetActivities({ ...input.base, plannedBank, links: [] }, window)
     .map(item => ({ ...item, recordType: item.executed?'entry':'plan', movementKind: item.sourceEmiLoanId?'financing':item.module==='rentals' || item.sourceSubscriptionId?'operating':'unclassified' }));
   const add = (row: MovementActivity) => { if (Number.isFinite(row.amount) && row.date && row.currencyCode) rows.push(row); };
   const cards = new Map(native.cards.cards.map(card => [card.id,card]));
+  if (modules.includes('subscriptions') && input.subscriptions?.length) {
+    const asOf = window.asOf ?? new Date();
+    const horizonEnd = new Date(asOf);
+    horizonEnd.setUTCDate(horizonEnd.getUTCDate() + (window.horizonDays ?? 365));
+    const renewals = standaloneSubscriptionRenewals({
+      subscriptions: input.subscriptions,
+      plannedCash: input.base.plannedCash,
+      plannedBank: input.base.plannedBank,
+      bankAccounts: input.base.bankAccounts,
+      plannedCreditCards: input.plannedCards,
+      creditCards: native.cards.cards.filter(card => sourcePolicy === 'all-ledgers' || card.includeInNetWorth !== false),
+    }, asOf, window.toDate ?? horizonEnd.toISOString().slice(0, 10));
+    for (const { subscription, date, amount } of renewals) {
+      if (amount <= 0 || (window.fromDate && date < window.fromDate)) continue;
+      add({ id: `${subscription.id}@${date}`, recordType: 'subscription-estimate', module: 'subscriptions', sourceId: subscription.id,
+        sourceLabel: subscription.name, date, amount: -amount, currencyCode: subscription.currencyCode, categoryId: subscription.categoryID,
+        category: subscription.categoryID ? categoryName(subscription.categoryID, categories) : subscription.category,
+        description: `${subscription.name} (estimated renewal)`, executed: false, movementKind: 'operating' });
+    }
+  }
   for (const tx of native.cards.transactions) {
     const card = cards.get(tx.cardId); if (!card) continue;
     add({ id: tx.id, recordType: 'card-transaction', module: 'creditCards', sourceId: card.id, sourceLabel: card.name, date: tx.date,
@@ -49,6 +74,7 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
   }
   for (const plan of planOccurrences(input.plannedCards,window.fromDate,window.toDate,window.asOf,window.horizonDays)) {
     const card = cards.get(plan.cardId); if (!card || plan.executed) continue;
+    if (plan.sourceSubscriptionId && card.isActive === false) continue;
     add({ id: plan.id, recordType: 'plan', module: 'creditCards', sourceId: card.id, sourceLabel: card.name, date: plan.date,
       amount: plan.kind === 'payment' || plan.kind === 'cashAdvance' ? plan.amount : -plan.amount,
       currencyCode: card.currencyCode, category: plan.category, description: plan.description, executed: false, planGroupId: plan.groupId,
@@ -121,7 +147,7 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
   const domain = new Set<LinkModule>(['rentals','personalLoans','emi']);
   const suppressed = new Set<string>();
   const internal = new Set<string>();
-  const entityModules=new Set<LinkModule>(['bank','rentals','personalLoans','emi','creditCard','qse','psx']);
+  const entityModules=new Set<string>(['bank','rentals','personalLoans','emi','creditCard','qse','psx']);
   const linkable=(row:MovementActivity)=>row.executed && (['qse','psx','funds'].includes(row.module)?row.recordType==='transfer':row.module==='emi'?row.recordType==='emi-repayment':row.recordType!=='plan');
   const rowKey=(row:MovementActivity)=>linkModule(row.module)+':'+(entityModules.has(linkModule(row.module))?(row.sourceId ?? '')+':':'')+row.id;
   const nativeKeys = new Set(rows.filter(linkable).map(rowKey));
