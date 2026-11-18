@@ -83,3 +83,22 @@ it('saves a month override from the shared batch editor', async () => {
     monthlyLimit: 100, monthlyLimits: { '2026-01': 80 },
   }));
 });
+
+it('edits budget definitions from the card menu while keeping monthly overrides', async () => {
+  usePlannedCashWorkbookStore.getState().setWorkbook({
+    ...originalPlans, entries: [], budgetAllocations: [],
+    budgets: [{ id: 'food-budget', name: 'Food', currencyCode: 'USD', startMonth: '2026-01',
+      monthlyLimit: 100, monthlyLimits: { '2026-01': 80 }, rollover: 'none' }],
+  });
+  show();
+  fireEvent.click(screen.getByRole('button', { name: 'Card options' }));
+  fireEvent.click(screen.getByText('Batch edit budget definitions', { exact: true }));
+  const dialog = within(await screen.findByRole('dialog', { name: 'Batch edit budget definitions' }));
+  fireEvent.change(dialog.getByLabelText('Row 1, Budget name'), { target: { value: 'Household' } });
+  fireEvent.change(dialog.getByLabelText('Row 1, Default monthly limit'), { target: { value: '120' } });
+  fireEvent.change(dialog.getByLabelText('Row 1, Rollover'), { target: { value: 'surplus' } });
+  fireEvent.click(dialog.getByRole('button', { name: 'Save all changes' }));
+  await waitFor(() => expect(usePlannedCashWorkbookStore.getState().workbook.budgets?.[0]).toMatchObject({
+    name: 'Household', monthlyLimit: 120, monthlyLimits: { '2026-01': 80 }, currencyCode: 'USD', rollover: 'surplus',
+  }));
+});

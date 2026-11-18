@@ -1,6 +1,6 @@
 import { parseCSV } from '../../lib/csv';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { getBudgetOverview, exportBudgetCsv, BUDGET_IMPORT_COLUMNS, previewBudgetDefinitionImport, applyBudgetDefinitionImport, applyBudgetMonthLimits, saveBudget, saveBudgetAllocations, setBudgetMonthLimit, removeBudget } from './budgetService';
+import { getBudgetOverview, exportBudgetCsv, BUDGET_IMPORT_COLUMNS, previewBudgetDefinitionImport, applyBudgetDefinitionImport, applyBudgetMonthLimits, applyBudgetDefinitionChanges, saveBudget, saveBudgetAllocations, setBudgetMonthLimit, removeBudget } from './budgetService';
 import { usePlannedCashWorkbookStore } from '../../store/plannedCashWorkbookStore';
 import { useCashWorkbookStore } from '../../store/cashWorkbookStore';
 import { useCategoryStore } from '../../store/categoryStore';
@@ -122,4 +122,25 @@ it('validates all budget month edits before saving and keeps earlier overrides',
   expect(applyBudgetMonthLimits(edits, session.uid)).toBe(2);
   expect(getBudgetOverview().budgets[0]).toMatchObject({ monthlyLimit: 100, monthlyLimits: { '2026-02': 0, '2026-04': 80 } });
   expect(() => applyBudgetMonthLimits(edits, session.uid)).toThrow('budget changed');
+});
+
+it('applies definition edits together and preserves overrides, allocations and native scopes', () => {
+  saveBudget(input);
+  saveBudget({ ...input, id: 'rent', name: 'Rent' });
+  const food = getBudgetOverview().budgets[0];
+  setBudgetMonthLimit(food.id, '2026-01', '80', food);
+  const initial = getBudgetOverview();
+  saveBudgetAllocations(initial.records.find(row => row.id === 'spent')!, [{ budgetId: food.id, amount: '30' }], []);
+  const before = getBudgetOverview();
+  const changes = before.budgets.map(expected => ({ expected, name: expected.name + ' revised', monthlyLimit: 120, rollover: 'surplus' as const }));
+  const owner = session.uid;
+  expect(() => applyBudgetDefinitionChanges([changes[0], { ...changes[1], monthlyLimit: -1 }], owner)).toThrow('finite monthly limit');
+  expect(getBudgetOverview().budgets).toEqual(before.budgets);
+  expect(() => applyBudgetDefinitionChanges(changes, 'other-account')).toThrow('account changed');
+  expect(applyBudgetDefinitionChanges(changes, owner)).toBe(2);
+  expect(() => applyBudgetDefinitionChanges(changes, owner)).toThrow('budget changed');
+  const result = getBudgetOverview();
+  expect(result.allocations).toEqual(before.allocations);
+  expect(result.budgets[0]).toEqual({ ...before.budgets[0], name: 'Food revised', monthlyLimit: 120, rollover: 'surplus' });
+  expect(result.report.rows[0].months[0]).toMatchObject({ limit: 80, used: 30 });
 });
