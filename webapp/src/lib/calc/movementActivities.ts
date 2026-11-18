@@ -211,7 +211,9 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
   const internal = new Set<string>();
   const entityModules=new Set<string>(['bank','rentals','personalLoans','emi','creditCard','qse','psx']);
   const linkable=(row:MovementActivity)=>row.executed && (['qse','psx','funds'].includes(row.module)?row.recordType==='transfer':row.module==='emi'?row.recordType==='emi-repayment':row.recordType!=='plan');
-  const rowKey=(row:MovementActivity)=>linkModule(row.module)+':'+(entityModules.has(linkModule(row.module))?(row.sourceId ?? '')+':':'')+row.id;
+  const recordKey = (module: LinkModule, sourceId: string | undefined, id: string) =>
+    JSON.stringify([module, entityModules.has(module) ? sourceId ?? null : null, id]);
+  const rowKey = (row: MovementActivity) => recordKey(linkModule(row.module), row.sourceId, row.id);
   const nativeKeys = new Set(rows.filter(linkable).map(rowKey));
   for (const link of input.links) {
     const key=(side:typeof link.from,id:string)=>{
@@ -220,20 +222,20 @@ export function collectMovementActivities(input: MovementInputs, modules: readon
         const candidates=new Set(rows.filter(row=>linkable(row) && linkModule(row.module)===side.module && row.id===id).map(row=>row.sourceId));
         if(candidates.size===1)ref=[...candidates][0];
       }
-      return side.module+':'+(entityModules.has(side.module)?(ref ?? '__unresolved__')+':':'')+id;
+      return entityModules.has(side.module) && !ref ? undefined : recordKey(side.module, ref, id);
     };
     const left=key(link.from,link.fromRecordId),right=key(link.to,link.toRecordId);
     if (isIndependentInstallmentLink(link) && ['cash', 'bank', 'creditCard'].includes(link.from.module)) {
-      if (nativeKeys.has(right)) suppressed.add(left);
+      if (left && right && nativeKeys.has(right)) suppressed.add(left);
       continue;
     }
     if (domain.has(link.from.module) && ['cash', 'bank'].includes(link.to.module)) {
-      if (nativeKeys.has(left)) suppressed.add(right);
+      if (left && right && nativeKeys.has(left)) suppressed.add(right);
     } else if (domain.has(link.to.module) && ['cash', 'bank'].includes(link.from.module)) {
-      if (nativeKeys.has(right)) suppressed.add(left);
+      if (left && right && nativeKeys.has(right)) suppressed.add(left);
     } else {
-      internal.add(left);
-      internal.add(right);
+      if (left) internal.add(left);
+      if (right) internal.add(right);
     }
   }
   const included = (row: MovementActivity) => {

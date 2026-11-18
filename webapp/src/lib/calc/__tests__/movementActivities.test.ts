@@ -308,3 +308,30 @@ it('retains Cash and Bank counterparts when a linked rental record is absent fro
     ['deposit', 100, 'unclassified'], ['expense', -30, 'unclassified'],
   ]);
 });
+
+it('keeps source and record IDs containing colons distinct when resolving historical links', () => {
+  const f = fixture();
+  const date = '2026-01-02';
+  const account = { name: 'Checking', currencyCode: 'USD', openingBalance: 0 };
+  f.base.bankAccounts.push({ ...account, id: 'bank:a' }, { ...account, id: 'bank' }, { ...account, id: '__unresolved__' });
+  const deposit = { date, amount: 100, description: 'Deposit', source: 'manual' as const, isDeposit: true };
+  f.base.bankTransactions.push(
+    { ...deposit, accountId: 'bank:a', id: 'record' },
+    { ...deposit, accountId: 'bank', id: 'a:record' },
+    { ...deposit, accountId: 'bank', id: 'ambiguous' },
+    { ...deposit, accountId: '__unresolved__', id: 'ambiguous' },
+  );
+  f.base.rentalProperties.push({ id: 'property', name: 'Rental', currencyCode: 'USD' });
+  f.base.rentalEntries.push(
+    { id: 'rent', propertyId: 'property', date, amount: 100, isDeposit: true },
+    { id: 'legacy-rent', propertyId: 'property', date, amount: 100, isDeposit: true },
+  );
+  const link = { date, fromAmount: 100, toAmount: 100, from: { module: 'rentals' as const, ref: 'property' } };
+  f.links.push(
+    { ...link, id: 'resolved', fromRecordId: 'rent', toRecordId: 'record', to: { module: 'bank', ref: 'bank:a' } },
+    { ...link, id: 'legacy', fromRecordId: 'legacy-rent', toRecordId: 'ambiguous', to: { module: 'bank' } },
+  );
+  const bankRows = collect(f, ['bank']);
+  expect(bankRows.map(row => row.id)).toEqual(['a:record', 'ambiguous', 'ambiguous']);
+  expect(bankRows.map(row => row.sourceId)).toEqual(['bank', 'bank', '__unresolved__']);
+});
