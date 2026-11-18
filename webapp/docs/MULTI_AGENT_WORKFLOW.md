@@ -24,6 +24,7 @@ The register lives on the shared delivery branch linked to the active PR. For th
 | Add explicit void for pending Cash and Bank occurrences | Done | WC-TR coordination, PR #51 | Draft transaction removes the pending ledger record and preserves execution history. Fixtures cover replay, settled entries and linked transfers. |
 | Add standalone subscription renewals to planned movement | Done | WC-TR coordination, PR #51 | Shared Upcoming funding checks and dashboard scope. Tests cover active and archived funding, cancelled subscriptions, and the Money in/out breakdown and record detail. |
 | Keep installment funding visible when its linked receipt is missing | Done | WC-TR coordination, PR #51 | Cash and Bank regressions verify the funding stays visible until its receipt exists, then counts only once. Card behavior uses the same rule. |
+| Include standalone rent collections in planned movement | In progress | WC-TR session 1939ef032035, work/standalone-rent-movement, 2026-11-18 UTC | Reuse the Upcoming rent proposal; suppress duplicates when a native rental plan already covers the due date. |
 | Finish remaining canonical reporting adapters and drilldowns | Ready | | Other standalone schedules, allocation drilldowns and source-scope acceptance. |
 | Finish currency budget workflows | Ready | | Bulk definition edits, source identity and planned reservations. |
 | Verify budget source identity | Done | WC-TR PSX session, work/budget-source-identity | `70691ca4` guards ambiguous legacy identities and malformed duplicates. Full local suite (1,411 tests) and production build passed. |
@@ -35,6 +36,6 @@ The register lives on the shared delivery branch linked to the active PR. For th
 | Add app-wide record search | Done | WC-TR session 1939ef032035, PR #51 | `466b642b` adds account-scoped topbar search, native record links and module/submodule filters. 1,408 tests passed locally; Actions 492 passed. |
 | Validate Cash currency detail links | Done | WC-TR session 1939ef032035, PR #51 | `7fb88810` shares the Cash currency registry, rejects unknown URLs and preserves active filters. Focused tests and Actions 483 passed. |
 | Verify app-wide search in a mobile browser | Ready | | The local Chromium process was blocked by the execution environment. Recheck the topbar and results at a narrow viewport with fixtures. |
-| Deep-link exchange broker search results | In progress | WC-TR session 1939ef032035, work/search-broker-links, 2026-11-18 UTC | Open the matching broker on the native broker screen without switching the active broker. |
+| Deep-link exchange broker search results | Done | WC-TR session 1939ef032035, PR #51 | `486160fe` opens the matching QSE or PSX profile without activating it. Focused tests and production build passed. |
 | Complete UX acceptance | Ready | | Claim one module or a specific shared control at a time. |
 | Final PR validation and merge | Ready | | Depends on the remaining acceptance checks and exact-head CI. |
