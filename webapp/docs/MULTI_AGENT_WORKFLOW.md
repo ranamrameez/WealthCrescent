@@ -22,6 +22,6 @@ The register lives on the shared delivery branch linked to the active PR. For th
 | Finish currency budget workflows | Ready | | Bulk definition edits, source identity and planned reservations. |
 | Continue UI-to-service migration | Ready | | Claim one named module and workflow at a time. |
 | Cash accounts in the global finder | Done | WC-TR session 1939ef032035, PR #51 | `0526e262` covers defaults, Cash entries, Cash plans, independent favorites and filter-preserving links. 1,390 tests and build passed locally; Actions 474 passed. |
-| Shared finder keyboard acceptance | In progress | WC-TR session 1939ef032035, work/shared-finder-keyboard, 2026-11-18 UTC | StandardDropdown navigation with disabled or empty search results. |
+| Shared finder keyboard acceptance | Done | WC-TR session 1939ef032035, PR #51 | `92c13b71` skips disabled keyboard results and handles empty searches. 1,393 tests passed locally; Actions 477 passed tests and build. |
 | Complete UX acceptance | Ready | | Claim one module or a specific shared control at a time. |
 | Final PR validation and merge | Ready | | Depends on the remaining acceptance checks and exact-head CI. |
