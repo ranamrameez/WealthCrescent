@@ -84,8 +84,17 @@ export async function createPendingPayment(expectedUid: string, input: PendingPa
       record.planLink?.module === reviewed.module && record.planLink.planId === reviewed.plan.id &&
       record.planLink.occurrenceDate === occurrenceDate
     );
-    const existing = [...cashEntries, ...bankEntries].find(record => record.id === id || matchesOccurrence(record));
-    if (history.some(entry => entry.id === id)) {
+    const ledgerMatches = [...cashEntries, ...bankEntries].filter(record => record.id === id || matchesOccurrence(record));
+    const existing = ledgerMatches[0];
+    const executions = history.filter(entry => entry.id === id);
+    if (ledgerMatches.length > 1 || executions.length > 1) {
+      throw new Error('This occurrence has duplicate records. Review its ledger and execution history.');
+    }
+    if (executions.length === 1) {
+      const execution = executions[0];
+      if (execution.module !== reviewed.module || execution.planId !== reviewed.plan.id || execution.occurrenceDate !== occurrenceDate) {
+        throw new Error('This occurrence has conflicting execution history. Review it before retrying.');
+      }
       if (!existing || existing.id !== id || !matchesOccurrence(existing)) {
         throw new Error('This occurrence has execution history. Review its ledger before retrying.');
       }

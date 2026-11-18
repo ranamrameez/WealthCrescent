@@ -202,3 +202,18 @@ it.each(['from', 'to'] as const)('aborts settlement if a transfer links its %s s
   await expect(settlePendingPayment('owner', cash, date, date, now)).rejects.toThrow('linked transfer');
   expect(read()).toEqual(original);
 });
+
+it('rejects duplicate native records or execution identities instead of accepting a replay', async () => {
+  const read = transactionFor(fixture());
+  await createPendingPayment('owner', cash, date, now);
+  const saved = read() as { cash: { entries: unknown[] }; paymentExecutions: unknown[] };
+  const duplicateLedger = { ...saved, cash: { ...saved.cash, entries: [...saved.cash.entries, saved.cash.entries[0]] } };
+  const reread = transactionFor(duplicateLedger);
+  await expect(createPendingPayment('owner', cash, date, now)).rejects.toThrow('duplicate records');
+  expect(reread()).toEqual(duplicateLedger);
+
+  const duplicateHistory = { ...saved, paymentExecutions: [...saved.paymentExecutions, saved.paymentExecutions[0]] };
+  const thirdRead = transactionFor(duplicateHistory);
+  await expect(createPendingPayment('owner', cash, date, now)).rejects.toThrow('duplicate records');
+  expect(thirdRead()).toEqual(duplicateHistory);
+});
