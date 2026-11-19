@@ -131,7 +131,7 @@ function App() {
   const categorySync = useCategoryFirebaseSync();
   // Category groups (the "bird's-eye view" — README Pending item 5) — same
   // no-dedicated-status-UI treatment as the Category registry itself.
-  useCategoryGroupFirebaseSync();
+  const categoryGroupSync = useCategoryGroupFirebaseSync();
   // User-reported (2026-09-14): "the app asks the user on every new device,
   // which is wrong" — mirrors the enabled-currencies/onboarding-seen
   // preference into the account's real cloud profile so it follows the
@@ -188,7 +188,7 @@ function App() {
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/search" element={<RecordSearchPage owner={user?.uid} workbookOwners={searchWorkbookOwners} />} />
               <Route path="/organize/categories/:categoryId?" element={<CategoriesPage
-                owner={user?.uid} categoryOwner={categorySync.workbookOwner} workbookOwners={searchWorkbookOwners} />} />
+                owner={user?.uid} categoryOwner={categorySync.workbookOwner} groupOwner={categoryGroupSync.workbookOwner} workbookOwners={searchWorkbookOwners} />} />
               <Route path="/net-worth" element={<Navigate to="/dashboard" replace />} />
               <Route path="/qse" element={<DashboardPage />} />
               <Route path="/brokers" element={<BrokersPage />} />

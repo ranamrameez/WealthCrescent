@@ -23,10 +23,10 @@ export type SearchWorkbook = 'cash' | 'bank' | 'cards' | 'rentals' | 'funds' | '
   'qse' | 'psx' | 'cashPlans' | 'bankPlans' | 'cardPlans' | 'rentalPlans' | 'transfers' | 'snapshots';
 
 const encode = encodeURIComponent;
-type NamedRecord = { id: string; name?: string; person?: string };
+type NamedRecord = { id: string; name?: string; person?: string; currencyCode?: string };
 function scope(records: NamedRecord[], fallback: string, url: (id: string) => string) {
-  const labels = new Map(records.map(row => [row.id, row.name ?? row.person ?? row.id]));
-  return (id: string) => ({ id, label: labels.get(id) ?? fallback, url: url(encode(id)) });
+  const labels = new Map(records.map(row => [row.id, { label: row.name ?? row.person ?? row.id, currencyCode: row.currencyCode }]));
+  return (id: string) => ({ id, label: labels.get(id)?.label ?? fallback, currencyCode: labels.get(id)?.currencyCode, url: url(encode(id)) });
 }
 
 type ExchangeWorkbook = BrokerPortfolioData & {
