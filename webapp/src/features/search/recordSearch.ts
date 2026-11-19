@@ -9,6 +9,7 @@ export interface SearchRecord {
   date?: string;
   url: string;
   terms: string;
+  categoryId?: string;
 }
 
 type SearchableFields = {
@@ -25,6 +26,7 @@ type SearchableFields = {
   date?: string;
   currencyCode?: string;
   amount?: number;
+  categoryID?: string;
 };
 
 interface RecordSource<T> {
@@ -42,7 +44,7 @@ export function collectSearchRecords<T extends SearchableFields>({ module, kind,
       .filter((value): value is string => !!value && value !== title).join(' · ');
     const terms = [title, detail, row.id, row.ticker, row.date, row.currencyCode, row.amount, module, kind, scope]
       .filter(value => value !== undefined).join(' ');
-    return { key: JSON.stringify([module, kind, scopeId, row.id, index]), module, scopeId, scope, kind, title, detail, date: row.date, url, terms };
+    return { key: JSON.stringify([module, kind, scopeId, row.id, index]), module, scopeId, scope, kind, title, detail, date: row.date, url, terms, categoryId: row.categoryID };
   });
 }
 
@@ -56,4 +58,10 @@ export function findSearchRecords(records: SearchRecord[], query: string, module
     const text = normalize(row.terms);
     return tokens.every(token => text.includes(token));
   }).sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '') || a.title.localeCompare(b.title) || a.key.localeCompare(b.key));
+}
+
+/** Native transactions and repayments only. Plans and linked transfer shadows are separate records. */
+export function categoryTransactions(records: SearchRecord[], categoryId: string) {
+  return records.filter(row => row.categoryId === categoryId && (row.kind === 'Transaction' || row.kind === 'Repayment' || row.kind === 'Trade'))
+    .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '') || a.title.localeCompare(b.title) || a.key.localeCompare(b.key));
 }

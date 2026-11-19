@@ -1,3 +1,4 @@
+import { CategoriesPage } from './features/categories/CategoriesPage';
 import { RecordSearchPage } from './features/search/RecordSearchPage';
 import { MarketPricesPage } from './features/qse/pages/MarketPricesPage';
 import { HashRouter, Navigate, Route } from 'react-router-dom';
@@ -140,6 +141,15 @@ function App() {
   // have an smsSenderId/smsSenderNumber configured — see lib/nativeBridge.ts. A no-op outside
   // the Android app's own WebView (window.AndroidBridge never exists in a normal browser).
   useNativeBridgeSync();
+  const searchWorkbookOwners = {
+    qse: qseOwner, psx: psxSync.workbookOwner, cash: cashSync.workbookOwner,
+    bank: bankSync.workbookOwner, cards: creditCardSync.workbookOwner, rentals: rentalsSync.workbookOwner,
+    funds: fundsSync.workbookOwner, emi: emiSync.workbookOwner, loans: personalLoansSync.workbookOwner,
+    subscriptions: subscriptionsSync.workbookOwner, cashPlans: plannedCashSync.workbookOwner,
+    bankPlans: plannedBankSync.workbookOwner, cardPlans: plannedCreditCardSync.workbookOwner,
+    rentalPlans: plannedRentalsSync.workbookOwner, transfers: transfersSync.workbookOwner,
+    snapshots: netWorthSnapshotsSync.workbookOwner,
+  };
 
   // README Pending item 76: one worst-of-N sync-status indicator in the
   // Sidebar instead of each module's own status buried in its own
@@ -176,15 +186,9 @@ function App() {
           <ErrorBoundary>
             <PageContent>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/search" element={<RecordSearchPage owner={user?.uid} workbookOwners={{
-                qse: qseOwner, psx: psxSync.workbookOwner, cash: cashSync.workbookOwner,
-                bank: bankSync.workbookOwner, cards: creditCardSync.workbookOwner, rentals: rentalsSync.workbookOwner,
-                funds: fundsSync.workbookOwner, emi: emiSync.workbookOwner, loans: personalLoansSync.workbookOwner,
-                subscriptions: subscriptionsSync.workbookOwner, cashPlans: plannedCashSync.workbookOwner,
-                bankPlans: plannedBankSync.workbookOwner, cardPlans: plannedCreditCardSync.workbookOwner,
-                rentalPlans: plannedRentalsSync.workbookOwner, transfers: transfersSync.workbookOwner,
-                snapshots: netWorthSnapshotsSync.workbookOwner,
-              }} />} />
+              <Route path="/search" element={<RecordSearchPage owner={user?.uid} workbookOwners={searchWorkbookOwners} />} />
+              <Route path="/organize/categories/:categoryId?" element={<CategoriesPage
+                owner={user?.uid} categoryOwner={categorySync.workbookOwner} workbookOwners={searchWorkbookOwners} />} />
               <Route path="/net-worth" element={<Navigate to="/dashboard" replace />} />
               <Route path="/qse" element={<DashboardPage />} />
               <Route path="/brokers" element={<BrokersPage />} />
