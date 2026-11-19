@@ -8098,3 +8098,6 @@ Category transaction drilldown now includes native amounts and transaction types
 ### 2026-11-19 — payment history backups
 
 App Data now distinguishes a full cloud snapshot (all native workbooks plus payment execution history) from device-local workbook recovery. Restore reviews the current owner and baseline, replaces selected paths in one root RTDB transaction, and rejects incomplete history-bearing files or stale selected data. Scoped maintenance keeps unrelated queued drafts, resumes failed-restore drafts and retains newly entered local edits as a conflict. Full reset still explicitly clears all financial data. Fifty focused tests and production build passed; full CI remains required. The next claim addresses a legacy one-second lazy archive-dialog wait exposed by local full-suite timing. No scheduling activation or actual financial data restore occurred.
+
+
+App Data's local workbook reads now live in an explicit recovery-export service with registry completeness checks. Its UI dispatches backup/restore/removal services and no longer reads native stores or writes Firebase directly. Twenty focused tests and production build passed. The prior backup/archive local full rerun passed 1,504 tests, and Actions 567 passed the backup source. Next claimed scope: native shared search/category queries, ownership guards and subscriptions behind a service.

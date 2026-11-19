@@ -24,6 +24,7 @@ export const CLOUD_PATH_SUFFIX = {
   interEntityTransfers: 'interEntityTransfers', netWorthSnapshots: 'netWorthSnapshots',
   categories: 'categories', categoryGroups: 'categoryGroups',
 } as const;
+export type WorkbookModuleKey = keyof typeof CLOUD_PATH_SUFFIX;
 export const CREATE_EMPTY = {
   qse: createEmptyWorkbook, psx: createEmptyPSXWorkbook, bank: createEmptyBankWorkbook,
   creditCards: createEmptyCreditCardWorkbook,
@@ -34,4 +35,13 @@ export const CREATE_EMPTY = {
   plannedRentals: createEmptyPlannedRentalsWorkbook,
   interEntityTransfers: createEmptyInterEntityWorkbook, netWorthSnapshots: createEmptyNetWorthSnapshotsWorkbook,
   categories: createEmptyCategoriesWorkbook, categoryGroups: createEmptyCategoryGroupsWorkbook,
-} as const;
+} as const satisfies Record<WorkbookModuleKey, () => unknown>;
+
+
+export const APP_DATA_MODULE_LABELS = {
+  qse: 'QSE stocks', psx: 'PSX stocks', bank: 'Banking', creditCards: 'Credit Cards', cash: 'Cash', emiLoans: 'EMI/Loans',
+  funds: 'Funds', personalLoans: 'Personal Loans', rentals: 'Rentals', subscriptions: 'Subscriptions',
+  plannedBank: 'Bank Planning', plannedCash: 'Cash Planning', plannedCreditCard: 'Credit Card Planning',
+  plannedRentals: 'Rentals Planning', interEntityTransfers: 'Transfers', netWorthSnapshots: 'Net Worth history',
+  categories: 'Categories', categoryGroups: 'Category groups',
+} as const satisfies Record<WorkbookModuleKey, string>;

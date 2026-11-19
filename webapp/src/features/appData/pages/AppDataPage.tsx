@@ -1,3 +1,5 @@
+import { exportLocalWorkbookBackup } from '../../../services/appData/localWorkbookBackupService';
+import { APP_DATA_MODULE_LABELS as moduleLabels } from '../../../services/appData/workbookRegistry';
 import { exportFullCloudBackup, reviewFullBackup, restoreReviewedFullBackup } from '../../../services/appData/fullBackupService';
 import { removeAllFinancialData } from '../../../services/appData/removeAllFinancialData';
 import { PageHeading } from '../../../components/PageHeading';
@@ -9,24 +11,6 @@ import { Notice } from '../../../components/Notice';
 import { toast } from '../../../components/Toast';
 import { useAuthState, getCurrentUser } from '../../../lib/firebase/useAuthState';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
-import { useWorkbookStore } from '../../../store/workbookStore';
-import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
-import { useBankWorkbookStore } from '../../../store/bankWorkbookStore';
-import { useCreditCardWorkbookStore } from '../../../store/creditCardWorkbookStore';
-import { useCashWorkbookStore } from '../../../store/cashWorkbookStore';
-import { useEMIWorkbookStore } from '../../../store/emiWorkbookStore';
-import { useFundsWorkbookStore } from '../../../store/fundsWorkbookStore';
-import { usePersonalLoansWorkbookStore } from '../../../store/personalLoansWorkbookStore';
-import { useRentalsWorkbookStore } from '../../../store/rentalsWorkbookStore';
-import { useSubscriptionsWorkbookStore } from '../../../store/subscriptionsWorkbookStore';
-import { usePlannedBankWorkbookStore } from '../../../store/plannedBankWorkbookStore';
-import { usePlannedCashWorkbookStore } from '../../../store/plannedCashWorkbookStore';
-import { usePlannedCreditCardWorkbookStore } from '../../../store/plannedCreditCardWorkbookStore';
-import { usePlannedRentalsWorkbookStore } from '../../../store/plannedRentalsWorkbookStore';
-import { useInterEntityTransfersStore } from '../../../store/interEntityTransfersStore';
-import { useNetWorthSnapshotsWorkbookStore } from '../../../store/netWorthSnapshotsWorkbookStore';
-import { useCategoryStore } from '../../../store/categoryStore';
-import { useCategoryGroupStore } from '../../../store/categoryGroupStore';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -40,39 +24,6 @@ export function AppDataPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
 
-  const qse = useWorkbookStore();
-  const psx = usePSXWorkbookStore();
-  const bank = useBankWorkbookStore();
-  const creditCards = useCreditCardWorkbookStore();
-  const cash = useCashWorkbookStore();
-  const emiLoans = useEMIWorkbookStore();
-  const funds = useFundsWorkbookStore();
-  const personalLoans = usePersonalLoansWorkbookStore();
-  const rentals = useRentalsWorkbookStore();
-  const subscriptions = useSubscriptionsWorkbookStore();
-  const plannedBank = usePlannedBankWorkbookStore();
-  const plannedCash = usePlannedCashWorkbookStore();
-  const plannedCreditCard = usePlannedCreditCardWorkbookStore();
-  const plannedRentals = usePlannedRentalsWorkbookStore();
-  const interEntityTransfers = useInterEntityTransfersStore();
-  const netWorthSnapshots = useNetWorthSnapshotsWorkbookStore();
-  const categories = useCategoryStore();
-  const categoryGroups = useCategoryGroupStore();
-
-  const stores = {
-    qse, psx, bank, creditCards, cash, emiLoans, funds, personalLoans, rentals, subscriptions,
-    plannedBank, plannedCash, plannedCreditCard, plannedRentals, interEntityTransfers, netWorthSnapshots, categories, categoryGroups,
-  } as const;
-  type ModuleKey = keyof typeof stores;
-  const moduleLabels: Record<ModuleKey, string> = {
-    qse: 'QSE stocks', psx: 'PSX stocks', bank: 'Banking', creditCards: 'Credit Cards', cash: 'Cash', emiLoans: 'EMI/Loans',
-    funds: 'Funds', personalLoans: 'Personal Loans', rentals: 'Rentals', subscriptions: 'Subscriptions',
-    plannedBank: 'Bank Planning', plannedCash: 'Cash Planning', plannedCreditCard: 'Credit Card Planning',
-    plannedRentals: 'Rentals Planning',
-    interEntityTransfers: 'Transfers', netWorthSnapshots: 'Net Worth history', categories: 'Categories',
-    categoryGroups: 'Category groups',
-  };
-
   const downloadBackup = (combined: Record<string, unknown>, label: string) => {
     const blob = new Blob([JSON.stringify(combined, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -83,10 +34,7 @@ export function AppDataPage() {
     URL.revokeObjectURL(url);
   };
   const exportLocal = () => {
-    const combined: Record<string, unknown> = {};
-    (Object.keys(stores) as ModuleKey[]).forEach(key => { combined[key] = stores[key].workbook; });
-    combined._backup = { version: 2, scope: 'local-workbooks', createdAt: new Date().toISOString() };
-    downloadBackup(combined, 'local-workbooks');
+    downloadBackup(exportLocalWorkbookBackup(), 'local-workbooks');
     toast('Local workbooks downloaded. Payment execution history is included only in a full cloud backup.');
   };
   const exportAll = async () => {

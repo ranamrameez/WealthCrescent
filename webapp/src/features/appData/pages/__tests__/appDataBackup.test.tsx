@@ -55,3 +55,14 @@ it('refreshes only through the acknowledged restore command and reports success'
   await waitFor(() => expect(mocks.restore).toHaveBeenCalledWith(preview));
   await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith('Backup restored. Selected workbooks are syncing.'));
 });
+it('exports device-local recovery without reading the cloud snapshot', () => {
+  const create = vi.fn(() => 'blob:local-backup');
+  Object.defineProperty(URL, 'createObjectURL', { value: create, configurable: true });
+  Object.defineProperty(URL, 'revokeObjectURL', { value: vi.fn(), configurable: true });
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  render(<MemoryRouter><AppDataPage /></MemoryRouter>);
+  fireEvent.click(screen.getByRole('button', { name: 'Export local workbooks' }));
+  expect(create).toHaveBeenCalledOnce();
+  expect(mocks.export).not.toHaveBeenCalled();
+  expect(mocks.toast).toHaveBeenCalledWith('Local workbooks downloaded. Payment execution history is included only in a full cloud backup.');
+});

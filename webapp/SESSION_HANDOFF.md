@@ -1,3 +1,7 @@
+## App Data read migration and clean full rerun
+
+The isolated local rerun passed all 197 files / 1,504 tests after the archive dialog wait fix. App Data local-export reads now live in a service; its UI has no direct native-store or Firebase data writes. Module factories, display labels and local export coverage share a typed registry. Twenty focused tests and production build passed for this read migration. Backup/scoped-sync source 57031242 already passed Actions 567. The next published claim migrates shared native search/category record queries and their subscriptions to a service, preserving auth/owner gates, filters, amounts and broker links.
+
 ## Verified backup checkpoint and App Data read migration
 
 Backup/scoped-sync source 57031242 passed Actions 567: 197 files / 1,504 tests, 63 broker regressions and both TypeScript projects/production build. The cold archive test now waits for its actual lazy dialog with a five-second allowance and bounded overall deadline; all data/focus assertions remain and seven focused files / 53 tests passed. The next published claim removes App Data's direct native-store reads for local export while retaining local recovery and complete registry coverage. No payment scheduling is active, and emulator/deployed-rule checks remain separate gates.
