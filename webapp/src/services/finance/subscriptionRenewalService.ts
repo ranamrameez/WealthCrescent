@@ -1,22 +1,19 @@
 import { categoryName, UNCATEGORIZED_ID } from '../../lib/categories';
 import { generateRenewalOccurrences } from '../../lib/calc/subscriptionsModule';
-import { auth } from '../../lib/firebase/client';
 import { useBankWorkbookStore } from '../../store/bankWorkbookStore';
 import { useCategoryStore } from '../../store/categoryStore';
 import { useCreditCardWorkbookStore } from '../../store/creditCardWorkbookStore';
 import { usePlannedBankWorkbookStore } from '../../store/plannedBankWorkbookStore';
 import { usePlannedCashWorkbookStore } from '../../store/plannedCashWorkbookStore';
 import { usePlannedCreditCardWorkbookStore } from '../../store/plannedCreditCardWorkbookStore';
-import { useSubscriptionsWorkbookStore } from '../../store/subscriptionsWorkbookStore';
+import { requireCurrentSubscription, requireSubscriptionOwner } from './subscriptionLifecycleService';
 import type { Subscription } from '../../types/subscriptionsWorkbook';
 
 export type RenewalFundingSource = { module: 'cash' } | { module: 'bank' | 'creditCard'; ref: string };
 
 export function regenerateSubscriptionRenewals(expected: Subscription, funding: RenewalFundingSource, owner: string, asOf = new Date()) {
-  if (!auth?.currentUser || auth.currentUser.uid !== owner) throw new Error('The signed-in account changed. Review the subscription again.');
-  const subscriptions = useSubscriptionsWorkbookStore.getState();
-  const sub = subscriptions.workbook.entries.find(item => item.id === expected.id);
-  if (!sub || JSON.stringify(sub) !== JSON.stringify(expected)) throw new Error('The subscription changed. Review it again.');
+  const subscriptions = requireSubscriptionOwner(owner);
+  const sub = requireCurrentSubscription(subscriptions, expected);
   if (!sub.active || !Number.isFinite(sub.amount) || sub.amount <= 0) throw new Error('Choose an active subscription with a valid amount.');
 
   const bank = usePlannedBankWorkbookStore.getState();
