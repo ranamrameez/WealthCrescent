@@ -49,6 +49,9 @@ The register lives on the shared delivery branch linked to the active PR. For th
 | Deep-link exchange broker search results | Done | WC-TR session 1939ef032035, PR #51 | `486160fe` opens the matching QSE or PSX profile without activating it. Focused tests, production build, clean 1,414-test rerun and integrated Actions 493 passed. |
 | Distinguish fullscreen enter and exit | Done | WC-TR session 1939ef032035, PR #51 | `ec62ffaa` uses inward arrows for exit. Two focused tests and Actions 522 passed. |
 | Clarify credit card entry actions | Done | WC-TR session 1939ef032035, PR #51 | `77d2002c` routes ordinary charges and payments to the shared transfer form and retains a specialized batch form for fees, markup and advances. Eight banking tests and Actions 526 passed. |
+| Align credit card transaction limits and section menus | In progress | WC-TR session 1939ef032035, work/card-ledger-parity, 2026-11-19 UTC | Reconcile ledger consumed/available credit with the main summary and review shared section actions. |
+| Allow reviewed edits to closed credit card statements | Ready | | Support bank bill amount and due-date overrides while keeping ledger transactions and original calculated amounts. |
+| Count all eligible card payments toward closed bills and minimum due | Ready | | Reconcile ordinary and linked payments after billing date without requiring the minimum-payment form or counting a record twice. |
 | Complete UX acceptance | Ready | | Claim one module or a specific shared control at a time. |
 | PSX transfer review fixture acceptance | Done | WC-TR PSX session, work/psx-transfer-review-acceptance | `e8425d9f` covers statement selection, bank filtering and stale-save failure/retry. 10 focused tests passed. The deployed terms gate prevented live interaction. |
 | Final PR validation and merge | Ready | | Depends on the remaining acceptance checks and exact-head CI. |
