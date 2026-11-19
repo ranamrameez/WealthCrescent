@@ -1,3 +1,4 @@
+import type { SubscriptionMatch } from './subscriptionMatch';
 import type { PlanLink } from './planLink';
 /** Credit Card module — see CLAUDE.md's "Credit Card redesign — concrete
  * proposal" for the full research-backed design writeup this is built
@@ -129,6 +130,7 @@ export interface CreditCard {
 }
 
 export interface CreditCardTransaction {
+  subscriptionMatch?: SubscriptionMatch;
   planLink?: PlanLink;
   id: string;
   cardId: string;

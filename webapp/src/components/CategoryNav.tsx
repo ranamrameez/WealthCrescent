@@ -108,6 +108,7 @@ export function CategoryNav({ onNavigate, stocksSubnav }: { onNavigate?: () => v
           </NavLink>
           {c.key === 'stocks' && active === 'stocks' && stocksSubnav}
           {c.key === 'organize' && active === 'organize' && <div className="category-stocks-subnav">
+            <NavLink className="navbtn" to="/organize/suggested-links" onClick={onNavigate}>Suggested links</NavLink>
             <NavLink className="navbtn" to="/organize/categories" onClick={onNavigate}>Categories</NavLink>
           </div>}
         </Fragment>

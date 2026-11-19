@@ -1,3 +1,4 @@
+import type { SubscriptionMatch } from './subscriptionMatch';
 import type { PlanLink } from './planLink';
 /** Shared base for every "ledger-style money movement" record in the app —
  * user-requested (2026-09-03): "create 1 base model (Finance) and inherit
@@ -40,6 +41,7 @@ import type { PlanLink } from './planLink';
  *   stale the moment a link is created or removed from elsewhere in the
  *   app; a live lookup can't. */
 export interface Finance {
+  subscriptionMatch?: SubscriptionMatch;
   planLink?: PlanLink;
   /** Stable id — already what every module's own `id: string` field is. */
   id: string;

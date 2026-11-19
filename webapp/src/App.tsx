@@ -1,3 +1,4 @@
+import { SuggestedLinksPage, SuggestedLinksProvider } from './features/organize/SuggestedLinks';
 import { CategoriesPage } from './features/categories/CategoriesPage';
 import { RecordSearchPage } from './features/search/RecordSearchPage';
 import { MarketPricesPage } from './features/qse/pages/MarketPricesPage';
@@ -182,11 +183,13 @@ function App() {
       <LinkedEditChoiceDialogHost />
       <SignInModalHost />
       <HashRouter useTransitions={false}>
+        <SuggestedLinksProvider key={user?.uid ?? 'guest'} owner={user?.uid} owners={{ ...searchWorkbookOwners, categories: categorySync.workbookOwner }}>
         <AppShell user={user}>
           <ErrorBoundary>
             <PageContent>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/search" element={<RecordSearchPage owner={user?.uid} workbookOwners={searchWorkbookOwners} />} />
+              <Route path="/organize/suggested-links" element={<SuggestedLinksPage />} />
               <Route path="/organize/categories/:categoryId?" element={<CategoriesPage
                 owner={user?.uid} categoryOwner={categorySync.workbookOwner} groupOwner={categoryGroupSync.workbookOwner} workbookOwners={searchWorkbookOwners} />} />
               <Route path="/net-worth" element={<Navigate to="/dashboard" replace />} />
@@ -363,6 +366,7 @@ function App() {
             </PageContent>
           </ErrorBoundary>
         </AppShell>
+        </SuggestedLinksProvider>
         <CalculatorLauncher />
         <div className="app-notification-stack">
           <SubscriptionAlertsPopup />

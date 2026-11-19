@@ -1,3 +1,4 @@
+import { useReviewedSubscriptionPayments } from '../../organize/SuggestedLinks';
 import { useUrlEntitySelection } from '../../../hooks/useUrlEntitySelection';
 import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
@@ -624,7 +625,9 @@ function SubscriptionPlansOverview({ subscriptions, filters }: { subscriptions: 
   const payments = useSubscriptionPaymentPlans();
   const dateFormat = useAppearanceStore(state => state.appearance.dateFormat);
   const categories = useCategoryStore(state => state.workbook.categories);
-  const rows = subscriptions.flatMap(subscription => generateRenewalOccurrences(subscription).filter(occurrence => !payments.some(plan => plan.sourceSubscriptionId === subscription.id && plan.executed && plan.date === occurrence.date)).map(occurrence => ({ subscription, ...occurrence })))
+  const reviewed = useReviewedSubscriptionPayments();
+  const reviewedOccurrences = new Set(reviewed.map(row => JSON.stringify([row.subscriptionId, row.occurrenceDate])));
+  const rows = subscriptions.flatMap(subscription => generateRenewalOccurrences(subscription).filter(occurrence => !reviewedOccurrences.has(JSON.stringify([subscription.id, occurrence.date])) && !payments.some(plan => plan.sourceSubscriptionId === subscription.id && plan.executed && plan.date === occurrence.date)).map(occurrence => ({ subscription, ...occurrence })))
     .filter(row => (!filters.fromDate || row.date >= filters.fromDate) && (!filters.toDate || row.date <= filters.toDate) && filters.direction !== 'in' && filters.source !== 'statement-import' && (filters.category === 'all' || subCategoryLabel(row.subscription, categories) === filters.category)).sort((a, b) => a.date.localeCompare(b.date));
   const sortedRows = dateSort.rows(rows, { date: row => row });
   const { rows: pageRows, controls } = useTablePagination(sortedRows);
@@ -634,13 +637,21 @@ function SubscriptionPlansOverview({ subscriptions, filters }: { subscriptions: 
 function SubscriptionPaymentsOverview({ subscriptions, filters }: { subscriptions: Subscription[]; filters: TransactionPageFilters }) {
   const dateSort = useDateTableSort();
   const plans = useSubscriptionPaymentPlans();
+  const reviewed = useReviewedSubscriptionPayments();
   const categories = useCategoryStore(state => state.workbook.categories);
-  const rows = plans.filter(plan => plan.executed && subscriptions.some(sub => sub.id === plan.sourceSubscriptionId && (filters.category === 'all' || subCategoryLabel(sub, categories) === filters.category)))
-    .map(plan => ({ plan, date: plan.fulfilledDate ?? plan.date, sub: subscriptions.find(sub => sub.id === plan.sourceSubscriptionId)! }))
+  const fulfilled = plans.filter(plan => plan.executed && subscriptions.some(sub => sub.id === plan.sourceSubscriptionId && (filters.category === 'all' || subCategoryLabel(sub, categories) === filters.category)))
+    .map(plan => ({ plan, date: plan.fulfilledDate ?? plan.date, sub: subscriptions.find(sub => sub.id === plan.sourceSubscriptionId)! }));
+  const reviewedRows = reviewed.flatMap(({ payment, subscriptionId, occurrenceDate }) => {
+    const sub = subscriptions.find(item => item.id === subscriptionId);
+    if (!sub || (filters.category !== 'all' && subCategoryLabel(sub, categories) !== filters.category) ||
+        fulfilled.some(row => row.sub.id === subscriptionId && row.plan.date === occurrenceDate)) return [];
+    return [{ sub, date: payment.date, plan: { id: JSON.stringify([payment.module, payment.sourceId, payment.recordId]), date: occurrenceDate, amount: payment.amount } }];
+  });
+  const rows = [...fulfilled, ...reviewedRows]
     .filter(row => (!filters.fromDate || row.date >= filters.fromDate) && (!filters.toDate || row.date <= filters.toDate) && filters.direction !== 'in' && filters.source !== 'statement-import').sort((a, b) => b.date.localeCompare(a.date));
   const sortedRows = dateSort.rows(rows, { date: row => row, renewal: row => row.plan });
   const { rows: pageRows, controls } = useTablePagination(sortedRows);
-  return <div className="table-scroll"><table><thead><tr><dateSort.Th rows={rows} column="date">Paid on</dateSort.Th><th>Subscription</th><dateSort.Th rows={rows} column="renewal">Scheduled renewal</dateSort.Th><th>Amount</th></tr></thead><tbody>{pageRows.map(row => <RecordRow record={row} key={row.plan.id}><td><DateValue value={row.date} /></td><td>{row.sub.name}</td><td><DateValue value={row.plan.date} /></td><td>{fmtMoney(Math.abs(row.plan.amount), row.sub.currencyCode)}</td></RecordRow>)}</tbody></table>{controls}{!rows.length && <p className="text-muted">No fulfilled renewal plans in this period.</p>}</div>;
+  return <div className="table-scroll"><table><thead><tr><dateSort.Th rows={rows} column="date">Paid on</dateSort.Th><th>Subscription</th><dateSort.Th rows={rows} column="renewal">Scheduled renewal</dateSort.Th><th>Amount</th></tr></thead><tbody>{pageRows.map(row => <RecordRow record={row} key={row.plan.id}><td><DateValue value={row.date} /></td><td>{row.sub.name}</td><td><DateValue value={row.plan.date} /></td><td>{fmtMoney(Math.abs(row.plan.amount), row.sub.currencyCode)}</td></RecordRow>)}</tbody></table>{controls}{!rows.length && <p className="text-muted">No subscription payments in this period.</p>}</div>;
 }
 
 function SubscriptionAlertsOverview({ subscriptions }: { subscriptions: Subscription[] }) {

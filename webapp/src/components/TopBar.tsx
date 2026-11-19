@@ -1,3 +1,4 @@
+import { SuggestedLinksActions } from '../features/organize/SuggestedLinks';
 import { useWorkbookStore } from '../store/workbookStore';
 import { usePSXWorkbookStore } from '../store/psxWorkbookStore';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -66,6 +67,7 @@ export function TopBar({ onToggleNavigation, navigationOpen = false }: { onToggl
       <div className="page-topbar-right">
         <AppEntityFinder />
         <TopBarRecordSearch />
+        <SuggestedLinksActions />
         {category === 'stocks' && (
           <TopBarSelect
             label="Broker"
