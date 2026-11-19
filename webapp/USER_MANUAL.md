@@ -1218,3 +1218,7 @@ Open Edit on an existing QSE, PSX or Funds cash transfer, or a personal-loan pay
 Linked rows in a finance batch editor offer Edit linked transfer. Save the coordinated popup to refresh that row. Other unsaved batch edits stay in the grid.
 
 Credit-card transactions and transfers use the shared Transfers form. Card transaction type includes purchases, payments, fees, markup and cash advances. Related form fields stay grouped and wrap into adjacent groups as the popup grows. Exit full screen uses inward-facing corners.
+
+### Browse and manage categories
+
+Open **Organize → Categories** and select a category to see its transactions from your synced workbooks. Select a transaction to open its native account view. Custom categories can be added, renamed, or deleted after your category workbook syncs. App categories are shared reference categories.
