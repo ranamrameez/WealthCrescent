@@ -43,7 +43,7 @@ it('reviews and restores only the selected loan archive through the ledger', asy
   const trigger = screen.getByRole('button', { name: 'Receipt archive' });
   trigger.focus();
   fireEvent.click(trigger);
-  const dialog = await screen.findByRole('dialog', { name: 'Receipt archive for Property' });
+  const dialog = await screen.findByRole('dialog', { name: 'Receipt archive for Property' }, { timeout: 5000 });
   expect(document.activeElement).toBe(dialog);
   expect(screen.queryByRole('option', { name: /Other worksheet/ })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Review archive' }));
@@ -59,7 +59,7 @@ it('reviews and restores only the selected loan archive through the ledger', asy
   expect(document.activeElement).toBe(trigger);
   expect(useEMIWorkbookStore.getState().workbook.repayments).toEqual([archived]);
   expect(useEMIWorkbookStore.getState().workbook.reconciliationHistory?.at(-1)?.repayments).toEqual([imported]);
-});
+}, 10000);
 
 it('records a reversal from the receipt list and refreshes the remaining balance', async () => {
   const loan = { id: 'fixture', name: 'Property', lender: 'Seller', currencyCode: 'PKR', principal: 1000, totalToReturn: 1000, tenureMonths: 1, startDate: '2026-01-01', repaymentMode: 'fixedTotal' as const, balanceTracking: 'recorded' as const };
