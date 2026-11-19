@@ -337,7 +337,7 @@ export function moduleBreakdownChart(row: CurrencyNetWorth) {
 
 export type FlowDimension = 'category' | 'module' | 'source' | 'plan' | 'kind';
 export type FlowPopulation = 'actual' | 'pending' | 'planned';
-function movementGroupIdentity(item: MovementActivity, dimension: FlowDimension, planNames: Record<string, string>) {
+function movementGroupIdentity(item: MovementActivity, dimension: FlowDimension, planNames: Record<string, string>, unallocatedKey: string) {
   const moduleLabel = MOVEMENT_MODULE_LABELS[item.module];
   switch (dimension) {
     case 'kind': {
@@ -358,7 +358,7 @@ function movementGroupIdentity(item: MovementActivity, dimension: FlowDimension,
     case 'plan': {
       const id = item.planGroupId;
       return {
-        key: id || '__unallocated__',
+        key: id || unallocatedKey,
         label: id ? (Object.hasOwn(planNames, id) ? planNames[id] : '') || 'Unnamed plan group' : 'Unallocated / no explicit plan link',
       };
     }
@@ -367,12 +367,17 @@ function movementGroupIdentity(item: MovementActivity, dimension: FlowDimension,
 
 export function moneyMovementReport(activities: MovementActivity[], from: string, to: string, today: string, dimension: FlowDimension, population: FlowPopulation, planNames: Record<string, string> = {}, kind: MovementKind | 'all' = 'all') {
   const items = selectMovementActivities(activities,from,to,today,population,kind);
+  let unallocatedKey = '__unallocated__';
+  if (dimension === 'plan') {
+    const planIds = new Set(items.map(item => item.planGroupId));
+    while (planIds.has(unallocatedKey)) unallocatedKey += '_';
+  }
   const rows = [...new Set(items.map(item => item.currencyCode))].sort().map(currency => {
     const native = items.filter(item => item.currencyCode === currency);
     const buckets = new Map<string, { key: string; label: string; inflow: number; outflow: number; net: number; items: FlowActivityItem[] }>();
     let inflow = 0, outflow = 0;
     for (const item of native) {
-      const { key, label } = movementGroupIdentity(item, dimension, planNames);
+      const { key, label } = movementGroupIdentity(item, dimension, planNames, unallocatedKey);
       const group = buckets.get(key) ?? { key, label, inflow: 0, outflow: 0, net: 0, items: [] };
       group.inflow += Math.max(0,item.amount); group.outflow += Math.min(0,item.amount); group.net += item.amount;
       group.items.push({ module: MOVEMENT_MODULE_LABELS[item.module], accountName: item.sourceLabel, date: item.date, description: item.description, amount: item.amount });

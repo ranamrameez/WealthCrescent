@@ -352,3 +352,22 @@ it('opens separate drilldowns for same-name categories and source-label fallback
     expect(new Set(row.groups.map(group => group.key)).size).toBe(2);
   }
 });
+
+it('keeps unallocated activity separate from imported plan IDs that resemble its group key', () => {
+  const common = { module: 'bank' as const, date: '2026-01-02', currencyCode: 'USD', sourceLabel: 'Checking', executed: true };
+  const rows = [
+    { ...common, id: 'one', planGroupId: '__unallocated__', amount: -10, description: 'First plan' },
+    { ...common, id: 'two', planGroupId: '__unallocated___', amount: -15, description: 'Second plan' },
+    { ...common, id: 'three', amount: -5, description: 'Unallocated bill' },
+  ];
+  const result = engine.dashboard.moneyMovementReport(
+    rows, '2026-01-01', '2026-01-31', '2026-01-31', 'plan', 'actual',
+    { __unallocated__: 'First plan', __unallocated___: 'Second plan' },
+  ).rows[0];
+  expect(result.outflow).toBe(-30);
+  expect(result.groups.map(group => [group.key, group.label, group.outflow])).toEqual([
+    ['__unallocated___', 'Second plan', -15],
+    ['__unallocated__', 'First plan', -10],
+    ['__unallocated____', 'Unallocated / no explicit plan link', -5],
+  ]);
+});
