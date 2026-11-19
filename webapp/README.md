@@ -19,6 +19,10 @@ FinanceManager live link:
 > `SESSION_HANDOFF.md` current; never push directly to `main`; and do not merge until the
 > latest application-code head passes the full test suite and production build/type-check.
 
+## Trade Journal, PSX Profiler and AHL imports
+
+See the [trading tools guide](docs/trading-tools.md) for feature coverage, import instructions and links to the original apps.
+
 ## QSE statement quick import
 
 Use **Import QSE trades** on the main Dashboard or the QSE Dashboard to review and selectively apply The Group trades for the active broker. See [Importing The Group statements](docs/the-group-import.md).
@@ -186,6 +190,8 @@ guess — matching the user's own words: *"I may sell in bulk completely differe
 from the lot system."*
 
 ## Done
+
+- Added Trade Journal to QSE and PSX and PSX Profiler to PSX. Added reviewed AHL order-history and account-statement entry points on the PSX Dashboard and Trade Transactions.
 
 - **Transaction-page cost-basis consistency slice (2026-10-29, merged in PR #31; full CI green):** QSE/PSX inline SELL P/L now uses the weighted-average engine when Average cost is selected; FIFO/Lowest cost first uses the configured lot method. Open/Closed lot-attribution reports are hidden under Average cost rather than presenting incompatible lot math. The independent page-local lot-match selector was removed. Regression coverage includes weighted-average SELL P/L and unmatched oversells. The production build and full test suite passed in [PR #31](https://github.com/ranamrameez/WealthCrescent/pull/31).
 
