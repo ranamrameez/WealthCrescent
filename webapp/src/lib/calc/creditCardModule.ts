@@ -130,8 +130,8 @@ export function creditCardRunningBalances(card: CreditCard, transactions: Credit
   let balance = card.openingBalance ?? 0;
   const result = new Map<string, number>();
   for (const { transaction } of ordered) {
-    balance = Math.max(0, balance + (transaction.kind === 'payment' ? -transaction.amount : transaction.amount));
-    result.set(transaction.id, balance);
+    balance += transaction.kind === 'payment' ? -transaction.amount : transaction.amount;
+    result.set(transaction.id, Math.max(0, round2(balance)));
   }
   return result;
 }

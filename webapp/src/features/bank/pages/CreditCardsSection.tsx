@@ -1,3 +1,4 @@
+import { toCSV } from '../../../lib/csv';
 import { isCardFundedInstallmentLink } from '../../../types/interEntityTransfer';
 import { fulfillManualPlan } from '../../../services/finance/manualPlanPaymentService';
 import { RecordRow } from '../../../components/RecordRow';
@@ -59,6 +60,7 @@ import {
   latestClosedStatement,
   markupThisCycle,
   nextPendingMinDue,
+  availableCredit,
   outstandingBalanceByCard,
   proposeMinPayment,
 } from '../../../lib/calc/creditCardModule';
@@ -412,7 +414,7 @@ function TransactionsTable({ card, filters, showActions = false }: { card: Credi
   // Running utilization is calculated from the complete chronological ledger,
   // never from the filtered/sorted page, so a date filter cannot reset the
   // opening balance or change the limit usage shown on an individual row.
-  const runningConsumedById = useMemo(() => creditCardRunningBalances(card, cardTxs), [card, cardTxs]);
+  const runningConsumedById = useMemo(() => creditCardRunningBalances(card, transactions), [card, transactions]);
 
   if (!cardTxs.length) return <p className="text-muted m-0">No transactions yet.</p>;
   return (
@@ -431,7 +433,7 @@ function TransactionsTable({ card, filters, showActions = false }: { card: Credi
               <td>{fmtMoney(t.amount, card.currencyCode)}</td>
               <td>{fmtMoney(runningConsumedById.get(t.id) ?? 0, card.currencyCode)}</td>
               <td>{card.creditLimit == null ? '—' : fmtMoney(card.creditLimit, card.currencyCode)}</td>
-              <td>{card.creditLimit == null ? '—' : fmtMoney(Math.max(0, card.creditLimit - (runningConsumedById.get(t.id) ?? 0)), card.currencyCode)}</td>
+              <td>{card.creditLimit == null ? '—' : fmtMoney(availableCredit(card, runningConsumedById.get(t.id) ?? 0), card.currencyCode)}</td>
               <td onClick={(e) => e.stopPropagation()}>
                 {showActions && <IconButton label="Edit" icon={<EditIcon size={12} />} align="right" onClick={() => setEditingTransaction(t)} />}
                 {showActions && <IconButton
@@ -516,8 +518,8 @@ function CreditCardAnalyticsSection({ card, transactions }: { card: CreditCard; 
 
   let balance = card.openingBalance ?? 0;
   const ledger = rows.map((tx) => {
-    balance = Math.max(0, balance + effect(tx));
-    return { tx, balance };
+    balance += effect(tx);
+    return { tx, balance: Math.max(0, balance) };
   });
   const categoryTotals = Object.entries(rows.filter((tx) => tx.kind !== 'payment').reduce<Record<string, number>>((out, tx) => {
     const name = categoryName(tx.categoryID, categories);
@@ -636,6 +638,26 @@ export function CreditCardDetailPage() {
       return true;
     });
   }, [card, transactions, filters.fromDate, filters.toDate, filters.direction, filters.category, filters.source]);
+  const exportTransactions = (filtered: boolean) => {
+    if (!card) return;
+    const rows = filtered ? visibleTransactions : transactions.filter(tx => tx.cardId === card.id);
+    const categories = useCategoryStore.getState().workbook.categories;
+    const balances = creditCardRunningBalances(card, transactions);
+    const csv = toCSV([
+      ['Date', 'Time', 'Timezone', 'Type', 'Description', 'Category', 'Amount', 'Currency', 'Consumed limit', 'Allowed limit', 'Available limit'],
+      ...rows.map(tx => {
+        const consumed = balances.get(tx.id) ?? 0;
+        return [tx.date, tx.time ?? '', tx.timezone ?? '', KIND_LABELS[tx.kind], tx.description, categoryName(tx.categoryID, categories),
+          tx.amount, card.currencyCode, consumed, card.creditLimit ?? '', card.creditLimit == null ? '' : availableCredit(card, consumed)];
+      }),
+    ]);
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `credit-card-transactions-${filtered ? 'filtered' : 'all'}.csv`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
   const monthlyHistory = useMemo(() => (card ? creditCardMonthlyHistory(card, visibleTransactions, 6) : []), [card, visibleTransactions]);
   const cycleHistory = useMemo(() => (card ? creditCardCycleHistory(card, visibleTransactions, 6) : []), [card, visibleTransactions]);
   const [collectAmount, setCollectAmount] = useState(proposal?.amount ?? 0);
@@ -757,7 +779,7 @@ export function CreditCardDetailPage() {
               <SummaryValue label="Spent" value={fmtMoney(openCycle.chargesThisCycle, card.currencyCode)} tone="negative" />
               <SummaryValue label="Paid" value={fmtMoney(openCycle.paymentsThisCycle, card.currencyCode)} tone="positive" />
               <SummaryValue label="Current outstanding" value={fmtMoney(balance, card.currencyCode)} tone={balance > 0 ? 'negative' : 'positive'} />
-              {card.creditLimit ? <SummaryValue label="Available credit" value={fmtMoney(Math.max(0, card.creditLimit - Math.max(0, balance)), card.currencyCode)} tone="positive" /> : null}
+              {card.creditLimit ? <SummaryValue label="Available credit" value={fmtMoney(availableCredit(card, balance), card.currencyCode)} tone="positive" /> : null}
               <SummaryValue label="Next billing date" value={openCycle.cycleEnd} />
               <SummaryValue label="Cycle" value={<><DateValue value={openCycle.cycleStart} /> {'\u2192'} <DateValue value={openCycle.cycleEnd} /></>} />
             </> : <p className="text-muted m-0">Add the last billing date in Card details.</p>}
@@ -804,7 +826,9 @@ export function CreditCardDetailPage() {
       <div id="card-transactions"><StandardCard title="Transactions" hue={card.color} defaultOpen={false}
         actions={[
           { label: showTransactionActions ? 'Done modifying' : 'Modify', icon: <EditIcon size={14} />, onClick: () => setShowTransactionActions((value) => !value) },
-          { label: 'Batch edit', icon: <ListIcon size={14} />, onClick: () => setBatchEditOpen(true) },
+          { label: 'Batch edit', icon: <ListIcon size={14} />, onClick: () => setBatchEditOpen(true), disabled: !visibleTransactions.length },
+          { label: 'Export filtered', onClick: () => exportTransactions(true), disabled: !visibleTransactions.length },
+          { label: 'Export all', onClick: () => exportTransactions(false), disabled: !transactions.some(tx => tx.cardId === card.id) },
         ]}
         headerEnd={showTransactionActions ? <IconButton label="Hide modification options" icon={<EditIcon size={13} />} align="right" onClick={() => setShowTransactionActions(false)} /> : undefined}>
         <TransactionsTable card={card} filters={filters} showActions={showTransactionActions} />

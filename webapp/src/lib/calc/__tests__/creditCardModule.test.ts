@@ -73,6 +73,15 @@ const tx = (over: Partial<CreditCardTransaction>): CreditCardTransaction => ({
 });
 
 describe('creditCardRunningBalances', () => {
+  it('carries an overpayment forward before displaying consumed credit', () => {
+    const c = card({ openingBalance: 50 });
+    const transactions = [
+      tx({ id: 'payment', date: '2026-01-10', kind: 'payment', amount: 120 }),
+      tx({ id: 'charge', date: '2026-01-11', kind: 'charge', amount: 90 }),
+    ];
+    expect([...creditCardRunningBalances(c, transactions)]).toEqual([['payment', 0], ['charge', 20]]);
+    expect(outstandingBalanceByCard(c, transactions)).toBe(20);
+  });
   it('tracks consumed credit chronologically from opening debt, independent of other cards', () => {
     const first = tx({ id: 'charge-1', date: '2026-01-10', kind: 'charge', amount: 300, seq: 1 });
     const payment = tx({ id: 'payment-1', date: '2026-01-11', kind: 'payment', amount: 100, seq: 2 });
