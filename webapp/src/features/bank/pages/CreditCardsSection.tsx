@@ -313,13 +313,15 @@ function LinkedCardPaymentFields({
   );
 }
 
+const SPECIAL_CARD_ENTRY_KINDS: CreditCardTransactionKind[] = ['fee', 'markup', 'cashAdvance'];
+
 function emptyTx(cardId: string, currencyCode: string): Omit<CreditCardTransaction, 'id'> {
   return {
     cardId,
     date: today(),
     time: nowTime(defaultTimezoneForCurrency(currencyCode)),
     timezone: defaultTimezoneForCurrency(currencyCode),
-    kind: 'charge',
+    kind: 'fee',
     amount: 0,
     description: '',
     categoryID: UNCATEGORIZED_ID,
@@ -331,16 +333,18 @@ function CreditCardTransactionFields({
   value,
   onChange,
   required = false,
+  kinds = Object.keys(KIND_LABELS) as CreditCardTransactionKind[],
 }: {
   value: Omit<CreditCardTransaction, 'id'>;
   onChange: (patch: Partial<CreditCardTransaction>) => void;
   required?: boolean;
+  kinds?: CreditCardTransactionKind[];
 }) {
   return (
     <>
       <Field label="Type" width={190} required={required}>
         <Select value={value.kind} onChange={(e) => onChange({ kind: e.target.value as CreditCardTransactionKind })}>
-          {(Object.keys(KIND_LABELS) as CreditCardTransactionKind[]).map((k) => <option key={k} value={k}>{KIND_LABELS[k]}</option>)}
+          {kinds.map((k) => <option key={k} value={k}>{KIND_LABELS[k]}</option>)}
         </Select>
       </Field>
       <Field label="Date" width={140}>
@@ -365,19 +369,7 @@ function CreditCardTransactionFields({
   );
 }
 
-/** User-reported (2026-09-14): "No FAB capable of multiple enteries at a
- * time" — this used to add exactly one transaction per submit (add, form
- * resets, sign-in-gate re-runs) with no way to queue several from one
- * real statement in a single sitting, unlike the app-wide `Main` tier's
- * own "FAB(+) + popups for adding a single OR A BATCH of new
- * transactions" rule (CLAUDE.md) — every other kind-picker-needing add
- * flow either already batches (Bank's own CSV import,
- * `TransactionEntryModal`'s multi-row `rows` state) or doesn't need to
- * (a plain deposit/withdrawal covered by `TransactionEntryModal` itself,
- * which a credit card can't fully use since it hardcodes `kind:'payment'`
- * — see that file's own comment). Rewritten onto the same
- * queue-a-row/remove-a-row/submit-all-at-once shape, backed by the
- * already-existing bulk `addCreditCardTransactions`. */
+/** Batch entry for card kinds the shared charge/payment form does not expose. */
 function AddCardTransactionForm({ card, onDone }: { card: CreditCard; onDone?: () => void }) {
   const ensureSignedIn = useEnsureSignedIn();
   const [nextKey, setNextKey] = useState(1);
@@ -404,7 +396,7 @@ function AddCardTransactionForm({ card, onDone }: { card: CreditCard; onDone?: (
     <div>
       {rows.map((row, i) => (
         <div key={row.key} className="row gap-sm mb-sm" style={{ alignItems: 'flex-end' }}>
-          <CreditCardTransactionFields value={row} required={i === 0} onChange={(patch) => updateRow(row.key, patch)} />
+          <CreditCardTransactionFields value={row} kinds={SPECIAL_CARD_ENTRY_KINDS} required={i === 0} onChange={(patch) => updateRow(row.key, patch)} />
           <IconButton label="Remove row" icon={<TrashIcon size={12} />} align="right" onClick={() => removeRow(row.key)} />
         </div>
       ))}
@@ -932,30 +924,21 @@ export function CreditCardDetailPage() {
   );
 }
 
-/** User-reported (2026-09-14): "CC UI is definitely violating the UI
- * Rules... No FAB capable of multiple enteries at a time" — this detail
- * page used to have NO FAB at all; "Add a transaction" sat as a
- * permanently-visible card, unlike every other per-entity detail page
- * (`AccountDetailPage`'s `AccountTransfersFab`), which is exactly the
- * "Often tier" pattern this app's Main/Often/Rare model calls for. Gives
- * this page a real 2-action panel: the kind-aware batch add form (charges/
- * fees/markup/cashAdvance — `TransactionEntryModal` can't do these, see
- * its own comment) and "Transfers" (a real linked payment from a Bank/Cash
- * account, distinct from the "Approve & log" minimum-payment flow above,
- * which is about the proposed minimum specifically). */
+/** Ordinary card charges, payments and links use the shared entry form.
+ * The focused batch form handles card fees, markup and cash advances. */
 function CreditCardDetailFab({ card }: { card: CreditCard }) {
   const [open, setOpen] = useState<'add' | 'transfer' | 'plan' | null>(null);
   return (
     <>
       <FabPanel
         actions={[
-          { label: 'Add a transaction', icon: <PlusIcon />, onClick: () => setOpen('add') },
-          { label: 'Transfers', icon: <TransferIcon />, onClick: () => setOpen('transfer') },
+          { label: 'Fees, markup and cash advances', icon: <PlusIcon />, onClick: () => setOpen('add') },
+          { label: 'Charges, payments and transfers', icon: <TransferIcon />, onClick: () => setOpen('transfer') },
           { label: 'Add a plan', icon: <PlusIcon />, onClick: () => setOpen('plan') },
         ]}
       />
       {open === 'add' && (
-        <Modal title="Add a transaction" onClose={() => setOpen(null)}>
+        <Modal title="Fees, markup and cash advances" onClose={() => setOpen(null)} manageFocus>
           <AddCardTransactionForm card={card} onDone={() => setOpen(null)} />
         </Modal>
       )}

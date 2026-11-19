@@ -1,3 +1,5 @@
+import { CreditCardDetailPage } from '../CreditCardsSection';
+import { useCreditCardWorkbookStore } from '../../../../store/creditCardWorkbookStore';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -32,6 +34,7 @@ function show(url: string) {
   return render(<MemoryRouter initialEntries={[url]}><TopBar /><Routes>
     <Route path="/bank/account/:id" element={<AccountDetailPage />} />
     <Route path="/bank/bank/:id" element={<BankDetailPage />} />
+    <Route path="/bank/card/:id" element={<CreditCardDetailPage />} />
   </Routes></MemoryRouter>);
 }
 
@@ -106,3 +109,24 @@ it('keeps one live section stack after repeatedly closing batch edit', async () 
     expect(screen.getAllByText('Future cleared payment')).toHaveLength(1);
   }
 }, 15000);
+
+it('routes normal card entry to Transfers and keeps specialized kinds in their own batch form', () => {
+  const previous = useCreditCardWorkbookStore.getState().workbook;
+  useCreditCardWorkbookStore.setState({ workbook: { ...previous, cards: [{ id: 'card', name: 'Test card', currencyCode: 'USD' }], transactions: [] } });
+  try {
+    show('/bank/card/card');
+    const openActions = () => { const button = screen.queryByRole('button', { name: 'Open actions' }); if (button) fireEvent.click(button); };
+    openActions();
+    fireEvent.click(screen.getByRole('button', { name: 'Fees, markup and cash advances' }));
+    const dialog = screen.getByRole('dialog', { name: 'Fees, markup and cash advances' });
+    const kinds = Array.from(dialog.querySelectorAll<HTMLSelectElement>('select')).find(select => select.value === 'fee');
+    expect(Array.from(kinds?.options ?? []).map(option => option.value)).toEqual(['fee', 'markup', 'cashAdvance']);
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    openActions();
+    fireEvent.click(screen.getByRole('button', { name: 'Charges, payments and transfers' }));
+    expect(screen.getByRole('heading', { name: 'Transfers' })).toBeTruthy();
+  } finally {
+    cleanup();
+    useCreditCardWorkbookStore.setState({ workbook: previous });
+  }
+});
