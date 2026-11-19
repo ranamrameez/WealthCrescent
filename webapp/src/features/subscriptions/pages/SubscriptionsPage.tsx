@@ -456,7 +456,6 @@ function SubscriptionDetail({ sub, onSelect, onBack }: { sub: Subscription; onSe
       : activeAccounts[0]?.id || '',
   );
 
-  const occurrences = generateRenewalOccurrences(sub);
   const linkedLabel = sub.paidVia
     ? sub.paidVia.module === 'cash'
       ? 'Cash'
