@@ -1,3 +1,4 @@
+import { TradingToolPage } from './features/stocks/pages/TradingToolPage';
 import { MarketPricesPage } from './features/qse/pages/MarketPricesPage';
 import { HashRouter, Navigate, Route } from 'react-router-dom';
 import { PageContent } from './components/PageContent';
@@ -177,6 +178,7 @@ function App() {
               <Route path="/" element={<Navigate to="/net-worth" replace />} />
               <Route path="/qse" element={<DashboardPage />} />
               <Route path="/brokers" element={<BrokersPage />} />
+              <Route path="/trade-journal" element={<TradingToolPage tool="journal-qse" />} />
               <Route path="/portfolio" element={<PortfolioPage />} />
               <Route path="/transactions" element={<TransactionsPage />} />
               <Route path="/watchlist" element={<WatchlistPage />} />
@@ -198,6 +200,7 @@ function App() {
               />
               <Route path="/psx" element={<PSXDashboardPage />} />
               <Route path="/psx/brokers" element={<BrokersPage />} />
+              <Route path="/psx/trade-journal" element={<TradingToolPage tool="journal-psx" />} />
               <Route path="/psx/portfolio" element={<PSXPortfolioPage />} />
               <Route path="/psx/transactions" element={<PSXTransactionsPage />} />
               <Route path="/psx/watchlist" element={<PSXWatchlistPage />} />
@@ -207,6 +210,7 @@ function App() {
               <Route path="/psx/trade-planner" element={<Navigate to="/psx/trade-strategy" replace />} />
               <Route path="/psx/trade-strategy" element={<PSXTradeStrategyPage />} />
               <Route path="/psx/risk-analysis" element={<PSXRiskAnalysisPage />} />
+              <Route path="/psx/profiler" element={<TradingToolPage tool="profiler" />} />
               <Route
                 path="/psx/settings"
                 element={

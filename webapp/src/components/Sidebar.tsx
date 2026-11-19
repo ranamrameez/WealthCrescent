@@ -20,6 +20,7 @@ const QSE_NAV_ITEMS = [
   { num: '07', label: 'Analytics', to: '/analytics' },
   { num: '08', label: 'Brokers', to: '/brokers' },
   { num: '09', label: 'Settings', to: '/settings' },
+  { num: '10', label: 'Trade Journal', to: '/trade-journal' },
 ];
 
 const PSX_NAV_ITEMS = [
@@ -32,6 +33,8 @@ const PSX_NAV_ITEMS = [
   { num: '07', label: 'Analytics', to: '/psx/analytics' },
   { num: '08', label: 'Brokers', to: '/psx/brokers' },
   { num: '09', label: 'Settings', to: '/psx/settings' },
+  { num: '10', label: 'Trade Journal', to: '/psx/trade-journal' },
+  { num: '11', label: 'PSX Profiler', to: '/psx/profiler' },
 ];
 
 const PAGES_OPEN_KEY = 'WealthCrescent_stock_pages_open_v1';
