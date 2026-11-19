@@ -10,5 +10,7 @@ export function createEmptyPlannedCashWorkbook(): PlannedCashWorkbook {
     settings: { ...DEFAULT_PLANNED_CASH_SETTINGS },
     entries: [],
     planGroups: [],
+    budgets: [],
+    budgetAllocations: [],
   };
 }

@@ -1,0 +1,20 @@
+import '@testing-library/jest-dom/vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { afterEach, expect, it, vi } from 'vitest';
+import { AppShell } from '../AppShell';
+vi.mock('../Sidebar', () => ({ Sidebar: ({ className, onNavigate }: { className: string; onNavigate: () => void }) => <nav data-testid="sidebar" className={className}><button onClick={onNavigate}>Navigate</button></nav> }));
+vi.mock('../PageFabGroup', () => ({ PageFabGroup: () => null }));
+afterEach(cleanup);
+it('owns the mobile menu inside the top bar and closes the drawer on Escape and navigation', () => {
+  const { container } = render(<MemoryRouter><AppShell user={null}><main>Page</main></AppShell></MemoryRouter>);
+  const button = screen.getByRole('button', { name: 'Open navigation' });
+  expect(button.closest('.page-topbar')).toBeTruthy();
+  expect(container.querySelector('.page-topbar')?.firstElementChild).toBe(button);
+  expect(container.querySelectorAll('.mobile-menu-btn')).toHaveLength(1);
+  fireEvent.click(button); expect(button).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByTestId('sidebar')).toHaveClass('open');
+  fireEvent.keyDown(window, { key: 'Escape' }); expect(button).toHaveAttribute('aria-expanded', 'false');
+  fireEvent.click(button); fireEvent.click(screen.getByRole('button', { name: 'Navigate' }));
+  expect(screen.getByTestId('sidebar')).not.toHaveClass('open');
+});

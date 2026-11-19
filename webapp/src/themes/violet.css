@@ -99,3 +99,23 @@ html[data-color="violet"] .btn.fab-btn {
 }
 html[data-color="violet"] { --accent:#6d4fc9; --accent-soft:#241b3f; --on-accent:#fff; }
 html[data-color="violet"][data-theme="light"] { --accent:#6d4fc9; --accent-soft:#ece6fa; --on-accent:#fff; }
+
+
+/* Shared-component visual treatment: shape, surfaces and chart depth. */
+html[data-color="violet"] {
+  --summary-radius: 14px;
+  --summary-surface: var(--panel);
+  --summary-border: 1px solid color-mix(in srgb,var(--accent) 22%,var(--border));
+  --summary-shadow: 0 4px 14px color-mix(in srgb,var(--accent) 8%,transparent);
+  --navigation-radius: 18px;
+  --dropdown-radius: 14px;
+  --dropdown-item-radius: 8px;
+  --chart-tension: 0.28;
+  --chart-bar-radius: 10;
+  --chart-fill-opacity: 0.5;
+  --chart-line-width: 2;
+  --chart-grid-opacity: 0.2;
+  --chart-tooltip-radius: 10;
+  --chart-shadow-blur: 8;
+  --chart-shadow-opacity: 0.1;
+}

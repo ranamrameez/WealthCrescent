@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { BackButton } from '../../../components/BackButton';
 import { PageHeading } from '../../../components/PageHeading';
 import { StandardPageSections, type StandardPageSection } from '../../../components/StandardPageSections';
@@ -33,6 +33,9 @@ export function BrokersPage() {
   const workbook = isPSX ? psx : qse;
   const profiles = workbook.brokerProfiles ?? [];
   const activeId = workbook.activeBrokerId ?? '';
+  const requestedBrokerId = new URLSearchParams(location.search).get('broker');
+  const requestedBroker = requestedBrokerId ? profiles.find(profile => profile.id === requestedBrokerId) : undefined;
+  const brokerListPath = isPSX ? '/psx/brokers' : '/brokers';
   const [newName, setNewName] = useState('');
   const [newAccountLabel, setNewAccountLabel] = useState('');
   const [drafts, setDrafts] = useState<Record<string, BrokerDraft>>({});
@@ -314,7 +317,12 @@ export function BrokersPage() {
         <h1 className="pagetitle">Broker profiles</h1>
         <p className="text-muted" style={{ marginTop: 4 }}>{isPSX ? 'Manage separate PSX accounts and broker-specific portfolio histories.' : 'Manage separate QSE broker/account profiles and portfolio histories.'}</p>
       </PageHeading>
-      <StandardPageSections sections={sections} defaultKey="active-profiles" preserveOrder />
+      {requestedBrokerId ? <>
+        <p><Link to={brokerListPath}>Show all broker profiles</Link></p>
+        {requestedBroker
+          ? renderProfile(requestedBroker, requestedBroker.archived ? 'archived' : requestedBroker.deactivated ? 'deactivated' : 'active')
+          : <p role="status">Broker profile not found.</p>}
+      </> : <StandardPageSections sections={sections} defaultKey="active-profiles" preserveOrder />}
       {isPSX && <p className="text-muted">Market prices, price history and exchange-wide information are shared across all PSX broker profiles. Historical trades already in the legacy PSX workbook are assigned to JS Zindagi without changing their trade fields.</p>}
     </div>
   );

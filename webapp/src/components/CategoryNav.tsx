@@ -14,7 +14,7 @@ import {
   SubscriptionsIcon,
 } from './icons';
 
-export type CategoryKey = 'netWorth' | 'stocks' | 'funds' | 'bank' | 'cash' | 'personalLoans' | 'emi' | 'rentals' | 'subscriptions' | 'planning';
+export type CategoryKey = 'netWorth' | 'stocks' | 'funds' | 'bank' | 'cash' | 'personalLoans' | 'emi' | 'rentals' | 'subscriptions' | 'planning' | 'organize';
 
 // User-requested (2026-08-28): "This entirely removes the transfers page
 // and the problem of duplicated transaction cards" — the standalone
@@ -22,7 +22,7 @@ export type CategoryKey = 'netWorth' | 'stocks' | 'funds' | 'bank' | 'cash' | 'p
 // "Transfers" FAB (`components/ui/Fab.tsx`'s `FabPanel`) reachable from
 // every module page.
 export const CATEGORIES: { key: CategoryKey; label: string; to: string; icon: ReactNode }[] = [
-  { key: 'netWorth', label: 'Dashboard', to: '/net-worth', icon: <DashboardIcon /> },
+  { key: 'netWorth', label: 'Dashboard', to: '/dashboard', icon: <DashboardIcon /> },
   { key: 'stocks', label: 'Stock Exchanges', to: '/qse', icon: <StocksIcon /> },
   { key: 'funds', label: 'Funds', to: '/funds', icon: <FundsIcon /> },
   { key: 'bank', label: 'Banking', to: '/bank', icon: <BankIcon /> },
@@ -31,6 +31,7 @@ export const CATEGORIES: { key: CategoryKey; label: string; to: string; icon: Re
   { key: 'emi', label: 'EMI / Loans', to: '/emi-loans', icon: <EMIIcon /> },
   { key: 'rentals', label: 'Rentals', to: '/rentals', icon: <RentalsIcon /> },
   { key: 'subscriptions', label: 'Subscriptions', to: '/subscriptions', icon: <SubscriptionsIcon /> },
+  { key: 'organize', label: 'Organize', to: '/organize/categories', icon: <PlanningIcon /> },
   { key: 'planning', label: 'Planning', to: '/planning', icon: <PlanningIcon /> },
 ];
 
@@ -47,10 +48,10 @@ export const CATEGORIES: { key: CategoryKey; label: string; to: string; icon: Re
  * sidebar while on `/account` — this was that same fallback firing for a
  * page it was never meant to cover. */
 export function categoryForPath(pathname: string): CategoryKey | null {
-  if (pathname.startsWith('/account')) return null;
+  if (pathname === '/search' || pathname.startsWith('/account')) return null;
   if (pathname.startsWith('/app-data')) return null;
   if (pathname.startsWith('/legal')) return null;
-  if (pathname.startsWith('/net-worth')) return 'netWorth';
+  if (pathname === '/' || pathname === '/dashboard' || pathname.startsWith('/net-worth')) return 'netWorth';
   if (pathname.startsWith('/funds')) return 'funds';
   if (pathname.startsWith('/bank')) return 'bank';
   if (pathname.startsWith('/cash')) return 'cash';
@@ -58,6 +59,7 @@ export function categoryForPath(pathname: string): CategoryKey | null {
   if (pathname.startsWith('/emi-loans')) return 'emi';
   if (pathname.startsWith('/rentals')) return 'rentals';
   if (pathname.startsWith('/subscriptions')) return 'subscriptions';
+  if (pathname === '/organize' || pathname.startsWith('/organize/')) return 'organize';
   if (pathname.startsWith('/planning')) return 'planning';
   if (pathname.startsWith('/budget')) return 'planning';
   return 'stocks';
@@ -105,6 +107,10 @@ export function CategoryNav({ onNavigate, stocksSubnav }: { onNavigate?: () => v
             {c.label}
           </NavLink>
           {c.key === 'stocks' && active === 'stocks' && stocksSubnav}
+          {c.key === 'organize' && active === 'organize' && <div className="category-stocks-subnav">
+            <NavLink className="navbtn" to="/organize/suggested-links" onClick={onNavigate}>Suggested links</NavLink>
+            <NavLink className="navbtn" to="/organize/categories" onClick={onNavigate}>Categories</NavLink>
+          </div>}
         </Fragment>
       ))}
     </nav>

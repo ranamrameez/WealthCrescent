@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PricePoint } from '../../../types/workbook';
-import { computePriceStats } from '../priceHistory';
+import { computePriceStats, getMarketPrice } from '../priceHistory';
 
 describe('computePriceStats', () => {
   it('computes min/max/median across a single update per day (unaffected by the fix)', () => {
@@ -56,4 +56,24 @@ describe('computePriceStats', () => {
   it('returns null when there is no price history at all', () => {
     expect(computePriceStats('TEST', {})).toBeNull();
   });
+});
+
+
+it('never values a cleared holding using an unfilled BUY as its price fallback', () => {
+  const transactions = [
+    { date: '2026-01-01', ticker: 'ABC', action: 'BUY', shares: 10, price: 20 },
+    { date: '2026-01-02', ticker: 'ABC', action: 'BUY', shares: 10, price: 900, isPending: true },
+  ] as import('../../../types/workbook').Transaction[];
+  expect(getMarketPrice('ABC', {}, transactions)).toBe(20);
+  expect(getMarketPrice('ABC', { ABC: Infinity }, transactions)).toBe(20);
+});
+
+it('uses shared accounting order for same-day BUY fallback prices without mutating inputs', () => {
+  const transactions = [
+    { date: '2026-01-01', ticker: 'ABC', action: 'BUY', shares: 10, price: 20, accountingOrder: 2, seq: 1 },
+    { date: '2026-01-01', ticker: 'ABC', action: 'BUY', shares: 10, price: 10, accountingOrder: 1, seq: 2 },
+  ] as import('../../../types/workbook').Transaction[];
+  const before = structuredClone(transactions);
+  expect(getMarketPrice('ABC', {}, transactions)).toBe(20);
+  expect(transactions).toEqual(before);
 });

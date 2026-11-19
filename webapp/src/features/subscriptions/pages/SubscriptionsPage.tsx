@@ -1,3 +1,5 @@
+import { useReviewedSubscriptionPayments } from '../../organize/SuggestedLinks';
+import { useUrlEntitySelection } from '../../../hooks/useUrlEntitySelection';
 import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
@@ -15,7 +17,7 @@ import { ModuleDetailTemplate } from '../../../components/ModuleDetailTemplate';
 import type { User } from 'firebase/auth';
 import { useMemo, useState, type ComponentProps } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Bar, Doughnut } from 'react-chartjs-2';
+import { AppBar as Bar, AppDoughnut as Doughnut } from '../../../components/AppCharts';
 import { Card, EntityCard, MoneyValue } from '../../../components/Card';
 import { CategorySelect } from '../../../components/CategorySelect';
 import { Notice } from '../../../components/Notice';
@@ -47,7 +49,9 @@ import { categoryName, UNCATEGORIZED_ID } from '../../../lib/categories';
 import { cssVar, tickerColor } from '../../../lib/cssVar';
 import { fmtMoney, formatDate } from '../../../lib/format';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
-import { firebaseReady } from '../../../lib/firebase/client';
+import { auth, firebaseReady } from '../../../lib/firebase/client';
+import { regenerateSubscriptionRenewals, type RenewalFundingSource } from '../../../services/finance/subscriptionRenewalService';
+import { deleteSubscription, saveSubscription, toggleSubscriptionActive } from '../../../services/finance/subscriptionLifecycleService';
 import { useAppearanceStore } from '../../../store/appearanceStore';
 import { useBankWorkbookStore } from '../../../store/bankWorkbookStore';
 import { useCategoryStore } from '../../../store/categoryStore';
@@ -59,9 +63,6 @@ import { usePlannedCreditCardWorkbookStore } from '../../../store/plannedCreditC
 import { useSubscriptionsWorkbookStore } from '../../../store/subscriptionsWorkbookStore';
 import type { Subscription, SubscriptionAlert } from '../../../types/subscriptionsWorkbook';
 import type { Category } from '../../../types/finance';
-import type { PlannedBankTransaction } from '../../../types/plannedBank';
-import type { PlannedCashEntry } from '../../../types/plannedCash';
-import type { PlannedCreditCardTransaction } from '../../../types/plannedCreditCard';
 import { ChartCard } from '../../qse/components/ChartCard';
 import { gridAutoStyle } from '../../../lib/gridStyle';
 
@@ -99,7 +100,6 @@ function AddSubscriptionFab() {
 }
 
 function AddSubscriptionForm({ onSaved, subscription }: { onSaved?: () => void; subscription?: Subscription } = {}) {
-  const addEntry = useSubscriptionsWorkbookStore((s) => s.addEntry);
   const defaultCurrency = useSubscriptionsWorkbookStore((s) => s.workbook.settings.defaultCurrency);
   const [lastCurrency, setLastCurrency] = useLastCurrency('subscriptions', defaultCurrency);
   const ensureSignedIn = useEnsureSignedIn();
@@ -107,15 +107,17 @@ function AddSubscriptionForm({ onSaved, subscription }: { onSaved?: () => void; 
   const currencyOptions = useEnabledCurrencies(s.currencyCode);
 
   const submit = async () => {
-    if (!s.name.trim()) return toast('Enter a subscription name.');
-    if (!s.amount || s.amount <= 0) return toast('Enter an amount.');
-    if (s.billingCycle === 'custom' && (!s.customDays || s.customDays <= 0)) return toast('Enter the custom cycle length in days.');
     if (!(await ensureSignedIn('Sign in to save subscriptions.'))) return;
-    if (subscription) useSubscriptionsWorkbookStore.getState().updateEntry(subscription.id, { ...s, name: s.name.trim() });
-    else addEntry({ ...s, id: crypto.randomUUID(), name: s.name.trim() });
-    toast(`Subscription "${s.name.trim()}" added.`);
-    setS(emptySubscription(s.currencyCode));
-    onSaved?.();
+    const owner = auth?.currentUser?.uid;
+    if (!owner) return;
+    try {
+      const name = saveSubscription(s, owner, subscription);
+      toast(`Subscription "${name}" ${subscription ? 'updated' : 'added'}.`);
+      setS(emptySubscription(s.currencyCode));
+      onSaved?.();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Could not save this subscription.');
+    }
   };
 
   return (
@@ -435,8 +437,6 @@ function SubscriptionDetail({ sub, onSelect, onBack }: { sub: Subscription; onSe
   const switchEntities = useSubscriptionsWorkbookStore(s=>s.workbook.entries);
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
   const dateFormat = useAppearanceStore((s) => s.appearance.dateFormat);
-  const updateEntry = useSubscriptionsWorkbookStore((s) => s.updateEntry);
-  const deleteEntry = useSubscriptionsWorkbookStore((s) => s.deleteEntry);
   const categoryRegistry = useCategoryStore((s) => s.workbook.categories);
   const ensureSignedIn = useEnsureSignedIn();
   const [editing, setEditing] = useState(false);
@@ -449,15 +449,6 @@ function SubscriptionDetail({ sub, onSelect, onBack }: { sub: Subscription; onSe
   const activeAccounts = accounts.filter((a) => a.isActive !== false);
   const cards = useCreditCardWorkbookStore((s) => s.workbook.cards);
   const activeCards = cards.filter((c) => c.isActive !== false);
-  const plannedBankEntries = usePlannedBankWorkbookStore((s) => s.workbook.entries);
-  const addPlannedBankEntries = usePlannedBankWorkbookStore((s) => s.addEntries);
-  const deletePlannedBankEntry = usePlannedBankWorkbookStore((s) => s.deleteEntry);
-  const plannedCashEntries = usePlannedCashWorkbookStore((s) => s.workbook.entries);
-  const addPlannedCashEntries = usePlannedCashWorkbookStore((s) => s.addEntries);
-  const deletePlannedCashEntry = usePlannedCashWorkbookStore((s) => s.deleteEntry);
-  const plannedCreditCardEntries = usePlannedCreditCardWorkbookStore((s) => s.workbook.entries);
-  const addPlannedCreditCardEntries = usePlannedCreditCardWorkbookStore((s) => s.addEntries);
-  const deletePlannedCreditCardEntry = usePlannedCreditCardWorkbookStore((s) => s.deleteEntry);
 
   const [linkModule, setLinkModule] = useState<'bank' | 'cash' | 'creditCard'>(sub.paidVia?.module ?? 'bank');
   const [linkRefId, setLinkRefId] = useState(
@@ -466,7 +457,6 @@ function SubscriptionDetail({ sub, onSelect, onBack }: { sub: Subscription; onSe
       : activeAccounts[0]?.id || '',
   );
 
-  const occurrences = generateRenewalOccurrences(sub);
   const linkedLabel = sub.paidVia
     ? sub.paidVia.module === 'cash'
       ? 'Cash'
@@ -478,62 +468,30 @@ function SubscriptionDetail({ sub, onSelect, onBack }: { sub: Subscription; onSe
 
   const toggleActive = async () => {
     if (!(await ensureSignedIn('Sign in to update this subscription.'))) return;
-    updateEntry(sub.id, sub.active ? { active: false, cancelledDate: today() } : { active: true, cancelledDate: undefined });
-    toast(sub.active ? 'Subscription cancelled.' : 'Subscription reactivated.');
+    const owner = auth?.currentUser?.uid;
+    if (!owner) return;
+    try {
+      const active = toggleSubscriptionActive(sub, owner, today());
+      toast(active ? 'Subscription reactivated.' : 'Subscription cancelled.');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Could not update this subscription.');
+    }
   };
 
   const generatePlans = async () => {
     if (!(await ensureSignedIn('Sign in to generate renewal plans.'))) return;
-    const completedDates = new Set([...plannedBankEntries, ...plannedCashEntries, ...plannedCreditCardEntries]
-      .filter(plan => plan.sourceSubscriptionId === sub.id && plan.executed).map(plan => plan.date));
-    const remainingOccurrences = occurrences.filter(occurrence => !completedDates.has(occurrence.date));
-    if (linkModule === 'bank' && !accounts.some(account => account.id === linkRefId)) return toast('Pick a bank account first.');
-    if (linkModule === 'creditCard' && !cards.some(card => card.id === linkRefId)) return toast('Pick a credit card first.');
-    const relinking = !!sub.paidVia;
-    if (relinking) {
-      const ok = await confirmDialog(
-        'This replaces this subscription\'s not-yet-done planned renewals with fresh ones. Already-completed plans are untouched.',
-        'Regenerate renewal plans?',
-      );
-      if (!ok) return;
-    }
-    plannedBankEntries.filter((p) => p.sourceSubscriptionId === sub.id && !p.executed).forEach((p) => deletePlannedBankEntry(p.id));
-    plannedCashEntries.filter((p) => p.sourceSubscriptionId === sub.id && !p.executed).forEach((p) => deletePlannedCashEntry(p.id));
-    plannedCreditCardEntries.filter((p) => p.sourceSubscriptionId === sub.id && !p.executed).forEach((p) => deletePlannedCreditCardEntry(p.id));
-    if (linkModule === 'bank') {
-      const account = accounts.find((a) => a.id === linkRefId);
-      if (!account) return toast('Pick a bank account first.');
-      const newPlans: PlannedBankTransaction[] = remainingOccurrences.map((o) => ({
-        id: crypto.randomUUID(), accountId: account.id, date: o.date,
-        description: `Subscription: ${sub.name}`, amount: -o.amount, executed: false, sourceSubscriptionId: sub.id,
-      }));
-      addPlannedBankEntries(newPlans);
-      updateEntry(sub.id, { paidVia: { module: 'bank', ref: account.id } });
-      toast(`${newPlans.length} planned renewal${newPlans.length > 1 ? 's' : ''} added to ${account.name}'s Planning tab.`);
-    } else if (linkModule === 'creditCard') {
-      const card = cards.find((c) => c.id === linkRefId);
-      if (!card) return toast('Pick a credit card first.');
-      const newPlans: PlannedCreditCardTransaction[] = remainingOccurrences.map((o) => ({
-        id: crypto.randomUUID(), cardId: card.id, date: o.date, kind: 'charge',
-        description: `Subscription: ${sub.name}`, amount: o.amount, executed: false, sourceSubscriptionId: sub.id,
-      }));
-      addPlannedCreditCardEntries(newPlans);
-      updateEntry(sub.id, { paidVia: { module: 'creditCard', ref: card.id } });
-      toast(`${newPlans.length} planned renewal${newPlans.length > 1 ? 's' : ''} added to ${card.name}'s Planning section.`);
-    } else {
-      // A generated plan's own `category` is free text (Planning predates the
-      // shared registry) — only pass a real category name through, not the
-      // generic "Uncategorized" fallback `subCategoryLabel` uses for display.
-      const planCategory = sub.categoryID && sub.categoryID !== UNCATEGORIZED_ID
-        ? categoryName(sub.categoryID, categoryRegistry)
-        : sub.category;
-      const newPlans: PlannedCashEntry[] = remainingOccurrences.map((o) => ({
-        id: crypto.randomUUID(), date: o.date, type: 'OUT', amount: o.amount, currencyCode: sub.currencyCode,
-        category: planCategory, note: `Subscription: ${sub.name}`, executed: false, sourceSubscriptionId: sub.id,
-      }));
-      addPlannedCashEntries(newPlans);
-      updateEntry(sub.id, { paidVia: { module: 'cash' } });
-      toast(`${newPlans.length} planned renewal${newPlans.length > 1 ? 's' : ''} added to Cash's Planning tab.`);
+    const owner = auth?.currentUser?.uid;
+    if (!owner) return;
+    if (sub.paidVia && !(await confirmDialog(
+      "This replaces this subscription's not-yet-done planned renewals with fresh ones. Already-completed plans are untouched.",
+      'Regenerate renewal plans?',
+    ))) return;
+    try {
+      const funding: RenewalFundingSource = linkModule === 'cash' ? { module: linkModule } : { module: linkModule, ref: linkRefId };
+      const { count, sourceName } = regenerateSubscriptionRenewals(sub, funding, owner);
+      toast(`${count} planned renewal${count === 1 ? '' : 's'} added to ${sourceName}.`);
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Could not generate renewal plans.');
     }
   };
 
@@ -558,7 +516,15 @@ function SubscriptionDetail({ sub, onSelect, onBack }: { sub: Subscription; onSe
                 icon={<TrashIcon size={13} />}
                 align="right"
                 onClick={async () => {
-                  if (await confirmDialog('This cannot be undone.', `Delete subscription "${sub.name}"?`)) { deleteEntry(sub.id); onBack(); }
+                  if (!(await ensureSignedIn('Sign in to delete this subscription.'))) return;
+                  const owner = auth?.currentUser?.uid;
+                  if (!owner || !(await confirmDialog('This cannot be undone.', `Delete subscription "${sub.name}"?`))) return;
+                  try {
+                    deleteSubscription(sub, owner);
+                    onBack();
+                  } catch (error) {
+                    toast(error instanceof Error ? error.message : 'Could not delete this subscription.');
+                  }
                 }}
               />
             </div>
@@ -659,7 +625,9 @@ function SubscriptionPlansOverview({ subscriptions, filters }: { subscriptions: 
   const payments = useSubscriptionPaymentPlans();
   const dateFormat = useAppearanceStore(state => state.appearance.dateFormat);
   const categories = useCategoryStore(state => state.workbook.categories);
-  const rows = subscriptions.flatMap(subscription => generateRenewalOccurrences(subscription).filter(occurrence => !payments.some(plan => plan.sourceSubscriptionId === subscription.id && plan.executed && plan.date === occurrence.date)).map(occurrence => ({ subscription, ...occurrence })))
+  const reviewed = useReviewedSubscriptionPayments();
+  const reviewedOccurrences = new Set(reviewed.map(row => JSON.stringify([row.subscriptionId, row.occurrenceDate])));
+  const rows = subscriptions.flatMap(subscription => generateRenewalOccurrences(subscription).filter(occurrence => !reviewedOccurrences.has(JSON.stringify([subscription.id, occurrence.date])) && !payments.some(plan => plan.sourceSubscriptionId === subscription.id && plan.executed && plan.date === occurrence.date)).map(occurrence => ({ subscription, ...occurrence })))
     .filter(row => (!filters.fromDate || row.date >= filters.fromDate) && (!filters.toDate || row.date <= filters.toDate) && filters.direction !== 'in' && filters.source !== 'statement-import' && (filters.category === 'all' || subCategoryLabel(row.subscription, categories) === filters.category)).sort((a, b) => a.date.localeCompare(b.date));
   const sortedRows = dateSort.rows(rows, { date: row => row });
   const { rows: pageRows, controls } = useTablePagination(sortedRows);
@@ -669,13 +637,21 @@ function SubscriptionPlansOverview({ subscriptions, filters }: { subscriptions: 
 function SubscriptionPaymentsOverview({ subscriptions, filters }: { subscriptions: Subscription[]; filters: TransactionPageFilters }) {
   const dateSort = useDateTableSort();
   const plans = useSubscriptionPaymentPlans();
+  const reviewed = useReviewedSubscriptionPayments();
   const categories = useCategoryStore(state => state.workbook.categories);
-  const rows = plans.filter(plan => plan.executed && subscriptions.some(sub => sub.id === plan.sourceSubscriptionId && (filters.category === 'all' || subCategoryLabel(sub, categories) === filters.category)))
-    .map(plan => ({ plan, date: plan.fulfilledDate ?? plan.date, sub: subscriptions.find(sub => sub.id === plan.sourceSubscriptionId)! }))
+  const fulfilled = plans.filter(plan => plan.executed && subscriptions.some(sub => sub.id === plan.sourceSubscriptionId && (filters.category === 'all' || subCategoryLabel(sub, categories) === filters.category)))
+    .map(plan => ({ plan, date: plan.fulfilledDate ?? plan.date, sub: subscriptions.find(sub => sub.id === plan.sourceSubscriptionId)! }));
+  const reviewedRows = reviewed.flatMap(({ payment, subscriptionId, occurrenceDate }) => {
+    const sub = subscriptions.find(item => item.id === subscriptionId);
+    if (!sub || (filters.category !== 'all' && subCategoryLabel(sub, categories) !== filters.category) ||
+        fulfilled.some(row => row.sub.id === subscriptionId && row.plan.date === occurrenceDate)) return [];
+    return [{ sub, date: payment.date, plan: { id: JSON.stringify([payment.module, payment.sourceId, payment.recordId]), date: occurrenceDate, amount: payment.amount } }];
+  });
+  const rows = [...fulfilled, ...reviewedRows]
     .filter(row => (!filters.fromDate || row.date >= filters.fromDate) && (!filters.toDate || row.date <= filters.toDate) && filters.direction !== 'in' && filters.source !== 'statement-import').sort((a, b) => b.date.localeCompare(a.date));
   const sortedRows = dateSort.rows(rows, { date: row => row, renewal: row => row.plan });
   const { rows: pageRows, controls } = useTablePagination(sortedRows);
-  return <div className="table-scroll"><table><thead><tr><dateSort.Th rows={rows} column="date">Paid on</dateSort.Th><th>Subscription</th><dateSort.Th rows={rows} column="renewal">Scheduled renewal</dateSort.Th><th>Amount</th></tr></thead><tbody>{pageRows.map(row => <RecordRow record={row} key={row.plan.id}><td><DateValue value={row.date} /></td><td>{row.sub.name}</td><td><DateValue value={row.plan.date} /></td><td>{fmtMoney(Math.abs(row.plan.amount), row.sub.currencyCode)}</td></RecordRow>)}</tbody></table>{controls}{!rows.length && <p className="text-muted">No fulfilled renewal plans in this period.</p>}</div>;
+  return <div className="table-scroll"><table><thead><tr><dateSort.Th rows={rows} column="date">Paid on</dateSort.Th><th>Subscription</th><dateSort.Th rows={rows} column="renewal">Scheduled renewal</dateSort.Th><th>Amount</th></tr></thead><tbody>{pageRows.map(row => <RecordRow record={row} key={row.plan.id}><td><DateValue value={row.date} /></td><td>{row.sub.name}</td><td><DateValue value={row.plan.date} /></td><td>{fmtMoney(Math.abs(row.plan.amount), row.sub.currencyCode)}</td></RecordRow>)}</tbody></table>{controls}{!rows.length && <p className="text-muted">No subscription payments in this period.</p>}</div>;
 }
 
 function SubscriptionAlertsOverview({ subscriptions }: { subscriptions: Subscription[] }) {
@@ -862,8 +838,8 @@ export function SubscriptionsPage({
   cloudEmpty: boolean;
   uploadLocalToCloud: () => Promise<void>;
 }) {
-  const [selected, setSelected] = useState<Subscription | null>(null);
   const subs = useSubscriptionsWorkbookStore((s) => s.workbook.entries);
+  const [selected, setSelected] = useUrlEntitySelection('subscription', subs);
   const liveSelected = selected ? subs.find((s) => s.id === selected.id) ?? null : null;
   const [params] = useSearchParams();
   const selectedIds = selectedEntityValues(params, subs.map((s) => s.id));

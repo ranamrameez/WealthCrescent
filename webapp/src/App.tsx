@@ -1,3 +1,6 @@
+import { SuggestedLinksPage, SuggestedLinksProvider } from './features/organize/SuggestedLinks';
+import { CategoriesPage } from './features/categories/CategoriesPage';
+import { RecordSearchPage } from './features/search/RecordSearchPage';
 import { TradingToolPage } from './features/stocks/pages/TradingToolPage';
 import { MarketPricesPage } from './features/qse/pages/MarketPricesPage';
 import { HashRouter, Navigate, Route } from 'react-router-dom';
@@ -98,7 +101,7 @@ function useApplyAppearance() {
 // feedback_cloud_sync_safety memory.
 function App() {
   useApplyAppearance();
-  const { user, status, cloudEmpty, uploadLocalToCloud } = useFirebaseSync();
+  const { user, status, cloudEmpty, uploadLocalToCloud, workbookOwner: qseOwner } = useFirebaseSync();
   // Same account, separate cloud path — see usePSXFirebaseSync. Both syncs
   // run all the time (not just while their routes are active) so a PSX
   // trade logged, say, right before switching to QSE has already started
@@ -119,7 +122,7 @@ function App() {
   // speculative data, not irreplaceable history, so skipping the manual
   // "upload local to cloud" affordance for cloudEmpty is an accepted v1
   // simplification. Still run the sync itself so plans persist/pull.
-  usePlannedRentalsFirebaseSync();
+  const plannedRentalsSync = usePlannedRentalsFirebaseSync();
   const transfersSync = useInterEntityTransfersFirebaseSync();
   const subscriptionsSync = useSubscriptionsFirebaseSync();
   const netWorthSnapshotsSync = useNetWorthSnapshotsFirebaseSync();
@@ -130,7 +133,7 @@ function App() {
   const categorySync = useCategoryFirebaseSync();
   // Category groups (the "bird's-eye view" — README Pending item 5) — same
   // no-dedicated-status-UI treatment as the Category registry itself.
-  useCategoryGroupFirebaseSync();
+  const categoryGroupSync = useCategoryGroupFirebaseSync();
   // User-reported (2026-09-14): "the app asks the user on every new device,
   // which is wrong" — mirrors the enabled-currencies/onboarding-seen
   // preference into the account's real cloud profile so it follows the
@@ -140,6 +143,15 @@ function App() {
   // have an smsSenderId/smsSenderNumber configured — see lib/nativeBridge.ts. A no-op outside
   // the Android app's own WebView (window.AndroidBridge never exists in a normal browser).
   useNativeBridgeSync();
+  const searchWorkbookOwners = {
+    qse: qseOwner, psx: psxSync.workbookOwner, cash: cashSync.workbookOwner,
+    bank: bankSync.workbookOwner, cards: creditCardSync.workbookOwner, rentals: rentalsSync.workbookOwner,
+    funds: fundsSync.workbookOwner, emi: emiSync.workbookOwner, loans: personalLoansSync.workbookOwner,
+    subscriptions: subscriptionsSync.workbookOwner, cashPlans: plannedCashSync.workbookOwner,
+    bankPlans: plannedBankSync.workbookOwner, cardPlans: plannedCreditCardSync.workbookOwner,
+    rentalPlans: plannedRentalsSync.workbookOwner, transfers: transfersSync.workbookOwner,
+    snapshots: netWorthSnapshotsSync.workbookOwner,
+  };
 
   // README Pending item 76: one worst-of-N sync-status indicator in the
   // Sidebar instead of each module's own status buried in its own
@@ -172,10 +184,16 @@ function App() {
       <LinkedEditChoiceDialogHost />
       <SignInModalHost />
       <HashRouter useTransitions={false}>
+        <SuggestedLinksProvider key={user?.uid ?? 'guest'} owner={user?.uid} owners={{ ...searchWorkbookOwners, categories: categorySync.workbookOwner }}>
         <AppShell user={user}>
           <ErrorBoundary>
             <PageContent>
-              <Route path="/" element={<Navigate to="/net-worth" replace />} />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/search" element={<RecordSearchPage owner={user?.uid} workbookOwners={searchWorkbookOwners} />} />
+              <Route path="/organize/suggested-links" element={<SuggestedLinksPage />} />
+              <Route path="/organize/categories/:categoryId?" element={<CategoriesPage
+                owner={user?.uid} categoryOwner={categorySync.workbookOwner} groupOwner={categoryGroupSync.workbookOwner} workbookOwners={searchWorkbookOwners} />} />
+              <Route path="/net-worth" element={<Navigate to="/dashboard" replace />} />
               <Route path="/qse" element={<DashboardPage />} />
               <Route path="/brokers" element={<BrokersPage />} />
               <Route path="/trade-journal" element={<TradingToolPage tool="journal-qse" />} />
@@ -336,7 +354,7 @@ function App() {
                 }
               />
               <Route
-                path="/net-worth"
+                path="/dashboard"
                 element={
                   <NetWorthPage
                     syncStatus={netWorthSnapshotsSync.status}
@@ -352,6 +370,7 @@ function App() {
             </PageContent>
           </ErrorBoundary>
         </AppShell>
+        </SuggestedLinksProvider>
         <CalculatorLauncher />
         <div className="app-notification-stack">
           <SubscriptionAlertsPopup />

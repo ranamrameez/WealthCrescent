@@ -275,7 +275,7 @@ export function ExpandIcon({ size = 14 }: IconProps) {
 export function CollapseIcon({ size = 14 }: IconProps) {
   return (
     <svg width={size} height={size} {...base} aria-hidden>
-      <path d="M3 8V3h5M21 8V3h-5M3 16v5h5M21 16v5h-5" />
+      <path d="M3 3l6 6M4 9h5V4M21 3l-6 6M15 4v5h5M3 21l6-6M4 15h5v5M21 21l-6-6M15 20v-5h5" />
     </svg>
   );
 }

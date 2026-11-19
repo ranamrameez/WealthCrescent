@@ -1,3 +1,5 @@
+import type { SubscriptionMatch } from './subscriptionMatch';
+import type { PlanLink } from './planLink';
 /** Credit Card module — see CLAUDE.md's "Credit Card redesign — concrete
  * proposal" for the full research-backed design writeup this is built
  * from. The user rejected an earlier `isLiability`-on-`BankAccount` design
@@ -30,6 +32,13 @@ export type MarkupMethod = 'flatOnCarried';
  * card just keeps the one number it always had. */
 export type MinPaymentMethod = 'fixed' | 'percentOfBalance' | 'greaterOfFixedOrPercent';
 
+export interface CreditCardStatementOverride {
+  statementBalance?: number;
+  minimumDue?: number;
+  minDueDate?: string;
+  dueDate?: string;
+}
+
 export interface CreditCard {
   id: string;
   name: string;
@@ -59,6 +68,7 @@ export interface CreditCard {
    * printed on the latest statement; recurring day values above/below are
    * maintained internally for compatibility and future cycles. */
   lastBillingDate?: string;
+  statementOverrides?: Record<string, CreditCardStatementOverride>;
   lastMinPaymentDate?: string;
   lastPaymentDueDate?: string;
   /** Day of month (1-31, clamped) the MINIMUM payment is due — resolved
@@ -120,6 +130,8 @@ export interface CreditCard {
 }
 
 export interface CreditCardTransaction {
+  subscriptionMatch?: SubscriptionMatch;
+  planLink?: PlanLink;
   id: string;
   cardId: string;
   date: string;

@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { confirmDialog } from '../../components/ConfirmDialog';
 import {
+  confirmAndDeleteLinkable,
   createLinkedTransfer,
+  linkExistingTransfer,
   deleteLinkCascade,
   findLinkForRecord,
+  hasIndependentInstallmentLinks,
   propagateLinkedEdit,
   resolveLinkedEdit,
   resolveSideCurrency,
@@ -27,7 +30,7 @@ import { useWorkbookStore } from '../../store/workbookStore';
 import { usePSXWorkbookStore } from '../../store/psxWorkbookStore';
 import { createEmptyWorkbook } from '../../store/defaultWorkbook';
 import { createEmptyPSXWorkbook } from '../../store/defaultPsxWorkbook';
-import type { InterEntityTransferInput } from '../../types/interEntityTransfer';
+import type { InterEntityTransfer, InterEntityTransferInput } from '../../types/interEntityTransfer';
 
 const bankAccountId = 'acct-1';
 const loanId = 'loan-1';
@@ -64,6 +67,43 @@ const cashToBankInput: InterEntityTransferInput = {
   from: { module: 'cash', currencyCode: 'USD' },
   to: { module: 'bank', ref: bankAccountId },
 };
+
+const installmentLink: InterEntityTransfer = {
+  ...cashToBankInput,
+  id: 'installment-link',
+  fromRecordId: 'funding-record',
+  toRecordId: 'receipt',
+  to: { module: 'emi', ref: loanId, emiIndependent: true },
+};
+
+it.each(['cash', 'bank', 'creditCard'] as const)('preserves independent receipts funded by %s in generic transfer actions', async module => {
+  const link = { ...installmentLink, from: { ...installmentLink.from, module, ref: bankAccountId } };
+  useInterEntityTransfersStore.getState().addEntry(link);
+
+  expect(await resolveLinkedEdit(module, link.fromRecordId)).toBe('cancel');
+  expect(await warnIfLinked('emi', link.toRecordId)).toBe(false);
+  expect(propagateLinkedEdit(module, link.fromRecordId, { amount: 20 }).error).toContain('corrected together');
+  expect(updateLinkedTransfer({ ...link, toAmount: 20 }, link)).toHaveProperty('error');
+  expect(() => deleteLinkCascade(link)).toThrow('corrected together');
+  const plainDelete = vi.fn();
+  await confirmAndDeleteLinkable('emi', link.toRecordId, plainDelete);
+  expect(plainDelete).not.toHaveBeenCalled();
+  expect(hasIndependentInstallmentLinks('emi', loanId)).toBe(true);
+  expect(hasIndependentInstallmentLinks('bank', bankAccountId)).toBe(module === 'bank');
+  expect(hasIndependentInstallmentLinks('creditCard', bankAccountId)).toBe(module === 'creditCard');
+  expect(findLinkForRecord('emi', link.toRecordId)).toMatchObject(link);
+});
+
+it('rechecks receipt linkage after the delete confirmation', async () => {
+  vi.mocked(confirmDialog).mockImplementationOnce(async () => {
+    useInterEntityTransfersStore.getState().addEntry(installmentLink);
+    return true;
+  });
+  const plainDelete = vi.fn();
+  await confirmAndDeleteLinkable('cash', installmentLink.fromRecordId, plainDelete);
+  expect(plainDelete).not.toHaveBeenCalled();
+  expect(findLinkForRecord('cash', installmentLink.fromRecordId)).toMatchObject(installmentLink);
+});
 
 describe('broker profile currency resolution', () => {
   it('uses the selected QSE and PSX broker settings instead of exchange defaults', () => {
@@ -426,4 +466,61 @@ it('defaults bank-to-QSE fees, preserves explicit zero, time and later module-si
   const zero = createLinkedTransfer({ ...input, to: { ...input.to, fee: 0 } });
   expect('link' in zero).toBe(true);
   expect(useWorkbookStore.getState().workbook.transfers[1].fee).toBe(0);
+});
+
+it('links an existing Cash entry without replacing its ID or statement metadata', () => {
+  useCashWorkbookStore.getState().addEntry({
+    id: 'existing-cash', date: '2026-01-01', amount: 100, isDeposit: false, currencyCode: 'USD',
+    source: 'statement-import', statementRef: 'cash.csv', serialNumber: 14, note: 'Original',
+  });
+  const original = useCashWorkbookStore.getState().workbook.entries[0];
+  const result = linkExistingTransfer(cashToBankInput, { module: 'cash', record: original }, true);
+  expect(result).toHaveProperty('link');
+  expect(useCashWorkbookStore.getState().workbook.entries).toHaveLength(1);
+  expect(useCashWorkbookStore.getState().workbook.entries[0]).toMatchObject({
+    id: original.id, source: 'statement-import', statementRef: 'cash.csv', serialNumber: 14,
+  });
+  expect(useBankWorkbookStore.getState().workbook.transactions).toHaveLength(1);
+  expect(findLinkForRecord('cash', original.id)?.fromRecordId).toBe(original.id);
+  expect(linkExistingTransfer(cashToBankInput, { module: 'cash', record: original }, true)).toHaveProperty('error');
+  expect(useBankWorkbookStore.getState().workbook.transactions).toHaveLength(1);
+});
+
+it('restores the original record and removes the new counterpart if attaching its link fails', () => {
+  useCashWorkbookStore.getState().addEntry({
+    id: 'original', date: '2026-01-01', amount: 100, isDeposit: false, currencyCode: 'USD', source: 'manual',
+  });
+  const original = useCashWorkbookStore.getState().workbook.entries[0];
+  const failure = vi.spyOn(useInterEntityTransfersStore.getState(), 'addEntry').mockImplementationOnce(() => { throw new Error('Link save failed'); });
+  const result = linkExistingTransfer({ ...cashToBankInput, fromAmount: 125, toAmount: 125 }, { module: 'cash', record: original }, true);
+  expect(result).toEqual({ error: 'Link save failed' });
+  expect(useCashWorkbookStore.getState().workbook.entries).toEqual([original]);
+  expect(useBankWorkbookStore.getState().workbook.transactions).toEqual([]);
+  failure.mockRestore();
+});
+
+it('joins two existing native records without duplicating or overwriting the selected counterpart', () => {
+  useCashWorkbookStore.getState().addEntry({ id: 'cash-existing', date: '2026-01-01', amount: 100, currencyCode: 'USD', isDeposit: false, source: 'manual' });
+  useBankWorkbookStore.getState().addTransaction({ id: 'bank-existing', date: '2026-01-02', accountId: bankAccountId, amount: 100, isDeposit: true, description: 'Statement deposit', source: 'statement-import', statementRef: 'bank.csv' });
+  const own = useCashWorkbookStore.getState().workbook.entries[0];
+  const peer = useBankWorkbookStore.getState().workbook.transactions[0];
+  const result = linkExistingTransfer(cashToBankInput, { module: 'cash', record: own }, true, { module: 'bank', record: peer });
+  expect(result).toHaveProperty('link');
+  expect(useCashWorkbookStore.getState().workbook.entries).toHaveLength(1);
+  expect(useBankWorkbookStore.getState().workbook.transactions).toEqual([peer]);
+  expect(findLinkForRecord('cash', own.id)?.toRecordId).toBe(peer.id);
+});
+
+it('rolls back both edited sides when updating the shared link fails', () => {
+  const created = createLinkedTransfer(cashToBankInput);
+  if ('error' in created) throw new Error(created.error);
+  const cash = useCashWorkbookStore.getState().workbook;
+  const bank = useBankWorkbookStore.getState().workbook;
+  const links = useInterEntityTransfersStore.getState().workbook;
+  const failure = vi.spyOn(useInterEntityTransfersStore.getState(), 'updateEntry').mockImplementationOnce(() => { throw new Error('Update failed'); });
+  expect(updateLinkedTransfer({ ...cashToBankInput, fromAmount: 120, toAmount: 120 }, created.link)).toEqual({ error: 'Update failed' });
+  expect(useCashWorkbookStore.getState().workbook).toEqual(cash);
+  expect(useBankWorkbookStore.getState().workbook).toEqual(bank);
+  expect(useInterEntityTransfersStore.getState().workbook).toEqual(links);
+  failure.mockRestore();
 });

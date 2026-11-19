@@ -148,3 +148,23 @@ html[data-color="aurora"][data-theme="dark"] {
 	--shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2), 0 6px 18px rgba(0, 0, 0, 0.22);
 	--shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.32);
 }
+
+
+/* Shared-component visual treatment: shape, surfaces and chart depth. */
+html[data-color="aurora"] {
+  --summary-radius: 20px;
+  --summary-surface: linear-gradient(135deg,color-mix(in srgb,var(--accent) 8%,var(--panel)),var(--panel));
+  --summary-border: 1px solid color-mix(in srgb,var(--accent) 24%,var(--border));
+  --summary-shadow: 0 8px 24px color-mix(in srgb,var(--accent) 10%,transparent);
+  --navigation-radius: 20px;
+  --dropdown-radius: 16px;
+  --dropdown-item-radius: 12px;
+  --chart-tension: 0.32;
+  --chart-bar-radius: 8;
+  --chart-fill-opacity: 0.42;
+  --chart-line-width: 2;
+  --chart-grid-opacity: 0.18;
+  --chart-tooltip-radius: 12;
+  --chart-shadow-blur: 10;
+  --chart-shadow-opacity: 0.12;
+}

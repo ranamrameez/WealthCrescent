@@ -154,3 +154,33 @@ describe('projectedNetWorthTrend', () => {
     expect(result[0].byCurrency.USD).toBeUndefined();
   });
 });
+
+
+it('uses the exact forecast day and excludes future records presented as actual or pending', () => {
+  const result = projectedNetWorthTrend({ months: ['2026-04'], currentMonth: '2026-03', todayISODate: '2026-03-15',
+    currentRows: [{ currency: 'USD', assets: 500, liabilities: 0, net: 500, breakdown: [] }], emiLoans: [], netWorthAsOfInputs: emptyNetWorthAsOfInputs,
+    projectionThroughDate: '2026-04-10', activities: [
+      activity({ amount: -25, date: '2026-04-10' }), activity({ amount: -1000, date: '2026-04-11' }),
+      activity({ amount: 900, date: '2026-04-01', executed: true }), activity({ amount: 800, date: '2026-04-01', isPending: true }),
+    ],
+  });
+  expect(result[0].byCurrency.USD).toBe(475);
+});
+
+it('includes due-today plans and same-month horizons without changing the live current-month point', () => {
+  const input = { months: ['2026-03'], currentMonth: '2026-03', todayISODate: '2026-03-01',
+    currentRows: [{ currency: 'USD', assets: 500, liabilities: 0, net: 500, breakdown: [] }], emiLoans: [], netWorthAsOfInputs: emptyNetWorthAsOfInputs,
+    activities: [activity({ amount: -25, date: '2026-03-01' }), activity({ amount: -75, date: '2026-03-30' })],
+  };
+  expect(projectedNetWorthTrend(input)[0].byCurrency.USD).toBe(500);
+  expect(projectedNetWorthTrend({ ...input, projectionThroughDate: '2026-03-31' })[0].byCurrency.USD).toBe(400);
+});
+
+it('retains a planned currency without an existing balance and does not amortize a not-yet-started loan today', () => {
+  const result = projectedNetWorthTrend({ months: ['2026-04'], currentMonth: '2026-03', todayISODate: '2026-03-15',
+    currentRows: [], emiLoans: [{ ...loan, startDate: '2026-05-01' }], netWorthAsOfInputs: emptyNetWorthAsOfInputs,
+    activities: [activity({ amount: 100, currencyCode: 'QAR', date: '2026-04-01' })],
+  });
+  expect(result[0].byCurrency.QAR).toBe(100);
+  expect(result[0].liabilitiesByCurrency.USD).toBe(0);
+});

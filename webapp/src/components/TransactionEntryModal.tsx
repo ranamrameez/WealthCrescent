@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Modal } from './Modal';
 import { toast } from './Toast';
 import { PlusIcon, SaveIcon, TrashIcon } from './icons';
-import { Field, TextInput } from './ui/Field';
+import { Field, Select, TextInput } from './ui/Field';
 import { AmountInput } from './ui/AmountInput';
 import { DirectionChips } from './ui/DirectionChips';
 import { TimeZoneFields } from './ui/TimeZoneFields';
@@ -15,14 +15,16 @@ import { defaultTimeForDate, defaultTimezoneForCurrency, nowTime } from '../lib/
 import { loanCategoryForDirection, loanDirectionForTransfer, transferDirectionForLoan } from '../lib/calc/personalLoansModule';
 import { convertAmount, loadCachedFxRates } from '../lib/fx';
 import { useEnsureSignedIn } from '../lib/firebase/useEnsureSignedIn';
+import type { LinkSideRecord } from '../lib/interEntityLink';
 import { buildLinkedRecords, defaultLinkedOtherSide, isSupportedLinkPair, linkSideRequiresRef } from '../lib/interEntityLink';
-import { createLinkedTransfer, dispatchUpdate, findLinkForRecord, getLinkedSideRecord, propagateLinkedEdit, resolveLinkedEdit, resolveSideCurrency, resolveTransferSide, updateLinkedTransfer } from '../lib/linkCascade';
+import { createLinkedTransfer, dispatchUpdate, findLinkForRecord, getLinkedSideRecord, linkExistingTransfer, propagateLinkedEdit, resolveLinkedEdit, resolveSideCurrency, resolveTransferSide, updateLinkedTransfer } from '../lib/linkCascade';
 import { useBankWorkbookStore } from '../store/bankWorkbookStore';
 import { useCashWorkbookStore } from '../store/cashWorkbookStore';
 import { useCreditCardWorkbookStore } from '../store/creditCardWorkbookStore';
 import { useEMIWorkbookStore } from '../store/emiWorkbookStore';
 import { useFundsWorkbookStore } from '../store/fundsWorkbookStore';
 import { usePersonalLoansWorkbookStore } from '../store/personalLoansWorkbookStore';
+import { useInterEntityTransfersStore } from '../store/interEntityTransfersStore';
 import { usePSXWorkbookStore } from '../store/psxWorkbookStore';
 import { useRentalsWorkbookStore } from '../store/rentalsWorkbookStore';
 import { useSubscriptionsWorkbookStore } from '../store/subscriptionsWorkbookStore';
@@ -30,6 +32,7 @@ import { useAppearanceStore } from '../store/appearanceStore';
 import { useWorkbookStore } from '../store/workbookStore';
 import type { InterEntityTransfer, LinkModule, LinkSideConfig } from '../types/interEntityTransfer';
 import type { PersonalLoanRepayment } from '../types/personalLoansWorkbook';
+import type { CreditCardTransactionKind } from '../types/creditCard';
 import type { Transfer } from '../types/workbook';
 
 export interface TransferEditRequest { module: 'qse' | 'psx' | 'funds'; record: Transfer }
@@ -152,6 +155,8 @@ interface TxRow {
   categoryTouched: boolean;
   description: string;
   pending: boolean;
+  cardKind?: CreditCardTransactionKind;
+  otherRecord?: LinkSideRecord;
   /** Set when the Finance selector is in Subscriptions mode. */
   subscriptionId: string;
   subscriptionMode: boolean;
@@ -224,6 +229,9 @@ function TxRowFields({
   wholeLinkEditing?: boolean;
 }) {
   const personalLoans = usePersonalLoansWorkbookStore((s) => s.workbook.loans);
+  const bankTransactions = useBankWorkbookStore(s => s.workbook.transactions);
+  const cashEntries = useCashWorkbookStore(s => s.workbook.entries);
+  const linkRecords = useInterEntityTransfersStore(s => s.workbook.entries);
   const otherCurrency = useSideCurrency(row.other);
   const financeCurrency = useSideCurrency(row.finance);
   const currencyMismatch = row.linked && !!otherCurrency && !!financeCurrency && otherCurrency !== financeCurrency;
@@ -232,9 +240,19 @@ function TxRowFields({
   // transfer from a real bank/cash account can only ever mean "pay this
   // card down," so the Charge/Payment choice only makes sense (and is only
   // shown) for a plain, non-linked card row.
-  const showDirection = direction && !(row.finance.module === 'creditCard' && row.linked);
+  const showDirection = direction && row.finance.module !== 'creditCard';
   const sameEntity = row.linked && row.finance.module === row.other.module && !!row.finance.ref && row.finance.ref === row.other.ref;
   const pairSupported = !row.linked || (isSupportedLinkPair(row.finance.module, row.other.module) && isSupportedLinkPair(row.other.module, row.finance.module));
+  const candidates: LinkSideRecord[] = row.other.module === 'bank'
+    ? bankTransactions.filter(record => record.accountId === row.other.ref && (record.amount >= 0) === (row.direction === 'out'))
+      .map(record => ({ module: 'bank', record }))
+    : row.other.module === 'cash'
+      ? cashEntries.filter(record => record.currencyCode === row.other.currencyCode && record.isDeposit === (row.direction === 'out'))
+        .map(record => ({ module: 'cash', record }))
+      : [];
+  const availableCounterparts = candidates.filter(candidate => !linkRecords.some(link =>
+    (link.from.module === candidate.module && link.fromRecordId === candidate.record.id) ||
+    (link.to.module === candidate.module && link.toRecordId === candidate.record.id)));
 
   // User-requested (2026-09-08, design confirmed via AskUserQuestion):
   // "allow the automated editable converted values" — suggests the other
@@ -252,9 +270,11 @@ function TxRowFields({
   }, [currencyMismatch, suggestedToAmount, row.toAmountTouched]);
 
   return (
-    <div className="entry-row">
-      <SideFields
+    <div className="entry-row transfer-entry-row">
+      <div className="transfer-form-group">
+        <SideFields
         label="Finance"
+        wrap
         cfg={row.finance}
         disabled={financeLocked}
         allowSubscriptions
@@ -294,19 +314,32 @@ function TxRowFields({
             toAmountTouched: false,
           });
         }}
-      />
-
-      <div className="row gap-sm mt-sm" style={{ alignItems: 'flex-end' }}>
+        />
+      </div>
+      <div className="transfer-form-group" style={{ alignItems: 'flex-end' }}>
         <Field label="Amount" required title={!showDirection ? 'A repayment is always entered as a positive amount, regardless of which way the debt runs.' : 'You can type a math expression here too, e.g. 10.5+5 — it evaluates once you leave the field.'}>
           <AmountInput value={row.amount} onChange={(amount) => onChange({ ...row, amount })} />
         </Field>
+        {row.finance.module === 'creditCard' && !row.linked && <Field label="Card transaction type">
+          <Select value={row.cardKind ?? (row.direction === 'in' ? 'payment' : 'charge')}
+            onChange={event => {
+              const cardKind = event.target.value as CreditCardTransactionKind;
+              onChange({ ...row, cardKind, direction: cardKind === 'payment' ? 'in' : 'out' });
+            }}>
+            <option value="charge">Charge (purchase)</option>
+            <option value="payment">Payment (toward the balance)</option>
+            <option value="fee">Fee</option>
+            <option value="markup">Markup</option>
+            <option value="cashAdvance">Cash advance</option>
+          </Select>
+        </Field>}
         {showDirection && (
           <Field label={row.finance.module === 'personalLoans' ? 'Loan type' : 'Direction'}>
             <DirectionChips
               value={row.direction}
               onChange={(d) => {
                 if (row.finance.module !== 'personalLoans') {
-                  onChange({ ...row, direction: d });
+                  onChange({ ...row, direction: d, cardKind: undefined });
                   return;
                 }
                 const wantedDirection = loanDirectionForTransfer(d);
@@ -347,7 +380,7 @@ function TxRowFields({
         )}
       </div>
 
-      <div className="row gap-sm mt-sm">
+      <div className="transfer-form-group">
         <Field label="Description" required={row.finance.module === 'bank'}>
           <TextInput
             value={row.description}
@@ -362,7 +395,7 @@ function TxRowFields({
         )}
       </div>
 
-      <div className="row gap-sm mt-sm">
+      <div className="transfer-form-group">
         <Field label="Date">
           <TextInput
             type="date"
@@ -381,8 +414,8 @@ function TxRowFields({
         />
       </div>
 
-      <div className="row gap-sm mt-sm" style={{ alignItems: 'flex-end' }}>
-        <Field label="Link to another finance">
+      <div className="transfer-form-group" style={{ alignItems: 'flex-end' }}>
+        <Field label="Link to another finance" as="div">
           <YesNoChips
             value={row.linked}
             disabled={transferEditing}
@@ -391,25 +424,39 @@ function TxRowFields({
             onChange={(linked) => {
               const remembered = linked ? getLastTransferSource(row.finance) : undefined;
               const rememberedIsUsable = remembered && (!linkSideRequiresRef(remembered) || !!remembered.ref);
-              onChange({ ...row, linked, other: rememberedIsUsable ? remembered : row.other, toAmount: undefined, toAmountTouched: false });
+              onChange({ ...row, linked, other: rememberedIsUsable ? remembered : row.other, otherRecord: undefined, toAmount: undefined, toAmountTouched: false });
             }}
           />
         </Field>
         {HAS_PENDING.includes(row.finance.module) && !row.linked && (
-          <Field label="Pending transaction">
+          <Field label="Pending transaction" as="div">
             <YesNoChips value={row.pending} onChange={(pending) => onChange({ ...row, pending })} />
           </Field>
         )}
       </div>
       {row.linked && (
-        <div className="mt-sm">
+        <div className="transfer-form-group">
           <SideFields
             label="Other finance"
+            wrap
             disabled={transferEditing}
             cfg={row.other}
-            onChange={(other) => onChange({ ...row, other, toAmount: undefined, toAmountTouched: false })}
+            onChange={(other) => onChange({ ...row, other, otherRecord: undefined, toAmount: undefined, toAmountTouched: false })}
             preferredCurrency={financeCurrency ?? undefined}
           />
+          {financeLocked && !transferEditing && ['bank', 'cash'].includes(row.other.module) && <Field label="Other finance record">
+            <Select value={row.otherRecord?.record.id ?? ''} onChange={event => {
+              const otherRecord = availableCounterparts.find(item => item.record.id === event.target.value);
+              onChange({ ...row, otherRecord: otherRecord ? structuredClone(otherRecord) : undefined,
+                toAmount: otherRecord && 'amount' in otherRecord.record ? Math.abs(otherRecord.record.amount) : undefined,
+                toAmountTouched: !!otherRecord });
+            }}>
+              <option value="">Create a new counterpart</option>
+              {availableCounterparts.map(({ record }) => <option key={record.id} value={record.id}>
+                {record.date} · {'amount' in record ? Math.abs(record.amount) : record.gross} · {'description' in record ? record.description : 'note' in record ? record.note : record.id}
+              </option>)}
+            </Select>
+          </Field>}
           {sameEntity && <p className="text-muted" style={{ color: 'var(--warn, orange)' }}>Pick a different account — this is the same one.</p>}
           {!pairSupported && !sameEntity && (
             <p className="text-muted" style={{ color: 'var(--warn, orange)' }}>Linking these two isn't supported yet.</p>
@@ -448,12 +495,12 @@ function TxRowFields({
           )}
         </div>
       )}
-      <div className="row gap-sm mt-sm">
+      <div className="transfer-form-group">
         <TransferFeeField side={row.finance} direction={row.direction} amount={row.amount} onChange={finance => onChange({ ...row, finance })} />
         {row.linked && <TransferFeeField disabled={transferEditing && !wholeLinkEditing} side={row.other} direction={row.direction === 'in' ? 'out' : 'in'} amount={row.toAmount ?? row.amount} onChange={other => onChange({ ...row, other })} />}
       </div>
       {canRemove && (
-        <div className="d-flex justify-end mt-sm">
+        <div className="transfer-entry-actions d-flex justify-end">
           <button className="btn secondary small" onClick={onRemove}>
             <TrashIcon size={12} />Remove row
           </button>
@@ -486,6 +533,18 @@ function getSideCurrency(cfg: LinkSideConfig): string | undefined {
  * already do for a link, generalized here to also cover the plain
  * single-account case by calling that module's own native "add" action
  * directly. */
+function linkEditedRecord(row: TxRow, existing: LinkSideRecord) {
+  const ownIsFrom = row.direction === 'out';
+  const otherAmount = row.otherRecord ? row.toAmount
+    : resolveSideCurrency(row.finance) === resolveSideCurrency(row.other) ? Math.abs(row.amount) : row.toAmount;
+  if (!(otherAmount && otherAmount > 0)) return { error: 'Enter the linked finance amount.' };
+  return linkExistingTransfer({ date: row.date, time: row.time, timezone: row.timezone,
+    from: ownIsFrom ? row.finance : row.other, to: ownIsFrom ? row.other : row.finance,
+    fromAmount: ownIsFrom ? Math.abs(row.amount) : otherAmount, toAmount: ownIsFrom ? otherAmount : Math.abs(row.amount),
+    note: row.description.trim() || undefined, categoryID: row.categoryID, rateSource: row.rateSource || undefined,
+  }, existing, ownIsFrom, row.otherRecord);
+}
+
 export function TransactionEntryModal({
   defaultFinance,
   editPersonalLoanPayment,
@@ -640,6 +699,8 @@ export function TransactionEntryModal({
     }];
   });
   const [nextKey, setNextKey] = useState(1);
+  const existingLinked = !!editLink || !!editTransfer && !!findLinkForRecord(editTransfer.module, editTransfer.record.id) ||
+    !!editPersonalLoanPayment && !!findLinkForRecord('personalLoans', editPersonalLoanPayment.id);
 
   const updateRow = (key: number, patch: TxRow) => setRows((rs) => rs.map((r) => (r.key === key ? patch : r)));
   const removeRow = (key: number) => setRows((rs) => rs.filter((r) => r.key !== key));
@@ -691,6 +752,11 @@ export function TransactionEntryModal({
       const profileTransfers = 'brokerProfiles' in store.workbook ? store.workbook.brokerProfiles?.flatMap((profile) => profile.data?.transfers ?? []) : undefined;
       const current = store.workbook.transfers.find(item => item.id === record.id) ?? profileTransfers?.find(item => item.id === record.id);
       if (!current || JSON.stringify(current) !== JSON.stringify(record)) return toast('This transfer changed. Reopen its editor.');
+      if (row.linked && !existingLinked) {
+        const result = linkEditedRecord(row, { module, record });
+        if ('error' in result) return toast(result.error);
+        toast('Transfer linked.'); onClose(); return;
+      }
       const choice = await resolveLinkedEdit(module, record.id);
       if (choice === 'cancel') return;
       store.updateTransfer(record.id, { date: row.date, time: row.time, timezone: row.timezone, gross: Math.abs(row.amount), fee: row.finance.fee ?? record.fee, type: row.direction === 'in' ? 'DEPOSIT' : 'WITHDRAWAL', ...(module === 'funds' ? { currencyCode: row.finance.currencyCode ?? fundsDefaultCurrency } : {}), description: row.description.trim() || undefined });
@@ -706,6 +772,11 @@ export function TransactionEntryModal({
       if (r.finance.module !== 'personalLoans' || !r.finance.ref) return toast('Pick a personal loan first.');
       if (r.finance.ref !== editPersonalLoanPayment.loanId) {
         return toast('Move-to-another-loan is not supported while editing a payment. Add a new payment on the other loan instead.');
+      }
+      if (r.linked && !existingLinked) {
+        const result = linkEditedRecord(r, { module: 'personalLoans', record: editPersonalLoanPayment });
+        if ('error' in result) return toast(result.error);
+        toast('Payment linked.'); onClose(); return;
       }
       const choice = await resolveLinkedEdit('personalLoans', editPersonalLoanPayment.id);
       if (choice === 'cancel') return;
@@ -847,7 +918,7 @@ export function TransactionEntryModal({
           // full 5-way kind picker this generic popup deliberately doesn't
           // replicate.
           if (!r.finance.ref) { toast('Pick a credit card first.'); continue; }
-          const kind = r.direction === 'out' ? 'charge' : 'payment';
+          const kind = r.cardKind ?? (r.direction === 'out' ? 'charge' : 'payment');
           addCreditCardTransaction({
             id: uid(), cardId: r.finance.ref, date: r.date, time: r.time, timezone: r.timezone,
             kind, amount: Math.abs(r.amount),
@@ -878,7 +949,7 @@ export function TransactionEntryModal({
       : 'Transfers';
 
   return (
-    <Modal title={modalTitle} onClose={onClose}>
+    <Modal title={modalTitle} onClose={onClose} widthClass="60">
       {rows.map((r) => (
         <TxRowFields
           key={r.key}
@@ -887,7 +958,7 @@ export function TransactionEntryModal({
           onRemove={() => removeRow(r.key)}
           canRemove={!editPersonalLoanPayment && !editTransfer && !editLink && rows.length > 1}
           financeLocked={!!editPersonalLoanPayment || !!editTransfer || !!editLink}
-          transferEditing={!!editTransfer || !!editLink}
+          transferEditing={existingLinked}
           wholeLinkEditing={!!editLink}
         />
       ))}

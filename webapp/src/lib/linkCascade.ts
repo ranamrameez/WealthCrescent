@@ -1,3 +1,4 @@
+import { toast } from '../components/Toast';
 import { confirmDialog } from '../components/ConfirmDialog';
 import { linkedEditChoiceDialog, type LinkedEditChoice } from '../components/LinkedEditChoiceDialog';
 import { useBankWorkbookStore } from '../store/bankWorkbookStore';
@@ -10,7 +11,7 @@ import { usePersonalLoansWorkbookStore } from '../store/personalLoansWorkbookSto
 import { usePSXWorkbookStore } from '../store/psxWorkbookStore';
 import { useRentalsWorkbookStore } from '../store/rentalsWorkbookStore';
 import { useWorkbookStore } from '../store/workbookStore';
-import { LINK_MODULE_LABELS, type InterEntityTransfer, type InterEntityTransferInput, type LinkModule, type LinkSideConfig } from '../types/interEntityTransfer';
+import { isIndependentInstallmentLink, LINK_MODULE_LABELS, type InterEntityTransfer, type InterEntityTransferInput, type LinkModule, type LinkSideConfig } from '../types/interEntityTransfer';
 import { buildLinkedRecords, type LinkSideRecord } from './interEntityLink';
 import { defaultTimeForDate, defaultTimezoneForCurrency } from './datetime';
 
@@ -140,31 +141,107 @@ export function createLinkedTransfer(input: InterEntityTransferInput): { link: I
   }
 }
 
-/** Recomputes and re-dispatches both side records for an edit. Unlike
- * `createLinkedTransfer`, this doesn't attempt rollback on a partial
- * failure — reverting an *update* would need the pre-edit record values,
- * which aren't retained here. If this ever throws partway, the two sides
- * may end up briefly inconsistent; this is reported honestly rather than
- * claimed as safe. */
+/** Attach a new counterpart to a reviewed native record, retaining its identity
+ * and module-specific metadata. Restore the original on a failed local write. */
+function restoreWorkbook<T>(state: { workbook: T; setWorkbook: (workbook: T) => void }) {
+  return () => state.setWorkbook(state.workbook);
+}
+
+const captureLinkWorkbook = {
+  cash: () => restoreWorkbook(useCashWorkbookStore.getState()),
+  bank: () => restoreWorkbook(useBankWorkbookStore.getState()),
+  creditCard: () => restoreWorkbook(useCreditCardWorkbookStore.getState()),
+  qse: () => restoreWorkbook(useWorkbookStore.getState()),
+  psx: () => restoreWorkbook(usePSXWorkbookStore.getState()),
+  funds: () => restoreWorkbook(useFundsWorkbookStore.getState()),
+  rentals: () => restoreWorkbook(useRentalsWorkbookStore.getState()),
+  personalLoans: () => restoreWorkbook(usePersonalLoansWorkbookStore.getState()),
+  emi: () => restoreWorkbook(useEMIWorkbookStore.getState()),
+};
+
+export function linkExistingTransfer(
+  input: InterEntityTransferInput,
+  existing: LinkSideRecord,
+  existingIsFrom: boolean,
+  existingCounterpart?: LinkSideRecord,
+): { link: InterEntityTransfer } | { error: string } {
+  const side = existingIsFrom ? input.from : input.to;
+  const id = existing.record.id;
+  if (side.module !== existing.module) return { error: 'The original finance changed. Reopen the editor.' };
+  if (findLinkForRecord(existing.module, id)) return { error: 'This record is already linked. Reopen the editor.' };
+  if (JSON.stringify(getLinkedSideRecord(side, id)) !== JSON.stringify(existing.record)) {
+    return { error: 'This record changed. Reopen the editor.' };
+  }
+  const peerSide = existingIsFrom ? input.to : input.from;
+  if (existingCounterpart && (existingCounterpart.module !== peerSide.module ||
+      findLinkForRecord(peerSide.module, existingCounterpart.record.id) ||
+      JSON.stringify(getLinkedSideRecord(peerSide, existingCounterpart.record.id)) !== JSON.stringify(existingCounterpart.record))) {
+    return { error: 'The other record changed or became linked. Review it again.' };
+  }
+  const peerId = existingCounterpart?.record.id ?? crypto.randomUUID();
+  const ids = { linkId: crypto.randomUUID(), fromRecordId: existingIsFrom ? id : peerId, toRecordId: existingIsFrom ? peerId : id };
+  const rollback = [captureLinkWorkbook[input.from.module](), captureLinkWorkbook[input.to.module](),
+    restoreWorkbook(useInterEntityTransfersStore.getState())];
+  try {
+    const built = buildLinkedRecords(resolveTransferInput(input), ids);
+    const own = existingIsFrom ? built.from : built.to;
+    const counterpart = existingIsFrom ? built.to : built.from;
+    if (existingCounterpart) {
+      const record = existingCounterpart.record;
+      const magnitude = 'gross' in record ? record.gross : Math.abs(record.amount);
+      if (magnitude !== (existingIsFrom ? input.toAmount : input.fromAmount) ||
+          ('isDeposit' in record && record.isDeposit !== existingIsFrom) ||
+          ('accountId' in record && record.accountId !== peerSide.ref) ||
+          ('currencyCode' in record && peerSide.currencyCode && record.currencyCode !== peerSide.currencyCode)) {
+        throw new Error('The selected counterpart has a different amount, direction or account. Review both sides.');
+      }
+    }
+    if ('isPending' in existing.record && existing.record.isPending) {
+      if (['creditCard', 'emi'].includes(counterpart.module)) throw new Error('This finance requires a settled funding record.');
+      Object.assign(counterpart.record, { isPending: true });
+    }
+    dispatchUpdate({ ...own, record: { ...existing.record, ...own.record,
+      ...('source' in existing.record ? { source: existing.record.source } : {}),
+    } } as LinkSideRecord);
+    if (!existingCounterpart) dispatchAdd(counterpart);
+    useInterEntityTransfersStore.getState().addEntry(built.link);
+    return { link: built.link };
+  } catch (error) {
+    for (const restore of rollback) restore();
+    return { error: error instanceof Error ? error.message : 'Could not link the existing record.' };
+  }
+}
+
+const installmentEditMessage = 'This installment receipt and its funding transaction must be corrected together.';
+
 export function updateLinkedTransfer(
   input: InterEntityTransferInput,
   link: InterEntityTransfer,
 ): { link: InterEntityTransfer } | { error: string } {
+  if (isIndependentInstallmentLink(link)) return { error: installmentEditMessage };
   const ids = { linkId: link.id, fromRecordId: link.fromRecordId, toRecordId: link.toRecordId };
   const resolved = resolveTransferInput(input);
   const fromSide = resolveTransferSide(input.from, 'out', link.fromRecordId);
   const toSide = resolveTransferSide(input.to, 'in', link.toRecordId);
+  const rollback = [captureLinkWorkbook[input.from.module](), captureLinkWorkbook[input.to.module](),
+    restoreWorkbook(useInterEntityTransfersStore.getState())];
   const { from, to, link: updated } = buildLinkedRecords({ ...resolved,
     from: { ...fromSide, ...input.from, ...(input.from.module === 'funds' && !input.from.currencyCode ? { currencyCode: fromSide.currencyCode } : {}) },
     to: { ...toSide, ...input.to, ...(input.to.module === 'funds' && !input.to.currencyCode ? { currencyCode: toSide.currencyCode } : {}) },
   }, ids);
   try {
-    dispatchUpdate(from);
-    dispatchUpdate(to);
+    for (const side of [from, to]) {
+      const config = side === from ? input.from : input.to;
+      const original = getLinkedSideRecord(config, side.record.id);
+      dispatchUpdate({ ...side, record: { ...original, ...side.record,
+        ...(original && 'source' in original ? { source: original.source } : {}),
+      } } as LinkSideRecord);
+    }
+    useInterEntityTransfersStore.getState().updateEntry(link.id, updated);
   } catch (e) {
+    for (const restore of rollback) restore();
     return { error: e instanceof Error ? e.message : 'Failed to update the linked transfer.' };
   }
-  useInterEntityTransfersStore.getState().updateEntry(link.id, updated);
   return { link: updated };
 }
 
@@ -173,6 +250,7 @@ export function updateLinkedTransfer(
  * below, so deleting either side from its native module cascades exactly
  * like deleting it from the Transfers page does. */
 export function deleteLinkCascade(link: InterEntityTransfer) {
+  if (isIndependentInstallmentLink(link)) throw new Error(installmentEditMessage);
   dispatchRemove(link.from.module, link.fromRecordId);
   dispatchRemove(link.to.module, link.toRecordId);
   useInterEntityTransfersStore.getState().deleteEntry(link.id);
@@ -193,6 +271,13 @@ export function findLinkForRecord(module: LinkModule, recordId: string): InterEn
  * link store, never a second persisted copy of the same fact (a stored
  * boolean could silently go stale the moment a link is created or removed
  * elsewhere in the app — see `types/finance.ts`'s file-level comment). */
+export function hasIndependentInstallmentLinks(module: 'bank' | 'creditCard' | 'emi', entityId: string): boolean {
+  return useInterEntityTransfersStore.getState().workbook.entries.some(link =>
+    isIndependentInstallmentLink(link) && (module === 'emi'
+      ? link.to.ref === entityId
+      : link.from.module === module && link.from.ref === entityId));
+}
+
 export function isRecordLinked(module: LinkModule, recordId: string): boolean {
   return !!findLinkForRecord(module, recordId);
 }
@@ -218,11 +303,13 @@ export function isRecordLinked(module: LinkModule, recordId: string): boolean {
 export async function warnIfLinked(module: LinkModule, id: string): Promise<boolean> {
   const link = findLinkForRecord(module, id);
   if (!link) return true;
+  if (isIndependentInstallmentLink(link)) { toast(installmentEditMessage); return false; }
   const otherModule = link.from.module === module ? link.to.module : link.from.module;
-  return confirmDialog(
+  const confirmed = await confirmDialog(
     `This entry is linked to a transfer with ${LINK_MODULE_LABELS[otherModule]}. Editing it here updates only this side — the other side and the link record won't change to match.`,
     'Edit this linked entry anyway?',
   );
+  return confirmed && findLinkForRecord(module, id) === link;
 }
 
 /** User-reported (2026-09-11): the old `warnIfLinked` confirm dialog told
@@ -238,8 +325,12 @@ export async function warnIfLinked(module: LinkModule, id: string): Promise<bool
 export async function resolveLinkedEdit(module: LinkModule, id: string): Promise<LinkedEditChoice> {
   const link = findLinkForRecord(module, id);
   if (!link) return 'this';
+  if (isIndependentInstallmentLink(link)) { toast(installmentEditMessage); return 'cancel'; }
   const otherModule = link.fromRecordId === id ? link.to.module : link.from.module;
-  return linkedEditChoiceDialog(LINK_MODULE_LABELS[otherModule]);
+  const choice = await linkedEditChoiceDialog(LINK_MODULE_LABELS[otherModule]);
+  if (choice === 'cancel' || findLinkForRecord(module, id) === link) return choice;
+  toast('This link changed. Review it again before editing.');
+  return 'cancel';
 }
 
 /** Same currency-lookup `useSideCurrency` (`features/transfers/pages/
@@ -305,6 +396,7 @@ export function propagateLinkedEdit(
 ): { error?: string; message?: string } {
   const link = findLinkForRecord(module, id);
   if (!link) return {};
+  if (isIndependentInstallmentLink(link)) return { error: installmentEditMessage };
 
   const wasFromSide = link.fromRecordId === id;
   // For money-pool modules, OUT means this record is the link's from side
@@ -391,14 +483,19 @@ export function propagateLinkedEdit(
 export async function confirmAndDeleteLinkable(module: LinkModule, id: string, plainDelete: () => void): Promise<void> {
   const link = findLinkForRecord(module, id);
   if (!link) {
-    if (await confirmDialog('This cannot be undone.', 'Delete this entry?')) plainDelete();
+    if (await confirmDialog('This cannot be undone.', 'Delete this entry?')) {
+      if (findLinkForRecord(module, id)) return toast('This entry became linked. Review it again before deleting.');
+      plainDelete();
+    }
     return;
   }
+  if (isIndependentInstallmentLink(link)) { toast(installmentEditMessage); return; }
   const otherModule = link.from.module === module ? link.to.module : link.from.module;
   const ok = await confirmDialog(
     `This entry is part of a linked transfer with ${LINK_MODULE_LABELS[otherModule]} — deleting it here also removes the linked record on the other side and the link itself. This cannot be undone.`,
     'Delete this linked entry?',
   );
   if (!ok) return;
+  if (findLinkForRecord(module, id) !== link) return toast('This link changed. Review it again before deleting.');
   deleteLinkCascade(link);
 }

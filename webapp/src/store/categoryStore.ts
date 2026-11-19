@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { scheduleLocalStorageWrite } from '../lib/localStoragePersistence';
 import { toast } from '../components/Toast';
 import { createEmptyCategoriesWorkbook } from './defaultCategoriesWorkbook';
-import { DEFAULT_CATEGORIES, DEFAULT_CATEGORY_IDS } from '../lib/categories';
+import { DEFAULT_CATEGORIES, DEFAULT_CATEGORY_IDS, LEGACY_PERSONAL_CATEGORY_IDS } from '../lib/categories';
 import type { CategoriesWorkbook, Category } from '../types/finance';
 
 const STORAGE_KEY = 'WealthCrescent_categories_v1';
@@ -28,6 +28,7 @@ function normalize(wb: CategoriesWorkbook): CategoriesWorkbook {
   let max = withMissingDefaults.reduce((m, c) => Math.max(m, c.serialNumber ?? 0), 0);
   const categories = withMissingDefaults.map((c) => {
     const withSerial = c.serialNumber !== undefined ? c : { ...c, serialNumber: ++max };
+    if (LEGACY_PERSONAL_CATEGORY_IDS.has(withSerial.id)) return { ...withSerial, scope: 'custom' as const };
     if (withSerial.scope) return withSerial;
     return { ...withSerial, scope: DEFAULT_CATEGORY_IDS.has(withSerial.id) ? 'app' as const : 'custom' as const };
   });

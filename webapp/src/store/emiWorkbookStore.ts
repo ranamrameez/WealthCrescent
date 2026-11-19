@@ -2,7 +2,7 @@ import { removeEmiPlans } from '../lib/planLifecycle';
 import { create } from 'zustand';
 import { scheduleLocalStorageWrite } from '../lib/localStoragePersistence';
 import { createEmptyEMIWorkbook } from './defaultEmiWorkbook';
-import type { EMILoan, EMIRepayment, EMIWorkbook } from '../types/emiWorkbook';
+import { isEmiReversalProtected, type EMILoan, type EMIRepayment, type EMIWorkbook } from '../types/emiWorkbook';
 
 const STORAGE_KEY = 'WealthCrescent_emi_workbook_v1';
 
@@ -102,14 +102,16 @@ export const useEMIWorkbookStore = create<EMIStoreState>((set, get) => {
       mutate((wb) => ({
         ...wb,
         repayments: [...wb.repayments, repayment],
-        entries: applyOverride(wb.entries, repayment.loanId, repayment.month, repayment.amount),
+        entries: repayment.paymentOnly || wb.entries.find(loan => loan.id === repayment.loanId)?.contractSchedule ? wb.entries : applyOverride(wb.entries, repayment.loanId, repayment.month, repayment.amount),
       })),
 
     updateRepayment: (id, patch) =>
       mutate((wb) => {
         const existing = wb.repayments.find((r) => r.id === id);
         if (!existing) return wb;
+        if (isEmiReversalProtected(existing, wb.repayments)) throw new Error('Receipts with reversal history cannot be edited in place.');
         const updated = { ...existing, ...patch };
+        if (existing.paymentOnly || wb.entries.find(loan => loan.id === existing.loanId)?.contractSchedule) return { ...wb, repayments: wb.repayments.map(row => row.id === id ? updated : row) };
         let entries = wb.entries;
         // A month change needs the OLD slot cleared first, or the loan
         // would end up with both the stale and the new override set.
@@ -127,10 +129,11 @@ export const useEMIWorkbookStore = create<EMIStoreState>((set, get) => {
     deleteRepayment: (id) =>
       mutate((wb) => {
         const existing = wb.repayments.find((r) => r.id === id);
+        if (existing && isEmiReversalProtected(existing, wb.repayments)) throw new Error('Receipts with reversal history cannot be deleted individually.');
         return {
           ...wb,
           repayments: wb.repayments.filter((r) => r.id !== id),
-          entries: existing ? applyOverride(wb.entries, existing.loanId, existing.month, null) : wb.entries,
+          entries: (existing && !existing.paymentOnly && !wb.entries.find(loan => loan.id === existing.loanId)?.contractSchedule ? applyOverride(wb.entries, existing.loanId, existing.month, null) : wb.entries).map(loan => loan.paymentAllocations?.some(row => row.paymentId === id) ? { ...loan, paymentAllocations: loan.paymentAllocations.filter(row => row.paymentId !== id) } : loan),
         };
       }),
 

@@ -1,3 +1,7 @@
+## Scope clarification — 2026-11-05
+
+See [current delivery checklist](../webapp/docs/DELIVERY_CHECKLIST.md) for dashboard redesign, all-app charts, shared topbar/filters, dropdown navigation, themes, categories and engine/payment work. Dashboard and UI acceptance are still outstanding. Category defaults are being corrected to general-purpose labels; existing personal labels retain their IDs as custom categories.
+
 # UI and performance audit — 2026-09-29
 
 ## Verified

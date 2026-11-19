@@ -2,13 +2,13 @@ import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { useTablePagination } from '../../../hooks/useTablePagination';
 import { DateValue } from '../../../components/DateValue';
-import { Line } from 'react-chartjs-2';
+import { AppLine as Line } from '../../../components/AppCharts';
 import { BalanceSummaryCards, type BalanceSummary } from '../../../components/BalanceSummaryCards';
 import { InvestmentPlans } from '../../../components/InvestmentPlans';
 import type { TransactionPageFilters } from '../../../hooks/useUrlTransactionFilters';
 import { useFundsWorkbookStore } from '../../../store/fundsWorkbookStore';
 import { useCategoryStore } from '../../../store/categoryStore';
-import { contributionVsValueSeries, fundCategoryLabel } from '../../../lib/calc/fundsModule';
+import { CalculationEngine } from '../../../lib/calc/CalculationEngine';
 import { fmtMoney } from '../../../lib/format';
 import { cssVar } from '../../../lib/cssVar';
 import { useAppearanceStore } from '../../../store/appearanceStore';
@@ -22,9 +22,9 @@ function useScope(ids: string[], filters: TransactionPageFilters) {
   const funds = workbook.funds.filter(fund => ids.includes(fund.id));
   const period = (date: string) => (!filters.fromDate || date >= filters.fromDate) && (!filters.toDate || date <= filters.toDate);
   const matches = (tx: Transaction) => period(tx.date) && (filters.direction === 'all' || (filters.direction === 'in' ? tx.action === 'BUY' : tx.action === 'SELL')) && filters.source !== 'statement-import'
-    && (filters.category === 'all' || fundCategoryLabel(funds.find(fund => fund.id === tx.ticker)!, categories) === filters.category);
+    && (filters.category === 'all' || CalculationEngine.funds.fundCategoryLabel(funds.find(fund => fund.id === tx.ticker)!, categories) === filters.category);
   const transactions = workbook.transactions.filter(tx => ids.includes(tx.ticker) && matches(tx));
-  const series = funds.map(fund => ({ fund, points: contributionVsValueSeries(fund.id, workbook.transactions.filter(tx => !tx.isPending), workbook.priceHistory) }));
+  const series = funds.map(fund => ({ fund, points: CalculationEngine.funds.contributionVsValueSeries(fund.id, workbook.transactions.filter(tx => !tx.isPending), workbook.priceHistory) }));
   return { workbook, funds, transactions, series, period };
 }
 
@@ -34,12 +34,19 @@ export function FundsScopeSummary({ ids, filters }: { ids: string[]; filters: Tr
     const currencyIds = new Set(funds.filter(fund => fund.currencyCode === currency).map(fund => fund.id));
     const scoped = transactions.filter(tx => currencyIds.has(tx.ticker));
     const sum: BalanceSummary = { start: 0, current: 0, inflow: 0, outflow: 0, pendingInflow: 0, pendingOutflow: 0, plannedInflow: 0, plannedOutflow: 0 };
-    for (const { fund, points } of series.filter(item => currencyIds.has(item.fund.id))) {
+    const currencyFunds = funds.filter(fund => currencyIds.has(fund.id));
+    const currencySeries = series.filter(item => currencyIds.has(item.fund.id));
+    for (const { points } of currencySeries) {
       sum.start += points.filter(point => filters.fromDate && point.date < filters.fromDate).at(-1)?.value ?? 0;
-      const latest = points.filter(point => !filters.toDate || point.date <= filters.toDate).at(-1);
-      const units = workbook.transactions.filter(tx => tx.ticker === fund.id && !tx.isPending && (!filters.toDate || tx.date <= filters.toDate)).reduce((total, tx) => total + (tx.action === 'BUY' ? tx.shares : -tx.shares), 0);
-      const value = !filters.toDate && workbook.marketPrices[fund.id] !== undefined ? units * workbook.marketPrices[fund.id] : latest?.value ?? 0;
-      sum.current += value;
+    }
+    if (filters.toDate) {
+      // Historical value is the last engine-derived position/NAV point on or
+      // before the selected end date. It must not sum raw BUY/SELL quantities.
+      sum.current = currencySeries.reduce((total, item) => total + (item.points.filter(point => point.date <= filters.toDate).at(-1)?.value ?? 0), 0);
+    } else {
+      // Live holdings value comes from the same central stock engine used by
+      // Net Worth, broker totals and the Fund detail page.
+      sum.current = CalculationEngine.funds.fundsValueByCurrency(currencyFunds, workbook.transactions, workbook.marketPrices)[currency] ?? 0;
     }
     for (const tx of scoped) {
       const field = tx.isPending ? (tx.action === 'BUY' ? 'pendingInflow' : 'pendingOutflow') : (tx.action === 'BUY' ? 'inflow' : 'outflow');

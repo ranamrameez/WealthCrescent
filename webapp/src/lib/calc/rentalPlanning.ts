@@ -53,6 +53,7 @@ export function proposeRentCollection(property: Property, today: Date = new Date
   const anchor = property.lastCollectionDate ?? property.leaseStartDate;
   if (!anchor) return null;
   const due = advanceByCycle(new Date(anchor), property.collectionCycle);
+  if (!Number.isFinite(due.getTime())) return null;
   const dueDate = due.toISOString().slice(0, 10);
   const todayStr = today.toISOString().slice(0, 10);
   return {
@@ -60,6 +61,21 @@ export function proposeRentCollection(property: Property, today: Date = new Date
     amount: (property.monthlyRent ?? 0) + (property.pendingRentBalance ?? 0),
     isDue: dueDate <= todayStr,
   };
+}
+
+export function standaloneRentCollections(properties: Property[], plans: PlannedRentalEntry[], asOf: Date, through: string) {
+  const start = asOf.toISOString().slice(0, 10);
+  return properties.flatMap(property => {
+    if (property.isActive === false) return [];
+    const proposal = proposeRentCollection(property, asOf);
+    if (!proposal || !Number.isFinite(proposal.amount) || proposal.amount <= 0 ||
+        proposal.dueDate < start || proposal.dueDate > through ||
+        (property.leaseEndDate && proposal.dueDate > property.leaseEndDate)) return [];
+    const covered = plans.some(plan => plan.propertyId === property.id && plan.date === proposal.dueDate &&
+      plan.type === 'RENT_INCOME' && !plan.cancelled && Number.isFinite(plan.amount) && plan.amount > 0 &&
+      (plan.finance?.currencyCode ?? property.currencyCode) === property.currencyCode);
+    return covered ? [] : [{ property, ...proposal }];
+  });
 }
 
 /** After logging a collection of `amountPaid` against a proposal that

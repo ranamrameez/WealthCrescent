@@ -5,9 +5,11 @@ import { NetWorthPage } from '../NetWorthPage';
 import { TopBar } from '../../../../components/TopBar';
 import { useCashWorkbookStore } from '../../../../store/cashWorkbookStore';
 import { useBankWorkbookStore } from '../../../../store/bankWorkbookStore';
+import { useSubscriptionsWorkbookStore } from '../../../../store/subscriptionsWorkbookStore';
 import { createEmptyBankWorkbook } from '../../../../store/defaultBankWorkbook';
 import { useEnabledCurrenciesStore } from '../../../../store/enabledCurrenciesStore';
 import { saveFxRates } from '../../../../lib/fx';
+import { currentMonthRange, presetDateRange } from '../../../../lib/dateRange';
 
 vi.mock('react-chartjs-2', () => ({ Chart: () => <div>Trend chart</div>, Doughnut: () => <div>Allocation chart</div> }));
 vi.mock('../../../../lib/firebase/useEnsureSignedIn', () => ({ useEnsureSignedIn: () => async () => false }));
@@ -37,12 +39,34 @@ it('shows converted overall summaries in both currencies before the per-currency
   expect(qar.textContent).toContain('400.00');
   const sections = document.querySelectorAll('.standard-section-anchor');
   expect(sections[0].textContent).toContain('Overall summary');
-  expect(sections[1].textContent).toContain('Per currency summary');
+  expect(sections[1].textContent).toContain('Money in / out');
+  expect(sections[2].textContent).toContain('Per currency summary');
   expect(screen.queryByLabelText('Show total in')).toBeNull();
+});
+it('shows a subscription renewal estimate in remaining plans and its contributing record', () => {
+  const original = useSubscriptionsWorkbookStore.getState().workbook;
+  const today = new Date().toISOString().slice(0, 10);
+  useSubscriptionsWorkbookStore.setState({ workbook: { ...original, entries: [
+    { id: 'fixture-subscription', name: 'Fixture membership', amount: 17, currencyCode: 'USD', billingCycle: 'monthly', startDate: today, active: true },
+  ] } });
+  try {
+    const view = show(`/net-worth?entities=subscriptions&period=custom&from=${today}&to=${today}`);
+    fireEvent.click(screen.getByRole('button', { name: 'Money in / out', expanded: false }));
+    const report = within(view.container.querySelector<HTMLElement>('.money-movement-report')!);
+    expect(report.getByText(/No matching actual activity/)).toBeTruthy();
+    const [population, dimension] = report.getAllByRole('combobox');
+    fireEvent.change(population, { target: { value: 'planned' } });
+    fireEvent.change(dimension, { target: { value: 'module' } });
+    fireEvent.click(report.getByRole('cell', { name: 'Subscriptions' }));
+    expect(screen.getByText('Fixture membership (estimated renewal)')).toBeTruthy();
+    view.unmount();
+  } finally {
+    useSubscriptionsWorkbookStore.setState({ workbook: original });
+  }
 });
 it('centralizes URL-backed section and source filters and restores defaults', () => {
   show();
-  fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Dashboard filters' }));
   const modal = document.querySelector<HTMLElement>('.modal-box')!;
   expect(within(modal).getByText('Include in Net Worth')).toBeTruthy();
   fireEvent.click(within(modal).getByRole('button', { name: 'Per currency summary' }));
@@ -52,7 +76,10 @@ it('centralizes URL-backed section and source filters and restores defaults', ()
   const usd = screen.getByRole('heading', { name: 'Overall summary — USD' }).parentElement!;
   expect(usd.textContent).toContain('100.00');
   fireEvent.click(within(modal).getByRole('button', { name: 'Reset' }));
-  expect(screen.getByTestId('location').textContent).toBe('');
+  const resetParams = new URLSearchParams(screen.getByTestId('location').textContent ?? '');
+  expect(resetParams.get('period')).toBe('since-month');
+  expect(resetParams.get('from')).toBe(currentMonthRange().startDate);
+  expect(resetParams.get('to')).toBe('');
   fireEvent.click(within(modal).getByRole('button', { name: 'Done' }));
   expect(document.querySelector('.modal-box')).toBeNull();
 });
@@ -64,24 +91,18 @@ it('applies the URL-backed custom date range to flow figures and exposes the sel
   expect(summary.textContent).toContain('Period net flow');
   expect(summary.textContent).toContain('100.00');
 
-  fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
-  const modal = document.querySelector<HTMLElement>('.modal-box')!;
-  expect((within(modal).getByLabelText('From date') as HTMLInputElement).value).toBe(todayISO);
-  expect((within(modal).getByLabelText('To date') as HTMLInputElement).value).toBe(todayISO);
-  expect(within(modal).getByText(new RegExp(todayISO))).toBeTruthy();
+  expect((screen.getByLabelText('From date') as HTMLInputElement).value).toBe(todayISO);
+  expect((screen.getByLabelText('To date') as HTMLInputElement).value).toBe(todayISO);
 });
 
 it('preserves a selected preset when switching to a custom range', () => {
   const todayISO = new Date().toISOString().slice(0, 10);
-  const fromDate = new Date(todayISO + 'T00:00:00Z');
-  fromDate.setUTCDate(fromDate.getUTCDate() - 89);
-  const expectedFrom = fromDate.toISOString().slice(0, 10);
-  show('/net-worth?period=90d');
-  fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
-  const modal = document.querySelector<HTMLElement>('.modal-box')!;
-  fireEvent.change(within(modal).getByLabelText('Period'), { target: { value: 'custom' } });
-  expect((within(modal).getByLabelText('From date') as HTMLInputElement).value).toBe(expectedFrom);
-  expect((within(modal).getByLabelText('To date') as HTMLInputElement).value).toBe(todayISO);
+  const expectedFrom = presetDateRange('3').startDate;
+  show(`/net-worth?period=3&from=${expectedFrom}&to=${todayISO}`);
+  const dateRange = screen.getByLabelText('Date range');
+  fireEvent.change(dateRange, { target: { value: 'custom' } });
+  expect((screen.getByLabelText('From date') as HTMLInputElement).value).toBe(expectedFrom);
+  expect((screen.getByLabelText('To date') as HTMLInputElement).value).toBe(todayISO);
 });
 
 it('excludes transactions outside the selected range while retaining the live balance', () => {
@@ -100,33 +121,53 @@ it('excludes transactions outside the selected range while retaining the live ba
   }));
   show(`/net-worth?period=custom&from=${todayISO}&to=${todayISO}`);
   const summary = screen.getByRole('heading', { name: 'Overall summary — USD' }).parentElement!;
-  const periodFlow = [...summary.querySelectorAll('.stat-card')].find(card => card.textContent?.includes('Period net flow'));
+  const periodFlow = [...summary.querySelectorAll('.current-position-metric')].find(card => card.textContent?.includes('Period net flow'));
   expect(periodFlow?.textContent).toContain('100.00');
   expect(summary.textContent).toContain('1,100.00');
 });
 
-it('renders the dashboard sections without nesting cards and provides period insights', () => {
+it('renders standard dashboard sections and provides period insights', () => {
   const todayISO = new Date().toISOString().slice(0, 10);
   show(`/net-worth?section=analytics&period=custom&from=${todayISO}&to=${todayISO}`);
-  expect(document.querySelector('.standard-card .card')).toBeNull();
+  expect(document.querySelector('[data-page-section="analytics"] .standard-card')).not.toBeNull();
   expect(screen.getByRole('heading', { name: new RegExp('Insights') })).toBeTruthy();
   expect(screen.getAllByText(/Largest asset:/).length).toBeGreaterThan(0);
   expect(screen.getAllByText(/Recorded net activity:/).length).toBeGreaterThan(0);
   const analytics = document.querySelector<HTMLElement>('[data-page-section="analytics"]')!;
-  fireEvent.click(within(analytics).getByRole('button', { name: 'Hide section' }));
+  expect(analytics.querySelectorAll('.standard-card-toggle')).toHaveLength(1);
+  expect(analytics.querySelector('details')).toBeNull();
+  fireEvent.click(within(analytics).getByRole('button', { name: /^Analytics$/ }));
   expect(screen.queryByRole('heading', { name: new RegExp('Insights') })).toBeNull();
-  fireEvent.click(within(analytics).getByRole('button', { name: 'Show section' }));
+  fireEvent.click(within(analytics).getByRole('button', { name: /^Analytics$/ }));
   expect(screen.getByRole('heading', { name: new RegExp('Insights') })).toBeTruthy();
 });
 
 it('restores hidden sections from a deep link and opens exchange rates only from the FAB', () => {
   show('/net-worth?show-currencies=false&show-plans=false&show-analytics=false');
-  expect(document.querySelectorAll('.standard-section-anchor')).toHaveLength(1);
+  expect(document.querySelectorAll('.standard-section-anchor')).toHaveLength(4);
+  expect(document.querySelector('[data-page-section="movement"]')).toBeTruthy();
+  expect(document.querySelector('[data-page-section="upcoming"]')).toBeTruthy();
+  expect(document.querySelector('[data-page-section="recent"]')).toBeTruthy();
   expect(screen.queryByText('Refresh rates')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Exchange rates' }));
   expect(within(document.querySelector<HTMLElement>('.modal-box')!).getByText('Refresh rates')).toBeTruthy();
   fireEvent.keyDown(document, { key: 'Escape' });
   expect(document.querySelector('.modal-box')).toBeNull();
+});
+
+it('uses calendar months for Plans and preserves a future month in its controls', () => {
+  show('/dashboard?section=plans&plan-month=2028-02&plan-months=3');
+  const month = screen.getByDisplayValue('2028-02');
+  expect(screen.getByText(/2028-02-01 – 2028-04-30/)).toBeTruthy();
+  fireEvent.change(month, { target: { value: '2024-02' } });
+  expect(screen.getByText(/2024-02-01 – 2024-04-30/)).toBeTruthy();
+});
+
+it('renders a scoped money-in/out breakdown with accessible totals and group rows', () => {
+  show('/dashboard?section=movement');
+  expect(screen.getAllByText('Net movement').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('Uncategorized').length).toBeGreaterThan(0);
+  expect(screen.getByText(/Unclassified account records stay visible/)).toBeTruthy();
 });
 
 it('opens the QSE statement picker from the dashboard and returns keyboard focus on Escape', () => {
@@ -140,4 +181,13 @@ it('opens the QSE statement picker from the dashboard and returns keyboard focus
   fireEvent.keyDown(document, { key: 'Escape' });
   expect(screen.queryByRole('dialog', { name: 'Import QSE statement' })).toBeNull();
   expect(document.activeElement).toBe(shortcut);
+});
+
+it('shows the previous calendar month with its actual date bounds', () => {
+  show('/dashboard?section=movement&period=custom&from=2024-03-01&to=2024-03-31');
+  const compare = screen.getByRole('combobox', { name: 'Compare with' });
+  fireEvent.change(compare, { target: { value: 'calendar-month' } });
+  expect(screen.getByRole('table', {
+    name: 'Cleared movement, 2024-03-01 to 2024-03-31 compared with 2024-02-01 to 2024-02-29',
+  })).toBeTruthy();
 });

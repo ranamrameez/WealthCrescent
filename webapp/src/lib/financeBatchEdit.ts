@@ -17,7 +17,7 @@ import type { PlannedBankTransaction } from '../types/plannedBank';
 export function linkedBatchReason(module: 'bank' | 'personalLoans' | 'cash' | 'rentals' | 'creditCard', id: string): string | undefined {
   return useInterEntityTransfersStore.getState().workbook.entries.some(link =>
     (link.from.module === module && link.fromRecordId === id) || (link.to.module === module && link.toRecordId === id))
-    ? 'Linked transfer: use single Edit to handle both sides.' : undefined;
+    ? 'Linked transfer: use Edit linked transfer to handle both sides.' : undefined;
 }
 export function bankPlanBatchReason(row: PlannedBankTransaction): string | undefined {
   if (row.executed) return 'Executed plan: read-only.';

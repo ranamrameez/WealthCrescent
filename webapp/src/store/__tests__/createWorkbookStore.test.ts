@@ -177,7 +177,7 @@ describe('createWorkbookStore normalize', () => {
   });
 
   it('leaves a trade plan with real legs untouched', () => {
-    const leg = { date: '2026-08-01', ticker: 'QGTS', action: 'BUY' as const, shares: 100, price: 10 };
+    const leg = { date: '2026-08-01', ticker: 'QGTS', action: 'BUY' as const, shares: 100, price: 10, feeOverride: 0.25, manualSameDay: true };
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
@@ -272,7 +272,7 @@ describe('createWorkbookStore normalize', () => {
 
   it('executeTradePlanLeg links the leg to the transaction it creates, so a later edit stays visible from the plan', () => {
     const useStore = createWorkbookStore(STORAGE_KEY, createEmptyTestWorkbook);
-    const leg = { date: '2026-08-01', ticker: 'QGTS', action: 'BUY' as const, shares: 100, price: 10 };
+    const leg = { date: '2026-08-01', ticker: 'QGTS', action: 'BUY' as const, shares: 100, price: 10, feeOverride: 0.25, manualSameDay: true };
     useStore.getState().addTradePlan({ id: 'p1', name: 'Plan', createdAt: '2026-08-01', legs: [leg] });
     useStore.getState().executeTradePlanLeg('p1', 0);
 
@@ -282,7 +282,7 @@ describe('createWorkbookStore normalize', () => {
     expect(savedLeg.executedTransactionId).toBeTruthy();
     const linkedTx = state.workbook.transactions.find((t) => t.id === savedLeg.executedTransactionId);
     expect(linkedTx).toBeTruthy();
-    expect(linkedTx?.shares).toBe(100);
+    expect(linkedTx).toMatchObject({ shares: 100, date: leg.date, feeOverride: 0.25, manualSameDay: true });
 
     // Editing the transaction elsewhere (e.g. the Transactions page) — the
     // leg's link should still resolve to the updated, not stale, data.

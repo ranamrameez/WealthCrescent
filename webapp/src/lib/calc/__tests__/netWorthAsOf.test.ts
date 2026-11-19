@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { CalculationEngine } from '../CalculationEngine';
+import type { NetWorthValuationInputs } from '../netWorthValuation';
 import { earliestActivityDate, netWorthAsOfDate, priceAsOfDate } from '../netWorthAsOf';
 import type { QSESettings } from '../../../types/workbook';
 import type { PSXSettings } from '../../../types/psxWorkbook';
@@ -48,6 +50,13 @@ describe('priceAsOfDate', () => {
 });
 
 describe('netWorthAsOfDate', () => {
+  it('values fixed-total EMI from native dated repayments when the ledger is supplied', () => {
+    const inputs = { ...emptyInputs(), emiLoans: [{ id: 'property', name: 'Property', lender: 'Seller', currencyCode: 'PKR', principal: 10000, totalToReturn: 10000, repaymentMode: 'fixedTotal' as const, tenureMonths: 10, startDate: '2026-01-01' }], emiRepayments: [
+      { id: 'paid', loanId: 'property', month: 1, date: '2026-02-01', amount: 2000 },
+      { id: 'future', loanId: 'property', month: 9, date: '2027-01-01', amount: 1000 },
+    ] };
+    expect(netWorthAsOfDate('2026-11-06', inputs).find(row => row.currency === 'PKR')?.liabilities).toBe(8000);
+  });
   it('sums Cash and Bank balances as of a past date, ignoring later activity', () => {
     const inputs = {
       ...emptyInputs(),
@@ -184,4 +193,112 @@ describe('earliestActivityDate', () => {
     };
     expect(earliestActivityDate(inputs as never)).toBe('2024-03-01');
   });
+});
+
+
+describe('central net-worth valuation reconciliation', () => {
+  it('includes only dividends recorded by the valuation date, even for a dividend-only ledger', () => {
+    const inputs: NetWorthValuationInputs = { ...emptyInputs(), qseDividends: [
+      { date: '2026-01-05', ticker: 'QIBK', shares: 10, perShare: 2, amount: 20 },
+      { date: '2026-02-05', ticker: 'QIBK', shares: 10, perShare: 3, amount: 30 },
+    ] };
+    expect(netWorthAsOfDate('2026-01-31', inputs)[0].net).toBe(20);
+    expect(CalculationEngine.valuation.calculateNetWorth(inputs, { date: '2026-01-31' }).rows).toEqual(netWorthAsOfDate('2026-01-31', inputs));
+    expect(earliestActivityDate(inputs)).toBe('2026-01-05');
+  });
+
+  it('reports gross personal-loan receivables and debts, with pending repayments excluded', () => {
+    const inputs: NetWorthValuationInputs = { ...emptyInputs(), personalLoans: [
+      { id: 'lent', person: 'A', direction: 'owed_to_me', currencyCode: 'USD', principal: 500, date: '2026-01-01' },
+      { id: 'borrowed', person: 'B', direction: 'i_owe', currencyCode: 'USD', principal: 300, date: '2026-01-01' },
+    ], personalLoanRepayments: [
+      { id: 'p1', loanId: 'lent', date: '2026-01-02', amount: 100 },
+      { id: 'p2', loanId: 'borrowed', date: '2026-01-02', amount: 200, isPending: true },
+    ] };
+    const [row] = netWorthAsOfDate('2026-01-31', inputs);
+    expect(row).toMatchObject({ assets: 400, liabilities: 300, net: 100 });
+    expect(row.breakdown).toContainEqual({ module: 'Personal Loans (receivable)', amount: 400 });
+    expect(row.breakdown).toContainEqual({ module: 'Personal Loans (owed)', amount: -300 });
+    expect(row.breakdown.reduce((sum, entry) => sum + entry.amount, 0)).toBe(row.net);
+  });
+
+  it('does not treat a pending bank row as evidence for an undated historical opening balance', () => {
+    const inputs: NetWorthValuationInputs = { ...emptyInputs(), bankAccounts: [
+      { id: 'bank', name: 'Bank', currencyCode: 'USD', openingBalance: 900 },
+    ], bankTransactions: [{ id: 'pending', accountId: 'bank', date: '2026-01-01', amount: 50, description: 'Pending', isDeposit: true, source: 'manual', categoryID: '', serialNumber: 1, isPending: true }] };
+    expect(netWorthAsOfDate('2026-01-31', inputs)).toEqual([]);
+    // Live opening balances remain valid; the pending amount still cannot count.
+    expect(CalculationEngine.valuation.calculateNetWorth(inputs, { date: '2026-01-31' }).rows[0].net).toBe(900);
+  });
+
+  it('applies one cutoff, inclusion policy and currency boundary to current and historical calculations', () => {
+    const inputs: NetWorthValuationInputs = { ...emptyInputs(), cashEntries: [
+      { id: 'c1', date: '2026-01-01', isDeposit: true, amount: 100, currencyCode: 'USD', source: 'manual', categoryID: '', serialNumber: 1 },
+      { id: 'c2', date: '2026-01-01', isDeposit: true, amount: 999, currencyCode: 'USD', source: 'manual', categoryID: '', serialNumber: 2, isPending: true },
+      { id: 'c3', date: '2026-02-01', isDeposit: true, amount: 800, currencyCode: 'USD', source: 'manual', categoryID: '', serialNumber: 3 },
+      { id: 'c4', date: '2026-01-01', isDeposit: true, amount: 700, currencyCode: 'PKR', source: 'manual', categoryID: '', serialNumber: 4 },
+    ] };
+    const live = CalculationEngine.valuation.calculateNetWorth(inputs, { date: '2026-01-31' }).rows;
+    expect(live).toEqual(netWorthAsOfDate('2026-01-31', inputs));
+    expect(live.map(row => [row.currency, row.net])).toEqual([['PKR', 700], ['USD', 100]]);
+    expect(CalculationEngine.valuation.calculateNetWorth(inputs, { date: '2026-01-31', selectedModules: [] }).rows).toEqual([]);
+    expect(CalculationEngine.valuation.calculateNetWorth(inputs, { date: '2026-01-31', selectedModules: ['bank'] }).rows).toEqual([]);
+    expect(CalculationEngine.valuation.calculateNetWorth({ ...inputs, cashSettings: { ...inputs.cashSettings, includeInNetWorth: false } }, { date: '2026-01-31' }).rows).toEqual([]);
+  });
+
+  it('orders historical quotes by date before time, without mutating price history', () => {
+    const history = { F: [{ date: '2026-01-01', time: '23:59', price: 50 }, { date: '2026-01-02', price: 70 }] };
+    const before = structuredClone(history);
+    expect(priceAsOfDate('F', history, '2026-01-31')).toBe(70);
+    expect(history).toEqual(before);
+  });
+});
+
+
+it('keeps pending BUY limit prices out of real net worth and preserves the input snapshot', () => {
+  const inputs: NetWorthValuationInputs = { ...emptyInputs(), qseSettings: { ...emptyInputs().qseSettings, feePct: 0, minFee: 0 },
+    qseTransfers: [{ id: 'deposit', date: '2026-01-01', type: 'DEPOSIT', gross: 1000, fee: 0 }],
+    qseTransactions: [
+      { id: 'buy', date: '2026-01-01', ticker: 'QIBK', action: 'BUY', shares: 10, price: 20 },
+      { id: 'pending', date: '2026-01-02', ticker: 'QIBK', action: 'BUY', shares: 10, price: 900, isPending: true },
+    ],
+  };
+  const before = structuredClone(inputs);
+  const current = CalculationEngine.valuation.calculateNetWorth(inputs, { date: '2026-01-31' });
+  expect(current.rows.find(row => row.currency === 'QAR')?.net).toBe(1000);
+  expect(netWorthAsOfDate('2026-01-31', inputs)).toEqual(current.rows);
+  expect(inputs).toEqual(before);
+});
+
+it('does not let excluded or pending ledgers establish a historical comparison baseline', () => {
+  const inputs: NetWorthValuationInputs = { ...emptyInputs(), cashEntries: [
+    { id: 'pending', date: '2020-01-01', isDeposit: true, amount: 100, currencyCode: 'USD', source: 'manual', isPending: true },
+  ], qseDividends: [{ date: '2019-01-01', ticker: 'QIBK', amount: 50, shares: 10, perShare: 5 }],
+    personalLoans: [{ id: 'excluded', date: '2018-01-01', person: 'A', direction: 'owed_to_me', principal: 100, currencyCode: 'USD', includeInNetWorth: false }],
+  };
+  const scoped = CalculationEngine.valuation.scopeNetWorthInputs(inputs, ['cash', 'personalLoans']);
+  expect(earliestActivityDate(scoped)).toBeUndefined();
+});
+
+
+it('reports missing opening evidence and excludes undated card debt from unsupported history', () => {
+  const inputs: NetWorthValuationInputs = { ...emptyInputs(),
+    bankAccounts: [{ id: 'a', name: 'Bank', currencyCode: 'USD', openingBalance: 500 }],
+    creditCards: [{ id: 'card', name: 'Card', currencyCode: 'QAR', openingBalance: 200 }],
+  };
+  expect(CalculationEngine.valuation.unverifiedOpeningCurrencies(inputs, '2026-01-31')).toEqual(['QAR', 'USD']);
+  expect(netWorthAsOfDate('2026-01-31', inputs)).toEqual([]);
+  const live = CalculationEngine.valuation.calculateNetWorth(inputs, { date: '2026-01-31' }).rows;
+  expect(live.find(row => row.currency === 'USD')?.net).toBe(500);
+  expect(live.find(row => row.currency === 'QAR')?.net).toBe(-200);
+});
+
+it('values broker ledgers independently and includes inactive-selection history', () => {
+  const inputs = { ...emptyInputs(), psxBrokers: [
+    { settings: { ...emptyInputs().psxSettings, currency: 'PKR' }, transactions: [], transfers: [{ id: 'one', date: '2020-01-01', type: 'DEPOSIT' as const, gross: 100, fee: 0 }], adjustments: [] },
+    { settings: { ...emptyInputs().psxSettings, currency: 'PKR' }, transactions: [], transfers: [{ id: 'two', date: '2020-01-01', type: 'DEPOSIT' as const, gross: 200, fee: 0 }], adjustments: [] },
+  ] };
+  expect(netWorthAsOfDate('2026-01-01', inputs).find(row => row.currency === 'PKR')?.net).toBe(300);
+  expect(earliestActivityDate(inputs)).toBe('2020-01-01');
+  expect(CalculationEngine.valuation.calculateNetWorth(inputs, { date: '2026-01-01', selectedModules: ['cash'] }).rows).toEqual([]);
 });

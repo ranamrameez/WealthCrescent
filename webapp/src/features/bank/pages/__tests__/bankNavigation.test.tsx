@@ -1,5 +1,7 @@
+import { CreditCardDetailPage } from '../CreditCardsSection';
+import { useCreditCardWorkbookStore } from '../../../../store/creditCardWorkbookStore';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AccountDetailPage, BankDetailPage } from '../BankPage';
 import { TopBar } from '../../../../components/TopBar';
@@ -7,7 +9,12 @@ import { useBankWorkbookStore } from '../../../../store/bankWorkbookStore';
 import { createEmptyBankWorkbook } from '../../../../store/defaultBankWorkbook';
 
 vi.mock('react-chartjs-2', () => ({ Bar: () => <div>Bar chart</div>, Line: () => <div>Line chart</div>, Doughnut: () => <div>Doughnut chart</div> }));
-vi.mock('../../../../lib/firebase/useEnsureSignedIn', () => ({ useEnsureSignedIn: () => async () => false }));
+const session = vi.hoisted(() => ({ owner: undefined as string | undefined }));
+vi.mock('../../../../lib/firebase/useEnsureSignedIn', () => ({ useEnsureSignedIn: () => async () => !!session.owner }));
+vi.mock('../../../../lib/firebase/useAuthState', async importOriginal => ({
+  ...await importOriginal<typeof import('../../../../lib/firebase/useAuthState')>(),
+  getCurrentUser: () => session.owner ? { uid: session.owner } : null,
+}));
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -32,6 +39,7 @@ function show(url: string) {
   return render(<MemoryRouter initialEntries={[url]}><TopBar /><Routes>
     <Route path="/bank/account/:id" element={<AccountDetailPage />} />
     <Route path="/bank/bank/:id" element={<BankDetailPage />} />
+    <Route path="/bank/card/:id" element={<CreditCardDetailPage />} />
   </Routes></MemoryRouter>);
 }
 
@@ -90,15 +98,69 @@ it.each(['/bank/account/a1', '/bank/bank/b1'])('keeps plan creation in the FAB w
   expect(screen.getByRole('button', { name: 'Save plan' })).toBeTruthy();
 });
 
+// Three lazy-editor cycles need a total budget that covers the bounded
+// five-second finder for each cycle on a cold Windows/CI worker.
 it('keeps one live section stack after repeatedly closing batch edit', async () => {
   const { container } = show('/bank/account/a1?section=transactions');
   for (let i = 0; i < 3; i++) {
     const transactionSection = [...container.querySelectorAll('section')].find(section => section.querySelector('.standard-card-title')?.textContent === 'Transactions')!;
     fireEvent.click(transactionSection.querySelector('button[aria-label="Card options"]')!);
     fireEvent.click(screen.getByRole('button', { name: 'Batch edit' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Cancel / Discard' }));
+    // The editor is lazy-loaded; cold Windows/CI transforms may exceed the
+    // default one-second DOM query timeout without changing its behavior.
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel / Discard' }, { timeout: 5000 }));
     expect(container.querySelectorAll('.standard-section-stack')).toHaveLength(1);
     expect(container.querySelectorAll('.standard-section-anchor')).toHaveLength(5);
     expect(screen.getAllByText('Future cleared payment')).toHaveLength(1);
+  }
+}, 15000);
+
+it('routes all card entry kinds through one shared transfer form', () => {
+  const previous = useCreditCardWorkbookStore.getState().workbook;
+  useCreditCardWorkbookStore.setState({ workbook: { ...previous, cards: [{ id: 'card', name: 'Test card', currencyCode: 'USD' }], transactions: [] } });
+  try {
+    show('/bank/card/card');
+    fireEvent.click(screen.getByRole('button', { name: 'Open actions' }));
+    expect(screen.queryByRole('button', { name: 'Fees, markup and cash advances' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Transactions and transfers' }));
+    expect(screen.getByRole('heading', { name: 'Transfers' })).toBeTruthy();
+    const kinds = screen.getByLabelText('Card transaction type') as HTMLSelectElement;
+    expect(Array.from(kinds.options).map(option => option.value)).toEqual(['charge', 'payment', 'fee', 'markup', 'cashAdvance']);
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    const ledger = within(document.getElementById('card-transactions')!);
+    fireEvent.click(ledger.getByRole('button', { name: 'Card options' }));
+    fireEvent.click(ledger.getByText('Transactions and transfers'));
+    expect(screen.getByRole('heading', { name: 'Transfers' })).toBeTruthy();
+  } finally {
+    cleanup();
+    useCreditCardWorkbookStore.setState({ workbook: previous });
+  }
+});
+
+it('saves a reviewed bank bill override without editing the underlying ledger', async () => {
+  const store = useCreditCardWorkbookStore;
+  const previous = store.getState().workbook;
+  const transactions = [{ id: 'purchase', cardId: 'bill', kind: 'charge' as const, date: '2026-09-10', amount: 100, description: 'Purchase' }];
+  session.owner = 'fixture';
+  store.setState({ workbook: { ...previous, cards: [
+    { id: 'bill', name: 'Bill fixture', currencyCode: 'USD', statementDate: 17, paymentDueDate: 27 },
+  ], transactions } });
+  try {
+    show('/bank/card/bill?section=statement');
+    const section = document.getElementById('card-statement')!;
+    fireEvent.click(within(section).getByRole('button', { name: 'Card options' }));
+    fireEvent.click(screen.getByText('Edit closed statement'));
+    const dialog = within(screen.getByRole('dialog', { name: /Edit closed statement/ }));
+    fireEvent.change(dialog.getByLabelText('Bank bill amount'), { target: { value: '102.50' } });
+    fireEvent.change(dialog.getByLabelText('Bank minimum due'), { target: { value: '20' } });
+    fireEvent.change(dialog.getByLabelText('Final payment date'), { target: { value: '2026-09-28' } });
+    fireEvent.click(dialog.getByRole('button', { name: 'Save statement' }));
+    await waitFor(() => expect(store.getState().workbook.cards[0].statementOverrides?.['2026-09-17'])
+      .toMatchObject({ statementBalance: 102.5, minimumDue: 20, dueDate: '2026-09-28' }));
+    expect(store.getState().workbook.transactions).toBe(transactions);
+  } finally {
+    cleanup();
+    session.owner = undefined;
+    store.setState({ workbook: previous });
   }
 });
