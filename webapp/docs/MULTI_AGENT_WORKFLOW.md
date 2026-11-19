@@ -42,6 +42,7 @@ The register lives on the shared delivery branch linked to the active PR. For th
 | Batch edit budget definitions | Done | WC-TR PSX session, work/budget-definition-batch | `f9b282f0` adds grid edits for names, default limits and rollover. Focused service/UI tests and production build passed. |
 | Budget pending and planned reservations | Done | WC-TR PSX session, work/budget-reservations | `e9dd8264` adds monthly reservations, detail and CSV, apart from cleared usage and rollover. Full local suite (1,431 tests) and production build passed. |
 | Continue UI-to-service migration | Ready | | Claim one named module and workflow at a time. |
+| Move subscription renewal planning to a service | In progress | WC-TR PSX session, work/subscription-renewal-service, 2026-11-19 UTC | Centralize renewal regeneration and validate fresh subscription and funding source before editing plans. |
 | Cash accounts in the global finder | Done | WC-TR session 1939ef032035, PR #51 | `0526e262` covers defaults, Cash entries, Cash plans, independent favorites and filter-preserving links. 1,390 tests and build passed locally; Actions 474 passed. |
 | Shared finder keyboard acceptance | Done | WC-TR session 1939ef032035, PR #51 | `92c13b71` skips disabled keyboard results and handles empty searches. 1,393 tests passed locally; Actions 477 passed tests and build. |
 | Add app-wide record search | Done | WC-TR session 1939ef032035, PR #51 | `466b642b` adds account-scoped topbar search, native record links and module/submodule filters. 1,408 tests passed locally; Actions 492 passed. |
