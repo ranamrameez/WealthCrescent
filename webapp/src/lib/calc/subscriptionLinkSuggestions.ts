@@ -22,7 +22,7 @@ const GENERIC_WORDS = new Set(['card', 'mobile', 'payment', 'phone', 'recharge',
 const normalize = (value: string) => value.normalize('NFKC').toLowerCase().trim();
 const words = (value: string) => normalize(value).match(/[\p{L}\p{N}]+/gu) ?? [];
 
-function identifiers(value: string) {
+function identifiers(value: string): { masked: string[]; full: string[] } {
   const text = normalize(value);
   return {
     masked: [...text.matchAll(/(?:[x*•]{2,}\s*(\d{4,8})\b|\[\s*(\d{4,8})\s*\])/gu)].map(match => match[1] ?? match[2]),
