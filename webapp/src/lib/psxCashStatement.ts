@@ -16,7 +16,7 @@ const numericDate = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/;
 type DateOrder = 'day-first' | 'month-first';
 const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
-function statementDate(value: string, dateSystem?: '1900' | '1904', order?: DateOrder) {
+export function statementDate(value: string, dateSystem?: '1900' | '1904', order?: DateOrder) {
   const named = /^([a-z]{3})\s+(\d{1,2}),\s*(\d{4})$/i.exec(value);
   const numeric = numericDate.exec(value);
   if (numeric && !order && Number(numeric[1]) !== Number(numeric[2])) {
@@ -47,7 +47,7 @@ const cashNarration = /^(?:funds? transfer\b|(?:cash|bank) (?:deposit|withdrawal
 const chargeNarration = /\b(?:fees?|charges?|commission|tax)\b/i;
 const isCashNarration = (description: string) => cashNarration.test(description) && !chargeNarration.test(description);
 
-function inferDateOrder(dates: string[]): DateOrder | undefined {
+export function inferDateOrder(dates: string[]): DateOrder | undefined {
   const orders = new Set<DateOrder>();
   for (const date of dates) {
     const parts = numericDate.exec(date);
@@ -115,13 +115,18 @@ export function parsePsxCashStatement(tables: string[][][], dateSystem?: '1900' 
 }
 
 export async function readPsxCashStatement(file: File) {
+  const { tables, dateSystem } = await readPsxBrokerTables(file);
+  return parsePsxCashStatement(tables, dateSystem);
+}
+
+export async function readPsxBrokerTables(file: File): Promise<{ tables: string[][][]; dateSystem?: '1900' | '1904' }> {
   if (file.size > 10_000_000) throw new Error('Statement is too large (maximum 10 MB).');
   if (/\.xlsx$/i.test(file.name)) {
     const { sheets, dateSystem } = readTabularXlsx(new Uint8Array(await file.arrayBuffer()));
-    return parsePsxCashStatement(sheets.map(sheet => sheet.rows), dateSystem);
+    return { tables: sheets.map(sheet => sheet.rows), dateSystem };
   }
   const text = await file.text();
-  if (!/<table(?:\s|>)/i.test(text)) return parsePsxCashStatement([parseCSV(text)]);
+  if (!/<table(?:\s|>)/i.test(text)) return { tables: [parseCSV(text)] };
   // Parse text into an inert syntax tree without invoking browser DOM sinks.
   const { parseFragment } = await import('parse5');
   const fragment = parseFragment(text);
@@ -135,5 +140,5 @@ export async function readPsxCashStatement(file: File) {
   };
   const tables = find(fragment.childNodes, ['table']).map(table =>
     find(children(table), ['tr']).map(row => find(children(row), ['td', 'th']).map(plainText)));
-  return parsePsxCashStatement(tables);
+  return { tables };
 }

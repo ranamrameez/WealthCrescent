@@ -1,3 +1,7 @@
+## Trade Journal, PSX Profiler and reviewed AHL orders
+
+The [trading tools guide](docs/trading-tools.md) records the upstream revision, user entry points, complete feature inventory and storage boundary. The PSX Dashboard and Trade Transactions show the AHL shortcuts when an active Al Habib broker is selected. Native order-history writes are reviewed, broker-scoped and guarded against stale workbooks and new unmatched sell shares. The Journal uses its own browser-local statement and order history data.
+
 ## 2026-11-18 — PSX cash-transfer reconciliation
 
 Branch `feat/psx-cash-transfer-reconciliation` adds Cash transfers statement import and Al Habib bank sync. Source matching and stale-preview checks live in `psxCashTransferReview.ts`. Review choices persist through the ordinary PSX workbook and affect only its active profile. Bank sync stores source references on the broker transfer. Existing inter-entity links retain their usual editing workflow.

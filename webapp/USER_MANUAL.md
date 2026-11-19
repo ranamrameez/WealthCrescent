@@ -1103,6 +1103,12 @@ Loading masks use small rounded stat placeholders and large 600px section cards 
 - Profit/Loss is derived performance, not a separate transaction row. The Funds cash ledger now reconciles transfer cash with BUY/SELL movements per currency; see §20 above.
 
 
+## Import Al Habib records and open the trading tools
+
+Select Al Habib on the PSX Dashboard. Use **Import AHL order history** to review executed fills or **Import AHL account statement (cash)** to reconcile deposits and withdrawals. Use **Review full AHL statement in Trade Journal** to inspect settlements, charges and order-to-ledger differences.
+
+Open **Trade Journal** from Stocks under either exchange. Open **PSX Profiler** under PSX for the Al Habib break-even calculator, stock profiles and return comparisons. See the [trading tools guide and original app links](docs/trading-tools.md).
+
 ## Stock broker profiles
 
 QSE and PSX portfolios are separated by broker profile. Each broker owns its own trades, cash transfers, adjustments, dividends, trade plans, settings and derived P/L. Select the broker profile before adding activity. A cash transfer linked to QSE or PSX must target the specific broker profile; its own currency and deposit-fee settings are used, not the parent exchange defaults. Market prices, price history and watchlists remain shared for the exchange. Archived profiles remain available as read-only history; deactivated profiles are hidden from normal activity and cannot be selected for new activity. Legacy PSX records are assigned to the default JS Zindigi/JS Zindagi profile during the versioned migration. Review your backup/export after migration before relying on the new profile separation.

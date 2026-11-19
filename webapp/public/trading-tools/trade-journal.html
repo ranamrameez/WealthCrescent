@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<title>Trade Journal</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{--bg:#eef1f4;--card:#fff;--ink:#14202b;--mut:#5d6b78;--line:#d9dfe5;--pos:#17783f;--neg:#b8372f;--acc:#0f6670;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1418;--card:#171e24;--ink:#e6ecf1;--mut:#93a1ad;--line:#27313a;--pos:#4cc07a;--neg:#ef7a70;--acc:#5bc0cc;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1418;--card:#171e24;--ink:#e6ecf1;--mut:#93a1ad;--line:#27313a;--pos:#4cc07a;--neg:#ef7a70;--acc:#5bc0cc;color-scheme:dark}
+:root:root{--bg:var(--wc-bg,#eef1f4);--card:var(--wc-card,#fff);--ink:var(--wc-ink,#14202b);--line:var(--wc-line,#d9dfe5);--acc:var(--wc-accent,#0f6670);--mut:var(--wc-muted,#5d6b78)}
+html{scroll-behavior:smooth;scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+site-navbar{position:sticky;top:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums}
+main{max-width:760px;margin:0 auto;padding:56px 16px 48px}
+#nav{position:fixed;inset:0px auto 0 0;width:250px;background:var(--card);border-right:1px solid var(--line);padding:calc(16px + env(safe-area-inset-top,0px)) 12px 16px;overflow-y:auto;transform:translateX(-100%);transition:transform .2s;z-index:20}
+#nav.open{transform:none}
+#nav a{display:block;padding:7px 10px;border-radius:8px;color:var(--ink);text-decoration:none;font-size:14px}
+#nav a.k{padding-left:24px;color:var(--mut)}
+#nav a.p{font-weight:700;margin-top:12px}
+#nav a.on{background:var(--bg);color:var(--acc)}
+#mb{position:fixed;top:calc(0px + 8px);left:8px;z-index:21;margin:0}
+@media (min-width:900px){#nav{transform:none}#mb{display:none}main{margin:0 0 0 250px;max-width:920px;padding-top:20px}}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;background:var(--card);padding:10px 12px;margin:8px 0}
+.pill{font-size:12px;padding:3px 9px;border-radius:99px;border:1px solid var(--line);color:var(--mut);white-space:nowrap}.pill.ok{border-color:var(--pos);color:var(--pos)}
+h3{font-size:15px;margin:18px 0 6px}
+.mini{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}.lt.off{opacity:.35}
+.chw{position:relative}.tip{position:absolute;top:8px;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.2);min-width:170px;z-index:5}.tip dl{display:grid;grid-template-columns:1fr auto;gap:2px 12px;margin:4px 0 0}.tip dt{color:var(--mut)}.tip dd{margin:0;text-align:right}
+.lg{margin-bottom:6px}.lg span{display:inline-flex;align-items:center;gap:5px;margin-right:12px;font-size:12px;color:var(--mut)}.lg i{width:14px;height:4px;border-radius:2px;display:inline-block}
+.days{display:flex;flex-wrap:wrap;gap:10px}.dc{width:190px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}.dc b{display:block;margin-bottom:4px}.dc dl{display:grid;grid-template-columns:1fr auto;gap:2px 10px;margin:0;font-size:13px}.dc dt{color:var(--mut)}.dc dd{margin:0;text-align:right}
+h1{font-size:26px;line-height:1.15;margin:8px 0 6px;letter-spacing:-.01em}
+h2{font-size:17px;margin:28px 0 10px}
+p{margin:0 0 10px}
+.mut{color:var(--mut);font-size:13px}
+.pos{color:var(--pos)}.neg{color:var(--neg)}
+.drop{display:block;border:2px dashed var(--line);border-radius:14px;padding:26px 16px;text-align:center;background:var(--card);cursor:pointer;margin-top:14px}
+.drop:hover,.drop.on{border-color:var(--acc)}
+.drop input{display:none}
+.drop b{display:block;font-size:16px;margin-bottom:4px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.hero{padding:18px 16px 8px}
+.big{font-size:44px;font-weight:700;letter-spacing:-.02em;line-height:1.05}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px}
+.grid .card b{display:block;font-size:20px}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:7px 8px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:600;color:var(--mut);font-size:13px}
+.err{background:var(--card);border:1px solid var(--neg);border-radius:12px;padding:12px;margin-top:14px;color:var(--neg)}
+.note{font-size:13px;color:var(--mut);border-left:3px solid var(--line);padding-left:10px;margin-top:12px}
+#out input{width:84px;padding:6px 8px;text-align:right;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+#cp td,#cp th{white-space:normal}
+.sec{font-size:22px;margin:34px 0 4px;padding-top:12px;border-top:2px solid var(--acc)}.upd{font-size:13px;color:var(--mut);margin:0 0 10px}.tabs{display:flex;gap:8px;margin:16px 0 4px}.tabs button{flex:1;padding:9px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit;cursor:pointer}.tabs button.on{border-color:var(--acc);color:var(--acc);font-weight:600}.btn{padding:8px 14px;border:0;border-radius:10px;background:var(--acc);color:var(--bg);font:inherit;cursor:pointer;margin:8px 0}#out input[type=date]{width:auto}#pp,#paste,.mk,#pa-led,#pa-ord{display:block;width:100%;margin-top:8px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-size:13px;font-family:inherit}
+[data-p]{scroll-margin-top:56px}
+[hidden]{display:none}
+</style>
+<script src="./ahl-journal.js"></script>
+<script src="./trading-tool-bridge.js"></script>
+</head>
+<body>
+
+<button id="mb" class="btn" aria-label="Journal sections">Sections</button>
+<nav id="nav" aria-label="Trade Journal sections"><b>Trade Journal</b>
+<a href="#overview" data-v="overview">Top of page</a>
+<a class="p" href="#qse" data-v="qse">QSE - The Group</a>
+<a class="k" href="#qse-calculator" data-v="qse-calculator">Buy &amp; BE calculator</a>
+<a class="k" href="#qse-prices" data-v="qse-prices">Prices and break-even</a>
+<a class="k" href="#qse-report" data-v="qse-report">Report</a>
+<a class="k" href="#qse-import" data-v="qse-import">Statement and history</a>
+<a class="p" href="#psx" data-v="psx">PSX - Al Habib</a>
+<a class="k" href="#psx-calculator" data-v="psx-calculator">Buy &amp; BE calculator</a>
+<a class="k" href="#psx-prices" data-v="psx-prices">Prices and break-even</a>
+<a class="k" href="#psx-report" data-v="psx-report">Dashboard &amp; P&amp;L</a>
+<a class="k" href="#psx-import" data-v="psx-import">Import &amp; reconcile</a>
+</nav>
+<main>
+<h1>Trade Journal</h1>
+<p class="mut">Everything is calculated in this page. Nothing is uploaded, and your data stays in this browser.</p>
+<label class="drop" id="drop"><input type="file" id="file" multiple accept=".xlsx,.xls,.csv,.html,.htm,.txt"><b>Choose a statement</b><span class="mut">or drop it here. Use the longest date range you have.</span></label>
+<details style="margin-top:10px"><summary class="mut">Paste statement or order history (markup or CSV)</summary><textarea id="paste" rows="6" placeholder="Paste the table markup or CSV here"></textarea><button class="btn" id="go">Read pasted text</button></details>
+<div id="err" class="err" hidden></div>
+<div id="out"><section><div data-p="qse-calculator"><h2 class="sec">QSE · The Group — Buy &amp; break-even calculator</h2><div id="calc-qa"></div></div><div data-p="qse-prices"><h2 class="sec">QSE - The Group · Prices and break-even</h2><div id="bd-qa"></div></div>
+<div data-p="qse-report"><h2 class="sec">QSE - The Group · Report</h2><div id="rp-qa"></div></div>
+<div data-p="qse-import"><h2 class="sec">QSE - The Group · Statement and history</h2><p class="note" style="margin-top:0"><b>Loading replaces.</b> A new Qatar statement replaces the current one completely, and the page keeps no older copy. Load the longest date range you have so earlier days stay in. Prices you saved are never touched.</p><div id="qa-slot"></div><div id="im-qa"></div></div></section>
+<section><div data-p="psx-calculator"><h2 class="sec">PSX · AHL — Buy &amp; break-even calculator</h2><div id="calc-ps"></div></div><div data-p="psx-prices"><h2 class="sec">PSX - Al Habib · Prices and break-even</h2><div id="bd-ps"></div></div>
+<div data-p="psx-report"><h2 class="sec">PSX - Al Habib · Report</h2><div id="rp-ps"></div></div>
+<div data-p="psx-import"><h2 class="sec">PSX - Al Habib · Statement and history</h2><p class="note" style="margin-top:0"><b>Pasting replaces.</b> Each box replaces its own data completely: a new account statement replaces the previous account statement, and a new order history replaces the previous order history. Paste the full table each time so earlier days stay in. Prices you saved are never touched.</p>
+<div class="card"><b>Account statement</b> <span class="mut">(date, description, debit, credit, balance)</span><textarea id="pa-led" rows="5" placeholder="Paste the account statement table markup or CSV"></textarea><button class="btn" id="go-led">Replace from pasted text</button> <label class="btn">Replace from CSV or Excel file<input type="file" id="fl-led" accept=".csv,.xlsx,.xls,.html,.htm,.txt" style="display:none"></label></div>
+<div class="card" style="margin-top:10px"><b>Order history</b> <span class="mut">(scrip, quantity, gross rate, net amount, type, dates)</span><textarea id="pa-ord" rows="5" placeholder="Paste the order history table markup or CSV"></textarea><button class="btn" id="go-ord">Replace from pasted text</button> <label class="btn">Replace from CSV or Excel file<input type="file" id="fl-ord" accept=".csv,.xlsx,.xls,.html,.htm,.txt" style="display:none"></label></div>
+<div class="card" style="margin-top:10px"><b>Show days by</b> <span class="mut">Your broker’s statement dates a trade the next business day (T+1). Statement date matches the lines you see at the broker, so the newest line shows as the latest day. Trade date books each trade on the day you made it.</span><br><button class="btn" data-day="stmt">Statement date</button> <button class="btn" data-day="exec">Trade date</button></div>
+<p id="pmsg" class="note"></p><div id="im-ps"></div></div></section>
+<details style="margin-top:24px"><summary class="mut">Fee settings</summary><p><label>Qatar per side % <input id="fq"></label> <label>PSX commission % <input id="fc"></label> <label>PSX tax on commission % <input id="fs"></label> <label>PSX CDC per share <input id="fd"></label></p></details></div>
+</main>
+<script src="./trade-journal.js"></script>
+<script src="./trade-calculators.js"></script>
+</body>
+</html>
