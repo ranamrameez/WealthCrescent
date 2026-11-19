@@ -1209,3 +1209,12 @@ In **Money in/out**, select **Cleared actual** and open **Compare with**. Use **
 Use **Batch edit monthly limits** in the **Currency budgets** menu to edit limits for the report's displayed months. Saving the batch creates month-specific overrides and retains each budget's default limit and currency.
 
 Use **Batch edit budget definitions** to update names, default limits, and rollover policies together. Changes to default limits or rollover recalculate results throughout each budget period. Monthly overrides, native currency, categories, plan scope, and allocations are preserved.
+
+
+### Repairing a missed transfer link
+
+Open Edit on an existing QSE, PSX or Funds cash transfer, or a personal-loan payment, and enable Link to another finance. Choose the other finance. For Bank and Cash, Other finance record can select an existing unlinked counterpart or create a new one. Saving retains the original record ID and import metadata. Existing counterparts keep their original posting dates and values.
+
+Linked rows in a finance batch editor offer Edit linked transfer. Save the coordinated popup to refresh that row. Other unsaved batch edits stay in the grid.
+
+Credit-card transactions and transfers use the shared Transfers form. Card transaction type includes purchases, payments, fees, markup and cash advances. Related form fields stay grouped and wrap into adjacent groups as the popup grows. Exit full screen uses inward-facing corners.

@@ -141,12 +141,77 @@ export function createLinkedTransfer(input: InterEntityTransferInput): { link: I
   }
 }
 
-/** Recomputes and re-dispatches both side records for an edit. Unlike
- * `createLinkedTransfer`, this doesn't attempt rollback on a partial
- * failure — reverting an *update* would need the pre-edit record values,
- * which aren't retained here. If this ever throws partway, the two sides
- * may end up briefly inconsistent; this is reported honestly rather than
- * claimed as safe. */
+/** Attach a new counterpart to a reviewed native record, retaining its identity
+ * and module-specific metadata. Restore the original on a failed local write. */
+function restoreWorkbook<T>(state: { workbook: T; setWorkbook: (workbook: T) => void }) {
+  return () => state.setWorkbook(state.workbook);
+}
+
+const captureLinkWorkbook = {
+  cash: () => restoreWorkbook(useCashWorkbookStore.getState()),
+  bank: () => restoreWorkbook(useBankWorkbookStore.getState()),
+  creditCard: () => restoreWorkbook(useCreditCardWorkbookStore.getState()),
+  qse: () => restoreWorkbook(useWorkbookStore.getState()),
+  psx: () => restoreWorkbook(usePSXWorkbookStore.getState()),
+  funds: () => restoreWorkbook(useFundsWorkbookStore.getState()),
+  rentals: () => restoreWorkbook(useRentalsWorkbookStore.getState()),
+  personalLoans: () => restoreWorkbook(usePersonalLoansWorkbookStore.getState()),
+  emi: () => restoreWorkbook(useEMIWorkbookStore.getState()),
+};
+
+export function linkExistingTransfer(
+  input: InterEntityTransferInput,
+  existing: LinkSideRecord,
+  existingIsFrom: boolean,
+  existingCounterpart?: LinkSideRecord,
+): { link: InterEntityTransfer } | { error: string } {
+  const side = existingIsFrom ? input.from : input.to;
+  const id = existing.record.id;
+  if (side.module !== existing.module) return { error: 'The original finance changed. Reopen the editor.' };
+  if (findLinkForRecord(existing.module, id)) return { error: 'This record is already linked. Reopen the editor.' };
+  if (JSON.stringify(getLinkedSideRecord(side, id)) !== JSON.stringify(existing.record)) {
+    return { error: 'This record changed. Reopen the editor.' };
+  }
+  const peerSide = existingIsFrom ? input.to : input.from;
+  if (existingCounterpart && (existingCounterpart.module !== peerSide.module ||
+      findLinkForRecord(peerSide.module, existingCounterpart.record.id) ||
+      JSON.stringify(getLinkedSideRecord(peerSide, existingCounterpart.record.id)) !== JSON.stringify(existingCounterpart.record))) {
+    return { error: 'The other record changed or became linked. Review it again.' };
+  }
+  const peerId = existingCounterpart?.record.id ?? crypto.randomUUID();
+  const ids = { linkId: crypto.randomUUID(), fromRecordId: existingIsFrom ? id : peerId, toRecordId: existingIsFrom ? peerId : id };
+  const rollback = [captureLinkWorkbook[input.from.module](), captureLinkWorkbook[input.to.module](),
+    restoreWorkbook(useInterEntityTransfersStore.getState())];
+  try {
+    const built = buildLinkedRecords(resolveTransferInput(input), ids);
+    const own = existingIsFrom ? built.from : built.to;
+    const counterpart = existingIsFrom ? built.to : built.from;
+    if (existingCounterpart) {
+      const record = existingCounterpart.record;
+      const magnitude = 'gross' in record ? record.gross : Math.abs(record.amount);
+      if (magnitude !== (existingIsFrom ? input.toAmount : input.fromAmount) ||
+          ('isDeposit' in record && record.isDeposit !== existingIsFrom) ||
+          ('accountId' in record && record.accountId !== peerSide.ref) ||
+          ('currencyCode' in record && peerSide.currencyCode && record.currencyCode !== peerSide.currencyCode)) {
+        throw new Error('The selected counterpart has a different amount, direction or account. Review both sides.');
+      }
+    }
+    if ('isPending' in existing.record && existing.record.isPending) {
+      if (['creditCard', 'emi'].includes(counterpart.module)) throw new Error('This finance requires a settled funding record.');
+      Object.assign(counterpart.record, { isPending: true });
+    }
+    dispatchUpdate({ ...own, record: { ...existing.record, ...own.record,
+      ...('source' in existing.record ? { source: existing.record.source } : {}),
+    } } as LinkSideRecord);
+    if (!existingCounterpart) dispatchAdd(counterpart);
+    useInterEntityTransfersStore.getState().addEntry(built.link);
+    return { link: built.link };
+  } catch (error) {
+    for (const restore of rollback) restore();
+    return { error: error instanceof Error ? error.message : 'Could not link the existing record.' };
+  }
+}
+
 const installmentEditMessage = 'This installment receipt and its funding transaction must be corrected together.';
 
 export function updateLinkedTransfer(
@@ -158,17 +223,25 @@ export function updateLinkedTransfer(
   const resolved = resolveTransferInput(input);
   const fromSide = resolveTransferSide(input.from, 'out', link.fromRecordId);
   const toSide = resolveTransferSide(input.to, 'in', link.toRecordId);
+  const rollback = [captureLinkWorkbook[input.from.module](), captureLinkWorkbook[input.to.module](),
+    restoreWorkbook(useInterEntityTransfersStore.getState())];
   const { from, to, link: updated } = buildLinkedRecords({ ...resolved,
     from: { ...fromSide, ...input.from, ...(input.from.module === 'funds' && !input.from.currencyCode ? { currencyCode: fromSide.currencyCode } : {}) },
     to: { ...toSide, ...input.to, ...(input.to.module === 'funds' && !input.to.currencyCode ? { currencyCode: toSide.currencyCode } : {}) },
   }, ids);
   try {
-    dispatchUpdate(from);
-    dispatchUpdate(to);
+    for (const side of [from, to]) {
+      const config = side === from ? input.from : input.to;
+      const original = getLinkedSideRecord(config, side.record.id);
+      dispatchUpdate({ ...side, record: { ...original, ...side.record,
+        ...(original && 'source' in original ? { source: original.source } : {}),
+      } } as LinkSideRecord);
+    }
+    useInterEntityTransfersStore.getState().updateEntry(link.id, updated);
   } catch (e) {
+    for (const restore of rollback) restore();
     return { error: e instanceof Error ? e.message : 'Failed to update the linked transfer.' };
   }
-  useInterEntityTransfersStore.getState().updateEntry(link.id, updated);
   return { link: updated };
 }
 

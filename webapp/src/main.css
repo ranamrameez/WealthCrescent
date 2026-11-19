@@ -2888,3 +2888,18 @@ html[data-density="console"] .summary-overview .current-position-primary strong 
 .money-movement-report .current-position-primary strong { font-size: clamp(26px,3vw,36px); }
 
 .chart-card-flat { margin-top: var(--section-content-gap, 16px); }
+
+.transfer-entry-row > .transfer-form-group {
+  display: flex;
+  flex: 1 1 360px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+.transfer-form-group label {
+  max-width: 100%;
+}
+.transfer-form-group:empty {
+  display: none;
+}

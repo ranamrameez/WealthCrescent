@@ -4,6 +4,8 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { useState } from 'react';
 import { RecordRow } from '../RecordRow';
 import { TransactionEntryModal } from '../TransactionEntryModal';
+import { BankTransactionsBatchEditor } from '../FinanceBatchEditors';
+import { useCreditCardWorkbookStore } from '../../store/creditCardWorkbookStore';
 import { useWorkbookStore } from '../../store/workbookStore';
 import { createEmptyWorkbook } from '../../store/defaultWorkbook';
 import { useInterEntityTransfersStore } from '../../store/interEntityTransfersStore';
@@ -110,4 +112,60 @@ it('keeps the entered time when the date changes and defaults new rows to outgoi
   expect(screen.getByRole('button', { name: 'Withdrawal' }).className).toContain('active');
   fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-10-14' } });
   expect(time.value).toBe(originalTime);
+});
+
+it('adds a missed bank link while editing an existing exchange transfer', async () => {
+  useWorkbookStore.getState().setWorkbook(createEmptyWorkbook());
+  useBankWorkbookStore.getState().setWorkbook({
+    ...createEmptyBankWorkbook(), settings: { accounts: [{ id: 'bank', name: 'QAR bank', currencyCode: 'QAR', openingBalance: 0 }] },
+  });
+  useInterEntityTransfersStore.getState().setWorkbook({ settings: {}, entries: [] });
+  useWorkbookStore.getState().addTransfer({ id: 'original-deposit', date: '2026-10-15', type: 'DEPOSIT', gross: 6000, fee: 10, description: 'Original deposit' });
+  const original = useWorkbookStore.getState().workbook.transfers[0];
+  const close = vi.fn();
+  render(<MemoryRouter><TransactionEntryModal editTransfer={{ module: 'qse', record: original }} onClose={close} /></MemoryRouter>);
+  const field = screen.getByText('Link to another finance');
+  fireEvent.click(within(field).getByRole('button', { name: 'Yes' }));
+  expect(screen.getByText('Other finance')).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(close).toHaveBeenCalledOnce());
+  expect(useWorkbookStore.getState().workbook.transfers).toHaveLength(1);
+  expect(useWorkbookStore.getState().workbook.transfers[0]).toMatchObject({ id: original.id, gross: 6000, fee: 10 });
+  expect(useBankWorkbookStore.getState().workbook.transactions).toHaveLength(1);
+  expect(useInterEntityTransfersStore.getState().workbook.entries[0].toRecordId).toBe(original.id);
+});
+
+it.each(['fee', 'markup', 'cashAdvance'] as const)('records a card %s through the shared transfer form', async kind => {
+  useCreditCardWorkbookStore.getState().setWorkbook({ cards: [{ id: 'card', name: 'Test card', currencyCode: 'QAR' }], transactions: [] });
+  const close = vi.fn();
+  render(<MemoryRouter><TransactionEntryModal defaultFinance={{ module: 'creditCard', ref: 'card', currencyCode: 'QAR' }} onClose={close} /></MemoryRouter>);
+  fireEvent.change(screen.getByLabelText('Card transaction type'), { target: { value: kind } });
+  fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '25' } });
+  fireEvent.blur(screen.getByLabelText('Amount'));
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(close).toHaveBeenCalledOnce());
+  expect(useCreditCardWorkbookStore.getState().workbook.transactions).toEqual([
+    expect.objectContaining({ cardId: 'card', amount: 25, kind }),
+  ]);
+});
+
+it('edits both linked sides directly from the Bank batch editor and refreshes its row', async () => {
+  useWorkbookStore.getState().setWorkbook(createEmptyWorkbook());
+  const account = { id: 'bank', name: 'QAR bank', currencyCode: 'QAR', openingBalance: 0 };
+  useBankWorkbookStore.getState().setWorkbook({ ...createEmptyBankWorkbook(), settings: { accounts: [account] } });
+  useInterEntityTransfersStore.getState().setWorkbook({ settings: {}, entries: [] });
+  const created = createLinkedTransfer({
+    date: '2026-10-15', from: { module: 'bank', ref: 'bank' }, to: { module: 'qse' }, fromAmount: 6000, toAmount: 6000,
+  });
+  if ('error' in created) throw new Error(created.error);
+  render(<MemoryRouter><BankTransactionsBatchEditor account={account}
+    rows={useBankWorkbookStore.getState().workbook.transactions} onClose={vi.fn()} /></MemoryRouter>);
+  fireEvent.click(screen.getByRole('button', { name: 'Edit linked transfer' }));
+  const amount = await screen.findByLabelText('Amount');
+  fireEvent.change(amount, { target: { value: '6200' } }); fireEvent.blur(amount);
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(screen.queryByText('Edit transfer')).toBeNull());
+  expect(useBankWorkbookStore.getState().workbook.transactions[0].amount).toBe(-6200);
+  expect(useWorkbookStore.getState().workbook.transfers[0].gross).toBe(6200);
+  expect(screen.getByText('-6200')).toBeVisible();
 });

@@ -4,7 +4,9 @@ import { useBankWorkbookStore } from '../store/bankWorkbookStore';
 import { usePersonalLoansWorkbookStore } from '../store/personalLoansWorkbookStore';
 import { useCreditCardWorkbookStore } from '../store/creditCardWorkbookStore';
 import { nextSerialNumberForEntity } from '../lib/financeSerial';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
+import { findLinkForRecord, getLinkedSideRecord } from '../lib/linkCascade';
+import type { InterEntityTransfer, LinkModule } from '../types/interEntityTransfer';
 import { nextSeqForEntity } from '../lib/seq';
 import { saveCashBatch, saveCreditCardBatch, saveRentalBatch } from '../lib/financeBatchEdit';
 import type { Property, RentalEntry } from '../types/rentalsWorkbook';
@@ -21,6 +23,29 @@ import type { BankAccount, BankTransaction } from '../types/bankWorkbook';
 import type { PlannedBankTransaction } from '../types/plannedBank';
 import type { PersonalLoan, PersonalLoanPlan, PersonalLoanRepayment } from '../types/personalLoansWorkbook';
 import type { CreditCard, CreditCardTransaction } from '../types/creditCard';
+
+const LinkedTransferEditor = lazy(() => import('./RecordTransferEditor'));
+
+function LinkedFinanceBatchGrid<T extends { id: string }>({ module, ...props }: Parameters<typeof BatchEditGrid<T>>[0] & { module: LinkModule }) {
+  const [editing, setEditing] = useState<{
+    link: InterEntityTransfer; recordId: string; finish: () => void;
+  } | null>(null);
+  const edit = (row: T) => new Promise<T | undefined>(resolve => {
+    const link = findLinkForRecord(module, row.id);
+    if (!link) { resolve(undefined); return; }
+    setEditing({ link, recordId: row.id, finish: () => {
+      const current = getLinkedSideRecord(link.from.module === module && link.fromRecordId === row.id ? link.from : link.to, row.id);
+      resolve(current ? { ...row, ...current } : undefined);
+      setEditing(null);
+    } });
+  });
+  return <>
+    <BatchEditGrid {...props} onEditReadOnly={edit} />
+    {editing && <Suspense fallback={<p role="status">Opening linked transfer…</p>}>
+      <LinkedTransferEditor editLink={editing} onClose={editing.finish} />
+    </Suspense>}
+  </>;
+}
 
 function useBatchSave<T>(commit: (changes: BatchChange<T>[], mutations?: BatchMutations<T>) => void) {
   const ensureSignedIn = useEnsureSignedIn();
@@ -58,7 +83,7 @@ export function CashTransactionsBatchEditor({ currencyCode, rows, onClose }: { c
     { key: 'isDeposit', label: 'Cash in', type: 'boolean', width: 90 },
     { key: 'categoryID', label: 'Category', type: 'category', options, width: 190 }, pendingColumn, sourceColumn,
   ];
-  return <BatchEditGrid title={`Batch edit Cash — ${currencyCode}`} description="Amounts must be positive. Cash in checked = deposit; unchecked = withdrawal. Currency and source are locked." rows={rows} columns={columns} getRowId={row => row.id} getRowDate={row => row.date} validateRow={row => validateFinanceBatch(row, false)} rowReadOnly={row => linkedBatchReason('cash', row.id)} addLabel="Add transaction" createRow={() => ({ id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), amount: 0, serialNumber: nextSerialNumberForEntity(useCashWorkbookStore.getState().workbook.entries, row => row.currencyCode, currencyCode), currencyCode, isDeposit: true, source: 'manual' as const })} orderKey="serialNumber" onSave={save} onClose={onClose} />;
+  return <LinkedFinanceBatchGrid module="cash" title={`Batch edit Cash — ${currencyCode}`} description="Amounts must be positive. Cash in checked = deposit; unchecked = withdrawal. Currency and source are locked." rows={rows} columns={columns} getRowId={row => row.id} getRowDate={row => row.date} validateRow={row => validateFinanceBatch(row, false)} rowReadOnly={row => linkedBatchReason('cash', row.id)} addLabel="Add transaction" createRow={() => ({ id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), amount: 0, serialNumber: nextSerialNumberForEntity(useCashWorkbookStore.getState().workbook.entries, row => row.currencyCode, currencyCode), currencyCode, isDeposit: true, source: 'manual' as const })} orderKey="serialNumber" onSave={save} onClose={onClose} />;
 }
 
 export function RentalTransactionsBatchEditor({ property, rows, onClose }: { property: Property; rows: RentalEntry[]; onClose: () => void }) {
@@ -74,7 +99,7 @@ export function RentalTransactionsBatchEditor({ property, rows, onClose }: { pro
     { key: 'isDeposit', label: 'Rent income', type: 'boolean', width: 100 },
     { key: 'categoryID', label: 'Category', type: 'category', options, width: 190 }, pendingColumn, sourceColumn,
   ];
-  return <BatchEditGrid title={`Batch edit Rentals — ${entity.name}`} description="Amounts must be positive. Rent income checked = income; unchecked = expense. Property and source are locked." rows={rows} columns={columns} getRowId={row => row.id} getRowDate={row => row.date} validateRow={row => validateFinanceBatch(row, false)} rowReadOnly={row => linkedBatchReason('rentals', row.id)} addLabel="Add transaction" createRow={() => ({ id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), amount: 0, serialNumber: nextSerialNumberForEntity(useRentalsWorkbookStore.getState().workbook.entries, row => row.propertyId, entity.id), propertyId: entity.id, isDeposit: true, source: 'manual' as const })} orderKey="serialNumber" onSave={save} onClose={onClose} />;
+  return <LinkedFinanceBatchGrid module="rentals" title={`Batch edit Rentals — ${entity.name}`} description="Amounts must be positive. Rent income checked = income; unchecked = expense. Property and source are locked." rows={rows} columns={columns} getRowId={row => row.id} getRowDate={row => row.date} validateRow={row => validateFinanceBatch(row, false)} rowReadOnly={row => linkedBatchReason('rentals', row.id)} addLabel="Add transaction" createRow={() => ({ id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), amount: 0, serialNumber: nextSerialNumberForEntity(useRentalsWorkbookStore.getState().workbook.entries, row => row.propertyId, entity.id), propertyId: entity.id, isDeposit: true, source: 'manual' as const })} orderKey="serialNumber" onSave={save} onClose={onClose} />;
 }
 
 export function BankTransactionsBatchEditor({ account, rows, onClose }: { account: BankAccount; rows: BankTransaction[]; onClose: () => void }) {
@@ -88,7 +113,7 @@ export function BankTransactionsBatchEditor({ account, rows, onClose }: { accoun
     { ...amountColumn, label: `Amount (${entity.currencyCode}, signed)` },
     { key: 'categoryID', label: 'Category', type: 'category', options, width: 190 }, pendingColumn, sourceColumn,
   ];
-  return <BatchEditGrid title={`Batch edit transactions — ${entity.nickname || entity.name}`} description={`Filtered transactions · ${entity.currencyCode}. Positive = deposit; negative = withdrawal. Account and source are locked.`} rows={rows} columns={columns} getRowId={row => row.id} getRowDate={row => row.date} validateRow={row => validateFinanceBatch(row, true)} rowReadOnly={row => linkedBatchReason('bank', row.id)} addLabel="Add transaction" createRow={() => ({ id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), amount: 0, serialNumber: nextSerialNumberForEntity(useBankWorkbookStore.getState().workbook.transactions, row => row.accountId, entity.id), accountId: entity.id, description: '', isDeposit: true, source: 'manual' as const })} orderKey="serialNumber" onSave={save} onClose={onClose} />;
+  return <LinkedFinanceBatchGrid module="bank" title={`Batch edit transactions — ${entity.nickname || entity.name}`} description={`Filtered transactions · ${entity.currencyCode}. Positive = deposit; negative = withdrawal. Account and source are locked.`} rows={rows} columns={columns} getRowId={row => row.id} getRowDate={row => row.date} validateRow={row => validateFinanceBatch(row, true)} rowReadOnly={row => linkedBatchReason('bank', row.id)} addLabel="Add transaction" createRow={() => ({ id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), amount: 0, serialNumber: nextSerialNumberForEntity(useBankWorkbookStore.getState().workbook.transactions, row => row.accountId, entity.id), accountId: entity.id, description: '', isDeposit: true, source: 'manual' as const })} orderKey="serialNumber" onSave={save} onClose={onClose} />;
 }
 export function BankPlansBatchEditor({ account, rows, onClose }: { account: BankAccount; rows: PlannedBankTransaction[]; onClose: () => void }) {
   const [entity] = useState(() => ({ ...account }));
@@ -110,7 +135,7 @@ export function LoanPaymentsBatchEditor({ loan, rows, onClose }: { loan: Persona
     { key: 'seq', label: '#', editable: false, width: 70 }, { ...dateColumn, formatter: value => formatDate(String(value), dateFormat) }, ...timeColumns, descriptionColumn,
     { ...amountColumn, label: `Amount (${entity.currencyCode})` }, { key: 'categoryID', label: 'Category', type: 'category', options, width: 190 }, pendingColumn, sourceColumn,
   ];
-  return <BatchEditGrid title={`Batch edit payments — ${entity.person}`} description={`Filtered payments · ${entity.currencyCode} · ${entity.direction === 'owed_to_me' ? 'Lent' : 'Borrowed'}. Amounts must be positive. Loan and source are locked.`} rows={rows} columns={columns} getRowId={row => row.id} getRowDate={row => row.date} validateRow={row => validateFinanceBatch(row, false)} rowReadOnly={row => linkedBatchReason('personalLoans', row.id)} addLabel="Add transaction" createRow={() => ({ id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), amount: 0, seq: Math.max(0, ...usePersonalLoansWorkbookStore.getState().workbook.repayments.map(row => row.seq ?? 0)) + 1, loanId: entity.id, source: 'manual' as const })} orderKey="seq" onSave={save} onClose={onClose} />;
+  return <LinkedFinanceBatchGrid module="personalLoans" title={`Batch edit payments — ${entity.person}`} description={`Filtered payments · ${entity.currencyCode} · ${entity.direction === 'owed_to_me' ? 'Lent' : 'Borrowed'}. Amounts must be positive. Loan and source are locked.`} rows={rows} columns={columns} getRowId={row => row.id} getRowDate={row => row.date} validateRow={row => validateFinanceBatch(row, false)} rowReadOnly={row => linkedBatchReason('personalLoans', row.id)} addLabel="Add transaction" createRow={() => ({ id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), amount: 0, seq: Math.max(0, ...usePersonalLoansWorkbookStore.getState().workbook.repayments.map(row => row.seq ?? 0)) + 1, loanId: entity.id, source: 'manual' as const })} orderKey="seq" onSave={save} onClose={onClose} />;
 }
 export function LoanPlansBatchEditor({ loan, rows, onClose }: { loan: PersonalLoan; rows: PersonalLoanPlan[]; onClose: () => void }) {
   const [entity] = useState(() => ({ ...loan }));
@@ -146,9 +171,9 @@ export function CreditCardTransactionsBatchEditor({ card, rows, onClose }: { car
     { key: 'categoryID', label: 'Category', type: 'category', options, width: 190 },
     sourceColumn,
   ];
-  return <BatchEditGrid
+  return <LinkedFinanceBatchGrid module="creditCard"
     title={`Batch edit transactions — ${entity.name}`}
-    description={`Filtered transactions · ${entity.currencyCode}. Amounts must be positive; Type determines whether the balance is charged or paid. Linked transactions and source are locked.`}
+    description={`Filtered transactions · ${entity.currencyCode}. Amounts must be positive; Type determines whether the balance is charged or paid. Use Edit linked transfer to update both sides. Source is locked.`}
     rows={rows}
     columns={columns}
     getRowId={row => row.id}

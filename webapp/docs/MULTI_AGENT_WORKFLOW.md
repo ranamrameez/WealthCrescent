@@ -11,7 +11,7 @@ The register lives on the shared delivery branch linked to the active PR. For th
 
 | Task | Status | Owner and branch | Scope or evidence |
 | --- | --- | --- | --- |
-| Link existing payments from transfer edit and batch editor | In progress | WC-TR coordination, PR #51, 2026-11-19 UTC | Keep the original record when adding a missed link. Expose coordinated linked editing in batch grids. |
+| Link existing payments from transfer edit and batch editor | Done | WC-TR coordination, PR #51 | Existing record IDs and metadata survive linking; Bank/Cash peers can be reused. Batch rows open coordinated edits and retain other drafts. Shared card entry, wrapping field groups and distinct fullscreen icons included. |
 | Make transfer form groups responsive | Done | WC-TR PSX session, work/responsive-transfer-form | `be77c4d2` wraps field groups in their existing order. Desktop and mobile interactive acceptance remain open. |
 | Preserve the QSE statement reconciliation in the delivery branch | Done | WC-TR coordination, PR #51 | Integrate `main` at `32c289aa`, which contains merged PR #53. |
 | Integrate the PSX cash reconciliation from main | Done | WC-TR coordination, PR #51 | Merged main at `23085a33` and kept both release notes. |

@@ -64,7 +64,6 @@ import {
 } from '../../../lib/calc/creditCardModule';
 import { formatDate, fmtMoney } from '../../../lib/format';
 import { createLinkedTransfer, findLinkForRecord, hasIndependentInstallmentLinks } from '../../../lib/linkCascade';
-import { defaultTimezoneForCurrency, nowTime } from '../../../lib/datetime';
 import { firebaseReady } from '../../../lib/firebase/client';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { useBankWorkbookStore } from '../../../store/bankWorkbookStore';
@@ -313,22 +312,6 @@ function LinkedCardPaymentFields({
   );
 }
 
-const SPECIAL_CARD_ENTRY_KINDS: CreditCardTransactionKind[] = ['fee', 'markup', 'cashAdvance'];
-
-function emptyTx(cardId: string, currencyCode: string): Omit<CreditCardTransaction, 'id'> {
-  return {
-    cardId,
-    date: today(),
-    time: nowTime(defaultTimezoneForCurrency(currencyCode)),
-    timezone: defaultTimezoneForCurrency(currencyCode),
-    kind: 'fee',
-    amount: 0,
-    description: '',
-    categoryID: UNCATEGORIZED_ID,
-    source: 'manual',
-  };
-}
-
 function CreditCardTransactionFields({
   value,
   onChange,
@@ -369,50 +352,6 @@ function CreditCardTransactionFields({
   );
 }
 
-/** Batch entry for card kinds the shared charge/payment form does not expose. */
-function AddCardTransactionForm({ card, onDone }: { card: CreditCard; onDone?: () => void }) {
-  const ensureSignedIn = useEnsureSignedIn();
-  const [nextKey, setNextKey] = useState(1);
-  const [rows, setRows] = useState<(Omit<CreditCardTransaction, 'id'> & { key: number })[]>(() => [{ ...emptyTx(card.id, card.currencyCode), key: 0 }]);
-
-  const updateRow = (key: number, patch: Partial<CreditCardTransaction>) =>
-    setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
-  const addRow = () => {
-    setRows((rs) => [...rs, { ...emptyTx(card.id, card.currencyCode), key: nextKey }]);
-    setNextKey((k) => k + 1);
-  };
-  const removeRow = (key: number) => setRows((rs) => (rs.length > 1 ? rs.filter((r) => r.key !== key) : rs));
-
-  const submit = async () => {
-    const valid = rows.filter((r) => r.amount > 0 && r.description.trim());
-    if (!valid.length) return toast('Enter an amount and description on at least one row.');
-    if (!(await ensureSignedIn('Sign in to save transactions.'))) return;
-    addCreditCardTransactions(valid.map((r) => ({ ...r, id: uid(), description: r.description.trim() })));
-    toast(valid.length > 1 ? `${valid.length} transactions saved.` : 'Transaction saved.');
-    onDone?.();
-  };
-
-  return (
-    <div>
-      {rows.map((row, i) => (
-        <div key={row.key} className="row gap-sm mb-sm" style={{ alignItems: 'flex-end' }}>
-          <CreditCardTransactionFields value={row} kinds={SPECIAL_CARD_ENTRY_KINDS} required={i === 0} onChange={(patch) => updateRow(row.key, patch)} />
-          <IconButton label="Remove row" icon={<TrashIcon size={12} />} align="right" onClick={() => removeRow(row.key)} />
-        </div>
-      ))}
-      <div className="row gap-sm">
-        <button className="btn secondary small" onClick={addRow}><PlusIcon size={12} />Add another row</button>
-        <button className="btn" onClick={submit}><SaveIcon size={12} />Save {rows.length > 1 ? `${rows.length} transactions` : 'transaction'}</button>
-      </div>
-    </div>
-  );
-}
-
-/** User-reported (2026-09-11): "CC is stuck in a popup with no edition
- * options for transactions" — this table only ever offered Delete + a
- * read-only detail popup; there was no way to correct a typo'd amount or
- * description without deleting and re-adding the row. Mirrors Bank's own
- * `TransactionsList` inline-edit-row pattern (`BankPage.tsx`). */
 function CreditCardTransactionEditModal({
   transaction,
   onClose,
@@ -924,24 +863,16 @@ export function CreditCardDetailPage() {
   );
 }
 
-/** Ordinary card charges, payments and links use the shared entry form.
- * The focused batch form handles card fees, markup and cash advances. */
 function CreditCardDetailFab({ card }: { card: CreditCard }) {
-  const [open, setOpen] = useState<'add' | 'transfer' | 'plan' | null>(null);
+  const [open, setOpen] = useState<'transfer' | 'plan' | null>(null);
   return (
     <>
       <FabPanel
         actions={[
-          { label: 'Fees, markup and cash advances', icon: <PlusIcon />, onClick: () => setOpen('add') },
-          { label: 'Charges, payments and transfers', icon: <TransferIcon />, onClick: () => setOpen('transfer') },
+          { label: 'Transactions and transfers', icon: <TransferIcon />, onClick: () => setOpen('transfer') },
           { label: 'Add a plan', icon: <PlusIcon />, onClick: () => setOpen('plan') },
         ]}
       />
-      {open === 'add' && (
-        <Modal title="Fees, markup and cash advances" onClose={() => setOpen(null)} manageFocus>
-          <AddCardTransactionForm card={card} onDone={() => setOpen(null)} />
-        </Modal>
-      )}
       {open === 'transfer' && (
         <TransactionEntryModal defaultFinance={{ module: 'creditCard', ref: card.id, currencyCode: card.currencyCode }} onClose={() => setOpen(null)} />
       )}

@@ -110,21 +110,17 @@ it('keeps one live section stack after repeatedly closing batch edit', async () 
   }
 }, 15000);
 
-it('routes normal card entry to Transfers and keeps specialized kinds in their own batch form', () => {
+it('routes all card entry kinds through one shared transfer form', () => {
   const previous = useCreditCardWorkbookStore.getState().workbook;
   useCreditCardWorkbookStore.setState({ workbook: { ...previous, cards: [{ id: 'card', name: 'Test card', currencyCode: 'USD' }], transactions: [] } });
   try {
     show('/bank/card/card');
-    const openActions = () => { const button = screen.queryByRole('button', { name: 'Open actions' }); if (button) fireEvent.click(button); };
-    openActions();
-    fireEvent.click(screen.getByRole('button', { name: 'Fees, markup and cash advances' }));
-    const dialog = screen.getByRole('dialog', { name: 'Fees, markup and cash advances' });
-    const kinds = Array.from(dialog.querySelectorAll<HTMLSelectElement>('select')).find(select => select.value === 'fee');
-    expect(Array.from(kinds?.options ?? []).map(option => option.value)).toEqual(['fee', 'markup', 'cashAdvance']);
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-    openActions();
-    fireEvent.click(screen.getByRole('button', { name: 'Charges, payments and transfers' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open actions' }));
+    expect(screen.queryByRole('button', { name: 'Fees, markup and cash advances' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Transactions and transfers' }));
     expect(screen.getByRole('heading', { name: 'Transfers' })).toBeTruthy();
+    const kinds = screen.getByLabelText('Card transaction type') as HTMLSelectElement;
+    expect(Array.from(kinds.options).map(option => option.value)).toEqual(['charge', 'payment', 'fee', 'markup', 'cashAdvance']);
   } finally {
     cleanup();
     useCreditCardWorkbookStore.setState({ workbook: previous });

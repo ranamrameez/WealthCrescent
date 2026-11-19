@@ -36,7 +36,7 @@ Updated 2026-11-07. This is the concise status index; SESSION_HANDOFF.md records
 
 ## Remaining work, in dependency order
 
-- User-reported transfer editing gap: edit mode must allow adding a missed finance link while retaining the original record. Linked rows in batch editors must offer coordinated editing of both sides.
+- Transfer and personal-loan payment edit popups can attach a missed link while retaining the original record. Bank and Cash counterparts can be selected from existing unlinked records or created. Linked batch rows offer a coordinated edit action that refreshes the row while preserving other drafts. Credit cards use the shared form for charges, payments, fees, markup and cash advances. Transfer field groups wrap side by side at wider sizes. Fullscreen exit uses distinct inward corners. Desktop/mobile browser acceptance remains open.
 
 Use the [delivery task register](MULTI_AGENT_WORKFLOW.md) to coordinate ownership across agents and sessions.
 
