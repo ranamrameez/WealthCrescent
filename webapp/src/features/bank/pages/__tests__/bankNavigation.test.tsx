@@ -126,6 +126,11 @@ it('routes all card entry kinds through one shared transfer form', () => {
     expect(screen.getByRole('heading', { name: 'Transfers' })).toBeTruthy();
     const kinds = screen.getByLabelText('Card transaction type') as HTMLSelectElement;
     expect(Array.from(kinds.options).map(option => option.value)).toEqual(['charge', 'payment', 'fee', 'markup', 'cashAdvance']);
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    const ledger = within(document.getElementById('card-transactions')!);
+    fireEvent.click(ledger.getByRole('button', { name: 'Card options' }));
+    fireEvent.click(ledger.getByText('Transactions and transfers'));
+    expect(screen.getByRole('heading', { name: 'Transfers' })).toBeTruthy();
   } finally {
     cleanup();
     useCreditCardWorkbookStore.setState({ workbook: previous });

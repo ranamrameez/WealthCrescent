@@ -650,6 +650,8 @@ function CardStatementOverrideDialog({ card, cycle, onClose }: { card: CreditCar
   </Modal>;
 }
 
+type CardEntryMode = 'transfer' | 'plan';
+
 export function CreditCardDetailPage() {
   const banks=useBankWorkbookStore(s=>s.workbook.settings.banks??[]);
   const { id } = useParams();
@@ -664,6 +666,7 @@ export function CreditCardDetailPage() {
   const [editCardOpen, setEditCardOpen] = useState(false);
   const [cardDetailsOpen, setCardDetailsOpen] = useState(false);
   const [editingCycle, setEditingCycle] = useState<CreditCardStatement | null>(null);
+  const [entryMode, setEntryMode] = useState<CardEntryMode | null>(null);
 
   const balance = card ? outstandingBalanceByCard(card, transactions) : 0;
   const openCycle = card ? activeCycleStatement(card, transactions) : null;
@@ -872,13 +875,14 @@ export function CreditCardDetailPage() {
         </StandardCard></div>
       )}
 
-      <div id="card-plans"><StandardCard title="Plans" hue={card.color} defaultOpen={false}>
+      <div id="card-plans"><StandardCard title="Plans" hue={card.color} defaultOpen={false} actions={[{ label: 'Add a plan', onClick: () => setEntryMode('plan') }]}>
           <PlanningHorizonField value={horizonDays} onChange={setHorizonDays} />
           <CardPlanList card={card} horizonDays={horizonDays} />
       </StandardCard></div>
 
       <div id="card-transactions"><StandardCard title="Transactions" hue={card.color} defaultOpen={false}
         actions={[
+          { label: 'Transactions and transfers', onClick: () => setEntryMode('transfer') },
           { label: showTransactionActions ? 'Done modifying' : 'Modify', icon: <EditIcon size={14} />, onClick: () => setShowTransactionActions((value) => !value) },
           { label: 'Batch edit', icon: <ListIcon size={14} />, onClick: () => setBatchEditOpen(true), disabled: !visibleTransactions.length },
           { label: 'Export filtered', onClick: () => exportTransactions(true), disabled: !visibleTransactions.length },
@@ -938,13 +942,14 @@ export function CreditCardDetailPage() {
         <button className="btn mt-md" onClick={() => { setCardDetailsOpen(false); setEditCardOpen(true); }}><EditIcon size={13} />Edit card</button>
       </Modal>}
       {editingCycle && <CardStatementOverrideDialog card={card} cycle={editingCycle} onClose={() => setEditingCycle(null)} />}
-      <CreditCardDetailFab card={card} />
+      <CreditCardDetailFab card={card} open={entryMode} setOpen={setEntryMode} />
     </div>
   );
 }
 
-function CreditCardDetailFab({ card }: { card: CreditCard }) {
-  const [open, setOpen] = useState<'transfer' | 'plan' | null>(null);
+function CreditCardDetailFab({ card, open, setOpen }: {
+  card: CreditCard; open: CardEntryMode | null; setOpen: (mode: CardEntryMode | null) => void;
+}) {
   return (
     <>
       <FabPanel
