@@ -1,5 +1,7 @@
+import { CalculationEngine } from '../../lib/calc/CalculationEngine';
+import { canScanTransferSuggestions, subscribeTransferSuggestionSources, scanTransferSuggestions, acceptTransferSuggestion, type TransferSuggestionOwners, type TransferSuggestion } from './transferSuggestionsService';
 import { categoryName } from '../../lib/categories';
-import { suggestSubscriptionLinks, type SubscriptionPaymentCandidate } from '../../lib/calc/subscriptionLinkSuggestions';
+import type { SubscriptionPaymentCandidate } from '../../lib/calc/subscriptionLinkSuggestions';
 import { getCurrentUser } from '../../lib/firebase/useAuthState';
 import { useBankWorkbookStore } from '../../store/bankWorkbookStore';
 import { useCashWorkbookStore } from '../../store/cashWorkbookStore';
@@ -9,7 +11,7 @@ import { useSubscriptionsWorkbookStore } from '../../store/subscriptionsWorkbook
 import type { PlanLink } from '../../types/planLink';
 import type { SubscriptionMatch } from '../../types/subscriptionMatch';
 
-export type SuggestedLinkOwners = Partial<Record<'cash' | 'bank' | 'cards' | 'subscriptions' | 'categories', string>>;
+export type SuggestedLinkOwners = TransferSuggestionOwners & Partial<Record<'subscriptions' | 'categories', string>>;
 type NativePayment = SubscriptionPaymentCandidate & {
   planLink?: PlanLink;
   subscriptionMatch?: SubscriptionMatch;
@@ -18,17 +20,18 @@ type NativePayment = SubscriptionPaymentCandidate & {
 };
 
 const occurrenceKey = (match: SubscriptionMatch) => JSON.stringify([match.subscriptionId, match.occurrenceDate]);
-export const canScanSuggestedLinks = (owner: string, owners: SuggestedLinkOwners) => getCurrentUser()?.uid === owner &&
+const canScanSubscriptionSuggestions = (owner: string, owners: SuggestedLinkOwners) => getCurrentUser()?.uid === owner &&
   owners.subscriptions === owner && [owners.cash, owners.bank, owners.cards].includes(owner);
 
 export function subscribeSuggestedLinkSources(listener: () => void) {
   const stops = [useBankWorkbookStore, useCashWorkbookStore, useCreditCardWorkbookStore, useSubscriptionsWorkbookStore, useCategoryStore]
     .map(store => store.subscribe(listener));
-  return () => stops.forEach(stop => stop());
+  const stopTransfers = subscribeTransferSuggestionSources(listener);
+  return () => { stops.forEach(stop => stop()); stopTransfers(); };
 }
 
 function getPayments(owner: string, owners: SuggestedLinkOwners): NativePayment[] {
-  if (!canScanSuggestedLinks(owner, owners)) return [];
+  if (!canScanSubscriptionSuggestions(owner, owners)) return [];
   const categories = owners.categories === owner ? useCategoryStore.getState().workbook.categories : [];
   const cash = owners.cash === owner ? useCashWorkbookStore.getState().workbook.entries : [];
   const bank = owners.bank === owner ? useBankWorkbookStore.getState().workbook : undefined;
@@ -62,8 +65,8 @@ function getPayments(owner: string, owners: SuggestedLinkOwners): NativePayment[
   ];
 }
 
-export function scanSuggestedLinks(owner: string, owners: SuggestedLinkOwners) {
-  if (!canScanSuggestedLinks(owner, owners)) return [];
+function scanSubscriptionSuggestions(owner: string, owners: SuggestedLinkOwners) {
+  if (!canScanSubscriptionSuggestions(owner, owners)) return [];
   const subscriptions = useSubscriptionsWorkbookStore.getState().workbook.entries;
   const names = new Map(subscriptions.map(row => [row.id, row.name]));
   const payments = getPayments(owner, owners);
@@ -76,16 +79,30 @@ export function scanSuggestedLinks(owner: string, owners: SuggestedLinkOwners) {
   }));
   return payments.flatMap(payment => {
     if (payment.subscriptionMatch || payment.planLink?.source) return [];
-    return suggestSubscriptionLinks(payment, subscriptions).filter(match => !occupied.has(occurrenceKey(match)))
+    return CalculationEngine.linkSuggestions.suggestSubscriptionLinks(payment, subscriptions).filter(match => !occupied.has(occurrenceKey(match)))
       .map(match => ({ ...match, payment, subscriptionName: names.get(match.subscriptionId) ?? '', owner }));
   }).sort((a, b) => b.payment.date.localeCompare(a.payment.date) || b.score - a.score || a.id.localeCompare(b.id));
 }
 
-export type SuggestedLink = ReturnType<typeof scanSuggestedLinks>[number];
+export const canScanSuggestedLinks = (owner: string, owners: SuggestedLinkOwners) =>
+  canScanSubscriptionSuggestions(owner, owners) || canScanTransferSuggestions(owner, owners);
+export type SuggestedLink = (ReturnType<typeof scanSubscriptionSuggestions>[number] & { kind: 'subscription' }) |
+  (TransferSuggestion & { kind: 'transfer' });
+export function scanSuggestedLinks(owner: string, owners: SuggestedLinkOwners): SuggestedLink[] {
+  return [
+    ...scanSubscriptionSuggestions(owner, owners).map(row => ({ ...row, kind: 'subscription' as const })),
+    ...scanTransferSuggestions(owner, owners).map(row => ({ ...row, kind: 'transfer' as const })),
+  ];
+}
 
 export function acceptSuggestedLink(reviewed: SuggestedLink, owners: SuggestedLinkOwners) {
-  const candidate = scanSuggestedLinks(reviewed.owner, owners).find(match => match.id === reviewed.id);
-  if (!candidate || JSON.stringify(candidate) !== JSON.stringify(reviewed)) {
+  if (reviewed.kind === 'transfer') {
+    const { kind: _kind, ...transfer } = reviewed;
+    acceptTransferSuggestion(transfer, owners);
+    return;
+  }
+  const candidate = scanSuggestedLinks(reviewed.owner, owners).find(match => match.kind === 'subscription' && match.id === reviewed.id);
+  if (!candidate || candidate.kind !== 'subscription' || JSON.stringify(candidate) !== JSON.stringify(reviewed)) {
     throw new Error('This payment or renewal changed. Scan again before linking it.');
   }
   const subscriptionMatch = { subscriptionId: candidate.subscriptionId, occurrenceDate: candidate.occurrenceDate };

@@ -21,6 +21,10 @@ FinanceManager live link:
 > `SESSION_HANDOFF.md` current; never push directly to `main`; and do not merge until the
 > latest application-code head passes the full test suite and production build/type-check.
 
+## Organize and suggested links
+
+Organize contains Categories with management, source/date filters and native transaction drilldown, plus the shared Suggested links inbox. Global controls support manual scans and optional popups; ledger changes trigger scans while the app is open. Matching covers recurring subscriptions, including custom 28-day cycles, and supported Bank/Cash/card/investment cash-transfer pairs. Approval preserves native records; uncertain matches wait for review. See [Organize](docs/ORGANIZE.md) and [the user guide](USER_MANUAL.md#review-suggested-links) for conservative matching limits.
+
 ## QSE statement quick import
 
 Use **Import QSE trades** on the main Dashboard or the QSE Dashboard to review and selectively apply The Group trades for the active broker. See [Importing The Group statements](docs/the-group-import.md).

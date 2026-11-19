@@ -41,6 +41,8 @@ import * as movements from './movementActivities';
 import * as pendingPayments from './pendingPayment';
 import * as manualPayments from './manualPlanFulfillment';
 import * as unifiedBudgets from './unifiedBudgets';
+import * as transferSuggestions from './transferLinkSuggestions';
+import * as subscriptionSuggestions from './subscriptionLinkSuggestions';
 import * as installmentLedger from './installmentLedger';
 
 /**
@@ -49,6 +51,7 @@ import * as installmentLedger from './installmentLedger';
  * reorganized without changing consumers of the engine contract.
  */
 export const CalculationEngine = Object.freeze({
+  linkSuggestions: Object.freeze({ ...transferSuggestions, ...subscriptionSuggestions }),
   stock,
   portfolio,
   funds,

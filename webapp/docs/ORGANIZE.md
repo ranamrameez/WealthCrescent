@@ -22,3 +22,8 @@ Move the existing category management workflow from Account to a dedicated page,
 - Keep the transaction view read-only and use the existing category edit and merge actions for category changes.
 
 Track implementation and verification in the shared delivery register.
+
+
+## Implemented scanner boundaries
+
+Transfer review covers Bank/Cash pairs, Bank-to-Bank transfers, Bank/Cash card repayments, Bank-to-QSE/PSX cash transfers, and Bank/Cash-to-Funds cash transfers in either supported direction. It requires cleared records with the same currency and cent-rounded gross amount, posting dates within three days, and meaningful identifier, keyword, account/broker-name or category evidence. Unsupported pairs and cross-currency/fee-adjusted amounts remain available through manual transfer review. Approval writes only the link record; it never rewrites either native ledger. Active broker snapshots are scanned once, with inactive profiles isolated by source. Live background scans run while the app is open. Rejections and popup preference are account-scoped on the current device.

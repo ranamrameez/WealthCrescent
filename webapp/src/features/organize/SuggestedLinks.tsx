@@ -36,7 +36,7 @@ interface Inbox {
 const InboxContext = createContext<Inbox | null>(null);
 
 export function SuggestedLinksProvider({ owner, owners, children }: { owner?: string; owners: SuggestedLinkOwners; children: ReactNode }) {
-  const { cash, bank, cards, subscriptions, categories } = owners;
+  const { cash, bank, cards, subscriptions, categories, qse, psx, funds, transfers } = owners;
   const [prefs, setPrefs] = useState(() => loadPreferences(owner));
   const [rows, setRows] = useState<SuggestedLink[]>([]);
   const [open, setOpen] = useState(false);
@@ -44,8 +44,8 @@ export function SuggestedLinksProvider({ owner, owners, children }: { owner?: st
   const ready = !!owner && canScanSuggestedLinks(owner, owners);
   const scan = useCallback(() => {
     if (!owner) return [];
-    return scanSuggestedLinks(owner, { cash, bank, cards, subscriptions, categories }).filter(row => !prefs.rejected.includes(row.id));
-  }, [owner, cash, bank, cards, subscriptions, categories, prefs.rejected]);
+    return scanSuggestedLinks(owner, { cash, bank, cards, subscriptions, categories, qse, psx, funds, transfers }).filter(row => !prefs.rejected.includes(row.id));
+  }, [owner, cash, bank, cards, subscriptions, categories, qse, psx, funds, transfers, prefs.rejected]);
   const updatePrefs = (next: Preferences) => {
     setPrefs(next);
     if (owner) {
@@ -86,7 +86,7 @@ export function SuggestedLinksProvider({ owner, owners, children }: { owner?: st
         if (accept) {
           acceptSuggestedLink(row, owners);
           setRows(scan());
-          setStatus('Linked the existing payment to the subscription.');
+          setStatus(row.kind === 'transfer' ? 'Linked the existing transfer records.' : 'Linked the existing payment to the subscription.');
         } else {
           updatePrefs({ ...prefs, rejected: [...new Set([...prefs.rejected, row.id])] });
           setRows(current => current.filter(item => item.id !== row.id));
@@ -134,12 +134,20 @@ function InboxContent({ inbox }: { inbox: Inbox }) {
       <label><input type="checkbox" checked={inbox.autoPopup} onChange={event => inbox.setAutoPopup(event.target.checked)} /> Open a popup for new suggestions</label>
     </div>
     {inbox.status && <p role="status">{inbox.status}</p>}
-    {!inbox.ready ? <p>Wait for your subscriptions and payment workbooks to sync.</p> : !inbox.rows.length && <p>No suggestions to review.</p>}
+    {!inbox.ready ? <p>Wait for your payment and link workbooks to sync.</p> : !inbox.rows.length && <p>No suggestions to review.</p>}
     {rows.length > 0 && controls}
     {rows.map(row => <article key={row.id} className="card stack-sm">
+      {row.kind === 'transfer' ? <>
+      <h4>{row.from.sourceLabel} → {row.to.sourceLabel}</h4>
+      {[row.from, row.to].map((record, index) => <div key={index}>
+        <Link to={record.url} onClick={inbox.close}>{record.description || record.sourceLabel}</Link>
+        <p>{record.sourceLabel} · {record.date} · {fmtMoney(record.amount, record.currencyCode)}</p>
+      </div>)}
+      </> : <>
       <h4>{row.subscriptionName} · {row.occurrenceDate}</h4>
       <Link to={row.payment.url} onClick={inbox.close}>{row.payment.description || row.payment.sourceLabel}</Link>
       <p>{row.payment.sourceLabel} · {row.payment.date} · {fmtMoney(row.payment.amount, row.payment.currencyCode)}</p>
+      </>}
       <p>{row.reasons.join(' · ')}</p>
       <div className="row gap-sm">
         <StandardButton size="small" onClick={() => inbox.decide(row, true)}>Accept</StandardButton>

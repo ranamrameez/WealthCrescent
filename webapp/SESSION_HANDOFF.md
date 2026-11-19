@@ -1,3 +1,7 @@
+## 2026-11-19 — transfer suggestion adapters
+
+Extended the shared Organize inbox with Bank/Cash, card repayment and QSE/PSX/Funds cash-transfer adapters. CalculationEngine ranks same-currency, same-amount records within three posting days using descriptions, account/broker names, category identity and identifier suffixes. Competing suggestions stay pending. Accept revalidates owner and native snapshots, then writes only the existing-record link. No ledger records or timestamps are rewritten. Invalid fees, pending entries, already-linked records and ambiguous native IDs are excluded. Both global Scan now and debounced ledger-change scans use this flow. Popup and rejection preferences remain per account on this device. Nine focused tests passed; full suite passed 192 files / 1,473 tests before the last focused additions. Final build and resulting-head CI must be recorded before merge. Broader delivery gates remain in CURRENT_DELIVERY_STATUS.
+
 ## Pending payment continuation
 
 The full app reset clears payment execution history with the native workbooks in one acknowledged update. Settlement and void both recheck linked transfers inside their transaction callback. Focused fixtures verify new links arriving during a retry abort settlement. Complete pending-payment backup, emulator/rules verification and UI integration before activation. Read CURRENT_DELIVERY_STATUS and the shared task register for current ownership.

@@ -1222,3 +1222,14 @@ Credit-card transactions and transfers use the shared Transfers form. Card trans
 ### Browse and manage categories
 
 Open **Organize → Categories** and select a category to see its transactions from your synced workbooks. Select a transaction to open its native account view. Custom categories can be added, renamed, or deleted after your category workbook syncs. App categories are shared reference categories.
+
+
+### Review suggested links
+
+Use **Suggested links** or **Scan now** in the global toolbar, or open **Organize → Suggested links**. The app scans after synced native ledgers change while it is open. Enable **Open a popup for new suggestions** if desired; the full inbox remains available with popups disabled.
+
+Review the original records, dates, currency, amounts and reasons before choosing **Accept** or **Reject**. Competing candidates remain pending until reviewed. Subscription approval marks the existing payment against its renewal without creating another payment. Transfer approval joins two existing records and preserves their original values and posting dates. Changed or already-linked records require a fresh scan. Rejections and popup preferences are saved per signed-in account on the current device.
+
+The scanner covers subscription payments from Bank, Cash and card charges, plus supported transfers between Bank, Cash, card repayments and QSE, PSX or Funds cash ledgers. Transfer suggestions require the same currency and amount within three days, plus matching keywords, account/broker names, identifiers or category. Cross-currency and unmatched-fee transfers can still be linked manually after review; the scanner does not guess conversion rates or fees.
+
+For a phone recharge every 28 days, create a Subscription with a **Custom** billing cycle and **28** days. Include a recognizable name or masked identifier, such as `SIM [5678]`, so payment descriptions can be matched to renewal occurrences.
