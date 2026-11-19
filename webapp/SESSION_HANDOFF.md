@@ -1,3 +1,7 @@
+## 2026-11-19 — category native amounts
+
+Category transaction tables now show original native amounts and transaction types without changing their signs or deriving missing trade amounts. Existing source/date filtering and currency separation remain intact. Five focused category/search tests and both TypeScript projects/production build passed. Prior complete Organize workflow source 1de77df2 passed Actions 562, including the full suite. The final category checkpoint needs resulting-head CI. See docs/ORGANIZE.md for the requested workflow audit and limits; the draft PR still has broader delivery gates.
+
 ## 2026-11-19 — Organize workflow audit and preference service
 
 The requested personal-finance workflow is mapped to implementation in docs/ORGANIZE.md. Categories management/drilldown and custom 28-day subscriptions reuse existing modules; shared review now includes native transfers as well as subscription renewals. Transfer source `7df71bcf` passed Actions 560. Preferences now persist through an authenticated service; storage failure keeps a rejected candidate pending. Final integrated local verification passed 193 files / 1,479 tests and both TypeScript projects/production build. PR #51 discussion, submitted-review and inline-thread endpoints returned no comments/reviews/threads. Nothing was merged or deployed; broader delivery gates remain open. No browser visual acceptance is claimed for this slice.

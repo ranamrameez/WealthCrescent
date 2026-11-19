@@ -27,6 +27,10 @@ it('lists transactions by exact category ID from the signed-in account only', ()
     expect(screen.queryByText('Other owner activity')).toBeNull();
     expect(screen.getByRole('table', { name: 'USD transactions' })).toBeTruthy();
     expect(screen.getByRole('table', { name: 'QAR transactions' })).toBeTruthy();
+    expect(screen.getAllByRole('columnheader', { name: 'Native amount' })).toHaveLength(2);
+    expect(screen.getAllByRole('cell', { name: 'Withdrawal' })).toHaveLength(2);
+    expect(screen.getByRole('cell', { name: /20\.00/ })).toBeTruthy();
+    expect(screen.getByRole('cell', { name: /12\.00/ })).toBeTruthy();
     fireEvent.change(screen.getByLabelText('From'), { target: { value: '2026-01-03' } });
     expect(screen.queryByText('Fresh groceries')).toBeNull();
     expect(screen.getByText('Qatar groceries')).toBeTruthy();

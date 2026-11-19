@@ -11,7 +11,7 @@ Add a sidebar parent named **Organize** with two child pages.
 | Review popup from every page and manual scan | Global toolbar Suggested links and Scan now; optional new-suggestion popup shares the same inbox. |
 | Dedicated approve/reject page | Organize → Suggested links reviews existing records and explains each match. |
 | Categories under the same navigation parent | Organize → Categories reuses category CRUD, groups and merge actions. |
-| Click a category to see its transactions | Exact category-ID drilldown, source/date filters, currency-separated native links. |
+| Click a category to see its transactions | Exact category-ID drilldown, source/date filters, currency-separated native amounts, types and links. |
 | Reuse the workflow for new transactions | Debounced subscriptions to all supported native stores plus explicit rescans. |
 | Phone recharge every 28 days | Custom subscription cycle with customDays = 28; existing recurrence engine and review regression exercise the next renewal. |
 | Keep ambiguous matches pending | Scanner returns all eligible peers; only a reviewed Accept writes provenance or a link. |

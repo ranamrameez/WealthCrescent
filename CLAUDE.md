@@ -8090,3 +8090,6 @@ The shared Suggested links flow now includes native transfer candidates for Bank
 
 
 The Organize preference service continuation passed the full 193-file / 1,479-test local suite and production build. Transfer matcher checkpoint 7df71bcf passed Actions 560. PR #51 reviews/comments/thread endpoints were empty on 2026-11-19. The request-by-request audit is in webapp/docs/ORGANIZE.md; keep the larger draft PR's delivery gates separate from this completed slice.
+
+
+Category transaction drilldown now includes native amounts and transaction types. Original signed amounts are preserved; missing amounts are shown as a dash. Five focused category/search tests and production build passed. Organize source 1de77df2 passed Actions 562. This does not close unrelated draft PR delivery gates.

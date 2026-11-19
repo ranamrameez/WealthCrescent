@@ -1,3 +1,4 @@
+import { fmtMoney } from '../../lib/format';
 import { useState } from 'react';
 import { Field, Select, TextInput } from '../../components/ui/Field';
 import { Link, useParams } from 'react-router-dom';
@@ -86,9 +87,11 @@ function CurrencyTransactions({ currency, records }: { currency: string; records
   return <>
     <div className="table-scroll"><table>
       <caption>{currency} transactions</caption>
-      <thead><tr><th>Date</th><th>Transaction</th><th>Module</th><th>Source</th></tr></thead>
+      <thead><tr><th>Date</th><th>Transaction</th><th>Type</th><th>Native amount</th><th>Module</th><th>Source</th></tr></thead>
       <tbody>{rows.map(record => <tr key={record.key}>
         <td>{record.date ?? '—'}</td><td><Link to={record.url}>{record.title}</Link></td>
+        <td>{record.nativeKind ?? record.kind}</td>
+        <td className="num">{record.amount === undefined ? '—' : record.currencyCode ? fmtMoney(record.amount, record.currencyCode) : record.amount}</td>
         <td>{record.module}</td><td>{record.scope}</td>
       </tr>)}</tbody>
     </table></div>

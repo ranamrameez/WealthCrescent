@@ -11,6 +11,8 @@ export interface SearchRecord {
   terms: string;
   categoryId?: string;
   currencyCode?: string;
+  amount?: number;
+  nativeKind?: string;
 }
 
 type SearchableFields = {
@@ -27,6 +29,9 @@ type SearchableFields = {
   date?: string;
   currencyCode?: string;
   amount?: number;
+  isDeposit?: boolean;
+  kind?: string;
+  type?: string;
   categoryID?: string;
 };
 
@@ -45,7 +50,10 @@ export function collectSearchRecords<T extends SearchableFields>({ module, kind,
       .filter((value): value is string => !!value && value !== title).join(' · ');
     const terms = [title, detail, row.id, row.ticker, row.date, row.currencyCode, row.amount, module, kind, scope]
       .filter(value => value !== undefined).join(' ');
-    return { key: JSON.stringify([module, kind, scopeId, row.id, index]), module, scopeId, scope, kind, title, detail, date: row.date, url, terms, categoryId: row.categoryID, currencyCode: row.currencyCode ?? currencyCode };
+    return { key: JSON.stringify([module, kind, scopeId, row.id, index]), module, scopeId, scope, kind, title, detail, date: row.date, url, terms, categoryId: row.categoryID, currencyCode: row.currencyCode ?? currencyCode,
+      ...(typeof row.amount === 'number' && Number.isFinite(row.amount) ? { amount: row.amount } : {}),
+      ...(typeof row.isDeposit === 'boolean' ? { nativeKind: row.isDeposit ? 'Deposit' : 'Withdrawal' } : row.kind || row.type ? { nativeKind: row.kind || row.type } : {}),
+    };
   });
 }
 
