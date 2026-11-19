@@ -10,6 +10,7 @@ export interface SearchRecord {
   url: string;
   terms: string;
   categoryId?: string;
+  currencyCode?: string;
 }
 
 type SearchableFields = {
@@ -33,18 +34,18 @@ interface RecordSource<T> {
   module: string;
   kind: string;
   records: T[];
-  context: (row: T) => { id: string; label: string; url: string };
+  context: (row: T) => { id: string; label: string; url: string; currencyCode?: string };
 }
 
 export function collectSearchRecords<T extends SearchableFields>({ module, kind, records, context }: RecordSource<T>): SearchRecord[] {
   return records.map((row, index) => {
-    const { id: scopeId, label: scope, url } = context(row);
+    const { id: scopeId, label: scope, url, currencyCode } = context(row);
     const title = row.title || row.name || row.person || row.description || row.ticker || row.note || kind;
     const detail = [row.description, row.note, row.notes, row.reference, row.statementRef]
       .filter((value): value is string => !!value && value !== title).join(' · ');
     const terms = [title, detail, row.id, row.ticker, row.date, row.currencyCode, row.amount, module, kind, scope]
       .filter(value => value !== undefined).join(' ');
-    return { key: JSON.stringify([module, kind, scopeId, row.id, index]), module, scopeId, scope, kind, title, detail, date: row.date, url, terms, categoryId: row.categoryID };
+    return { key: JSON.stringify([module, kind, scopeId, row.id, index]), module, scopeId, scope, kind, title, detail, date: row.date, url, terms, categoryId: row.categoryID, currencyCode: row.currencyCode ?? currencyCode };
   });
 }
 

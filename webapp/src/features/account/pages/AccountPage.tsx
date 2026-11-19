@@ -345,7 +345,7 @@ export function CategoriesSection({ showGroups = true }: { showGroups?: boolean 
 
   return (
     <CollapsibleCard title={<h3 className="m-0">Categories</h3>}>
-      {showGroups && ignoreCount && (
+      {ignoreCount && (
         <Notice tone="info" className="mb-sm">
           <p className="m-0">
             "Ignore" and "IgnoreCount" mean the same thing in your data.{' '}
@@ -553,7 +553,7 @@ export function AccountPage({ syncStatuses }: { syncStatuses: ModuleSyncStatus[]
          group's expandable category checklist needs more room than a
          narrow ~300px card. */}
       <div className="mb-md">
-        <CategoriesSection />
+        <CollapsibleCard title={<h3 className="m-0">Categories</h3>}><Link to="/organize/categories">Browse and manage categories</Link></CollapsibleCard>
       </div>
 
       <Notice tone="info" className="mb-md">
