@@ -929,6 +929,8 @@ schedule. Pick **Subscriptions** from the category list.
 
 ## 23. Transfers (linking money between modules)
 
+Use the full-screen control for more room when entering transfers. Related fields stay grouped, and the groups wrap onto the next line as the popup narrows. The inward-arrow control exits full screen.
+
 Normally, moving money between two modules — say, withdrawing cash from your bank account —
 means entering it twice: a withdrawal in Banking and a cash-in entry in Cash. Do that and the
 two records have no idea they're related; edit or delete one later and the other silently
