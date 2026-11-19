@@ -1,3 +1,7 @@
+## 2026-11-19 — integrate main PR #55
+
+Merged main at 00e94aaf into PR #51's delivery branch. Retained Organize, global search and review imports alongside TradingToolPage; kept both documentation sections and the merged sidebar/navigation changes. Al Habib order imports, Trade Journal and PSX Profiler remain intact. Earlier PR #53/#54 integrations remain ancestors. The merged lockfile was installed and both TypeScript projects/production build passed. Local full-suite attempts hit five-second timeouts under concurrent build load; an isolated rerun and exact-head CI remain required before final delivery; no merge to main is claimed.
+
 ## 2026-11-19 — category native amounts
 
 Category transaction tables now show original native amounts and transaction types without changing their signs or deriving missing trade amounts. Existing source/date filtering and currency separation remain intact. Five focused category/search tests and both TypeScript projects/production build passed. Prior complete Organize workflow source 1de77df2 passed Actions 562, including the full suite. The final category checkpoint needs resulting-head CI. See docs/ORGANIZE.md for the requested workflow audit and limits; the draft PR still has broader delivery gates.
@@ -17,6 +21,10 @@ The full app reset clears payment execution history with the native workbooks in
 ## PR #51 integration and budgeting
 
 Integrated the QSE dashboard import released on main. Added reviewed CSV creation of currency budget definitions, batch editing for monthly limits, and a previous-calendar-month comparison in Money in/out. Work on linked funding reversals, routine sync and pending-only payments remains open.
+
+## Trade Journal, PSX Profiler and reviewed AHL orders
+
+The [trading tools guide](docs/trading-tools.md) records the upstream revision, user entry points, complete feature inventory and storage boundary. The PSX Dashboard and Trade Transactions show the AHL shortcuts when an active Al Habib broker is selected. Native order-history writes are reviewed, broker-scoped and guarded against stale workbooks and new unmatched sell shares. The Journal uses its own browser-local statement and order history data.
 
 ## 2026-11-18 — PSX cash-transfer reconciliation
 

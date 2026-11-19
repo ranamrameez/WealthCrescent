@@ -25,6 +25,10 @@ FinanceManager live link:
 
 Organize contains Categories with management, source/date filters and native transaction drilldown, plus the shared Suggested links inbox. Global controls support manual scans and optional popups; ledger changes trigger scans while the app is open. Account-checked preference persistence keeps a rejection pending if device storage fails. Matching covers recurring subscriptions, including custom 28-day cycles, and supported Bank/Cash/card/investment cash-transfer pairs. Approval preserves native records; uncertain matches wait for review. See [Organize](docs/ORGANIZE.md) and [the user guide](USER_MANUAL.md#review-suggested-links) for conservative matching limits.
 
+## Trade Journal, PSX Profiler and AHL imports
+
+See the [trading tools guide](docs/trading-tools.md) for feature coverage, import instructions and links to the original apps.
+
 ## QSE statement quick import
 
 Use **Import QSE trades** on the main Dashboard or the QSE Dashboard to review and selectively apply The Group trades for the active broker. See [Importing The Group statements](docs/the-group-import.md).
@@ -34,6 +38,8 @@ Use **Import QSE trades** on the main Dashboard or the QSE Dashboard to review a
 For new sessions, read [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md) first. **Latest checkpoint: 2026-11-05 — financial correctness is the priority on the existing branch / draft PR #51.** Source through 44018f7b is published on PR #51 and passed GitHub Actions #432. The newer Banking aggregate/budget and App Data removal changes are tracked in the current handoff. The handoff records exact local tests/build results and pending final-suite/browser/CI validation. Nothing has been merged to main in this continuation.
 
 - **Planning service migration (2026-11-04, PR #51):** PlanningPage and FinancePlansHierarchy obtain activities, recurring items, summary amounts, statuses and chart data through cached application queries and CalculationEngine. Shared payment/group editors dispatch authenticated service commands for saves, deletions and finance relinking, retaining stale-edit and completed-history checks. Monthly category and module totals now stay separate by currency and follow category/direction filters. This is a feature-branch checkpoint, not a completed app-wide migration or auto-pay release.
+
+- Added Trade Journal to QSE and PSX and PSX Profiler to PSX. Added reviewed AHL order-history and account-statement entry points on the PSX Dashboard and Trade Transactions.
 
 - **Transaction-page cost-basis consistency slice (2026-10-29, merged in PR #31; full CI green):** QSE/PSX inline SELL P/L now uses the weighted-average engine when Average cost is selected; FIFO/Lowest cost first uses the configured lot method. Open/Closed lot-attribution reports are hidden under Average cost rather than presenting incompatible lot math. The independent page-local lot-match selector was removed. Regression coverage includes weighted-average SELL P/L and unmatched oversells. The production build and full test suite passed in [PR #31](https://github.com/ranamrameez/WealthCrescent/pull/31).
 
