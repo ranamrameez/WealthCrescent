@@ -7,18 +7,7 @@ import { fmtMoney } from '../../lib/format';
 import { useTablePagination } from '../../hooks/useTablePagination';
 import { acceptSuggestedLink, canScanSuggestedLinks, getReviewedSubscriptionPayments, scanSuggestedLinks, subscribeSuggestedLinkSources, type SuggestedLink, type SuggestedLinkOwners } from '../../services/finance/suggestedLinksService';
 
-interface Preferences { popup: boolean; rejected: string[] }
-const defaultPreferences: Preferences = { popup: false, rejected: [] };
-const storageKey = (owner: string) => 'wc:suggested-links:' + owner;
-function loadPreferences(owner?: string): Preferences {
-  if (!owner) return defaultPreferences;
-  try {
-    const value = JSON.parse(localStorage.getItem(storageKey(owner)) ?? 'null');
-    return { popup: value?.popup === true, rejected: Array.isArray(value?.rejected) ? value.rejected.filter((id: unknown) => typeof id === 'string') : [] };
-  } catch {
-    return defaultPreferences;
-  }
-}
+import { readSuggestedLinkPreferences, saveSuggestedLinkPreferences, type SuggestedLinkPreferences } from '../../services/finance/suggestedLinkPreferencesService';
 
 interface Inbox {
   owner?: string;
@@ -37,7 +26,7 @@ const InboxContext = createContext<Inbox | null>(null);
 
 export function SuggestedLinksProvider({ owner, owners, children }: { owner?: string; owners: SuggestedLinkOwners; children: ReactNode }) {
   const { cash, bank, cards, subscriptions, categories, qse, psx, funds, transfers } = owners;
-  const [prefs, setPrefs] = useState(() => loadPreferences(owner));
+  const [prefs, setPrefs] = useState(() => readSuggestedLinkPreferences(owner));
   const [rows, setRows] = useState<SuggestedLink[]>([]);
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState('');
@@ -46,11 +35,15 @@ export function SuggestedLinksProvider({ owner, owners, children }: { owner?: st
     if (!owner) return [];
     return scanSuggestedLinks(owner, { cash, bank, cards, subscriptions, categories, qse, psx, funds, transfers }).filter(row => !prefs.rejected.includes(row.id));
   }, [owner, cash, bank, cards, subscriptions, categories, qse, psx, funds, transfers, prefs.rejected]);
-  const updatePrefs = (next: Preferences) => {
-    setPrefs(next);
-    if (owner) {
-      try { localStorage.setItem(storageKey(owner), JSON.stringify(next)); }
-      catch { setStatus('Preferences could not be saved on this device.'); }
+  const updatePrefs = (next: SuggestedLinkPreferences) => {
+    if (!owner) return false;
+    try {
+      saveSuggestedLinkPreferences(owner, next);
+      setPrefs(next);
+      return true;
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Preferences could not be saved.');
+      return false;
     }
   };
   useEffect(() => {
@@ -88,7 +81,7 @@ export function SuggestedLinksProvider({ owner, owners, children }: { owner?: st
           setRows(scan());
           setStatus(row.kind === 'transfer' ? 'Linked the existing transfer records.' : 'Linked the existing payment to the subscription.');
         } else {
-          updatePrefs({ ...prefs, rejected: [...new Set([...prefs.rejected, row.id])] });
+          if (!updatePrefs({ ...prefs, rejected: [...new Set([...prefs.rejected, row.id])] })) return;
           setRows(current => current.filter(item => item.id !== row.id));
           setStatus('Suggestion rejected.');
         }

@@ -23,7 +23,7 @@ FinanceManager live link:
 
 ## Organize and suggested links
 
-Organize contains Categories with management, source/date filters and native transaction drilldown, plus the shared Suggested links inbox. Global controls support manual scans and optional popups; ledger changes trigger scans while the app is open. Matching covers recurring subscriptions, including custom 28-day cycles, and supported Bank/Cash/card/investment cash-transfer pairs. Approval preserves native records; uncertain matches wait for review. See [Organize](docs/ORGANIZE.md) and [the user guide](USER_MANUAL.md#review-suggested-links) for conservative matching limits.
+Organize contains Categories with management, source/date filters and native transaction drilldown, plus the shared Suggested links inbox. Global controls support manual scans and optional popups; ledger changes trigger scans while the app is open. Account-checked preference persistence keeps a rejection pending if device storage fails. Matching covers recurring subscriptions, including custom 28-day cycles, and supported Bank/Cash/card/investment cash-transfer pairs. Approval preserves native records; uncertain matches wait for review. See [Organize](docs/ORGANIZE.md) and [the user guide](USER_MANUAL.md#review-suggested-links) for conservative matching limits.
 
 ## QSE statement quick import
 

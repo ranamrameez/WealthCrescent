@@ -20,6 +20,7 @@ const owners = { cards: 'fixture', subscriptions: 'fixture' };
 const payment = { id: 'charge', timestamp: '2026-11-19T00:00:00Z', cardId: 'card', date: '2026-11-19', amount: 50, kind: 'charge' as const, description: 'Recharge [5678]' };
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   useBankWorkbookStore.setState({ workbook: bank });
   useCashWorkbookStore.setState({ workbook: cash });
   useInterEntityTransfersStore.setState({ workbook: links });
@@ -74,4 +75,13 @@ it('automatically scans new transfer records and accepts them through the shared
   fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
   expect(useInterEntityTransfersStore.getState().workbook.entries).toHaveLength(1);
   expect(screen.getByText('Linked the existing transfer records.')).toBeVisible();
+});
+
+it('keeps a rejection pending when saving review preferences fails', () => {
+  fixture();
+  show();
+  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota'); });
+  fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
+  expect(screen.getByRole('button', { name: 'Accept' })).toBeVisible();
+  expect(screen.getByRole('status')).toHaveTextContent('Preferences could not be saved on this device.');
 });

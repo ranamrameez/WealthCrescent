@@ -2,6 +2,22 @@
 
 Add a sidebar parent named **Organize** with two child pages.
 
+## Requested workflow audit — 2026-11-19
+
+| Requirement | Existing or added implementation |
+| --- | --- |
+| Log transactions, subscriptions, card payments, bank and investment transfers | Native Cash, Banking/Cards, Subscriptions, Transfers, QSE/PSX and Funds ledgers remain the source of truth. |
+| Scan descriptions, categories, account names, phone fragments and keywords | Subscription renewal matcher plus native transfer adapters and CalculationEngine.linkSuggestions. Scans run after ledger changes while the app is open. |
+| Review popup from every page and manual scan | Global toolbar Suggested links and Scan now; optional new-suggestion popup shares the same inbox. |
+| Dedicated approve/reject page | Organize → Suggested links reviews existing records and explains each match. |
+| Categories under the same navigation parent | Organize → Categories reuses category CRUD, groups and merge actions. |
+| Click a category to see its transactions | Exact category-ID drilldown, source/date filters, currency-separated native links. |
+| Reuse the workflow for new transactions | Debounced subscriptions to all supported native stores plus explicit rescans. |
+| Phone recharge every 28 days | Custom subscription cycle with customDays = 28; existing recurrence engine and review regression exercise the next renewal. |
+| Keep ambiguous matches pending | Scanner returns all eligible peers; only a reviewed Accept writes provenance or a link. |
+
+The transfer scanner conservatively excludes invalid fees and malformed duplicate native IDs. It proposes supported same-currency pairs rather than guessing an exchange rate. Background scanning means in-app observation; it does not imply an offline server scanner or real money movement. Popup and rejected-candidate preferences are local to each signed-in account on this device. Storage failure leaves a rejection pending and reports the error.
+
 ## Suggested links
 
 Show the original payment, the candidate entity and occurrence, and the reasons for the match. Include the payment date, amount, and currency. Offer **Accept** and **Reject** for each candidate and keep ambiguous matches together for review.
