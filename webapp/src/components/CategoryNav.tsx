@@ -14,7 +14,7 @@ import {
   SubscriptionsIcon,
 } from './icons';
 
-export type CategoryKey = 'netWorth' | 'stocks' | 'funds' | 'bank' | 'cash' | 'personalLoans' | 'emi' | 'rentals' | 'subscriptions' | 'planning';
+export type CategoryKey = 'netWorth' | 'stocks' | 'funds' | 'bank' | 'cash' | 'personalLoans' | 'emi' | 'rentals' | 'subscriptions' | 'planning' | 'organize';
 
 // User-requested (2026-08-28): "This entirely removes the transfers page
 // and the problem of duplicated transaction cards" — the standalone
@@ -31,6 +31,7 @@ export const CATEGORIES: { key: CategoryKey; label: string; to: string; icon: Re
   { key: 'emi', label: 'EMI / Loans', to: '/emi-loans', icon: <EMIIcon /> },
   { key: 'rentals', label: 'Rentals', to: '/rentals', icon: <RentalsIcon /> },
   { key: 'subscriptions', label: 'Subscriptions', to: '/subscriptions', icon: <SubscriptionsIcon /> },
+  { key: 'organize', label: 'Organize', to: '/organize/categories', icon: <PlanningIcon /> },
   { key: 'planning', label: 'Planning', to: '/planning', icon: <PlanningIcon /> },
 ];
 
@@ -58,6 +59,7 @@ export function categoryForPath(pathname: string): CategoryKey | null {
   if (pathname.startsWith('/emi-loans')) return 'emi';
   if (pathname.startsWith('/rentals')) return 'rentals';
   if (pathname.startsWith('/subscriptions')) return 'subscriptions';
+  if (pathname === '/organize' || pathname.startsWith('/organize/')) return 'organize';
   if (pathname.startsWith('/planning')) return 'planning';
   if (pathname.startsWith('/budget')) return 'planning';
   return 'stocks';
@@ -105,6 +107,9 @@ export function CategoryNav({ onNavigate, stocksSubnav }: { onNavigate?: () => v
             {c.label}
           </NavLink>
           {c.key === 'stocks' && active === 'stocks' && stocksSubnav}
+          {c.key === 'organize' && active === 'organize' && <div className="category-stocks-subnav">
+            <NavLink className="navbtn" to="/organize/categories" onClick={onNavigate}>Categories</NavLink>
+          </div>}
         </Fragment>
       ))}
     </nav>
