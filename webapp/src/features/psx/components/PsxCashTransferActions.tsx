@@ -128,7 +128,7 @@ function CashTransferReview({ preview, fileName, close }: { preview: PsxCashPrev
   </Modal>;
 }
 
-export function PsxCashTransferActions() {
+export function PsxCashTransferActions({ statementOnly = false, label = 'Import cash statement' }: { statementOnly?: boolean; label?: string } = {}) {
   const broker = usePSXWorkbookStore(state => state.workbook.brokerProfiles.find(profile => profile.id === state.workbook.activeBrokerId));
   const ensureSignedIn = useEnsureSignedIn();
   const upload = useRef<HTMLInputElement>(null);
@@ -163,8 +163,8 @@ export function PsxCashTransferActions() {
           event.target.value = '';
           if (file) void open(file);
         }} />
-      <StandardButton size="small" tone="secondary" onClick={() => upload.current?.click()}>Import cash statement</StandardButton>
-      {broker && isAhlBroker(broker.id, broker.name) &&
+      <StandardButton size="small" tone="secondary" onClick={() => upload.current?.click()}>{label}</StandardButton>
+      {!statementOnly && broker && isAhlBroker(broker.id, broker.name) &&
         <StandardButton size="small" tone="secondary" onClick={() => void open()}>Sync bank transfers</StandardButton>}
     </div>
     {review && <CashTransferReview {...review} close={() => setReview(undefined)} />}

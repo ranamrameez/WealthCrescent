@@ -1,3 +1,4 @@
+import { AhlBrokerImports } from '../components/AhlBrokerImports';
 import { RecordRow } from '../../../components/RecordRow';
 import { PageHeading } from '../../../components/PageHeading';
 import { InvestmentPlans } from '../../../components/InvestmentPlans';
@@ -350,7 +351,7 @@ export function DashboardPage() {
 
   return (
     <div className="standard-page">
-      <PageHeading back={<BackButton to="/net-worth">← Overview</BackButton>}><h1 className="pagetitle">PSX Dashboard</h1></PageHeading>
+      <PageHeading back={<BackButton to="/net-worth">← Overview</BackButton>}><div className="row gap-sm"><h1 className="pagetitle">PSX Dashboard</h1><AhlBrokerImports /></div></PageHeading>
 
       {/* See QSE's DashboardPage.tsx for why only these 9 (of the original
           13) stat cards are unified here — the other 4 (Realized/Unrealized/

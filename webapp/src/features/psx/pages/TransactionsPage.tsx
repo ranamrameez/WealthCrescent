@@ -1,3 +1,4 @@
+import { AhlBrokerImports } from '../components/AhlBrokerImports';
 import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { DateValue } from '../../../components/DateValue';
@@ -1092,7 +1093,7 @@ function CashLedgerSection() {
 export function TransactionsPage() {
   return (
     <div className="standard-page">
-      <PageHeading back={<BackButton to="/psx">← PSX</BackButton>}><h1 className="pagetitle">PSX Trade Transactions</h1></PageHeading>
+      <PageHeading back={<BackButton to="/psx">← PSX</BackButton>}><div className="row gap-sm"><h1 className="pagetitle">PSX Trade Transactions</h1><AhlBrokerImports /></div></PageHeading>
       {/* User-reported (2026-08-28, real audit after "you're ignoring what's
          asked for") — same fix as QSE's identical structure: the Transfers
          FAB used to live inside the "Cash transfers" tab's own content,
