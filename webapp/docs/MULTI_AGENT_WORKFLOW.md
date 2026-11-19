@@ -46,7 +46,8 @@ The register lives on the shared delivery branch linked to the active PR. For th
 | Validate Cash currency detail links | Done | WC-TR session 1939ef032035, PR #51 | `7fb88810` shares the Cash currency registry, rejects unknown URLs and preserves active filters. Focused tests and Actions 483 passed. |
 | Verify app-wide search in a mobile browser | Ready | | The local Chromium process was blocked by the execution environment. Recheck the topbar and results at a narrow viewport with fixtures. |
 | Deep-link exchange broker search results | Done | WC-TR session 1939ef032035, PR #51 | `486160fe` opens the matching QSE or PSX profile without activating it. Focused tests, production build, clean 1,414-test rerun and integrated Actions 493 passed. |
-| Distinguish fullscreen enter and exit | In progress | WC-TR session 1939ef032035, work/fullscreen-icons, 2026-11-19 UTC | Shared icon used in section cards, charts and dialogs. |
+| Distinguish fullscreen enter and exit | Done | WC-TR session 1939ef032035, PR #51 | `ec62ffaa` uses inward arrows for exit. Two focused tests and Actions 522 passed. |
+| Clarify credit card entry actions | In progress | WC-TR session 1939ef032035, work/card-entry-actions, 2026-11-19 UTC | Keep standard charges, payments and transfers in one entry flow; label specialized card entries by purpose. |
 | Complete UX acceptance | Ready | | Claim one module or a specific shared control at a time. |
 | PSX transfer review fixture acceptance | Done | WC-TR PSX session, work/psx-transfer-review-acceptance | `e8425d9f` covers statement selection, bank filtering and stale-save failure/retry. 10 focused tests passed. The deployed terms gate prevented live interaction. |
 | Final PR validation and merge | Ready | | Depends on the remaining acceptance checks and exact-head CI. |
