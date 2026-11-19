@@ -55,12 +55,14 @@ it('adapts card payments and isolated QSE, PSX and Funds cash ledgers', () => {
   const payment = { id: 'payment', timestamp: '2026-11-19T00:00:00Z', cardId: 'card', date: '2026-11-19', amount: 100, kind: 'payment' as const, description: 'ATM [5678]' };
   useCreditCardWorkbookStore.setState({ workbook: { ...cards, cards: [{ id: 'card', name: 'Card', currencyCode: 'QAR' }], transactions: [payment, { ...payment, id: 'charge', kind: 'charge' }] } });
   expect(scanTransferSuggestions('fixture', { ...owners, cash: undefined, cards: 'fixture' }).map(row => row.to.recordId)).toEqual(['payment']);
-  for (const [module, store, workbook] of [['qse', useWorkbookStore, qse], ['psx', usePSXWorkbookStore, psx]] as const) {
+  for (const module of ['qse', 'psx'] as const) {
     const transfer = { id: 'deposit', date: '2026-11-19', gross: 100, fee: 1, type: 'DEPOSIT' as const, description: 'ATM [5678]' };
-    store.setState({ workbook: { ...workbook, activeBrokerId: 'active', transfers: [transfer], brokerProfiles: [
+    const fixtureWorkbook = <T extends { settings: { currency: string } }>(workbook: T) => ({ ...workbook, activeBrokerId: 'active', transfers: [transfer], brokerProfiles: [
       { id: 'active', name: 'Active', settings: { ...workbook.settings, currency: 'QAR' }, data: { transactions: [], transfers: [{ ...transfer, id: 'stale' }], adjustments: [], dividends: [], tradePlans: [] } },
       { id: 'other', name: 'Other', settings: { ...workbook.settings, currency: 'QAR' }, data: { transactions: [], transfers: [{ ...transfer, id: 'other' }], adjustments: [], dividends: [], tradePlans: [] } },
-    ] } });
+    ] });
+    if (module === 'qse') useWorkbookStore.setState({ workbook: fixtureWorkbook(qse) });
+    else usePSXWorkbookStore.setState({ workbook: fixtureWorkbook(psx) });
     const matches = scanTransferSuggestions('fixture', { ...owners, cash: undefined, [module]: 'fixture' });
     expect(matches.map(row => row.to.recordId).sort()).toEqual(['deposit', 'other']);
     expect(matches[0].to.side.fee).toBe(1);
@@ -69,4 +71,10 @@ it('adapts card payments and isolated QSE, PSX and Funds cash ledgers', () => {
   }
   useFundsWorkbookStore.setState({ workbook: { ...funds, transfers: [{ id: 'fund-deposit', date: '2026-11-19', gross: 100, fee: 0, type: 'DEPOSIT', currencyCode: 'QAR', description: 'ATM [5678]' }] } });
   expect(scanTransferSuggestions('fixture', { ...owners, cash: undefined, funds: 'fixture' }).map(row => row.to.recordId)).toEqual(['fund-deposit']);
+});
+
+it('withholds malformed duplicate native IDs rather than linking an arbitrary record', () => {
+  const current = useCashWorkbookStore.getState().workbook;
+  useCashWorkbookStore.setState({ workbook: { ...current, entries: [...current.entries, { ...current.entries[0], note: 'Other copy' }] } });
+  expect(scanTransferSuggestions('fixture', owners)).toEqual([]);
 });
