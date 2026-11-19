@@ -50,6 +50,7 @@ import { fmtMoney, formatDate } from '../../../lib/format';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { auth, firebaseReady } from '../../../lib/firebase/client';
 import { regenerateSubscriptionRenewals, type RenewalFundingSource } from '../../../services/finance/subscriptionRenewalService';
+import { deleteSubscription, saveSubscription, toggleSubscriptionActive } from '../../../services/finance/subscriptionLifecycleService';
 import { useAppearanceStore } from '../../../store/appearanceStore';
 import { useBankWorkbookStore } from '../../../store/bankWorkbookStore';
 import { useCategoryStore } from '../../../store/categoryStore';
@@ -98,7 +99,6 @@ function AddSubscriptionFab() {
 }
 
 function AddSubscriptionForm({ onSaved, subscription }: { onSaved?: () => void; subscription?: Subscription } = {}) {
-  const addEntry = useSubscriptionsWorkbookStore((s) => s.addEntry);
   const defaultCurrency = useSubscriptionsWorkbookStore((s) => s.workbook.settings.defaultCurrency);
   const [lastCurrency, setLastCurrency] = useLastCurrency('subscriptions', defaultCurrency);
   const ensureSignedIn = useEnsureSignedIn();
@@ -106,15 +106,17 @@ function AddSubscriptionForm({ onSaved, subscription }: { onSaved?: () => void; 
   const currencyOptions = useEnabledCurrencies(s.currencyCode);
 
   const submit = async () => {
-    if (!s.name.trim()) return toast('Enter a subscription name.');
-    if (!s.amount || s.amount <= 0) return toast('Enter an amount.');
-    if (s.billingCycle === 'custom' && (!s.customDays || s.customDays <= 0)) return toast('Enter the custom cycle length in days.');
     if (!(await ensureSignedIn('Sign in to save subscriptions.'))) return;
-    if (subscription) useSubscriptionsWorkbookStore.getState().updateEntry(subscription.id, { ...s, name: s.name.trim() });
-    else addEntry({ ...s, id: crypto.randomUUID(), name: s.name.trim() });
-    toast(`Subscription "${s.name.trim()}" added.`);
-    setS(emptySubscription(s.currencyCode));
-    onSaved?.();
+    const owner = auth?.currentUser?.uid;
+    if (!owner) return;
+    try {
+      const name = saveSubscription(s, owner, subscription);
+      toast(`Subscription "${name}" ${subscription ? 'updated' : 'added'}.`);
+      setS(emptySubscription(s.currencyCode));
+      onSaved?.();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Could not save this subscription.');
+    }
   };
 
   return (
@@ -434,8 +436,6 @@ function SubscriptionDetail({ sub, onSelect, onBack }: { sub: Subscription; onSe
   const switchEntities = useSubscriptionsWorkbookStore(s=>s.workbook.entries);
   const { filters, setFilters, resetFilters, activeCount } = useUrlTransactionFilters();
   const dateFormat = useAppearanceStore((s) => s.appearance.dateFormat);
-  const updateEntry = useSubscriptionsWorkbookStore((s) => s.updateEntry);
-  const deleteEntry = useSubscriptionsWorkbookStore((s) => s.deleteEntry);
   const categoryRegistry = useCategoryStore((s) => s.workbook.categories);
   const ensureSignedIn = useEnsureSignedIn();
   const [editing, setEditing] = useState(false);
@@ -467,8 +467,14 @@ function SubscriptionDetail({ sub, onSelect, onBack }: { sub: Subscription; onSe
 
   const toggleActive = async () => {
     if (!(await ensureSignedIn('Sign in to update this subscription.'))) return;
-    updateEntry(sub.id, sub.active ? { active: false, cancelledDate: today() } : { active: true, cancelledDate: undefined });
-    toast(sub.active ? 'Subscription cancelled.' : 'Subscription reactivated.');
+    const owner = auth?.currentUser?.uid;
+    if (!owner) return;
+    try {
+      const active = toggleSubscriptionActive(sub, owner, today());
+      toast(active ? 'Subscription reactivated.' : 'Subscription cancelled.');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Could not update this subscription.');
+    }
   };
 
   const generatePlans = async () => {
@@ -509,7 +515,15 @@ function SubscriptionDetail({ sub, onSelect, onBack }: { sub: Subscription; onSe
                 icon={<TrashIcon size={13} />}
                 align="right"
                 onClick={async () => {
-                  if (await confirmDialog('This cannot be undone.', `Delete subscription "${sub.name}"?`)) { deleteEntry(sub.id); onBack(); }
+                  if (!(await ensureSignedIn('Sign in to delete this subscription.'))) return;
+                  const owner = auth?.currentUser?.uid;
+                  if (!owner || !(await confirmDialog('This cannot be undone.', `Delete subscription "${sub.name}"?`))) return;
+                  try {
+                    deleteSubscription(sub, owner);
+                    onBack();
+                  } catch (error) {
+                    toast(error instanceof Error ? error.message : 'Could not delete this subscription.');
+                  }
                 }}
               />
             </div>

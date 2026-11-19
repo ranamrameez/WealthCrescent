@@ -48,3 +48,20 @@ it('leaves plans intact when the source currency, subscription, or signed-in acc
   expect(bank.getState().workbook).toBe(before);
   expect(cash.getState().workbook.entries).toEqual([]);
 });
+
+it('rejects stale lifecycle edits and requires the reviewed account for confirmed deletion', async () => {
+  const { saveSubscription, toggleSubscriptionActive, deleteSubscription } = await import('./subscriptionLifecycleService');
+  const [initial] = subscriptions.getState().workbook.entries;
+  expect(toggleSubscriptionActive(initial, 'owner', '2026-01-31')).toBe(false);
+  expect(() => saveSubscription({ ...initial, amount: 30 }, 'owner', initial)).toThrow(/subscription changed/i);
+  let current = subscriptions.getState().workbook.entries[0];
+  expect(current).toMatchObject({ active: false, cancelledDate: '2026-01-31', amount: 20 });
+  expect(() => deleteSubscription(current, 'other')).toThrow(/signed-in account/);
+  expect(toggleSubscriptionActive(current, 'owner', '2026-02-01')).toBe(true);
+  current = subscriptions.getState().workbook.entries[0];
+  expect(current.cancelledDate).toBeUndefined();
+  expect(saveSubscription({ ...current, name: ' Updated ' }, 'owner', current)).toBe('Updated');
+  expect(() => deleteSubscription(current, 'owner')).toThrow(/subscription changed/i);
+  deleteSubscription(subscriptions.getState().workbook.entries[0], 'owner');
+  expect(subscriptions.getState().workbook.entries).toHaveLength(0);
+});
