@@ -337,19 +337,45 @@ export function moduleBreakdownChart(row: CurrencyNetWorth) {
 
 export type FlowDimension = 'category' | 'module' | 'source' | 'plan' | 'kind';
 export type FlowPopulation = 'actual' | 'pending' | 'planned';
+function movementGroupIdentity(item: MovementActivity, dimension: FlowDimension, planNames: Record<string, string>) {
+  const moduleLabel = MOVEMENT_MODULE_LABELS[item.module];
+  switch (dimension) {
+    case 'kind': {
+      const key = item.movementKind ?? 'unclassified';
+      return { key, label: MOVEMENT_KIND_LABELS[key] };
+    }
+    case 'category': {
+      const label = item.category || 'Uncategorized';
+      return { key: JSON.stringify(item.categoryId ? ['id', item.categoryId] : ['label', label]), label };
+    }
+    case 'module':
+      return { key: item.module, label: moduleLabel };
+    case 'source':
+      return {
+        key: JSON.stringify([item.module, item.sourceId ? ['id', item.sourceId] : ['label', item.sourceLabel]]),
+        label: moduleLabel + ' · ' + item.sourceLabel,
+      };
+    case 'plan': {
+      const id = item.planGroupId;
+      return {
+        key: id || '__unallocated__',
+        label: id ? (Object.hasOwn(planNames, id) ? planNames[id] : '') || 'Unnamed plan group' : 'Unallocated / no explicit plan link',
+      };
+    }
+  }
+}
+
 export function moneyMovementReport(activities: MovementActivity[], from: string, to: string, today: string, dimension: FlowDimension, population: FlowPopulation, planNames: Record<string, string> = {}, kind: MovementKind | 'all' = 'all') {
   const items = selectMovementActivities(activities,from,to,today,population,kind);
-  const modules = MOVEMENT_MODULE_LABELS;
   const rows = [...new Set(items.map(item => item.currencyCode))].sort().map(currency => {
     const native = items.filter(item => item.currencyCode === currency);
     const buckets = new Map<string, { key: string; label: string; inflow: number; outflow: number; net: number; items: FlowActivityItem[] }>();
     let inflow = 0, outflow = 0;
     for (const item of native) {
-      const key = dimension === 'kind' ? item.movementKind ?? 'unclassified' : dimension === 'category' ? item.category || 'Uncategorized' : dimension === 'module' ? item.module : dimension === 'source' ? item.module + ':' + (item.sourceId ?? item.sourceLabel) : item.planGroupId || '__unallocated__';
-      const label = dimension === 'kind' ? MOVEMENT_KIND_LABELS[key as MovementKind] : dimension === 'module' ? modules[item.module] : dimension === 'source' ? modules[item.module] + ' · ' + item.sourceLabel : dimension === 'plan' ? (item.planGroupId ? planNames[item.planGroupId] || 'Unnamed plan group' : 'Unallocated / no explicit plan link') : key;
+      const { key, label } = movementGroupIdentity(item, dimension, planNames);
       const group = buckets.get(key) ?? { key, label, inflow: 0, outflow: 0, net: 0, items: [] };
       group.inflow += Math.max(0,item.amount); group.outflow += Math.min(0,item.amount); group.net += item.amount;
-      group.items.push({ module: modules[item.module], accountName: item.sourceLabel, date: item.date, description: item.description, amount: item.amount });
+      group.items.push({ module: MOVEMENT_MODULE_LABELS[item.module], accountName: item.sourceLabel, date: item.date, description: item.description, amount: item.amount });
       buckets.set(key,group); inflow += Math.max(0,item.amount); outflow += Math.min(0,item.amount);
     }
     return { currency, inflow, outflow, net: inflow + outflow, groups: [...buckets.values()].sort((a,b) => a.outflow - b.outflow || b.inflow - a.inflow || a.label.localeCompare(b.label)) };

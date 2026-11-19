@@ -335,3 +335,20 @@ it('keeps source and record IDs containing colons distinct when resolving histor
   expect(bankRows.map(row => row.id)).toEqual(['a:record', 'ambiguous', 'ambiguous']);
   expect(bankRows.map(row => row.sourceId)).toEqual(['bank', 'bank', '__unresolved__']);
 });
+
+it('opens separate drilldowns for same-name categories and source-label fallbacks', () => {
+  const common = { module: 'bank' as const, date: '2026-01-02', currencyCode: 'USD', category: 'Bills', executed: true };
+  const movements = [
+    { ...common, id: 'one', sourceId: 'account', sourceLabel: 'First account', categoryId: 'category-1',
+      amount: -10, description: 'First bill' },
+    { ...common, id: 'two', sourceLabel: 'account', categoryId: 'category-2', amount: -15, description: 'Second bill' },
+  ];
+  for (const dimension of ['category', 'source'] as const) {
+    const row = engine.dashboard.moneyMovementReport(
+      movements, '2026-01-01', '2026-01-31', '2026-01-31', dimension, 'actual',
+    ).rows[0];
+    expect(row).toMatchObject({ outflow: -25 });
+    expect(row.groups.map(group => group.items.map(item => item.description))).toEqual([['Second bill'], ['First bill']]);
+    expect(new Set(row.groups.map(group => group.key)).size).toBe(2);
+  }
+});
