@@ -179,6 +179,9 @@ export interface CreditCardStatement {
    * bill's applicable due day. */
   paymentsAfterClose: number;
   remainingMinimumDue: number;
+  calculatedStatementBalance?: number;
+  calculatedMinimumDue?: number;
+  paidByDueDate?: number;
   remainingStatementBalance: number;
   isClosed: boolean;
 }
@@ -227,35 +230,42 @@ export function currentStatement(
   };
 }
 
-/** Latest locked bill. New spending after `cycleEnd` cannot change it.
- * Payments posted after close are allocated to that locked bill through
- * its due date, reducing both minimum and total still due. */
+function closedStatementAt(card: CreditCard, cardTxs: CreditCardTransaction[], cycleEnd: string, asOfDate: string): CreditCardStatement {
+  const cycleStart = oneCutoffBack(card, cycleEnd);
+  const previousBalance = balanceAsOf(card, cardTxs, cycleStart);
+  const cycleTxs = cardTxs.filter(t => t.date > cycleStart && t.date <= cycleEnd);
+  const sumPayments = (rows: CreditCardTransaction[]) => round2(rows.filter(t => t.kind === 'payment').reduce((sum, t) => sum + t.amount, 0));
+  const chargesThisCycle = round2(cycleTxs.filter(t => t.kind !== 'payment').reduce((sum, t) => sum + t.amount, 0));
+  const paymentsThisCycle = sumPayments(cycleTxs);
+  const calculatedStatementBalance = round2(previousBalance + chargesThisCycle - paymentsThisCycle);
+  const calculatedMinimumDue = computeMinimumDue(card, calculatedStatementBalance);
+  const override = card.statementOverrides?.[cycleEnd];
+  const statementBalance = override?.statementBalance ?? calculatedStatementBalance;
+  const minimumDue = override?.minimumDue ?? computeMinimumDue(card, statementBalance);
+  const minDueDate = override?.minDueDate ?? dueDateForDay(cycleEnd, configuredDueDay(card.lastMinPaymentDate, card.minDueDate));
+  const dueDate = override?.dueDate ?? dueDateForDay(cycleEnd, configuredDueDay(card.lastPaymentDueDate, card.paymentDueDate));
+  const nextCutoff = oneCutoffForward(card, cycleEnd);
+  const postClose = cardTxs.filter(t => t.date > cycleEnd && t.date <= asOfDate && t.date <= nextCutoff);
+  const paymentsAfterClose = Math.max(0, Math.min(statementBalance, sumPayments(postClose)));
+  const paidByDueDate = Math.max(0, Math.min(statementBalance, sumPayments(postClose.filter(t => !dueDate || t.date <= dueDate))));
+  return {
+    cycleStart, cycleEnd, previousBalance: round2(previousBalance), chargesThisCycle, paymentsThisCycle,
+    statementBalance, minimumDue, minDueDate, dueDate, paymentsAfterClose, paidByDueDate,
+    calculatedStatementBalance, calculatedMinimumDue,
+    remainingMinimumDue: Math.max(0, round2(minimumDue - paymentsAfterClose)),
+    remainingStatementBalance: Math.max(0, round2(statementBalance - paymentsAfterClose)),
+    isClosed: true,
+  };
+}
+
+/** Payments posted after billing reduce the closed bill until the next cutoff. */
 export function latestClosedStatement(
   card: CreditCard,
   transactions: CreditCardTransaction[],
   asOfDate: string = new Date().toISOString().slice(0, 10),
 ): CreditCardStatement | null {
   const cycleEnd = mostRecentCutoff(card, asOfDate);
-  if (!cycleEnd) return null;
-  const cycleStart = oneCutoffBack(card, cycleEnd);
-  const cardTxs = transactions.filter((t) => t.cardId === card.id);
-  const previousBalance = balanceAsOf(card, cardTxs, cycleStart);
-  const cycleTxs = cardTxs.filter((t) => t.date > cycleStart && t.date <= cycleEnd);
-  const chargesThisCycle = round2(cycleTxs.filter((t) => t.kind !== 'payment').reduce((sum, t) => sum + t.amount, 0));
-  const paymentsThisCycle = round2(cycleTxs.filter((t) => t.kind === 'payment').reduce((sum, t) => sum + t.amount, 0));
-  const statementBalance = round2(previousBalance + chargesThisCycle - paymentsThisCycle);
-  const minimumDue = computeMinimumDue(card, statementBalance);
-  const minDueDate = dueDateForDay(cycleEnd, configuredDueDay(card.lastMinPaymentDate, card.minDueDate));
-  const dueDate = dueDateForDay(cycleEnd, configuredDueDay(card.lastPaymentDueDate, card.paymentDueDate));
-  const paymentWindowEnd = [asOfDate, dueDate ?? asOfDate].sort()[0];
-  const paymentsAfterClose = round2(cardTxs.filter((t) => t.kind === 'payment' && t.date > cycleEnd && t.date <= paymentWindowEnd).reduce((sum, t) => sum + t.amount, 0));
-  return {
-    cycleStart, cycleEnd, previousBalance: round2(previousBalance), chargesThisCycle, paymentsThisCycle,
-    statementBalance, minimumDue, minDueDate, dueDate, paymentsAfterClose,
-    remainingMinimumDue: Math.max(0, round2(minimumDue - paymentsAfterClose)),
-    remainingStatementBalance: Math.max(0, round2(statementBalance - paymentsAfterClose)),
-    isClosed: true,
-  };
+  return cycleEnd ? closedStatementAt(card, transactions.filter(t => t.cardId === card.id), cycleEnd, asOfDate) : null;
 }
 
 /** Locked statements for recent billing cut-offs, including payments posted
@@ -275,28 +285,11 @@ export function creditCardCycleHistory(
       if (cutoff <= asOfDate) candidates.add(cutoff);
     }
   }
-  return [...candidates].sort().slice(-count).map((cycleEnd) => {
-    const cycleStart = oneCutoffBack(card, cycleEnd);
-    const cardTxs = transactions.filter((t) => t.cardId === card.id);
-    const previousBalance = balanceAsOf(card, cardTxs, cycleStart);
-    const cycleTxs = cardTxs.filter((t) => t.date > cycleStart && t.date <= cycleEnd);
-    const chargesThisCycle = round2(cycleTxs.filter((t) => t.kind !== 'payment').reduce((sum, t) => sum + t.amount, 0));
-    const paymentsThisCycle = round2(cycleTxs.filter((t) => t.kind === 'payment').reduce((sum, t) => sum + t.amount, 0));
-    const statementBalance = round2(previousBalance + chargesThisCycle - paymentsThisCycle);
-    const minimumDue = computeMinimumDue(card, statementBalance);
-    const minDueDate = dueDateForDay(cycleEnd, configuredDueDay(card.lastMinPaymentDate, card.minDueDate));
-    const dueDate = dueDateForDay(cycleEnd, configuredDueDay(card.lastPaymentDueDate, card.paymentDueDate));
-    const paymentWindowEnd = [asOfDate, dueDate ?? asOfDate].sort()[0];
-    const paymentsAfterClose = round2(cardTxs.filter((t) => t.kind === 'payment' && t.date > cycleEnd && t.date <= paymentWindowEnd).reduce((sum, t) => sum + t.amount, 0));
-    return { cycleStart, cycleEnd, previousBalance: round2(previousBalance), chargesThisCycle, paymentsThisCycle, statementBalance, minimumDue, minDueDate, dueDate, paymentsAfterClose, remainingMinimumDue: Math.max(0, round2(minimumDue - paymentsAfterClose)), remainingStatementBalance: Math.max(0, round2(statementBalance - paymentsAfterClose)), isClosed: true };
-  });
+  const cardTxs = transactions.filter(t => t.cardId === card.id);
+  return [...candidates].sort().slice(-count).map(cycleEnd => closedStatementAt(card, cardTxs, cycleEnd, asOfDate));
 }
 
-/** The currently open cycle with payments allocated exclusively. Payments
- * made after the prior cut-off but on/before that locked bill's final due
- * date belong to the closed bill, so they are excluded here. Only payments
- * after the final due date reduce the active cycle. Charges still enter the
- * active cycle immediately after the cut-off. */
+/** Payments first reduce the locked bill. Any excess reduces the open cycle. */
 export function activeCycleStatement(
   card: CreditCard,
   transactions: CreditCardTransaction[],
@@ -305,14 +298,13 @@ export function activeCycleStatement(
   const open = currentStatement(card, transactions, asOfDate);
   if (!open) return null;
   const closed = latestClosedStatement(card, transactions, asOfDate);
-  const paymentBoundary = closed?.dueDate ?? open.cycleStart;
-  const activePayments = round2(transactions
-    .filter((tx) => tx.cardId === card.id && tx.kind === 'payment' && tx.date > paymentBoundary && tx.date <= asOfDate && tx.date <= open.cycleEnd)
-    .reduce((sum, tx) => sum + tx.amount, 0));
-  const statementBalance = round2(open.previousBalance + open.chargesThisCycle - activePayments);
+  const activePayments = Math.max(0, round2(open.paymentsThisCycle - (closed?.paymentsAfterClose ?? 0)));
+  const previousBalance = round2(open.previousBalance - (closed?.paymentsAfterClose ?? 0));
+  const statementBalance = round2(previousBalance + open.chargesThisCycle - activePayments);
   const minimumDue = computeMinimumDue(card, statementBalance);
   return {
     ...open,
+    previousBalance,
     paymentsThisCycle: activePayments,
     statementBalance,
     minimumDue,
@@ -345,7 +337,7 @@ export function computeMinimumDue(card: CreditCard, statementBalance: number): n
 export function markupThisCycle(card: CreditCard, statement: CreditCardStatement): number {
   if (card.markupMethod !== 'flatOnCarried' || !card.markupRatePct) return 0;
   const unpaidFromPrior = statement.isClosed
-    ? statement.remainingStatementBalance
+    ? Math.max(0, round2(statement.statementBalance - (statement.paidByDueDate ?? statement.paymentsAfterClose)))
     : Math.max(0, round2(statement.previousBalance - statement.paymentsThisCycle));
   if (unpaidFromPrior <= 0) return 0; // grace period held — nothing carried, no markup.
   const threshold = card.markupThresholdAmount ?? 0;
@@ -375,7 +367,7 @@ export interface MinPaymentProposal {
 export function proposeMinPayment(card: CreditCard, statement: CreditCardStatement): MinPaymentProposal | null {
   const dueDate = statement.minDueDate ?? statement.dueDate;
   if (!dueDate) return null;
-  const amount = round2(statement.remainingMinimumDue + (card.pendingMinDue ?? 0));
+  const amount = round2(statement.remainingMinimumDue + (statement.isClosed ? 0 : card.pendingMinDue ?? 0));
   if (amount <= 0) return null;
   const todayStr = new Date().toISOString().slice(0, 10);
   return { dueDate, amount, isDue: dueDate <= todayStr };

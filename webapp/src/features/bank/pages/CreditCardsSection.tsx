@@ -59,7 +59,7 @@ import {
   activeCycleStatement,
   latestClosedStatement,
   markupThisCycle,
-  nextPendingMinDue,
+  type CreditCardStatement,
   availableCredit,
   outstandingBalanceByCard,
   proposeMinPayment,
@@ -67,6 +67,7 @@ import {
 import { formatDate, fmtMoney } from '../../../lib/format';
 import { createLinkedTransfer, findLinkForRecord, hasIndependentInstallmentLinks } from '../../../lib/linkCascade';
 import { firebaseReady } from '../../../lib/firebase/client';
+import { getCurrentUser } from '../../../lib/firebase/useAuthState';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { useBankWorkbookStore } from '../../../store/bankWorkbookStore';
 import { useCashWorkbookStore } from '../../../store/cashWorkbookStore';
@@ -74,7 +75,7 @@ import { addCreditCardTransactions, useCreditCardWorkbookStore } from '../../../
 import { usePlannedCreditCardWorkbookStore } from '../../../store/plannedCreditCardWorkbookStore';
 import { useAppearanceStore } from '../../../store/appearanceStore';
 import type { LinkSideConfig } from '../../../types/interEntityTransfer';
-import type { CreditCard, CreditCardTransaction, CreditCardTransactionKind } from '../../../types/creditCard';
+import type { CreditCard, CreditCardTransaction, CreditCardTransactionKind, CreditCardStatementOverride } from '../../../types/creditCard';
 import type { PlannedCreditCardTransaction } from '../../../types/plannedCreditCard';
 import type { BankAccount } from '../../../types/bankWorkbook';
 
@@ -597,6 +598,58 @@ function CreditCardAnalyticsSection({ card, transactions }: { card: CreditCard; 
   </>;
 }
 
+function CardStatementOverrideDialog({ card, cycle, onClose }: { card: CreditCard; cycle: CreditCardStatement; onClose: () => void }) {
+  const ensureSignedIn = useEnsureSignedIn();
+  const [owner] = useState(() => getCurrentUser()?.uid);
+  const [reviewedCard] = useState(card);
+  const [draft, setDraft] = useState<CreditCardStatementOverride>(() => ({ ...card.statementOverrides?.[cycle.cycleEnd] }));
+  const [error, setError] = useState('');
+  const save = async (override?: CreditCardStatementOverride) => {
+    if (!(await ensureSignedIn('Sign in to update the closed statement.'))) return;
+    const store = useCreditCardWorkbookStore.getState();
+    const current = store.workbook.cards.find(item => item.id === card.id);
+    if (!owner || getCurrentUser()?.uid !== owner || !current || JSON.stringify(current) !== JSON.stringify(reviewedCard)) {
+      return setError('The account or card changed. Reopen the statement to review it.');
+    }
+    const statementOverrides = { ...current.statementOverrides };
+    delete statementOverrides[cycle.cycleEnd];
+    const calculated = latestClosedStatement({ ...current, statementOverrides }, store.workbook.transactions, cycle.cycleEnd);
+    if (!calculated || calculated.cycleEnd !== cycle.cycleEnd) return setError('This billing cutoff is no longer available.');
+    if (override) {
+      const { statementBalance, minimumDue, minDueDate, dueDate } = override;
+      const total = statementBalance ?? Math.max(0, calculated.statementBalance);
+      const minDate = minDueDate ?? calculated.minDueDate;
+      const finalDate = dueDate ?? calculated.dueDate;
+      if ((statementBalance !== undefined && (!Number.isFinite(statementBalance) || statementBalance < 0)) ||
+          (minimumDue !== undefined && (!Number.isFinite(minimumDue) || minimumDue < 0 || minimumDue > total))) {
+        return setError('Enter a non-negative bill and a minimum no greater than the bill.');
+      }
+      if ((minDate && minDate < cycle.cycleEnd) || (finalDate && finalDate < cycle.cycleEnd) || (minDate && finalDate && minDate > finalDate)) {
+        return setError('Due dates must follow the billing date, with minimum due on or before final payment.');
+      }
+      if (Object.values(override).some(value => value !== undefined)) statementOverrides[cycle.cycleEnd] = override;
+    }
+    store.updateCard(card.id, { statementOverrides });
+    onClose();
+  };
+  return <Modal title={`Edit closed statement · ${cycle.cycleEnd}`} onClose={onClose} manageFocus>
+    <p>Use the amounts and due dates shown by your bank. Blank fields use the calculated statement.</p>
+    <div className="row gap-sm">
+      <Field label="Bank bill amount"><TextInput type="number" min="0" step="0.01" placeholder={String(cycle.calculatedStatementBalance ?? cycle.statementBalance)}
+        value={draft.statementBalance ?? ''} onChange={event => setDraft({ ...draft, statementBalance: event.target.value === '' ? undefined : event.target.valueAsNumber })} /></Field>
+      <Field label="Bank minimum due"><TextInput type="number" min="0" step="0.01" placeholder={String(cycle.calculatedMinimumDue ?? cycle.minimumDue)}
+        value={draft.minimumDue ?? ''} onChange={event => setDraft({ ...draft, minimumDue: event.target.value === '' ? undefined : event.target.valueAsNumber })} /></Field>
+      <Field label="Minimum due date"><TextInput type="date" value={draft.minDueDate ?? ''} onChange={event => setDraft({ ...draft, minDueDate: event.target.value || undefined })} /></Field>
+      <Field label="Final payment date"><TextInput type="date" value={draft.dueDate ?? ''} onChange={event => setDraft({ ...draft, dueDate: event.target.value || undefined })} /></Field>
+    </div>
+    {error && <p role="alert">{error}</p>}
+    <div className="row gap-sm">
+      <button type="button" className="btn" onClick={() => void save(draft)}>Save statement</button>
+      {reviewedCard.statementOverrides?.[cycle.cycleEnd] && <button type="button" className="btn secondary" onClick={() => void save()}>Restore calculated statement</button>}
+    </div>
+  </Modal>;
+}
+
 export function CreditCardDetailPage() {
   const banks=useBankWorkbookStore(s=>s.workbook.settings.banks??[]);
   const { id } = useParams();
@@ -610,6 +663,7 @@ export function CreditCardDetailPage() {
   const ensureSignedIn = useEnsureSignedIn();
   const [editCardOpen, setEditCardOpen] = useState(false);
   const [cardDetailsOpen, setCardDetailsOpen] = useState(false);
+  const [editingCycle, setEditingCycle] = useState<CreditCardStatement | null>(null);
 
   const balance = card ? outstandingBalanceByCard(card, transactions) : 0;
   const openCycle = card ? activeCycleStatement(card, transactions) : null;
@@ -659,9 +713,10 @@ export function CreditCardDetailPage() {
     setTimeout(() => URL.revokeObjectURL(url), 0);
   };
   const monthlyHistory = useMemo(() => (card ? creditCardMonthlyHistory(card, visibleTransactions, 6) : []), [card, visibleTransactions]);
-  const cycleHistory = useMemo(() => (card ? creditCardCycleHistory(card, visibleTransactions, 6) : []), [card, visibleTransactions]);
-  const [collectAmount, setCollectAmount] = useState(proposal?.amount ?? 0);
-  const [collectDate, setCollectDate] = useState(proposal?.dueDate ?? today());
+  const cycleHistory = useMemo(() => (card ? creditCardCycleHistory(card, transactions, 6) : []), [card, transactions]);
+  const [paymentDraft, setCollectAmount] = useState<number | null>(null);
+  const collectAmount = paymentDraft ?? proposal?.amount ?? 0;
+  const [collectDate, setCollectDate] = useState(today);
   const [linkMode, setLinkMode] = useState(false);
   // Same shared-picker reasoning as Cash's/Bank's own Planning views
   // (2026-09-20) — one "Time period" control governs both the balance
@@ -696,14 +751,13 @@ export function CreditCardDetailPage() {
   }
 
   const logMinPayment = async () => {
-    if (!proposal) return;
+    if (!proposal || !Number.isFinite(collectAmount) || collectAmount <= 0 || !collectDate) return;
     const ok = await confirmDialog(`Log ${fmtMoney(collectAmount, card.currencyCode)} payment on ${collectDate}?`, 'Approve this payment?');
     if (!ok) return;
     if (!(await ensureSignedIn('Sign in to record this transaction.'))) return;
     addTransaction({ id: uid(), cardId: card.id, date: collectDate, kind: 'payment', amount: collectAmount, description: 'Minimum payment', source: 'manual' });
-    const pendingMinDue = nextPendingMinDue(proposal.amount, collectAmount);
-    updateCard(card.id, { pendingMinDue });
-    toast(pendingMinDue ? `Logged — ${fmtMoney(pendingMinDue, card.currencyCode)} still pending, carried to next cycle.` : 'Logged to the ledger.');
+    setCollectAmount(null);
+    toast('Logged to the ledger.');
   };
 
   const logMarkup = async () => {
@@ -788,10 +842,10 @@ export function CreditCardDetailPage() {
       </StandardCard></div>
 
       {statement && (
-        <div id="card-statement"><StandardCard title="Bill payment" hue={card.color}>
+        <div id="card-statement"><StandardCard title="Bill payment" hue={card.color} actions={[{ label: 'Edit closed statement', onClick: () => setEditingCycle(statement) }]}>
           <Notice tone={statement.remainingStatementBalance > 0 ? 'warning' : 'success'}>
             <strong>{fmtMoney(statement.remainingStatementBalance, card.currencyCode)} remains on the locked bill</strong>
-            <div className="text-muted mt-4">Billing period {statement.cycleStart} → {statement.cycleEnd}. Payments through {statement.dueDate ?? 'the configured final due date'} reduce this bill; later payments belong to the open cycle.</div>
+            <div className="text-muted mt-4">Billing period {statement.cycleStart} → {statement.cycleEnd}. Payments after billing reduce this bill until the next billing cutoff. Any excess reduces the open cycle.</div>
             <div className="text-muted mt-4">Original bill {fmtMoney(statement.statementBalance, card.currencyCode)} · Applied after billing {fmtMoney(statement.paymentsAfterClose, card.currencyCode)} · Minimum still due {fmtMoney(statement.remainingMinimumDue, card.currencyCode)}</div>
           </Notice>
           {markup > 0 && (
@@ -808,7 +862,7 @@ export function CreditCardDetailPage() {
               </>} />
               {linkMode ? (
                 <div className="mt-sm">
-                  <LinkedCardPaymentFields card={card} amount={collectAmount} date={collectDate} onLinked={() => { const pendingMinDue = nextPendingMinDue(proposal.amount, collectAmount); updateCard(card.id, { pendingMinDue }); }} />
+                  <LinkedCardPaymentFields card={card} amount={collectAmount} date={collectDate} onLinked={() => setCollectAmount(null)} />
                 </div>
               ) : (
                 <button className="btn small mt-sm" onClick={logMinPayment}>Approve &amp; log</button>
@@ -854,6 +908,7 @@ export function CreditCardDetailPage() {
             <SummaryValue label="Paid after billing" value={fmtMoney(cycle.paymentsAfterClose, card.currencyCode)} tone="positive" />
             <SummaryValue label="Minimum still due" value={fmtMoney(cycle.remainingMinimumDue, card.currencyCode)} tone={cycle.remainingMinimumDue > 0 ? 'negative' : 'positive'} />
             <SummaryValue label="Full-payment date" value={cycle.dueDate ?? 'Not set'} />
+            <button type="button" className="btn secondary small" onClick={() => setEditingCycle(cycle)}>Edit closed statement</button>
           </SummarySection>)}
         </SummarySections>
       </StandardCard></div>
@@ -882,7 +937,8 @@ export function CreditCardDetailPage() {
         ]} />
         <button className="btn mt-md" onClick={() => { setCardDetailsOpen(false); setEditCardOpen(true); }}><EditIcon size={13} />Edit card</button>
       </Modal>}
-            <CreditCardDetailFab card={card} />
+      {editingCycle && <CardStatementOverrideDialog card={card} cycle={editingCycle} onClose={() => setEditingCycle(null)} />}
+      <CreditCardDetailFab card={card} />
     </div>
   );
 }

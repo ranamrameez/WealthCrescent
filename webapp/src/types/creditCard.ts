@@ -31,6 +31,13 @@ export type MarkupMethod = 'flatOnCarried';
  * card just keeps the one number it always had. */
 export type MinPaymentMethod = 'fixed' | 'percentOfBalance' | 'greaterOfFixedOrPercent';
 
+export interface CreditCardStatementOverride {
+  statementBalance?: number;
+  minimumDue?: number;
+  minDueDate?: string;
+  dueDate?: string;
+}
+
 export interface CreditCard {
   id: string;
   name: string;
@@ -60,6 +67,7 @@ export interface CreditCard {
    * printed on the latest statement; recurring day values above/below are
    * maintained internally for compatibility and future cycles. */
   lastBillingDate?: string;
+  statementOverrides?: Record<string, CreditCardStatementOverride>;
   lastMinPaymentDate?: string;
   lastPaymentDueDate?: string;
   /** Day of month (1-31, clamped) the MINIMUM payment is due — resolved

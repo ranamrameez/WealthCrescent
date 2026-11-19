@@ -1,7 +1,7 @@
 import { CreditCardDetailPage } from '../CreditCardsSection';
 import { useCreditCardWorkbookStore } from '../../../../store/creditCardWorkbookStore';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AccountDetailPage, BankDetailPage } from '../BankPage';
 import { TopBar } from '../../../../components/TopBar';
@@ -9,7 +9,12 @@ import { useBankWorkbookStore } from '../../../../store/bankWorkbookStore';
 import { createEmptyBankWorkbook } from '../../../../store/defaultBankWorkbook';
 
 vi.mock('react-chartjs-2', () => ({ Bar: () => <div>Bar chart</div>, Line: () => <div>Line chart</div>, Doughnut: () => <div>Doughnut chart</div> }));
-vi.mock('../../../../lib/firebase/useEnsureSignedIn', () => ({ useEnsureSignedIn: () => async () => false }));
+const session = vi.hoisted(() => ({ owner: undefined as string | undefined }));
+vi.mock('../../../../lib/firebase/useEnsureSignedIn', () => ({ useEnsureSignedIn: () => async () => !!session.owner }));
+vi.mock('../../../../lib/firebase/useAuthState', async importOriginal => ({
+  ...await importOriginal<typeof import('../../../../lib/firebase/useAuthState')>(),
+  getCurrentUser: () => session.owner ? { uid: session.owner } : null,
+}));
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -124,5 +129,33 @@ it('routes all card entry kinds through one shared transfer form', () => {
   } finally {
     cleanup();
     useCreditCardWorkbookStore.setState({ workbook: previous });
+  }
+});
+
+it('saves a reviewed bank bill override without editing the underlying ledger', async () => {
+  const store = useCreditCardWorkbookStore;
+  const previous = store.getState().workbook;
+  const transactions = [{ id: 'purchase', cardId: 'bill', kind: 'charge' as const, date: '2026-09-10', amount: 100, description: 'Purchase' }];
+  session.owner = 'fixture';
+  store.setState({ workbook: { ...previous, cards: [
+    { id: 'bill', name: 'Bill fixture', currencyCode: 'USD', statementDate: 17, paymentDueDate: 27 },
+  ], transactions } });
+  try {
+    show('/bank/card/bill?section=statement');
+    const section = document.getElementById('card-statement')!;
+    fireEvent.click(within(section).getByRole('button', { name: 'Card options' }));
+    fireEvent.click(screen.getByText('Edit closed statement'));
+    const dialog = within(screen.getByRole('dialog', { name: /Edit closed statement/ }));
+    fireEvent.change(dialog.getByLabelText('Bank bill amount'), { target: { value: '102.50' } });
+    fireEvent.change(dialog.getByLabelText('Bank minimum due'), { target: { value: '20' } });
+    fireEvent.change(dialog.getByLabelText('Final payment date'), { target: { value: '2026-09-28' } });
+    fireEvent.click(dialog.getByRole('button', { name: 'Save statement' }));
+    await waitFor(() => expect(store.getState().workbook.cards[0].statementOverrides?.['2026-09-17'])
+      .toMatchObject({ statementBalance: 102.5, minimumDue: 20, dueDate: '2026-09-28' }));
+    expect(store.getState().workbook.transactions).toBe(transactions);
+  } finally {
+    cleanup();
+    session.owner = undefined;
+    store.setState({ workbook: previous });
   }
 });
