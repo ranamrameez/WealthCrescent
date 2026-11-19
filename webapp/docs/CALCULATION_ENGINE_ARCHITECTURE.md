@@ -158,3 +158,8 @@ Validation: focused rental/manual/movement tests passed 3 files / 26 tests; prod
 
 Next: align dashboard headline/monthly actual reporting with the canonical movement scope; complete native plan adapters/classification, unified budgets/allocations/rollover, remaining UI/services and safe RTDB repositories before backend pending-only payment lifecycle. Full UI/theme/mobile/finder/chart acceptance remains open. Do not stop at this checkpoint or mark the large draft PR complete.
 
+
+
+## Full-account backup boundary
+
+The full-backup service reads one authenticated account-root snapshot and exports only the registered native workbooks plus payment execution history. Device-local workbook export is explicitly separate. Reviewed restore uses a single account-root RTDB transaction, checks selected paths and history against the reviewed baseline on every retry, preserves unrelated account fields and fences queued writes only for restored workbooks. Scoped maintenance refreshes their acknowledged snapshots through cloud-first subscriptions while preserving unrelated local drafts and queued saves. History-bearing backups require all modules; legacy payment-workbook restores cannot omit existing execution history. This does not enable pending-payment UI or scheduling and does not replace emulator/rules verification.

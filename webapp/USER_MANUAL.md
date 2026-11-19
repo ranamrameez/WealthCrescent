@@ -1144,6 +1144,14 @@ Bank, account-directory and account-detail balances now share a current cutoff. 
 
 See [the detailed delivery checklist](docs/DELIVERY_CHECKLIST.md) for completed implementation, pending work, planned dependencies, dashboard/app UI acceptance and validation evidence. General app categories coexist with custom categories; existing personal labels keep their IDs, and older name-only records retain compatibility mappings. The app-wide engine migration and dashboard/UI acceptance are not complete.
 
+## Full cloud backup and reviewed restore
+
+On **App Data**, use **Export full cloud backup** after your edits finish syncing. It downloads one account snapshot containing the native financial workbooks and payment execution history together. **Export local workbooks** remains available for this device’s unsynced or offline data; that file does not contain cloud execution history.
+
+Choose a JSON file to restore, then review the signed-in target account and modules shown in the confirmation. A backup containing execution history must include every module. An older workbook-only backup can still be restored when it would not overwrite existing payment execution history; otherwise use a full cloud backup. QSE’s raw cloud `workbook` key is also recognized.
+
+Restore applies the selected workbooks and included history in one acknowledged cloud operation, then refreshes the restored workbooks. Unsynced drafts in unrelated modules are retained. If another device changes the selected data or history during review, restore stops and asks for a fresh review. Failed writes do not replace local workbooks. Appearance, login and unrelated account data are preserved.
+
 ## Removing all financial app data
 
 On App Data, export a full backup first. Finish editing on other devices, then type DELETE ALL DATA in the removal section and choose Remove all app data. Review the signed-in account and confirm. This clears all financial modules, accounts, transactions, plans, transfers, custom categories and history from that account and this device, restoring app defaults. Your login account, appearance preferences and shared market data remain. The action cannot be undone from the app; restoring requires a backup. If cloud removal fails, an error is shown.

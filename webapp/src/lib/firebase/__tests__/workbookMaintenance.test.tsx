@@ -2,9 +2,9 @@ import { act, renderHook, cleanup } from '@testing-library/react';
 import { create } from 'zustand';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { User } from 'firebase/auth';
-const mock = vi.hoisted(() => ({ set: vi.fn(), transaction: vi.fn(), listener: undefined as undefined | ((snapshot: { val: () => unknown }) => void) }));
+const mock = vi.hoisted(() => ({ set: vi.fn(), transaction: vi.fn(), listener: undefined as undefined | ((snapshot: { val: () => unknown }) => void), listeners: new Map<string, (snapshot: { val: () => unknown }) => void>() }));
 vi.mock('firebase/database', () => ({ ref: (_db: unknown, path: string) => path, set: mock.set, runTransaction: mock.transaction,
-  onValue: (_ref: unknown, listener: typeof mock.listener) => { mock.listener = listener; return () => {}; } }));
+  onValue: (path: string, listener: typeof mock.listener) => { mock.listener = listener; if (listener) mock.listeners.set(path, listener); return () => { mock.listeners.delete(path); }; } }));
 vi.mock('../client', () => ({ db: {}, firebaseReady: true }));
 import { useWorkbookCloudSync } from '../useWorkbookCloudSync';
 import { beginWorkbookMaintenance } from '../workbookMaintenance';
@@ -12,7 +12,7 @@ afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks(); });
 it('invalidates pre-reset queued writes and resumes normal writes after maintenance', async () => {
   vi.useFakeTimers();
   mock.transaction.mockImplementation(async (_ref, update) => {
-    expect(update({ entries: ['original'] })).toMatchObject({ entries: ['new-entry'] });
+    expect(update({ entries: [] })).toMatchObject({ entries: ['new-entry'] });
     return { committed: true };
   });
   const store = create<{ workbook: { entries: string[] }; setWorkbook: (wb: { entries: string[] }) => void }>(set => ({ workbook: { entries: [] }, setWorkbook: workbook => set({ workbook }) }));
@@ -21,7 +21,7 @@ it('invalidates pre-reset queued writes and resumes normal writes after maintena
   act(() => store.getState().setWorkbook({ entries: ['queued-old-data'] }));
   const finish = beginWorkbookMaintenance();
   act(() => store.getState().setWorkbook({ entries: [] }));
-  finish();
+  act(() => finish({ cash: { entries: [] } }, true));
   await act(async () => { vi.advanceTimersByTime(1000); });
   expect(mock.transaction).not.toHaveBeenCalled();
   act(() => store.getState().setWorkbook({ entries: ['new-entry'] }));
@@ -168,4 +168,93 @@ it('serializes routine writes and uses the first committed snapshot for a queued
   await act(async () => { vi.advanceTimersByTime(1000); });
   expect(mock.transaction).toHaveBeenCalledTimes(2);
   expect(store.getState().workbook.entries).toEqual(['second edit']);
+});
+
+
+it('keeps another module’s unsynced draft and queued save during a partial restore', async () => {
+  vi.useFakeTimers();
+  const makeStore = () => create<{ workbook: { entries: string[] }; setWorkbook: (wb: { entries: string[] }) => void }>(set => ({ workbook: { entries: [] }, setWorkbook: workbook => set({ workbook }) }));
+  const qse = makeStore(), bank = makeStore();
+  renderHook(() => useWorkbookCloudSync('workbook', qse, { uid: 'owner' } as User, () => ({ entries: [] })));
+  renderHook(() => useWorkbookCloudSync('bank', bank, { uid: 'owner' } as User, () => ({ entries: [] })));
+  act(() => {
+    mock.listeners.get('users/owner/workbook')?.({ val: () => ({ entries: ['old QSE'] }) });
+    mock.listeners.get('users/owner/bank')?.({ val: () => ({ entries: ['old Bank'] }) });
+    qse.getState().setWorkbook({ entries: ['queued QSE'] });
+    bank.getState().setWorkbook({ entries: ['unsynced Bank'] });
+  });
+  mock.transaction.mockImplementation(async (path, update) => {
+    expect(path).toBe('users/owner/bank');
+    const next = update({ entries: ['old Bank'] });
+    expect(next).toMatchObject({ entries: ['unsynced Bank'] });
+    return { committed: true, snapshot: { val: () => next } };
+  });
+  let finish!: (snapshots?: Record<string, unknown>, discardLocalChanges?: boolean) => void;
+  act(() => { finish = beginWorkbookMaintenance(['workbook']); });
+  act(() => mock.listeners.get('users/owner/workbook')?.({ val: () => ({ entries: ['restored QSE'] }) }));
+  act(() => finish({ workbook: { entries: ['restored QSE'] } }));
+  await act(async () => { vi.advanceTimersByTime(1000); });
+  expect(mock.transaction).toHaveBeenCalledOnce();
+  expect(qse.getState().workbook.entries).toEqual(['restored QSE']);
+  expect(bank.getState().workbook.entries).toEqual(['unsynced Bank']);
+});
+
+it('applies a restored snapshot received while an invalidated old write is still finishing', async () => {
+  vi.useFakeTimers();
+  let retry!: (value: unknown) => unknown;
+  let complete!: (result: { committed: boolean }) => void;
+  mock.transaction.mockImplementation((_path, update) => {
+    retry = update;
+    return new Promise(resolve => { complete = resolve; });
+  });
+  const store = create<{ workbook: { entries: string[] }; setWorkbook: (wb: { entries: string[] }) => void }>(set => ({ workbook: { entries: [] }, setWorkbook: workbook => set({ workbook }) }));
+  renderHook(() => useWorkbookCloudSync('cash', store, { uid: 'owner' } as User, () => ({ entries: [] })));
+  act(() => mock.listener?.({ val: () => ({ entries: ['original'] }) }));
+  act(() => store.getState().setWorkbook({ entries: ['old queued edit'] }));
+  await act(async () => { vi.advanceTimersByTime(1000); });
+  expect(retry({ entries: ['original'] })).toMatchObject({ entries: ['old queued edit'] });
+  let finish!: (snapshots?: Record<string, unknown>, discardLocalChanges?: boolean) => void;
+  act(() => { finish = beginWorkbookMaintenance(['cash']); });
+  expect(retry({ entries: ['original'] })).toBeUndefined();
+  act(() => mock.listener?.({ val: () => ({ entries: ['restored'] }) }));
+  act(() => finish({ cash: { entries: ['restored'] } }));
+  await act(async () => { complete({ committed: false }); });
+  expect(store.getState().workbook.entries).toEqual(['restored']);
+  expect(mock.transaction).toHaveBeenCalledOnce();
+});
+
+it('retains and resumes a selected unsynced draft when restore fails without changing its server base', async () => {
+  vi.useFakeTimers();
+  const store = create<{ workbook: { entries: string[] }; setWorkbook: (wb: { entries: string[] }) => void }>(set => ({ workbook: { entries: [] }, setWorkbook: workbook => set({ workbook }) }));
+  renderHook(() => useWorkbookCloudSync('cash', store, { uid: 'owner' } as User, () => ({ entries: [] })));
+  act(() => mock.listener?.({ val: () => ({ entries: ['original'] }) }));
+  act(() => store.getState().setWorkbook({ entries: ['unsynced draft'] }));
+  let finish!: () => void;
+  act(() => { finish = beginWorkbookMaintenance(['cash']); });
+  act(() => finish());
+  mock.transaction.mockImplementation(async (_path, update) => {
+    const next = update({ entries: ['original'] });
+    expect(next).toMatchObject({ entries: ['unsynced draft'] });
+    return { committed: true, snapshot: { val: () => next } };
+  });
+  await act(async () => { vi.advanceTimersByTime(1000); });
+  expect(store.getState().workbook.entries).toEqual(['unsynced draft']);
+  expect(mock.transaction).toHaveBeenCalledOnce();
+});
+
+it('preserves edits entered during restore and exposes a conflict instead of uploading over the restored cloud data', async () => {
+  vi.useFakeTimers();
+  const store = create<{ workbook: { entries: string[] }; setWorkbook: (wb: { entries: string[] }) => void }>(set => ({ workbook: { entries: [] }, setWorkbook: workbook => set({ workbook }) }));
+  const { result } = renderHook(() => useWorkbookCloudSync('cash', store, { uid: 'owner' } as User, () => ({ entries: [] })));
+  act(() => mock.listener?.({ val: () => ({ entries: ['original'] }) }));
+  let finish!: (snapshots?: Record<string, unknown>) => void;
+  act(() => { finish = beginWorkbookMaintenance(['cash']); });
+  act(() => store.getState().setWorkbook({ entries: ['new edit during restore'] }));
+  act(() => mock.listener?.({ val: () => ({ entries: ['restored'] }) }));
+  expect(store.getState().workbook.entries).toEqual(['new edit during restore']);
+  act(() => finish({ cash: { entries: ['restored'] } }));
+  await act(async () => { vi.advanceTimersByTime(1000); });
+  expect(result.current.status).toContain('newer local edits kept');
+  expect(store.getState().workbook.entries).toEqual(['new edit during restore']);
+  expect(mock.transaction).not.toHaveBeenCalled();
 });

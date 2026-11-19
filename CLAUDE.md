@@ -8093,3 +8093,8 @@ The Organize preference service continuation passed the full 193-file / 1,479-te
 
 
 Category transaction drilldown now includes native amounts and transaction types. Original signed amounts are preserved; missing amounts are shown as a dash. Five focused category/search tests and production build passed. Organize source 1de77df2 passed Actions 562. This does not close unrelated draft PR delivery gates.
+
+
+### 2026-11-19 — payment history backups
+
+App Data now distinguishes a full cloud snapshot (all native workbooks plus payment execution history) from device-local workbook recovery. Restore reviews the current owner and baseline, replaces selected paths in one root RTDB transaction, and rejects incomplete history-bearing files or stale selected data. Scoped maintenance keeps unrelated queued drafts, resumes failed-restore drafts and retains newly entered local edits as a conflict. Full reset still explicitly clears all financial data. Fifty focused tests and production build passed; full CI remains required. The next claim addresses a legacy one-second lazy archive-dialog wait exposed by local full-suite timing. No scheduling activation or actual financial data restore occurred.

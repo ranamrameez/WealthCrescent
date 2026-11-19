@@ -20,6 +20,9 @@ export async function removeAllFinancialData(expectedUid: string) {
     // One acknowledged multi-path update: no partial deletion across modules.
     // Empty shapes intentionally replace data rather than null, preserving cloud-first sync.
     await update(ref(db, 'users/' + expectedUid), updates);
-    if (auth.currentUser?.uid === expectedUid) resetAllLocalWorkbooks();
+    if (auth.currentUser?.uid === expectedUid) {
+      resetAllLocalWorkbooks();
+      finish(updates, true);
+    }
   } finally { finish(); }
 }

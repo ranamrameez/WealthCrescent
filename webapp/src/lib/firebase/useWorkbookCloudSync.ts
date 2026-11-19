@@ -1,5 +1,5 @@
 import { fingerprint } from './workbookFingerprint';
-import { workbookSyncEpoch, workbookSyncPaused } from './workbookMaintenance';
+import { workbookSyncEpochFor, workbookSyncPaused, subscribeWorkbookMaintenance } from './workbookMaintenance';
 import type { User } from 'firebase/auth';
 import { onValue, ref, runTransaction } from 'firebase/database';
 import { useEffect, useRef, useState } from 'react';
@@ -81,7 +81,8 @@ export function useWorkbookCloudSync<TWorkbook>(
     let writing = false;
     let closed = false;
     let conflict = false;
-    let sessionEpoch = workbookSyncEpoch();
+    let maintenanceDraft: { baseline: Snapshot | undefined; dirty: boolean; editedDuring: boolean } | undefined;
+    let sessionEpoch = workbookSyncEpochFor(cloudPathSuffix);
 
     const applyRemote = (remote: Snapshot) => {
       baseline = remote;
@@ -103,7 +104,7 @@ export function useWorkbookCloudSync<TWorkbook>(
     };
 
     const refreshEpoch = () => {
-      const epoch = workbookSyncEpoch();
+      const epoch = workbookSyncEpochFor(cloudPathSuffix);
       if (sessionEpoch === epoch) return;
       sessionEpoch = epoch;
       pending = undefined;
@@ -119,7 +120,7 @@ export function useWorkbookCloudSync<TWorkbook>(
     const persist = async (draft: NonNullable<typeof pending>, expected: Snapshot) => {
       const expectedKey = fingerprint(expected);
       const eventsBeforeWrite = remoteEvents;
-      const active = () => !closed && !workbookSyncPaused() && workbookSyncEpoch() === draft.epoch;
+      const active = () => !closed && !workbookSyncPaused(cloudPathSuffix) && workbookSyncEpochFor(cloudPathSuffix) === draft.epoch;
       const payload = stripUndefinedDeep({ ...draft.workbook, _updated: new Date().toISOString() });
       writing = true;
       try {
@@ -143,19 +144,20 @@ export function useWorkbookCloudSync<TWorkbook>(
             fingerprint(latest) !== fingerprint(committed)) applyRemote(latest);
       } finally {
         writing = false;
+        if (!closed && draft.epoch !== workbookSyncEpochFor(cloudPathSuffix) && !workbookSyncPaused(cloudPathSuffix) && !pending && !conflict && latest !== undefined) applyRemote(latest);
         if (!closed && pending && !conflict) schedule();
       }
     };
 
     async function flush() {
       refreshEpoch();
-      if (closed || writing || conflict || workbookSyncPaused() || !pending || baseline === undefined) return;
+      if (closed || writing || conflict || workbookSyncPaused(cloudPathSuffix) || !pending || baseline === undefined) return;
       const draft = pending;
       pending = undefined;
       try {
         await persist(draft, baseline);
       } catch (error) {
-        if (closed || draft.epoch !== workbookSyncEpoch()) return;
+        if (closed || draft.epoch !== workbookSyncEpochFor(cloudPathSuffix)) return;
         if (!conflict) {
           conflict = true;
           setCloudEmpty(false);
@@ -170,7 +172,7 @@ export function useWorkbookCloudSync<TWorkbook>(
       refreshEpoch();
       latest = snap.val() as Snapshot;
       remoteEvents++;
-      if (!writing && !pending && !conflict) applyRemote(latest);
+      if (!workbookSyncPaused(cloudPathSuffix) && !writing && !pending && !conflict) applyRemote(latest);
     }, err => {
       if (closed) return;
       console.warn(`Firebase ${cloudPathSuffix} listener error`, err);
@@ -178,16 +180,52 @@ export function useWorkbookCloudSync<TWorkbook>(
     });
 
     const unsubscribeStore = useStore.subscribe((state, previous) => {
-      if (workbookSyncPaused() || applying || state.workbook === previous.workbook) return;
+      if (applying || state.workbook === previous.workbook) return;
+      if (workbookSyncPaused(cloudPathSuffix)) {
+        if (maintenanceDraft) maintenanceDraft.editedDuring = true;
+        else maintenanceDraft = { baseline, dirty: !!pending || writing || conflict, editedDuring: true };
+        return;
+      }
       refreshEpoch();
       if (baseline === undefined || conflict) return;
       pending = { workbook: state.workbook, epoch: sessionEpoch };
       schedule();
     });
 
+    const unsubscribeMaintenance = subscribeWorkbookMaintenance(event => {
+      if (closed) return;
+      if (event.phase === 'begin') {
+        if (workbookSyncPaused(cloudPathSuffix)) maintenanceDraft = { baseline, dirty: !!pending || writing || conflict, editedDuring: false };
+        return;
+      }
+      if (sessionEpoch === workbookSyncEpochFor(cloudPathSuffix)) return;
+      const draft = maintenanceDraft;
+      maintenanceDraft = undefined;
+      refreshEpoch();
+      const acknowledged = event.snapshots && Object.prototype.hasOwnProperty.call(event.snapshots, cloudPathSuffix);
+      if (acknowledged) {
+        latest = event.snapshots![cloudPathSuffix] as Snapshot;
+        baseline = latest;
+        if (draft?.editedDuring && !event.discardLocalChanges) {
+          conflict = true;
+          setStatus('Cloud restore saved — newer local edits kept. Export local data before reloading.');
+        } else applyRemote(latest);
+        return;
+      }
+      if (draft?.dirty || draft?.editedDuring) {
+        if (fingerprint(latest) !== fingerprint(draft.baseline)) {
+          conflict = true;
+          setStatus('Cloud conflict — local edits kept. Export local data before reloading.');
+        } else if (baseline !== undefined) {
+          pending = { workbook: useStore.getState().workbook, epoch: sessionEpoch };
+          schedule();
+        }
+      } else if (!writing && latest !== undefined) applyRemote(latest);
+    });
+
     const initialize = async () => {
       if (closed) throw new Error('The active account changed. Reopen the upload.');
-      if (workbookSyncPaused() || writing) throw new Error('A data operation is in progress.');
+      if (workbookSyncPaused(cloudPathSuffix) || writing) throw new Error('A data operation is in progress.');
       refreshEpoch();
       if (baseline !== null || latest !== null || conflict) throw new Error('Cloud storage must be confirmed empty before upload.');
       clearTimeout(timer);
@@ -201,6 +239,7 @@ export function useWorkbookCloudSync<TWorkbook>(
       upload.current = null;
       clearTimeout(timer);
       unsubscribeStore();
+      unsubscribeMaintenance();
       unsubscribeRemote();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

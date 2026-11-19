@@ -29,6 +29,10 @@ Organize contains Categories with management, source/date filters and native tra
 
 See the [trading tools guide](docs/trading-tools.md) for feature coverage, import instructions and links to the original apps.
 
+## Full cloud backup and reviewed restore
+
+App Data can export a complete cloud account snapshot including payment execution history, or this device's local workbooks separately. Reviewed restore changes the selected cloud workbooks and history in one transaction, rechecks concurrent edits and refreshes selected workbooks without discarding unrelated local drafts. See [the backup guide](USER_MANUAL.md#full-cloud-backup-and-reviewed-restore).
+
 ## QSE statement quick import
 
 Use **Import QSE trades** on the main Dashboard or the QSE Dashboard to review and selectively apply The Group trades for the active broker. See [Importing The Group statements](docs/the-group-import.md).
