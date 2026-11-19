@@ -48,7 +48,8 @@ import { categoryName, UNCATEGORIZED_ID } from '../../../lib/categories';
 import { cssVar, tickerColor } from '../../../lib/cssVar';
 import { fmtMoney, formatDate } from '../../../lib/format';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
-import { firebaseReady } from '../../../lib/firebase/client';
+import { auth, firebaseReady } from '../../../lib/firebase/client';
+import { regenerateSubscriptionRenewals, type RenewalFundingSource } from '../../../services/finance/subscriptionRenewalService';
 import { useAppearanceStore } from '../../../store/appearanceStore';
 import { useBankWorkbookStore } from '../../../store/bankWorkbookStore';
 import { useCategoryStore } from '../../../store/categoryStore';
@@ -60,9 +61,6 @@ import { usePlannedCreditCardWorkbookStore } from '../../../store/plannedCreditC
 import { useSubscriptionsWorkbookStore } from '../../../store/subscriptionsWorkbookStore';
 import type { Subscription, SubscriptionAlert } from '../../../types/subscriptionsWorkbook';
 import type { Category } from '../../../types/finance';
-import type { PlannedBankTransaction } from '../../../types/plannedBank';
-import type { PlannedCashEntry } from '../../../types/plannedCash';
-import type { PlannedCreditCardTransaction } from '../../../types/plannedCreditCard';
 import { ChartCard } from '../../qse/components/ChartCard';
 import { gridAutoStyle } from '../../../lib/gridStyle';
 
@@ -450,15 +448,6 @@ function SubscriptionDetail({ sub, onSelect, onBack }: { sub: Subscription; onSe
   const activeAccounts = accounts.filter((a) => a.isActive !== false);
   const cards = useCreditCardWorkbookStore((s) => s.workbook.cards);
   const activeCards = cards.filter((c) => c.isActive !== false);
-  const plannedBankEntries = usePlannedBankWorkbookStore((s) => s.workbook.entries);
-  const addPlannedBankEntries = usePlannedBankWorkbookStore((s) => s.addEntries);
-  const deletePlannedBankEntry = usePlannedBankWorkbookStore((s) => s.deleteEntry);
-  const plannedCashEntries = usePlannedCashWorkbookStore((s) => s.workbook.entries);
-  const addPlannedCashEntries = usePlannedCashWorkbookStore((s) => s.addEntries);
-  const deletePlannedCashEntry = usePlannedCashWorkbookStore((s) => s.deleteEntry);
-  const plannedCreditCardEntries = usePlannedCreditCardWorkbookStore((s) => s.workbook.entries);
-  const addPlannedCreditCardEntries = usePlannedCreditCardWorkbookStore((s) => s.addEntries);
-  const deletePlannedCreditCardEntry = usePlannedCreditCardWorkbookStore((s) => s.deleteEntry);
 
   const [linkModule, setLinkModule] = useState<'bank' | 'cash' | 'creditCard'>(sub.paidVia?.module ?? 'bank');
   const [linkRefId, setLinkRefId] = useState(
@@ -485,56 +474,18 @@ function SubscriptionDetail({ sub, onSelect, onBack }: { sub: Subscription; onSe
 
   const generatePlans = async () => {
     if (!(await ensureSignedIn('Sign in to generate renewal plans.'))) return;
-    const completedDates = new Set([...plannedBankEntries, ...plannedCashEntries, ...plannedCreditCardEntries]
-      .filter(plan => plan.sourceSubscriptionId === sub.id && plan.executed).map(plan => plan.date));
-    const remainingOccurrences = occurrences.filter(occurrence => !completedDates.has(occurrence.date));
-    if (linkModule === 'bank' && !accounts.some(account => account.id === linkRefId)) return toast('Pick a bank account first.');
-    if (linkModule === 'creditCard' && !cards.some(card => card.id === linkRefId)) return toast('Pick a credit card first.');
-    const relinking = !!sub.paidVia;
-    if (relinking) {
-      const ok = await confirmDialog(
-        'This replaces this subscription\'s not-yet-done planned renewals with fresh ones. Already-completed plans are untouched.',
-        'Regenerate renewal plans?',
-      );
-      if (!ok) return;
-    }
-    plannedBankEntries.filter((p) => p.sourceSubscriptionId === sub.id && !p.executed).forEach((p) => deletePlannedBankEntry(p.id));
-    plannedCashEntries.filter((p) => p.sourceSubscriptionId === sub.id && !p.executed).forEach((p) => deletePlannedCashEntry(p.id));
-    plannedCreditCardEntries.filter((p) => p.sourceSubscriptionId === sub.id && !p.executed).forEach((p) => deletePlannedCreditCardEntry(p.id));
-    if (linkModule === 'bank') {
-      const account = accounts.find((a) => a.id === linkRefId);
-      if (!account) return toast('Pick a bank account first.');
-      const newPlans: PlannedBankTransaction[] = remainingOccurrences.map((o) => ({
-        id: crypto.randomUUID(), accountId: account.id, date: o.date,
-        description: `Subscription: ${sub.name}`, amount: -o.amount, executed: false, sourceSubscriptionId: sub.id,
-      }));
-      addPlannedBankEntries(newPlans);
-      updateEntry(sub.id, { paidVia: { module: 'bank', ref: account.id } });
-      toast(`${newPlans.length} planned renewal${newPlans.length > 1 ? 's' : ''} added to ${account.name}'s Planning tab.`);
-    } else if (linkModule === 'creditCard') {
-      const card = cards.find((c) => c.id === linkRefId);
-      if (!card) return toast('Pick a credit card first.');
-      const newPlans: PlannedCreditCardTransaction[] = remainingOccurrences.map((o) => ({
-        id: crypto.randomUUID(), cardId: card.id, date: o.date, kind: 'charge',
-        description: `Subscription: ${sub.name}`, amount: o.amount, executed: false, sourceSubscriptionId: sub.id,
-      }));
-      addPlannedCreditCardEntries(newPlans);
-      updateEntry(sub.id, { paidVia: { module: 'creditCard', ref: card.id } });
-      toast(`${newPlans.length} planned renewal${newPlans.length > 1 ? 's' : ''} added to ${card.name}'s Planning section.`);
-    } else {
-      // A generated plan's own `category` is free text (Planning predates the
-      // shared registry) — only pass a real category name through, not the
-      // generic "Uncategorized" fallback `subCategoryLabel` uses for display.
-      const planCategory = sub.categoryID && sub.categoryID !== UNCATEGORIZED_ID
-        ? categoryName(sub.categoryID, categoryRegistry)
-        : sub.category;
-      const newPlans: PlannedCashEntry[] = remainingOccurrences.map((o) => ({
-        id: crypto.randomUUID(), date: o.date, type: 'OUT', amount: o.amount, currencyCode: sub.currencyCode,
-        category: planCategory, note: `Subscription: ${sub.name}`, executed: false, sourceSubscriptionId: sub.id,
-      }));
-      addPlannedCashEntries(newPlans);
-      updateEntry(sub.id, { paidVia: { module: 'cash' } });
-      toast(`${newPlans.length} planned renewal${newPlans.length > 1 ? 's' : ''} added to Cash's Planning tab.`);
+    const owner = auth?.currentUser?.uid;
+    if (!owner) return;
+    if (sub.paidVia && !(await confirmDialog(
+      "This replaces this subscription's not-yet-done planned renewals with fresh ones. Already-completed plans are untouched.",
+      'Regenerate renewal plans?',
+    ))) return;
+    try {
+      const funding: RenewalFundingSource = linkModule === 'cash' ? { module: linkModule } : { module: linkModule, ref: linkRefId };
+      const { count, sourceName } = regenerateSubscriptionRenewals(sub, funding, owner);
+      toast(`${count} planned renewal${count === 1 ? '' : 's'} added to ${sourceName}.`);
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Could not generate renewal plans.');
     }
   };
 
