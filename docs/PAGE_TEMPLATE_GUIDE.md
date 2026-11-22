@@ -2,7 +2,7 @@
 
 ## Shared prototype references
 
-Web and Android may use the design prototype folder referenced in the project report. Link the exact folder and screen revision in each relevant PR once available. The repo's [modules plan](../webapp/MODULES_PLAN.md) also references a finance-suite prototype. Treat flows, information hierarchy and visual intent as shared references. Use native Android navigation and controls on Android and existing shared components on web. Keep accounting semantics and accessible behavior aligned across both clients.
+Web and Android share the repository's [design prototypes](../wealth_tracker_template/) and [UI samples](ui-samples/). The prototypes pair HTML with screenshots for flows such as the [wealth dashboard](../wealth_tracker_template/global_wealth_dashboard_1/), [cash and credit](../wealth_tracker_template/cash_credit_management/), and [link history](../wealth_tracker_template/linking_history_report/). Link the source prototype in relevant PRs. Use native Android navigation and controls on Android and existing shared components on web. Keep accounting semantics and accessible behavior aligned across both clients.
 
 ## Web page contract
 

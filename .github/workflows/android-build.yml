@@ -1,23 +1,4 @@
-# Builds the native Android app (android/) and publishes a downloadable debug APK, plus a
-# real release-signed APK + AAB once release-signing secrets are configured (see the
-# "Release signing" section in android/README.md for what to set and why).
-#
-# Deliberately separate from static.yml (which only builds/deploys webapp/) — this
-# workflow only runs when an android/ change actually lands on main/master, via the
-# `paths: android/**` filter below, so an ordinary webapp-only push never triggers an
-# Android build, and the build-output commit this workflow makes back into
-# builds/android/ (see the last step) never re-triggers ITSELF, since that path isn't
-# under android/. It carries an explicit [skip ci] in that commit message anyway, so it
-# also doesn't cause static.yml's own unfiltered `push: branches: [main]` to needlessly
-# rebuild/redeploy the webapp for a binary-only commit.
-#
-# Release signing is entirely additive and optional. Without the 3 required secrets below
-# set, only the debug APK is built and published — exactly as this workflow has always
-# behaved. Once they're set, this workflow ALSO builds and publishes a real release-signed
-# APK (a much better story for Google Play Protect's install-time warning than a
-# debug-keystore-signed APK, since it carries a real, permanent signing identity instead
-# of Android's shared generic debug key) and a release AAB (for manual upload to Play
-# Console the first time, to bootstrap Play App Signing).
+# Android builds are published as workflow artifacts for the checked-out revision.
 name: Build Android APK
 
 on:
@@ -25,22 +6,25 @@ on:
     branches: [main, master]
     paths:
       - "android/**"
+      - ".github/workflows/android-build.yml"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "android/**"
+      - ".github/workflows/android-build.yml"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: android-build-${{ github.ref }}
   cancel-in-progress: true
 
 env:
-  APK_FILE_NAME: WealthCrescent-debug.apk
   ARTIFACT_NAME: WealthCrescent-debug-apk
-  RELEASE_APK_FILE_NAME: WealthCrescent-release.apk
   RELEASE_ARTIFACT_NAME: WealthCrescent-release-apk
   RELEASE_AAB_ARTIFACT_NAME: WealthCrescent-release-aab
-  BUILD_DIR: builds/android
 
 jobs:
   build:
@@ -49,11 +33,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # Passing an explicit branch name (not a bare `ref`-less checkout) keeps the
-          # working tree on a real local branch instead of actions/checkout's usual
-          # detached-HEAD-at-github.sha state — the "commit the built APK back" step
-          # below needs a real branch to push to.
-          ref: ${{ github.ref_name }}
+          persist-credentials: false
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -72,6 +52,7 @@ jobs:
       # substituted, same as any other secret consumption) and exposes a plain
       # true/false step output that later `if:` conditions key off instead.
       - name: Check for release signing secrets
+        if: github.event_name != 'pull_request'
         id: signing_check
         run: |
           if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ] && \
@@ -162,7 +143,7 @@ jobs:
 
       - name: Get signing certificate fingerprint
         if: steps.signing_check.outputs.has_signing == 'true'
-        id: fingerprint
+
         run: |
           fp=$(keytool -list -v \
             -keystore "${{ steps.decode_keystore.outputs.keystore_path }}" \
@@ -170,66 +151,4 @@ jobs:
             -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
             2>/dev/null | grep 'SHA256:' | head -n1 | sed 's/^[[:space:]]*//')
           echo "sha256=$fp" >> "$GITHUB_OUTPUT"
-
-      - name: Stage the published copies + build info
-        run: |
-          mkdir -p "$BUILD_DIR"
-          cp "${{ steps.locate.outputs.apk_path }}" "$BUILD_DIR/$APK_FILE_NAME"
-          {
-            echo "Run:      #${{ github.run_number }} (${{ github.run_id }})"
-            echo "Commit:   ${{ github.sha }}"
-            echo "Branch:   ${{ github.ref_name }}"
-            echo "Built at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-            echo "Workflow: ${{ github.workflow }}"
-            echo ""
-            if [ "${{ steps.signing_check.outputs.has_signing }}" = "true" ]; then
-              echo "Release signing: yes"
-              echo "Signing cert:    ${{ steps.fingerprint.outputs.sha256 }}"
-            else
-              echo "Release signing: no (ANDROID_KEYSTORE_BASE64/ANDROID_KEYSTORE_PASSWORD/ANDROID_KEY_ALIAS secrets not set — see android/README.md)"
-            fi
-          } > "$BUILD_DIR/build-info.txt"
-          if [ "${{ steps.signing_check.outputs.has_signing }}" = "true" ]; then
-            cp "${{ steps.locate_release.outputs.apk_path }}" "$BUILD_DIR/$RELEASE_APK_FILE_NAME"
-          fi
-
-      - name: Set up Python (QR code generation)
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-
-      - name: Generate the download QR codes
-        run: |
-          pip install --quiet "qrcode[pil]"
-          python3 - <<'PY'
-          import os
-          import qrcode
-
-          repo = os.environ["GITHUB_REPOSITORY"]
-          branch = os.environ["GITHUB_REF_NAME"]
-          has_signing = os.environ["HAS_SIGNING"] == "true"
-
-          debug_url = f"https://raw.githubusercontent.com/{repo}/{branch}/builds/android/WealthCrescent-debug.apk"
-          qrcode.make(debug_url, box_size=10, border=2).save("builds/android/download-qr.png")
-          print(f"Debug QR points to: {debug_url}")
-
-          if has_signing:
-              release_url = f"https://raw.githubusercontent.com/{repo}/{branch}/builds/android/WealthCrescent-release.apk"
-              qrcode.make(release_url, box_size=10, border=2).save("builds/android/download-qr-release.png")
-              print(f"Release QR points to: {release_url}")
-          PY
-        env:
-          HAS_SIGNING: ${{ steps.signing_check.outputs.has_signing }}
-
-      - name: Commit and push the published build
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add "$BUILD_DIR"
-          if git diff --cached --quiet; then
-            echo "Built APK is byte-identical to what's already published — nothing to commit."
-            exit 0
-          fi
-          git commit -m "chore(android): publish built APK (run #${{ github.run_number }}, ${GITHUB_SHA::7}) [skip ci]"
-          git pull --rebase origin "${{ github.ref_name }}"
-          git push origin "HEAD:${{ github.ref_name }}"
+          echo "Release signing certificate: $fp" >> "$GITHUB_STEP_SUMMARY"

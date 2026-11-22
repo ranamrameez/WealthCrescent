@@ -1,7 +1,0 @@
-Run:      #1 (36084893399)
-Commit:   6fac18ab9f9709bab645091cd4853974f3511489
-Branch:   main
-Built at: 2026-09-25T02:10:00Z
-Workflow: Build Android APK
-
-Release signing: no (ANDROID_KEYSTORE_BASE64/ANDROID_KEYSTORE_PASSWORD/ANDROID_KEY_ALIAS secrets not set — see android/README.md)
