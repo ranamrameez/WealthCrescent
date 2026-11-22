@@ -389,7 +389,7 @@ export function moneyMovementReport(activities: MovementActivity[], from: string
 }
 
 export function clearedRangeActivities(activities: MovementActivity[], from: string, to: string, today: string) {
-  return activities.filter(item => item.executed && !item.isPending && item.date >= from && item.date <= to && item.date <= today);
+  return selectMovementActivities(activities, from, to, today, 'actual');
 }
 
 /** Compare the observed portion of the selected period with an immediately
