@@ -2,6 +2,12 @@
 
 Start follow-ups from current `main`. Follow the [delivery task register](webapp/docs/MULTI_AGENT_WORKFLOW.md) to claim one ready group or named task in a scoped PR before editing shared code. Own the claim through development, testing, exact-head GitHub Actions, merge and merge verification. Merge each accepted PR independently of unrelated work. If a genuine blocker remains after recovery attempts, record the blocker and claim status in the PR, finish any independent slice and continue with ready, unowned work.
 
+## Continue until the claimed work is merged
+
+- At the start of a turn or after resuming a session, check your existing claims first. If a claim is actionable, resume it immediately. Keep working in the current turn through implementation, tests, CI, review fixes, merge, and verification on `main`. A status update, opened PR, passing local tests, or running CI is a checkpoint. Send progress in commentary and continue working. Wait for active checks and recover from ordinary failures without asking for another prompt.
+- After verifying a merge, record the evidence and immediately start the next actionable slice of your claim. When the claim is complete, reread the delivery register and open PRs, claim the next ready unowned task within the assigned scope, and start it in the same turn. A request for status during active work calls for a brief update followed by continued work unless the user asks you to pause.
+- If an external blocker remains after reasonable recovery attempts, document the blocker, evidence, remaining steps, and whether the claim is retained or released. Continue independent work and take the next ready task within scope. End the turn only when the user asks you to stop, required authorization or input blocks all remaining in-scope work, or no actionable in-scope task remains. Report the specific reason and any open claim.
+
 # Project skills
 
 Project-local skills are in `.agents/skills/`. Read the relevant `SKILL.md` when
