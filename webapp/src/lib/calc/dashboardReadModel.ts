@@ -85,8 +85,7 @@ export function activityFlowItems(activities: MovementActivity[], currency: stri
 
 export function plannedActivityByCurrency(activities: MovementActivity[], fromDate: string, toDate: string) {
   const totals: Record<string, number> = {};
-  for (const activity of activities) {
-    if (activity.executed || activity.date < fromDate || activity.date > toDate) continue;
+  for (const activity of selectMovementActivities(activities, fromDate, toDate, toDate, 'planned')) {
     totals[activity.currencyCode] = (totals[activity.currencyCode] ?? 0) + activity.amount;
   }
   return totals;
@@ -198,7 +197,7 @@ export function dashboardReport(input: { inputs: NetWorthAsOfInputs; rows: Curre
   const rangeEndByCurrency = Object.fromEntries(rangeEndRows.map(row => [row.currency, row.net]));
   const rangeEndBreakdownByCurrency = Object.fromEntries(rangeEndRows.map(row => [row.currency, row.breakdown]));
   const periodFlow = sumActivitiesByCurrency(actualMovements, rangeStartDate, rangeEndDate);
-  const plannedUpcomingByCurrency = plannedActivityByCurrency(selectMovementActivities(movementSource,todayISO,shiftISODate(todayISO,29),todayISO,'planned'),todayISO,shiftISODate(todayISO,29));
+  const plannedUpcomingByCurrency = plannedActivityByCurrency(movementSource, todayISO, shiftISODate(todayISO, 29));
 
   // Item 4: "capital split per currency" — each currency's net worth
   // converted to the preferred currency for a like-for-like comparison
@@ -308,18 +307,22 @@ export function monthlyPlanReport(activities: MovementActivity[], fromMonth: str
   const date = new Date(start + '-01T00:00:00Z'); date.setUTCMonth(date.getUTCMonth() + count - 1);
   const months = reportingMonths(start, date.toISOString().slice(0, 7));
   const fromDate = start + '-01', toDate = endOfMonthAsOf(months.at(-1)!);
-  const items = activities.filter(item => item.movementKind !== 'transfer' && item.date >= fromDate && item.date <= toDate);
+  const actualItems = selectMovementActivities(activities, fromDate, toDate, today, 'actual');
+  const pendingItems = selectMovementActivities(activities, fromDate, toDate, today, 'pending');
+  const planned = selectMovementActivities(activities, fromDate, toDate, today, 'planned');
+  const included = new Set([...actualItems, ...pendingItems, ...planned]);
+  const items = activities.filter(item => included.has(item));
   const currencies = [...new Set(items.map(item => item.currencyCode))].sort();
   const rows = currencies.map(currency => ({ currency, months: months.map(month => {
-    const bucket = items.filter(item => item.currencyCode === currency && item.date.slice(0, 7) === month);
-    const actual = bucket.filter(item => item.executed && !item.isPending && item.date <= today);
-    const pending = bucket.filter(item => item.isPending);
-    const planned = bucket.filter(item => !item.executed && !item.isPending);
+    const inBucket = (item: MovementActivity) => item.currencyCode === currency && item.date.slice(0, 7) === month;
+    const actual = actualItems.filter(inBucket);
+    const pending = pendingItems.filter(inBucket);
+    const remaining = planned.filter(inBucket);
     const inflow = (values: MovementActivity[]) => values.reduce((sum, item) => sum + Math.max(0, item.amount), 0);
     const outflow = (values: MovementActivity[]) => values.reduce((sum, item) => sum + Math.min(0, item.amount), 0);
-    return { month, actualIn: inflow(actual), actualOut: outflow(actual), pendingIn: inflow(pending), pendingOut: outflow(pending), pendingNet: inflow(pending) + outflow(pending), plannedIn: inflow(planned), plannedOut: outflow(planned), plannedNet: inflow(planned) + outflow(planned) };
+    return { month, actualIn: inflow(actual), actualOut: outflow(actual), pendingIn: inflow(pending), pendingOut: outflow(pending), pendingNet: inflow(pending) + outflow(pending), plannedIn: inflow(remaining), plannedOut: outflow(remaining), plannedNet: inflow(remaining) + outflow(remaining) };
   }) }));
-  return { fromDate, toDate, items, planned: items.filter(item => !item.executed && !item.isPending).sort((a,b) => a.date.localeCompare(b.date)), rows, months };
+  return { fromDate, toDate, items, planned: planned.sort((a,b) => a.date.localeCompare(b.date)), rows, months };
 }
 
 export function monthlyStatCards(months: string[], currency: string, monthly: { month: string; income: Record<string, number>; expense: Record<string, number> }[], trend: MonthlyNetWorthPoint[]) {
