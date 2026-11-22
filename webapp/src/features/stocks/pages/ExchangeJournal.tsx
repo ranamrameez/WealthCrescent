@@ -24,10 +24,11 @@ export function ExchangeJournal({ exchange, transactions, currency, calcFee, rea
   const tickers = useMemo(() => [...new Set(fills.map(tx => tx.ticker))].sort(), [fills]);
   const selected = tickers.includes(ticker) ? ticker : '';
   // Reuse realized results from the full workbook, so filtering cannot drop prior buys.
-  const report = useMemo(() => fills.filter(tx => !selected || tx.ticker === selected).map(tx => ({
+  const report = useMemo(() => fills.filter(tx => !selected || tx.ticker === selected).map((tx, index) => ({
+    key: tx.id ?? index,
     tx,
     fee: calcFee(tx.shares * tx.price, tx.action === 'BUY', { tx, shares: tx.shares }),
-    realized: tx.action === 'SELL' ? realizedBySellTxId[tx.id]?.netPL : undefined,
+    realized: tx.action === 'SELL' && tx.id ? realizedBySellTxId[tx.id]?.netPL : undefined,
   })), [fills, selected, calcFee, realizedBySellTxId]);
   const { rows, controls } = useTablePagination(report);
 
@@ -50,7 +51,7 @@ export function ExchangeJournal({ exchange, transactions, currency, calcFee, rea
           {' · '}Realized P/L {fmtMoney(report.reduce((sum, row) => sum + (row.realized ?? 0), 0), currency)}</p>
         <div className="table-scroll"><table>
           <thead><tr><th scope="col">Date</th><th scope="col">Ticker</th><th scope="col">Side</th><th scope="col">Shares</th><th scope="col">Price</th><th scope="col">Fee</th><th scope="col">Realized P/L</th></tr></thead>
-          <tbody>{rows.map(({ tx, fee, realized }) => <tr key={tx.id}>
+          <tbody>{rows.map(({ key, tx, fee, realized }) => <tr key={key}>
             <td>{tx.date}</td><td>{tx.ticker}</td><td>{tx.action}</td><td>{fmt(tx.shares, 0)}</td>
             <td>{fmtMoney(tx.price, currency)}</td><td>{fmtMoney(fee, currency)}</td>
             <td>{realized === undefined ? '—' : fmtMoney(realized, currency)}</td>
