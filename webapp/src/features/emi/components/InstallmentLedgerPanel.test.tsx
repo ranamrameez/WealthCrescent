@@ -85,7 +85,7 @@ it('downloads complete chronological, monthly and obligation reports with native
       amount: 100, description: index === 25 ? '=Future, installment' : 'Installment',
     })),
   };
-  const paid = { id: 'paid', loanId: loan.id, date: '2020-02-01', amount: 80, month: 1 };
+  const paid = { id: 'paid', loanId: loan.id, date: '2020-02-01', amount: 80, month: 1, description: 'Partial, receipt' };
   useEMIWorkbookStore.getState().setWorkbook({
     settings: { defaultCurrency: 'PKR' },
     entries: [loan],
@@ -126,6 +126,14 @@ it('downloads complete chronological, monthly and obligation reports with native
     expect(obligations).toHaveLength(27);
     expect(obligations[1]).toEqual(['2020-01-10', 'Installment', 'PKR', expect.any(String), '100', '50', '50', 'partial']);
     expect(obligations.at(-1)).toEqual(['2099-01-01', "'=Future, installment", 'PKR', expect.any(String), '100', '0', '100', 'scheduled']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export payment receipts CSV' }));
+    expect(click.mock.contexts[3]).toHaveProperty('download', expect.stringMatching(/^installment-receipts-\d{4}-\d{2}-\d{2}\.csv$/));
+    const receipts = await readRows(createObjectURL.mock.calls[3][0]);
+    expect(receipts.slice(1)).toEqual([
+      ['2020-02-01', 'paid', 'Partial, receipt', 'PKR', '80', 'Recorded', '', expect.any(String)],
+      ['2020-02-02', 'reversal', 'Partial, receipt', 'PKR', '-30', 'Reversal', 'paid', expect.any(String)],
+    ]);
   } finally {
     click.mockRestore();
     vi.unstubAllGlobals();
