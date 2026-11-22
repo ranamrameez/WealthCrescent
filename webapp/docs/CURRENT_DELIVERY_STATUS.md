@@ -1,5 +1,9 @@
 # Current delivery status
 
+## Main baseline — 2026-11-22
+
+[PR #51](https://github.com/ranamrameez/WealthCrescent/pull/51) merged as `6dda934`. [Actions 569](https://github.com/ranamrameez/WealthCrescent/actions/runs/44551173630) passed on its exact PR head. Browser and emulator acceptance remain open. Payment scheduling is inactive. Use the [delivery task register](MULTI_AGENT_WORKFLOW.md) for current scope, ownership and independent merge instructions. Earlier checkpoints below describe the pre-merge state.
+
 ## Latest verified continuation — 2026-11-19
 
 The personal-finance workflow audit and matching limits are in [Organize](ORGANIZE.md). The shared global suggestion inbox supports subscriptions and Bank/Cash/card/investment transfer records, optional popup, manual scans, pending review and account-checked device preferences. Categories includes management/groups, date/source filters and currency-separated native amounts and transaction links. Custom 28-day subscription recurrence is covered. Main through PR #55 is integrated while preserving PR #53/#54. Source `a3aeae02` passed Actions 565: 195 files / 1,484 tests, broker regressions, both TypeScript projects and production build. PR #51 is mergeable and remains draft for the wider gates below. No browser visual acceptance or production merge is claimed.
@@ -40,7 +44,7 @@ Updated 2026-11-07. This is the concise status index; SESSION_HANDOFF.md records
 | Categories | General defaults plus preserved custom/legacy identities; authenticated category creation service. No automatic semantic remapping of historical records. |
 | App Data | Visible Remove all app data section; typed phrase + confirmation, confirmed-user checks, acknowledged atomic reset of 18 financial paths and pending-payment execution history and local sync-queue invalidation. UI verified without deleting real data. Login/appearance/shared market data preserved. |
 
-## Remaining work, in dependency order
+## Remaining work and acceptance criteria
 
 - Transfer and personal-loan payment edit popups can attach a missed link while retaining the original record. Bank and Cash counterparts can be selected from existing unlinked records or created. Linked batch rows offer a coordinated edit action that refreshes the row while preserving other drafts. Credit cards use the shared form for charges, payments, fees, markup and cash advances. Transfer field groups wrap side by side at wider sizes. Fullscreen exit uses distinct inward corners. Desktop/mobile browser acceptance remains open.
 
@@ -85,4 +89,4 @@ Implemented core/service/Planning UI now includes optional definitions/allocatio
 ### 6. Final delivery gates
 - Run focused regressions for each change, full suite, both TypeScript projects and production build; inspect the complete diff and preserve all user changes.
 - Browser-check desktop/mobile with fixtures and representative existing records read-only; do not use real financial writes as UI tests.
-- Push focused commits to existing branch, verify CI on exact current head, update draft PR metadata and these docs. Keep draft until all acceptance work is actually complete.
+- Use a scoped PR from current main. Verify CI on its exact head, complete its applicable acceptance and merge it independently of other groups. Record the evidence and verified merge in the claim PR and affected docs.
