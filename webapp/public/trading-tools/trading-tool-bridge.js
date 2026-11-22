@@ -35,6 +35,9 @@ const tradingToolReady = new Promise(resolve => {
     journalPort.onmessage = ({ data }) => {
       if (data.error) showJournalPersistenceError();
       else if (data.theme) updateAppearance(data);
+      else if (Number.isFinite(data.journalInset)) {
+        document.documentElement.style.setProperty('--journal-inset', `${data.journalInset}px`);
+      }
     };
     updateAppearance(event.data);
     for (const [key, value] of Object.entries(event.data.values)) journalValues.set(key, value);
