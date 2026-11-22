@@ -1,7 +1,7 @@
 import { useTablePagination } from '../../../hooks/useTablePagination';
 import { useAppearanceStore } from '../../../store/appearanceStore';
 import { lazy, Suspense, useState } from 'react';
-import { useInstallmentReport, saveInstallmentContract, saveInstallmentPayment, saveInstallmentAllocations, setInstallmentPayingAccount, previewInstallmentReversal, saveInstallmentReversal } from '../../../services/finance/installmentService';
+import { useInstallmentReport, exportInstallmentLedgerCsv, saveInstallmentContract, saveInstallmentPayment, saveInstallmentAllocations, setInstallmentPayingAccount, previewInstallmentReversal, saveInstallmentReversal } from '../../../services/finance/installmentService';
 import { emiRepaymentEffect, isEmiReversalProtected, type EMILoan, type EMIRepayment } from '../../../types/emiWorkbook';
 import { Field, TextInput } from '../../../components/ui/Field';
 import { StandardButton } from '../../../components/standard/Button';
@@ -34,6 +34,16 @@ export function InstallmentLedgerPanel({ loanId }: { loanId: string }) {
   const paymentPage = useTablePagination(model?.payments ?? []);
   if (!model) return null;
   const { loan, report, asOf } = model;
+  const exportLedger = () => {
+    if (!report) return;
+    const { fileName, csv } = exportInstallmentLedgerCsv(report);
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
   const saveContract = async () => {
     if (!contract) return;
     if (!(await ensureSignedIn('Sign in to save the reviewed contract.'))) return;
@@ -73,6 +83,7 @@ export function InstallmentLedgerPanel({ loanId }: { loanId: string }) {
       <button className="btn secondary" onClick={() => setImporting(true)}>Reconcile workbook</button>
       {model.archives.length > 0 && <StandardButton tone="secondary" onClick={() => setRestoringLoanId(loan.id)}>Receipt archive</StandardButton>}
       <button className="btn secondary" onClick={() => setContract((loan.contractSchedule ?? model.suggested).map(row => ({ ...row })))}>{report ? 'Edit contract obligations' : 'Review independent contract'}</button>
+      {report && <StandardButton tone="secondary" onClick={exportLedger}>Export full ledger CSV</StandardButton>}
       {report && <button className="btn" onClick={() => setPayment({ date: asOf, amount: '', description: '' })}>＋ Record payment</button>}
     </div>
     {importing && <Suspense fallback={<p>Loading reconciliation…</p>}><InstallmentImportDialog loan={loan} onClose={() => setImporting(false)} /></Suspense>}

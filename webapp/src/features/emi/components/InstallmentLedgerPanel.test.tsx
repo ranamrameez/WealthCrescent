@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { InstallmentLedgerPanel } from './InstallmentLedgerPanel';
+import { parseCSV } from '../../../lib/csv';
 import { useEMIWorkbookStore } from '../../../store/emiWorkbookStore';
 vi.mock('../../../lib/firebase/client', () => ({ auth: { currentUser: { uid: 'fixture' } }, db: null, firebaseReady: false }));
 vi.mock('../../../lib/firebase/useEnsureSignedIn', () => ({ useEnsureSignedIn: () => async () => true }));
@@ -72,4 +73,46 @@ it('records a reversal from the receipt list and refreshes the remaining balance
   expect(useEMIWorkbookStore.getState().workbook.repayments).toEqual([paid, expect.objectContaining({ amount: 80, reversesPaymentId: paid.id })]);
   expect(screen.getAllByText('900.00 PKR').length).toBeGreaterThan(0);
   expect(screen.queryByRole('button', { name: 'Edit payment' })).toBeNull();
+});
+
+it('downloads the complete chronological ledger with native amounts and future status', async () => {
+  const loan = {
+    id: 'fixture', name: 'Property', lender: 'Seller', currencyCode: 'PKR',
+    principal: 2600, totalToReturn: 2600, tenureMonths: 26, startDate: '2020-01-01',
+    repaymentMode: 'fixedTotal' as const,
+    contractSchedule: Array.from({ length: 26 }, (_, index) => ({
+      id: String(index), dueDate: index === 25 ? '2099-01-01' : '2020-01-10',
+      amount: 100, description: index === 25 ? '=Future, installment' : 'Installment',
+    })),
+  };
+  const paid = { id: 'paid', loanId: loan.id, date: '2020-02-01', amount: 80, month: 1 };
+  useEMIWorkbookStore.getState().setWorkbook({
+    settings: { defaultCurrency: 'PKR' },
+    entries: [loan],
+    repayments: [paid, { ...paid, id: 'reversal', date: '2020-02-02', amount: 30, reversesPaymentId: paid.id }],
+  });
+  const createObjectURL = vi.fn((_blob: Blob) => 'blob:ledger');
+  vi.stubGlobal('URL', class extends URL {
+    static createObjectURL = createObjectURL;
+    static revokeObjectURL = vi.fn();
+  });
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  try {
+    render(<InstallmentLedgerPanel loanId={loan.id} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Export full ledger CSV' }));
+    expect(click.mock.contexts[0]).toHaveProperty('download', expect.stringMatching(/^installment-ledger-\d{4}-\d{2}-\d{2}\.csv$/));
+    const rows = parseCSV(await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(createObjectURL.mock.calls[0][0]);
+    }));
+    expect(rows).toHaveLength(29);
+    expect(rows[26].slice(0, 9)).toEqual(['2020-02-01', 'payment', 'Payment', 'PKR', expect.any(String), 'No', '', '80', '80']);
+    expect(rows[27].slice(0, 9)).toEqual(['2020-02-02', 'reversal', 'Payment reversal', 'PKR', expect.any(String), 'No', '', '-30', '50']);
+    expect(rows[28].slice(0, 9)).toEqual(['2099-01-01', 'obligation', "'=Future, installment", 'PKR', expect.any(String), 'Yes', '100', '', '50']);
+  } finally {
+    click.mockRestore();
+    vi.unstubAllGlobals();
+  }
 });
