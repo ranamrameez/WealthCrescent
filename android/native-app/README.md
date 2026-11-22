@@ -5,3 +5,5 @@ This module is a development preview for the Compose replacement. It uses its ow
 Build with `./gradlew :native-app:assembleDebug` from `android/`. The Android workflow publishes its APK as the `WealthCrescent-native-preview-apk` artifact.
 
 Design references are the [wealth dashboard](../../wealth_tracker_template/global_wealth_dashboard_1/) and [cash and credit](../../wealth_tracker_template/cash_credit_management/) prototypes. See the [delivery register](../DELIVERY_REGISTER.md) for native authentication, data integration and release acceptance.
+
+Android CI checks the packaged preview manifest before uploading it. It rejects new requested permissions, services, and unexpected exported components. The baseline allows the launcher and specific AndroidX infrastructure.
