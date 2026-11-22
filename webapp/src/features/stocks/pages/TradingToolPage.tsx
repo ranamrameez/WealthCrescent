@@ -33,6 +33,29 @@ export function TradingToolPage({ tool }: { tool: 'journal-qse' | 'journal-psx' 
   }, [theme, color]);
   useEffect(() => () => port.current?.close(), [tool]);
 
+  function updateJournalInset() {
+    const element = frame.current;
+    const header = element?.closest('.main')?.querySelector('.page-topbar');
+    if (!element || !header) return;
+    const inset = Math.max(0, Math.ceil(header.getBoundingClientRect().bottom - element.getBoundingClientRect().top));
+    port.current?.postMessage({ journalInset: inset });
+  }
+
+  useEffect(() => {
+    if (!journal) return;
+    const header = frame.current?.closest('.main')?.querySelector('.page-topbar');
+    const resize = new ResizeObserver(updateJournalInset);
+    if (header) resize.observe(header);
+    window.addEventListener('scroll', updateJournalInset, true);
+    window.addEventListener('resize', updateJournalInset);
+    return () => {
+      resize.disconnect();
+      window.removeEventListener('scroll', updateJournalInset, true);
+      window.removeEventListener('resize', updateJournalInset);
+    };
+  }, [journal]);
+
+
   function connect() {
     port.current?.close();
     const target = frame.current?.contentWindow;
@@ -65,6 +88,7 @@ export function TradingToolPage({ tool }: { tool: 'journal-qse' | 'journal-psx' 
       type: 'wealth-crescent-trading-tool', values, error, ...appearance(theme),
       spreadsheetReader: journal ? new URL(spreadsheetReaderUrl, document.baseURI).href : undefined,
     }, '*', [port2]);
+    if (journal) updateJournalInset();
   }
 
   const file = journal ? `trade-journal.html#${tool === 'journal-psx' ? 'psx-import' : 'qse-import'}` : 'psx-profiler.html';
