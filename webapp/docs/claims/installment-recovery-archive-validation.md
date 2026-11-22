@@ -1,0 +1,1 @@
+Agent 2, 2026-11-23 Qatar. Validate archived reversal references and amounts before restoring a legacy schedule using the existing installment calculation rules. Keep ordinary legacy receipt restoration compatible. Verify invalid archives leave current receipts intact.
