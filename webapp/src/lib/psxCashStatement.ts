@@ -126,7 +126,7 @@ export async function readPsxBrokerTables(file: File): Promise<{ tables: string[
     return { tables: sheets.map(sheet => sheet.rows), dateSystem };
   }
   const text = await file.text();
-  if (!/<table(?:\s|>)/i.test(text)) return { tables: [parseCSV(text)] };
+  if (/\.csv$/i.test(file.name) || !/<table(?:\s|>)/i.test(text)) return { tables: [parseCSV(text)] };
   // Parse text into an inert syntax tree without invoking browser DOM sinks.
   const { parseFragment } = await import('parse5');
   const fragment = parseFragment(text);
