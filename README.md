@@ -48,66 +48,14 @@ for Google Play Protect's install-time warning than the debug build) is availabl
 release-signing secrets are configured — see
 [`android/README.md`'s "Release signing" section](android/README.md#release-signing).
 
-### GitHub Actions build and published APK
+### Download Android builds
 
-The workflow is located at:
+Open [Build Android APK](https://github.com/ranamrameez/WealthCrescent/actions/workflows/android-build.yml), select a successful run for the desired commit, and download the ZIP from **Artifacts** while signed into GitHub. Extract the APK before installing. Debug builds are intended for testing.
 
-```
-.github/workflows/android-build.yml
-```
+- `WealthCrescent-debug-apk` contains the debug APK.
+- `WealthCrescent-release-apk` and `WealthCrescent-release-aab` are available on eligible builds with release signing configured. Use the AAB for Play Console.
 
-It builds the Android project from `/android` and runs only on a push to `master` or `main`
-when the pushed changes include `android/**`. A merged pull request produces such a push, so a
-merge containing Android changes triggers the build; opening or updating a PR does not.
-
-After a successful build, CI does two things with the debug APK:
-
-1. Uploads `WealthCrescent-debug-apk` as the normal GitHub Actions artifact.
-2. Copies/replaces the latest APK in the repository at:
-
-```
-builds/android/WealthCrescent-debug.apk
-```
-
-It also writes:
-
-```
-builds/android/build-info.txt
-```
-
-with the CI run number, source commit, and branch.
-
-Once release-signing secrets are configured in the repository (see
-[`android/README.md`'s "Release signing" section](android/README.md#release-signing)),
-the same run also publishes a real release-signed APK at
-`builds/android/WealthCrescent-release.apk` — the recommended download once that's
-available, since it doesn't carry Android's shared, reputation-less debug signing key.
-
-### Download on your phone
-
-If release signing is configured, prefer this QR code — a release-signed APK gives
-Google Play Protect a real, permanent signing identity to trust instead of the generic
-debug key:
-
-
-The debug build, always available:
-
-<img src="builds/android/download-qr.png" alt="Download the WealthCrescent Android APK (debug)" width="200" height="200">
-
-Scan either with your phone to open and download the current APK without navigating
-through GitHub Actions. Or download directly:
-[release APK](builds/android/WealthCrescent-release.apk) ·
-[debug APK](builds/android/WealthCrescent-debug.apk)
-
-*(All four links populate the first time `android-build.yml` runs after being added — the
-release ones only once release-signing secrets are configured. Until then they point at a
-file that doesn't exist yet.)*
-
-The repository copy under `/builds/android` is the canonical latest-build download. This
-README links directly to those APKs rather than to the list of GitHub Actions runs.
-
-The generated `/builds/android` commit does not start another Android build because the
-workflow path filter only watches `android/**`.
+Android and workflow changes trigger a debug build on pull requests. Pushes to `main` or `master` and manual runs can also build signed outputs when signing secrets are configured. The workflow run records the source revision and signing fingerprint when available. Artifacts expire according to the repository's retention settings.
 
 ## For AI coding sessions
 

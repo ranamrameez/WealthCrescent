@@ -7,3 +7,8 @@ dist/
 webapp/audit/
 .npm-cache/
 .ignore
+
+# Android binaries are GitHub Actions artifacts.
+/builds/android/
+*.apk
+*.aab
