@@ -132,13 +132,19 @@ export async function readPsxBrokerTables(file: File): Promise<{ tables: string[
   const fragment = parseFragment(text);
   type Node = (typeof fragment.childNodes)[number];
   const children = (node: Node) => 'childNodes' in node ? node.childNodes : [];
-  const find = (nodes: Node[], names: string[]): Node[] => nodes.flatMap(node =>
-    'tagName' in node && names.includes(node.tagName) ? [node] : find(children(node), names));
+  const findTables = (nodes: Node[]): Node[] => nodes.flatMap(node => {
+    const nested = findTables(children(node));
+    return 'tagName' in node && node.tagName === 'table' ? [node, ...nested] : nested;
+  });
+  const hasTag = (node: Node, tags: string[]) => 'tagName' in node && tags.includes(node.tagName);
   const plainText = (node: Node): string => {
-    if ('tagName' in node && ['script', 'style', 'template'].includes(node.tagName)) return '';
+    if ('tagName' in node && ['script', 'style', 'template', 'table'].includes(node.tagName)) return '';
     return 'value' in node ? node.value : children(node).map(plainText).join('');
   };
-  const tables = find(fragment.childNodes, ['table']).map(table =>
-    find(children(table), ['tr']).map(row => find(children(row), ['td', 'th']).map(plainText)));
+  const tables = findTables(fragment.childNodes).map(table =>
+    children(table)
+      .flatMap(node => hasTag(node, ['thead', 'tbody', 'tfoot']) ? children(node) : [node])
+      .filter(row => hasTag(row, ['tr']))
+      .map(row => children(row).filter(cell => hasTag(cell, ['td', 'th'])).map(plainText)));
   return { tables };
 }
