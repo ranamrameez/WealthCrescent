@@ -85,6 +85,13 @@ jobs:
           path: ${{ steps.locate.outputs.apk_path }}
           if-no-files-found: error
 
+      - name: Verify packaged native preview manifest
+        run: |
+          apk=android/native-app/build/outputs/apk/debug/native-app-debug.apk
+          manifest="$RUNNER_TEMP/native-preview-manifest.xml"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" manifest print "$apk" > "$manifest"
+          python3 android/native-app/verify-preview-manifest.py "$manifest"
+
       - name: Upload native preview artifact
         uses: actions/upload-artifact@v4
         with:
