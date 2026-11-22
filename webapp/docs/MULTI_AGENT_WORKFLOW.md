@@ -25,6 +25,10 @@
 | `ux-acceptance` | Page templates, shared controls, charts, themes, densities and keyboard/mobile checks | Claim one module or one shared control at a time. Include responsive transfer groups and fullscreen controls as applicable. Use fixture data, record browser evidence and merge each fixes PR independently. |
 | `trading-acceptance` | AHL broker-export and desktop/mobile verification for merged trading tools | Verify reviewed order and cash imports, Trade Journal and PSX Profiler with authorized local fixtures. Keep private statements and values out of PRs. Merge focused fixes independently. |
 
+## Active follow-ups
+
+- **Movement reporting, cleared analytics (WC-TR PSX session, 2026-11-22).** Align the monthly analytics and its contributing rows with the canonical cleared movement selection. Verify with focused regressions, full CI and production build.
+
 ## Historical PR #51 task register
 
 
