@@ -3,6 +3,7 @@ import { ValueChange } from '../../../components/ValueChange';
 import { MonthlyStatsWidget } from '../../../components/MonthlyStatsWidget';
 import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
+import { getBudgetRecordKey } from '../../../services/finance/budgetService';
 import { TableCard } from '../../../components/TableCard';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { DateValue } from '../../../components/DateValue';
@@ -725,7 +726,7 @@ function NetWorthPlanningReality({ selectedModules, defaultMonth, todayISODate }
       <div className="table-scroll"><table><caption>{row.currency} — same monthly dataset as chart</caption><thead><tr><th>Month</th><th>Actual in</th><th>Actual out</th><th>Pending in</th><th>Pending out</th><th>Planned in</th><th>Planned out</th></tr></thead><tbody>{row.months.map(item => <tr key={item.month}><td>{item.month}</td>{[item.actualIn,item.actualOut,item.pendingIn,item.pendingOut,item.plannedIn,item.plannedOut].map((value,index) => <td key={index}>{fmtMoney(value,row.currency)}</td>)}</tr>)}</tbody></table></div>
     </div>)}
     {!report.rows.length && <p className="text-muted">No actual, pending or planned activity in this month range and source scope.</p>}
-    <div className="table-scroll"><table><caption>Remaining plans — {report.fromDate} to {report.toDate}</caption><thead><tr><th>Date</th><th>Source</th><th>Description</th><th>Category</th><th>Amount</th></tr></thead><tbody>{planRows.map(item => <RecordRow record={item} key={item.module + ':' + item.id}><td><DateValue value={item.date} /></td><td>{item.sourceLabel}</td><td>{item.description}</td><td>{item.category || 'Uncategorized'}</td><td>{fmtMoney(item.amount,item.currencyCode)}</td></RecordRow>)}</tbody></table></div>
+    <div className="table-scroll"><table><caption>Remaining plans — {report.fromDate} to {report.toDate}</caption><thead><tr><th>Date</th><th>Source</th><th>Description</th><th>Category</th><th>Amount</th></tr></thead><tbody>{planRows.map(item => <RecordRow record={item} key={getBudgetRecordKey(item)}><td><DateValue value={item.date} /></td><td>{item.sourceLabel}</td><td>{item.description}</td><td>{item.category || 'Uncategorized'}</td><td>{fmtMoney(item.amount,item.currencyCode)}</td></RecordRow>)}</tbody></table></div>
     {planPagination}
   </div>;
 }
