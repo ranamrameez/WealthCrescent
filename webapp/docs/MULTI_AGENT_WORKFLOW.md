@@ -45,8 +45,6 @@ Use the same claim ID across platform work and cross-link dependencies in PRs. A
 
 ## Active follow-ups
 
-- **Movement reporting, monthly plan parity (WC-TR PSX session, 2026-11-22).** Align monthly plan evidence and currency totals with canonical actual, pending and planned populations. Verify regressions, production build and exact-head CI.
-
 - **Movement reporting, cleared analytics (WC-TR PSX session, 2026-11-22).** Align the monthly analytics and its contributing rows with the canonical cleared movement selection. Verify with focused regressions, full CI and production build.
 
 ## Priority work and app-wide audits
