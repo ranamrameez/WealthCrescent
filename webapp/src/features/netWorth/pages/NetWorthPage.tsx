@@ -84,7 +84,7 @@ function NetWorthDrilldownModal({ drilldown, onClose }: { drilldown: Drilldown; 
   const flowRows = drilldown.kind === 'flow' ? dateSort.rows(drilldown.items, { date: row => row }) : [];
   const { rows: pageFlowRows, controls: flowPaginationControls } = useTablePagination(flowRows);
   return (
-    <Modal title={drilldown.title} onClose={onClose}>
+    <Modal title={drilldown.title} onClose={onClose} manageFocus>
       <p className="text-muted mt-0">{drilldown.explanation}</p>
       {drilldown.kind === 'breakdown' && (
         drilldown.rows.length === 0 ? (
