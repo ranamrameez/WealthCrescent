@@ -127,3 +127,28 @@ it('rolls back the entire workbook when archived contract validation fails', () 
   expect(() => applyInstallmentRestore(invalid, loan.name)).toThrow(/date/i);
   expect(useEMIWorkbookStore.getState().workbook).toEqual(before);
 });
+
+
+it.each([
+  ['missing original', 'missing', 10, 'an original payment'],
+  ['over-reversal', 'old', 10000, 'exceed the original payment'],
+])('blocks a legacy archive with a %s without changing the workbook', (_, originalId, amount, message) => {
+  const preview = importAndReviewRestore();
+  const store = useEMIWorkbookStore.getState();
+  const workbook = store.workbook;
+  store.setWorkbook({
+    ...workbook,
+    reconciliationHistory: [{
+      ...preview.archive,
+      repayments: [...(preview.archive.repayments ?? []), {
+        id: 'reversal', loanId: loan.id, date: '2024-12-01', month: 1, amount,
+        reversesPaymentId: originalId,
+      }],
+    }],
+  });
+  const before = useEMIWorkbookStore.getState().workbook;
+  const review = previewInstallmentRestore(loan.id, preview.archive.id);
+
+  expect(() => applyInstallmentRestore(review, loan.name)).toThrow(message);
+  expect(useEMIWorkbookStore.getState().workbook).toBe(before);
+});

@@ -148,6 +148,14 @@ export function applyInstallmentRestore(preview: InstallmentRestorePreview, conf
   if (budgetReferences(loan.id, affected)) throw new Error('Review receipt budget allocations before restoring.');
 
   if (!restored.contractSchedule?.length) {
+    const reversals = restoredPayments.filter(row => row.reversesPaymentId !== undefined);
+    if (reversals.length) {
+      const originalIds = new Set(reversals.map(row => row.reversesPaymentId));
+      const related = restoredPayments.filter(row => row.reversesPaymentId !== undefined || originalIds.has(row.id));
+      CalculationEngine.installmentLedger.reconcileInstallments(
+        [], related.map(row => ({ ...row, currency: loan.currencyCode })), loan.currencyCode, todayISODate(),
+      );
+    }
     const plans = [
       ...usePlannedBankWorkbookStore.getState().workbook.entries,
       ...usePlannedCashWorkbookStore.getState().workbook.entries,
