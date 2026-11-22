@@ -378,6 +378,12 @@ export function NetWorthPage(_legacySyncProps: {
               value={fmtMoney(plannedTotal.total, preferredCurrency)}
               tone={(plannedTotal.total) >= 0 ? 'positive' : 'negative'}
               title={plannedTotal.anyUnconverted ? `Excludes ${plannedTotal.missing.join(', ')} — no rate available.` : `Unexecuted planned income and expenses from ${todayISO} through ${shiftISODate(todayISO, 29)}. Linked transfers are excluded.`}
+              onClick={() => setDrilldown({
+                kind: 'breakdown',
+                title: 'Upcoming planned activity, by currency',
+                explanation: `Remaining planned income and expenses from ${todayISO} through ${shiftISODate(todayISO, 29)}. Pending items and internal transfers are excluded. The headline converts these native totals to ${preferredCurrency}.${plannedTotal.anyUnconverted ? ` No rate was available for ${plannedTotal.missing.join(', ')}.` : ''}`,
+                rows: Object.entries(plannedUpcomingByCurrency).map(([code, amount]) => ({ label: code, currency: code, amount })),
+              })}
             />
             {netWorthDelta !== null ? (
               <SummaryValue
