@@ -1,6 +1,6 @@
 # Parallel work
 
-At the start of each task, fetch the delivery branch and study the current repository instructions, handoff, delivery checklist, and guidelines for the affected area. Keep the affected docs current as you work. Publish your claim in the [delivery task register](webapp/docs/MULTI_AGENT_WORKFLOW.md) before editing shared work. After recording verification, automatically claim the next ready, unowned task without waiting for another user prompt.
+Start follow-ups from current `main`. Follow the [delivery task register](webapp/docs/MULTI_AGENT_WORKFLOW.md) to claim one ready group or named task in a scoped PR before editing shared code. Own the claim through development, testing, exact-head GitHub Actions, merge and merge verification. Merge each accepted PR independently of unrelated work. If a genuine blocker remains after recovery attempts, record the blocker and claim status in the PR, finish any independent slice and continue with ready, unowned work.
 
 # Project skills
 

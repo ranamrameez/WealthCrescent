@@ -1,3 +1,9 @@
+## 2026-11-22 — PR #51 merged and follow-up ownership
+
+[PR #51](https://github.com/ranamrameez/WealthCrescent/pull/51) is on `main` as `6dda934`. [Actions 569](https://github.com/ranamrameez/WealthCrescent/actions/runs/44551173630) passed before merge. Desktop/mobile and emulator acceptance remain open. Scheduled payments remain inactive.
+
+Use the [delivery task register](docs/MULTI_AGENT_WORKFLOW.md) for current claims and scope. Start each follow-up from current `main`, publish a scoped claim, and own it through implementation, testing, CI, merge and verification. The entries below record historical checkpoints and claims from before the merge.
+
 ## App Data read migration and clean full rerun
 
 The isolated local rerun passed all 197 files / 1,504 tests after the archive dialog wait fix. App Data local-export reads now live in a service; its UI has no direct native-store or Firebase data writes. Module factories, display labels and local export coverage share a typed registry. Twenty focused tests and production build passed for this read migration. Backup/scoped-sync source 57031242 already passed Actions 567. The next published claim migrates shared native search/category record queries and their subscriptions to a service, preserving auth/owner gates, filters, amounts and broker links.
