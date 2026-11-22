@@ -10,6 +10,16 @@
 4. Mark the PR ready, verify GitHub Actions on the exact head, resolve review feedback and conflicts, and merge it into `main` as soon as its own acceptance and repository checks pass. Recheck CI after head changes. No other group's PR is a prerequisite unless the behavior genuinely depends on it. Merge ready slices as they pass and link the next PR from the claim if the group spans multiple slices.
 5. Stay with claimed work through development, CI, corrections, merge and merge verification. A pushed commit, open PR or pending check is an intermediate step. If genuinely blocked after trying available recovery, record the precise blocker, evidence, remaining work and whether you retain ownership in the PR. Finish and merge any independent slice, then claim the next ready, unowned task without waiting for another prompt. Release unfinished claims explicitly so another agent can resume.
 
+## Continuation checklist
+
+| State | Required next action in the same turn |
+| --- | --- |
+| Resuming with an actionable claim | Resume the claimed task before selecting a new one. |
+| Implementation complete or PR open | Run outstanding checks, wait for CI, address failures, conflicts or review feedback, then merge once accepted. |
+| A slice has merged | Verify it on `main`, record the merge and check evidence, and start the next slice in the claim. |
+| Final slice has merged | Record the claim as complete, refresh the register and open PRs, then claim and start the next ready unowned task within scope. |
+| External blocker survives recovery | Document the evidence, remaining action and ownership in the claim PR. Finish any independent slice and start the next ready task. End the turn only when no in-scope work can advance or the user asks you to stop. |
+
 ## Follow-up groups
 
 | Group ID | Pick up together | Scope and merge acceptance |
