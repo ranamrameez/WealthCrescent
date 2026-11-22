@@ -156,6 +156,24 @@ export function setInstallmentPayingAccount(expected: EMILoan, accountId: string
     saveInstallmentContract(updated, updated.contractSchedule!);
   } catch (error) { store.setWorkbook(before); plans.setWorkbook(beforePlans); throw error; }
 }
+function toInstallmentCsv(rows: (string | number)[][]) {
+  return toCSV(rows.map(row => row.map(value =>
+    typeof value === 'string' && /^[\s\uFEFF]*[=+@-]|^[\t\r\n]/.test(value) ? "'" + value : value,
+  )));
+}
+
+export function exportInstallmentObligationsCsv(report: ReturnType<typeof CalculationEngine.installmentLedger.reconcileInstallments>) {
+  return {
+    fileName: `installment-obligations-${report.asOf}.csv`,
+    csv: toInstallmentCsv([
+      ['Due date', 'Description', 'Currency', 'Report cutoff', 'Scheduled', 'Allocated paid', 'Remaining', 'Status'],
+      ...report.rows.map(row => [
+        row.dueDate, row.description, report.currency, report.asOf, row.amount, row.paid, row.remaining, row.status,
+      ]),
+    ]),
+  };
+}
+
 export function exportInstallmentLedgerCsv(report: ReturnType<typeof CalculationEngine.installmentLedger.reconcileInstallments>) {
   const rows = report.events.map(event => [
     event.date,
@@ -171,9 +189,9 @@ export function exportInstallmentLedgerCsv(report: ReturnType<typeof Calculation
     event.scheduledRemaining,
     event.pending,
   ]);
-  const csv = toCSV([
+  const csv = toInstallmentCsv([
     ['Date', 'Event type', 'Description', 'Currency', 'Report cutoff', 'Future', 'Scheduled amount', 'Payment or reversal', 'Cumulative paid', 'Actual remaining', 'Scheduled remaining', 'Net due less paid'],
-    ...rows.map(row => row.map(value => typeof value === 'string' && /^[\s\uFEFF]*[=+@-]|^[\t\r\n]/.test(value) ? "'" + value : value)),
+    ...rows,
   ]);
   return { fileName: `installment-ledger-${report.asOf}.csv`, csv };
 }

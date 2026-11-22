@@ -75,7 +75,7 @@ it('records a reversal from the receipt list and refreshes the remaining balance
   expect(screen.queryByRole('button', { name: 'Edit payment' })).toBeNull();
 });
 
-it('downloads complete chronological and monthly reports with native amounts and future status', async () => {
+it('downloads complete chronological, monthly and obligation reports with native amounts and statuses', async () => {
   const loan = {
     id: 'fixture', name: 'Property', lender: 'Seller', currencyCode: 'PKR',
     principal: 2600, totalToReturn: 2600, tenureMonths: 26, startDate: '2020-01-01',
@@ -119,6 +119,13 @@ it('downloads complete chronological and monthly reports with native amounts and
     expect(months.length).toBeGreaterThan(26);
     expect(months[2]).toEqual(['2020-02', 'PKR', expect.any(String), '0', '50', '2550', '100']);
     expect(months.at(-1)).toEqual(['2099-01', 'PKR', expect.any(String), '100', '', '', '0']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export contract obligations CSV' }));
+    expect(click.mock.contexts[2]).toHaveProperty('download', expect.stringMatching(/^installment-obligations-\d{4}-\d{2}-\d{2}\.csv$/));
+    const obligations = await readRows(createObjectURL.mock.calls[2][0]);
+    expect(obligations).toHaveLength(27);
+    expect(obligations[1]).toEqual(['2020-01-10', 'Installment', 'PKR', expect.any(String), '100', '50', '50', 'partial']);
+    expect(obligations.at(-1)).toEqual(['2099-01-01', "'=Future, installment", 'PKR', expect.any(String), '100', '0', '100', 'scheduled']);
   } finally {
     click.mockRestore();
     vi.unstubAllGlobals();
