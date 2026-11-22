@@ -47,3 +47,7 @@ The Profiler snapshot is separate from live prices and portfolio holdings. Fee f
 ## Implementation notes
 
 The source snapshot is pinned to [Translation Helper commit 12c5ddc](https://github.com/ranamrameez/Translation-Helper/commit/12c5ddc1feaede76d440343c62d079e44d46556b). Wealth Crescent renders the adapted pages inside its standard cards. The browser sandbox grants scripts and downloads and isolates the tools from the parent origin. The Journal only receives its own allowlisted storage keys, the appearance colors and the bundled SheetJS asset. Browser storage errors display a backup prompt. The bundled spreadsheet reader supports legacy XLS alongside the source app's other file formats. Native AHL order and cash import use Wealth Crescent’s existing table readers and broker workbook.
+
+## Native integration work
+
+WC-TR coordination owns the exchange-specific Journal and PSX Profiler routes. Use the selected broker workbook and existing portfolio and fee calculations. Preserve access to browser-local legacy data for export while moving each remaining capability into its native workflow.
