@@ -1,0 +1,82 @@
+name: PSX Profiler browser acceptance
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  profiler:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: webapp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: npm run build
+      - run: pip install playwright==1.58.0 && python -m playwright install --with-deps chromium
+      - name: Verify desktop and mobile Profiler
+        run: |
+          npm run preview -- --host 127.0.0.1 &
+          trap 'kill $!' EXIT
+          for attempt in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/WealthCrescent/ >/dev/null; then break; fi
+            sleep 1
+          done
+          python - <<'PY'
+          from playwright.sync_api import sync_playwright, expect
+          with sync_playwright() as p:
+              browser = p.chromium.launch(args=['--no-sandbox'])
+              for width, height, mobile in [(1440,900,False),(390,844,True)]:
+                  page = browser.new_page(viewport={'width':width,'height':height},has_touch=mobile)
+                  errors=[]
+                  page.on('pageerror',lambda error: errors.append(str(error)))
+                  page.add_init_script("""if (location.origin !== 'null') {
+                      localStorage.setItem('WealthCrescent_terms_accepted_v1','true');
+                      localStorage.setItem('WealthCrescent_currency_onboarding_seen_v1','true');
+                  }""")
+                  page.goto('http://127.0.0.1:4173/WealthCrescent/#/psx/profiler')
+                  expect(page.get_by_role('heading',name='PSX Profiler',exact=True).first).to_be_visible(timeout=20000)
+                  frame = page.frame_locator('iframe[title="PSX Profiler"]')
+                  band = frame.locator('.fee-band').first
+                  slider = band.get_by_role('slider')
+                  entry = band.get_by_role('spinbutton')
+                  entry.fill('25.00')
+                  expect(slider).to_have_value('2500')
+                  slider.press('ArrowRight')
+                  expect(entry).to_have_value('25.01')
+                  expect(band.locator('output')).to_contain_text('Multi-day sell price')
+                  band.locator('summary').click()
+                  point=band.locator('[data-price]').last
+                  expected=point.get_attribute('data-price')
+                  point.click()
+                  expect(slider).to_have_value(expected)
+                  expect(frame.locator('.fee-band').last.get_by_role('slider')).to_have_attribute('max','150000')
+                  frame.locator('#group').select_option('price')
+                  frame.locator('[data-zone="green"]').click()
+                  expect(frame.locator('[data-zone="green"]')).to_have_attribute('aria-pressed','true')
+                  expect(frame.locator('.tile:not([data-tone="green"])')).to_have_count(0)
+                  tile=frame.locator('.tile').first
+                  toggle=tile.get_by_role('button')
+                  (toggle.tap if mobile else toggle.click)()
+                  expect(tile.locator('.stock-profile')).to_be_visible()
+                  expect(toggle).to_have_attribute('aria-expanded','true')
+                  (toggle.tap if mobile else toggle.click)()
+                  expect(tile.locator('.stock-profile')).to_be_hidden()
+                  expect(frame.locator('#profile')).to_be_hidden()
+                  frame.locator('#open-profile').click()
+                  expect(frame.locator('#profile')).to_be_visible()
+                  frame.locator('#profile button').first.press('Escape')
+                  expect(frame.locator('#profile')).to_be_hidden()
+                  for doc in [page.locator('html'),frame.locator('html')]:
+                      assert doc.evaluate('el => el.scrollWidth <= el.clientWidth + 1'), width
+                  assert not errors, errors
+                  print(f'{width}x{height}: fees, breakpoints, grouping, zone filtering, stock details, profile and overflow passed')
+                  page.close()
+          PY
