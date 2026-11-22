@@ -93,7 +93,16 @@ const GOOGLE_REDIRECT_PENDING_KEY = 'WealthCrescent_google_redirect_pending';
 
 export async function signInWithGoogle() {
   try { window.sessionStorage.setItem(GOOGLE_REDIRECT_PENDING_KEY, '1'); } catch { /* ignore — worst case, a failed redirect just goes unexplained like before this fix */ }
-  await signInWithRedirect(requireAuth(), new GoogleAuthProvider());
+  try {
+    await signInWithRedirect(requireAuth(), new GoogleAuthProvider());
+  } catch (error) {
+    try {
+      window.sessionStorage.removeItem(GOOGLE_REDIRECT_PENDING_KEY);
+    } catch {
+      // Preserve the original sign-in error if session storage is unavailable.
+    }
+    throw error;
+  }
 }
 
 /** Call once on app load (see `signInWithGoogle`'s own doc comment for
