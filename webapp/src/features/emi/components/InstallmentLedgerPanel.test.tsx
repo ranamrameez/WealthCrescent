@@ -75,7 +75,7 @@ it('records a reversal from the receipt list and refreshes the remaining balance
   expect(screen.queryByRole('button', { name: 'Edit payment' })).toBeNull();
 });
 
-it('downloads the complete chronological ledger with native amounts and future status', async () => {
+it('downloads complete chronological and monthly reports with native amounts and future status', async () => {
   const loan = {
     id: 'fixture', name: 'Property', lender: 'Seller', currencyCode: 'PKR',
     principal: 2600, totalToReturn: 2600, tenureMonths: 26, startDate: '2020-01-01',
@@ -97,20 +97,28 @@ it('downloads the complete chronological ledger with native amounts and future s
     static revokeObjectURL = vi.fn();
   });
   const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  const readRows = async (blob: Blob) => parseCSV(await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(blob);
+  }));
   try {
     render(<InstallmentLedgerPanel loanId={loan.id} />);
     fireEvent.click(screen.getByRole('button', { name: 'Export full ledger CSV' }));
     expect(click.mock.contexts[0]).toHaveProperty('download', expect.stringMatching(/^installment-ledger-\d{4}-\d{2}-\d{2}\.csv$/));
-    const rows = parseCSV(await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsText(createObjectURL.mock.calls[0][0]);
-    }));
+    const rows = await readRows(createObjectURL.mock.calls[0][0]);
     expect(rows).toHaveLength(29);
     expect(rows[26].slice(0, 9)).toEqual(['2020-02-01', 'payment', 'Payment', 'PKR', expect.any(String), 'No', '', '80', '80']);
     expect(rows[27].slice(0, 9)).toEqual(['2020-02-02', 'reversal', 'Payment reversal', 'PKR', expect.any(String), 'No', '', '-30', '50']);
     expect(rows[28].slice(0, 9)).toEqual(['2099-01-01', 'obligation', "'=Future, installment", 'PKR', expect.any(String), 'Yes', '100', '', '50']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export monthly chart data CSV' }));
+    expect(click.mock.contexts[1]).toHaveProperty('download', expect.stringMatching(/^installment-monthly-\d{4}-\d{2}-\d{2}\.csv$/));
+    const months = await readRows(createObjectURL.mock.calls[1][0]);
+    expect(months.length).toBeGreaterThan(26);
+    expect(months[2]).toEqual(['2020-02', 'PKR', expect.any(String), '0', '50', '2550', '100']);
+    expect(months.at(-1)).toEqual(['2099-01', 'PKR', expect.any(String), '100', '', '', '0']);
   } finally {
     click.mockRestore();
     vi.unstubAllGlobals();

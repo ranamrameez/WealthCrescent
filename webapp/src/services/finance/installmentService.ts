@@ -178,6 +178,22 @@ export function exportInstallmentLedgerCsv(report: ReturnType<typeof Calculation
   return { fileName: `installment-ledger-${report.asOf}.csv`, csv };
 }
 
+export function exportInstallmentMonthlyCsv(
+  monthly: ReturnType<typeof CalculationEngine.installmentLedger.installmentMonthlySummary>,
+  currency: string,
+  asOf: string,
+) {
+  return {
+    fileName: `installment-monthly-${asOf}.csv`,
+    csv: toCSV([
+      ['Month', 'Currency', 'Report cutoff', 'Scheduled', 'Actual paid', 'Actual remaining', 'Scheduled remaining'],
+      ...monthly.rows.map(row => [
+        row.month, currency, asOf, row.scheduled, row.actual ?? '', row.actualRemaining ?? '', row.scheduledRemaining,
+      ]),
+    ]),
+  };
+}
+
 export function useInstallmentReport(loanId: string) {
   const workbook = useEMIWorkbookStore(state => state.workbook);
   const accounts = useBankWorkbookStore(state => state.workbook.settings.accounts);
