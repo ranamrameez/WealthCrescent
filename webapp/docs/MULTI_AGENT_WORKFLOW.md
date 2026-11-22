@@ -45,8 +45,6 @@ Use the same claim ID across platform work and cross-link dependencies in PRs. A
 
 ## Active follow-ups
 
-- **Movement reporting, monthly plan row identity (WC-TR PSX session, 2026-11-23).** Keep Remaining plans rows distinct across native sources and record types.
-
 - **Movement reporting, cleared analytics (WC-TR PSX session, 2026-11-22).** Align the monthly analytics and its contributing rows with the canonical cleared movement selection. Verify with focused regressions, full CI and production build.
 
 ## Priority work and app-wide audits
