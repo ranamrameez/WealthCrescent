@@ -1219,17 +1219,31 @@ function MoneyMovementSection({ selectedModules, from, to, today, setDrilldown }
       {!comparison.rows.length && <tr><td colSpan={6}>No cleared movement in either period.</td></tr>}</tbody>
     </table></div>}
     {population === 'actual' && comparisonMode !== 'none' && !comparison && <p className="text-muted">{comparisonMode === 'calendar-month' ? 'Choose a date range that starts on the first day of a single month.' : 'No comparable prior period for these dates.'}</p>}
-    {report.rows.map(row => <div key={row.currency} className="mb-md"><SummarySections><SummarySection title={row.currency + ' · ' + population}>
-      <SummaryValue primary label="Net movement" value={fmtMoney(row.net,row.currency)} />
-      <SummaryValue label="Money in" value={fmtMoney(row.inflow,row.currency)} tone="positive" />
-      <SummaryValue label="Money out" value={fmtMoney(row.outflow,row.currency)} tone="negative" />
+    {report.rows.map(row => {
+      const openMetric = (metric: 'Net movement' | 'Money in' | 'Money out') => {
+        const items = row.groups.flatMap(group => group.items);
+        setDrilldown({
+          kind: 'flow',
+          title: metric + ' · ' + row.currency,
+          explanation: population === 'actual' ? 'Cleared records for the selected movement kind.' : 'Records for the selected activity and movement kind.',
+          currency: row.currency,
+          from,
+          to,
+          items: metric === 'Net movement' ? items : items.filter(item => metric === 'Money in' ? item.amount > 0 : item.amount < 0),
+        });
+      };
+      return <div key={row.currency} className="mb-md"><SummarySections><SummarySection title={row.currency + ' · ' + population}>
+      <SummaryValue primary label="Net movement" value={fmtMoney(row.net,row.currency)} onClick={() => openMetric('Net movement')} />
+      <SummaryValue label="Money in" value={fmtMoney(row.inflow,row.currency)} tone="positive" onClick={() => openMetric('Money in')} />
+      <SummaryValue label="Money out" value={fmtMoney(row.outflow,row.currency)} tone="negative" onClick={() => openMetric('Money out')} />
     </SummarySection></SummarySections>
     <ChartCard flat title={row.currency + ' — money in and out by ' + dimension}><div style={{ height: Math.max(200,Math.min(600,row.groups.length * 34)) }}><Chart type="bar" data={{ labels: row.groups.map(group => group.label), datasets: [
       { label: 'Money in (' + row.currency + ')', data: row.groups.map(group => group.inflow), backgroundColor: HUES[2] },
       { label: 'Money out (' + row.currency + ')', data: row.groups.map(group => group.outflow), backgroundColor: HUES[1] },
     ] }} options={{ indexAxis: 'y', plugins: { legend: { display: true } } }} /></div></ChartCard>
     <div className="table-scroll"><table><caption>{row.currency} — same records as chart; select a row for contributing activity</caption><thead><tr><th>{dimension}</th><th>Money in</th><th>Money out</th><th>Net</th></tr></thead><tbody>{row.groups.map(group => <RecordRow key={group.key} record={group} onOpen={() => setDrilldown({ kind: 'flow', title: group.label + ' · ' + row.currency, explanation: population + ' activity from ' + from + ' through ' + to + '. Unallocated means no explicit plan link.', currency: row.currency, from, to, items: group.items })}><td>{group.label}</td><td>{fmtMoney(group.inflow,row.currency)}</td><td>{fmtMoney(group.outflow,row.currency)}</td><td>{fmtMoney(group.net,row.currency)}</td></RecordRow>)}</tbody></table></div>
-    </div>)}
+      </div>;
+    })}
     {monthly.rows.map(row => <div key={'monthly-' + row.currency} className="mb-md">
       <h3>{row.currency} · monthly {population} movement</h3>
       <MonthlyStatsWidget currency={row.currency} rows={row.months} primary="movement" population={population} />
