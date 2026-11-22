@@ -109,7 +109,7 @@ export function AhlBrokerImports() {
     <div className="row gap-sm">
       <StandardButton type="button" size="small" tone="secondary" onClick={() => setOpenFor(broker.id)}>Import AHL order history</StandardButton>
       <PsxCashTransferActions statementOnly label="Import AHL account statement (cash)" />
-      <Link to="/psx/trade-journal">Review full AHL statement in Trade Journal</Link>
+      <Link to="/psx/trade-journal">Review PSX trades in Trade Journal</Link>
     </div>
     {openFor === broker.id && <AhlOrderImportDialog brokerId={broker.id} close={() => setOpenFor(undefined)} />}
   </>;
