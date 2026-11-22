@@ -197,3 +197,20 @@ it('aligns calendar-month comparisons for short, leap, and partial months', () =
   expect(engine.precedingCalendarMonthWindow('2024-03-02', '2024-03-31', '2024-03-30')).toBeNull();
   expect(engine.precedingCalendarMonthWindow('2024-03-01', '2024-04-01', '2024-04-02')).toBeNull();
 });
+
+it('reconciles currency period details to cleared native movement totals', () => {
+  const deposit = activity('bank deposit', 25, true, { module: 'bank' });
+  const movements = [
+    activity('broker dividend', 80, true, { module: 'psx' }),
+    { ...deposit, movementKind: 'transfer' as const },
+    activity('pending', 200, true, { isPending: true }),
+    activity('other currency', 400, true, { currencyCode: 'PKR' }),
+    activity('before range', 100, true, { date: '2026-01-01' }),
+    activity('future', 500, true, { date: '2026-01-20' }),
+  ];
+  const cleared = engine.clearedRangeActivities(movements, '0000-01-01', '2026-01-15', '2026-01-15');
+  const from = '2026-01-02', to = '2026-01-20';
+  const items = engine.activityFlowItems(cleared, 'USD', from, to);
+  expect(items.map(item => item.description)).toEqual(['broker dividend']);
+  expect(items.reduce((sum, item) => sum + item.amount, 0)).toBe(engine.sumActivitiesByCurrency(cleared, from, to).USD);
+});
