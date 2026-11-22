@@ -201,7 +201,7 @@ it('aligns calendar-month comparisons for short, leap, and partial months', () =
 it('reconciles currency period details to cleared native movement totals', () => {
   const deposit = activity('bank deposit', 25, true, { module: 'bank' });
   const movements = [
-    activity('broker dividend', 80, true, { module: 'psx' }),
+    { ...activity('broker dividend', 80, true), module: 'psx' as const },
     { ...deposit, movementKind: 'transfer' as const },
     activity('pending', 200, true, { isPending: true }),
     activity('other currency', 400, true, { currencyCode: 'PKR' }),
