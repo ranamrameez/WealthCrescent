@@ -153,12 +153,29 @@ describe('alertTriggerMs', () => {
 });
 
 describe('dueSubscriptionAlerts', () => {
-  it('includes an alert once its trigger instant has passed', () => {
+  it('does not replay a missed lead-time reminder after its scheduled calendar day', () => {
     const s = sub({ id: 's1', startDate: '2026-01-01', billingCycle: 'monthly', alerts: [{ id: 'a1', daysBefore: 3 }] });
-    // Next occurrence from 2026-01-30 is 2026-02-01 -> trigger is 2026-01-29, already passed.
-    const due = dueSubscriptionAlerts([s], new Date('2026-01-30'));
-    expect(due).toHaveLength(1);
-    expect(due[0].subscription.id).toBe('s1');
+    // The trigger was 2026-01-29; by 2026-01-30 that reminder day has passed.
+    expect(dueSubscriptionAlerts([s], new Date('2026-01-30'))).toHaveLength(0);
+  });
+
+  it('does not replay earlier lead-time reminders together with the reminder scheduled for today', () => {
+    const s = sub({
+      id: 's1',
+      startDate: '2026-01-01',
+      billingCycle: 'monthly',
+      alerts: [
+        { id: 'one-day', daysBefore: 1 },
+        { id: 'two-days', daysBefore: 2 },
+        { id: 'three-days', daysBefore: 3 },
+      ],
+    });
+    const onThreeDaysBefore = dueSubscriptionAlerts([s], new Date('2026-01-29T10:00:00'));
+    expect(onThreeDaysBefore.map(row => row.alert.id)).toEqual(['three-days']);
+    const onTwoDaysBefore = dueSubscriptionAlerts([s], new Date('2026-01-30T10:00:00'));
+    expect(onTwoDaysBefore.map(row => row.alert.id)).toEqual(['two-days']);
+    const onOneDayBefore = dueSubscriptionAlerts([s], new Date('2026-01-31T10:00:00'));
+    expect(onOneDayBefore.map(row => row.alert.id)).toEqual(['one-day']);
   });
 
   it('excludes an alert whose trigger instant is still in the future', () => {
@@ -180,10 +197,11 @@ describe('dueSubscriptionAlerts', () => {
     expect(due).toHaveLength(0);
   });
 
-  it('a dismissed occurrence still lets the NEXT cycle re-trigger with a fresh key', () => {
+  it('a new cycle can re-trigger on its own scheduled day with a fresh key', () => {
     const s = sub({ id: 's1', startDate: '2026-01-01', billingCycle: 'monthly', alerts: [{ id: 'a1', daysBefore: 3 }] });
     const staleKey = 's1:a1:2026-02-01'; // dismissed for an earlier cycle
-    const due = dueSubscriptionAlerts([s], new Date('2026-02-28'), (key) => key === staleKey);
-    expect(due).toHaveLength(1); // now anchored to the March occurrence, a different key
+    const due = dueSubscriptionAlerts([s], new Date('2026-02-26T10:00:00'), (key) => key === staleKey);
+    expect(due).toHaveLength(1);
+    expect(due[0].key).toBe('s1:a1:2026-03-01');
   });
 });

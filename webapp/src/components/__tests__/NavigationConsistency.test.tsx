@@ -10,9 +10,18 @@ import { SummaryGroupCard } from '../SummaryGroupCard';
 import { MemoryRouter } from 'react-router-dom';
 import { TopBar } from '../TopBar';
 import { usePageTopBarStore } from '../../store/pageTopBarStore';
+import { CategoryNav, categoryForPath } from '../CategoryNav';
 
 afterEach(cleanup);
 describe('Consistent navigation and presentation',()=>{
+  it('recognizes the canonical main dashboard without stock-only controls', () => {
+    expect(categoryForPath('/dashboard')).toBe('netWorth');
+    render(<MemoryRouter initialEntries={['/dashboard']}><CategoryNav/><TopBar/></MemoryRouter>);
+    expect(screen.getByRole('link', {name:'Dashboard'})).toHaveClass('active');
+    expect(screen.getByRole('link', {name:'Dashboard'})).toHaveAttribute('href', '/dashboard');
+    expect(screen.queryByRole('combobox', {name:'Broker'})).toBeNull();
+    expect(screen.queryByRole('combobox', {name:'Stock'})).toBeNull();
+  });
   it('omits the main-module switcher while preserving banking child dropdowns and accessible names',()=>{
     usePageTopBarStore.getState().setRightSlot(<TopBarControls><TopBarSelect label="Bank" className="account-switch-select" value="" options={[{value:'',label:'All banks'}]} /><QuickEntitySwitch label="Account" value="" options={[{value:'',label:'All accounts'}]} onChange={()=>{}} /></TopBarControls>);
     try {
@@ -20,7 +29,8 @@ describe('Consistent navigation and presentation',()=>{
       expect(screen.queryByRole('combobox',{name:'Module'})).toBeNull();
       expect(screen.getByRole('combobox',{name:'Bank'})).toBeVisible();
       expect(screen.getByRole('combobox',{name:'Account'})).toBeVisible();
-      expect(screen.getAllByRole('combobox')).toHaveLength(2);
+      expect(screen.getByRole('combobox', {name:'Find an item'})).toBeVisible();
+      expect(screen.getAllByRole('combobox')).toHaveLength(3);
     } finally {
       act(()=>usePageTopBarStore.getState().setRightSlot(null));
     }

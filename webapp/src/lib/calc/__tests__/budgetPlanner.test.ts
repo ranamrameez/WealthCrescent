@@ -22,6 +22,29 @@ describe('collectBudgetActivities', () => {
     expect(activities.map((a) => a.id)).toEqual(['c1', 'b1', 'r1']);
   });
 
+  it('keeps pending records identifiable but excludes them from cleared monthly totals', () => {
+    const activities = collectBudgetActivities({
+      cashEntries: [{ id: 'pending-cash', date: '2026-03-01', isDeposit: true, amount: 100, currencyCode: 'USD', source: 'manual', isPending: true }],
+      plannedCash: [],
+      bankAccounts: [{ id: 'a1', name: 'Checking', currencyCode: 'USD', openingBalance: 0 }],
+      bankTransactions: [{ id: 'pending-bank', accountId: 'a1', date: '2026-03-02', amount: -50, isDeposit: false, description: 'Pending debit', source: 'manual', isPending: true }],
+      plannedBank: [],
+      rentalProperties: [{ id: 'p1', name: 'Flat 1', currencyCode: 'USD' }],
+      rentalEntries: [
+        { id: 'r1', propertyId: 'p1', date: '2026-03-03', isDeposit: true, amount: 300, source: 'manual' },
+        { id: 'pending-rent', propertyId: 'p1', date: '2026-03-04', isDeposit: false, amount: 75, source: 'manual', isPending: true },
+      ],
+      plannedRentals: [],
+      categories: [],
+    });
+    expect(activities.find(item => item.id === 'pending-cash')?.isPending).toBe(true);
+    expect(activities.find(item => item.id === 'pending-bank')?.isPending).toBe(true);
+    const month = monthlyIncomeExpense(activities, ['2026-03'])[0];
+    // Cleared Rental income is included alongside Cash/Bank; pending rows are
+    // not treated as completed cash flow.
+    expect(month).toEqual({ month: '2026-03', income: { USD: 300 }, expense: {} });
+  });
+
   it('includes a not-yet-executed planned entry but excludes an already-executed one (its real counterpart already covers it)', () => {
     const activities = collectBudgetActivities({
       cashEntries: [],

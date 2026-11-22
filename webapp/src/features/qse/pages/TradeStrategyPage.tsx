@@ -411,14 +411,6 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
   // stats right away instead of only once a leg exists.
   const guardTicker = plan.defaultTicker || plan.legs[0]?.ticker || '';
   const hasOpenShares = (rows.find((r) => r.ticker === guardTicker)?.shares || 0) > 0;
-  const currentPlanDate = today();
-  useEffect(() => {
-    if (!plan.legs.some((leg) => !leg.executed && !leg.ignored && leg.date !== currentPlanDate)) return;
-    updateTradePlan(plan.id, {
-      legs: plan.legs.map((leg) => (leg.executed || leg.ignored) ? leg : { ...leg, date: currentPlanDate }),
-    });
-  }, [currentPlanDate, plan.id, plan.legs, updateTradePlan]);
-
   const planLots = useMemo(
     () => strategyPositions(workbook.transactions, calcFee).lotsByTicker[guardTicker.toUpperCase()] || [],
     [workbook.transactions, calcFee, guardTicker],
@@ -527,9 +519,18 @@ function PlanCard({ plan, open, onToggle }: { plan: TradePlan; open?: boolean; o
   };
   const markDone = async (i: number) => {
     const leg = plan.legs[i];
-    const ok = await confirmDialog(`Add ${leg.action} ${fmt(leg.shares, 0)} ${leg.ticker} @ ${fmtQSEPrice(leg.price)} to your transaction history? This can't be undone from here.`, 'Mark leg as done?');
-    if (!ok) return;
-    if (!(await ensureSignedIn('Sign in to record this transaction.'))) return;
+    const date = leg.date || today();
+    if (date > today()) return toast('Set the leg’s actual trade date before recording it.');
+    const ok = await confirmDialog(
+      `Add ${leg.action} ${fmt(leg.shares, 0)} ${leg.ticker} @ ${fmtQSEPrice(leg.price)} on ${date} to your transaction history?`,
+      'Mark leg as done?',
+    );
+    if (!ok || !(await ensureSignedIn('Sign in to record this transaction.'))) return;
+    const latest = useWorkbookStore.getState().workbook;
+    if (latest.activeBrokerId !== workbook.activeBrokerId ||
+        JSON.stringify(latest.tradePlans.find(row => row.id === plan.id)?.legs[i]) !== JSON.stringify(leg)) {
+      return toast('The plan or broker changed. Review the leg again.');
+    }
     executeTradePlanLeg(plan.id, i);
     toast('Logged to transaction history.');
   };

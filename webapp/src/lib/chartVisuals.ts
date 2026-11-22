@@ -1,4 +1,5 @@
 import type { Plugin } from 'chart.js';
+import { chartThemeVisuals } from './chartThemeVisuals';
 export function chartAlpha(color:string,alpha=.58):string{
  const hex=color.trim();
  if(/^#[0-9a-f]{6}$/i.test(hex)){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return `rgba(${r}, ${g}, ${b}, ${alpha})`;}
@@ -7,4 +8,15 @@ export function chartAlpha(color:string,alpha=.58):string{
  if(rgb)return `rgba(${rgb[1]}, ${rgb[2]}, ${rgb[3]}, ${alpha})`;
  return color;
 }
-export const chartDepthPlugin:Plugin={id:'finance-recorder-depth',beforeDatasetDraw(chart){const ctx=chart.ctx;ctx.save();ctx.shadowColor='rgba(0,0,0,.22)';ctx.shadowBlur=10;ctx.shadowOffsetX=3;ctx.shadowOffsetY=5;},afterDatasetDraw(chart){chart.ctx.restore();}};
+const depthStyles = new WeakMap<object, ReturnType<typeof chartThemeVisuals>>();
+export const chartDepthPlugin: Plugin = {
+  id: 'finance-recorder-depth',
+  beforeUpdate(chart) { depthStyles.set(chart, chartThemeVisuals()); },
+  beforeDatasetDraw(chart) {
+    const visuals = depthStyles.get(chart) ?? chartThemeVisuals(), ctx = chart.ctx;
+    ctx.save(); ctx.shadowColor = `rgba(0,0,0,${visuals.shadowAlpha})`; ctx.shadowBlur = visuals.shadowBlur;
+    ctx.shadowOffsetX = 0; ctx.shadowOffsetY = visuals.shadowBlur ? 2 : 0;
+  },
+  afterDatasetDraw(chart) { chart.ctx.restore(); },
+  afterDestroy(chart) { depthStyles.delete(chart); },
+};

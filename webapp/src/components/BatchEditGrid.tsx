@@ -12,13 +12,14 @@ import './BatchEditGrid.css';
 
 export type { BatchMutations, BatchChange, BatchColumn, RowErrors } from './batchEditModel';
 
-export function BatchEditGrid<T>({ title, description, rows, columns, getRowId, getRowDate, getReorderGroup, validateRow, rowReadOnly, onSave, onClose, createRow, orderKey, addLabel = 'Add row' }: {
+export function BatchEditGrid<T>({ title, description, rows, columns, getRowId, getRowDate, getReorderGroup, validateRow, rowReadOnly, onEditReadOnly, onSave, onClose, createRow, orderKey, addLabel = 'Add row' }: {
   title: string; description?: string; rows: T[]; columns: BatchColumn<T>[];
   getRowId: (row: T) => string;
   getRowDate?: (row: T) => string;
   getReorderGroup?: (row: T) => string;
   validateRow?: (row: T) => RowErrors;
   rowReadOnly?: (row: T) => string | undefined;
+  onEditReadOnly?: (row: T) => Promise<T | undefined>;
   createRow?: () => T;
   addLabel?: string;
   orderKey?: Extract<keyof T, string>;
@@ -31,7 +32,7 @@ export function BatchEditGrid<T>({ title, description, rows, columns, getRowId, 
   const [added, setAdded] = useState<T[]>([]);
   const [deleted, setDeleted] = useState<string[]>([]);
   const [order, setOrder] = useState<string[]>([]);
-  const [baseline] = useState(() => structuredClone(rows));
+  const [baseline, setBaseline] = useState(() => structuredClone(rows));
   const [drafts, setDrafts] = useState<Record<string, Record<string, CellValue>>>({});
   const [showErrors, setShowErrors] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -208,7 +209,13 @@ export function BatchEditGrid<T>({ title, description, rows, columns, getRowId, 
             return <tr key={id}>
               <th scope="row">{index + 1}
                 {isNew && <small>New</small>}
-                {dirtyKeys.length > 0 ? ' · Changed' : ''}{locked && <span className="batch-edit-linked-pill" title={locked}>Read-only</span>}<small>{showErrors && errors._row}</small></th>
+                {dirtyKeys.length > 0 ? ' · Changed' : ''}{locked && <span className="batch-edit-linked-pill" title={locked}>Read-only</span>}
+                {locked && onEditReadOnly && <button type="button" className="btn secondary small" onClick={() => {
+                  void onEditReadOnly(before).then(updated => {
+                    if (updated) setBaseline(current => current.map(row => getRowId(row) === id ? structuredClone(updated) : row));
+                  }).catch(error => setSaveError(error instanceof Error ? error.message : 'Could not edit the linked transaction.'));
+                }}>Edit linked transfer</button>}
+                <small>{showErrors && errors._row}</small></th>
               {columns.map((col, ci) => {
                 const editable = !locked && col.editable !== false && (typeof col.editable !== 'function' || col.editable(before));
                 const value = drafts[id]?.[col.key] ?? cellValue(before, col);

@@ -56,7 +56,7 @@ export function ChartCard({
   children: ReactNode;
 }) {
   const heading = (
-    <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+    <h4 style={{ margin: '0 0 var(--heading-gap, 10px)', display: 'flex', alignItems: 'center', gap: 8 }}>
       {titleTooltip ? <Tooltip text={titleTooltip}><span className="clickable">{title}</span></Tooltip> : title}
       {unfiltered && <span className="text-muted" style={{ fontWeight: 400, textTransform: 'none' }}>(whole portfolio — not filtered)</span>}
     </h4>
@@ -65,9 +65,9 @@ export function ChartCard({
 
   if (flat) {
     return (
-      <div style={{ marginBottom: 20 }}>
+      <div className="chart-card-flat" style={{ marginBottom: 'var(--section-content-gap, 20px)' }}>
         {heading}
-        <div style={{ marginTop: 10 }}>{body}</div>
+        <div>{body}</div>
       </div>
     );
   }

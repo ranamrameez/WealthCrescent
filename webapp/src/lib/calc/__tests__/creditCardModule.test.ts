@@ -5,6 +5,7 @@ import {
   activeCycleStatement,
   computeMinimumDue,
   creditCardLiabilityByCurrency,
+  creditCardCycleHistory,
   creditCardMonthlyHistory,
   creditCardRunningBalances,
   currentStatement,
@@ -32,7 +33,7 @@ describe('multi-cycle locked statements', () => {
     expect(s?.cycleEnd).toBe('2026-01-20');
   });
 
-  it('locks the closed bill and applies payments through the due day', () => {
+  it('applies post-billing payments while preserving the due-day markup basis', () => {
     const c = card({ statementDate: 17, statementDates: [17], minDueDate: 22, paymentDueDate: 25, minPaymentMethod: 'percentOfBalance', minPaymentPct: 10, markupMethod: 'flatOnCarried', markupRatePct: 1 });
     const txs = [
       tx({ date: '2026-09-10', kind: 'charge', amount: 1000 }),
@@ -43,14 +44,33 @@ describe('multi-cycle locked statements', () => {
     ];
     const s = latestClosedStatement(c, txs, '2026-09-28')!;
     expect(s.statementBalance).toBe(1000);
-    expect(s.paymentsAfterClose).toBe(500);
+    expect(s.paymentsAfterClose).toBe(900);
+    expect(s.paidByDueDate).toBe(500);
     expect(s.remainingMinimumDue).toBe(0);
-    expect(s.remainingStatementBalance).toBe(500);
+    expect(s.remainingStatementBalance).toBe(100);
     expect(markupThisCycle(c, s)).toBe(5);
     const active = activeCycleStatement(c, txs, '2026-09-28')!;
     expect(active.chargesThisCycle).toBe(999);
-    expect(active.paymentsThisCycle).toBe(400);
+    expect(active.paymentsThisCycle).toBe(0);
+    expect(active.statementBalance).toBe(1099);
   });
+});
+
+it('honors bank bill overrides and applies ordinary late payments to the remaining minimum', () => {
+  const c = card({ statementDate: 17, minDueDate: 22, paymentDueDate: 25, pendingMinDue: 120,
+    statementOverrides: { '2026-09-17': { statementBalance: 1010, minimumDue: 100, minDueDate: '2026-09-23', dueDate: '2026-09-26' } } });
+  const transactions = [
+    tx({ date: '2026-09-10', amount: 1000 }),
+    tx({ date: '2026-09-27', kind: 'payment', amount: 60 }),
+    tx({ date: '2026-10-18', kind: 'payment', amount: 400 }),
+  ];
+  const closed = latestClosedStatement(c, transactions, '2026-09-28')!;
+  expect(closed).toMatchObject({ statementBalance: 1010, calculatedStatementBalance: 1000, minimumDue: 100,
+    remainingMinimumDue: 40, remainingStatementBalance: 950, minDueDate: '2026-09-23', dueDate: '2026-09-26' });
+  expect(proposeMinPayment(c, closed)?.amount).toBe(40);
+  const historical = creditCardCycleHistory(c, transactions, 2, '2026-10-20');
+  expect(historical[0]).toMatchObject({ cycleEnd: '2026-09-17', paymentsAfterClose: 60 });
+  expect(historical[1]).toMatchObject({ cycleEnd: '2026-10-17', paymentsAfterClose: 400 });
 });
 
 const card = (over: Partial<CreditCard> = {}): CreditCard => ({
@@ -73,6 +93,15 @@ const tx = (over: Partial<CreditCardTransaction>): CreditCardTransaction => ({
 });
 
 describe('creditCardRunningBalances', () => {
+  it('carries an overpayment forward before displaying consumed credit', () => {
+    const c = card({ openingBalance: 50 });
+    const transactions = [
+      tx({ id: 'payment', date: '2026-01-10', kind: 'payment', amount: 120 }),
+      tx({ id: 'charge', date: '2026-01-11', kind: 'charge', amount: 90 }),
+    ];
+    expect([...creditCardRunningBalances(c, transactions)]).toEqual([['payment', 0], ['charge', 20]]);
+    expect(outstandingBalanceByCard(c, transactions)).toBe(20);
+  });
   it('tracks consumed credit chronologically from opening debt, independent of other cards', () => {
     const first = tx({ id: 'charge-1', date: '2026-01-10', kind: 'charge', amount: 300, seq: 1 });
     const payment = tx({ id: 'payment-1', date: '2026-01-11', kind: 'payment', amount: 100, seq: 2 });

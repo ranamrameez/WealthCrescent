@@ -31,6 +31,13 @@ export function AppShell({ user, children }: { user: User | null; children: Reac
     setMobileOpen(false);
   }, [location.pathname]);
 
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setMobileOpen(false); };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [mobileOpen]);
+
   const toggleDesktopCollapsed = () => {
     setDesktopCollapsed((v) => {
       const next = !v;
@@ -49,7 +56,10 @@ export function AppShell({ user, children }: { user: User | null; children: Reac
         user={user}
         className={`${mobileOpen ? 'open' : ''} ${desktopCollapsed ? 'desktop-collapsed' : ''}`.trim()}
         onNavigate={() => setMobileOpen(false)}
-        onCollapse={toggleDesktopCollapsed}
+        onCollapse={() => {
+          if (window.matchMedia('(max-width: 860px)').matches) setMobileOpen(false);
+          else toggleDesktopCollapsed();
+        }}
       />
       <div className={`mobile-backdrop${mobileOpen ? ' open' : ''}`} onClick={() => setMobileOpen(false)} />
       <button
@@ -62,10 +72,7 @@ export function AppShell({ user, children }: { user: User | null; children: Reac
         »
       </button>
       <div className={`main${desktopCollapsed ? ' sidebar-collapsed' : ''}`}>
-        <button className="mobile-menu-btn" onClick={() => setMobileOpen((v) => !v)} type="button">
-          ☰ Menu
-        </button>
-        <TopBar />
+        <TopBar onToggleNavigation={() => setMobileOpen(value => !value)} navigationOpen={mobileOpen} />
         {children}
         <PageFabGroup />
       </div>

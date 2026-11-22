@@ -15,6 +15,7 @@ import { useCashWorkbookStore } from '../../store/cashWorkbookStore';
 import { planOccurrences } from '../../lib/calc/planOccurrences';
 import type { TransactionPageFilters } from '../../hooks/useUrlTransactionFilters';
 
+vi.mock('../../lib/firebase/client', () => ({ auth: { currentUser: { uid: 'test-user' } }, db: null, firebaseReady: false }));
 vi.mock('../../lib/firebase/useEnsureSignedIn', () => ({ useEnsureSignedIn: () => async () => true }));
 const filters: TransactionPageFilters = { period:'custom',fromDate:'2026-10-01',toDate:'2026-12-31',direction:'all',source:'all',category:'all',accountId:'all' };
 beforeEach(() => {

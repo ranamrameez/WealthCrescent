@@ -160,3 +160,16 @@ it('restricts reordering to the supplied effective-time group without changing d
   fireEvent.change(screen.getByLabelText('Batch to date'), { target: { value: '2026-10-01' } });
   expect(screen.getByLabelText('Row 2, Description')).toBeTruthy();
 });
+
+it('refreshes a coordinated linked row while preserving other unsaved batch edits', async () => {
+  const save = vi.fn();
+  const edit = vi.fn(async (row: Row) => ({ ...row, amount: 15 }));
+  render(<BatchEditGrid title="Linked batch" rows={rows} columns={columns} getRowId={row => row.id}
+    rowReadOnly={row => row.id === 'a' ? 'Linked transfer' : undefined} onEditReadOnly={edit}
+    onSave={save} onClose={() => {}} />);
+  fireEvent.change(screen.getByLabelText('Row 2, Description'), { target: { value: 'Unsaved note' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Edit linked transfer' }));
+  await waitFor(() => expect(edit).toHaveBeenCalledWith(rows[0]));
+  await waitFor(() => expect(screen.getByText('15')).toBeTruthy());
+  expect((screen.getByLabelText('Row 2, Description') as HTMLInputElement).value).toBe('Unsaved note');
+});

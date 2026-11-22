@@ -39,6 +39,7 @@ export interface CashEntry extends Finance {
 export interface CashSettings {
   /** Pre-fills new entries only — never converts existing ones. */
   defaultCurrency: string;
+  favoriteCurrencies?: string[];
   /** User-requested (2026-09-06): "let the user choose (checkboxes?) to
    * include the accounts in the Net calcs." Cash is a single per-currency
    * ledger with no sub-accounts to pick from individually (unlike Bank/

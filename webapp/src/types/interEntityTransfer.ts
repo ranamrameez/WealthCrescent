@@ -68,6 +68,7 @@ export interface LinkSideConfig {
    * simplicity as Personal Loans' plain loan picker) since `buildSideRecord`
    * has no store access to compute it from the loan's own schedule. */
   emiMonth?: number;
+  emiIndependent?: boolean;
   /** Fee charged on this exchange/fund side, in its own currency. */
   fee?: number;
 }
@@ -112,6 +113,14 @@ export interface InterEntityTransfer extends InterEntityTransferInput {
   fromRecordId: string;
   /** id of the ledger record this link created on the `to` side. */
   toRecordId: string;
+}
+
+export function isCardFundedInstallmentLink(link?: InterEntityTransfer): boolean {
+  return link?.from.module === 'creditCard' && isIndependentInstallmentLink(link);
+}
+
+export function isIndependentInstallmentLink(link?: InterEntityTransfer): boolean {
+  return link?.to.module === 'emi' && link.to.emiIndependent === true;
 }
 
 export interface InterEntityWorkbook {

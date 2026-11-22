@@ -8,7 +8,7 @@ import { StandardCard, type StandardCardAction } from './StandardCard';
 
 export interface SectionCardProps { open: boolean; onToggle: (open: boolean) => void }
 
-export interface StandardPageSection { table?: boolean; render?: (props: SectionCardProps) => ReactNode; key:string; label:string; content:ReactNode; summary?:ReactNode; actions?:StandardCardAction[]; headerEnd?:ReactNode; defaultOpen?:boolean; hue?:string; unframed?:boolean; unframedHeader?:boolean; }
+export interface StandardPageSection { icon?: ReactNode; table?: boolean; render?: (props: SectionCardProps) => ReactNode; key:string; label:string; content:ReactNode; summary?:ReactNode; actions?:StandardCardAction[]; headerEnd?:ReactNode; defaultOpen?:boolean; hue?:string; unframed?:boolean; unframedHeader?:boolean; }
 
 export function StandardPageSections({sections: suppliedSections,defaultKey,preserveOrder = false}:{sections:StandardPageSection[];defaultKey?:string;preserveOrder?:boolean}) {
   const sections = preserveOrder ? suppliedSections : orderedPageSections(suppliedSections);
@@ -46,7 +46,7 @@ export function StandardPageSections({sections: suppliedSections,defaultKey,pres
           </div>}
           {!!openKeys[s.key] && s.content}
         </div>
-      : s.table ? <TableCard title={s.label} summary={s.summary} actions={s.actions} headerEnd={s.headerEnd} hue={s.hue} open={!!openKeys[s.key]} onToggle={open=>{setOpenKeys(p=>({...p,[s.key]:open})); if(open)setSection(s.key); else if(requested==='all'||activeKey===s.key)setSection(null);}}>{s.content}</TableCard>
-      : <StandardCard title={s.label} summary={s.summary} actions={s.actions} headerEnd={s.headerEnd} hue={s.hue} open={!!openKeys[s.key]} onToggle={open=>{setOpenKeys(p=>({...p,[s.key]:open})); if(open)setSection(s.key); else if(requested==='all'||activeKey===s.key)setSection(null);}}>{s.content}</StandardCard>}
+      : s.table ? <TableCard title={s.icon ? <span className="standard-section-title">{s.icon}<span>{s.label}</span></span> : s.label} summary={s.summary} actions={s.actions} headerEnd={s.headerEnd} hue={s.hue} open={!!openKeys[s.key]} onToggle={open=>{setOpenKeys(p=>({...p,[s.key]:open})); if(open)setSection(s.key); else if(requested==='all'||activeKey===s.key)setSection(null);}}>{s.content}</TableCard>
+      : <StandardCard title={s.icon ? <span className="standard-section-title">{s.icon}<span>{s.label}</span></span> : s.label} summary={s.summary} actions={s.actions} headerEnd={s.headerEnd} hue={s.hue} open={!!openKeys[s.key]} onToggle={open=>{setOpenKeys(p=>({...p,[s.key]:open})); if(open)setSection(s.key); else if(requested==='all'||activeKey===s.key)setSection(null);}}>{s.content}</StandardCard>}
   </div>)}</div>;
 }

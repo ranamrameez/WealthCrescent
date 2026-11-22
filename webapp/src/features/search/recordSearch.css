@@ -1,0 +1,12 @@
+.topbar-record-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.topbar-record-search input {
+  width: 12rem;
+  min-width: 0;
+}

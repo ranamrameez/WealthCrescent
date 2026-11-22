@@ -128,7 +128,17 @@ export function dueSubscriptionAlerts(
     if (!sub.active) continue;
     for (const alert of sub.alerts ?? []) {
       const triggerMs = alertTriggerMs(sub, alert, asOf);
-      if (triggerMs == null || triggerMs > asOf.getTime()) continue;
+      if (triggerMs == null) continue;
+      if (alert.daysBefore != null) {
+        // A lead-time reminder belongs to one calendar day. Do not replay
+        // yesterday's/two-days-ago's missed reminders alongside today's one.
+        const triggerDate = new Date(triggerMs);
+        const triggerDay = `${triggerDate.getFullYear()}-${String(triggerDate.getMonth() + 1).padStart(2, '0')}-${String(triggerDate.getDate()).padStart(2, '0')}`;
+        const todayDay = `${asOf.getFullYear()}-${String(asOf.getMonth() + 1).padStart(2, '0')}-${String(asOf.getDate()).padStart(2, '0')}`;
+        if (triggerDay !== todayDay) continue;
+      } else if (triggerMs > asOf.getTime()) {
+        continue;
+      }
       const occurrenceTag = alert.customAt ? 'once' : nextBillingDate(sub, asOf);
       const key = `${sub.id}:${alert.id}:${occurrenceTag}`;
       if (isDismissed(key)) continue;

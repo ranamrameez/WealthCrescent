@@ -1,4 +1,5 @@
 import type { Adjustment, CashLedgerEvent, Dividend, FeeCalculator, Transaction, Transfer } from '../../types/workbook';
+import { transferCashAmount } from './transferBalance';
 import { fmt } from '../format';
 import { toInstantMs } from '../datetime';
 import { sortTransactionsChronological } from './sortTransactions';
@@ -25,7 +26,7 @@ export function buildCashLedger(
   });
 
   transfers.forEach((t) => {
-    const cashDelta = t.type === 'DEPOSIT' ? t.gross - t.fee : -(t.gross + t.fee);
+    const cashDelta = transferCashAmount(t);
     events.push({ sourceId: t.id, date: t.date, time: t.time, timezone: t.timezone, seq: t.seq, accountingOrder: t.accountingOrder, kind: 'transfer', action: t.type, label: t.type === 'DEPOSIT' ? 'Deposit' : 'Withdrawal', amount: cashDelta, fee: t.fee });
   });
 

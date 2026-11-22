@@ -436,7 +436,7 @@ export function createWorkbookStore<TWorkbook extends BaseWorkbook<unknown>>(
         if (!plan || !leg || leg.executed || leg.ignored) return wb;
         const globalTransactionIndex = Math.max(0, ...wb.transactions.map(t => t.globalTransactionIndex ?? t.transactionIndex ?? 0)) + 1;
         const perTickerIndex = nextSeqForEntity(wb.transactions, (t) => t.ticker, leg.ticker);
-        const tx: Transaction = { id: crypto.randomUUID(), brokerId: wb.activeBrokerId, globalTransactionIndex, perTickerIndex, transactionIndex: globalTransactionIndex, seq: perTickerIndex, timestamp: new Date().toISOString(), date: leg.date || new Date().toISOString().slice(0, 10), ticker: leg.ticker, action: leg.action, shares: leg.shares, price: leg.price, targetLotBuyId: leg.targetLotBuyId };
+        const tx: Transaction = { id: crypto.randomUUID(), brokerId: wb.activeBrokerId, globalTransactionIndex, perTickerIndex, transactionIndex: globalTransactionIndex, seq: perTickerIndex, timestamp: new Date().toISOString(), date: leg.date || new Date().toISOString().slice(0, 10), ticker: leg.ticker, action: leg.action, shares: leg.shares, price: leg.price, feeOverride: leg.feeOverride, manualSameDay: leg.manualSameDay, targetLotBuyId: leg.targetLotBuyId };
         return { ...wb, transactions: syncTransactionIndexes([...wb.transactions, tx]), tradePlans: wb.tradePlans.map((p) => p.id === planId ? { ...p, legs: p.legs.map((l, i) => i === legIndex ? { ...l, executed: true, executedTransactionId: tx.id } : l) } : p) };
       }),
     };

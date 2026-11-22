@@ -9,3 +9,6 @@ export { calculateStockPortfolio, type StockBasisMethod, type StockCalculationRe
 export { calculatePortfolio, type PortfolioCalculationInput, type PortfolioCalculationResult, type PortfolioPositionRow } from './portfolioCalculationEngine';
 
 export { calculatePositionMarketValue, type PositionMarketValue } from './positionValuation';
+
+// Preferred public boundary for all financial calculations.
+export { CalculationEngine, type CalculationEngineApi } from './CalculationEngine';

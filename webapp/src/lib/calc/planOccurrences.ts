@@ -4,7 +4,7 @@ import { recurrenceOccurrencesWithin } from './recurrence';
 interface RecurringPlan {
   id: string; date: string; recurrence?: RecurrenceRule; executed?: boolean;
   executedThrough?: string; completedDates?: string[];
-  seriesId?: string;
+  seriesId?: string; cancelled?: boolean;
 }
 
 export function occurrenceCompleted(plan: Pick<RecurringPlan, 'executedThrough' | 'completedDates'>, date: string) {
@@ -19,8 +19,13 @@ export function planOccurrences<T extends RecurringPlan>(plans: T[], fromDate?: 
   const endDate = toDate || end.toISOString().slice(0, 10);
   const snapshots = new Set(plans.filter(plan => plan.seriesId).map(plan => `${plan.seriesId}@${plan.date}`));
   return plans.flatMap((plan) => {
+    if (plan.cancelled && !plan.recurrence && !plan.executed) return [];
     if (!plan.recurrence) return (!fromDate || plan.date >= fromDate) && (!toDate || plan.date <= toDate) && (horizonDays === null || plan.date <= endDate) ? [plan] : [];
     const dates = recurrenceOccurrencesWithin(plan.recurrence, fromDate || today, toDate || (horizonDays === null ? plan.recurrence.endDate || endDate : endDate));
-    return dates.filter(date => !snapshots.has(`${plan.id}@${date}`)).map((date) => ({ ...plan, planId: plan.id, id: `${plan.id}@${date}`, date, executed: occurrenceCompleted(plan, date) }));
+    return dates.filter(date => (!plan.cancelled || occurrenceCompleted(plan,date)) && !snapshots.has(`${plan.id}@${date}`)).map((date) => ({ ...plan, planId: plan.id, id: `${plan.id}@${date}`, date, executed: occurrenceCompleted(plan, date) }));
   });
+}
+
+export function cancellationPatchForSourceRemoval(plan:RecurringPlan):{cancelled:true}|null {
+  return plan.recurrence && (plan.completedDates?.length || plan.executedThrough)?{cancelled:true}:null;
 }

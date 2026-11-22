@@ -1,5 +1,7 @@
+import { fingerprint } from './workbookFingerprint';
+import { workbookSyncEpochFor, workbookSyncPaused, subscribeWorkbookMaintenance } from './workbookMaintenance';
 import type { User } from 'firebase/auth';
-import { onValue, ref, set } from 'firebase/database';
+import { onValue, ref, runTransaction } from 'firebase/database';
 import { useEffect, useRef, useState } from 'react';
 import type { StoreApi, UseBoundStore } from 'zustand';
 import { db, firebaseReady } from './client';
@@ -43,10 +45,8 @@ export function stripUndefinedDeep<T>(value: T): T {
  * data yet" and auto-uploaded local (possibly empty/default) data over it —
  * that destroyed a real portfolio. Now: if the cloud looks empty, this only
  * reports that fact (`cloudEmpty`) and waits for the user to explicitly
- * confirm via `uploadLocalToCloud()`. The debounced local->cloud push is
- * also held back (`initialSnapshotReceived`) until we've actually seen what
- * the cloud contains at least once, so no local change can race ahead of
- * the initial pull and overwrite real data before it's even been read. */
+ * confirm via `uploadLocalToCloud()`. Subsequent local edits compare the
+ * last loaded or committed snapshot with the server before writing. */
 export function useWorkbookCloudSync<TWorkbook>(
   cloudPathSuffix: string,
   useStore: UseBoundStore<StoreApi<MinimalWorkbookStore<TWorkbook>>>,
@@ -55,14 +55,12 @@ export function useWorkbookCloudSync<TWorkbook>(
 ) {
   const [status, setStatus] = useState('Not signed in');
   const [cloudEmpty, setCloudEmpty] = useState(false);
-  const applyingRemote = useRef(false);
-  const pushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const initialSnapshotReceived = useRef(false);
-
-  const cloudPath = (uid: string) => `users/${uid}/${cloudPathSuffix}`;
+  const [workbookOwner, setWorkbookOwner] = useState<string>();
+  const upload = useRef<{ uid: string; run: () => Promise<void> } | null>(null);
 
   useEffect(() => {
-    initialSnapshotReceived.current = false;
+    setCloudEmpty(false);
+    setWorkbookOwner(undefined);
     if (!firebaseReady || !db) {
       setStatus('Cloud sync unavailable — Firebase failed to load');
       return;
@@ -72,86 +70,186 @@ export function useWorkbookCloudSync<TWorkbook>(
       return;
     }
     setStatus('Syncing…');
-    const workbookRef = ref(db, cloudPath(user.uid));
+    const workbookRef = ref(db, `users/${user.uid}/${cloudPathSuffix}`);
+    type Snapshot = (TWorkbook & { _updated?: string }) | null;
+    let baseline: Snapshot | undefined;
+    let latest: Snapshot | undefined;
+    let remoteEvents = 0;
+    let pending: { workbook: TWorkbook; epoch: number } | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let applying = false;
+    let writing = false;
+    let closed = false;
+    let conflict = false;
+    let maintenanceDraft: { baseline: Snapshot | undefined; dirty: boolean; editedDuring: boolean } | undefined;
+    let sessionEpoch = workbookSyncEpochFor(cloudPathSuffix);
 
-    const unsubscribe = onValue(
-      workbookRef,
-      (snap) => {
-        const remote = snap.val() as (TWorkbook & { _updated?: string }) | null;
-        if (remote) {
-          applyingRemote.current = true;
-          const { _updated, ...workbook } = remote;
-          // Merge onto a fresh default shape instead of trusting the cloud
-          // document to have every field — older data (written before a
-          // field like `watchlist` existed) coming back without it crashed
-          // every page's ticker-datalist useMemo on `.forEach` of
-          // `undefined`. Same defensive pattern as loadFromLocalStorage()
-          // and the JSON-import flow; the cloud sync path was the one
-          // place still skipping it.
-          useStore.getState().setWorkbook({ ...createEmpty(), ...workbook } as TWorkbook);
-          applyingRemote.current = false;
+    const applyRemote = (remote: Snapshot) => {
+      baseline = remote;
+      setCloudEmpty(remote === null);
+      if (remote === null) {
+        setWorkbookOwner(undefined);
+        setStatus('No cloud data found for this account yet');
+        return;
+      }
+      const { _updated, ...workbook } = remote;
+      applying = true;
+      try {
+        useStore.getState().setWorkbook({ ...createEmpty(), ...workbook } as TWorkbook);
+      } finally {
+        applying = false;
+      }
+      setWorkbookOwner(user.uid);
+      setStatus(`Synced${_updated ? ' · ' + new Date(_updated).toLocaleString() : ''}`);
+    };
+
+    const refreshEpoch = () => {
+      const epoch = workbookSyncEpochFor(cloudPathSuffix);
+      if (sessionEpoch === epoch) return;
+      sessionEpoch = epoch;
+      pending = undefined;
+      conflict = false;
+      baseline = latest;
+    };
+
+    const schedule = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => void flush(), PUSH_DEBOUNCE_MS);
+    };
+
+    const persist = async (draft: NonNullable<typeof pending>, expected: Snapshot) => {
+      const expectedKey = fingerprint(expected);
+      const eventsBeforeWrite = remoteEvents;
+      const active = () => !closed && !workbookSyncPaused(cloudPathSuffix) && workbookSyncEpochFor(cloudPathSuffix) === draft.epoch;
+      const payload = stripUndefinedDeep({ ...draft.workbook, _updated: new Date().toISOString() });
+      writing = true;
+      try {
+        const result = await runTransaction(workbookRef, (current: unknown) =>
+          active() && fingerprint(current) === expectedKey ? payload : undefined, { applyLocally: false });
+        if (!active()) throw new Error('The active account or workbook changed during upload.');
+        if (!result.committed) {
+          conflict = true;
           setCloudEmpty(false);
-          setStatus(`Synced${_updated ? ' · ' + new Date(_updated).toLocaleString() : ''}`);
-        } else {
-          // No data found at this path. Do NOT write anything — just
-          // surface it and let the user explicitly decide what to do.
-          setCloudEmpty(true);
-          setStatus('No cloud data found for this account yet');
+          setStatus('Cloud conflict — local edits kept. Export local data before reloading.');
+          throw new Error('Cloud data changed before the upload completed.');
         }
-        initialSnapshotReceived.current = true;
-      },
-      (err) => {
-        console.warn(`Firebase ${cloudPathSuffix} listener error`, err);
-        setStatus('Sync error — check console');
-      },
-    );
+        const committed = (result.snapshot?.val() ?? payload) as Snapshot;
+        baseline = committed;
+        setCloudEmpty(false);
+        setWorkbookOwner(user.uid);
+        setStatus('Synced');
+        // Firebase can deliver a newer server value before the transaction
+        // promise resolves. A queued edit still belongs to the committed base.
+        if (!pending && remoteEvents !== eventsBeforeWrite && latest !== undefined && fingerprint(latest) !== expectedKey &&
+            fingerprint(latest) !== fingerprint(committed)) applyRemote(latest);
+      } finally {
+        writing = false;
+        if (!closed && draft.epoch !== workbookSyncEpochFor(cloudPathSuffix) && !workbookSyncPaused(cloudPathSuffix) && !pending && !conflict && latest !== undefined) applyRemote(latest);
+        if (!closed && pending && !conflict) schedule();
+      }
+    };
 
-    return () => unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid]);
-
-  // Push local changes to the cloud, debounced, skipping echoes of a
-  // just-applied remote update, and never before the initial pull has
-  // actually completed (see safety note above).
-  useEffect(() => {
-    if (!firebaseReady || !db || !user) return;
-    const unsubscribe = useStore.subscribe((state) => {
-      if (applyingRemote.current) return;
-      if (!initialSnapshotReceived.current) return;
-      if (pushTimer.current) clearTimeout(pushTimer.current);
-      pushTimer.current = setTimeout(() => {
-        try {
-          const payload = stripUndefinedDeep({ ...state.workbook, _updated: new Date().toISOString() });
-          set(ref(db!, cloudPath(user.uid)), payload).catch((e) => console.warn(`Failed to push ${cloudPathSuffix} to cloud`, e));
-        } catch (e) {
-          // set() validates its argument synchronously and throws before
-          // even returning a promise for some invalid shapes — a .catch()
-          // on the call above can't see that. stripUndefinedDeep should
-          // prevent this in practice; caught here as defense-in-depth so a
-          // bad push never becomes an uncaught exception.
-          console.warn(`Failed to push ${cloudPathSuffix} to cloud`, e);
+    async function flush() {
+      refreshEpoch();
+      if (closed || writing || conflict || workbookSyncPaused(cloudPathSuffix) || !pending || baseline === undefined) return;
+      const draft = pending;
+      pending = undefined;
+      try {
+        await persist(draft, baseline);
+      } catch (error) {
+        if (closed || draft.epoch !== workbookSyncEpochFor(cloudPathSuffix)) return;
+        if (!conflict) {
+          conflict = true;
+          setCloudEmpty(false);
+          setStatus('Cloud write failed — local edits kept. Export local data before reloading.');
         }
-      }, PUSH_DEBOUNCE_MS);
+        console.warn(`Failed to push ${cloudPathSuffix} to cloud`, error);
+      }
+    }
+
+    const unsubscribeRemote = onValue(workbookRef, snap => {
+      if (closed) return;
+      refreshEpoch();
+      latest = snap.val() as Snapshot;
+      remoteEvents++;
+      if (!workbookSyncPaused(cloudPathSuffix) && !writing && !pending && !conflict) applyRemote(latest);
+    }, err => {
+      if (closed) return;
+      console.warn(`Firebase ${cloudPathSuffix} listener error`, err);
+      if (!conflict) setStatus('Sync error — check console');
     });
+
+    const unsubscribeStore = useStore.subscribe((state, previous) => {
+      if (applying || state.workbook === previous.workbook) return;
+      if (workbookSyncPaused(cloudPathSuffix)) {
+        if (maintenanceDraft) maintenanceDraft.editedDuring = true;
+        else maintenanceDraft = { baseline, dirty: !!pending || writing || conflict, editedDuring: true };
+        return;
+      }
+      refreshEpoch();
+      if (baseline === undefined || conflict) return;
+      pending = { workbook: state.workbook, epoch: sessionEpoch };
+      schedule();
+    });
+
+    const unsubscribeMaintenance = subscribeWorkbookMaintenance(event => {
+      if (closed) return;
+      if (event.phase === 'begin') {
+        if (workbookSyncPaused(cloudPathSuffix)) maintenanceDraft = { baseline, dirty: !!pending || writing || conflict, editedDuring: false };
+        return;
+      }
+      if (sessionEpoch === workbookSyncEpochFor(cloudPathSuffix)) return;
+      const draft = maintenanceDraft;
+      maintenanceDraft = undefined;
+      refreshEpoch();
+      const acknowledged = event.snapshots && Object.prototype.hasOwnProperty.call(event.snapshots, cloudPathSuffix);
+      if (acknowledged) {
+        latest = event.snapshots![cloudPathSuffix] as Snapshot;
+        baseline = latest;
+        if (draft?.editedDuring && !event.discardLocalChanges) {
+          conflict = true;
+          setStatus('Cloud restore saved — newer local edits kept. Export local data before reloading.');
+        } else applyRemote(latest);
+        return;
+      }
+      if (draft?.dirty || draft?.editedDuring) {
+        if (fingerprint(latest) !== fingerprint(draft.baseline)) {
+          conflict = true;
+          setStatus('Cloud conflict — local edits kept. Export local data before reloading.');
+        } else if (baseline !== undefined) {
+          pending = { workbook: useStore.getState().workbook, epoch: sessionEpoch };
+          schedule();
+        }
+      } else if (!writing && latest !== undefined) applyRemote(latest);
+    });
+
+    const initialize = async () => {
+      if (closed) throw new Error('The active account changed. Reopen the upload.');
+      if (workbookSyncPaused(cloudPathSuffix) || writing) throw new Error('A data operation is in progress.');
+      refreshEpoch();
+      if (baseline !== null || latest !== null || conflict) throw new Error('Cloud storage must be confirmed empty before upload.');
+      clearTimeout(timer);
+      pending = undefined;
+      await persist({ workbook: useStore.getState().workbook, epoch: sessionEpoch }, null);
+    };
+    upload.current = { uid: user.uid, run: initialize };
+
     return () => {
-      unsubscribe();
-      if (pushTimer.current) clearTimeout(pushTimer.current);
+      closed = true;
+      upload.current = null;
+      clearTimeout(timer);
+      unsubscribeStore();
+      unsubscribeMaintenance();
+      unsubscribeRemote();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid]);
+  }, [user?.uid, cloudPathSuffix, useStore]);
 
-  /** Explicit, user-initiated upload of the current local workbook to the
-   * cloud. Only meant to be offered when `cloudEmpty` is true (confirmed no
-   * data at this path) — the caller should still confirm with the user
-   * before calling this, since it's a full overwrite. */
   const uploadLocalToCloud = async () => {
-    if (!firebaseReady || !db || !user) throw new Error('Not signed in');
-    const local = useStore.getState().workbook;
-    const payload = stripUndefinedDeep({ ...local, _updated: new Date().toISOString() });
-    await set(ref(db, cloudPath(user.uid)), payload);
-    setCloudEmpty(false);
-    setStatus('Synced (uploaded local data)');
+    if (!user || !upload.current) throw new Error('Not signed in');
+    if (upload.current.uid !== user.uid) throw new Error('The active account changed. Reopen the upload.');
+    await upload.current.run();
   };
 
-  return { status, cloudEmpty, uploadLocalToCloud };
+  return { status, cloudEmpty, uploadLocalToCloud, workbookOwner: user?.uid === workbookOwner ? workbookOwner : undefined };
 }

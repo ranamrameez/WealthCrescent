@@ -280,7 +280,7 @@ function CategoryGroupRow({ group }: { group: CategoryGroup }) {
  * rendered while `cat_ignore_count` still exists in the registry, so the
  * button disappears once it's actually been merged rather than staying as
  * a dead, always-clickable action. */
-function CategoriesSection() {
+export function CategoriesSection({ showGroups = true }: { showGroups?: boolean } = {}) {
   const categories = useCategoryStore((s) => s.workbook.categories);
   const addCategory = useCategoryStore((s) => s.addCategory);
   const renameCategory = useCategoryStore((s) => s.renameCategory);
@@ -394,6 +394,7 @@ function CategoriesSection() {
         </button>
       </div>
 
+      {showGroups && <>
       <h4>Groups — bird's-eye view</h4>
       <p className="text-muted" style={{ marginTop: 0, marginBottom: 8 }}>
         Bundle categories into a named group (e.g. "Expense" = Travel + Grocery + ..., "Income" =
@@ -411,6 +412,7 @@ function CategoriesSection() {
           <PlusIcon size={12} />Add group
         </button>
       </div>
+      </>}
     </CollapsibleCard>
   );
 }
@@ -551,7 +553,7 @@ export function AccountPage({ syncStatuses }: { syncStatuses: ModuleSyncStatus[]
          group's expandable category checklist needs more room than a
          narrow ~300px card. */}
       <div className="mb-md">
-        <CategoriesSection />
+        <CollapsibleCard title={<h3 className="m-0">Categories</h3>}><Link to="/organize/categories">Browse and manage categories</Link></CollapsibleCard>
       </div>
 
       <Notice tone="info" className="mb-md">

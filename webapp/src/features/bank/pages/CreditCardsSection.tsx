@@ -1,3 +1,6 @@
+import { toCSV } from '../../../lib/csv';
+import { isCardFundedInstallmentLink } from '../../../types/interEntityTransfer';
+import { fulfillManualPlan } from '../../../services/finance/manualPlanPaymentService';
 import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
 import { CreditCardPositionSummary } from '../../../components/CreditCardPositionSummary';
@@ -5,10 +8,10 @@ import { DateValue } from '../../../components/DateValue';
 import { useTablePagination } from '../../../hooks/useTablePagination';
 import { ToggleChip } from '../../../components/ui/ToggleChip';
 import { EntityEditorModal } from '../../../components/EntityEditorModal';
-import { planOccurrences, occurrenceCompleted } from '../../../lib/calc/planOccurrences';
+import { planOccurrences } from '../../../lib/calc/planOccurrences';
 import { BackButton } from '../../../components/BackButton';
 import { useMemo, useState } from 'react';
-import { Bar, Doughnut, Line } from 'react-chartjs-2';
+import { AppBar as Bar, AppDoughnut as Doughnut, AppLine as Line } from '../../../components/AppCharts';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CreditCardVisual } from '../../../components/CreditCardVisual';
 import { SummarySection, SummarySections, SummaryValue } from '../../../components/SummaryGroupCard';
@@ -45,7 +48,7 @@ import { categoryName, UNCATEGORIZED_ID } from '../../../lib/categories';
 import { dlBarV, dlDoughnut } from '../../../lib/chartLabels';
 import { applyChartTheme } from '../../../lib/chartSetup';
 import { cssVar, tickerColor } from '../../../lib/cssVar';
-import { chartAlpha, chartDepthPlugin } from '../../../lib/chartVisuals';
+import { chartAlpha } from '../../../lib/chartVisuals';
 import { recurrenceLabel } from '../../../lib/recurrenceLabel';
 import { type PlanningHorizonDays } from '../../../lib/calc/plannedBalance';
 import { useCategoryStore } from '../../../store/categoryStore';
@@ -56,14 +59,15 @@ import {
   activeCycleStatement,
   latestClosedStatement,
   markupThisCycle,
-  nextPendingMinDue,
+  type CreditCardStatement,
+  availableCredit,
   outstandingBalanceByCard,
   proposeMinPayment,
 } from '../../../lib/calc/creditCardModule';
 import { formatDate, fmtMoney } from '../../../lib/format';
-import { createLinkedTransfer } from '../../../lib/linkCascade';
-import { defaultTimezoneForCurrency, nowTime } from '../../../lib/datetime';
+import { createLinkedTransfer, findLinkForRecord, hasIndependentInstallmentLinks } from '../../../lib/linkCascade';
 import { firebaseReady } from '../../../lib/firebase/client';
+import { getCurrentUser } from '../../../lib/firebase/useAuthState';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { useBankWorkbookStore } from '../../../store/bankWorkbookStore';
 import { useCashWorkbookStore } from '../../../store/cashWorkbookStore';
@@ -71,7 +75,7 @@ import { addCreditCardTransactions, useCreditCardWorkbookStore } from '../../../
 import { usePlannedCreditCardWorkbookStore } from '../../../store/plannedCreditCardWorkbookStore';
 import { useAppearanceStore } from '../../../store/appearanceStore';
 import type { LinkSideConfig } from '../../../types/interEntityTransfer';
-import type { CreditCard, CreditCardTransaction, CreditCardTransactionKind } from '../../../types/creditCard';
+import type { CreditCard, CreditCardTransaction, CreditCardTransactionKind, CreditCardStatementOverride } from '../../../types/creditCard';
 import type { PlannedCreditCardTransaction } from '../../../types/plannedCreditCard';
 import type { BankAccount } from '../../../types/bankWorkbook';
 
@@ -144,6 +148,10 @@ function CreditCardForm({
     if (!(await ensureSignedIn(card ? 'Sign in to update this credit card.' : 'Sign in to save credit cards.'))) return;
     const clean = { ...draft, name: draft.name.trim() };
     if (card) {
+      const currentCard = useCreditCardWorkbookStore.getState().workbook.cards.find(row => row.id === card.id);
+      if (clean.currencyCode !== currentCard?.currencyCode && hasIndependentInstallmentLinks('creditCard', card.id)) {
+        return toast('This card cannot change currency while linked to installment receipts.');
+      }
       updateCard(card.id, clean);
       toast('Credit card updated.');
       onSaved?.(card.id);
@@ -307,34 +315,22 @@ function LinkedCardPaymentFields({
   );
 }
 
-function emptyTx(cardId: string, currencyCode: string): Omit<CreditCardTransaction, 'id'> {
-  return {
-    cardId,
-    date: today(),
-    time: nowTime(defaultTimezoneForCurrency(currencyCode)),
-    timezone: defaultTimezoneForCurrency(currencyCode),
-    kind: 'charge',
-    amount: 0,
-    description: '',
-    categoryID: UNCATEGORIZED_ID,
-    source: 'manual',
-  };
-}
-
 function CreditCardTransactionFields({
   value,
   onChange,
   required = false,
+  kinds = Object.keys(KIND_LABELS) as CreditCardTransactionKind[],
 }: {
   value: Omit<CreditCardTransaction, 'id'>;
   onChange: (patch: Partial<CreditCardTransaction>) => void;
   required?: boolean;
+  kinds?: CreditCardTransactionKind[];
 }) {
   return (
     <>
       <Field label="Type" width={190} required={required}>
         <Select value={value.kind} onChange={(e) => onChange({ kind: e.target.value as CreditCardTransactionKind })}>
-          {(Object.keys(KIND_LABELS) as CreditCardTransactionKind[]).map((k) => <option key={k} value={k}>{KIND_LABELS[k]}</option>)}
+          {kinds.map((k) => <option key={k} value={k}>{KIND_LABELS[k]}</option>)}
         </Select>
       </Field>
       <Field label="Date" width={140}>
@@ -359,62 +355,6 @@ function CreditCardTransactionFields({
   );
 }
 
-/** User-reported (2026-09-14): "No FAB capable of multiple enteries at a
- * time" — this used to add exactly one transaction per submit (add, form
- * resets, sign-in-gate re-runs) with no way to queue several from one
- * real statement in a single sitting, unlike the app-wide `Main` tier's
- * own "FAB(+) + popups for adding a single OR A BATCH of new
- * transactions" rule (CLAUDE.md) — every other kind-picker-needing add
- * flow either already batches (Bank's own CSV import,
- * `TransactionEntryModal`'s multi-row `rows` state) or doesn't need to
- * (a plain deposit/withdrawal covered by `TransactionEntryModal` itself,
- * which a credit card can't fully use since it hardcodes `kind:'payment'`
- * — see that file's own comment). Rewritten onto the same
- * queue-a-row/remove-a-row/submit-all-at-once shape, backed by the
- * already-existing bulk `addCreditCardTransactions`. */
-function AddCardTransactionForm({ card, onDone }: { card: CreditCard; onDone?: () => void }) {
-  const ensureSignedIn = useEnsureSignedIn();
-  const [nextKey, setNextKey] = useState(1);
-  const [rows, setRows] = useState<(Omit<CreditCardTransaction, 'id'> & { key: number })[]>(() => [{ ...emptyTx(card.id, card.currencyCode), key: 0 }]);
-
-  const updateRow = (key: number, patch: Partial<CreditCardTransaction>) =>
-    setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
-  const addRow = () => {
-    setRows((rs) => [...rs, { ...emptyTx(card.id, card.currencyCode), key: nextKey }]);
-    setNextKey((k) => k + 1);
-  };
-  const removeRow = (key: number) => setRows((rs) => (rs.length > 1 ? rs.filter((r) => r.key !== key) : rs));
-
-  const submit = async () => {
-    const valid = rows.filter((r) => r.amount > 0 && r.description.trim());
-    if (!valid.length) return toast('Enter an amount and description on at least one row.');
-    if (!(await ensureSignedIn('Sign in to save transactions.'))) return;
-    addCreditCardTransactions(valid.map((r) => ({ ...r, id: uid(), description: r.description.trim() })));
-    toast(valid.length > 1 ? `${valid.length} transactions saved.` : 'Transaction saved.');
-    onDone?.();
-  };
-
-  return (
-    <div>
-      {rows.map((row, i) => (
-        <div key={row.key} className="row gap-sm mb-sm" style={{ alignItems: 'flex-end' }}>
-          <CreditCardTransactionFields value={row} required={i === 0} onChange={(patch) => updateRow(row.key, patch)} />
-          <IconButton label="Remove row" icon={<TrashIcon size={12} />} align="right" onClick={() => removeRow(row.key)} />
-        </div>
-      ))}
-      <div className="row gap-sm">
-        <button className="btn secondary small" onClick={addRow}><PlusIcon size={12} />Add another row</button>
-        <button className="btn" onClick={submit}><SaveIcon size={12} />Save {rows.length > 1 ? `${rows.length} transactions` : 'transaction'}</button>
-      </div>
-    </div>
-  );
-}
-
-/** User-reported (2026-09-11): "CC is stuck in a popup with no edition
- * options for transactions" — this table only ever offered Delete + a
- * read-only detail popup; there was no way to correct a typo'd amount or
- * description without deleting and re-adding the row. Mirrors Bank's own
- * `TransactionsList` inline-edit-row pattern (`BankPage.tsx`). */
 function CreditCardTransactionEditModal({
   transaction,
   onClose,
@@ -426,6 +366,7 @@ function CreditCardTransactionEditModal({
   const [draft, setDraft] = useState<CreditCardTransaction>({ ...transaction });
 
   const save = () => {
+    if (isCardFundedInstallmentLink(findLinkForRecord('creditCard', draft.id))) return toast('This charge is linked to an installment receipt.');
     if (!(draft.amount > 0)) return toast('Enter an amount greater than zero.');
     if (!draft.description.trim()) return toast('Enter a description.');
     updateTransaction(draft.id, { ...draft, description: draft.description.trim() });
@@ -474,7 +415,7 @@ function TransactionsTable({ card, filters, showActions = false }: { card: Credi
   // Running utilization is calculated from the complete chronological ledger,
   // never from the filtered/sorted page, so a date filter cannot reset the
   // opening balance or change the limit usage shown on an individual row.
-  const runningConsumedById = useMemo(() => creditCardRunningBalances(card, cardTxs), [card, cardTxs]);
+  const runningConsumedById = useMemo(() => creditCardRunningBalances(card, transactions), [card, transactions]);
 
   if (!cardTxs.length) return <p className="text-muted m-0">No transactions yet.</p>;
   return (
@@ -493,7 +434,7 @@ function TransactionsTable({ card, filters, showActions = false }: { card: Credi
               <td>{fmtMoney(t.amount, card.currencyCode)}</td>
               <td>{fmtMoney(runningConsumedById.get(t.id) ?? 0, card.currencyCode)}</td>
               <td>{card.creditLimit == null ? '—' : fmtMoney(card.creditLimit, card.currencyCode)}</td>
-              <td>{card.creditLimit == null ? '—' : fmtMoney(Math.max(0, card.creditLimit - (runningConsumedById.get(t.id) ?? 0)), card.currencyCode)}</td>
+              <td>{card.creditLimit == null ? '—' : fmtMoney(availableCredit(card, runningConsumedById.get(t.id) ?? 0), card.currencyCode)}</td>
               <td onClick={(e) => e.stopPropagation()}>
                 {showActions && <IconButton label="Edit" icon={<EditIcon size={12} />} align="right" onClick={() => setEditingTransaction(t)} />}
                 {showActions && <IconButton
@@ -501,7 +442,9 @@ function TransactionsTable({ card, filters, showActions = false }: { card: Credi
                   icon={<TrashIcon size={12} />}
                   align="right"
                   onClick={async () => {
-                    if (await confirmDialog('This cannot be undone.', 'Delete this transaction?')) deleteTransaction(t.id);
+                    if (!(await confirmDialog('This cannot be undone.', 'Delete this transaction?'))) return;
+                    if (isCardFundedInstallmentLink(findLinkForRecord('creditCard', t.id))) return toast('This charge is linked to an installment receipt.');
+                    deleteTransaction(t.id);
                   }}
                 />}
               </td>
@@ -576,8 +519,8 @@ function CreditCardAnalyticsSection({ card, transactions }: { card: CreditCard; 
 
   let balance = card.openingBalance ?? 0;
   const ledger = rows.map((tx) => {
-    balance = Math.max(0, balance + effect(tx));
-    return { tx, balance };
+    balance += effect(tx);
+    return { tx, balance: Math.max(0, balance) };
   });
   const categoryTotals = Object.entries(rows.filter((tx) => tx.kind !== 'payment').reduce<Record<string, number>>((out, tx) => {
     const name = categoryName(tx.categoryID, categories);
@@ -646,14 +589,68 @@ function CreditCardAnalyticsSection({ card, transactions }: { card: CreditCard; 
     </div>
     <div className="analytics-grid">
     <AnalyticsChartEnhancer />
-    <div className="analytics-chart chart-height-lg"><Tooltip text="Outstanding card balance over time."><h4 className="clickable">Balance over time</h4></Tooltip><div className="chart-canvas-wrap"><Line plugins={[chartDepthPlugin]} data={({labels:['Opening',...ledger.map((row)=>formatDate(row.tx.date,dateFormat)),'Closing'],datasets:[{type:'bar' as never,label:'Balance columns',data:[opening,...ledger.map((row)=>row.balance),periodEndActual],backgroundColor:chartAlpha('#38bdf8',.18),borderColor:chartAlpha('#38bdf8',.5),borderWidth:1,borderRadius:4},{label:'Balance by transaction',data:[opening,...ledger.map((row)=>row.balance),periodEndActual],borderColor:chartAlpha('#38bdf8',.9),backgroundColor:chartAlpha('#38bdf8',.2),fill:true,tension:.24,pointRadius:0,pointHoverRadius:4},{label:'Start → end balance',data:[opening,...ledger.map(()=>null),periodEndActual],borderColor:chartAlpha('#a78bfa',.95),backgroundColor:'transparent',borderDash:[6,4],borderWidth:2,pointRadius:3,pointHoverRadius:5,spanGaps:true}]} as any)} options={{responsive:true,maintainAspectRatio:false,scales:{x:axisOptions,y:balanceAxis},interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,labels:{filter:(item)=>item.datasetIndex!==0}},tooltip:{enabled:true,filter:(item)=>item.datasetIndex!==0},datalabels:{display:false}}}} /></div></div>
-    <div className="analytics-chart chart-height-lg"><Tooltip text="Card spending and payments by calendar month, with the actual ending balance and planned adjustment."><h4 className="clickable">Spending, payments &amp; balance</h4></Tooltip><div className="chart-canvas-wrap"><Bar plugins={[chartDepthPlugin]} data={({labels:months,datasets:[{label:'Payments',data:deposits,backgroundColor:chartAlpha(profit,.72),borderColor:chartAlpha(profit,.95),borderWidth:2,borderRadius:6},{label:'Spending',data:withdrawals,backgroundColor:chartAlpha(loss,.72),borderColor:chartAlpha(loss,.95),borderWidth:2,borderRadius:6},{label:'Actual balance',data:monthlyActualBalance,backgroundColor:chartAlpha('#38bdf8',.42),borderColor:chartAlpha('#38bdf8',.85),borderWidth:1,borderRadius:4,stack:'balance'},{label:'Planned adjustment',data:monthlyExpectedAdjustment,backgroundColor:chartAlpha('#a78bfa',.5),borderColor:chartAlpha('#a78bfa',.9),borderWidth:1,borderRadius:4,stack:'balance'},{type:'line' as never,label:'Actual balance',data:monthlyActualBalance,borderColor:chartAlpha('#38bdf8',.95),backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.2}]} as any)} options={{interaction:{mode:'index',intersect:false},scales:{x:{...axisOptions,stacked:true},y:axisOptions},plugins:{legend:{labels:{filter:(item)=>item.datasetIndex!==2}},tooltip:{filter:(item)=>item.datasetIndex!==2},datalabels:dlBarV((v)=>fmtMoney(v,card.currencyCode))}}} /></div></div>
-    <div className="analytics-chart"><Tooltip text="Total card transaction amount grouped by category."><h4 className="clickable">Transactions by category</h4></Tooltip><div className="chart-canvas-wrap"><Doughnut plugins={[chartDepthPlugin]} data={({labels:categoryTotals.map(([name])=>name),datasets:[{label:'Transactions',data:categoryTotals.map(([,amount])=>amount),backgroundColor:categoryTotals.map(([name])=>chartAlpha(tickerColor(name),.72)),borderColor:categoryTotals.map(([name])=>chartAlpha(tickerColor(name),.95)),borderWidth:2,hoverOffset:8}]} as any)} options={{responsive:true,maintainAspectRatio:false,cutout:'48%',rotation:-25,plugins:{legend:{display:true,position:'right',labels:{boxWidth:10,padding:8}},datalabels:dlDoughnut((v)=>fmtMoney(v,card.currencyCode))},layout:{padding:8}}} /></div></div>
-    <div className="analytics-chart"><Tooltip text="Actual and planned expected outstanding balance. Credit Cards do not currently have pending ledger transactions, so Pending remains zero."><h4 className="clickable">Actual vs Expected Balance (Pending &amp; Planned)</h4></Tooltip><div className="chart-canvas-wrap"><Bar plugins={[chartDepthPlugin]} data={({labels:comparisonLabels,datasets:[{type:'bar' as never,label:'Actual balance',data:actualChartData,backgroundColor:chartAlpha('#38bdf8',.42),borderColor:chartAlpha('#38bdf8',.85),borderWidth:2,borderRadius:6,stack:'balance'},{type:'line' as never,label:'Actual balance',data:actualChartData,borderColor:chartAlpha('#38bdf8',.95),backgroundColor:'transparent',borderWidth:2,pointRadius:0,tension:.2},{type:'line' as never,label:'Pending balance',data:pendingChartData,borderColor:chartAlpha('#f59e0b',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[5,4],pointRadius:0},{type:'line' as never,label:'Planned balance',data:plannedChartData,borderColor:chartAlpha('#22c55e',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[8,3],pointRadius:0},{type:'line' as never,label:'Expected balance',data:expectedChartData,borderColor:chartAlpha('#a78bfa',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[2,3],pointRadius:0}]} as any)} options={{interaction:{mode:'index',intersect:false},scales:{x:{...axisOptions,stacked:true},y:balanceAxis},plugins:{legend:{display:true,labels:{filter:(item)=>item.datasetIndex!==0}},tooltip:{filter:(item)=>item.datasetIndex!==0},datalabels:{display:false}}}} /></div></div>
-    <div className="analytics-chart"><Tooltip text="Actual, pending, planned, and combined expected outstanding at period end."><h4 className="clickable">Period-end balance summary</h4></Tooltip><div className="chart-canvas-wrap"><Doughnut plugins={[chartDepthPlugin]} data={({labels:['Actual','Pending','Planned','Expected'],datasets:[{label:'Period end',data:[Math.abs(periodEndActual),Math.abs(periodEndPending),Math.abs(periodEndPlanned),Math.abs(periodEndExpected)],backgroundColor:['#38bdf8','#f59e0b','#22c55e','#a78bfa'].map((color)=>chartAlpha(color,.72)),borderColor:['#38bdf8','#f59e0b','#22c55e','#a78bfa'],borderWidth:2,hoverOffset:8}]} as any)} options={{responsive:true,maintainAspectRatio:false,cutout:'48%',plugins:{legend:{display:true,position:'right'},tooltip:{callbacks:{label:(item)=>`${item.label}: ${fmtMoney([periodEndActual,periodEndPending,periodEndPlanned,periodEndExpected][item.dataIndex],card.currencyCode)}`}},datalabels:dlDoughnut((v)=>fmtMoney(v,card.currencyCode))}}} /></div></div>
+    <div className="analytics-chart chart-height-lg"><Tooltip text="Outstanding card balance over time."><h4 className="clickable">Balance over time</h4></Tooltip><div className="chart-canvas-wrap"><Line  data={({labels:['Opening',...ledger.map((row)=>formatDate(row.tx.date,dateFormat)),'Closing'],datasets:[{type:'bar' as never,label:'Balance columns',data:[opening,...ledger.map((row)=>row.balance),periodEndActual],backgroundColor:chartAlpha('#38bdf8',.18),borderColor:chartAlpha('#38bdf8',.5),borderWidth:1,borderRadius:4},{label:'Balance by transaction',data:[opening,...ledger.map((row)=>row.balance),periodEndActual],borderColor:chartAlpha('#38bdf8',.9),backgroundColor:chartAlpha('#38bdf8',.2),fill:true,tension:.24,pointRadius:0,pointHoverRadius:4},{label:'Start → end balance',data:[opening,...ledger.map(()=>null),periodEndActual],borderColor:chartAlpha('#a78bfa',.95),backgroundColor:'transparent',borderDash:[6,4],borderWidth:2,pointRadius:3,pointHoverRadius:5,spanGaps:true}]} as any)} options={{responsive:true,maintainAspectRatio:false,scales:{x:axisOptions,y:balanceAxis},interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,labels:{filter:(item)=>item.datasetIndex!==0}},tooltip:{enabled:true,filter:(item)=>item.datasetIndex!==0},datalabels:{display:false}}}} /></div></div>
+    <div className="analytics-chart chart-height-lg"><Tooltip text="Card spending and payments by calendar month, with the actual ending balance and planned adjustment."><h4 className="clickable">Spending, payments &amp; balance</h4></Tooltip><div className="chart-canvas-wrap"><Bar  data={({labels:months,datasets:[{label:'Payments',data:deposits,backgroundColor:chartAlpha(profit,.72),borderColor:chartAlpha(profit,.95),borderWidth:2,borderRadius:6},{label:'Spending',data:withdrawals,backgroundColor:chartAlpha(loss,.72),borderColor:chartAlpha(loss,.95),borderWidth:2,borderRadius:6},{label:'Actual balance',data:monthlyActualBalance,backgroundColor:chartAlpha('#38bdf8',.42),borderColor:chartAlpha('#38bdf8',.85),borderWidth:1,borderRadius:4,stack:'balance'},{label:'Planned adjustment',data:monthlyExpectedAdjustment,backgroundColor:chartAlpha('#a78bfa',.5),borderColor:chartAlpha('#a78bfa',.9),borderWidth:1,borderRadius:4,stack:'balance'},{type:'line' as never,label:'Actual balance',data:monthlyActualBalance,borderColor:chartAlpha('#38bdf8',.95),backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:.2}]} as any)} options={{interaction:{mode:'index',intersect:false},scales:{x:{...axisOptions,stacked:true},y:axisOptions},plugins:{legend:{labels:{filter:(item)=>item.datasetIndex!==2}},tooltip:{filter:(item)=>item.datasetIndex!==2},datalabels:dlBarV((v)=>fmtMoney(v,card.currencyCode))}}} /></div></div>
+    <div className="analytics-chart"><Tooltip text="Total card transaction amount grouped by category."><h4 className="clickable">Transactions by category</h4></Tooltip><div className="chart-canvas-wrap"><Doughnut  data={({labels:categoryTotals.map(([name])=>name),datasets:[{label:'Transactions',data:categoryTotals.map(([,amount])=>amount),backgroundColor:categoryTotals.map(([name])=>chartAlpha(tickerColor(name),.72)),borderColor:categoryTotals.map(([name])=>chartAlpha(tickerColor(name),.95)),borderWidth:2,hoverOffset:8}]} as any)} options={{responsive:true,maintainAspectRatio:false,cutout:'48%',rotation:-25,plugins:{legend:{display:true,position:'right',labels:{boxWidth:10,padding:8}},datalabels:dlDoughnut((v)=>fmtMoney(v,card.currencyCode))},layout:{padding:8}}} /></div></div>
+    <div className="analytics-chart"><Tooltip text="Actual and planned expected outstanding balance. Credit Cards do not currently have pending ledger transactions, so Pending remains zero."><h4 className="clickable">Actual vs Expected Balance (Pending &amp; Planned)</h4></Tooltip><div className="chart-canvas-wrap"><Bar  data={({labels:comparisonLabels,datasets:[{type:'bar' as never,label:'Actual balance',data:actualChartData,backgroundColor:chartAlpha('#38bdf8',.42),borderColor:chartAlpha('#38bdf8',.85),borderWidth:2,borderRadius:6,stack:'balance'},{type:'line' as never,label:'Actual balance',data:actualChartData,borderColor:chartAlpha('#38bdf8',.95),backgroundColor:'transparent',borderWidth:2,pointRadius:0,tension:.2},{type:'line' as never,label:'Pending balance',data:pendingChartData,borderColor:chartAlpha('#f59e0b',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[5,4],pointRadius:0},{type:'line' as never,label:'Planned balance',data:plannedChartData,borderColor:chartAlpha('#22c55e',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[8,3],pointRadius:0},{type:'line' as never,label:'Expected balance',data:expectedChartData,borderColor:chartAlpha('#a78bfa',.95),backgroundColor:'transparent',borderWidth:2,borderDash:[2,3],pointRadius:0}]} as any)} options={{interaction:{mode:'index',intersect:false},scales:{x:{...axisOptions,stacked:true},y:balanceAxis},plugins:{legend:{display:true,labels:{filter:(item)=>item.datasetIndex!==0}},tooltip:{filter:(item)=>item.datasetIndex!==0},datalabels:{display:false}}}} /></div></div>
+    <div className="analytics-chart"><Tooltip text="Actual, pending, planned, and combined expected outstanding at period end."><h4 className="clickable">Period-end balance summary</h4></Tooltip><div className="chart-canvas-wrap"><Doughnut  data={({labels:['Actual','Pending','Planned','Expected'],datasets:[{label:'Period end',data:[Math.abs(periodEndActual),Math.abs(periodEndPending),Math.abs(periodEndPlanned),Math.abs(periodEndExpected)],backgroundColor:['#38bdf8','#f59e0b','#22c55e','#a78bfa'].map((color)=>chartAlpha(color,.72)),borderColor:['#38bdf8','#f59e0b','#22c55e','#a78bfa'],borderWidth:2,hoverOffset:8}]} as any)} options={{responsive:true,maintainAspectRatio:false,cutout:'48%',plugins:{legend:{display:true,position:'right'},tooltip:{callbacks:{label:(item)=>`${item.label}: ${fmtMoney([periodEndActual,periodEndPending,periodEndPlanned,periodEndExpected][item.dataIndex],card.currencyCode)}`}},datalabels:dlDoughnut((v)=>fmtMoney(v,card.currencyCode))}}} /></div></div>
     </div>
   </>;
 }
+
+function CardStatementOverrideDialog({ card, cycle, onClose }: { card: CreditCard; cycle: CreditCardStatement; onClose: () => void }) {
+  const ensureSignedIn = useEnsureSignedIn();
+  const [owner] = useState(() => getCurrentUser()?.uid);
+  const [reviewedCard] = useState(card);
+  const [draft, setDraft] = useState<CreditCardStatementOverride>(() => ({ ...card.statementOverrides?.[cycle.cycleEnd] }));
+  const [error, setError] = useState('');
+  const save = async (override?: CreditCardStatementOverride) => {
+    if (!(await ensureSignedIn('Sign in to update the closed statement.'))) return;
+    const store = useCreditCardWorkbookStore.getState();
+    const current = store.workbook.cards.find(item => item.id === card.id);
+    if (!owner || getCurrentUser()?.uid !== owner || !current || JSON.stringify(current) !== JSON.stringify(reviewedCard)) {
+      return setError('The account or card changed. Reopen the statement to review it.');
+    }
+    const statementOverrides = { ...current.statementOverrides };
+    delete statementOverrides[cycle.cycleEnd];
+    const calculated = latestClosedStatement({ ...current, statementOverrides }, store.workbook.transactions, cycle.cycleEnd);
+    if (!calculated || calculated.cycleEnd !== cycle.cycleEnd) return setError('This billing cutoff is no longer available.');
+    if (override) {
+      const { statementBalance, minimumDue, minDueDate, dueDate } = override;
+      const total = statementBalance ?? Math.max(0, calculated.statementBalance);
+      const minDate = minDueDate ?? calculated.minDueDate;
+      const finalDate = dueDate ?? calculated.dueDate;
+      if ((statementBalance !== undefined && (!Number.isFinite(statementBalance) || statementBalance < 0)) ||
+          (minimumDue !== undefined && (!Number.isFinite(minimumDue) || minimumDue < 0 || minimumDue > total))) {
+        return setError('Enter a non-negative bill and a minimum no greater than the bill.');
+      }
+      if ((minDate && minDate < cycle.cycleEnd) || (finalDate && finalDate < cycle.cycleEnd) || (minDate && finalDate && minDate > finalDate)) {
+        return setError('Due dates must follow the billing date, with minimum due on or before final payment.');
+      }
+      if (Object.values(override).some(value => value !== undefined)) statementOverrides[cycle.cycleEnd] = override;
+    }
+    store.updateCard(card.id, { statementOverrides });
+    onClose();
+  };
+  return <Modal title={`Edit closed statement · ${cycle.cycleEnd}`} onClose={onClose} manageFocus>
+    <p>Use the amounts and due dates shown by your bank. Blank fields use the calculated statement.</p>
+    <div className="row gap-sm">
+      <Field label="Bank bill amount"><TextInput type="number" min="0" step="0.01" placeholder={String(cycle.calculatedStatementBalance ?? cycle.statementBalance)}
+        value={draft.statementBalance ?? ''} onChange={event => setDraft({ ...draft, statementBalance: event.target.value === '' ? undefined : event.target.valueAsNumber })} /></Field>
+      <Field label="Bank minimum due"><TextInput type="number" min="0" step="0.01" placeholder={String(cycle.calculatedMinimumDue ?? cycle.minimumDue)}
+        value={draft.minimumDue ?? ''} onChange={event => setDraft({ ...draft, minimumDue: event.target.value === '' ? undefined : event.target.valueAsNumber })} /></Field>
+      <Field label="Minimum due date"><TextInput type="date" value={draft.minDueDate ?? ''} onChange={event => setDraft({ ...draft, minDueDate: event.target.value || undefined })} /></Field>
+      <Field label="Final payment date"><TextInput type="date" value={draft.dueDate ?? ''} onChange={event => setDraft({ ...draft, dueDate: event.target.value || undefined })} /></Field>
+    </div>
+    {error && <p role="alert">{error}</p>}
+    <div className="row gap-sm">
+      <button type="button" className="btn" onClick={() => void save(draft)}>Save statement</button>
+      {reviewedCard.statementOverrides?.[cycle.cycleEnd] && <button type="button" className="btn secondary" onClick={() => void save()}>Restore calculated statement</button>}
+    </div>
+  </Modal>;
+}
+
+type CardEntryMode = 'transfer' | 'plan';
 
 export function CreditCardDetailPage() {
   const banks=useBankWorkbookStore(s=>s.workbook.settings.banks??[]);
@@ -668,6 +665,8 @@ export function CreditCardDetailPage() {
   const ensureSignedIn = useEnsureSignedIn();
   const [editCardOpen, setEditCardOpen] = useState(false);
   const [cardDetailsOpen, setCardDetailsOpen] = useState(false);
+  const [editingCycle, setEditingCycle] = useState<CreditCardStatement | null>(null);
+  const [entryMode, setEntryMode] = useState<CardEntryMode | null>(null);
 
   const balance = card ? outstandingBalanceByCard(card, transactions) : 0;
   const openCycle = card ? activeCycleStatement(card, transactions) : null;
@@ -696,10 +695,31 @@ export function CreditCardDetailPage() {
       return true;
     });
   }, [card, transactions, filters.fromDate, filters.toDate, filters.direction, filters.category, filters.source]);
+  const exportTransactions = (filtered: boolean) => {
+    if (!card) return;
+    const rows = filtered ? visibleTransactions : transactions.filter(tx => tx.cardId === card.id);
+    const categories = useCategoryStore.getState().workbook.categories;
+    const balances = creditCardRunningBalances(card, transactions);
+    const csv = toCSV([
+      ['Date', 'Time', 'Timezone', 'Type', 'Description', 'Category', 'Amount', 'Currency', 'Consumed limit', 'Allowed limit', 'Available limit'],
+      ...rows.map(tx => {
+        const consumed = balances.get(tx.id) ?? 0;
+        return [tx.date, tx.time ?? '', tx.timezone ?? '', KIND_LABELS[tx.kind], tx.description, categoryName(tx.categoryID, categories),
+          tx.amount, card.currencyCode, consumed, card.creditLimit ?? '', card.creditLimit == null ? '' : availableCredit(card, consumed)];
+      }),
+    ]);
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `credit-card-transactions-${filtered ? 'filtered' : 'all'}.csv`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
   const monthlyHistory = useMemo(() => (card ? creditCardMonthlyHistory(card, visibleTransactions, 6) : []), [card, visibleTransactions]);
-  const cycleHistory = useMemo(() => (card ? creditCardCycleHistory(card, visibleTransactions, 6) : []), [card, visibleTransactions]);
-  const [collectAmount, setCollectAmount] = useState(proposal?.amount ?? 0);
-  const [collectDate, setCollectDate] = useState(proposal?.dueDate ?? today());
+  const cycleHistory = useMemo(() => (card ? creditCardCycleHistory(card, transactions, 6) : []), [card, transactions]);
+  const [paymentDraft, setCollectAmount] = useState<number | null>(null);
+  const collectAmount = paymentDraft ?? proposal?.amount ?? 0;
+  const [collectDate, setCollectDate] = useState(today);
   const [linkMode, setLinkMode] = useState(false);
   // Same shared-picker reasoning as Cash's/Bank's own Planning views
   // (2026-09-20) — one "Time period" control governs both the balance
@@ -734,14 +754,13 @@ export function CreditCardDetailPage() {
   }
 
   const logMinPayment = async () => {
-    if (!proposal) return;
+    if (!proposal || !Number.isFinite(collectAmount) || collectAmount <= 0 || !collectDate) return;
     const ok = await confirmDialog(`Log ${fmtMoney(collectAmount, card.currencyCode)} payment on ${collectDate}?`, 'Approve this payment?');
     if (!ok) return;
     if (!(await ensureSignedIn('Sign in to record this transaction.'))) return;
     addTransaction({ id: uid(), cardId: card.id, date: collectDate, kind: 'payment', amount: collectAmount, description: 'Minimum payment', source: 'manual' });
-    const pendingMinDue = nextPendingMinDue(proposal.amount, collectAmount);
-    updateCard(card.id, { pendingMinDue });
-    toast(pendingMinDue ? `Logged — ${fmtMoney(pendingMinDue, card.currencyCode)} still pending, carried to next cycle.` : 'Logged to the ledger.');
+    setCollectAmount(null);
+    toast('Logged to the ledger.');
   };
 
   const logMarkup = async () => {
@@ -766,6 +785,9 @@ export function CreditCardDetailPage() {
 
   const deleteThisCard = async () => {
     if (!(await confirmDialog('This deletes the card and all its transactions — this cannot be undone.', `Delete "${card.name}"?`))) return;
+    if (hasIndependentInstallmentLinks('creditCard', card.id)) {
+      return toast('This card has charges linked to installment receipts.');
+    }
     deleteCard(card.id);
     toast('Card deleted.');
     navigate('/bank');
@@ -814,7 +836,7 @@ export function CreditCardDetailPage() {
               <SummaryValue label="Spent" value={fmtMoney(openCycle.chargesThisCycle, card.currencyCode)} tone="negative" />
               <SummaryValue label="Paid" value={fmtMoney(openCycle.paymentsThisCycle, card.currencyCode)} tone="positive" />
               <SummaryValue label="Current outstanding" value={fmtMoney(balance, card.currencyCode)} tone={balance > 0 ? 'negative' : 'positive'} />
-              {card.creditLimit ? <SummaryValue label="Available credit" value={fmtMoney(Math.max(0, card.creditLimit - Math.max(0, balance)), card.currencyCode)} tone="positive" /> : null}
+              {card.creditLimit ? <SummaryValue label="Available credit" value={fmtMoney(availableCredit(card, balance), card.currencyCode)} tone="positive" /> : null}
               <SummaryValue label="Next billing date" value={openCycle.cycleEnd} />
               <SummaryValue label="Cycle" value={<><DateValue value={openCycle.cycleStart} /> {'\u2192'} <DateValue value={openCycle.cycleEnd} /></>} />
             </> : <p className="text-muted m-0">Add the last billing date in Card details.</p>}
@@ -823,10 +845,10 @@ export function CreditCardDetailPage() {
       </StandardCard></div>
 
       {statement && (
-        <div id="card-statement"><StandardCard title="Bill payment" hue={card.color}>
+        <div id="card-statement"><StandardCard title="Bill payment" hue={card.color} actions={[{ label: 'Edit closed statement', onClick: () => setEditingCycle(statement) }]}>
           <Notice tone={statement.remainingStatementBalance > 0 ? 'warning' : 'success'}>
             <strong>{fmtMoney(statement.remainingStatementBalance, card.currencyCode)} remains on the locked bill</strong>
-            <div className="text-muted mt-4">Billing period {statement.cycleStart} → {statement.cycleEnd}. Payments through {statement.dueDate ?? 'the configured final due date'} reduce this bill; later payments belong to the open cycle.</div>
+            <div className="text-muted mt-4">Billing period {statement.cycleStart} → {statement.cycleEnd}. Payments after billing reduce this bill until the next billing cutoff. Any excess reduces the open cycle.</div>
             <div className="text-muted mt-4">Original bill {fmtMoney(statement.statementBalance, card.currencyCode)} · Applied after billing {fmtMoney(statement.paymentsAfterClose, card.currencyCode)} · Minimum still due {fmtMoney(statement.remainingMinimumDue, card.currencyCode)}</div>
           </Notice>
           {markup > 0 && (
@@ -843,7 +865,7 @@ export function CreditCardDetailPage() {
               </>} />
               {linkMode ? (
                 <div className="mt-sm">
-                  <LinkedCardPaymentFields card={card} amount={collectAmount} date={collectDate} onLinked={() => { const pendingMinDue = nextPendingMinDue(proposal.amount, collectAmount); updateCard(card.id, { pendingMinDue }); }} />
+                  <LinkedCardPaymentFields card={card} amount={collectAmount} date={collectDate} onLinked={() => setCollectAmount(null)} />
                 </div>
               ) : (
                 <button className="btn small mt-sm" onClick={logMinPayment}>Approve &amp; log</button>
@@ -853,15 +875,18 @@ export function CreditCardDetailPage() {
         </StandardCard></div>
       )}
 
-      <div id="card-plans"><StandardCard title="Plans" hue={card.color} defaultOpen={false}>
+      <div id="card-plans"><StandardCard title="Plans" hue={card.color} defaultOpen={false} actions={[{ label: 'Add a plan', onClick: () => setEntryMode('plan') }]}>
           <PlanningHorizonField value={horizonDays} onChange={setHorizonDays} />
           <CardPlanList card={card} horizonDays={horizonDays} />
       </StandardCard></div>
 
       <div id="card-transactions"><StandardCard title="Transactions" hue={card.color} defaultOpen={false}
         actions={[
+          { label: 'Transactions and transfers', onClick: () => setEntryMode('transfer') },
           { label: showTransactionActions ? 'Done modifying' : 'Modify', icon: <EditIcon size={14} />, onClick: () => setShowTransactionActions((value) => !value) },
-          { label: 'Batch edit', icon: <ListIcon size={14} />, onClick: () => setBatchEditOpen(true) },
+          { label: 'Batch edit', icon: <ListIcon size={14} />, onClick: () => setBatchEditOpen(true), disabled: !visibleTransactions.length },
+          { label: 'Export filtered', onClick: () => exportTransactions(true), disabled: !visibleTransactions.length },
+          { label: 'Export all', onClick: () => exportTransactions(false), disabled: !transactions.some(tx => tx.cardId === card.id) },
         ]}
         headerEnd={showTransactionActions ? <IconButton label="Hide modification options" icon={<EditIcon size={13} />} align="right" onClick={() => setShowTransactionActions(false)} /> : undefined}>
         <TransactionsTable card={card} filters={filters} showActions={showTransactionActions} />
@@ -887,6 +912,7 @@ export function CreditCardDetailPage() {
             <SummaryValue label="Paid after billing" value={fmtMoney(cycle.paymentsAfterClose, card.currencyCode)} tone="positive" />
             <SummaryValue label="Minimum still due" value={fmtMoney(cycle.remainingMinimumDue, card.currencyCode)} tone={cycle.remainingMinimumDue > 0 ? 'negative' : 'positive'} />
             <SummaryValue label="Full-payment date" value={cycle.dueDate ?? 'Not set'} />
+            <button type="button" className="btn secondary small" onClick={() => setEditingCycle(cycle)}>Edit closed statement</button>
           </SummarySection>)}
         </SummarySections>
       </StandardCard></div>
@@ -915,38 +941,23 @@ export function CreditCardDetailPage() {
         ]} />
         <button className="btn mt-md" onClick={() => { setCardDetailsOpen(false); setEditCardOpen(true); }}><EditIcon size={13} />Edit card</button>
       </Modal>}
-            <CreditCardDetailFab card={card} />
+      {editingCycle && <CardStatementOverrideDialog card={card} cycle={editingCycle} onClose={() => setEditingCycle(null)} />}
+      <CreditCardDetailFab card={card} open={entryMode} setOpen={setEntryMode} />
     </div>
   );
 }
 
-/** User-reported (2026-09-14): "CC UI is definitely violating the UI
- * Rules... No FAB capable of multiple enteries at a time" — this detail
- * page used to have NO FAB at all; "Add a transaction" sat as a
- * permanently-visible card, unlike every other per-entity detail page
- * (`AccountDetailPage`'s `AccountTransfersFab`), which is exactly the
- * "Often tier" pattern this app's Main/Often/Rare model calls for. Gives
- * this page a real 2-action panel: the kind-aware batch add form (charges/
- * fees/markup/cashAdvance — `TransactionEntryModal` can't do these, see
- * its own comment) and "Transfers" (a real linked payment from a Bank/Cash
- * account, distinct from the "Approve & log" minimum-payment flow above,
- * which is about the proposed minimum specifically). */
-function CreditCardDetailFab({ card }: { card: CreditCard }) {
-  const [open, setOpen] = useState<'add' | 'transfer' | 'plan' | null>(null);
+function CreditCardDetailFab({ card, open, setOpen }: {
+  card: CreditCard; open: CardEntryMode | null; setOpen: (mode: CardEntryMode | null) => void;
+}) {
   return (
     <>
       <FabPanel
         actions={[
-          { label: 'Add a transaction', icon: <PlusIcon />, onClick: () => setOpen('add') },
-          { label: 'Transfers', icon: <TransferIcon />, onClick: () => setOpen('transfer') },
+          { label: 'Transactions and transfers', icon: <TransferIcon />, onClick: () => setOpen('transfer') },
           { label: 'Add a plan', icon: <PlusIcon />, onClick: () => setOpen('plan') },
         ]}
       />
-      {open === 'add' && (
-        <Modal title="Add a transaction" onClose={() => setOpen(null)}>
-          <AddCardTransactionForm card={card} onDone={() => setOpen(null)} />
-        </Modal>
-      )}
       {open === 'transfer' && (
         <TransactionEntryModal defaultFinance={{ module: 'creditCard', ref: card.id, currencyCode: card.currencyCode }} onClose={() => setOpen(null)} />
       )}
@@ -1017,10 +1028,7 @@ function AddCardPlanForm({ cardId, onSaved, plan }: { cardId: string; onSaved?: 
 function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: PlanningHorizonDays }) {
   const dateSort = useDateTableSort();
   const allPlans = usePlannedCreditCardWorkbookStore((s) => s.workbook.entries);
-  const updatePlan = usePlannedCreditCardWorkbookStore((s) => s.updateEntry);
-  const addCompletedPlan = usePlannedCreditCardWorkbookStore((s) => s.addEntry);
   const deletePlan = usePlannedCreditCardWorkbookStore((s) => s.deleteEntry);
-  const addTransaction = useCreditCardWorkbookStore((s) => s.addTransaction);
   const ensureSignedIn = useEnsureSignedIn();
   const [editingPlan, setEditingPlan] = useState<PlannedCreditCardTransaction | null>(null);
   const asOf = useMemo(() => new Date(), []);
@@ -1034,26 +1042,14 @@ function CardPlanList({ card, horizonDays }: { card: CreditCard; horizonDays: Pl
   const { rows: pageRows, controls: paginationControls } = useTablePagination(sorted);
 
   const markDone = async (p: PlannedCreditCardTransaction & { planId?: string }) => {
-    const occurrenceDate = p.date;
     const planId = p.planId ?? p.id;
-    const source = allPlans.find((plan) => plan.id === planId);
-    if (!source || p.executed || (p.recurrence && occurrenceCompleted(source, occurrenceDate))) return toast('This occurrence is already completed.');
-    if (!occurrenceDate) return toast('This plan has no more occurrences left (past its end date).');
-    if (!(await ensureSignedIn('Sign in to save credit card transactions.'))) return;
-    const latestPlan = usePlannedCreditCardWorkbookStore.getState().workbook.entries.find(plan => plan.id === planId);
-    if (!latestPlan || latestPlan.executed || (p.recurrence && occurrenceCompleted(latestPlan, occurrenceDate))) return toast('This occurrence is already completed.');
-    addTransaction({
-      id: crypto.randomUUID(), cardId: p.cardId, date: p.recurrence ? today() : occurrenceDate, kind: p.kind,
-      description: p.description, amount: p.amount, source: 'manual',
-    });
-    if (p.recurrence) {
-      updatePlan(planId, { completedDates: [...(latestPlan.completedDates ?? []), occurrenceDate] });
-      addCompletedPlan({ ...source, id: crypto.randomUUID(), seriesId: planId, date: occurrenceDate, fulfilledDate: today(), recurrence: undefined, completedDates: undefined, executedThrough: undefined, executed: true });
-      toast(`Marked ${occurrenceDate} as done — added to this card's transactions. This plan keeps recurring.`);
-    } else {
-      updatePlan(planId, { executed: true });
-      toast('Marked as done — added to this card\'s transactions.');
-    }
+    const source = allPlans.find(plan=>plan.id === planId);
+    if (!source) return toast('This plan was removed.');
+    if (!await ensureSignedIn('Sign in to fulfill this planned payment.')) return;
+    try {
+      const result = fulfillManualPlan({ module: 'creditCard', id: planId },p.date,source);
+      toast(result.recurring ? 'Occurrence marked as done. This plan keeps recurring.' : 'Marked as done — added to the ledger.');
+    } catch (error) { toast(error instanceof Error ? error.message : String(error)); }
   };
 
   return (
@@ -1322,6 +1318,7 @@ function MigrateLegacyCreditCards() {
     );
     if (!ok) return;
     if (!(await ensureSignedIn('Sign in to migrate this account.'))) return;
+    if (hasIndependentInstallmentLinks('bank', account.id)) return toast('This account has transactions linked to installment receipts.');
     const cardId = uid();
     addCard({
       id: cardId,

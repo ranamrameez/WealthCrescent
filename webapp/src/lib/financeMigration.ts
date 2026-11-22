@@ -1,4 +1,4 @@
-import { DEFAULT_CATEGORIES, UNCATEGORIZED_ID, findCategoryByName } from './categories';
+import { DEFAULT_CATEGORIES, LEGACY_PERSONAL_CATEGORIES, UNCATEGORIZED_ID, findCategoryByName } from './categories';
 
 /** Resolves a Finance-based record's `categoryID`: an already-set value
  * wins outright; otherwise this falls back to matching its legacy
@@ -17,7 +17,7 @@ import { DEFAULT_CATEGORIES, UNCATEGORIZED_ID, findCategoryByName } from './cate
  * `useCategoryStore` by the UI, never through this fallback path. */
 export function resolveLegacyCategoryId(legacyCategory: string | undefined): string {
   if (!legacyCategory || !legacyCategory.trim()) return UNCATEGORIZED_ID;
-  const match = findCategoryByName(legacyCategory, DEFAULT_CATEGORIES);
+  const match = findCategoryByName(legacyCategory, [...DEFAULT_CATEGORIES, ...LEGACY_PERSONAL_CATEGORIES]);
   return match ? match.id : UNCATEGORIZED_ID;
 }
 

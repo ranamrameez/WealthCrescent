@@ -2,45 +2,48 @@ import type { RecurrenceRule } from '../../types/recurrence';
 
 const MAX_ITER = 10000;
 
-/** Advances one date by a rule's own cycle — monthly/yearly use real
- * calendar arithmetic (`setMonth`/`setFullYear`, same day-clamping behavior
- * as EMI's `installmentDueDate`/Rentals' `cycleDate` for a day that doesn't
- * exist in the target month, e.g. day 31 landing on Feb 28), weekly/custom
- * use fixed day counts. Ported from `subscriptionsModule.ts`'s own
- * `advance()` — kept here as the one shared implementation. */
-export function advanceRecurrence(date: Date, rule: Pick<RecurrenceRule, 'cycle' | 'customDays'>): Date {
+/** UTC calendar stepping with a stable billing-day anchor. A short month
+ * clamps the day, never rolls into the following month. Passing the full rule
+ * restores the original day after February (Jan 31 -> Feb 28 -> Mar 31).
+ */
+export function advanceRecurrence(date: Date, rule: Pick<RecurrenceRule, 'cycle' | 'customDays'> & Partial<Pick<RecurrenceRule, 'startDate'>>): Date {
   const d = new Date(date);
-  switch (rule.cycle) {
-    case 'yearly':
-      d.setFullYear(d.getFullYear() + 1);
-      return d;
-    case 'weekly':
-      d.setDate(d.getDate() + 7);
-      return d;
-    case 'custom':
-      d.setDate(d.getDate() + Math.max(1, rule.customDays || 30));
-      return d;
-    default:
-      d.setMonth(d.getMonth() + 1);
-      return d;
+  if (rule.cycle === 'weekly' || rule.cycle === 'custom') {
+    d.setUTCDate(d.getUTCDate() + (rule.cycle === 'weekly' ? 7 : Math.max(1, rule.customDays || 30)));
+    return d;
   }
+  const anchorDay = rule.startDate ? new Date(rule.startDate).getUTCDate() : d.getUTCDate();
+  const month = d.getUTCMonth() + (rule.cycle === 'yearly' ? 12 : 1);
+  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), month + 1, 0)).getUTCDate();
+  d.setUTCFullYear(d.getUTCFullYear(), month, Math.min(anchorDay, lastDay));
+  return d;
 }
 
-/** Walks forward from `startDate` by whole cycles until reaching the first
- * occurrence on or after `asOf` — capped at `MAX_ITER` so a pathological
- * cycle length can never hang. Returns `null` once that occurrence would
- * fall after the rule's own `endDate` (the rule has stopped recurring by
- * `asOf`). */
+/** Jump to the calendar bucket containing asOf before walking exclusions.
+ * Historical daily/weekly rules cannot silently expire at MAX_ITER merely
+ * because their start date is decades old.
+ */
 export function nextRecurrenceOccurrence(rule: RecurrenceRule, asOf: Date = new Date()): Date | null {
-  let d = new Date(rule.startDate);
+  const start = new Date(rule.startDate);
   const asOfStr = asOf.toISOString().slice(0, 10);
+  const target = new Date(asOfStr);
+  const dayDifference = Math.floor((target.getTime() - start.getTime()) / 86_400_000);
+  const monthDifference = (target.getUTCFullYear() - start.getUTCFullYear()) * 12 + target.getUTCMonth() - start.getUTCMonth();
+  const days = rule.cycle === 'weekly' ? 7 : Math.max(1, rule.customDays || 30);
+  const index = Math.max(0, rule.cycle === 'yearly' ? target.getUTCFullYear() - start.getUTCFullYear()
+    : rule.cycle === 'monthly' ? monthDifference : Math.floor(dayDifference / days));
+  let d = new Date(start);
+  if (rule.cycle === 'monthly' || rule.cycle === 'yearly') {
+    const month = start.getUTCMonth() + index * (rule.cycle === 'yearly' ? 12 : 1);
+    const lastDay = new Date(Date.UTC(start.getUTCFullYear(), month + 1, 0)).getUTCDate();
+    d.setUTCFullYear(start.getUTCFullYear(), month, Math.min(start.getUTCDate(), lastDay));
+  } else d.setUTCDate(start.getUTCDate() + index * days);
   let i = 0;
   while ((d.toISOString().slice(0, 10) < asOfStr || rule.excludedDates?.includes(d.toISOString().slice(0, 10))) && i < MAX_ITER) {
     d = advanceRecurrence(d, rule);
     i++;
   }
-  if (i >= MAX_ITER) return null;
-  if (rule.endDate && d.toISOString().slice(0, 10) > rule.endDate) return null;
+  if (i >= MAX_ITER || (rule.endDate && d.toISOString().slice(0, 10) > rule.endDate)) return null;
   return d;
 }
 
