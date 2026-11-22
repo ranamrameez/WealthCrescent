@@ -45,6 +45,8 @@ Use the same claim ID across platform work and cross-link dependencies in PRs. A
 
 ## Active follow-ups
 
+- **Movement reporting, currency summary details (WC-TR PSX session, 2026-11-23).** Let Money in/out users open the native records behind each currency summary metric.
+
 - **Movement reporting, cleared analytics (WC-TR PSX session, 2026-11-22).** Align the monthly analytics and its contributing rows with the canonical cleared movement selection. Verify with focused regressions, full CI and production build.
 
 ## Priority work and app-wide audits
