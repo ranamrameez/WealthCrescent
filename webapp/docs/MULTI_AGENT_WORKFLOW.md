@@ -25,6 +25,10 @@
 | `ux-acceptance` | Page templates, shared controls, charts, themes, densities and keyboard/mobile checks | Claim one module or one shared control at a time. Include responsive transfer groups and fullscreen controls as applicable. Use fixture data, record browser evidence and merge each fixes PR independently. |
 | `trading-acceptance` | AHL broker-export and desktop/mobile verification for merged trading tools | Verify reviewed order and cash imports, Trade Journal and PSX Profiler with authorized local fixtures. Keep private statements and values out of PRs. Merge focused fixes independently. |
 
+## Active follow-ups
+
+- **Agent 1 · 2026-11-22 · PSX Profiler browser acceptance.** Verify the Wealth Crescent Profiler route and its fee controls, watchlist filters and stock detail at desktop and mobile widths using the bundled snapshot. Scope any fixes to the Profiler and its embedding. This slice is independent of importer and movement-reporting work.
+
 ## Historical PR #51 task register
 
 
