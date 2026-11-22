@@ -458,7 +458,7 @@ export function NetWorthPage(_legacySyncProps: {
                     className={`pill clickable ${todayFlowC >= 0 ? 'pill-positive' : 'pill-negative'}`}
                     onClick={() => setDrilldown({
                       kind: 'flow',
-                      title: `Today's ${r.currency} Cash+Bank activity`,
+                      title: `Today's ${r.currency} cleared activity`,
                       explanation: 'Every cleared native movement record dated today, in this currency. Internal transfers and pending entries are excluded. Financing and investments are movement, not earned income.',
                       currency: r.currency,
                       from: todayISO,
@@ -474,12 +474,12 @@ export function NetWorthPage(_legacySyncProps: {
                     className={`pill clickable ${periodFlowC >= 0 ? 'pill-positive' : 'pill-negative'}`}
                     onClick={() => setDrilldown({
                       kind: 'flow',
-                      title: `${r.currency} Cash+Bank activity (${rangeLabel})`,
+                      title: `${r.currency} cleared activity (${rangeLabel})`,
                       explanation: `Every cleared native movement record from ${rangeStartDate} through ${rangeEndDate}, in this currency. Internal transfers and pending entries are excluded. Financing and investments are movement, not earned income.`,
                       currency: r.currency,
                       from: rangeStartDate,
                       to: rangeEndDate,
-                      items: activityFlowItems(activities, r.currency, rangeStartDate, rangeEndDate),
+                      items: activityFlowItems(actualMovements, r.currency, rangeStartDate, rangeEndDate),
                     })}
                   >
                     Period {periodFlowC >= 0 ? '+' : ''}{fmtMoney(periodFlowC, r.currency)}
