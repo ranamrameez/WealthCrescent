@@ -4,7 +4,7 @@ import { toCSV } from '../../lib/csv';
 import { todayISODate } from '../../lib/datetime';
 import { CalculationEngine } from '../../lib/calc/CalculationEngine';
 import { useEMIWorkbookStore } from '../../store/emiWorkbookStore';
-import { isEmiReversalProtected, type EMILoan, type EMIRepayment } from '../../types/emiWorkbook';
+import { emiRepaymentEffect, isEmiReversalProtected, type EMILoan, type EMIRepayment } from '../../types/emiWorkbook';
 import { useInterEntityTransfersStore } from '../../store/interEntityTransfersStore';
 import { usePlannedBankWorkbookStore } from '../../store/plannedBankWorkbookStore';
 import { usePlannedCashWorkbookStore } from '../../store/plannedCashWorkbookStore';
@@ -160,6 +160,24 @@ function toInstallmentCsv(rows: (string | number)[][]) {
   return toCSV(rows.map(row => row.map(value =>
     typeof value === 'string' && /^[\s\uFEFF]*[=+@-]|^[\t\r\n]/.test(value) ? "'" + value : value,
   )));
+}
+
+export function installmentReceiptStatus(receipt: EMIRepayment, asOf: string) {
+  if (receipt.reversesPaymentId) return 'Reversal';
+  return receipt.date > asOf ? 'Future-dated' : 'Recorded';
+}
+
+export function exportInstallmentReceiptsCsv(receipts: readonly EMIRepayment[], currency: string, asOf: string) {
+  return {
+    fileName: `installment-receipts-${asOf}.csv`,
+    csv: toInstallmentCsv([
+      ['Date', 'Receipt ID', 'Description', 'Currency', 'Amount', 'Status', 'Reverses receipt ID', 'Report cutoff'],
+      ...receipts.map(receipt => [
+        receipt.date, receipt.id, receipt.description || 'Payment', currency, emiRepaymentEffect(receipt),
+        installmentReceiptStatus(receipt, asOf), receipt.reversesPaymentId ?? '', asOf,
+      ]),
+    ]),
+  };
 }
 
 export function exportInstallmentObligationsCsv(report: ReturnType<typeof CalculationEngine.installmentLedger.reconcileInstallments>) {
