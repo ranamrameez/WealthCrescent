@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { auth } from '../../lib/firebase/client';
+import { toCSV } from '../../lib/csv';
 import { todayISODate } from '../../lib/datetime';
 import { CalculationEngine } from '../../lib/calc/CalculationEngine';
 import { useEMIWorkbookStore } from '../../store/emiWorkbookStore';
@@ -155,6 +156,28 @@ export function setInstallmentPayingAccount(expected: EMILoan, accountId: string
     saveInstallmentContract(updated, updated.contractSchedule!);
   } catch (error) { store.setWorkbook(before); plans.setWorkbook(beforePlans); throw error; }
 }
+export function exportInstallmentLedgerCsv(report: ReturnType<typeof CalculationEngine.installmentLedger.reconcileInstallments>) {
+  const rows = report.events.map(event => [
+    event.date,
+    event.kind,
+    event.description,
+    report.currency,
+    report.asOf,
+    event.future ? 'Yes' : 'No',
+    event.kind === 'obligation' ? event.amount : '',
+    event.kind !== 'obligation' ? event.amount : '',
+    event.cumulativePaid,
+    event.actualRemaining,
+    event.scheduledRemaining,
+    event.pending,
+  ]);
+  const csv = toCSV([
+    ['Date', 'Event type', 'Description', 'Currency', 'Report cutoff', 'Future', 'Scheduled amount', 'Payment or reversal', 'Cumulative paid', 'Actual remaining', 'Scheduled remaining', 'Net due less paid'],
+    ...rows.map(row => row.map(value => typeof value === 'string' && /^[\s\uFEFF]*[=+@-]|^[\t\r\n]/.test(value) ? "'" + value : value)),
+  ]);
+  return { fileName: `installment-ledger-${report.asOf}.csv`, csv };
+}
+
 export function useInstallmentReport(loanId: string) {
   const workbook = useEMIWorkbookStore(state => state.workbook);
   const accounts = useBankWorkbookStore(state => state.workbook.settings.accounts);
