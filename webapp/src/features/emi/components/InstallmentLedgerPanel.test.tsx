@@ -28,6 +28,7 @@ it('records multiple same-day receipts through the independent payment form with
 it('reviews and restores only the selected loan archive through the ledger', async () => {
   const loan = { id: 'fixture', name: 'Property', lender: 'Seller', currencyCode: 'PKR', principal: 1000, totalToReturn: 1000, tenureMonths: 1, startDate: '2026-01-01', repaymentMode: 'fixedTotal' as const };
   const archived = { id: 'original', loanId: loan.id, date: '2026-02-01', amount: 120, month: 1 };
+  const reversal = { ...archived, id: 'reversal', date: '2026-02-02', amount: 20, reversesPaymentId: archived.id };
   const imported = { ...archived, id: 'imported', amount: 180 };
   const contractSchedule = [{ id: 'one', dueDate: '2026-02-01', amount: 1000, description: 'Contract' }];
   const store = useEMIWorkbookStore.getState();
@@ -36,7 +37,7 @@ it('reviews and restores only the selected loan archive through the ledger', asy
     entries: [{ ...loan, contractSchedule }],
     repayments: [imported],
     reconciliationHistory: [
-      { id: 'correct', sourceLabel: 'Reviewed worksheet', createdAt: '2026-02-02', loanId: loan.id, loan: { ...loan, contractSchedule, paymentAllocations: [{ paymentId: archived.id, obligationId: 'one', amount: 80 }] }, repayments: [archived] },
+      { id: 'correct', sourceLabel: 'Reviewed worksheet', createdAt: '2026-02-02', loanId: loan.id, loan: { ...loan, contractSchedule, paymentAllocations: [{ paymentId: archived.id, obligationId: 'one', amount: 80 }] }, repayments: [archived, reversal] },
       { id: 'foreign', sourceLabel: 'Other worksheet', createdAt: '2026-02-03', loanId: 'other', loan: { ...loan, id: 'other' }, repayments: [] },
     ],
   });
@@ -52,6 +53,7 @@ it('reviews and restores only the selected loan archive through the ledger', asy
   expect(restore.disabled).toBe(true);
   expect(screen.getByRole('table', { name: 'Archived receipts' }).textContent).toContain('120.00 PKR');
   expect(screen.getByRole('table', { name: 'Archived manual payment allocations' }).textContent).toContain('80.00 PKR');
+  expect(screen.getByRole('row', { name: /reversal.*-20.00 PKR.*original/ })).toBeTruthy();
   expect(useEMIWorkbookStore.getState().workbook.repayments).toEqual([imported]);
   fireEvent.click(screen.getByRole('checkbox', { name: /I reviewed/ }));
   fireEvent.change(screen.getByLabelText('Type Property to confirm restoration'), { target: { value: 'Property' } });
@@ -59,7 +61,7 @@ it('reviews and restores only the selected loan archive through the ledger', asy
   fireEvent.click(restore);
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   expect(document.activeElement).toBe(trigger);
-  expect(useEMIWorkbookStore.getState().workbook.repayments).toEqual([archived]);
+  expect(useEMIWorkbookStore.getState().workbook.repayments).toEqual([archived, reversal]);
   expect(useEMIWorkbookStore.getState().workbook.reconciliationHistory?.at(-1)?.repayments).toEqual([imported]);
 }, 10000);
 

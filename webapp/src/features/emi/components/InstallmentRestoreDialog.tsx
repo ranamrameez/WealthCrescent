@@ -8,7 +8,7 @@ import { useTablePagination } from '../../../hooks/useTablePagination';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { fmtMoney } from '../../../lib/format';
 import { applyInstallmentRestore, previewInstallmentRestore } from '../../../services/finance/installmentImportService';
-import type { EMILoan, EMIWorkbook } from '../../../types/emiWorkbook';
+import { emiRepaymentEffect, type EMILoan, type EMIWorkbook } from '../../../types/emiWorkbook';
 
 type ArchiveOption = Pick<NonNullable<EMIWorkbook['reconciliationHistory']>[number], 'id' | 'sourceLabel' | 'createdAt'>;
 
@@ -86,8 +86,8 @@ export function InstallmentRestoreDialog({ loan, archives, onClose }: {
         {!!preview.archive.repayments?.length && <>
           <div className="table-scroll"><table>
             <caption>Archived receipts</caption>
-            <thead><tr><th>Actual date</th><th>Description</th><th>Amount</th><th>Fine</th></tr></thead>
-            <tbody>{receipts.rows.map(row => <tr key={row.id}><td>{row.date}</td><td>{row.description ?? '—'}</td><td>{fmtMoney(row.amount, preview.archive.loan.currencyCode)}</td><td>{row.fine == null ? '—' : fmtMoney(row.fine, preview.archive.loan.currencyCode)}</td></tr>)}</tbody>
+            <thead><tr><th>Actual date</th><th>Receipt ID</th><th>Description</th><th>Amount</th><th>Fine</th><th>Reverses receipt ID</th></tr></thead>
+            <tbody>{receipts.rows.map(row => <tr key={row.id}><td>{row.date}</td><td>{row.id}</td><td>{row.description ?? '—'}</td><td>{fmtMoney(emiRepaymentEffect(row), preview.archive.loan.currencyCode)}</td><td>{row.fine == null ? '—' : fmtMoney(row.fine, preview.archive.loan.currencyCode)}</td><td>{row.reversesPaymentId ?? '—'}</td></tr>)}</tbody>
           </table></div>
           {receipts.controls}
         </>}
