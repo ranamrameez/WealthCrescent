@@ -8,6 +8,8 @@ Start follow-ups from current `main`. Follow the [delivery task register](webapp
 - After verifying a merge, record the evidence and immediately start the next actionable slice of your claim. When the claim is complete, reread the delivery register and open PRs, claim the next ready unowned task within the assigned scope, and start it in the same turn. A request for status during active work calls for a brief update followed by continued work unless the user asks you to pause.
 - If an external blocker remains after reasonable recovery attempts, document the blocker, evidence, remaining steps, and whether the claim is retained or released. Continue independent work and take the next ready task within scope. End the turn only when the user asks you to stop, required authorization or input blocks all remaining in-scope work, or no actionable in-scope task remains. Report the specific reason and any open claim.
 
+Use the platform registers for [web](webapp/docs/DELIVERY_REGISTER.md), [backend](functions/DELIVERY_REGISTER.md), and [native Android](android/DELIVERY_REGISTER.md). Keep cross-platform dependencies in the shared claim workflow.
+
 # Project skills
 
 Project-local skills are in `.agents/skills/`. Read the relevant `SKILL.md` when
