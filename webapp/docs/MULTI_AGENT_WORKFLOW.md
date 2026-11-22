@@ -45,6 +45,8 @@ Use the same claim ID across platform work and cross-link dependencies in PRs. A
 
 ## Active follow-ups
 
+- **UX acceptance, dashboard currency actions (WC-TR PSX session, 2026-11-23).** Make the currency flow and balance-change detail actions keyboard accessible.
+
 - **Movement reporting, cleared analytics (WC-TR PSX session, 2026-11-22).** Align the monthly analytics and its contributing rows with the canonical cleared movement selection. Verify with focused regressions, full CI and production build.
 
 ## Priority work and app-wide audits
