@@ -128,3 +128,7 @@ Architecture evidence is in [firebase.json](../../firebase.json), [Functions](..
 | Complete UX acceptance | Ready | | Claim one module or a specific shared control at a time. |
 | PSX transfer review fixture acceptance | Done | WC-TR PSX session, work/psx-transfer-review-acceptance | `e8425d9f` covers statement selection, bank filtering and stale-save failure/retry. 10 focused tests passed. The deployed terms gate prevented live interaction. |
 | Final PR validation and merge | Ready | | Depends on the remaining acceptance checks and exact-head CI. |
+
+## Follow-up acceptance evidence
+
+- **Agent 1 · 2026-11-22 · PSX Profiler** ([PR #59](https://github.com/ranamrameez/WealthCrescent/pull/59)). Headless Chromium verified the Wealth Crescent route against the production build at 1440×900 and 390×844, with touch enabled at mobile width. Checks covered the exact price field and slider, breakpoint selection, PKR 1,500 slider maximum, grouping and zone filters, stock detail, trader profile dialog and horizontal overflow. The production build and 1,506 webapp tests passed. The Journal and AHL statement workflows retain their separate acceptance scope.
