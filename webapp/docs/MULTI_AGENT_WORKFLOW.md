@@ -45,6 +45,8 @@ Use the same claim ID across platform work and cross-link dependencies in PRs. A
 
 ## Active follow-ups
 
+- **Movement reporting, upcoming breakdown (WC-TR PSX session, 2026-11-23).** Expose the native currency totals behind the dashboard’s 30-day planned headline.
+
 - **Movement reporting, cleared analytics (WC-TR PSX session, 2026-11-22).** Align the monthly analytics and its contributing rows with the canonical cleared movement selection. Verify with focused regressions, full CI and production build.
 
 ## Priority work and app-wide audits
