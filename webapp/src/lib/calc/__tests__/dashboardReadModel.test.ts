@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyWorkbook } from '../../../store/defaultWorkbook';
 import { createEmptyPSXWorkbook } from '../../../store/defaultPsxWorkbook';
 import { CalculationEngine } from '../CalculationEngine';
-import type { BudgetActivity } from '../budgetPlanner';
+import type { MovementActivity } from '../movementActivities';
 const engine = CalculationEngine.dashboard;
-const activity = (id: string, amount: number, executed: boolean, extra: Partial<BudgetActivity> = {}): BudgetActivity => ({
+const activity = (id: string, amount: number, executed: boolean, extra: Partial<MovementActivity> = {}): MovementActivity => ({
   id, amount, executed, module: 'cash', sourceLabel: 'Cash', currencyCode: 'USD', date: '2026-01-15', description: id, ...extra,
 });
 
