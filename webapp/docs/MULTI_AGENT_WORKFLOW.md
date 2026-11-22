@@ -2,6 +2,14 @@
 
 [PR #51](https://github.com/ranamrameez/WealthCrescent/pull/51) merged into `main` as `6dda934`. Start every follow-up from current `main` and use a separate branch and PR for each independently releasable slice. The [delivery status](CURRENT_DELIVERY_STATUS.md) supplies detailed acceptance criteria. The register below defines ownership boundaries.
 
+## Platform registers
+
+- [Web frontend](DELIVERY_REGISTER.md)
+- [Backend](../../functions/DELIVERY_REGISTER.md)
+- [Native Android](../../android/DELIVERY_REGISTER.md)
+
+Use the same claim ID across platform work and cross-link dependencies in PRs. Android native sign-in and web sign-in recovery can ship independently.
+
 ## Claim, deliver, and merge
 
 1. Read this register, the current handoff, the affected module docs, and open PRs. Pick one ready group or one named task in it. Claim only work you can own through merge. If a group needs several PRs, list the planned slices and their order in the first PR.
