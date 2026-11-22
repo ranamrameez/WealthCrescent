@@ -27,6 +27,10 @@ export function InstallmentRestoreDialog({ loan, archives, onClose }: {
   const receipts = useTablePagination(preview?.archive.repayments ?? []);
   const obligations = useTablePagination(preview?.archive.loan.contractSchedule ?? []);
 
+  const allocations = useTablePagination(preview?.archive.loan.paymentAllocations ?? []);
+  const receiptDates = new Map((preview?.archive.repayments ?? []).map(row => [row.id, row.date]));
+  const obligationDates = new Map((preview?.archive.loan.contractSchedule ?? []).map(row => [row.id, row.dueDate]));
+
   const clearReview = () => {
     setPreview(null);
     setAcknowledged(false);
@@ -87,6 +91,20 @@ export function InstallmentRestoreDialog({ loan, archives, onClose }: {
           </table></div>
           {receipts.controls}
         </>}
+        {preview.archive.loan.paymentAllocations?.length ? <>
+          <div className="table-scroll"><table>
+            <caption>Archived manual payment allocations</caption>
+            <thead><tr><th>Receipt date</th><th>Receipt ID</th><th>Obligation due date</th><th>Obligation ID</th><th>Allocated amount</th></tr></thead>
+            <tbody>{allocations.rows.map((row, index) => <tr key={index}>
+              <td>{receiptDates.get(row.paymentId) ?? '—'}</td>
+              <td>{row.paymentId}</td>
+              <td>{obligationDates.get(row.obligationId) ?? '—'}</td>
+              <td>{row.obligationId}</td>
+              <td>{fmtMoney(row.amount, preview.archive.loan.currencyCode)}</td>
+            </tr>)}</tbody>
+          </table></div>
+          {allocations.controls}
+        </> : null}
         <label><input type="checkbox" checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)} /> I reviewed the archived contract and receipts.</label>
         <Field label={`Type ${preview.loan.name} to confirm restoration`}>
           <TextInput value={confirmation} onChange={event => setConfirmation(event.target.value)} />

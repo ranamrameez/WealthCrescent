@@ -36,7 +36,7 @@ it('reviews and restores only the selected loan archive through the ledger', asy
     entries: [{ ...loan, contractSchedule }],
     repayments: [imported],
     reconciliationHistory: [
-      { id: 'correct', sourceLabel: 'Reviewed worksheet', createdAt: '2026-02-02', loanId: loan.id, loan, repayments: [archived] },
+      { id: 'correct', sourceLabel: 'Reviewed worksheet', createdAt: '2026-02-02', loanId: loan.id, loan: { ...loan, contractSchedule, paymentAllocations: [{ paymentId: archived.id, obligationId: 'one', amount: 80 }] }, repayments: [archived] },
       { id: 'foreign', sourceLabel: 'Other worksheet', createdAt: '2026-02-03', loanId: 'other', loan: { ...loan, id: 'other' }, repayments: [] },
     ],
   });
@@ -51,6 +51,7 @@ it('reviews and restores only the selected loan archive through the ledger', asy
   const restore = await screen.findByRole<HTMLButtonElement>('button', { name: 'Restore reviewed archive' });
   expect(restore.disabled).toBe(true);
   expect(screen.getByRole('table', { name: 'Archived receipts' }).textContent).toContain('120.00 PKR');
+  expect(screen.getByRole('table', { name: 'Archived manual payment allocations' }).textContent).toContain('80.00 PKR');
   expect(useEMIWorkbookStore.getState().workbook.repayments).toEqual([imported]);
   fireEvent.click(screen.getByRole('checkbox', { name: /I reviewed/ }));
   fireEvent.change(screen.getByLabelText('Type Property to confirm restoration'), { target: { value: 'Property' } });
