@@ -65,7 +65,7 @@ jobs:
 
       - name: Build debug APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew :app:assembleDebug :native-app:assembleDebug --no-daemon
 
       - name: Locate built debug APK
         id: locate
@@ -83,6 +83,13 @@ jobs:
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: ${{ steps.locate.outputs.apk_path }}
+          if-no-files-found: error
+
+      - name: Upload native preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WealthCrescent-native-preview-apk
+          path: android/native-app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
       - name: Decode release keystore
@@ -104,7 +111,7 @@ jobs:
           # isn't set — real PKCS12 keystores (including this app's) don't support a
           # separate key password, so this secret is optional.
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew assembleRelease bundleRelease --no-daemon
+        run: ./gradlew :app:assembleRelease :app:bundleRelease --no-daemon
 
       - name: Locate built release APK + AAB
         if: steps.signing_check.outputs.has_signing == 'true'
