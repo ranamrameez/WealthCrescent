@@ -2,16 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyWorkbook } from '../../../store/defaultWorkbook';
 import { createEmptyPSXWorkbook } from '../../../store/defaultPsxWorkbook';
 import { CalculationEngine } from '../CalculationEngine';
-import type { BudgetActivity } from '../budgetPlanner';
+import type { MovementActivity } from '../movementActivities';
 const engine = CalculationEngine.dashboard;
-const activity = (id: string, amount: number, executed: boolean, extra: Partial<BudgetActivity> = {}): BudgetActivity => ({
+const activity = (id: string, amount: number, executed: boolean, extra: Partial<MovementActivity> = {}): MovementActivity => ({
   id, amount, executed, module: 'cash', sourceLabel: 'Cash', currencyCode: 'USD', date: '2026-01-15', description: id, ...extra,
 });
 
 describe('dashboard financial read model', () => {
   it('uses exactly the cleared activity population for totals and itemized drilldown', () => {
     const input = [activity('income', 200, true), activity('expense', -50, true), activity('pending', 1000, true, { isPending: true }),
-      activity('plan', -80, false), activity('other-currency', 700, true, { currencyCode: 'QAR' }), activity('later', 600, true, { date: '2026-02-01' })];
+      activity('plan', -80, false), activity('pending-plan', -900, false, { isPending: true }),
+      activity('internal-plan', -700, false, { movementKind: 'transfer' }), activity('other-currency', 700, true, { currencyCode: 'QAR' }), activity('later', 600, true, { date: '2026-02-01' })];
     const totals = engine.sumActivitiesByCurrency(input, '2026-01-01', '2026-01-31');
     expect(totals).toEqual({ USD: 150, QAR: 700 });
     for (const [currency, amount] of Object.entries(totals)) {
@@ -80,7 +81,8 @@ it('reports full calendar months with separate cleared, pending and planned popu
     activity('cleared', 100, true, { date: '2024-02-01' }),
     activity('pending', -20, true, { date: '2024-02-10', isPending: true }),
     activity('plan', -30, false, { date: '2024-02-29' }),
-    activity('future-real', 900, true, { date: '2024-02-29' }),
+    activity('future-real', 900, true, { date: '2024-02-29', currencyCode: 'PKR' }),
+    activity('transfer', 500, false, { date: '2024-02-15', movementKind: 'transfer' }),
     activity('outside', 500, false, { date: '2024-03-01' }),
     activity('qar', 7, false, { date: '2024-02-20', currencyCode: 'QAR' }),
   ], '2024-02', 1, '2024-02-15');
@@ -89,6 +91,9 @@ it('reports full calendar months with separate cleared, pending and planned popu
     { month: '2024-02', actualIn: 100, actualOut: 0, pendingIn: 0, pendingOut: -20, pendingNet: -20, plannedIn: 0, plannedOut: -30, plannedNet: -30 },
   ]);
   expect(report.rows.find(row => row.currency === 'QAR')?.months[0].plannedIn).toBe(7);
+  expect(report.rows.map(row => row.currency)).toEqual(['QAR', 'USD']);
+  expect(report.items.map(item => item.id)).toEqual(['cleared', 'pending', 'plan', 'qar']);
+  expect(report.planned.map(item => item.id)).toEqual(['qar', 'plan']);
 });
 it('includes zero-activity months and normalizes unsupported timeline requests', () => {
   const report = engine.monthlyPlanReport([activity('last', -10, false, { date: '2026-03-31' })], '2026-01', 3, '2026-01-01');
