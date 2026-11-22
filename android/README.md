@@ -1,5 +1,7 @@
 # WealthCrescent — Android app
 
+The app is moving to a full native Kotlin and Compose client. Follow the [native Android delivery register](DELIVERY_REGISTER.md) for new work. The architecture below documents the legacy release and its upgrade considerations.
+
 A native Kotlin + Jetpack Compose Android app that wraps the real deployed webapp
 (`webapp/`, live at https://ranamrameez.github.io/WealthCrescent/) in a WebView, and adds one
 native-only capability on top: detecting a bank SMS and turning it into a draft Bank
