@@ -1,5 +1,11 @@
 # WealthCrescent page template and parity guide
 
+## Shared prototype references
+
+Web and Android may use the design prototype folder referenced in the project report. Link the exact folder and screen revision in each relevant PR once available. The repo's [modules plan](../webapp/MODULES_PLAN.md) also references a finance-suite prototype. Treat flows, information hierarchy and visual intent as shared references. Use native Android navigation and controls on Android and existing shared components on web. Keep accounting semantics and accessible behavior aligned across both clients.
+
+## Web page contract
+
 This is the implementation contract for every new page and every parity pass on an existing page. The Bank Account detail page is the reference implementation.
 
 ## Required page anatomy
