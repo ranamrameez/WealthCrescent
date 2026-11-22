@@ -1213,6 +1213,10 @@ tbody td:last-child:has(button) {
 	font-family: var(--mono);
 	font-weight: 700;
 }
+.pill-action {
+	border: 0;
+	line-height: inherit;
+}
 .pill-positive {
 	background: color-mix(in srgb, var(--profit) 16%, var(--panel));
 	color: var(--profit);

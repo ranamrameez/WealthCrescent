@@ -84,7 +84,7 @@ function NetWorthDrilldownModal({ drilldown, onClose }: { drilldown: Drilldown; 
   const flowRows = drilldown.kind === 'flow' ? dateSort.rows(drilldown.items, { date: row => row }) : [];
   const { rows: pageFlowRows, controls: flowPaginationControls } = useTablePagination(flowRows);
   return (
-    <Modal title={drilldown.title} onClose={onClose}>
+    <Modal title={drilldown.title} onClose={onClose} manageFocus>
       <p className="text-muted mt-0">{drilldown.explanation}</p>
       {drilldown.kind === 'breakdown' && (
         drilldown.rows.length === 0 ? (
@@ -461,8 +461,8 @@ export function NetWorthPage(_legacySyncProps: {
                  real, unconverted terms. */}
               <div className="row" style={{ gap: 6, marginTop: 10, alignItems: 'center' }}>
                 <Tooltip text="Cleared recorded movement across included modules (excluding internal transfers) today, excluding linked transfers and pending entries. Click for the real transactions.">
-                  <span
-                    className={`pill clickable ${todayFlowC >= 0 ? 'pill-positive' : 'pill-negative'}`}
+                  <button type="button" aria-haspopup="dialog"
+                    className={`pill pill-action clickable ${todayFlowC >= 0 ? 'pill-positive' : 'pill-negative'}`}
                     onClick={() => setDrilldown({
                       kind: 'flow',
                       title: `Today's ${r.currency} cleared activity`,
@@ -474,11 +474,11 @@ export function NetWorthPage(_legacySyncProps: {
                     })}
                   >
                     Today {todayFlowC >= 0 ? '+' : ''}{fmtMoney(todayFlowC, r.currency)}
-                  </span>
+                  </button>
                 </Tooltip>
                 <Tooltip text={`Cleared recorded movement across included modules (excluding internal transfers) from ${rangeStartDate} through ${rangeEndDate}, excluding linked transfers and pending entries. Click for the real transactions.`}>
-                  <span
-                    className={`pill clickable ${periodFlowC >= 0 ? 'pill-positive' : 'pill-negative'}`}
+                  <button type="button" aria-haspopup="dialog"
+                    className={`pill pill-action clickable ${periodFlowC >= 0 ? 'pill-positive' : 'pill-negative'}`}
                     onClick={() => setDrilldown({
                       kind: 'flow',
                       title: `${r.currency} cleared activity (${rangeLabel})`,
@@ -490,12 +490,12 @@ export function NetWorthPage(_legacySyncProps: {
                     })}
                   >
                     Period {periodFlowC >= 0 ? '+' : ''}{fmtMoney(periodFlowC, r.currency)}
-                  </span>
+                  </button>
                 </Tooltip>
                 {deltaC !== null ? (
                   <Tooltip text={`This currency's real net worth at ${rangeEndDate} minus its net worth at ${rangeBaselineDate}. Click for a module-by-module breakdown of what changed.`}>
-                    <span
-                      className={`pill clickable ${deltaC >= 0 ? 'pill-positive' : 'pill-negative'}`}
+                    <button type="button" aria-haspopup="dialog"
+                      className={`pill pill-action clickable ${deltaC >= 0 ? 'pill-positive' : 'pill-negative'}`}
                       onClick={() => setDrilldown({
                         kind: 'delta',
                         title: `${r.currency}: selected period change, by module`,
@@ -506,7 +506,7 @@ export function NetWorthPage(_legacySyncProps: {
                       })}
                     >
                       Period change <ValueChange amount={deltaC} percent={deltaPctC} currency={r.currency} />
-                    </span>
+                    </button>
                   </Tooltip>
                 ) : (
                   <span className="pill" style={{ background: 'var(--panel-2)', color: 'var(--muted)' }}>
