@@ -47,6 +47,16 @@ describe('Google redirect sign-in silent-failure detection', () => {
     expect(sessionStorage.getItem('WealthCrescent_google_redirect_pending')).toBe('1');
   });
 
+  it('clears a rejected redirect start and lets the user retry', async () => {
+    const error = new Error('Google sign-in could not start');
+    signInWithRedirect.mockRejectedValueOnce(error);
+    await expect(signInWithGoogle()).rejects.toBe(error);
+    expect(await completeGoogleSignInRedirect()).toEqual({ signedIn: false, wasPending: false });
+
+    await signInWithGoogle();
+    expect(sessionStorage.getItem('WealthCrescent_google_redirect_pending')).toBe('1');
+  });
+
   it('reports wasPending: false on an ordinary page load that never attempted a redirect', async () => {
     const { signedIn, wasPending } = await completeGoogleSignInRedirect();
     expect(signedIn).toBe(false);
