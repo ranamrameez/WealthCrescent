@@ -6,4 +6,4 @@ Build with `./gradlew :native-app:assembleDebug` from `android/`. The Android wo
 
 Design references are the [wealth dashboard](../../wealth_tracker_template/global_wealth_dashboard_1/) and [cash and credit](../../wealth_tracker_template/cash_credit_management/) prototypes. See the [delivery register](../DELIVERY_REGISTER.md) for native authentication, data integration and release acceptance.
 
-Android CI checks the packaged preview manifest before uploading it. The preview permits only its app-scoped AndroidX signature permission and the exported launcher. A new permission, service, provider, or receiver requires an explicit review of the preview baseline.
+Android CI checks the packaged preview manifest before uploading it. It rejects new requested permissions, services, and unexpected exported components. The baseline allows the launcher and specific AndroidX infrastructure.
