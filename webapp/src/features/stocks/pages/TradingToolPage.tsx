@@ -81,7 +81,7 @@ export function TradingToolPage({ tool }: { tool: 'journal-qse' | 'journal-psx' 
     <StandardCard title={title}>
       <iframe key={tool} ref={frame} onLoad={connect} title={title} sandbox="allow-scripts allow-downloads"
         src={`${import.meta.env.BASE_URL}trading-tools/${file}`}
-        style={{ width: '100%', height: '72dvh', minHeight: '30rem', border: 0, display: 'block', scrollMarginTop: journal ? '8rem' : undefined }} />
+        style={{ width: '100%', height: '72dvh', minHeight: '30rem', border: 0, display: 'block' }} />
     </StandardCard>
   </div>;
 }
