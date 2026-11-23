@@ -45,7 +45,21 @@ Use the same claim ID across platform work and cross-link dependencies in PRs. A
 
 ## Active follow-ups
 
-- **Movement reporting, cleared analytics (WC-TR PSX session, 2026-11-22).** Align the monthly analytics and its contributing rows with the canonical cleared movement selection. Verify with focused regressions, full CI and production build.
+- Check open PRs for current claims. The dashboard movement slices below are merged.
+
+### Completed dashboard movement slices
+
+| Slice | Merge and verification |
+| --- | --- |
+| Cleared monthly analytics | [PR #57](https://github.com/ranamrameez/WealthCrescent/pull/57) |
+| Monthly plan populations | [PR #73](https://github.com/ranamrameez/WealthCrescent/pull/73) and [Actions 605](https://github.com/ranamrameez/WealthCrescent/actions/runs/45084843761) |
+| Cleared currency period drilldown | [PR #77](https://github.com/ranamrameez/WealthCrescent/pull/77) and [Actions 612](https://github.com/ranamrameez/WealthCrescent/actions/runs/45085140393) |
+| Upcoming native currency breakdown | [PR #80](https://github.com/ranamrameez/WealthCrescent/pull/80) and [Actions 616](https://github.com/ranamrameez/WealthCrescent/actions/runs/45085223405) |
+| Remaining-plan row identity | [PR #84](https://github.com/ranamrameez/WealthCrescent/pull/84) and [Actions 622](https://github.com/ranamrameez/WealthCrescent/actions/runs/45085451206) |
+| Money in/out currency summary details | [PR #86](https://github.com/ranamrameez/WealthCrescent/pull/86) and [Actions 634](https://github.com/ranamrameez/WealthCrescent/actions/runs/45085583814) |
+| Dashboard currency drilldown keyboard controls | [PR #87](https://github.com/ranamrameez/WealthCrescent/pull/87) and [Actions 639](https://github.com/ranamrameez/WealthCrescent/actions/runs/45085826183) |
+
+Interactive dashboard acceptance remains open. The local Chromium runtime failed before page load because it could not create its process socket. A fixture preview in a working browser is needed for desktop and mobile checks.
 
 ## Priority work and app-wide audits
 
