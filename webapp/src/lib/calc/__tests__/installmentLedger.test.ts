@@ -79,3 +79,25 @@ it('rejects overlapping reversal amounts, missing originals, reversal chains and
   expect(() => report([original, { ...reversal, date: '2026-01-14' }])).toThrow('on or after');
   expect(() => report([original, reversal, { ...reversal, id: 'chain', reversesPaymentId: reversal.id }])).toThrow('original payment');
 });
+
+it.each([
+  ['2026-02-15', 150, 150, 0, 80, true],
+  ['2026-02-16', 70, 230, -80, 70, false],
+] as const)('reconciles manual allocations and report totals at cutoff %s', (cutoff, paid, remaining, februaryActual, allocated, futureReversal) => {
+  const payments = [
+    { id: 'receipt', date: '2026-01-20', amount: 150, currency: 'PKR' },
+    { id: 'refund', date: '2026-02-16', amount: 80, currency: 'PKR', reversesPaymentId: 'receipt' },
+    { id: 'future', date: '2026-02-28', amount: 100, currency: 'PKR' },
+  ];
+  const report = reconcileInstallments(obligations, payments, 'PKR', cutoff, [
+    { paymentId: 'receipt', obligationId: 'due-3', amount: 80 },
+  ]);
+
+  expect(report).toMatchObject({ actualPaid: paid, actualRemaining: remaining, overdue: 200, unappliedCredit: paid - allocated });
+  expect(report.rows.map(row => row.paid)).toEqual([0, 0, allocated]);
+  expect(report.events.find(row => row.id === 'refund')).toMatchObject({ amount: -80, future: futureReversal });
+  expect(report.events.find(row => row.id === 'future')).toMatchObject({ future: true, cumulativePaid: paid, actualRemaining: remaining });
+  const { rows } = installmentMonthlySummary(report);
+  expect(rows[1]).toMatchObject({ month: '2026-02', scheduled: 100, actual: februaryActual, actualRemaining: remaining });
+  expect(rows[2]).toMatchObject({ month: '2026-03', actual: null, actualRemaining: null });
+});
