@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { PendingPaymentPlan } from '../../lib/calc/pendingPayment';
+import { beginWorkbookMaintenance } from '../../lib/firebase/workbookMaintenance';
 
 const mocks = vi.hoisted(() => ({
   auth: { currentUser: { uid: 'owner' } as { uid: string } | null },
@@ -241,4 +242,26 @@ it.each([cash, bank])('aborts $module settlement and void retries after an accou
     await expect(command()).rejects.toThrow('The active account or workbook changed');
     expect(read()).toBe(pending);
   }
+});
+
+it('does not settle a reviewed payment after a scoped workbook restore finishes during retry', async () => {
+  const read = transactionFor(fixture());
+  await createPendingPayment('owner', cash, date, now);
+  const pending = read();
+  const restored = { ...pending as object, preferences: { theme: 'light' } };
+
+  mocks.transaction.mockImplementationOnce(async (_path, update) => {
+    expect(update(structuredClone(pending))).toMatchObject({
+      paymentExecutions: [{ settledOn: date }],
+    });
+    const finishRestore = beginWorkbookMaintenance(['cash']);
+    finishRestore({ cash: {} }, true);
+    expect(update(structuredClone(restored))).toBeUndefined();
+    return { committed: false, snapshot: { val: () => restored } };
+  });
+
+  await expect(settlePendingPayment('owner', cash, date, date, now))
+    .rejects.toThrow('The active account or workbook changed');
+  expect(mocks.auth.currentUser?.uid).toBe('owner');
+  expect(read()).toBe(pending);
 });
