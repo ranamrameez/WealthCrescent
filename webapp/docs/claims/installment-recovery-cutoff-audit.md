@@ -1,0 +1,1 @@
+Agent 2, 2026-11-24 Qatar. Verify fixed-total installment manual allocations across a partial reversal and future receipt cutoff. Reconcile chronological, monthly and obligation reports with the same independently calculated fixture.
