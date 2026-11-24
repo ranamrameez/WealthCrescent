@@ -9,4 +9,6 @@ Use the [common claim and merge workflow](MULTI_AGENT_WORKFLOW.md). The [follow-
 | Financial workflows | `movement-reporting`, `budget-acceptance`, `installment-recovery`, `funding-reversals`, `audit-calculations` and `module-services` cover named functional slices. |
 | Data integration and reliability | `backend-migration` web slices consume the shared API. Coordinate cutover with the [backend register](../../functions/DELIVERY_REGISTER.md). Claim web reliability work under `audit-reliability-performance`. |
 
+| QSE statement import data integrity | [`qse-import-data-integrity`](qse-import-data-integrity.md) is blocked on private snapshots. Recovery is read-only and implementation requires approval after the recovery report. |
+
 Publish the PR under the listed claim ID so the central workflow and platform registers point to the same work.
