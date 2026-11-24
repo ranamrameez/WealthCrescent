@@ -217,3 +217,28 @@ it('rejects duplicate native records or execution identities instead of acceptin
   await expect(createPendingPayment('owner', cash, date, now)).rejects.toThrow('duplicate records');
   expect(thirdRead()).toEqual(duplicateHistory);
 });
+
+it.each([cash, bank])('aborts $module settlement and void retries after an account switch', async reviewed => {
+  const read = transactionFor(fixture());
+  await createPendingPayment('owner', reviewed, date, now);
+  const pending = read();
+
+  const commands = [
+    () => settlePendingPayment('owner', reviewed, date, date, now),
+    () => voidPendingPayment('owner', reviewed, date, now),
+  ];
+  for (const command of commands) {
+    mocks.auth.currentUser = { uid: 'owner' };
+    mocks.transaction.mockImplementationOnce(async (path, update, options) => {
+      expect(path).toBe('users/owner');
+      expect(options).toEqual({ applyLocally: false });
+      expect(update(structuredClone(pending))).not.toEqual(pending);
+      mocks.auth.currentUser = { uid: 'another-owner' };
+      expect(update(structuredClone(pending))).toBeUndefined();
+      return { committed: false, snapshot: { val: () => pending } };
+    });
+
+    await expect(command()).rejects.toThrow('The active account or workbook changed');
+    expect(read()).toBe(pending);
+  }
+});

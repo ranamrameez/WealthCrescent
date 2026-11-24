@@ -1,0 +1,1 @@
+Agent 2. Verify that pending Cash and Bank settlement and void abort if the signed-in account switches during a transaction retry. This is a service fixture check for the funding prerequisite; deployed rules remain a separate gate.
