@@ -5,6 +5,8 @@ import type { Transfer } from '../types/workbook';
 export type CashTransferSource = Pick<Transfer, 'date' | 'type' | 'gross' | 'description' | 'time' | 'timezone'> & {
   sourceId: string;
   fee?: number;
+  grossDecimals?: number;
+  feeDecimals?: number;
   brokerId?: string;
   currencyCode?: string;
   accountName?: string;
@@ -89,8 +91,11 @@ export function parsePsxCashStatement(tables: string[][][], dateSystem?: '1900' 
         const debit = explicit ? 0 : amount(get('debit'));
         if (!explicit && (credit > 0) === (debit > 0)) throw new Error('Expected a debit or a credit.');
         const type = explicit ? direction as Transfer['type'] : credit ? 'DEPOSIT' : 'WITHDRAWAL';
-        const gross = explicit ? amount(get('gross')) : credit || debit;
-        const fee = explicit && get('fee') ? amount(get('fee')) : undefined;
+        const grossText = get(explicit ? 'gross' : credit ? 'credit' : 'debit');
+        const feeText = explicit ? get('fee') : '';
+        const gross = explicit ? amount(grossText) : credit || debit;
+        const fee = feeText ? amount(feeText) : undefined;
+        const decimals = (value: string) => value.split('.')[1]?.length ?? 0;
         if (gross <= 0 || (type === 'DEPOSIT' && fee !== undefined && fee > gross)) throw new Error('Invalid gross amount or fee.');
         const date = statementDate(get('date'), dateSystem, order);
         const reference = get('id') || get('reference');
@@ -102,7 +107,10 @@ export function parsePsxCashStatement(tables: string[][][], dateSystem?: '1900' 
         const occurrence = (occurrences.get(key) ?? 0) + 1;
         if (reference && occurrence > 1) throw new Error('Duplicate transfer ID.');
         occurrences.set(key, occurrence);
-        records.push({ date, type, gross, fee, description: description || undefined, time, timezone, brokerId: get('brokerid') || undefined,
+        records.push({ date, type, gross, fee,
+          grossDecimals: dateSystem ? undefined : decimals(grossText),
+          feeDecimals: fee === undefined || dateSystem ? undefined : decimals(feeText),
+          description: description || undefined, time, timezone, brokerId: get('brokerid') || undefined,
           currencyCode: get('currencycode') || undefined, sourceId: `statement:${key}:${occurrence}` });
       } catch (error) {
         throw new Error(`Statement row ${headerAt + index + 2}. ${(error as Error).message}`);
