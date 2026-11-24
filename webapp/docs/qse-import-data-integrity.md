@@ -14,6 +14,10 @@ Claim ID: `qse-import-data-integrity`
 2. **Read-only recovery — pending snapshots.** Inspect Firebase history and backups, localStorage, Git history, and earlier exports. Report each verified exact reward and its source. For unresolved rewards, list date and current rounded amount so the owner can re-enter the exact SMS figures. Do not infer amounts, run destructive migrations, or bulk overwrite data. Recheck the reconciliation residual after verified amounts are restored. Report recovery findings and wait for the owner's explicit approval before implementation.
 3. **Implementation — pending approval after recovery.** Complete the acceptance criteria below and report actual test results.
 
+## QSE whole-riyal statement rule
+
+The rounding rule applies specifically to QSE statements from The Group. For a confirmed match, compare the stored QAR amount rounded to the nearest whole riyal with the whole-riyal figure presented by the statement. If they agree, retain the stored amount exactly, including its decimals. For example, QAR 125.42 stays QAR 125.42 when the statement shows QAR 125. An amount that rounds to a different figure is a conflict. Show both values and let the user explicitly choose the statement value for the confirmed record. A rounded amount alone does not establish record identity or authorize bulk replacement.
+
 ## Implementation acceptance criteria
 
 - **Provenance.** Track manual, imported, or system at record and financial-field level. Treat all existing records as manual. Enforce at the write boundary that imports only create missing records or fill genuinely missing fields. Preserve populated amounts, fees, prices, and shares, including zero. Show both values for conflicts and require a separate explicit choice per field. Remove bulk statement overwrite. Cash matches must be consistent with whole-riyal rounding. Classify larger differences as new or conflicting. Add the permanent rule to `AGENTS.md` during implementation.
