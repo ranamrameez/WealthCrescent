@@ -41,7 +41,7 @@ export function previewQseStatementTrades(table: string[][], fileName: string, t
     const protectedReward = match?.kind === 'adjustment' && incoming.kind === 'adjustment';
     const mismatched = protectedReward ? match.amount !== incoming.amount : !!match && Boolean(statementChanges(match, incoming));
     const blocked = match?.kind === 'transfer' && incoming.kind === 'transfer' &&
-      match.gross !== incoming.gross && isLinkedTransfer(match.id);
+      !qseAmountAgrees(match.gross, incoming.gross) && isLinkedTransfer(match.id);
     return { index, incoming, match, conflict, mismatched, blocked, protectedReward };
   });
   return {
@@ -61,13 +61,19 @@ function isLinkedTransfer(id: string) {
     (link.to.module === 'qse' && link.toRecordId === id));
 }
 
+function qseAmountAgrees(stored: number, incoming: number) {
+  return stored === incoming || (Number.isInteger(incoming) && Math.round(stored) === incoming);
+}
+
 function statementChanges(match: StatementRecord, incoming: StatementRecord): StatementRecord | undefined {
   if (match.kind === 'trade' && incoming.kind === 'trade' &&
     (match.ticker !== incoming.ticker || match.price !== incoming.price || match.shares !== incoming.shares)) {
     return { ...match, ticker: incoming.ticker, price: incoming.price, shares: incoming.shares };
   }
-  if (match.kind === 'transfer' && incoming.kind === 'transfer' && (match.gross !== incoming.gross || match.fee !== incoming.fee)) {
-    return { ...match, gross: incoming.gross, fee: incoming.fee };
+  if (match.kind === 'transfer' && incoming.kind === 'transfer') {
+    const gross = qseAmountAgrees(match.gross, incoming.gross) ? match.gross : incoming.gross;
+    const fee = qseAmountAgrees(match.fee, incoming.fee) ? match.fee : incoming.fee;
+    if (gross !== match.gross || fee !== match.fee) return { ...match, gross, fee };
   }
   // The Group reports rounded rewards. Keep the stored value until a user edits it in Modify.
   return undefined;
