@@ -41,7 +41,13 @@ For the separate browser-local dataset, select **Export legacy Journal data** fr
 
 The legacy Journal starts with the source sample data and labels it as a placeholder. Your data stays in the current browser. To move from the original app or another device, export a JSON backup there and restore it in Wealth Crescent’s Journal. A new upload replaces that Journal dataset and preserves saved prices. The native Wealth Crescent importers have their own review and save flow. [AHL Journal accounting notes](https://github.com/ranamrameez/Translation-Helper/blob/12c5ddc1feaede76d440343c62d079e44d46556b/AHL-REFACTOR.md)
 
-## PSX Profiler features
+## Native PSX Profiler
+
+The native PSX Profiler shows open holdings from the active broker and uses the shared PSX trade calculator. The positions table uses the portfolio valuation price, which can fall back to recorded trades when a market quote is unavailable. The original reference remains available from the page.
+
+On 2026-11-24 the native route passed headless Chromium checks on the production bundle from PR #106 at 1440×900 and 390×844 with touch enabled at mobile width. Synthetic holdings verified a supplied market price, a fallback valuation, the stock detail and dashboard links, calculator mode changes, and horizontal layout. The browser run was offline and used fixture data.
+
+## Original PSX Profiler features
 
 | Area | Features |
 |---|---|
