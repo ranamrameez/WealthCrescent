@@ -20,7 +20,15 @@ The original PSX Profiler still uses `psx-command-deck.html` in its URL. Each Jo
 
 The reviewed QSE importer remains available from **Import QSE statement** on the [QSE Dashboard](https://ranamrameez.github.io/WealthCrescent/#/qse). [The Group import guide](the-group-import.md)
 
-## Trade Journal features
+## Native Trade Journal
+
+Select the broker profile for QSE or PSX, then open that exchange’s Trade Journal. The page reads executed fills from the active broker workbook and uses its fee and cost-basis settings. The **Ticker** filter applies to the fill table, its totals, **Daily results**, and **Ticker results**.
+
+Open **Executed trades → Card options** to export all executed trades or the selected ticker. Both CSV exports include matching fills across all pages, with fee, realized P/L, and currency. See the [native export guide](native-journal-export.md).
+
+For the separate browser-local dataset, select **Export legacy Journal data** from the native Journal. The features below apply to that legacy route.
+
+## Legacy Trade Journal features
 
 | Area | Features |
 |---|---|
@@ -50,6 +58,6 @@ The source snapshot is pinned to [Translation Helper commit 12c5ddc](https://git
 
 ## Native integration work
 
-The native Journal covers executed fills, ticker filtering, fees and realized P/L using the existing accounting hooks. The native PSX Profiler covers active holdings, market prices, cost, break-even and unrealized P/L. Follow-up native slices include Journal statement reconciliation reports, exports, and Profiler fee scenarios, research/watchlist, return comparisons and profile tools. Legacy Journal backup remains available while these are migrated.
+The native Journal covers executed fills, ticker filtering, fees and realized P/L using the existing accounting hooks. The native PSX Profiler covers active holdings, market prices, cost, break-even and unrealized P/L. Follow-up native slices include Journal statement reconciliation reports and Profiler fee scenarios, research/watchlist, return comparisons and profile tools. Legacy Journal backup remains available while these are migrated.
 
 The native Journal includes daily and ticker breakdowns of executed fill counts, fees and realized P/L. Both breakdowns use the same ticker filter as the fill table and cover every filtered fill across all pages.
