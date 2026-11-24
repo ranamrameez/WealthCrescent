@@ -37,8 +37,22 @@ export function bankCashSources(bank: BankWorkbook, links: InterEntityTransfer[]
   });
 }
 
+function amountAgrees(source: number, existing: number, decimals?: number) {
+  if (Math.abs(source - existing) < 1e-8) return true;
+  if (decimals === undefined || decimals > 10 || !Number.isFinite(existing)) return false;
+  const scale = 10 ** decimals;
+  return Math.round((existing + Number.EPSILON * existing) * scale) === Math.round(source * scale);
+}
+
+const grossAgrees = (source: CashTransferSource, row: Transfer) =>
+  amountAgrees(source.gross, row.gross, source.grossDecimals);
+
+export function statementAmountsAgree(source: CashTransferSource, row: Transfer) {
+  return grossAgrees(source, row) && (source.fee === undefined || amountAgrees(source.fee, row.fee, source.feeDecimals));
+}
+
 const exact = (source: CashTransferSource, row: Transfer) =>
-  source.date === row.date && source.type === row.type && Math.abs(source.gross - row.gross) < 1e-8;
+  source.date === row.date && source.type === row.type && grossAgrees(source, row);
 
 export function matchCashTransfers(sources: CashTransferSource[], existing: Transfer[], bankLinkedIds = new Set<string>()) {
   const available = (source: CashTransferSource, row: Transfer) => !source.sourceId.startsWith('bank:') ||
@@ -65,7 +79,7 @@ export function matchCashTransfers(sources: CashTransferSource[], existing: Tran
         row.date === source.date ||
         (Math.abs(source.gross - row.gross) < 1e-8 && Math.abs(Date.parse(row.date) - Date.parse(source.date)) <= 7 * 86400000)
       ));
-    const status = match ? exact(source, match) && (source.fee === undefined || source.fee === match.fee) &&
+    const status = match ? exact(source, match) && statementAmountsAgree(source, match) &&
       (source.description === undefined || source.description === match.description) &&
       (source.time === undefined || source.time === match.time) &&
       (source.timezone === undefined || source.timezone === match.timezone) ? 'matched' : 'mismatch'
@@ -150,10 +164,14 @@ export function applyPsxCashTransfers(preview: PsxCashPreview, choices: Readonly
     const existing = candidates.find(row => row.id === choice.id);
     if (!existing || updates.has(existing.id)) throw new Error('Choose a different existing transfer for each source row.');
     if (choice.action === 'replace' && fresh.linkedIds.has(existing.id)) throw new Error('Edit linked values through the existing transfer link.');
-    const nextFee = fee ?? existing.fee;
-    if (choice.action === 'replace' && type === 'DEPOSIT' && nextFee > gross) throw new Error('The existing fee exceeds the incoming deposit. Correct the fee in the ledger first.');
+    if (fresh.statement && choice.action === 'keep' && !statementAmountsAgree(source, existing)) {
+      throw new Error('Use the statement amounts for conflicting values or skip this source row.');
+    }
+    const nextGross = fresh.statement && grossAgrees(source, existing) ? existing.gross : gross;
+    const nextFee = fee === undefined || (fresh.statement && amountAgrees(fee, existing.fee, source.feeDecimals)) ? existing.fee : fee;
+    if (choice.action === 'replace' && type === 'DEPOSIT' && nextFee > nextGross) throw new Error('The existing fee exceeds the incoming deposit. Correct the fee in the ledger first.');
     const replacement = choice.action === 'replace' ? {
-      date, type, gross, fee: nextFee,
+      date, type, gross: nextGross, fee: nextFee,
       description: description ?? existing.description,
       time: time ?? existing.time,
       timezone: timezone ?? existing.timezone,
