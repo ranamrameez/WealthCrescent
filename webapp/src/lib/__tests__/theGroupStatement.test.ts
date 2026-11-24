@@ -136,3 +136,15 @@ it('reserves exact cash matches before pairing same-day differences and exposes 
     2: { type: 'WITHDRAWAL', gross: 100, fee: 10 },
   });
 });
+
+it('imports an identical next-day fill when the previous date has its own match', () => {
+  const existing = [{ kind: 'trade' as const, id: 'previous', date: '2026-11-11', ticker: 'QIBK', action: 'BUY' as const, shares: 20, price: 21.75 }];
+  const result = parseTheGroupStatement([header,
+    ['12/11/2026', 'Buy', '20', 'QIB', '21.75'],
+    ['11/11/2026', 'Buy', '20', 'QIB', '21.75'],
+  ], existing, { reviewTrades: true });
+  expect(result.conflicts).toEqual({});
+  expect(result.records.find(row => row.date === '2026-11-11')?.id).toBe('previous');
+  expect(result.records.find(row => row.date === '2026-11-12')).toMatchObject({ shares: 20, price: 21.75 });
+  expect(result.records.find(row => row.date === '2026-11-12')?.id).not.toBe('previous');
+});

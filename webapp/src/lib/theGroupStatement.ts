@@ -126,7 +126,7 @@ export function parseTheGroupStatement(table: string[][], existing: StatementRec
           markConflict(group, candidates, `Existing ${first.ticker} trades on ${first.date} need manual price or quantity reconciliation.`);
           continue;
         }
-        const nearby = trades.filter(r => r.date !== first.date && tickerOf(r) === first.ticker && r.action === first.action && r.price === first.price && group.length === 1 && r.shares === first.shares && Math.abs(Date.parse(r.date) - Date.parse(first.date)) <= 3 * 86400000);
+        const nearby = trades.filter(r => !used.has(r) && !groups.has(key(r)) && r.date !== first.date && tickerOf(r) === first.ticker && r.action === first.action && r.price === first.price && group.length === 1 && r.shares === first.shares && Math.abs(Date.parse(r.date) - Date.parse(first.date)) <= 3 * 86400000);
         if (nearby.length) markConflict(group, nearby, `A similar ${first.ticker} trade has a different date. Correct it with Modify before importing this trade.`);
         if (options.reviewTrades && !nearby.length) {
           const pending = existing.filter((row): row is StatementTrade => row.kind === 'trade' && !!row.isPending && key(row) === k);
