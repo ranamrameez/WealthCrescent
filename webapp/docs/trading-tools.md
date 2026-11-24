@@ -50,4 +50,6 @@ The source snapshot is pinned to [Translation Helper commit 12c5ddc](https://git
 
 ## Native integration work
 
-The native Journal covers executed fills, ticker filtering, fees and realized P/L using the existing accounting hooks. The native PSX Profiler covers active holdings, market prices, cost, break-even and unrealized P/L. Follow-up native slices include Journal daily/ticker and statement reconciliation reports, exports, and Profiler fee scenarios, research/watchlist, return comparisons and profile tools. Legacy Journal backup remains available while these are migrated.
+The native Journal covers executed fills, ticker filtering, fees and realized P/L using the existing accounting hooks. The native PSX Profiler covers active holdings, market prices, cost, break-even and unrealized P/L. Follow-up native slices include Journal statement reconciliation reports, exports, and Profiler fee scenarios, research/watchlist, return comparisons and profile tools. Legacy Journal backup remains available while these are migrated.
+
+The native Journal includes daily and ticker breakdowns of executed fill counts, fees and realized P/L. Both breakdowns use the same ticker filter as the fill table and cover every filtered fill across all pages.

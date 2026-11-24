@@ -15,6 +15,45 @@ interface JournalProps {
   realizedBySellTxId: Record<string, { netPL: number }>;
 }
 
+interface JournalReportRow {
+  tx: Transaction;
+  fee: number;
+  realized: number | undefined;
+}
+
+function JournalBreakdown({ report, by, currency }: {
+  report: JournalReportRow[];
+  by: 'date' | 'ticker';
+  currency: string;
+}) {
+  const breakdown = useMemo(() => {
+    const groups = new Map<string, { label: string; count: number; fees: number; realized: number | undefined }>();
+    for (const { tx, fee, realized } of report) {
+      const label = tx[by];
+      const row = groups.get(label) ?? { label, count: 0, fees: 0, realized: undefined };
+      row.count += 1;
+      row.fees += fee;
+      if (realized !== undefined) row.realized = (row.realized ?? 0) + realized;
+      groups.set(label, row);
+    }
+    return [...groups.values()].sort((a, b) => by === 'date'
+      ? b.label.localeCompare(a.label) : a.label.localeCompare(b.label));
+  }, [report, by]);
+  const { rows, controls } = useTablePagination(breakdown);
+  const title = by === 'date' ? 'Daily results' : 'Ticker results';
+  return <StandardCard title={title}>
+    <div className="table-scroll"><table aria-label={title}>
+      <thead><tr><th scope="col">{by === 'date' ? 'Trade date' : 'Ticker'}</th><th scope="col">Fills</th><th scope="col">Fees</th><th scope="col">Realized P/L</th></tr></thead>
+      <tbody>{rows.map(row => <tr key={row.label}>
+        <th scope="row">{row.label}</th><td>{fmt(row.count, 0)}</td>
+        <td>{fmtMoney(row.fees, currency)}</td>
+        <td>{row.realized === undefined ? '—' : fmtMoney(row.realized, currency)}</td>
+      </tr>)}</tbody>
+    </table></div>
+    {controls}
+  </StandardCard>;
+}
+
 export function ExchangeJournal({ exchange, transactions, currency, calcFee, realizedBySellTxId }: JournalProps) {
   const dashboard = exchange === 'PSX' ? '/psx' : '/qse';
   const ledger = exchange === 'PSX' ? '/psx/transactions' : '/transactions';
@@ -49,7 +88,7 @@ export function ExchangeJournal({ exchange, transactions, currency, calcFee, rea
       {report.length === 0 ? <p>No executed trades in this broker profile.</p> : <>
         <p>{fmt(report.length, 0)} fills · Fees {fmtMoney(report.reduce((sum, row) => sum + row.fee, 0), currency)}
           {' · '}Realized P/L {fmtMoney(report.reduce((sum, row) => sum + (row.realized ?? 0), 0), currency)}</p>
-        <div className="table-scroll"><table>
+        <div className="table-scroll"><table aria-label="Executed trades">
           <thead><tr><th scope="col">Date</th><th scope="col">Ticker</th><th scope="col">Side</th><th scope="col">Shares</th><th scope="col">Price</th><th scope="col">Fee</th><th scope="col">Realized P/L</th></tr></thead>
           <tbody>{rows.map(({ key, tx, fee, realized }) => <tr key={key}>
             <td>{tx.date}</td><td>{tx.ticker}</td><td>{tx.action}</td><td>{fmt(tx.shares, 0)}</td>
@@ -60,5 +99,9 @@ export function ExchangeJournal({ exchange, transactions, currency, calcFee, rea
         {controls}
       </>}
     </StandardCard>
+    {report.length > 0 && <>
+      <JournalBreakdown report={report} by="date" currency={currency} />
+      <JournalBreakdown report={report} by="ticker" currency={currency} />
+    </>}
   </div>;
 }
