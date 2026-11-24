@@ -46,7 +46,7 @@ Integrated the QSE dashboard import released on main. Added reviewed CSV creatio
 
 ## Trade Journal, PSX Profiler and reviewed AHL orders
 
-The [trading tools guide](docs/trading-tools.md) records the upstream revision, user entry points, complete feature inventory and storage boundary. The PSX Dashboard and Trade Transactions show the AHL shortcuts when an active Al Habib broker is selected. Native order-history writes are reviewed, broker-scoped and guarded against stale workbooks and new unmatched sell shares. The Journal uses its own browser-local statement and order history data.
+The [trading tools guide](docs/trading-tools.md) records the upstream revision, user entry points, complete feature inventory and storage boundary. The PSX Dashboard and Trade Transactions show the AHL shortcuts when an active Al Habib broker is selected. Native order-history writes are reviewed, broker-scoped and guarded against stale workbooks and new unmatched sell shares. The native Journal routes read from the active broker workbook in each exchange and export executed fills, daily results and ticker results. The legacy Journal uses separate browser-local statement and order history data. See the [desktop and mobile browser evidence](docs/trade-journal-acceptance.md).
 
 ## 2026-11-18 — PSX cash-transfer reconciliation
 
