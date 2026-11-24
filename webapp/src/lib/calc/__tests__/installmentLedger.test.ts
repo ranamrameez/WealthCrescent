@@ -101,3 +101,20 @@ it.each([
   expect(rows[1]).toMatchObject({ month: '2026-02', scheduled: 100, actual: februaryActual, actualRemaining: remaining });
   expect(rows[2]).toMatchObject({ month: '2026-03', actual: null, actualRemaining: null });
 });
+
+it('carries earlier payments and obligations into the first displayed month of a truncated chart', () => {
+  const report = reconcileInstallments([
+    { ...obligations[0], dueDate: '1900-01-10' },
+    { ...obligations[1], dueDate: '2000-02-10' },
+    { ...obligations[2], dueDate: '2100-01-10' },
+  ], [
+    { id: 'early', date: '1900-01-15', amount: 80, currency: 'PKR' },
+    { id: 'first-visible', date: '2000-02-15', amount: 30, currency: 'PKR' },
+  ], 'PKR', '2026-02-16');
+
+  const monthly = installmentMonthlySummary(report);
+  expect(monthly.truncated).toBe(true);
+  expect(monthly.rows).toHaveLength(1200);
+  expect(monthly.rows[0]).toEqual({ month: '2000-02', scheduled: 100, actual: 30, actualRemaining: 190, scheduledRemaining: 100 });
+  expect(monthly.rows.at(-1)).toEqual({ month: '2100-01', scheduled: 100, actual: null, actualRemaining: null, scheduledRemaining: 0 });
+});
