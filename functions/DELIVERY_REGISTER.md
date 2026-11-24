@@ -4,6 +4,7 @@ Use the [common claim and merge workflow](../webapp/docs/MULTI_AGENT_WORKFLOW.md
 
 | Claim | Delivery focus |
 | --- | --- |
+| `account-backup` | Implement versioned account recovery, pre-change snapshots and scheduled checks. See [account backup strategy](../webapp/docs/account-backup-strategy.md). Production activation is pending. |
 | `audit-data-access` | Inventory deployed access rules and every client path. Verify owner isolation, then publish route migration order. |
 | `backend-foundation` | Extend Firebase Functions with authenticated, versioned private data APIs for web and Android. Publish fixtures and error, retry and conflict contracts. |
 | `backend-migration` | Claim one workflow per PR. Move private data and authoritative calculations behind the API, stage both clients, then close direct database access after cutover verification. |

@@ -46,8 +46,8 @@ export function QseStatementTradeReviewContent({ preview, onClose }: { preview: 
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
-  const addable = preview.rows.filter(row => !row.match && !row.conflict && !row.blocked);
-  const matches = preview.rows.filter(row => row.match && !row.conflict && !row.blocked);
+  const addable = preview.rows.filter(row => !row.match && !row.conflict && !row.blocked && !row.protectedReward);
+  const matches = preview.rows.filter(row => row.match && !row.conflict && !row.blocked && !row.protectedReward);
   const conflicts = preview.rows.filter(row => row.conflict);
   const mismatches = preview.rows.filter(row => row.mismatched);
   const filtered = preview.rows.filter(row => {
@@ -77,7 +77,7 @@ export function QseStatementTradeReviewContent({ preview, onClose }: { preview: 
 
   return <div className="stack-md">
       <p>{preview.fileName} · {preview.brokerName}</p>
-      <Notice tone="warning">The statement rounds cash amounts and commissions. Trade values use the statement’s shares and price with the broker’s configured fees. Existing fee overrides are kept. New rewards and transfers use the statement amounts. Keeping existing cash values is recommended when they have more precision.</Notice>
+      <Notice tone="warning">The statement rounds cash amounts and commissions. Trade values use the statement’s shares and price with the broker’s configured fees. Existing fee overrides are kept. New rewards and transfers use the statement amounts. Existing reward amounts are protected. Keeping other existing cash values is recommended when they have more precision.</Notice>
       <div className="row gap-sm">
         <StatCard2 label="New" value={addable.length} />
         <StatCard2 label="Matched" value={matches.length} />
@@ -101,7 +101,7 @@ export function QseStatementTradeReviewContent({ preview, onClose }: { preview: 
         <StandardButton tone="secondary" onClick={onClose}>Cancel</StandardButton>
       </div>
       {controls}
-      {rows.map(({ index, incoming, match, conflict, mismatched, blocked }) => {
+      {rows.map(({ index, incoming, match, conflict, mismatched, blocked, protectedReward }) => {
         const label = recordLabel(incoming);
         const direction = incoming.kind === 'trade' ? incoming.action : incoming.kind === 'transfer' ? incoming.type : '';
         return <section key={index} className="stack-sm" aria-label={`${label} ${incoming.date} ${direction}, statement record ${index + 1}`}>
@@ -115,8 +115,8 @@ export function QseStatementTradeReviewContent({ preview, onClose }: { preview: 
             <RecordCard title={match || conflict ? 'Statement' : 'New statement record'} record={incoming} compare={match} currency={preview.currency} />
           </div>
           {!conflict && !blocked && <label>
-            <input type="checkbox" checked={selected.has(index)} onChange={event => select([index], event.target.checked)} />
-            {match ? ' Use statement values for this match' : ' Import this new record'}
+            <input type="checkbox" checked={selected.has(index)} disabled={protectedReward} onChange={event => select([index], event.target.checked)} />
+            {protectedReward ? ' Existing reward amount is protected. Edit it with Modify.' : match ? ' Use statement values for this match' : ' Import this new record'}
           </label>}
         </section>;
       })}

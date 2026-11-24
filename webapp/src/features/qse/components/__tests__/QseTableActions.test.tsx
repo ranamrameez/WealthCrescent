@@ -207,7 +207,10 @@ it('reviews ledger mismatches, imports new cash events, and keeps precise matche
   const reward = within(review.getByRole('region', { name: /Trading reward 2026-11-01/ }));
   expect(reward.getByText('0.34')).toBeVisible();
   expect(reward.getByText('0')).toBeVisible();
+  expect(reward.getByRole('checkbox')).toBeDisabled();
+  fireEvent.click(review.getByRole('button', { name: 'Use statement for all matches' }));
   expect(reward.getByRole('checkbox')).not.toBeChecked();
+  fireEvent.click(review.getByRole('button', { name: 'Clear selection' }));
   expect(reward.getByText(/Keeping existing values/)).toBeVisible();
   fireEvent.click(within(review.getByRole('region', { name: /MARK 2026-11-01 SELL/ })).getByRole('checkbox'));
   fireEvent.click(review.getByRole('button', { name: 'Select all new records' }));

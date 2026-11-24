@@ -8,7 +8,11 @@ Claim ID: `qse-import-data-integrity`
 - Trade matching includes the date in its main key, but the fallback blocks an otherwise identical trade within three days. This can suppress a legitimate consecutive-day fill.
 - The inspected QSE write path persists current workbook snapshots in localStorage and Firebase Realtime Database. It does not append field-level before and after values.
 
-## Required order and status
+## 2026-11-24 recovery checkpoint
+
+Both current snapshots were verified. The October audit export in Git history preserved precise reward amounts for 13 records matched by ID; the remaining 13 require older evidence. Corrections were prepared privately. No live rewards were restored. The first containment release makes matched reward amounts read-only in statement import; use Modify for verified corrections. Broader reconciliation and audit work remains outstanding. See [account backup strategy](account-backup-strategy.md).
+
+## Original recovery sequence
 
 1. **Snapshot first — blocked.** Export the current WealthCrescent localStorage app data and the Firebase account node to private JSON files and confirm both files and their locations. The prior session had no signed-in app tab or authenticated Firebase access. Keep exports and authentication material out of Git. Do not run imports or sync that could overwrite data before the snapshots exist.
 2. **Read-only recovery — pending snapshots.** Inspect Firebase history and backups, localStorage, Git history, and earlier exports. Report each verified exact reward and its source. For unresolved rewards, list date and current rounded amount so the owner can re-enter the exact SMS figures. Do not infer amounts, run destructive migrations, or bulk overwrite data. Recheck the reconciliation residual after verified amounts are restored. Report recovery findings and wait for the owner's explicit approval before implementation.
