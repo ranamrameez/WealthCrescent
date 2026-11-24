@@ -9,7 +9,7 @@ import { useTablePagination } from '../../../hooks/useTablePagination';
 import { getCurrentUser } from '../../../lib/firebase/useAuthState';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { readPsxCashStatement, type CashTransferSource } from '../../../lib/psxCashStatement';
-import { applyPsxCashTransfers, isAhlBroker, preparePsxCashTransferReview, type CashChoice, type PsxCashPreview } from '../../../services/finance/psxCashTransferReview';
+import { applyPsxCashTransfers, isAhlBroker, preparePsxCashTransferReview, statementAmountsAgree, type CashChoice, type PsxCashPreview } from '../../../services/finance/psxCashTransferReview';
 import { usePSXWorkbookStore } from '../../../store/psxWorkbookStore';
 import type { Transfer } from '../../../types/workbook';
 
@@ -66,7 +66,9 @@ function CashTransferReview({ preview, fileName, close }: { preview: PsxCashPrev
       <div className="row gap-sm">
         {Object.entries(statusLabels).map(([status, label]) => <StatCard2 key={status} label={label} value={list.filter(row => row.status === status).length} />)}
       </div>
-      <p>Review the values side by side. Choose which transfers to add and how to reconcile overlaps.</p>
+      <p>{preview.statement
+        ? 'Review each transfer. For an existing transfer with different amounts, use the statement values. The app retains finer decimals when they round to the statement amount.'
+        : 'Review the values side by side. Choose which transfers to add and how to reconcile overlaps.'}</p>
       <div className="row gap-sm">
         <StandardButton tone="secondary" disabled={!newRows.length} onClick={() => setChoices(current => {
           const next = new Map(current);
@@ -117,7 +119,8 @@ function CashTransferReview({ preview, fileName, close }: { preview: PsxCashPrev
               ? <label><input type="checkbox" checked={selected === 'add'} onChange={event => choose(event.target.checked ? 'add' : '')} /> Add this new transfer</label>
               : <Field label="Reconciliation choice"><Select value={selected} onChange={event => choose(event.target.value)}>
                 <option value="">Skip this source row</option>
-                {candidates.map((record, index) => <option key={record.id} value={`keep:${record.id}`}>Keep existing {index + 1}</option>)}
+                {candidates.map((record, index) => (!preview.statement || statementAmountsAgree(source, record))
+                  ? <option key={record.id} value={`keep:${record.id}`}>Keep existing {index + 1}</option> : null)}
                 {candidates.map((record, index) => !preview.linkedIds.has(record.id) && status !== 'matched'
                   ? <option key={record.id} value={`replace:${record.id}`}>Use {sourceLabel.toLowerCase()} values for existing {index + 1}</option> : null)}
                 {allowAdd && <option value="add">Add as a separate transfer</option>}
