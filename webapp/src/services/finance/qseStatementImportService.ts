@@ -38,10 +38,11 @@ export function previewQseStatementTrades(table: string[][], fileName: string, t
     const incoming = result.incomingValues[index] ?? row;
     const match = row.id ? existingById.get(recordKey(row)) : undefined;
     const conflict = result.conflicts[index];
-    const mismatched = !!match && Boolean(statementChanges(match, incoming));
+    const protectedReward = match?.kind === 'adjustment' && incoming.kind === 'adjustment';
+    const mismatched = protectedReward ? match.amount !== incoming.amount : !!match && Boolean(statementChanges(match, incoming));
     const blocked = match?.kind === 'transfer' && incoming.kind === 'transfer' &&
       match.gross !== incoming.gross && isLinkedTransfer(match.id);
-    return { index, incoming, match, conflict, mismatched, blocked };
+    return { index, incoming, match, conflict, mismatched, blocked, protectedReward };
   });
   return {
     rows, fileName, owner, snapshot: ledgerSnapshot(workbook), brokerId: workbook.activeBrokerId,
@@ -68,9 +69,7 @@ function statementChanges(match: StatementRecord, incoming: StatementRecord): St
   if (match.kind === 'transfer' && incoming.kind === 'transfer' && (match.gross !== incoming.gross || match.fee !== incoming.fee)) {
     return { ...match, gross: incoming.gross, fee: incoming.fee };
   }
-  if (match.kind === 'adjustment' && incoming.kind === 'adjustment' && match.amount !== incoming.amount) {
-    return { ...match, amount: incoming.amount };
-  }
+  // The Group reports rounded rewards. Keep the stored value until a user edits it in Modify.
   return undefined;
 }
 
