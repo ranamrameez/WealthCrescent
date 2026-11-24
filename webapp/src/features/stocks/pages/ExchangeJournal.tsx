@@ -4,6 +4,7 @@ import { BackButton } from '../../../components/BackButton';
 import { PageHeading } from '../../../components/PageHeading';
 import { StandardCard } from '../../../components/StandardCard';
 import { useTablePagination } from '../../../hooks/useTablePagination';
+import { toCSV } from '../../../lib/csv';
 import { fmt, fmtMoney } from '../../../lib/format';
 import type { FeeCalculator, Transaction } from '../../../types/workbook';
 
@@ -63,12 +64,28 @@ export function ExchangeJournal({ exchange, transactions, currency, calcFee, rea
   const tickers = useMemo(() => [...new Set(fills.map(tx => tx.ticker))].sort(), [fills]);
   const selected = tickers.includes(ticker) ? ticker : '';
   // Reuse realized results from the full workbook, so filtering cannot drop prior buys.
-  const report = useMemo(() => fills.filter(tx => !selected || tx.ticker === selected).map((tx, index) => ({
+  const executed = useMemo(() => fills.map((tx, index) => ({
     key: tx.id ?? index,
     tx,
     fee: calcFee(tx.shares * tx.price, tx.action === 'BUY', { tx, shares: tx.shares }),
     realized: tx.action === 'SELL' && tx.id ? realizedBySellTxId[tx.id]?.netPL : undefined,
-  })), [fills, selected, calcFee, realizedBySellTxId]);
+  })), [fills, calcFee, realizedBySellTxId]);
+  const report = useMemo(() => selected ? executed.filter(row => row.tx.ticker === selected) : executed, [executed, selected]);
+
+  const exportCsv = (scope: typeof executed, suffix: string) => {
+    const csv = toCSV([
+      ['Date', 'Ticker', 'Side', 'Shares', 'Price', 'Fee', 'Realized P/L', 'Currency'],
+      ...scope.map(({ tx, fee, realized }) => [
+        tx.date, tx.ticker, tx.action, tx.shares, tx.price, fee, realized ?? '', currency,
+      ]),
+    ]);
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${exchange.toLowerCase()}-trade-journal-${suffix}.csv`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
   const { rows, controls } = useTablePagination(report);
 
   return <div className="standard-page">
@@ -79,7 +96,10 @@ export function ExchangeJournal({ exchange, transactions, currency, calcFee, rea
       <Link to={ledger}>Trade Transactions</Link>
       <Link to={exchange === 'PSX' ? '/psx/trade-journal/legacy' : '/trade-journal/legacy'}>Export legacy Journal data</Link>
     </div>
-    <StandardCard title="Executed trades">
+    <StandardCard title="Executed trades" actions={[
+      { label: 'Export all executed trades', disabled: !executed.length, onClick: () => exportCsv(executed, 'all') },
+      ...(selected ? [{ label: 'Export filtered trades', onClick: () => exportCsv(report, selected.replace(/[^a-z0-9.-]/gi, '_')) }] : []),
+    ]}>
       <p>Uses the active {exchange} broker’s transactions, fees and cost-basis settings.</p>
       <label>Ticker <select value={selected} onChange={event => setTicker(event.target.value)}>
         <option value="">All tickers</option>
