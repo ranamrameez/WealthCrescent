@@ -208,7 +208,7 @@ it('reviews ledger mismatches, imports new cash events, and keeps precise matche
   expect(reward.getByText('0.34')).toBeVisible();
   expect(reward.getByText('0')).toBeVisible();
   expect(reward.getByRole('checkbox')).toBeDisabled();
-  fireEvent.click(review.getByRole('button', { name: 'Use statement for all matches' }));
+  expect(review.queryByRole('button', { name: 'Use statement for all matches' })).toBeNull();
   expect(reward.getByRole('checkbox')).not.toBeChecked();
   fireEvent.click(review.getByRole('button', { name: 'Clear selection' }));
   expect(reward.getByText(/Keeping existing values/)).toBeVisible();
@@ -240,7 +240,6 @@ it('lets the user compare and select matched and new trades, retaining existing 
   const buy = within(review.getByRole('region', { name: /QNBK 2026-10-01/ }));
   expect(buy.getByText('Existing')).toBeVisible();
   expect(buy.getByText('Statement')).toBeVisible();
-  fireEvent.click(review.getByRole('button', { name: 'Use statement for all matches' }));
   fireEvent.click(review.getByRole('button', { name: 'Keep all existing matches' }));
   fireEvent.click(buy.getByRole('checkbox', { name: 'Use statement values for this match' }));
   fireEvent.click(review.getByRole('button', { name: 'Select all new records' }));
@@ -296,7 +295,25 @@ it('inserts a selected same-day addition before its existing statement anchor wi
   fireEvent.change(input, { target: { files: [file] } });
   const repeated = within(await screen.findByRole('dialog', { name: 'Review The Group statement' }));
   expect(repeated.getByRole('button', { name: 'Select all new records' })).toBeDisabled();
-  fireEvent.click(repeated.getByRole('button', { name: 'Use statement for all matches' }));
-  fireEvent.click(repeated.getByRole('button', { name: 'Import selected records (2)' }));
+  expect(repeated.getByRole('button', { name: 'Import selected records (0)' })).toBeDisabled();
   expect(useWorkbookStore.getState().workbook).toBe(result);
+});
+
+it('keeps finer transfer gross when applying a conflicting statement fee', async () => {
+  const workbook = createEmptyWorkbook();
+  workbook.transfers = [{ id: 'transfer', date: '2026-11-02', type: 'WITHDRAWAL', gross: 5100.42, fee: 15.12, seq: 1 }];
+  useWorkbookStore.setState({ workbook });
+  const { container } = render(<QseRecordActions kind="ledger" rows={[]} modifying={false} onModify={() => {}} />);
+  const file = new File([], 'statement.csv');
+  Object.defineProperty(file, 'text', { value: async () => toCSV([
+    ['Date','Type','Count','Unit','Price','Amount'],
+    ['02/11/2026','Acc. Transfer','','','',-5110],
+    ['','Acc. Transfer','','','',-5100],
+    ['','Electronic Transfer','','','',-10],
+  ]) });
+  fireEvent.change(container.querySelector('input[type=file]')!, { target: { files: [file] } });
+  const review = within(await screen.findByRole('dialog', { name: 'Review The Group statement' }));
+  fireEvent.click(review.getByRole('checkbox', { name: 'Use statement values for this match' }));
+  fireEvent.click(review.getByRole('button', { name: 'Import selected records (1)' }));
+  expect(useWorkbookStore.getState().workbook.transfers).toMatchObject([{ id: 'transfer', gross: 5100.42, fee: 10 }]);
 });
