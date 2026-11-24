@@ -77,7 +77,7 @@ export function QseStatementTradeReviewContent({ preview, onClose }: { preview: 
 
   return <div className="stack-md">
       <p>{preview.fileName} · {preview.brokerName}</p>
-      <Notice tone="warning">The statement rounds cash amounts and commissions. Trade values use the statement’s shares and price with the broker’s configured fees. Existing fee overrides are kept. New rewards and transfers use the statement amounts. Existing reward amounts are protected. Keeping other existing cash values is recommended when they have more precision.</Notice>
+      <Notice tone="warning">The statement rounds cash amounts and commissions. Trade values use the statement’s shares and price with the broker’s configured fees. Existing fee overrides are kept. New rewards and transfers use the statement amounts. Existing reward amounts are protected. Stored transfer amounts and fees are kept when they round to the statement figure.</Notice>
       <div className="row gap-sm">
         <StatCard2 label="New" value={addable.length} />
         <StatCard2 label="Matched" value={matches.length} />
@@ -87,7 +87,6 @@ export function QseStatementTradeReviewContent({ preview, onClose }: { preview: 
       <p>Keep existing values for matched records and import statement values for new records. Use the checkbox on a mismatch to replace the stored values.</p>
       <div className="row gap-sm">
         <StandardButton tone="secondary" disabled={!addable.length} onClick={() => select(addable.map(row => row.index), true)}>Select all new records</StandardButton>
-        <StandardButton tone="secondary" disabled={!matches.length} onClick={() => select(matches.map(row => row.index), true)}>Use statement for all matches</StandardButton>
         <StandardButton tone="secondary" disabled={!matches.length} onClick={() => select(matches.map(row => row.index), false)}>Keep all existing matches</StandardButton>
         <StandardButton tone="secondary" disabled={!selected.size} onClick={() => setSelected(new Set())}>Clear selection</StandardButton>
       </div>
