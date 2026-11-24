@@ -12,11 +12,11 @@ Claim ID: `qse-import-data-integrity`
 
 Both current snapshots were verified. The October audit export in Git history preserved precise reward amounts for 13 records matched by ID; the remaining 13 require older evidence. Corrections were prepared privately. No live rewards were restored. The first containment release makes matched reward amounts read-only in statement import; use Modify for verified corrections. Broader reconciliation and audit work remains outstanding. See [account backup strategy](account-backup-strategy.md).
 
-## Original recovery sequence
+## Recovery and implementation gates
 
-1. **Snapshot first — blocked.** Export the current WealthCrescent localStorage app data and the Firebase account node to private JSON files and confirm both files and their locations. The prior session had no signed-in app tab or authenticated Firebase access. Keep exports and authentication material out of Git. Do not run imports or sync that could overwrite data before the snapshots exist.
-2. **Read-only recovery — pending snapshots.** Inspect Firebase history and backups, localStorage, Git history, and earlier exports. Report each verified exact reward and its source. For unresolved rewards, list date and current rounded amount so the owner can re-enter the exact SMS figures. Do not infer amounts, run destructive migrations, or bulk overwrite data. Recheck the reconciliation residual after verified amounts are restored. Report recovery findings and wait for the owner's explicit approval before implementation.
-3. **Implementation — pending approval after recovery.** Complete the acceptance criteria below and report actual test results.
+1. **Snapshot first — complete.** Both private snapshots were verified. Keep exports and authentication material out of Git. Do not run imports or sync that could overwrite data before the snapshots exist.
+2. **Read-only recovery — partial.** Inspect Firebase history and backups, localStorage, Git history, and earlier exports. Report each verified exact reward and its source. For unresolved rewards, list date and current rounded amount so the owner can re-enter the exact SMS figures. Do not infer amounts, run destructive migrations, or bulk overwrite data. Recheck the reconciliation residual after verified amounts are restored. Report recovery findings and wait for the owner's explicit approval before implementation.
+3. **Broader implementation — pending explicit approval after recovery.** Complete the acceptance criteria below and report actual test results.
 
 ## QSE whole-riyal statement rule
 
@@ -31,4 +31,4 @@ The rounding rule applies specifically to QSE statements from The Group. For a c
 
 ## Required verification
 
-Test consecutive-day identical buys (QIBK, 20 shares at 21.75 on November 11 and 12), three same-day identical fills, a genuine wrong-date suggestion, idempotent re-import, preservation of manual amounts, visible conflicts, and audit entries for create, update, and delete. Verify audit persistence on reload and through backup export and restore. Replay the pre-fix ledger CSV and broker statement XLSX privately and verify the November 12 QIBK buy appears as new. No recovery, code implementation, or regression tests have been performed for this claim.
+Test consecutive-day identical buys (QIBK, 20 shares at 21.75 on November 11 and 12), three same-day identical fills, a genuine wrong-date suggestion, idempotent re-import, preservation of manual amounts, visible conflicts, and audit entries for create, update, and delete. Verify audit persistence on reload and through backup export and restore. Replay the pre-fix ledger CSV and broker statement XLSX privately and verify the November 12 QIBK buy appears as new. See [PR #99](https://github.com/ranamrameez/WealthCrescent/pull/99) for the initial reward containment and its verification. The full regression list and private replay remain open.
