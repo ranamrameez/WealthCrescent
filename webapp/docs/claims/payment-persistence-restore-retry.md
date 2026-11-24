@@ -1,0 +1,1 @@
+Agent 2. Verify that reviewed pending payment commands cannot replay across a completed workbook restore, even when the same account is still signed in. Verify service fixtures and exact-head Actions.
