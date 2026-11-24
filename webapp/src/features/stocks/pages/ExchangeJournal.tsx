@@ -22,9 +22,19 @@ interface JournalReportRow {
   realized: number | undefined;
 }
 
-function JournalBreakdown({ report, by, currency }: {
+function downloadJournalCsv(filename: string, rows: (string | number)[][]) {
+  const url = URL.createObjectURL(new Blob([toCSV(rows)], { type: 'text/csv;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function JournalBreakdown({ report, by, currency, exchange }: {
   report: JournalReportRow[];
   by: 'date' | 'ticker';
+  exchange: JournalProps['exchange'];
   currency: string;
 }) {
   const breakdown = useMemo(() => {
@@ -42,9 +52,17 @@ function JournalBreakdown({ report, by, currency }: {
   }, [report, by]);
   const { rows, controls } = useTablePagination(breakdown);
   const title = by === 'date' ? 'Daily results' : 'Ticker results';
-  return <StandardCard title={title}>
+  const groupHeading = by === 'date' ? 'Trade date' : 'Ticker';
+  const exportBreakdown = () => downloadJournalCsv(
+    `${exchange.toLowerCase()}-trade-journal-${by === 'date' ? 'daily' : 'ticker'}-results.csv`,
+    [
+      [groupHeading, 'Fills', 'Fees', 'Realized P/L', 'Currency'],
+      ...breakdown.map(row => [row.label, row.count, row.fees, row.realized ?? '', currency]),
+    ],
+  );
+  return <StandardCard title={title} actions={[{ label: `Export ${title.toLowerCase()}`, onClick: exportBreakdown }]}>
     <div className="table-scroll"><table aria-label={title}>
-      <thead><tr><th scope="col">{by === 'date' ? 'Trade date' : 'Ticker'}</th><th scope="col">Fills</th><th scope="col">Fees</th><th scope="col">Realized P/L</th></tr></thead>
+      <thead><tr><th scope="col">{groupHeading}</th><th scope="col">Fills</th><th scope="col">Fees</th><th scope="col">Realized P/L</th></tr></thead>
       <tbody>{rows.map(row => <tr key={row.label}>
         <th scope="row">{row.label}</th><td>{fmt(row.count, 0)}</td>
         <td>{fmtMoney(row.fees, currency)}</td>
@@ -72,20 +90,15 @@ export function ExchangeJournal({ exchange, transactions, currency, calcFee, rea
   })), [fills, calcFee, realizedBySellTxId]);
   const report = useMemo(() => selected ? executed.filter(row => row.tx.ticker === selected) : executed, [executed, selected]);
 
-  const exportCsv = (scope: typeof executed, suffix: string) => {
-    const csv = toCSV([
+  const exportCsv = (scope: typeof executed, suffix: string) => downloadJournalCsv(
+    `${exchange.toLowerCase()}-trade-journal-${suffix}.csv`,
+    [
       ['Date', 'Ticker', 'Side', 'Shares', 'Price', 'Fee', 'Realized P/L', 'Currency'],
       ...scope.map(({ tx, fee, realized }) => [
         tx.date, tx.ticker, tx.action, tx.shares, tx.price, fee, realized ?? '', currency,
       ]),
-    ]);
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${exchange.toLowerCase()}-trade-journal-${suffix}.csv`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 0);
-  };
+    ],
+  );
   const { rows, controls } = useTablePagination(report);
 
   return <div className="standard-page">
@@ -120,8 +133,8 @@ export function ExchangeJournal({ exchange, transactions, currency, calcFee, rea
       </>}
     </StandardCard>
     {report.length > 0 && <>
-      <JournalBreakdown report={report} by="date" currency={currency} />
-      <JournalBreakdown report={report} by="ticker" currency={currency} />
+      <JournalBreakdown report={report} by="date" currency={currency} exchange={exchange} />
+      <JournalBreakdown report={report} by="ticker" currency={currency} exchange={exchange} />
     </>}
   </div>;
 }
