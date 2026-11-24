@@ -1,0 +1,1 @@
+Agent 2. Avoid rescanning installment events for every chart month. Preserve cumulative balances across the 1,200-month display boundary, future actuals, and report cutoff. Verify existing regressions plus the truncated range.

@@ -107,18 +107,31 @@ export function reconcileInstallments(obligations: readonly InstallmentObligatio
 }
 
 export function installmentMonthlySummary(report: ReturnType<typeof reconcileInstallments>) {
-  const months = [...report.events.map(row => row.date.slice(0, 7)), report.asOf.slice(0, 7)].sort();
+  const cutoff = report.asOf.slice(0, 7);
   const number = (month: string) => Number(month.slice(0, 4)) * 12 + Number(month.slice(5, 7)) - 1;
-  const first = number(months[0]), last = number(months.at(-1)!);
+  const cutoffMonth = number(cutoff);
+  const first = Math.min(cutoffMonth, number(report.events[0]?.date ?? cutoff));
+  const last = Math.max(cutoffMonth, number(report.events.at(-1)?.date ?? cutoff));
   const start = Math.max(first, last - 1199);
   const rows = [];
+  let cursor = 0, paidToDate = 0, dueToDate = 0;
   for (let index = start; index <= last; index++) {
     const month = `${Math.floor(index / 12).toString().padStart(4, '0')}-${String(index % 12 + 1).padStart(2, '0')}`;
-    const future = month > report.asOf.slice(0, 7);
-    const scheduled = report.events.filter(row => row.kind === 'obligation' && row.date.startsWith(month)).reduce((sum, row) => sum + row.amount, 0);
-    const actual = report.events.filter(row => row.kind !== 'obligation' && !row.future && row.date.startsWith(month)).reduce((sum, row) => sum + row.amount, 0);
-    const paidToDate = report.events.filter(row => row.kind !== 'obligation' && !row.future && row.date.slice(0, 7) <= month).reduce((sum, row) => sum + row.amount, 0);
-    const dueToDate = report.events.filter(row => row.kind === 'obligation' && row.date.slice(0, 7) <= month).reduce((sum, row) => sum + row.amount, 0);
+    const future = index > cutoffMonth;
+    let scheduled = 0, actual = 0;
+    while (cursor < report.events.length) {
+      const event = report.events[cursor];
+      const eventMonth = event.date.slice(0, 7);
+      if (eventMonth > month) break;
+      cursor++;
+      if (event.kind === 'obligation') {
+        dueToDate += event.amount;
+        if (eventMonth === month) scheduled += event.amount;
+      } else if (!event.future) {
+        paidToDate += event.amount;
+        if (eventMonth === month) actual += event.amount;
+      }
+    }
     rows.push({ month, scheduled, actual: future ? null : actual, actualRemaining: future ? null : Math.max(0, report.contractualTotal - paidToDate), scheduledRemaining: Math.max(0, report.contractualTotal - dueToDate) });
   }
   return { rows, truncated: start > first };
