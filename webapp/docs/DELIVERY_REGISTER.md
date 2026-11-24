@@ -8,7 +8,6 @@ Use the [common claim and merge workflow](MULTI_AGENT_WORKFLOW.md). The [follow-
 | UX and parity | `organize-search`, `ux-acceptance`, `audit-ui-ux`, `audit-page-parity` and `trading-acceptance` cover named screens or controls. Use the [shared design references](../../docs/PAGE_TEMPLATE_GUIDE.md). |
 | Financial workflows | `movement-reporting`, `budget-acceptance`, `installment-recovery`, `funding-reversals`, `audit-calculations` and `module-services` cover named functional slices. |
 | Data integration and reliability | `backend-migration` web slices consume the shared API. Coordinate cutover with the [backend register](../../functions/DELIVERY_REGISTER.md). Claim web reliability work under `audit-reliability-performance`. |
-
-| QSE statement import data integrity | [`qse-import-data-integrity`](qse-import-data-integrity.md) is blocked on private snapshots. Recovery is read-only and implementation requires approval after the recovery report. |
+| QSE statement import data integrity | [`qse-import-data-integrity`](qse-import-data-integrity.md) has verified snapshots and partial recovery evidence. Reward protection is merged. Broader implementation still requires explicit approval. |
 
 Publish the PR under the listed claim ID so the central workflow and platform registers point to the same work.
