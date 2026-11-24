@@ -126,3 +126,33 @@ describe('PSX cash-transfer reconciliation', () => {
   });
 
 });
+
+describe('statement amount authority', () => {
+  beforeEach(() => {
+    usePSXWorkbookStore.getState().setWorkbook(createEmptyPSXWorkbook());
+    usePSXWorkbookStore.getState().setActiveBroker(brokerId);
+  });
+
+  it('reconciles a rounded statement to existing precision while applying the statement description', () => {
+    usePSXWorkbookStore.getState().addTransfer(transfer('precise', '2026-11-02', 20000.42));
+    const statement = parsePsxCashStatement([[header, ['2026-11-02', 'Fund transfer', '0', '20,000', '20,000']]]);
+    const review = preparePsxCashTransferReview(statement);
+    expect(review.rows[0].status).toBe('mismatch');
+    expect(review.rows[0].candidates.map(row => row.id)).toEqual(['precise']);
+    applyPsxCashTransfers(review, new Map([[statement[0].sourceId, { action: 'replace', id: 'precise' }]]));
+    expect(usePSXWorkbookStore.getState().workbook.transfers).toMatchObject([
+      { id: 'precise', gross: 20000.42, description: 'Fund transfer' },
+    ]);
+    expect(preparePsxCashTransferReview(statement).rows[0].status).toBe('matched');
+  });
+
+  it('requires the statement figure for a conflict at the displayed precision', () => {
+    usePSXWorkbookStore.getState().addTransfer(transfer('precise', '2026-11-02', 20000.42));
+    const statement = parsePsxCashStatement([[header, ['2026-11-02', 'Fund transfer', '0', '20,000.00', '20,000.00']]]);
+    const review = preparePsxCashTransferReview(statement);
+    expect(() => applyPsxCashTransfers(review, new Map([[statement[0].sourceId, { action: 'keep', id: 'precise' }]])))
+      .toThrow(/Use the statement amounts/);
+    applyPsxCashTransfers(review, new Map([[statement[0].sourceId, { action: 'replace', id: 'precise' }]]));
+    expect(usePSXWorkbookStore.getState().workbook.transfers).toMatchObject([{ id: 'precise', gross: 20000 }]);
+  });
+});
