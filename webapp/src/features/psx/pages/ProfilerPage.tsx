@@ -4,6 +4,7 @@ import { PageHeading } from '../../../components/PageHeading';
 import { StandardCard } from '../../../components/StandardCard';
 import { fmt, fmtMoney } from '../../../lib/format';
 import { TradeCalculator } from '../components/TradeCalculator';
+import { ProfilerFeeBands } from '../components/ProfilerFeeBands';
 import { usePSXDerived } from '../hooks/usePSXDerived';
 
 export function ProfilerPage() {
@@ -19,6 +20,7 @@ export function ProfilerPage() {
       <a href="https://ranamrameez.github.io/Translation-Helper/psx-command-deck.html" target="_blank" rel="noreferrer">Original Profiler reference</a>
     </div>
     <StandardCard title="Trade and break-even calculator"><TradeCalculator /></StandardCard>
+    <ProfilerFeeBands />
     <StandardCard title="Active broker positions">
       <p>Market prices, costs and break-even estimates come from the active PSX broker profile.</p>
       {rows.length === 0 ? <p>No open positions in this broker profile.</p>
