@@ -176,7 +176,7 @@ it('opens the QSE statement picker from the dashboard and returns keyboard focus
   shortcut.focus();
   fireEvent.click(shortcut);
   const dialog = screen.getByRole('dialog', { name: 'Import QSE statement' });
-  expect(within(dialog).getByLabelText('The Group statement (.xlsx or .csv)')).toBeTruthy();
+  expect(within(dialog).getByLabelText('The Group statement (.xlsx, .csv or .pdf)')).toBeTruthy();
   expect(document.activeElement).toBe(dialog);
   fireEvent.keyDown(document, { key: 'Escape' });
   expect(screen.queryByRole('dialog', { name: 'Import QSE statement' })).toBeNull();
