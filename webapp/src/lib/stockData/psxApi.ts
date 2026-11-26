@@ -1,6 +1,6 @@
 import { get, ref, runTransaction, serverTimestamp } from 'firebase/database';
 import { auth, db } from '../firebase/client';
-import { PSX_CACHE_MS, psxCacheKey, validPsxPath } from '../../../../functions/psxDataModel.mjs';
+import { PSX_CACHE_MS, PSX_PRICE_PATH, psxCacheKey, validPsxPath } from '../../../../functions/psxDataModel.mjs';
 export { buildPsxReference } from '../../../../functions/psxDataModel.mjs';
 export type { PsxReference, PsxSector, PsxScreenerRow } from '../../../../functions/psxDataModel.mjs';
 
@@ -14,6 +14,7 @@ const pending = new Map<string, Promise<PsxResponse>>();
 const memory = new Map<string, { at: number; value: PsxResponse }>();
 
 export async function requestPsxDataset(path: string) {
+  if (path === PSX_PRICE_PATH) return;
   if (!db || !auth?.currentUser) throw new Error('Sign in to request this dataset.');
   await runTransaction(ref(db, 'PSX/requests/' + psxCacheKey(path)), current => current ? undefined : { path, requestedAt: serverTimestamp() }, { applyLocally: false });
 }
@@ -37,6 +38,7 @@ export function fetchPsx<T = unknown>(path: string, ttl = PSX_CACHE_MS): Promise
       const snapshot = await get(ref(db, 'PSX/api/' + id));
       const entry = snapshot.val();
       if (!entry?.payload) {
+        if (path === PSX_PRICE_PATH) throw new Error('Shared PSX prices are not available yet.');
         if (auth?.currentUser) await requestPsxDataset(path);
         throw new Error(auth?.currentUser ? 'Dataset requested. It will appear after the next scheduled refresh (up to 15 minutes).' : 'This dataset has not been cached yet. Sign in to request it.');
       }
