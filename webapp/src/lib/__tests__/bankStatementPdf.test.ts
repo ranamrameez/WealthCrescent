@@ -20,7 +20,7 @@ describe('bank text PDF statement', () => {
 
   it('rejects statements without a supported text table', () => {
     expect(() => parseBankPdfStatement([[]])).toThrow(/No supported text/);
-    expect(() => parseBankPdfStatement([['Date Description Amount Balance', '2026-11-01 Transfer 2.00 12.00']])).toThrow(/No supported text/);
+    expect(() => parseBankPdfStatement([['Date Description Amount Balance', '2026-11-01 Transfer 2.00 12.00']])).toThrow(/distinct amount/);
   });
 
   it('rejects ambiguous dates, malformed transactions and missing continuation headers', () => {
@@ -28,4 +28,18 @@ describe('bank text PDF statement', () => {
     expect(() => parseBankPdfStatement([['Date Description Amount', '2026-11-01 Transfer unclear']])).toThrow(/could not be read/);
     expect(() => parseBankPdfStatement([['Date Description Amount', '2026-11-01 Transfer -10.00'], ['2026-11-02 Deposit 20.00']])).toThrow(/missing/);
   });
+});
+
+it('uses positioned amount and balance fields, including when descriptions end in numbers', () => {
+  const header = ['Date', 'Description', 'Amount', 'Balance'].map((text, i) => ({ text, x: i * 100, y: 100 }));
+  const row = [
+    { text: '2026-11-01', x: 0, y: 80 },
+    { text: 'Transfer 867', x: 100, y: 80 },
+    { text: '-123.45', x: 200, y: 80 },
+    { text: '500.00', x: 300, y: 80 },
+  ];
+  expect(parseBankPdfStatement([pdfStatementLines([...header, ...row])])[1])
+    .toEqual(['2026-11-01', 'Transfer 867', '-123.45']);
+  expect(() => parseBankPdfStatement([pdfStatementLines([...header, ...row.filter(chunk => chunk.x !== 200)])]))
+    .toThrow(/distinct amount/);
 });
