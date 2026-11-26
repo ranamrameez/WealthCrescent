@@ -76,13 +76,13 @@ test('price failover keeps missing and newer cached symbols and preserves indivi
 test('secondary cooldown and provider failures leave the previous price cache intact', async () => {
   const { publishPsxPrices } = await import('./psxPriceProviders.js').then(module => module.default);
   const key = psxCacheKey('/prices'), previous = { payload: '{"data":[]}' }, now = Date.now();
-  const db = fakeDb({ ['PSX/api/' + key]: previous, 'PSX/syncStatus': { prices: { retryAfter: now + 120_000 } } });
+  const db = fakeDb({ ['PSX/api/' + key]: previous, 'PSX/syncStatus': { prices: { secondary: { retryAfter: now + 120_000 } } } });
   const skipped = await publishPsxPrices(db, key, undefined, async () => assert.fail('cooldown must skip network'), true);
-  assert.equal(skipped.retryAfter, now + 120_000);
+  assert.equal(skipped.secondary.retryAfter, now + 120_000);
   db.values.delete('PSX/syncStatus');
   const result = await publishPsxPrices(db, key, undefined, async () => new Response('', { status: 429, headers: { 'Retry-After': '180' } }), true);
-  assert.equal(result.status, 429);
-  assert.ok(result.retryAfter >= now + 180_000);
+  assert.equal(result.secondary.status, 429);
+  assert.ok(result.secondary.retryAfter >= now + 180_000);
   assert.equal(db.values.get('PSX/api/' + key), previous);
 });
 
@@ -97,4 +97,21 @@ test('primary screener publishes to the price cache before fallback is needed', 
   const result = JSON.parse(db.values.get('PSX/api/' + psxCacheKey('/prices')).payload);
   assert.equal(result.data[0].price, 100);
   assert.equal(result.meta.source, 'psxdata');
+});
+
+test('PSX Lens fallback preserves the trade date and paginates within its request budget', async () => {
+  const { publishPsxPrices } = await import('./psxPriceProviders.js').then(module => module.default);
+  const db = fakeDb(), key = psxCacheKey('/prices');
+  const calls = [];
+  const state = await publishPsxPrices(db, key, undefined, async url => {
+    calls.push(url);
+    return Response.json({ matches: [{ symbol: calls.length === 1 ? 'OGDC' : 'HBL', price: 100, last_traded: '2026-10-22' }], next_cursor: '500' });
+  }, false, true);
+  assert.equal(calls.length, 2);
+  assert.match(calls[1], /cursor=500$/);
+  assert.equal(state.source, 'psx-lens');
+  assert.equal(state.stale, true);
+  const rows = JSON.parse(db.values.get('PSX/api/' + key).payload).data;
+  assert.equal(rows[0].time, '2026-10-21T19:00:00.000Z');
+  assert.equal(rows[1].symbol, 'HBL');
 });
