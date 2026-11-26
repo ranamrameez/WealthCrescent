@@ -5,6 +5,7 @@ import { StandardCard } from '../../../components/StandardCard';
 import { fmt, fmtMoney } from '../../../lib/format';
 import { TradeCalculator } from '../components/TradeCalculator';
 import { ProfilerFeeBands } from '../components/ProfilerFeeBands';
+import { ProfilerWatchlist } from '../components/ProfilerWatchlist';
 import { usePSXDerived } from '../hooks/usePSXDerived';
 
 export function ProfilerPage() {
@@ -21,6 +22,7 @@ export function ProfilerPage() {
     </div>
     <StandardCard title="Trade and break-even calculator"><TradeCalculator /></StandardCard>
     <ProfilerFeeBands />
+    <ProfilerWatchlist workbook={workbook} positions={rows} />
     <StandardCard title="Active broker positions">
       <p>Market prices, costs and break-even estimates come from the active PSX broker profile.</p>
       {rows.length === 0 ? <p>No open positions in this broker profile.</p>
