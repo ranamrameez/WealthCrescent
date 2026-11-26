@@ -1,3 +1,4 @@
+import { CardPdfImport } from './CardPdfImport';
 import { toCSV } from '../../../lib/csv';
 import { isCardFundedInstallmentLink } from '../../../types/interEntityTransfer';
 import { fulfillManualPlan } from '../../../services/finance/manualPlanPaymentService';
@@ -726,6 +727,7 @@ export function CreditCardDetailPage() {
   // projection and the plan list below.
   const [horizonDays, setHorizonDays] = useState<PlanningHorizonDays>(30);
   const [showTransactionActions, setShowTransactionActions] = useState(false);
+  const [importCardPdf, setImportCardPdf] = useState<string>();
   const [batchEditOpen, setBatchEditOpen] = useState(false);
 
   usePageTopBarRightSlot(card ? (
@@ -885,12 +887,14 @@ export function CreditCardDetailPage() {
           { label: 'Transactions and transfers', onClick: () => setEntryMode('transfer') },
           { label: showTransactionActions ? 'Done modifying' : 'Modify', icon: <EditIcon size={14} />, onClick: () => setShowTransactionActions((value) => !value) },
           { label: 'Batch edit', icon: <ListIcon size={14} />, onClick: () => setBatchEditOpen(true), disabled: !visibleTransactions.length },
+          { label: 'Import PDF statement', onClick: () => setImportCardPdf(card.id) },
           { label: 'Export filtered', onClick: () => exportTransactions(true), disabled: !visibleTransactions.length },
           { label: 'Export all', onClick: () => exportTransactions(false), disabled: !transactions.some(tx => tx.cardId === card.id) },
         ]}
         headerEnd={showTransactionActions ? <IconButton label="Hide modification options" icon={<EditIcon size={13} />} align="right" onClick={() => setShowTransactionActions(false)} /> : undefined}>
         <TransactionsTable card={card} filters={filters} showActions={showTransactionActions} />
       </StandardCard></div>
+      {importCardPdf === card.id && <CardPdfImport card={card} onClose={() => setImportCardPdf(undefined)} />}
       {batchEditOpen && <CreditCardTransactionsBatchEditor card={card} rows={visibleTransactions} onClose={() => setBatchEditOpen(false)} />}
 
       <div id="card-history"><StandardCard title="Monthly history" hue={card.color} defaultOpen={false}>
