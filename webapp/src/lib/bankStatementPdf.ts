@@ -10,10 +10,32 @@ export function pdfStatementLines(chunks: PdfTextChunk[]): string[] {
     if (line && Math.abs(line.y - chunk.y) <= 2) line.chunks.push(chunk);
     else lines.push({ y: chunk.y, chunks: [chunk] });
   }
-  return lines.map(line => line.chunks.sort((a, b) => a.x - b.x).map(chunk => chunk.text.trim()).join(' '));
+  let boundaries: [number, number] | undefined;
+  return lines.map(line => {
+    const ordered = line.chunks.sort((a, b) => a.x - b.x);
+    const text = ordered.map(chunk => chunk.text.trim()).join(' ');
+    if (balanceHeader.test(text)) {
+      const amount = ordered.find(chunk => /^amount$/i.test(chunk.text.trim()));
+      const balance = ordered.find(chunk => /^balance$/i.test(chunk.text.trim()));
+      const description = ordered.find(chunk => /^(description|narration|details)$/i.test(chunk.text.trim()));
+      if (!description || !amount || !balance || description.x >= amount.x || amount.x >= balance.x) {
+        throw new Error('The PDF amount and balance columns could not be separated.');
+      }
+      boundaries = [(description.x + amount.x) / 2, (amount.x + balance.x) / 2];
+      return text;
+    }
+    if (tableHeader.test(text)) boundaries = undefined;
+    if (!boundaries || !datePrefix.test(text)) return text;
+    const [amountStart, balanceStart] = boundaries;
+    const columns: string[][] = [[], [], []];
+    for (const chunk of ordered) columns[chunk.x >= balanceStart ? 2 : chunk.x >= amountStart ? 1 : 0].push(chunk.text.trim());
+    return columns.map(column => column.join(' ')).join('\t');
+  });
 }
 
 const tableHeader = /^date\s+(?:description|narration|details)\s+amount$/i;
+const balanceHeader = /^date\s+(?:description|narration|details)\s+amount\s+balance$/i;
+const balanceAmount = /^[+-]?(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/;
 const datePrefix = /^(\d{4}-\d{2}-\d{2}|\d{1,2}[\s-][a-z]{3}[\s-]\d{4})(?=\s|$)/i;
 const unsupportedDate = /^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}(?=\s|$)/;
 const rowFields = /^\s+(.+?)\s+([+-]?(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?)$/;
@@ -23,9 +45,11 @@ export function parseBankPdfStatement(pages: string[][]): string[][] {
   let foundHeader = false;
   for (const lines of pages) {
     let inTable = false;
+    let hasBalance = false;
     for (const line of lines) {
-      if (tableHeader.test(line)) {
+      if (tableHeader.test(line) || balanceHeader.test(line)) {
         inTable = true;
+        hasBalance = balanceHeader.test(line);
         foundHeader = true;
         continue;
       }
@@ -39,7 +63,12 @@ export function parseBankPdfStatement(pages: string[][]): string[][] {
       const rawDate = datePrefix.exec(line)?.[0];
       if (!rawDate) continue;
       const date = parseDateInput(rawDate.replace(/\s+/g, '-').replace(/^(\d)-/, '0$1-'), 'DD-MMM-YYYY');
-      const fields = rowFields.exec(line.slice(rawDate.length));
+      const columns = line.split('\t');
+      if (hasBalance && (columns.length !== 3 || !balanceAmount.test(columns[1]) || !balanceAmount.test(columns[2]))) {
+        throw new Error('A PDF transaction is missing a distinct amount or running balance.');
+      }
+      const row = hasBalance ? columns[0] + ' ' + columns[1] : line;
+      const fields = rowFields.exec(row.slice(rawDate.length));
       const amount = fields?.[2].replaceAll(',', '');
       if (!date || !fields || !amount || !Number.isFinite(Number(amount)) || Number(amount) === 0) {
         throw new Error('A PDF transaction row could not be read reliably. Export the statement as CSV instead.');
