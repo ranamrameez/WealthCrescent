@@ -23,7 +23,7 @@ it('reviews from the dashboard, saves selected trades, and restores focus', asyn
   const dialog = screen.getByRole('dialog', { name: 'Import QSE statement' });
   const file = new File([], 'fixture.csv');
   Object.defineProperty(file, 'text', { value: async () => 'Date,Type,Count,Unit,Price,Amount\n17/11/2026,Buy,4,GWC,8,-32' });
-  fireEvent.change(within(dialog).getByLabelText('The Group statement (.xlsx or .csv)'), { target: { files: [file] } });
+  fireEvent.change(within(dialog).getByLabelText('The Group statement (.xlsx, .csv or .pdf)'), { target: { files: [file] } });
   const review = await screen.findByRole('dialog', { name: 'Review The Group statement' });
   expect(review).toBe(dialog);
   expect(within(review).getByText('GWCS')).toBeTruthy();
