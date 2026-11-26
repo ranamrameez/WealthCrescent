@@ -1,5 +1,6 @@
 // Shared by the scheduled worker and the web app. No Firebase dependencies.
 export const PSX_API_ORIGIN = 'https://psxdata-api.fastapicloud.dev';
+export const PSX_PRICE_PATH = '/prices';
 export const PSX_CACHE_MS = 15 * 60_000;
 export const PSX_BASE_PATHS = ['/health', '/stocks', '/sectors', '/screener', '/indices', '/debt-market', '/eligible-scrips'];
 
@@ -14,7 +15,7 @@ export function validPsxPath(path) {
     const detail = parts.length === 3 && parts[0] === 'stocks' && symbol.test(parts[1]) && ['quote', 'historical', 'fundamentals'].includes(parts[2]);
     const index = parts.length === 2 && parts[0] === 'indices';
     const sector = parts.length === 3 && parts[0] === 'sectors' && parts[2] === 'stocks';
-    if (!(PSX_BASE_PATHS.includes(url.pathname) || detail || index || sector)) return false;
+    if (!(path === PSX_PRICE_PATH || PSX_BASE_PATHS.includes(url.pathname) || detail || index || sector)) return false;
     for (const [key, value] of url.searchParams) {
       if (url.pathname === '/stocks' && key === 'index' && value.length <= 100) continue;
       if (detail && parts[2] === 'historical' && ['start', 'end'].includes(key) && /^\d{4}-\d{2}-\d{2}$/.test(value) && new Date(value).toISOString().slice(0, 10) === value) continue;
