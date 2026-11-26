@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { DateRangeWidget } from '../../../components/DateRangeWidget';
 import { useUrlTransactionFilters } from '../../../hooks/useUrlTransactionFilters';
 import { BackButton } from '../../../components/BackButton';
@@ -78,7 +78,14 @@ function JournalBreakdown({ report, by, currency, exchange }: {
 export function ExchangeJournal({ exchange, transactions, currency, calcFee, realizedBySellTxId }: JournalProps) {
   const dashboard = exchange === 'PSX' ? '/psx' : '/qse';
   const ledger = exchange === 'PSX' ? '/psx/transactions' : '/transactions';
-  const [ticker, setTicker] = useState('');
+  const [params, setParams] = useSearchParams();
+  const ticker = params.get('ticker') ?? '';
+  const setTicker = (symbol: string) => {
+    const next = new URLSearchParams(params);
+    if (symbol) next.set('ticker', symbol);
+    else next.delete('ticker');
+    setParams(next);
+  };
   const { filters, setFilters } = useUrlTransactionFilters('all');
   const { fromDate, toDate } = filters;
   const fills = useMemo(() => transactions.filter(tx => !tx.isPending)
