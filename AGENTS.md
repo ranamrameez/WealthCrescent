@@ -1,3 +1,7 @@
+# Record user requests as they arrive
+
+Record every material user-requested feature, fix, scope change, and product decision in the relevant project register or feature document during the same turn. Capture the request date, requirements and exceptions, acceptance criteria, and current status. Update the entry with ownership, verification, and PR links as work progresses. Link cross-platform work from the shared register and keep sensitive account data out of the repository.
+
 # Parallel work
 
 Start follow-ups from current `main`. Follow the [delivery task register](webapp/docs/MULTI_AGENT_WORKFLOW.md) to claim one ready group or named task in a scoped PR before editing shared code. Own the claim through development, testing, exact-head GitHub Actions, merge and merge verification. Merge each accepted PR independently of unrelated work. If a genuine blocker remains after recovery attempts, record the blocker and claim status in the PR, finish any independent slice and continue with ready, unowned work.

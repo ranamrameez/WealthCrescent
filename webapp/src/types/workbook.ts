@@ -266,6 +266,7 @@ export interface TradePlan {
 }
 
 export interface PricePoint {
+  provider?: 'psxdata' | 'psx-investors' | 'psx-lens';
   date: string;
   time?: string;
   price: number;

@@ -1,5 +1,7 @@
 # PSX shared market cache
 
+See [PSX market-price recovery](PSX_PRICE_FEED.md) for provider routing, price cache, quotas, and fallback activation.
+
 The web app reads Firebase only. `fetchPsxMarketData` refreshes the provider
 every 15 minutes; page loads never call the third-party API. The worker fetches
 seven market-wide datasets and up to 35 requested detail datasets per run,

@@ -15,10 +15,9 @@ export function useLivePsxSync() {
       if (!usePsxFeed.getState().updatedAt) usePsxFeed.setState({ loading: true });
       try {
         // Shared client handles memory, persisted fallback, and provider-cache freshness.
-        const payload = await fetchPsx('/screener');
+        const payload = await fetchPsx('/prices').catch(() => fetchPsx('/screener'));
         if (disposed) return;
-        const previous = usePsxFeed.getState();
-        const points = previous.updatedAt === payload.meta.timestamp ? previous.points : parsePsxScreener(payload);
+        const points = parsePsxScreener(payload);
         usePsxFeed.setState({ points, error: payload.stale ? 'Showing cached PSX prices; fresh data is unavailable.' : '', loading: false, updatedAt: payload.meta.timestamp });
       } catch (error) {
         if (!disposed) usePsxFeed.setState({ error: error instanceof Error ? error.message : 'PSX prices are unavailable.', loading: false });
