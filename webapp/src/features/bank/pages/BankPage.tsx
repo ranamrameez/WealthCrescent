@@ -1,3 +1,4 @@
+import { readStatementImportFile, STATEMENT_FILE_ACCEPT, STATEMENT_FILE_FORMATS, suggestStatementColumn } from '../../../lib/statementImportFile';
 import { fulfillManualPlan } from '../../../services/finance/manualPlanPaymentService';
 import { saveLegacyBankBudget } from '../../../services/finance/bankService';
 import { bankTransactionMatchesFilters as transactionMatchesFilters } from '../../../services/finance/bankService';
@@ -65,7 +66,7 @@ import { dlBarV, dlDoughnut } from '../../../lib/chartLabels';
 import { applyChartTheme } from '../../../lib/chartSetup';
 import { cssVar, tickerColor } from '../../../lib/cssVar';
 import { chartAlpha } from '../../../lib/chartVisuals';
-import { parseCSV, toCSV } from '../../../lib/csv';
+import { toCSV } from '../../../lib/csv';
 import { formatDate, fmtMoney, parseDateInput } from '../../../lib/format';
 import { dateOnlyMs } from '../../../lib/datetime';
 import { confirmAndDeleteLinkable, hasIndependentInstallmentLinks, propagateLinkedEdit, resolveLinkedEdit } from '../../../lib/linkCascade';
@@ -1428,14 +1429,12 @@ function ImportStatementSection({ account, compact = false }: { account: BankAcc
     const version = ++readVersion.current;
     reset();
     try {
-      const parsed = /\.pdf$/i.test(file.name)
-        ? await (await import('../../../lib/bankStatementPdf')).readBankStatementPdf(file)
-        : parseCSV(await file.text());
+      const parsed = await readStatementImportFile(file);
       if (version !== readVersion.current) return;
       if (parsed.length < 2) return toast('Could not find any data rows in that file.');
       const [head, ...body] = parsed;
       setFileName(file.name); setHeaders(head); setRows(body);
-      setDateCol(head[0] ?? ''); setDescCol(head[1] ?? ''); setAmountCol(head[2] ?? ''); setOpen(true);
+      setDateCol(suggestStatementColumn(head, 'date')); setDescCol(suggestStatementColumn(head, 'description')); setAmountCol(suggestStatementColumn(head, 'amount')); setOpen(true);
     } catch (cause) {
       if (version === readVersion.current) toast(cause instanceof Error ? cause.message : 'Could not read that statement.');
     }
@@ -1453,7 +1452,7 @@ function ImportStatementSection({ account, compact = false }: { account: BankAcc
     const date = parseImportedDate(rawDate);
     const description = (r[colIndex(descCol)] ?? '').trim();
     const amount = Number(r[colIndex(amountCol)] ?? 0) * (flipSign ? -1 : 1);
-    return { index, rawDate, date, description, amount, valid: Boolean(date && description && !Number.isNaN(amount) && amount !== 0) };
+    return { index, rawDate, date, description, amount, valid: Boolean(date && description && Number.isFinite(amount) && amount !== 0) };
   }), [rows, dateCol, descCol, amountCol, flipSign]);
 
   const fingerprint = (t: { date: string; description: string; amount: number }) => t.date + '|' + t.description.trim().toLowerCase().replace(/\s+/g, ' ') + '|' + t.amount.toFixed(8);
@@ -1494,18 +1493,18 @@ function ImportStatementSection({ account, compact = false }: { account: BankAcc
     <div>
       {compact && null}
       {!compact && <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-        <span className="text-muted">Import a CSV or supported text PDF into {accountDisplayName(account)}.</span>
-        <Tooltip text="Choose a CSV or PDF, map its columns, review the import, then confirm. Existing matching transactions are detected by date + description + amount so importing the same statement again does not create duplicates." />
+        <span className="text-muted">Import into {accountDisplayName(account)} from {STATEMENT_FILE_FORMATS}.</span>
+        <Tooltip text="Choose a statement file, map its columns, review the import, then confirm. Existing matching transactions are detected by date + description + amount so importing the same statement again does not create duplicates." />
       </div>}
-      {!compact && <button className="btn secondary" onClick={() => fileInput.current?.click()}>Choose CSV or PDF file</button>}
-      <input ref={fileInput} type="file" accept=".csv,text/csv,.pdf,application/pdf" className="hidden-file-input" onChange={(e) => { const file = e.target.files?.[0]; if (file) onFile(file); e.target.value = ''; }} />
+      {!compact && <button className="btn secondary" onClick={() => fileInput.current?.click()}>Choose statement file</button>}
+      <input ref={fileInput} type="file" accept={STATEMENT_FILE_ACCEPT} aria-label={`Statement file (${STATEMENT_FILE_FORMATS})`} className="hidden-file-input" onChange={(e) => { const file = e.target.files?.[0]; if (file) onFile(file); e.target.value = ''; }} />
 
       {open && (
         <Modal title={`Import statement — ${fileName}`} onClose={reset} width="900px">
           <div className="row gap-sm">
-            <Field label="Date column" width={180}><Select value={dateCol} onChange={(e) => setDateCol(e.target.value)}>{headers.map((h) => <option key={h} value={h}>{h}</option>)}</Select></Field>
-            <Field label="Description column" width={220}><Select value={descCol} onChange={(e) => setDescCol(e.target.value)}>{headers.map((h) => <option key={h} value={h}>{h}</option>)}</Select></Field>
-            <Field label="Amount column" width={180}><Select value={amountCol} onChange={(e) => setAmountCol(e.target.value)}>{headers.map((h) => <option key={h} value={h}>{h}</option>)}</Select></Field>
+            <Field label="Date column" width={180}><Select value={dateCol} onChange={(e) => setDateCol(e.target.value)}><option value="">Select a column</option>{headers.map((h) => <option key={h} value={h}>{h}</option>)}</Select></Field>
+            <Field label="Description column" width={220}><Select value={descCol} onChange={(e) => setDescCol(e.target.value)}><option value="">Select a column</option>{headers.map((h) => <option key={h} value={h}>{h}</option>)}</Select></Field>
+            <Field label="Amount column" width={180}><Select value={amountCol} onChange={(e) => setAmountCol(e.target.value)}><option value="">Select a column</option>{headers.map((h) => <option key={h} value={h}>{h}</option>)}</Select></Field>
             <ToggleChip checked={flipSign} onChange={next => setFlipSign(next)}  label={<>Flip sign</>} />
           </div>
           <div className="grid-auto mt-md" style={gridAutoStyle(150, 8)}>

@@ -9,6 +9,9 @@ import { TimeZoneFields } from './ui/TimeZoneFields';
 import { YesNoChips } from './ui/YesNoChips';
 import { SideFields, useSideCurrency, nextUnpaidEmiMonth } from '../features/transfers/pages/TransferLinksPage';
 import { getLastTransferSource, rememberTransferSource } from '../hooks/useLastTransferSource';
+import { useRepeatTransferReadiness } from '../features/organize/SuggestedLinks';
+import { suggestRepeatBankTransfer } from '../services/finance/repeatBankTransfer';
+import { getCategories } from '../services/finance/categoryService';
 import { CategorySelect } from './CategorySelect';
 import { UNCATEGORIZED_ID } from '../lib/categories';
 import { defaultTimeForDate, defaultTimezoneForCurrency, nowTime } from '../lib/datetime';
@@ -232,6 +235,13 @@ function TxRowFields({
   const bankTransactions = useBankWorkbookStore(s => s.workbook.transactions);
   const cashEntries = useCashWorkbookStore(s => s.workbook.entries);
   const linkRecords = useInterEntityTransfersStore(s => s.workbook.entries);
+  const activeBanks = useBankWorkbookStore(s => s.workbook.settings.accounts);
+  const repeatReadiness = useRepeatTransferReadiness();
+  const repeat = repeatReadiness.ready && !financeLocked && !transferEditing && !row.linked && row.finance.module === 'bank' && row.finance.ref
+    ? suggestRepeatBankTransfer(linkRecords, row.finance.ref, new Set(activeBanks.filter(account => account.isActive !== false).map(account => account.id)))
+    : undefined;
+  const repeatAccount = activeBanks.find(account => account.id === repeat?.otherAccountId);
+
   const otherCurrency = useSideCurrency(row.other);
   const financeCurrency = useSideCurrency(row.finance);
   const currencyMismatch = row.linked && !!otherCurrency && !!financeCurrency && otherCurrency !== financeCurrency;
@@ -415,6 +425,25 @@ function TxRowFields({
       </div>
 
       <div className="transfer-form-group" style={{ alignItems: 'flex-end' }}>
+        {repeat && repeatAccount && <button type="button" className="btn secondary" onClick={() => {
+          const categoryID = repeatReadiness.categoriesReady && !row.categoryTouched && getCategories().some(category => category.id === repeat.categoryID)
+            ? repeat.categoryID ?? row.categoryID
+            : row.categoryID;
+          onChange({
+            ...row,
+            direction: repeat.direction,
+            linked: true,
+            pending: false,
+            other: { module: 'bank', ref: repeatAccount.id, currencyCode: repeatAccount.currencyCode },
+            otherRecord: undefined,
+            toAmount: undefined,
+            toAmountTouched: true,
+            categoryID,
+            rateSource: financeCurrency === repeatAccount.currencyCode ? '' : repeat.rateSource ?? '',
+          });
+        }}>
+          Repeat transfer {repeat.direction === 'out' ? 'to' : 'from'} {repeatAccount.nickname || repeatAccount.name} ({repeatAccount.currencyCode})
+        </button>}
         <Field label="Link to another finance" as="div">
           <YesNoChips
             value={row.linked}
@@ -719,6 +748,9 @@ export function TransactionEntryModal({
         if (side.fee !== undefined && (!Number.isFinite(side.fee) || side.fee < 0)) return toast('Fee must be a non-negative number.');
       }
       if (r.linked) {
+        if (r.toAmountTouched && resolveSideCurrency(r.finance) !== resolveSideCurrency(r.other) && !(Number.isFinite(r.toAmount) && (r.toAmount ?? 0) > 0)) {
+          return toast('Enter the amount received for the cross-currency transfer.');
+        }
         if (linkSideRequiresRef(r.finance) && !r.finance.ref) return toast('Pick the account/entity for the first finance side.');
         if (linkSideRequiresRef(r.other) && !r.other.ref) return toast('Pick the account/entity for the linked finance side.');
         const sameEntity = r.finance.module === r.other.module && !!r.finance.ref && r.finance.ref === r.other.ref;

@@ -11,6 +11,8 @@ import { readSuggestedLinkPreferences, saveSuggestedLinkPreferences, type Sugges
 
 interface Inbox {
   owner?: string;
+  repeatTransferReady: boolean;
+  repeatTransferCategoriesReady: boolean;
   ready: boolean;
   rows: SuggestedLink[];
   autoPopup: boolean;
@@ -23,6 +25,11 @@ interface Inbox {
   reviewed: ReturnType<typeof getReviewedSubscriptionPayments>;
 }
 const InboxContext = createContext<Inbox | null>(null);
+
+export function useRepeatTransferReadiness() {
+  const inbox = useContext(InboxContext);
+  return { ready: inbox?.repeatTransferReady, categoriesReady: inbox?.repeatTransferCategoriesReady };
+}
 
 export function SuggestedLinksProvider({ owner, owners, children }: { owner?: string; owners: SuggestedLinkOwners; children: ReactNode }) {
   const { cash, bank, cards, subscriptions, categories, qse, psx, funds, transfers } = owners;
@@ -63,7 +70,8 @@ export function SuggestedLinksProvider({ owner, owners, children }: { owner?: st
     return () => { clearTimeout(timer); stop(); };
   }, [scan, prefs.popup]);
   const inbox: Inbox = {
-    owner, ready, rows: ready ? rows : [], status,
+    owner, ready, repeatTransferReady: !!owner && bank === owner && transfers === owner,
+    repeatTransferCategoriesReady: !!owner && categories === owner, rows: ready ? rows : [], status,
     reviewed: ready && owner ? getReviewedSubscriptionPayments(owner, owners) : [],
     autoPopup: prefs.popup, open: () => setOpen(true), close: () => setOpen(false),
     setAutoPopup: popup => updatePrefs({ ...prefs, popup }),

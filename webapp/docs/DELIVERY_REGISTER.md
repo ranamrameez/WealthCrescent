@@ -1,3 +1,5 @@
+See [Statement imports and repeat transfers](STATEMENT_IMPORTS.md) for supported formats, module coverage, and follow-up work.
+
 # Web frontend delivery register
 
 Use the [common claim and merge workflow](MULTI_AGENT_WORKFLOW.md). The [follow-up groups](MULTI_AGENT_WORKFLOW.md#follow-up-groups) and [priority audits](MULTI_AGENT_WORKFLOW.md#priority-work-and-app-wide-audits) retain the web task IDs and acceptance criteria.

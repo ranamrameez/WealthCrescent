@@ -5,7 +5,7 @@
  * string cells; the caller decides which column means what (see the
  * "map these columns" import UI — MODULES_PLAN.md explicitly avoids a
  * per-bank-format hardcoded parser). */
-export function parseCSV(text: string): string[][] {
+export function parseCSV(text: string, delimiter = ','): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = '';
@@ -24,7 +24,7 @@ export function parseCSV(text: string): string[][] {
       }
     } else if (c === '"') {
       inQuotes = true;
-    } else if (c === ',') {
+    } else if (c === delimiter) {
       pushField();
     } else if (c === '\r') {
       // ignore, \n (or end) handles the row break
