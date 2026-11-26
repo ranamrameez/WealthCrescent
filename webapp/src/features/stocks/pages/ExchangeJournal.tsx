@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { DateRangeWidget } from '../../../components/DateRangeWidget';
+import { useUrlTransactionFilters } from '../../../hooks/useUrlTransactionFilters';
 import { BackButton } from '../../../components/BackButton';
 import { PageHeading } from '../../../components/PageHeading';
 import { StandardCard } from '../../../components/StandardCard';
@@ -77,6 +79,8 @@ export function ExchangeJournal({ exchange, transactions, currency, calcFee, rea
   const dashboard = exchange === 'PSX' ? '/psx' : '/qse';
   const ledger = exchange === 'PSX' ? '/psx/transactions' : '/transactions';
   const [ticker, setTicker] = useState('');
+  const { filters, setFilters } = useUrlTransactionFilters('all');
+  const { fromDate, toDate } = filters;
   const fills = useMemo(() => transactions.filter(tx => !tx.isPending)
     .sort((a, b) => b.date.localeCompare(a.date)), [transactions]);
   const tickers = useMemo(() => [...new Set(fills.map(tx => tx.ticker))].sort(), [fills]);
@@ -88,7 +92,11 @@ export function ExchangeJournal({ exchange, transactions, currency, calcFee, rea
     fee: calcFee(tx.shares * tx.price, tx.action === 'BUY', { tx, shares: tx.shares }),
     realized: tx.action === 'SELL' && tx.id ? realizedBySellTxId[tx.id]?.netPL : undefined,
   })), [fills, calcFee, realizedBySellTxId]);
-  const report = useMemo(() => selected ? executed.filter(row => row.tx.ticker === selected) : executed, [executed, selected]);
+  const report = useMemo(() => executed.filter(({ tx }) =>
+    (!selected || tx.ticker === selected)
+    && (!fromDate || tx.date >= fromDate)
+    && (!toDate || tx.date <= toDate),
+  ), [executed, selected, fromDate, toDate]);
 
   const exportCsv = (scope: typeof executed, suffix: string) => downloadJournalCsv(
     `${exchange.toLowerCase()}-trade-journal-${suffix}.csv`,
@@ -111,14 +119,19 @@ export function ExchangeJournal({ exchange, transactions, currency, calcFee, rea
     </div>
     <StandardCard title="Executed trades" actions={[
       { label: 'Export all executed trades', disabled: !executed.length, onClick: () => exportCsv(executed, 'all') },
-      ...(selected ? [{ label: 'Export filtered trades', onClick: () => exportCsv(report, selected.replace(/[^a-z0-9.-]/gi, '_')) }] : []),
+      ...(selected || fromDate || toDate ? [{
+        label: 'Export filtered trades',
+        disabled: !report.length,
+        onClick: () => exportCsv(report, selected ? selected.replace(/[^a-z0-9.-]/gi, '_') : 'filtered'),
+      }] : []),
     ]}>
       <p>Uses the active {exchange} broker’s transactions, fees and cost-basis settings.</p>
+      <DateRangeWidget value={filters} onChange={setFilters} />
       <label>Ticker <select value={selected} onChange={event => setTicker(event.target.value)}>
         <option value="">All tickers</option>
         {tickers.map(symbol => <option key={symbol}>{symbol}</option>)}
       </select></label>
-      {report.length === 0 ? <p>No executed trades in this broker profile.</p> : <>
+      {report.length === 0 ? <p>{executed.length ? 'No executed trades match these filters.' : 'No executed trades in this broker profile.'}</p> : <>
         <p>{fmt(report.length, 0)} fills · Fees {fmtMoney(report.reduce((sum, row) => sum + row.fee, 0), currency)}
           {' · '}Realized P/L {fmtMoney(report.reduce((sum, row) => sum + (row.realized ?? 0), 0), currency)}</p>
         <div className="table-scroll"><table aria-label="Executed trades">
