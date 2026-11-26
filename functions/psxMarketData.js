@@ -1,10 +1,12 @@
+const { publishPsxPrices } = require('./psxPriceProviders');
+
 /** Provider access happens only in this scheduled worker, never in page loads. */
 async function refreshPsxMarketData(db, fetcher = fetch, pause = () => new Promise(resolve => setTimeout(resolve, 1200))) {
-  const { PSX_API_ORIGIN, PSX_CACHE_MS, PSX_BASE_PATHS, psxCacheKey, validPsxPath, buildPsxReference } = await import('./psxDataModel.mjs');
+  const { PSX_API_ORIGIN, PSX_PRICE_PATH, PSX_CACHE_MS, PSX_BASE_PATHS, psxCacheKey, validPsxPath, buildPsxReference } = await import('./psxDataModel.mjs');
   const requested = await db.ref('PSX/requests').orderByChild('requestedAt').limitToFirst(35).once('value');
   const jobs = Object.entries(requested.val() || {});
-  for (const [key, job] of jobs) if (!validPsxPath(job?.path) || psxCacheKey(job.path) !== key) await db.ref('PSX/requests/' + key).remove();
-  const paths = [...new Set([...PSX_BASE_PATHS, ...jobs.filter(([key, job]) => validPsxPath(job?.path) && psxCacheKey(job.path) === key).map(([, job]) => job.path)])];
+  for (const [key, job] of jobs) if (!validPsxPath(job?.path) || job.path === PSX_PRICE_PATH || psxCacheKey(job.path) !== key) await db.ref('PSX/requests/' + key).remove();
+  const paths = [...new Set(['/screener', ...PSX_BASE_PATHS, ...jobs.filter(([key, job]) => job?.path !== PSX_PRICE_PATH && validPsxPath(job?.path) && psxCacheKey(job.path) === key).map(([, job]) => job.path)])];
   const fresh = {};
   const failures = [];
   const deadline = Date.now() + 7 * 60_000;
@@ -37,7 +39,8 @@ async function refreshPsxMarketData(db, fetcher = fetch, pause = () => new Promi
     const reference = buildPsxReference(sectors.data, stocks.data, screener.data, sectors.meta.timestamp);
     await db.ref('PSX/reference').set(reference);
   }
-  await db.ref('PSX/syncStatus').set({ checkedAt: new Date().toISOString(), refreshed: Object.keys(fresh).length, failures });
+  const prices = await publishPsxPrices(db, psxCacheKey(PSX_PRICE_PATH), fresh['/screener'], fetcher);
+  await db.ref('PSX/syncStatus').set({ prices, checkedAt: new Date().toISOString(), refreshed: Object.keys(fresh).length, failures });
   if (failures.length) console.warn('PSX refresh failures', failures);
 }
 module.exports = { refreshPsxMarketData };
