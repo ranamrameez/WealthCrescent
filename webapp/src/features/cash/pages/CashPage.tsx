@@ -650,10 +650,14 @@ function ImportTab() {
   const [currencyCode, setCurrencyCode] = useState(defaultCurrency);
   const currencyOptions = useEnabledCurrencies(currencyCode);
 
-  const onFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const parsed = parseCSV(String(reader.result));
+  const statementReadVersion = useRef(0);
+  const onFile = async (file: File) => {
+    const version = ++statementReadVersion.current;
+    setRows([]);
+    try {
+      const pdf = /\.pdf$/i.test(file.name);
+      const parsed = pdf ? await (await import('../../../lib/bankStatementPdf')).readBankStatementPdf(file) : parseCSV(await file.text());
+      if (version !== statementReadVersion.current) return;
       if (parsed.length < 2) {
         toast('Could not find any data rows in that file.');
         return;
@@ -663,10 +667,11 @@ function ImportTab() {
       setHeaders(head);
       setRows(body);
       setDateCol(head[0] ?? '');
-      setAmountCol(head[1] ?? '');
+      setAmountCol(pdf ? 'Amount' : head[1] ?? '');
       setCategoryCol('');
-    };
-    reader.readAsText(file);
+    } catch (cause) {
+      if (version === statementReadVersion.current) toast(cause instanceof Error ? cause.message : 'Could not read that statement.');
+    }
   };
 
   const colIndex = (col: string) => headers.indexOf(col);
@@ -712,7 +717,7 @@ function ImportTab() {
   return (
     <div>
       <p className="text-muted mb-12">
-        Import a CSV export of cash entries. This is a simple "map these columns" tool, not a parser for a
+        Import a CSV or supported PDF of cash entries. This is a simple "map these columns" tool, not a parser for a
         specific spreadsheet format — pick which column is which below. A positive amount is treated as cash in,
         negative as cash out (check "Flip sign" if your export does the opposite). Date values must be in
         YYYY-MM-DD format (e.g. 2026-01-15) — other date formats will sort incorrectly once imported.
@@ -723,11 +728,11 @@ function ImportTab() {
         </Select>
       </Field>
       <div className="mt-sm">
-        <button className="btn secondary" onClick={() => fileInput.current?.click()}>Choose CSV file</button>
+        <button className="btn secondary" onClick={() => fileInput.current?.click()}>Choose CSV or PDF file</button>
         <input
           ref={fileInput}
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,text/csv,.pdf,application/pdf"
           className="hidden-file-input"
           onChange={(e) => {
             const file = e.target.files?.[0];

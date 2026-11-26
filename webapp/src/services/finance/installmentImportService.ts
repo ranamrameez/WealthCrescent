@@ -26,8 +26,9 @@ function budgetReferences(loanId: string, payments: EMIRepayment[]) {
 export interface InstallmentImportWorkbook { dateSystem: '1900' | '1904'; sheets: { name: string; rows: string[][]; rowNumbers?: number[] }[]; }
 export async function readInstallmentImportFile(file: File): Promise<InstallmentImportWorkbook> {
   if (file.size > 10_000_000) throw new Error('File is too large (maximum 10 MB).');
+  if (/\.pdf$/i.test(file.name)) return { dateSystem: '1900' as const, sheets: [{ name: file.name, rows: await (await import('../../lib/statementPdfTable')).readStatementPdfTable(file, 'installment') }] };
   if (/\.csv$/i.test(file.name)) return { dateSystem: '1900' as const, sheets: [{ name: file.name, rows: parseCSV(await file.text()) }] };
-  if (!/\.xlsx$/i.test(file.name)) throw new Error('Choose an XLSX or CSV file.');
+  if (!/\.xlsx$/i.test(file.name)) throw new Error('Choose an XLSX, CSV or PDF file.');
   return readTabularXlsx(new Uint8Array(await file.arrayBuffer()));
 }
 export function previewInstallmentImport(loan: EMILoan, table: string[][], dateSystem: '1900' | '1904', sourceLabel: string, sourceRows?: number[]) {
