@@ -1,3 +1,4 @@
+import { readStatementImportFile, STATEMENT_FILE_ACCEPT } from '../../../lib/statementImportFile';
 import { QseStatementTradeReview } from './QseStatementTradeReview';
 import { prepareQseStatementTradeReview, type QseStatementTradePreview } from '../../../services/finance/qseStatementImportService';
 import type { TableCardDateSort } from '../../../components/tableSortContext';
@@ -16,7 +17,7 @@ import { validBatchDate, prepareBatch } from '../../../components/batchEditModel
 import { CardActionMenu, SummaryChip, type StandardCardAction } from '../../../components/StandardCard';
 import { confirmDialog } from '../../../components/ConfirmDialog';
 import { toast } from '../../../components/Toast';
-import { parseCSV, toCSV } from '../../../lib/csv';
+import { toCSV } from '../../../lib/csv';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { getCurrentUser } from '../../../lib/firebase/useAuthState';
 import { useWorkbookStore } from '../../../store/workbookStore';
@@ -127,9 +128,9 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
       const requestedOwner = getCurrentUser()?.uid;
       const current = recordsFor(kind);
       const brokerId = useWorkbookStore.getState().workbook.activeBrokerId;
-      const xlsx = /\.xlsx$/i.test(file.name);
+      const xlsx = /\.xls[xm]$/i.test(file.name);
       const pdf = /\.pdf$/i.test(file.name);
-      const table = pdf ? await (await import('../../../lib/statementPdfTable')).readStatementPdfTable(file, 'qse') : xlsx ? readStatementXlsx(new Uint8Array(await file.arrayBuffer())) : parseCSV(await file.text());
+      const table = pdf ? await (await import('../../../lib/statementPdfTable')).readStatementPdfTable(file, 'qse') : xlsx ? readStatementXlsx(new Uint8Array(await file.arrayBuffer())) : await readStatementImportFile(file, { preserveHeaders: true });
       const isStatement = pdf || xlsx || table.some(row => row[0]?.trim().toLowerCase() === 'date' && row[1]?.trim().toLowerCase() === 'type' && row[2]?.trim().toLowerCase() === 'count');
       if (isStatement) {
         if (kind !== 'ledger' && kind !== 'transactions') throw new Error('Import The Group statements from Cash ledger or Trade list.');
@@ -138,7 +139,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
         return;
       }
       const [headers, ...data] = table;
-      if (!headers || !data.length) throw new Error('The CSV has no records. Export this table to get the expected column headers.');
+      if (!headers || !data.length) throw new Error('The statement has no records. Export this table to get the expected column headers.');
       const explicitIds = new Set<string>();
       const parsed = data.map((cells, index) => {
         const idColumn = headers.findIndex(header => header.trim().toLowerCase() === 'id');
@@ -219,7 +220,7 @@ export function QseRecordActions({ kind, rows, allRecords, modifying, onModify, 
   ];
   const header = { actions, summary: <SummaryChip label="Filtered" value={rows.length} />, headerEnd: modifying ? <IconButton label="Hide modification options" icon={<XIcon size={13} />} align="right" onClick={onModify} /> : null };
   return <>{render ? render(header) : <div className="section-toolbar">{header.summary}<CardActionMenu actions={actions} /></div>}
-  <input id={inputId} type="file" accept=".csv,.xlsx,.pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void importFile(file); }} />
+  <input id={inputId} type="file" accept={STATEMENT_FILE_ACCEPT} hidden onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void importFile(file); }} />
   {statementReview && <QseStatementTradeReview preview={statementReview} onClose={() => setStatementReview(null)} />}
   {editing && transferEdit && <TransactionEntryModal editTransfer={{ module: 'qse', record: Object.fromEntries(Object.entries(editing.rows[0]).filter(([key]) => key !== 'kind')) as unknown as Transfer }} onClose={closeEditor} />}
   {editing && !transferEdit && <BatchEditGrid title={`${editing.single ? 'Edit' : 'Batch edit'} QSE ${kind}`} description="Use the row arrows in the transaction tables to change the shared same-day sequence. Dates remain unchanged. Linked transfers must be edited individually." rows={editing.rows} columns={columns} getRowId={row => row.id} getRowDate={row => row.date} createRow={editing.single ? undefined : createRow} validateRow={row => validateQseRow(kind, row)} rowReadOnly={editing.single ? undefined : locked} onClose={closeEditor} onSave={async (changes, mutations) => {

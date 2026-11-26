@@ -1,9 +1,9 @@
+import { readStatementImportFile, STATEMENT_FILE_ACCEPT } from '../../../lib/statementImportFile';
 import { useState } from 'react';
 import { Modal } from '../../../components/Modal';
 import { Notice } from '../../../components/Notice';
 import { StandardButton } from '../../../components/standard/Button';
 import { Field, TextInput } from '../../../components/ui/Field';
-import { parseCSV } from '../../../lib/csv';
 import { getCurrentUser } from '../../../lib/firebase/useAuthState';
 import { useEnsureSignedIn } from '../../../lib/firebase/useEnsureSignedIn';
 import { readStatementXlsx } from '../../../lib/theGroupStatement';
@@ -38,11 +38,11 @@ function QuickImportDialog({ onClose }: { onClose: () => void }) {
     const requested = { owner: getCurrentUser()?.uid, brokerId: useWorkbookStore.getState().workbook.activeBrokerId };
     try {
       if (file.size > 10_000_000) throw new Error('Statement is too large (maximum 10 MB).');
-      const table = /\.xlsx$/i.test(file.name)
+      const table = /\.xls[xm]$/i.test(file.name)
         ? readStatementXlsx(new Uint8Array(await file.arrayBuffer()))
         : /\.pdf$/i.test(file.name)
           ? await (await import('../../../lib/statementPdfTable')).readStatementPdfTable(file, 'qse')
-          : parseCSV(await file.text());
+          : await readStatementImportFile(file, { preserveHeaders: true });
       setPreview(await prepareQseStatementTradeReview(table, file.name, tickerNames, requested, ensureSignedIn));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The statement could not be opened.');
@@ -54,8 +54,8 @@ function QuickImportDialog({ onClose }: { onClose: () => void }) {
   return <Modal title={preview ? 'Review The Group statement' : 'Import QSE statement'} onClose={onClose} widthClass={preview ? '60' : undefined} manageFocus>
     {preview ? <QseStatementTradeReviewContent preview={preview} onClose={onClose} /> : <div className="stack-md">
       <p>Import trades, rewards, and cash transfers from The Group into <strong>{brokerName}</strong>.</p>
-      <Field label="The Group statement (.xlsx, .csv or .pdf)">
-        <TextInput type="file" accept=".xlsx,.csv,.pdf" disabled={busy} onChange={event => {
+      <Field label="The Group statement">
+        <TextInput type="file" accept={STATEMENT_FILE_ACCEPT} disabled={busy} onChange={event => {
           const file = event.target.files?.[0];
           event.target.value = '';
           if (file) void reviewFile(file);

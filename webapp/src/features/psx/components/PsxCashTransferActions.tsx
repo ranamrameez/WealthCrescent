@@ -1,3 +1,4 @@
+import { STATEMENT_FILE_ACCEPT } from '../../../lib/statementImportFile';
 import { useRef, useState } from 'react';
 import { Modal } from '../../../components/Modal';
 import { Notice } from '../../../components/Notice';
@@ -160,7 +161,7 @@ export function PsxCashTransferActions({ statementOnly = false, label = 'Import 
 
   return <>
     <div className="row gap-sm justify-end">
-      <input ref={upload} type="file" hidden accept=".html,.htm,.txt,.csv,.xlsx,.pdf"
+      <input ref={upload} type="file" hidden accept={STATEMENT_FILE_ACCEPT}
         onChange={event => {
           const file = event.target.files?.[0];
           event.target.value = '';

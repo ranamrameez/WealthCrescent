@@ -887,7 +887,7 @@ export function CreditCardDetailPage() {
           { label: 'Transactions and transfers', onClick: () => setEntryMode('transfer') },
           { label: showTransactionActions ? 'Done modifying' : 'Modify', icon: <EditIcon size={14} />, onClick: () => setShowTransactionActions((value) => !value) },
           { label: 'Batch edit', icon: <ListIcon size={14} />, onClick: () => setBatchEditOpen(true), disabled: !visibleTransactions.length },
-          { label: 'Import PDF statement', onClick: () => setImportCardPdf(card.id) },
+          { label: 'Import statement', onClick: () => setImportCardPdf(card.id) },
           { label: 'Export filtered', onClick: () => exportTransactions(true), disabled: !visibleTransactions.length },
           { label: 'Export all', onClick: () => exportTransactions(false), disabled: !transactions.some(tx => tx.cardId === card.id) },
         ]}

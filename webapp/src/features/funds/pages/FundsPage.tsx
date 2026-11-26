@@ -1,3 +1,4 @@
+import { readStatementImportFile, STATEMENT_FILE_ACCEPT } from '../../../lib/statementImportFile';
 import { useUrlEntitySelection } from '../../../hooks/useUrlEntitySelection';
 import { RecordRow } from '../../../components/RecordRow';
 import { useDateTableSort } from '../../../hooks/useDateTableSort';
@@ -51,7 +52,6 @@ import { impliedFundNav } from '../../../lib/calc/fundsDailyHistoryImport';
 import {
   buildFundsImportPlan,
   materializeFundsImport,
-  parseFundsSnapshotCSV,
   parseFundsSnapshotRows,
   type FundSnapshotPlanRow,
   type FundSnapshotRow,
@@ -714,7 +714,7 @@ function SnapshotImportSection() {
     try {
       const parsed = /\.pdf$/i.test(file.name)
         ? parseFundsSnapshotRows(await (await import('../../../lib/statementPdfTable')).readStatementPdfTable(file, 'funds'))
-        : parseFundsSnapshotCSV(await file.text());
+        : parseFundsSnapshotRows(await readStatementImportFile(file, { preserveHeaders: true }));
       if (version !== statementReadVersion.current) return;
       if (!parsed.length) {
         toast('No fund rows found — expected a "FundCode" column header.');
@@ -768,7 +768,7 @@ function SnapshotImportSection() {
         <input
           ref={fileInput}
           type="file"
-          accept=".csv,text/csv,.pdf,application/pdf"
+          accept={STATEMENT_FILE_ACCEPT}
           className="hidden-file-input"
           onChange={(e) => {
             const file = e.target.files?.[0];

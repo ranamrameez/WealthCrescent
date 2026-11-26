@@ -44,7 +44,7 @@ function readJson(text: string): string[][] {
   }))];
 }
 
-export async function readStatementImportFile(file: File): Promise<string[][]> {
+export async function readStatementImportFile(file: File, { preserveHeaders = false } = {}): Promise<string[][]> {
   if (file.size > 10_000_000) throw new Error('Statement is too large (maximum 10 MB).');
   const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
   let rows: string[][];
@@ -104,6 +104,7 @@ export async function readStatementImportFile(file: File): Promise<string[][]> {
   if (!header || !body.length) throw new Error('Could not find any data rows in that file.');
   const width = body.reduce((maximum, row) => Math.max(maximum, row.length), header.length);
   if (width > 256 || body.length * width > 500_000) throw new Error('Statement table has too many cells.');
+  if (preserveHeaders) return [header, ...body];
   const labels = Array.from({ length: width }, (_, index) => header[index]?.trim() || `Column ${index + 1}`);
   const used = new Set<string>();
   return [labels.map((label, index) => {
