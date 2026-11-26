@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { expect, it, vi } from 'vitest';
 import { parseCSV } from '../../../lib/csv';
 import type { Transaction } from '../../../types/workbook';
@@ -110,4 +110,31 @@ it('uses inclusive URL trade dates without changing the realized result from the
 
   fireEvent.change(screen.getByRole('combobox', { name: 'Date range' }), { target: { value: 'all' } });
   expect(table.getAllByRole('row')).toHaveLength(4);
+});
+
+it('restores a ticker deep link and clears only the ticker when selecting all tickers', () => {
+  function CurrentSearch() {
+    return <output aria-label="Current search">{useLocation().search}</output>;
+  }
+  const transactions: Transaction[] = [
+    { id: 'a', date: '2026-11-10', ticker: 'OGDC', action: 'BUY', shares: 1, price: 100 },
+    { id: 'b', date: '2026-11-10', ticker: 'HBL', action: 'BUY', shares: 1, price: 90 },
+    { id: 'c', date: '2026-11-09', ticker: 'OGDC', action: 'BUY', shares: 1, price: 95 },
+  ];
+  render(<MemoryRouter initialEntries={['/?period=custom&from=2026-11-10&to=2026-11-10&ticker=OGDC']}>
+    <ExchangeJournal exchange="PSX" transactions={transactions}
+      currency="PKR" calcFee={() => 0} realizedBySellTxId={{}} />
+    <CurrentSearch />
+  </MemoryRouter>);
+
+  const ticker = screen.getByRole<HTMLSelectElement>('combobox', { name: 'Ticker' });
+  const table = within(screen.getByRole('table', { name: 'Executed trades' }));
+  expect(ticker.value).toBe('OGDC');
+  expect(table.getAllByRole('row')).toHaveLength(2);
+  fireEvent.change(ticker, { target: { value: '' } });
+  expect(table.getAllByRole('row')).toHaveLength(3);
+  const search = new URLSearchParams(screen.getByLabelText('Current search').textContent ?? '');
+  expect(search.get('ticker')).toBeNull();
+  expect(search.get('from')).toBe('2026-11-10');
+  expect(search.get('to')).toBe('2026-11-10');
 });
