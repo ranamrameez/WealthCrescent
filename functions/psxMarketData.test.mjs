@@ -52,3 +52,49 @@ test('rate limiting retains the previous reference and stops further provider re
   assert.equal(calls, 1);
   assert.deepEqual(db.values.get('PSX/reference'), previous);
 });
+
+test('price failover keeps missing and newer cached symbols and preserves individual timestamps', async () => {
+  const { publishPsxPrices } = await import('./psxPriceProviders.js').then(module => module.default);
+  const now = Date.now(), key = psxCacheKey('/prices');
+  const prior = { symbol: 'KEEP', price: 51, time: new Date(now - 1000).toISOString(), source: 'psxdata' };
+  const db = fakeDb({ ['PSX/api/' + key]: { payload: JSON.stringify({ data: [prior] }) } });
+  const state = await publishPsxPrices(db, key, undefined, async url => {
+    assert.equal(url, 'https://www.psxinvestors.pk/api/v1/psx-stocks/');
+    return Response.json({ success: true, data: { stocks: [
+      { symbol: 'keep', price: 11, lastUpdated: now - 5000 },
+      { symbol: 'new', price: 20, lastUpdated: Math.floor(now / 1000) - 1 },
+      { symbol: 'bad', price: 0, lastUpdated: now },
+    ] } });
+  }, true);
+  assert.equal(state.source, 'psx-investors');
+  const rows = JSON.parse(db.values.get('PSX/api/' + key).payload).data;
+  assert.deepEqual(rows[0], prior);
+  assert.equal(rows[1].symbol, 'NEW');
+  assert.match(rows[1].time, /Z$/);
+});
+
+test('secondary cooldown and provider failures leave the previous price cache intact', async () => {
+  const { publishPsxPrices } = await import('./psxPriceProviders.js').then(module => module.default);
+  const key = psxCacheKey('/prices'), previous = { payload: '{"data":[]}' }, now = Date.now();
+  const db = fakeDb({ ['PSX/api/' + key]: previous, 'PSX/syncStatus': { prices: { retryAfter: now + 120_000 } } });
+  const skipped = await publishPsxPrices(db, key, undefined, async () => assert.fail('cooldown must skip network'), true);
+  assert.equal(skipped.retryAfter, now + 120_000);
+  db.values.delete('PSX/syncStatus');
+  const result = await publishPsxPrices(db, key, undefined, async () => new Response('', { status: 429, headers: { 'Retry-After': '180' } }), true);
+  assert.equal(result.status, 429);
+  assert.ok(result.retryAfter >= now + 180_000);
+  assert.equal(db.values.get('PSX/api/' + key), previous);
+});
+
+test('primary screener publishes to the price cache before fallback is needed', async () => {
+  const db = fakeDb();
+  await worker.refreshPsxMarketData(db, async url => {
+    const path = new URL(url).pathname;
+    assert.equal(new URL(url).hostname, 'psxdata-api.fastapicloud.dev');
+    if (path !== '/screener') return new Response('', { status: 503 });
+    return Response.json({ data: datasets[path], meta: { timestamp: new Date().toISOString() } });
+  }, async () => {});
+  const result = JSON.parse(db.values.get('PSX/api/' + psxCacheKey('/prices')).payload);
+  assert.equal(result.data[0].price, 100);
+  assert.equal(result.meta.source, 'psxdata');
+});
