@@ -265,3 +265,19 @@ it('does not settle a reviewed payment after a scoped workbook restore finishes 
   expect(mocks.auth.currentUser?.uid).toBe('owner');
   expect(read()).toBe(pending);
 });
+
+it('rejects settlement and void when the pending Cash record loses its explicit outgoing direction', async () => {
+  const read = transactionFor(fixture());
+  await createPendingPayment('owner', cash, date, now);
+  const pending = read() as ReturnType<typeof fixture> & {
+    cash: { entries: { isDeposit?: boolean; type?: string }[] };
+  };
+  const changed = structuredClone(pending);
+  delete changed.cash.entries[0].isDeposit;
+  changed.cash.entries[0].type = 'IN';
+  const reread = transactionFor(changed);
+
+  await expect(settlePendingPayment('owner', cash, date, date, now)).rejects.toThrow('funded record changed');
+  await expect(voidPendingPayment('owner', cash, date, now)).rejects.toThrow('funded record changed');
+  expect(reread()).toEqual(changed);
+});

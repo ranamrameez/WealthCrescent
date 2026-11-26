@@ -1,0 +1,1 @@
+Agent 2. Reject pending Cash settlement and void when the stored ledger direction changed after review. Verify no ledger, plan, or execution history changes. Existing scheduler activation stays out of scope.

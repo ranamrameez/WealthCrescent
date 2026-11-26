@@ -138,7 +138,7 @@ function reviewedRecord<T extends CashEntry | BankTransaction>(
   const record = matches[0];
   if (matches.length !== 1 || record.planLink?.module !== history.module || record.planLink.planId !== history.planId ||
       record.planLink.occurrenceDate !== history.occurrenceDate || !sameSource(record) ||
-      record.isDeposit || record.amount !== amount) {
+      record.isDeposit !== false || record.amount !== amount) {
     throw new Error('The funded record changed. Review it before continuing.');
   }
   return record;
