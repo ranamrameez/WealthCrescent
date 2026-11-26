@@ -87,3 +87,27 @@ it('exports the filtered daily and ticker reports across all pages', async () =>
     vi.unstubAllGlobals();
   }
 });
+
+it('uses inclusive URL trade dates without changing the realized result from the full ledger', () => {
+  const transactions: Transaction[] = [
+    { id: 'buy', date: '2026-11-09', ticker: 'OGDC', action: 'BUY', shares: 3, price: 90 },
+    { id: 'sell', date: '2026-11-10', ticker: 'OGDC', action: 'SELL', shares: 2, price: 100 },
+    { id: 'other', date: '2026-11-11', ticker: 'HBL', action: 'BUY', shares: 1, price: 90 },
+  ];
+  render(<MemoryRouter initialEntries={['/?period=custom&from=2026-11-10&to=2026-11-10']}>
+    <ExchangeJournal exchange="PSX" transactions={transactions}
+      currency="PKR" calcFee={() => 2} realizedBySellTxId={{ sell: { netPL: 25 } }} />
+  </MemoryRouter>);
+
+  const table = within(screen.getByRole('table', { name: 'Executed trades' }));
+  expect(table.getAllByRole('row')).toHaveLength(2);
+  expect(table.getByText(/25\.00/)).toBeTruthy();
+  expect(within(screen.getByRole('table', { name: 'Daily results' })).getAllByRole('row')).toHaveLength(2);
+  const card = screen.getByRole('table', { name: 'Executed trades' }).closest('section')!;
+  fireEvent.click(within(card).getByRole('button', { name: 'Card options' }));
+  expect(within(card).getByRole('button', { name: 'Export filtered trades' }).hasAttribute("disabled")).toBe(false);
+  expect(within(card).getByRole('button', { name: 'Export all executed trades' }).hasAttribute("disabled")).toBe(false);
+
+  fireEvent.change(screen.getByRole('combobox', { name: 'Date range' }), { target: { value: 'all' } });
+  expect(table.getAllByRole('row')).toHaveLength(4);
+});
