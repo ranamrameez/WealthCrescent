@@ -25,6 +25,7 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return undefined
+          if (id.includes('/pdfjs-dist/')) return 'vendor-pdf'
           if (id.includes('firebase')) return 'vendor-firebase'
           if (id.includes('chart.js') || id.includes('react-chartjs-2') || id.includes('chartjs-plugin-datalabels')) return 'vendor-charts'
           if (id.includes('react') || id.includes('zustand')) return 'vendor-react'

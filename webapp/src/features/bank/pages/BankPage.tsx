@@ -1422,16 +1422,23 @@ function ImportStatementSection({ account, compact = false }: { account: BankAcc
 
   const reset = () => { setOpen(false); setFileName(''); setHeaders([]); setRows([]); setDateCol(''); setDescCol(''); setAmountCol(''); setFlipSign(false); };
 
-  const onFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const parsed = parseCSV(String(reader.result));
+  const readVersion = useRef(0);
+  useEffect(() => () => { readVersion.current++; }, [account.id]);
+  const onFile = async (file: File) => {
+    const version = ++readVersion.current;
+    reset();
+    try {
+      const parsed = /\.pdf$/i.test(file.name)
+        ? await (await import('../../../lib/bankStatementPdf')).readBankStatementPdf(file)
+        : parseCSV(await file.text());
+      if (version !== readVersion.current) return;
       if (parsed.length < 2) return toast('Could not find any data rows in that file.');
       const [head, ...body] = parsed;
       setFileName(file.name); setHeaders(head); setRows(body);
       setDateCol(head[0] ?? ''); setDescCol(head[1] ?? ''); setAmountCol(head[2] ?? ''); setOpen(true);
-    };
-    reader.readAsText(file);
+    } catch (cause) {
+      if (version === readVersion.current) toast(cause instanceof Error ? cause.message : 'Could not read that statement.');
+    }
   };
 
   const colIndex = (col: string) => headers.indexOf(col);
@@ -1487,11 +1494,11 @@ function ImportStatementSection({ account, compact = false }: { account: BankAcc
     <div>
       {compact && null}
       {!compact && <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-        <span className="text-muted">Import a CSV export from your bank into {accountDisplayName(account)}.</span>
-        <Tooltip text="Choose a CSV, map its columns, review the import, then confirm. Existing matching transactions are detected by date + description + amount so importing the same statement again does not create duplicates." />
+        <span className="text-muted">Import a CSV or supported text PDF into {accountDisplayName(account)}.</span>
+        <Tooltip text="Choose a CSV or PDF, map its columns, review the import, then confirm. Existing matching transactions are detected by date + description + amount so importing the same statement again does not create duplicates." />
       </div>}
-      {!compact && <button className="btn secondary" onClick={() => fileInput.current?.click()}>Choose CSV file</button>}
-      <input ref={fileInput} type="file" accept=".csv,text/csv" className="hidden-file-input" onChange={(e) => { const file = e.target.files?.[0]; if (file) onFile(file); e.target.value = ''; }} />
+      {!compact && <button className="btn secondary" onClick={() => fileInput.current?.click()}>Choose CSV or PDF file</button>}
+      <input ref={fileInput} type="file" accept=".csv,text/csv,.pdf,application/pdf" className="hidden-file-input" onChange={(e) => { const file = e.target.files?.[0]; if (file) onFile(file); e.target.value = ''; }} />
 
       {open && (
         <Modal title={`Import statement — ${fileName}`} onClose={reset} width="900px">
