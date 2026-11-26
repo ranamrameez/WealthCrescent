@@ -1,3 +1,5 @@
+import { parseDateInput } from '../../../lib/format';
+import { readStatementImportFile, STATEMENT_FILE_ACCEPT, suggestStatementColumn } from '../../../lib/statementImportFile';
 import { useState } from 'react';
 import { Modal } from '../../../components/Modal';
 import { Notice } from '../../../components/Notice';
@@ -18,7 +20,14 @@ const kinds: [CreditCardTransactionKind, string][] = [
 export function CardPdfImport({ card, onClose }: { card: CreditCard; onClose: () => void }) {
   const ensureSignedIn = useEnsureSignedIn();
   const transactions = useCreditCardWorkbookStore(state => state.workbook.transactions);
-  const [rows, setRows] = useState<Entry[]>([]);
+  const [table, setTable] = useState<string[][]>([]);
+  const [mapping, setMapping] = useState({ date: '', description: '', amount: '' });
+  const [columns = [], ...body] = table;
+  const rows: Entry[] = body.map(row => ({
+    date: row[columns.indexOf(mapping.date)]?.trim() ?? '',
+    description: row[columns.indexOf(mapping.description)]?.trim() ?? '',
+    amount: Number(row[columns.indexOf(mapping.amount)] ?? 0),
+  }));
   const [choices, setChoices] = useState<Record<number, CreditCardTransactionKind | ''>>({});
   const [owner, setOwner] = useState<string>();
   const [filename, setFilename] = useState('');
@@ -28,9 +37,11 @@ export function CardPdfImport({ card, onClose }: { card: CreditCard; onClose: ()
   const seen = new Set<string>();
   const report = rows.map((row, index) => {
     const identity = key(row);
-    const disabled = recorded.has(identity) || seen.has(identity);
-    seen.add(identity);
-    return { row, index, disabled };
+    const invalid = !/^\d{4}-\d{2}-\d{2}$/.test(row.date) || !parseDateInput(row.date, 'DD-MMM-YYYY') ||
+      !row.description || !Number.isFinite(row.amount) || row.amount === 0;
+    const disabled = invalid || recorded.has(identity) || seen.has(identity);
+    if (!invalid) seen.add(identity);
+    return { row, index, disabled, invalid };
   });
   const selected = report.filter(row => choices[row.index] && !row.disabled);
   const page = useTablePagination(report);
@@ -38,13 +49,17 @@ export function CardPdfImport({ card, onClose }: { card: CreditCard; onClose: ()
   async function read(file: File) {
     setBusy(true);
     setError('');
-    setRows([]);
+    setTable([]);
     setChoices({});
     const currentOwner = getCurrentUser()?.uid;
     try {
-      const { readBankStatementPdf } = await import('../../../lib/bankStatementPdf');
-      const [, ...table] = await readBankStatementPdf(file);
-      setRows(table.map(([date, description, amount]) => ({ date, description, amount: Number(amount) })));
+      const table = await readStatementImportFile(file);
+      setMapping({
+        date: suggestStatementColumn(table[0], 'date'),
+        description: suggestStatementColumn(table[0], 'description'),
+        amount: suggestStatementColumn(table[0], 'amount'),
+      });
+      setTable(table);
       setFilename(file.name);
       setOwner(currentOwner);
     } catch (cause) {
@@ -82,16 +97,28 @@ export function CardPdfImport({ card, onClose }: { card: CreditCard; onClose: ()
 
   return <Modal title="Import card statement" onClose={onClose} widthClass="60">
     <div className="stack-md">
-      <p>Review the PDF’s original signs and select the type of each transaction to add. Leave refunds and uncertain rows skipped.</p>
-      <Field label="Credit card statement (PDF)"><TextInput type="file" accept=".pdf,application/pdf" disabled={busy}
+      <p>Review the column mapping and original signs. Choose an import type for each transaction to add.</p>
+      <Field label="Credit card statement"><TextInput type="file" accept={STATEMENT_FILE_ACCEPT} disabled={busy}
         onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void read(file); }} /></Field>
       {error && <div role="alert"><Notice tone="danger">{error}</Notice></div>}
       {rows.length > 0 && <>
+        <div className="row">
+          {(['date', 'description', 'amount'] as const).map(field => <Field key={field} label={field[0].toUpperCase() + field.slice(1) + ' column'}>
+            <Select value={mapping[field]} disabled={busy} onChange={event => {
+              const column = event.target.value;
+              setMapping(previous => ({ ...previous, [field]: column }));
+              setChoices({});
+            }}>
+              <option value="">Select a column</option>
+              {columns.map(column => <option key={column} value={column}>{column}</option>)}
+            </Select>
+          </Field>)}
+        </div>
         <div className="table-scroll"><table>
           <thead><tr><th scope="col">Date</th><th scope="col">Description</th><th scope="col">Statement amount ({card.currencyCode})</th><th scope="col">Import as</th></tr></thead>
-          <tbody>{page.rows.map(({ row, index, disabled }) => <tr key={index}>
+          <tbody>{page.rows.map(({ row, index, disabled, invalid }) => <tr key={index}>
             <td>{row.date}</td><td>{row.description}</td><td>{row.amount}</td>
-            <td>{disabled ? 'Matching row already recorded or listed above' : <Select aria-label={`Import type for row ${index + 1}`} disabled={busy} value={choices[index] ?? ''}
+            <td>{invalid ? 'Check the date, description, and amount' : disabled ? 'Matching row already recorded or listed above' : <Select aria-label={`Import type for row ${index + 1}`} disabled={busy} value={choices[index] ?? ''}
               onChange={event => setChoices(previous => ({ ...previous, [index]: event.target.value as CreditCardTransactionKind | '' }))}>
               <option value="">Skip</option>{kinds.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </Select>}</td>

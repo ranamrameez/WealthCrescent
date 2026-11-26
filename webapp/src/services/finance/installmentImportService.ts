@@ -1,7 +1,7 @@
 import { auth } from '../../lib/firebase/client';
 import { CalculationEngine } from '../../lib/calc/CalculationEngine';
 import { todayISODate } from '../../lib/datetime';
-import { parseCSV } from '../../lib/csv';
+import { readStatementImportFile } from '../../lib/statementImportFile';
 import { readTabularXlsx } from '../../lib/tabularXlsx';
 import { useEMIWorkbookStore } from '../../store/emiWorkbookStore';
 import { useInterEntityTransfersStore } from '../../store/interEntityTransfersStore';
@@ -27,9 +27,8 @@ export interface InstallmentImportWorkbook { dateSystem: '1900' | '1904'; sheets
 export async function readInstallmentImportFile(file: File): Promise<InstallmentImportWorkbook> {
   if (file.size > 10_000_000) throw new Error('File is too large (maximum 10 MB).');
   if (/\.pdf$/i.test(file.name)) return { dateSystem: '1900' as const, sheets: [{ name: file.name, rows: await (await import('../../lib/statementPdfTable')).readStatementPdfTable(file, 'installment') }] };
-  if (/\.csv$/i.test(file.name)) return { dateSystem: '1900' as const, sheets: [{ name: file.name, rows: parseCSV(await file.text()) }] };
-  if (!/\.xlsx$/i.test(file.name)) throw new Error('Choose an XLSX, CSV or PDF file.');
-  return readTabularXlsx(new Uint8Array(await file.arrayBuffer()));
+  if (/\.xls[xm]$/i.test(file.name)) return readTabularXlsx(new Uint8Array(await file.arrayBuffer()));
+  return { dateSystem: '1900', sheets: [{ name: file.name, rows: await readStatementImportFile(file, { preserveHeaders: true }) }] };
 }
 export function previewInstallmentImport(loan: EMILoan, table: string[][], dateSystem: '1900' | '1904', sourceLabel: string, sourceRows?: number[]) {
   const parsed = CalculationEngine.installmentLedger.previewInstallmentTable(table, loan.currencyCode, dateSystem, sourceRows);

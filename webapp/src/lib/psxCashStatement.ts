@@ -1,3 +1,4 @@
+import { readStatementImportFile } from './statementImportFile';
 import { parseCSV } from './csv';
 import { readTabularXlsx } from './tabularXlsx';
 import type { Transfer } from '../types/workbook';
@@ -130,12 +131,15 @@ export async function readPsxCashStatement(file: File) {
 export async function readPsxBrokerTables(file: File): Promise<{ tables: string[][][]; dateSystem?: '1900' | '1904' }> {
   if (file.size > 10_000_000) throw new Error('Statement is too large (maximum 10 MB).');
   if (/\.pdf$/i.test(file.name)) return { tables: [await (await import('./statementPdfTable')).readStatementPdfTable(file, 'psx')] };
-  if (/\.xlsx$/i.test(file.name)) {
+  if (/\.xls[xm]$/i.test(file.name)) {
     const { sheets, dateSystem } = readTabularXlsx(new Uint8Array(await file.arrayBuffer()));
     return { tables: sheets.map(sheet => sheet.rows), dateSystem };
   }
+  if (/\.(csv|tsv|json)$/i.test(file.name)) return { tables: [await readStatementImportFile(file, { preserveHeaders: true })] };
   const text = await file.text();
-  if (/\.csv$/i.test(file.name) || !/<table(?:\s|>)/i.test(text)) return { tables: [parseCSV(text)] };
+  if (!/<table(?:\s|>)/i.test(text)) {
+    return { tables: [/\.txt$/i.test(file.name) ? await readStatementImportFile(file, { preserveHeaders: true }) : parseCSV(text)] };
+  }
   // Parse text into an inert syntax tree without invoking browser DOM sinks.
   const { parseFragment } = await import('parse5');
   const fragment = parseFragment(text);

@@ -1,3 +1,4 @@
+import { STATEMENT_FILE_ACCEPT } from '../../../lib/statementImportFile';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Modal } from '../../../components/Modal';
@@ -88,7 +89,7 @@ function AhlOrderImportDialog({ brokerId, close }: { brokerId: string; close: ()
     {preview ? <OrderReview preview={preview} close={close} /> : <div className="stack-md">
       <p>Choose an AHL order-history export containing executed buy and sell fills.</p>
       <Field label="AHL order history (.html, .txt, .csv, .xlsx or .pdf)">
-        <TextInput type="file" accept=".html,.htm,.txt,.csv,.xlsx,.pdf" disabled={busy} onChange={event => {
+        <TextInput type="file" accept={STATEMENT_FILE_ACCEPT} disabled={busy} onChange={event => {
           const file = event.target.files?.[0];
           event.target.value = '';
           if (file) void review(file);

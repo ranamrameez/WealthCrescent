@@ -23,7 +23,7 @@ it('imports only explicitly classified rows, keeps existing records, and imports
   useCreditCardWorkbookStore.getState().setWorkbook({ cards: [card], transactions: [existing] });
   const close = vi.fn();
   render(<CardPdfImport card={card} onClose={close} />);
-  fireEvent.change(screen.getByLabelText('Credit card statement (PDF)'), { target: { files: [new File([], 'statement.pdf')] } });
+  fireEvent.change(screen.getByLabelText('Credit card statement'), { target: { files: [new File([], 'statement.pdf')] } });
 
   const kind = await screen.findByRole('combobox', { name: 'Import type for row 2' });
   expect(screen.queryByRole('combobox', { name: 'Import type for row 1' })).toBeNull();
@@ -34,5 +34,24 @@ it('imports only explicitly classified rows, keeps existing records, and imports
   expect(useCreditCardWorkbookStore.getState().workbook.transactions).toMatchObject([
     existing,
     { cardId: card.id, date: '2026-11-02', kind: 'charge', amount: 20.25, source: 'statement-import' },
+  ]);
+});
+
+it('lets the user map an unrecognized card amount column before classifying a TSV row', async () => {
+  const card = { id: 'tsv-card', name: 'TSV card', currencyCode: 'QAR' } as CreditCard;
+  useCreditCardWorkbookStore.getState().setWorkbook({ cards: [card], transactions: [] });
+  const close = vi.fn();
+  render(<CardPdfImport card={card} onClose={close} />);
+  fireEvent.change(screen.getByLabelText('Credit card statement'), { target: {
+    files: [new File(['Memo\tPosting Date\tCard total\nGroceries\t2026-11-26\t-33.70'], 'card.tsv')],
+  } });
+  const amount = await screen.findByRole('combobox', { name: 'Amount column' });
+  expect(screen.queryByRole('combobox', { name: 'Import type for row 1' })).toBeNull();
+  fireEvent.change(amount, { target: { value: 'Card total' } });
+  fireEvent.change(screen.getByRole('combobox', { name: 'Import type for row 1' }), { target: { value: 'charge' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Import selected (1)' }));
+  await waitFor(() => expect(close).toHaveBeenCalledOnce());
+  expect(useCreditCardWorkbookStore.getState().workbook.transactions).toMatchObject([
+    { cardId: card.id, date: '2026-11-26', description: 'Groceries', amount: 33.70, kind: 'charge' },
   ]);
 });
