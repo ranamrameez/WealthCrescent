@@ -1,3 +1,4 @@
+import { readStatementImportFile, STATEMENT_FILE_ACCEPT, STATEMENT_FILE_FORMATS, suggestStatementColumn } from '../../../lib/statementImportFile';
 import { useUrlEntitySelection } from '../../../hooks/useUrlEntitySelection';
 import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
@@ -41,7 +42,7 @@ import { useLastCurrency } from '../../../hooks/useLastCurrency';
 import { usePrimaryCurrency } from '../../../hooks/usePrimaryCurrency';
 import { ReorderButtons } from '../../../components/ui/ReorderButtons';
 import { dateOnlyMs } from '../../../lib/datetime';
-import { parseCSV, toCSV } from '../../../lib/csv';
+import { toCSV } from '../../../lib/csv';
 import { formatDate, fmtMoney } from '../../../lib/format';
 import { categoryName } from '../../../lib/categories';
 import { confirmAndDeleteLinkable } from '../../../lib/linkCascade';
@@ -504,8 +505,7 @@ function ImportRepaymentsSection({ loan, onClose }: { loan: PersonalLoan; onClos
     const version = ++statementReadVersion.current;
     setRows([]);
     try {
-      const pdf = /\.pdf$/i.test(file.name);
-      const parsed = pdf ? await (await import('../../../lib/bankStatementPdf')).readBankStatementPdf(file) : parseCSV(await file.text());
+      const parsed = await readStatementImportFile(file);
       if (version !== statementReadVersion.current) return;
       if (parsed.length < 2) {
         toast('Could not find any data rows in that file.');
@@ -515,8 +515,8 @@ function ImportRepaymentsSection({ loan, onClose }: { loan: PersonalLoan; onClos
       setFileName(file.name);
       setHeaders(head);
       setRows(body);
-      setDateCol(head[0] ?? '');
-      setAmountCol(pdf ? 'Amount' : head[1] ?? '');
+      setDateCol(suggestStatementColumn(head, 'date'));
+      setAmountCol(suggestStatementColumn(head, 'amount'));
     } catch (cause) {
       if (version === statementReadVersion.current) toast(cause instanceof Error ? cause.message : 'Could not read that statement.');
     }
@@ -534,7 +534,7 @@ function ImportRepaymentsSection({ loan, onClose }: { loan: PersonalLoan; onClos
     if (!(await ensureSignedIn('Sign in to import payments.'))) return;
     const imported: PersonalLoanRepayment[] = rows
       .map(mapRow)
-      .filter((r) => r.date && !Number.isNaN(r.amount) && r.amount !== 0)
+      .filter((r) => r.date && Number.isFinite(r.amount) && r.amount !== 0)
       .map((r) => ({
         id: crypto.randomUUID(),
         loanId: loan.id,
@@ -554,19 +554,17 @@ function ImportRepaymentsSection({ loan, onClose }: { loan: PersonalLoan; onClos
   };
 
   return (
-    <Modal title="Import payments (CSV or PDF)" onClose={onClose} widthClass="50">
+    <Modal title="Import payments" onClose={onClose} widthClass="50">
       <p className="text-muted mb-12">
-        Import a CSV or supported PDF of payments against this loan. This is a simple "map these columns" tool —
-        pick which column is which below; every payment is recorded as a positive amount regardless of
-        the loan's direction. Date values must be in YYYY-MM-DD format (e.g. 2026-01-15) — other date
-        formats will sort incorrectly once imported.
+        Supported files include {STATEMENT_FILE_FORMATS}. Review the suggested columns before importing.
+        Payments are recorded as positive amounts for this loan. Use YYYY-MM-DD for text dates.
       </p>
       <div className="row" style={{ gap: 8, alignItems: 'center' }}>
-        <button className="btn secondary small" onClick={() => fileInput.current?.click()}>Choose CSV or PDF file</button>
+        <button className="btn secondary small" onClick={() => fileInput.current?.click()}>Choose statement file</button>
         <input
           ref={fileInput}
           type="file"
-          accept=".csv,text/csv,.pdf,application/pdf"
+          accept={STATEMENT_FILE_ACCEPT} aria-label={`Statement file (${STATEMENT_FILE_FORMATS})`}
           className="hidden-file-input"
           onChange={(e) => {
             const file = e.target.files?.[0];
@@ -582,11 +580,13 @@ function ImportRepaymentsSection({ loan, onClose }: { loan: PersonalLoan; onClos
           <div className="row gap-sm">
             <Field label="Date column" width={160}>
               <Select value={dateCol} onChange={(e) => setDateCol(e.target.value)}>
+                <option value="">Select a column</option>
                 {headers.map((h) => <option key={h} value={h}>{h}</option>)}
               </Select>
             </Field>
             <Field label="Amount column" width={160}>
               <Select value={amountCol} onChange={(e) => setAmountCol(e.target.value)}>
+                <option value="">Select a column</option>
                 {headers.map((h) => <option key={h} value={h}>{h}</option>)}
               </Select>
             </Field>

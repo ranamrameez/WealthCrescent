@@ -1,3 +1,4 @@
+import { readStatementImportFile, STATEMENT_FILE_ACCEPT, STATEMENT_FILE_FORMATS, suggestStatementColumn } from '../../../lib/statementImportFile';
 import { useTablePagination } from '../../../hooks/useTablePagination';
 import { RecordRow } from '../../../components/RecordRow';
 import { TableCard } from '../../../components/TableCard';
@@ -46,7 +47,7 @@ import { categoryName, RENT_CATEGORY_ID, UNCATEGORIZED_ID } from '../../../lib/c
 import { useCategoryStore } from '../../../store/categoryStore';
 import { netIncomeByProperty, propertyByCategory, propertyMonthlyRollup, propertyNetIncome } from '../../../lib/calc/rentalsModule';
 import { generateLeaseRentPlans, nextPendingBalance, proposeRentCollection } from '../../../lib/calc/rentalPlanning';
-import { parseCSV, toCSV } from '../../../lib/csv';
+import { toCSV } from '../../../lib/csv';
 import { fmtMoney, formatDate } from '../../../lib/format';
 import { RentalTransactionsBatchEditor } from '../../../components/LazyFinanceBatchEditors';
 import { confirmAndDeleteLinkable, createLinkedTransfer, propagateLinkedEdit, resolveLinkedEdit } from '../../../lib/linkCascade';
@@ -927,8 +928,7 @@ function ImportTab() {
     const version = ++statementReadVersion.current;
     setRows([]);
     try {
-      const pdf = /\.pdf$/i.test(file.name);
-      const parsed = pdf ? await (await import('../../../lib/bankStatementPdf')).readBankStatementPdf(file) : parseCSV(await file.text());
+      const parsed = await readStatementImportFile(file);
       if (version !== statementReadVersion.current) return;
       if (parsed.length < 2) {
         toast('Could not find any data rows in that file.');
@@ -938,9 +938,9 @@ function ImportTab() {
       setFileName(file.name);
       setHeaders(head);
       setRows(body);
-      setDateCol(head[0] ?? '');
-      setAmountCol(pdf ? 'Amount' : head[1] ?? '');
-      setCategoryCol('');
+      setDateCol(suggestStatementColumn(head, 'date'));
+      setAmountCol(suggestStatementColumn(head, 'amount'));
+      setCategoryCol(suggestStatementColumn(head, 'category'));
     } catch (cause) {
       if (version === statementReadVersion.current) toast(cause instanceof Error ? cause.message : 'Could not read that statement.');
     }
@@ -964,7 +964,7 @@ function ImportTab() {
     if (!(await ensureSignedIn('Sign in to import entries.'))) return;
     const imported: RentalEntry[] = rows
       .map(mapRow)
-      .filter((r) => r.date && !Number.isNaN(r.amount) && r.amount !== 0)
+      .filter((r) => r.date && Number.isFinite(r.amount) && r.amount !== 0)
       .map((r) => ({
         id: uid(),
         propertyId: property.id,
@@ -990,10 +990,8 @@ function ImportTab() {
   return (
     <div>
       <p className="text-muted mb-12">
-        Import a CSV or supported PDF of rent/expense entries for one property. This is a simple "map these columns" tool —
-        pick which column is which below. A positive amount is treated as rent income, negative as an expense
-        (check "Flip sign" if your export does the opposite). Date values must be in YYYY-MM-DD format
-        (e.g. 2026-01-15) — other date formats will sort incorrectly once imported.
+        Supported files include {STATEMENT_FILE_FORMATS}. Review the suggested columns before importing.
+        Positive amounts are rent income. Negative amounts are expenses. Use YYYY-MM-DD for text dates.
       </p>
       <Field label="Import into property" width={220}>
         <Select value={propertyId} onChange={(e) => setPropertyId(e.target.value)}>
@@ -1001,11 +999,11 @@ function ImportTab() {
         </Select>
       </Field>
       <div className="mt-sm">
-        <button className="btn secondary" onClick={() => fileInput.current?.click()}>Choose CSV or PDF file</button>
+        <button className="btn secondary" onClick={() => fileInput.current?.click()}>Choose statement file</button>
         <input
           ref={fileInput}
           type="file"
-          accept=".csv,text/csv,.pdf,application/pdf"
+          accept={STATEMENT_FILE_ACCEPT} aria-label={`Statement file (${STATEMENT_FILE_FORMATS})`}
           className="hidden-file-input"
           onChange={(e) => {
             const file = e.target.files?.[0];
@@ -1022,11 +1020,13 @@ function ImportTab() {
           <div className="row gap-sm">
             <Field label="Date column" width={160}>
               <Select value={dateCol} onChange={(e) => setDateCol(e.target.value)}>
+                <option value="">Select a column</option>
                 {headers.map((h) => <option key={h} value={h}>{h}</option>)}
               </Select>
             </Field>
             <Field label="Amount column" width={160}>
               <Select value={amountCol} onChange={(e) => setAmountCol(e.target.value)}>
+                <option value="">Select a column</option>
                 {headers.map((h) => <option key={h} value={h}>{h}</option>)}
               </Select>
             </Field>
