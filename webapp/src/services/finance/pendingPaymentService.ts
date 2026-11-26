@@ -95,8 +95,15 @@ export async function createPendingPayment(expectedUid: string, input: PendingPa
       if (execution.module !== reviewed.module || execution.planId !== reviewed.plan.id || execution.occurrenceDate !== occurrenceDate) {
         throw new Error('This occurrence has conflicting execution history. Review it before retrying.');
       }
-      if (!existing || existing.id !== id || !matchesOccurrence(existing)) {
+      if (execution.voidedAt || !existing || existing.id !== id || !matchesOccurrence(existing)) {
         throw new Error('This occurrence has execution history. Review its ledger before retrying.');
+      }
+      if (reviewed.module === 'cash') {
+        const currency = reviewed.plan.currencyCode;
+        reviewedRecord(cashEntries, execution, reviewed.plan.amount, record => record.currencyCode === currency);
+      } else {
+        const accountId = reviewed.plan.accountId;
+        reviewedRecord(bankEntries, execution, reviewed.plan.amount, record => record.accountId === accountId);
       }
       return value;
     }
