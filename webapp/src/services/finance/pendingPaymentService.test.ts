@@ -281,3 +281,28 @@ it('rejects settlement and void when the pending Cash record loses its explicit 
   await expect(voidPendingPayment('owner', cash, date, now)).rejects.toThrow('funded record changed');
   expect(reread()).toEqual(changed);
 });
+
+it.each([
+  { amount: 26 },
+  { currencyCode: 'EUR' },
+  { isDeposit: true },
+])('rejects a creation retry after the pending Cash record changes to %j', async change => {
+  const read = transactionFor(fixture());
+  await createPendingPayment('owner', cash, date, now);
+  const cloud = read() as { cash: { entries: object[] } };
+  const changed = { ...cloud, cash: { ...cloud.cash, entries: [{ ...cloud.cash.entries[0], ...change }] } };
+  const reread = transactionFor(changed);
+  await expect(createPendingPayment('owner', cash, date, now)).rejects.toThrow('funded record changed');
+  expect(reread()).toEqual(changed);
+});
+
+it('rejects creation replay when a voided Cash occurrence has a reappearing ledger record', async () => {
+  const read = transactionFor(fixture());
+  await createPendingPayment('owner', cash, date, now);
+  const pending = read() as { cash: object };
+  await voidPendingPayment('owner', cash, date, now);
+  const changed = { ...read() as object, cash: pending.cash };
+  const reread = transactionFor(changed);
+  await expect(createPendingPayment('owner', cash, date, now)).rejects.toThrow('execution history');
+  expect(reread()).toEqual(changed);
+});
