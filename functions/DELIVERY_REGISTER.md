@@ -12,3 +12,5 @@ Use the [common claim and merge workflow](../webapp/docs/MULTI_AGENT_WORKFLOW.md
 | `audit-data-protection` | Track account separation, retention, deletion, export/restore and private logging across the API and both clients. |
 
 Use [priority work and audits](../webapp/docs/MULTI_AGENT_WORKFLOW.md#priority-work-and-app-wide-audits) for acceptance criteria. Record affected web and Android clients in API PRs. Keep production rollouts compatible with deployed clients and verify their migration before disabling a legacy path.
+
+- [PSX market-price recovery](PSX_PRICE_FEED.md) tracks the backend provider engine and production activation.
