@@ -19,7 +19,7 @@ it('requires preview, review acknowledgement and typed confirmation before repla
   render(<InstallmentImportDialog loan={loan} onClose={onClose} />);
   const file = new File(['fixture'], 'fixture.csv', { type: 'text/csv' });
   Object.defineProperty(file, 'text', { value: async () => 'Payment Desc,Due Month,Scheduled Amount,Payment Date,Paid Installment\nBooking,2024-03-23,200,2024-03-23,200\nRegular,2024-04-10,800,2024-06-04,350' });
-  fireEvent.change(screen.getByLabelText('Installment workbook or CSV'), { target: { files: [file] } });
+  fireEvent.change(screen.getByLabelText('Installment workbook, CSV or PDF'), { target: { files: [file] } });
   fireEvent.click(await screen.findByRole('button', { name: 'Generate reconciliation preview' }));
   const apply = screen.getByRole('button', { name: 'Apply reviewed reconciliation' });
   expect((apply as HTMLButtonElement).disabled).toBe(true);

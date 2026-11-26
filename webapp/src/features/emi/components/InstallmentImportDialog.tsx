@@ -45,7 +45,7 @@ export function InstallmentImportDialog({ loan, onClose }: { loan: EMILoan; onCl
   return <Modal title={`Reconcile ${loan.name}`} onClose={onClose}>
     <div className="stack-lg">
       <Notice>Files are read locally. Choose one worksheet as the source; sheets are never silently combined. Obligations and actual receipts remain separate. Cached summary totals are checked against row totals. This preview does not change app data.</Notice>
-      <Field label="Installment workbook or CSV"><TextInput type="file" accept=".xlsx,.csv" disabled={busy} onChange={event => void read(event.target.files?.[0])} /></Field>
+      <Field label="Installment workbook, CSV or PDF"><TextInput type="file" accept=".xlsx,.csv,.pdf" disabled={busy} onChange={event => void read(event.target.files?.[0])} /></Field>
       {workbook && <div className="row gap-sm"><StandardDropdown label="Source worksheet" value={sheet} isTypeable sections={[{ title: 'Worksheets', items: workbook.sheets.map((item, index) => ({ value: String(index), label: item.name })) }]} onChange={value => { setSheet(value); setPreview(null); setReviewed(false); }} /><button className="btn secondary" disabled={busy} onClick={generate}>Generate reconciliation preview</button></div>}
       {error && <Notice tone="danger">{error}</Notice>}
       {preview && <>

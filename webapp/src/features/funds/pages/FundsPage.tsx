@@ -52,6 +52,7 @@ import {
   buildFundsImportPlan,
   materializeFundsImport,
   parseFundsSnapshotCSV,
+  parseFundsSnapshotRows,
   type FundSnapshotPlanRow,
   type FundSnapshotRow,
 } from '../../../lib/calc/fundsSnapshotImport';
@@ -706,18 +707,24 @@ function SnapshotImportSection() {
     return [...counts.entries()].filter(([, n]) => n > 1).map(([code]) => code);
   }, [rows]);
 
-  const onFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const parsed = parseFundsSnapshotCSV(String(reader.result));
+  const statementReadVersion = useRef(0);
+  const onFile = async (file: File) => {
+    const version = ++statementReadVersion.current;
+    setRows(null);
+    try {
+      const parsed = /\.pdf$/i.test(file.name)
+        ? parseFundsSnapshotRows(await (await import('../../../lib/statementPdfTable')).readStatementPdfTable(file, 'funds'))
+        : parseFundsSnapshotCSV(await file.text());
+      if (version !== statementReadVersion.current) return;
       if (!parsed.length) {
         toast('No fund rows found — expected a "FundCode" column header.');
         return;
       }
       setRows(parsed);
       toast(`Parsed ${parsed.length} fund row(s) — review below before importing.`);
-    };
-    reader.readAsText(file);
+    } catch (cause) {
+      if (version === statementReadVersion.current) toast(cause instanceof Error ? cause.message : 'Could not read that fund statement.');
+    }
   };
 
   const editRow = (i: number, patch: Partial<FundSnapshotRow>) => {
@@ -761,7 +768,7 @@ function SnapshotImportSection() {
         <input
           ref={fileInput}
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,text/csv,.pdf,application/pdf"
           className="hidden-file-input"
           onChange={(e) => {
             const file = e.target.files?.[0];

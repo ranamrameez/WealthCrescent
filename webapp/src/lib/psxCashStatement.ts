@@ -129,6 +129,7 @@ export async function readPsxCashStatement(file: File) {
 
 export async function readPsxBrokerTables(file: File): Promise<{ tables: string[][][]; dateSystem?: '1900' | '1904' }> {
   if (file.size > 10_000_000) throw new Error('Statement is too large (maximum 10 MB).');
+  if (/\.pdf$/i.test(file.name)) return { tables: [await (await import('./statementPdfTable')).readStatementPdfTable(file, 'psx')] };
   if (/\.xlsx$/i.test(file.name)) {
     const { sheets, dateSystem } = readTabularXlsx(new Uint8Array(await file.arrayBuffer()));
     return { tables: sheets.map(sheet => sheet.rows), dateSystem };

@@ -40,7 +40,9 @@ function QuickImportDialog({ onClose }: { onClose: () => void }) {
       if (file.size > 10_000_000) throw new Error('Statement is too large (maximum 10 MB).');
       const table = /\.xlsx$/i.test(file.name)
         ? readStatementXlsx(new Uint8Array(await file.arrayBuffer()))
-        : parseCSV(await file.text());
+        : /\.pdf$/i.test(file.name)
+          ? await (await import('../../../lib/statementPdfTable')).readStatementPdfTable(file, 'qse')
+          : parseCSV(await file.text());
       setPreview(await prepareQseStatementTradeReview(table, file.name, tickerNames, requested, ensureSignedIn));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The statement could not be opened.');
@@ -52,8 +54,8 @@ function QuickImportDialog({ onClose }: { onClose: () => void }) {
   return <Modal title={preview ? 'Review The Group statement' : 'Import QSE statement'} onClose={onClose} widthClass={preview ? '60' : undefined} manageFocus>
     {preview ? <QseStatementTradeReviewContent preview={preview} onClose={onClose} /> : <div className="stack-md">
       <p>Import trades, rewards, and cash transfers from The Group into <strong>{brokerName}</strong>.</p>
-      <Field label="The Group statement (.xlsx or .csv)">
-        <TextInput type="file" accept=".xlsx,.csv" disabled={busy} onChange={event => {
+      <Field label="The Group statement (.xlsx, .csv or .pdf)">
+        <TextInput type="file" accept=".xlsx,.csv,.pdf" disabled={busy} onChange={event => {
           const file = event.target.files?.[0];
           event.target.value = '';
           if (file) void reviewFile(file);

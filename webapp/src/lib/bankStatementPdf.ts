@@ -82,7 +82,7 @@ export function parseBankPdfStatement(pages: string[][]): string[][] {
   return rows;
 }
 
-export async function readBankStatementPdf(file: File): Promise<string[][]> {
+export async function readPdfTextPages(file: File): Promise<PdfTextChunk[][]> {
   if (file.size > 10_000_000) throw new Error('Choose a PDF no larger than 10 MB.');
   const [{ getDocument, GlobalWorkerOptions }, { default: workerUrl }] = await Promise.all([
     import('pdfjs-dist'),
@@ -93,17 +93,21 @@ export async function readBankStatementPdf(file: File): Promise<string[][]> {
   try {
     const pdf = await task.promise;
     if (pdf.numPages > 100) throw new Error('Choose a statement with no more than 100 pages.');
-    const pages: string[][] = [];
+    const pages: PdfTextChunk[][] = [];
     for (let index = 1; index <= pdf.numPages; index++) {
       const page = await pdf.getPage(index);
       const content = await page.getTextContent();
-      pages.push(pdfStatementLines(content.items.flatMap(item =>
+      pages.push(content.items.flatMap(item =>
         'str' in item ? [{ text: item.str, x: item.transform[4], y: item.transform[5] }] : [],
-      )));
+      ));
       page.cleanup();
     }
-    return parseBankPdfStatement(pages);
+    return pages;
   } finally {
     await task.destroy();
   }
+}
+
+export async function readBankStatementPdf(file: File): Promise<string[][]> {
+  return parseBankPdfStatement((await readPdfTextPages(file)).map(pdfStatementLines));
 }

@@ -160,7 +160,7 @@ export function PsxCashTransferActions({ statementOnly = false, label = 'Import 
 
   return <>
     <div className="row gap-sm justify-end">
-      <input ref={upload} type="file" hidden accept=".html,.htm,.txt,.csv,.xlsx"
+      <input ref={upload} type="file" hidden accept=".html,.htm,.txt,.csv,.xlsx,.pdf"
         onChange={event => {
           const file = event.target.files?.[0];
           event.target.value = '';
