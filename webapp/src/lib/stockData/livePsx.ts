@@ -1,7 +1,7 @@
 import type { PSXWorkbook } from '../../types/psxWorkbook';
 import type { PricePoint } from '../../types/workbook';
 
-interface ScreenerRow { symbol?: unknown; price?: unknown; time?: unknown }
+interface ScreenerRow { symbol?: unknown; price?: unknown; time?: unknown; source?: unknown }
 interface ScreenerPayload { data?: unknown; meta?: { timestamp?: unknown } }
 
 export function pakistanDay(time: string): string {
@@ -20,7 +20,8 @@ export function parsePsxScreener(payload: ScreenerPayload, fallbackTime = new Da
     const price = Number(item?.price);
     if (!/^[A-Z0-9][A-Z0-9-]{0,15}$/.test(symbol) || !Number.isFinite(price) || price <= 0) continue;
     const observed = typeof item.time === 'string' && Number.isFinite(Date.parse(item.time)) ? item.time : time;
-    points[symbol] = [{ date: pakistanDay(observed), time: observed, price }];
+    const provider = item.source === 'psx-investors' || item.source === 'psx-lens' ? item.source : 'psxdata';
+    points[symbol] = [{ date: pakistanDay(observed), time: observed, price, provider }];
   }
   return points;
 }
